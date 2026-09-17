@@ -897,11 +897,14 @@ public class MobileWallet internal constructor(
     /**
      * Deletes local wallet material owned by this mobile wallet instance.
      *
+     * Proximity admission is permanently closed and active proximity cleanup is awaited first.
+     * Use a newly opened wallet instance after deletion.
      * Active issuance continuations are invalidated before the key, credential, and DID stores receive
      * store-level remove calls. The wallet then closes and deletes the encrypted local database and deletes
      * the configured database key.
      */
     public suspend fun deleteWallet() {
+        proximityCoordinator.shutdown()
         WalletPresentationHandler.clearPreviews(wallet)
         issuanceSessions.clearSessions()
         keyStore.listKeys().toList().forEach { key ->

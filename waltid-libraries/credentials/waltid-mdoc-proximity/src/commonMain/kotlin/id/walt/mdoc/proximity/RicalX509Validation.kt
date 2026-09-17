@@ -1,13 +1,10 @@
 package id.walt.mdoc.proximity
 
-import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
-import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
-import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.cose.Cose
 import id.walt.cose.verify
 import id.walt.x509.CertificateDer
-import id.walt.x509.validateMdocReaderAuthenticationCertificateChain
+import id.walt.x509.validatedMdocReaderAuthenticationCertificatePath
 import id.walt.x509.validateRicalSignerCertificateChain
 import id.walt.x509.validateRicalSignerCertificateProfile
 import kotlinx.coroutines.CancellationException
@@ -64,58 +61,29 @@ class X509RicalReaderPathValidator(
         val readerChain = reader.certificateChainDer.map { CertificateDer(it.copy()) }
         if (readerChain.isEmpty()) return RicalReaderPathResult.Invalid
         val ricalCertificates = rical.certificateInfos.associateWith { CertificateDer(it.certificateDer.copy()) }
-        val parsedRicalCertificates = ricalCertificates.mapValues { (_, certificate) ->
-            X509CertificateUtil.parseCertificateDerEncoded(ByteString(certificate.bytes.toByteArray()))
-        }
-        val candidates = rical.certificateInfos.filter { info ->
+        // Build to explicit anchors, then retain the highest applicable anchor. A lower
+        // CertificateInfo can itself be an anchor without losing its more specific constraints.
+        val paths = rical.certificateInfos.filter(RicalCertificateInfo::isTrustAnchor).mapNotNull { info ->
             runCatching {
-                validateMdocReaderAuthenticationCertificateChain(
+                validatedMdocReaderAuthenticationCertificatePath(
                     leaf = readerChain.first(),
                     chain = readerChain.drop(1) + ricalCertificates.values,
                     trustAnchors = listOf(ricalCertificates.getValue(info)),
                     now = evaluatedAt,
                 )
-            }.isSuccess
+            }.getOrNull()
+        }.distinct()
+        if (paths.isEmpty()) return RicalReaderPathResult.NoMatch
+        val maximalPaths = paths.filter { path ->
+            paths.none { other -> other.size > path.size && other.take(path.size) == path }
         }
-        val bottomMost = candidates.maxByOrNull { it.depthToRicalAnchor(parsedRicalCertificates) }
-            ?: return RicalReaderPathResult.NoMatch
-
-        val ricalRoots = rical.certificateInfos
-            .filter(RicalCertificateInfo::isTrustAnchor)
-            .map(ricalCertificates::getValue)
-        return if (runCatching {
-                validateMdocReaderAuthenticationCertificateChain(
-                    leaf = readerChain.first(),
-                    chain = readerChain.drop(1) + ricalCertificates.values,
-                    trustAnchors = ricalRoots,
-                    now = evaluatedAt,
-                )
-            }.isSuccess
-        ) {
-            RicalReaderPathResult.Valid(bottomMost)
-        } else {
-            RicalReaderPathResult.Invalid
-        }
+        // Different validated routes are not interchangeable constraint or revocation evidence.
+        val path = maximalPaths.singleOrNull() ?: return RicalReaderPathResult.Invalid
+        val authority = path.drop(1).firstNotNullOfOrNull { certificate ->
+            ricalCertificates.entries.singleOrNull { it.value == certificate }?.key
+        } ?: return RicalReaderPathResult.NoMatch
+        return RicalReaderPathResult.Valid(authority, path.map { ImmutableBytes.of(it.bytes.toByteArray()) })
     }
-}
-
-private fun RicalCertificateInfo.depthToRicalAnchor(
-    all: Map<RicalCertificateInfo, X509Certificate>,
-): Int {
-    var current = this
-    var depth = 0
-    val visited = mutableSetOf<RicalCertificateInfo>()
-    while (visited.add(current) && !current.isTrustAnchor) {
-        val currentCertificate = all.getValue(current)
-        val authorityKeyIdentifier = currentCertificate.data.extensionAuthorityKeyIdentifier?.keyIdentifier
-            ?: break
-        current = all.entries.singleOrNull { (_, candidateCertificate) ->
-            candidateCertificate.data.subjectDnRaw == currentCertificate.data.issuerDnRaw &&
-                candidateCertificate.data.extensionSubjectKeyIdentifier?.keyIdentifier == authorityKeyIdentifier
-        }?.key ?: break
-        depth += 1
-    }
-    return depth
 }
 
 // DIS F.3.2 lists EdDSA at the COSE layer, while mandatory Table F.1 requires the

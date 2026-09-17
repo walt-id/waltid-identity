@@ -135,11 +135,21 @@ Use `ProximityCRLRevocationEvaluator` when the application supplies a complete-C
 ```swift
 let crlStatus = try ProximityCRLRevocationEvaluator(
     issuerCertificatesDER: [readerCA],
-    scope: .readerCertificateAndIssuingAuthorities,
+    scope: .validatedPath,
     fetcher: applicationCRLFetcher
 )
 // Supply crlStatus to ProximityReaderTrustConfiguration(revocationPolicy: .check(crlStatus)).
 ```
+
+The `.validatedPath` scope checks certificates below the selected configured anchor on the
+actual direct or RICAL-validated path. Install it through the configured trust evaluator;
+standalone raw evidence returns indeterminate for this scope. The separately explicit
+`.readerCertificateAndIssuingAuthorities` scope retains terminal-authority status checking.
+
+Set `requiredIACAIssuerCertificateDER` when the application identifies a required IACA direct
+issuer. That exact issuer must be on the validated path and the reader must include the
+conditional non-critical email/URI issuer contact extension. Generic imported CAs do not
+supply that role. Without this context, conditional IACA validation is outside the checked scope.
 
 `ProximityCRLFetcher` receives a Foundation `URL` and byte limit and returns
 `ProximityCRLFetchResult.available(der:)` or `.unavailable`. The application owns timeouts,

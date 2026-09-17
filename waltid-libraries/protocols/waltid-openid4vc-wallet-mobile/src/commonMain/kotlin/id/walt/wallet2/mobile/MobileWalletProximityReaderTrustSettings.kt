@@ -80,7 +80,10 @@ public data class ProximityReaderTrustSettings(
         }
     }
 
-    /** Applies this immutable settings snapshot to one new proximity session. */
+    /**
+     * Applies this settings snapshot, replacing the supplied reader-trust evaluator.
+     * Install application CRL, IACA or custom policy afterward; stored settings do not compose services.
+     */
     public fun applyTo(
         configuration: ProximityConfiguration,
     ): ProximityConfiguration {
@@ -141,8 +144,8 @@ public data class ProximityReaderTrustAnchorPreview(
     public val validFrom: Instant,
     /** End of the certificate validity interval. */
     public val validUntil: Instant,
-    /** Validated certificate profile shown during import review. */
-    public val profile: String = "ISO mdoc Reader CA",
+    /** Certificate type; import checks CA usage and current validity, not an ISO issuing-CA profile. */
+    public val profile: String = "X.509 CA certificate",
 )
 
 /** Display-safe preview of a validated static RICAL provider. */
@@ -262,11 +265,10 @@ public object ProximityReaderTrustSettingsCodec {
         val existingFingerprints = existing.trustAnchors.mapTo(mutableSetOf()) {
             parseCertificate(it.certificateDerBase64Url.decodeBase64Url()).fingerprintSha256Hex
         }
-        val importedFingerprints = mutableSetOf<String>()
         val previews = certificates.mapIndexed { index, certificate ->
             validateReaderCa(certificate, now)
             val fingerprint = certificate.fingerprintSha256Hex
-            require(existingFingerprints.add(fingerprint) && importedFingerprints.add(fingerprint)) {
+            require(existingFingerprints.add(fingerprint)) {
                 "Duplicate Reader CA certificate: $fingerprint"
             }
             certificate.preview(defaultDisplayName(sourceName, certificate, index, certificates.size))
@@ -302,23 +304,21 @@ public object ProximityReaderTrustSettingsCodec {
         val existingFingerprints = existing.trustAnchors.mapTo(mutableSetOf()) {
             parseCertificate(it.certificateDerBase64Url.decodeBase64Url()).fingerprintSha256Hex
         }
-        val readerPreviews = bundle.readerAuthorities.map { anchor ->
+        val readerRecords = bundle.readerAuthorities.map { anchor ->
             require(anchor.name.isNotBlank()) { "Reader authority name must not be blank" }
             val certificate = parseCertificate(anchor.certificateDerBase64Url.decodeBase64Url())
             validateReaderCa(certificate, now)
             require(existingFingerprints.add(certificate.fingerprintSha256Hex)) {
                 "Duplicate Reader CA certificate: ${certificate.fingerprintSha256Hex}"
             }
-            certificate.preview(anchor.name)
-        }
-        val storedAnchors = bundle.readerAuthorities.mapIndexed { index, anchor ->
-            ProximityStoredReaderTrustAnchor(
-                certificateDerBase64Url =
-                    parseCertificate(anchor.certificateDerBase64Url.decodeBase64Url())
-                        .encodedDer.toByteArray().encodeBase64Url(),
-                displayName = readerPreviews[index].displayName,
+            val preview = certificate.preview(anchor.name)
+            preview to ProximityStoredReaderTrustAnchor(
+                certificateDerBase64Url = certificate.encodedDer.toByteArray().encodeBase64Url(),
+                displayName = preview.displayName,
             )
         }
+        val readerPreviews = readerRecords.map { it.first }
+        val storedAnchors = readerRecords.map { it.second }
 
         val providerIds = existing.ricalProviders.mapTo(mutableSetOf()) { it.providerId }
         val ricalPreviews = mutableListOf<ProximityRicalPreview>()

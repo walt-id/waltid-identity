@@ -112,6 +112,12 @@ class ProximityCrlRevocationTest {
     }
 
     @Test
+    fun fetchProviderErrorsAreNotConvertedToStatus() = runTest {
+        val evaluator = newEvaluator(ProximityCrlFetcher { _, _ -> throw AssertionError("provider defect") })
+        assertFailsWith<AssertionError> { evaluator.evaluate(evidence()) }
+    }
+
+    @Test
     fun ambiguousIssuerCertificatesDoNotSelectAnArbitraryPath() = runTest {
         var fetches = 0
         val evaluator = newEvaluator(ProximityCrlFetcher { _, _ ->

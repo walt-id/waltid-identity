@@ -258,7 +258,7 @@ reader's issuer path and application-owned transport:
 ```kotlin
 val applicationRevocationEvaluator = ProximityCrlRevocationEvaluator(
     issuerCertificatesDerBase64Url = listOf(readerCaDerBase64Url),
-    scope = ProximityCrlScope.ReaderCertificateAndIssuingAuthorities,
+    scope = ProximityCrlScope.ValidatedPath,
     fetcher = ProximityCrlFetcher { url, maximumBytes ->
         // Apply application destination, redirect, timeout, and byte-limit policy.
         // Return Available with unpadded Base64URL DER, or Unavailable.
@@ -267,9 +267,13 @@ val applicationRevocationEvaluator = ProximityCrlRevocationEvaluator(
 )
 ```
 
-The evaluator follows signature-linked issuers and fetches applicable HTTP(S)
-distribution points from the checked certificates. Authority scope includes the
-terminal self-signed Reader CA, which must also advertise a distribution point.
+Install this evaluator as `ProximityReaderTrustConfiguration.revocationPolicy =
+ProximityReaderRevocationPolicy.Check(applicationRevocationEvaluator)`. `ValidatedPath`
+checks the reader and non-anchor intermediates on the exact validated direct or RICAL
+path, stopping at its selected configured anchor. Calling this scope with raw evidence
+alone returns `Indeterminate`. The explicit `ReaderCertificateAndIssuingAuthorities`
+policy retains additional status checking through the terminal self-signed authority;
+that authority must advertise an applicable distribution point.
 A current, authenticated complete CRL must cover every checked certificate;
 verified revocation of either the reader or an authority prevents disclosure.
 The issuer list supplies path material and does not add trust anchors.
@@ -282,6 +286,20 @@ never becomes `Good`. The SDK performs no implicit fetch and keeps no cache
 between evaluations. The default revocation policy remains `NotChecked`; demo
 trust settings do not configure a CRL client. OCSP needs a separate request and
 signed-response verifier and is not implemented by this evaluator.
+
+For IACA-issued readers, set `requiredIacaIssuerCertificateDerBase64Url` in the trust
+configuration to the application-identified direct issuer. The validated path must contain
+that exact direct issuer, and the reader must carry non-critical issuerAlternativeName with
+an email/URI contact. A self-signed or imported generic CA does not establish the IACA role.
+Without this context, validation covers the unconditional reader fields; do not claim the
+conditional IACA profile has been checked.
+
+Configuration snapshots detach collection data while retaining provider/evaluator service
+references. Providers and revocation sources are queried at evaluation time. Persisted
+settings decoding checks structure; import checks current CA usage and RICAL material;
+session evaluation establishes current trust. `applyTo` replaces the supplied trust evaluator,
+so applications needing CRL/IACA/custom policy must configure that evaluator after applying
+holder-managed settings. Imports do not add network services or infer issuer roles.
 
 Wallet applications that let holders manage this policy can persist a canonical
 `ProximityReaderTrustSettings` snapshot. Use

@@ -6,6 +6,7 @@ import id.walt.certificate.x509.extension.CrlDistributionPointsExtension.Compani
 import id.walt.certificate.x509.model.GeneralName
 import id.walt.certificate.x509.revocation.CertificateRevocationListVerifier
 import id.walt.certificate.x509.revocation.CrlCertificateStatus
+import id.walt.x509.CertificateDer
 import io.ktor.http.Url
 import kotlinx.coroutines.CancellationException
 import kotlinx.io.bytestring.ByteString
@@ -17,6 +18,9 @@ import kotlin.time.Instant
 public enum class ProximityCrlScope {
     /** Check the reader certificate against its direct issuer's CRL. */
     ReaderCertificate,
+
+    /** Check the validated path below its configured anchor; use with the configured trust evaluator. */
+    ValidatedPath,
 
     /** Also check issuing authorities, including the terminal self-signed authority. */
     ReaderCertificateAndIssuingAuthorities,
@@ -49,8 +53,13 @@ public fun interface ProximityCrlFetcher {
  *
  * [issuerCertificatesDerBase64Url] supplies the public issuer certificates needed to follow the
  * authenticated reader chain. They are lookup material and do not establish trust. With authority
- * checking selected, provide the path through its terminal self-signed authority; each checked
+ * checking selected via [ProximityCrlScope.ReaderCertificateAndIssuingAuthorities], provide
+ * the path through its terminal self-signed authority; each checked
  * certificate must have an applicable HTTP(S) CRL distribution point.
+ *
+ * [ProximityCrlScope.ValidatedPath] requires [ProximityConfiguredReaderTrustEvaluator], which supplies
+ * the exact validated path and selected anchor. The anchor itself is excluded from that scope.
+ * Raw-evidence calls for this scope return indeterminate and perform no fetch.
  *
  * The SDK verifies complete direct v2 CRLs, including CA revocation, with ECDSA/RSA PKCS#1 and
  * SHA-256/384/512. Unsupported CRL forms, absent status, invalid signatures and stale responses
@@ -81,10 +90,38 @@ public class ProximityCrlRevocationEvaluator internal constructor(
 
     override suspend fun evaluate(
         evidence: ProximityReaderEvidence,
+    ): ProximityCertificateRevocationResult = evaluatePath(evidence, null)
+
+    internal suspend fun evaluateValidatedPath(
+        evidence: ProximityReaderEvidence,
+        path: List<CertificateDer>,
+    ): ProximityCertificateRevocationResult = evaluatePath(evidence, path)
+
+    private suspend fun evaluatePath(
+        evidence: ProximityReaderEvidence,
+        validatedPath: List<CertificateDer>?,
     ): ProximityCertificateRevocationResult = try {
         require(evidence.certificateChainDerBase64Url.size in 1..MAX_CHAIN_LENGTH)
         val supplied = evidence.certificateChainDerBase64Url.toList().map(::parseCrlCertificate)
-        val path = resolvePath(supplied.first(), (supplied + issuers).distinctBy { it.encodedDer })
+        val available = (supplied + issuers).distinctBy { it.encodedDer }
+        val path = if (validatedPath != null) {
+            require(validatedPath.size in 2..MAX_CHAIN_LENGTH)
+            val validated = validatedPath.map { X509CertificateUtil.parseCertificateDerEncoded(it.bytes) }
+            require(validated.first().encodedDer == supplied.first().encodedDer)
+            val pairs = validated.zipWithNext()
+            when (scope) {
+                ProximityCrlScope.ReaderCertificate -> CrlPath(pairs.take(1), true)
+                ProximityCrlScope.ValidatedPath -> CrlPath(pairs, true)
+                ProximityCrlScope.ReaderCertificateAndIssuingAuthorities -> {
+                    val terminal = resolvePath(validated.last(), (available + validated).distinctBy { it.encodedDer })
+                    CrlPath(pairs + terminal.pairs, terminal.complete)
+                }
+            }
+        } else {
+            // Raw reader evidence is not a validated trust boundary.
+            if (scope == ProximityCrlScope.ValidatedPath) return indeterminate()
+            resolvePath(supplied.first(), available)
+        }
         val fetched = mutableMapOf<String, ByteString?>()
         val verified = mutableListOf<Pair<X509Certificate, List<CrlCertificateStatus.Good>>>()
         for ((index, pair) in path.pairs.withIndex()) {
@@ -113,7 +150,10 @@ public class ProximityCrlRevocationEvaluator internal constructor(
         else indeterminate()
     } catch (cancelled: CancellationException) {
         throw cancelled
-    } catch (_: Throwable) {
+    } catch (_: NotImplementedError) {
+        // Platform ASN.1 adapters can report unsupported input this way.
+        indeterminate()
+    } catch (_: Exception) {
         indeterminate()
     }
 
@@ -127,7 +167,7 @@ public class ProximityCrlRevocationEvaluator internal constructor(
         }
     } catch (cancelled: CancellationException) {
         throw cancelled
-    } catch (_: Throwable) {
+    } catch (_: Exception) {
         null
     }
 
@@ -145,7 +185,7 @@ public class ProximityCrlRevocationEvaluator internal constructor(
                     )
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (_: Throwable) {
+                } catch (_: Exception) {
                     false
                 }
                 if (valid) candidates += issuer
@@ -186,8 +226,10 @@ public class ProximityCrlRevocationEvaluator internal constructor(
         fun parseCrlCertificate(encoded: String): X509Certificate = try {
             require(encoded.length in 1..87_382)
             X509CertificateUtil.parseCertificateDerEncoded(ByteString(crlBase64.decode(encoded)))
-        } catch (error: Throwable) {
-            // Some platform ASN.1 parsers throw outside Exception; keep Swift construction recoverable.
+        } catch (error: NotImplementedError) {
+            // Preserve recoverable Swift construction for unsupported ASN.1 input only.
+            throw IllegalArgumentException("Unsupported CRL issuer certificate", error)
+        } catch (error: Exception) {
             throw IllegalArgumentException("Invalid CRL issuer certificate", error)
         }
 

@@ -465,7 +465,7 @@ public final class ProximityConfiguredReaderTrustEvaluator:
 /// transport/cache policy. Lookup certificates do not establish trust. Unsupported CRL forms and
 /// unavailable status remain indeterminate; verified revocation prevents disclosure.
 public final class ProximityCRLRevocationEvaluator: ProximityReaderRevocationEvaluator, @unchecked Sendable {
-    private let evaluator: WalletCore.ProximityCrlRevocationEvaluator
+    fileprivate let evaluator: WalletCore.ProximityCrlRevocationEvaluator
 
     /// Creates an explicit CRL evaluator for a reader revocation policy.
     /// - Parameters:
@@ -482,10 +482,16 @@ public final class ProximityCRLRevocationEvaluator: ProximityReaderRevocationEva
               issuerCertificatesDER.allSatisfy({ !$0.isEmpty && $0.count <= 65_536 }) else {
             throw WalletError.invalidInput("CRL issuer certificates exceed the supported bounds.")
         }
+        let kmpScope: WalletCore.ProximityCrlScope
+        switch scope {
+        case .readerCertificate: kmpScope = .readerCertificate
+        case .validatedPath: kmpScope = .validatedPath
+        case .readerCertificateAndIssuingAuthorities: kmpScope = .readerCertificateAndIssuingAuthorities
+        }
         do {
             evaluator = try WalletCore.ProximityCrlRevocationEvaluator(
                 issuerCertificatesDerBase64Url: issuerCertificatesDER.map { $0.base64URLEncodedString() },
-                scope: scope == .readerCertificate ? .readerCertificate : .readerCertificateAndIssuingAuthorities,
+                scope: kmpScope,
                 fetcher: KMPProximityCRLFetcherAdapter(fetcher)
             )
         } catch {
@@ -668,7 +674,8 @@ private extension ProximityReaderTrustConfiguration {
                     }
                 )
             },
-            revocationPolicy: revocationPolicy.toKMPPolicy()
+            revocationPolicy: revocationPolicy.toKMPPolicy(),
+            requiredIacaIssuerCertificateDerBase64Url: requiredIACAIssuerCertificateDER?.base64URLEncodedString()
         )
     }
 }
@@ -693,7 +700,8 @@ private extension ProximityReaderRevocationPolicy {
             return WalletCore.ProximityReaderRevocationPolicyNotChecked.shared
         case let .check(evaluator):
             return WalletCore.ProximityReaderRevocationPolicyCheck(
-                evaluator: KMPProximityReaderRevocationEvaluatorAdapter(evaluator)
+                evaluator: (evaluator as? ProximityCRLRevocationEvaluator)?.evaluator
+                    ?? KMPProximityReaderRevocationEvaluatorAdapter(evaluator)
             )
         }
     }
