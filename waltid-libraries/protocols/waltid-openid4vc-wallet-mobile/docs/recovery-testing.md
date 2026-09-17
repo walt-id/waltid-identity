@@ -40,9 +40,9 @@ count as completion. After launch acknowledgment, the runner matches the logged
 PID to the launched process and collects the result. It then releases that
 specific host through a per-launch file; the host exits itself, and the runner
 verifies that the process is gone before accepting the phase. An early exit
-without completion fails, preserving the Kotlin diagnostics. Launch and test
-execution share a 180-second deadline; setup, exit verification and forced cleanup
-of incomplete live hosts have separate 30-second limits. A timeout fails the phase without retrying it, and preserves
+without completion fails, preserving the Kotlin diagnostics. Container discovery,
+launch and test execution share a 180-second deadline; exit verification and forced
+cleanup of incomplete live hosts have separate 30-second limits. A timeout fails the phase without retrying it, and preserves
 available command output and the host log. The runner uses Android SDK
 tools or Xcode’s `xcrun simctl` for installation and launch. These are test
 hosts, not distributable demo apps.

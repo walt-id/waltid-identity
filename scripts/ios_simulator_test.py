@@ -29,16 +29,20 @@ def run_test(device, arguments, timeout=180):
     if device in ("booted", "all"):
         raise ValueError("Select an exact simulator UDID")
     run = str(uuid.uuid4())
-    container = Path(simctl("get_app_container", device, PACKAGE, "data").strip())
-    log = container / "Documents" / (run + ".log")
+    # Container discovery also waits on CoreSimulator during a cold boot. Give
+    # discovery, launch and test execution one budget, without resetting it.
     deadline = time.monotonic() + timeout
+    container = Path(simctl("get_app_container", device, PACKAGE, "data", timeout=timeout).strip())
+    log = container / "Documents" / (run + ".log")
+    launch_timeout = deadline - time.monotonic()
+    if launch_timeout <= 0:
+        raise RuntimeError(f"Recovery host exhausted its {timeout:g}-second budget during container discovery")
     launch = ""
     failure = None
     stopped = False
     try:
-        # Launch is part of the phase budget, not a separate short command timeout.
         launch = simctl("launch", "--terminate-running-process", device, PACKAGE, *arguments,
-                        env=dict(os.environ, SIMCTL_CHILD_RECOVERY_HOST_RUN=run), timeout=timeout)
+                        env=dict(os.environ, SIMCTL_CHILD_RECOVERY_HOST_RUN=run), timeout=launch_timeout)
         launched = re.search(r"^" + re.escape(PACKAGE) + r": (\d+)\s*$", launch, re.MULTILINE)
         if not launched or int(launched[1]) <= 1:
             raise RuntimeError("Simulator did not acknowledge a recovery host PID")
@@ -64,7 +68,7 @@ def run_test(device, arguments, timeout=180):
                 failure = "Recovery host exited without reporting completion"
                 break
             if time.monotonic() >= deadline:
-                failure = f"Recovery host did not report completion within {timeout:g} seconds (including launch)"
+                failure = f"Recovery host did not report completion within {timeout:g} seconds (including container discovery and launch)"
                 break
             time.sleep(0.25)
     except (RuntimeError, OSError) as error:
