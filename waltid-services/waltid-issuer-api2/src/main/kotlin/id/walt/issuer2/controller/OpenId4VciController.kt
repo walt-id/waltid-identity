@@ -277,6 +277,43 @@ class OpenId4VciController(
                     call.respondCredentialResponse(response)
                 }
             }
+
+            post("deferred_credential", OpenId4VciRoutesDocs.deferredCredential()) {
+                val requestId = requireNotNull(call.callId) { "Missing call ID" }
+                val authorizationHeaders = call.request.headers.getAll(HttpHeaders.Authorization).orEmpty()
+                val dpopProofHeaderValues = call.request.headers.getAll(DPoPConstants.HEADER_NAME).orEmpty()
+                val response =
+                    if (call.isEncryptedCredentialRequest()) {
+                        call.respondText(
+                            text = "This is not currently supported",
+                            contentType = ContentType.Text.Plain,
+                            status = HttpStatusCode.NotImplemented,
+                        )
+                        return@post
+                    } else {
+                        val parameters = try {
+                            call.receive<JsonObject>()
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: ContentTransformationException) {
+                            notificationService.notify(
+                                requestId = requestId,
+                                session = null,
+                                event = IssuanceSessionEvent.CREDENTIAL_REQUEST_FAILED,
+                                error = CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
+                                errorDescription = "Invalid credential request",
+                            )
+                            throw e
+                        }
+                        protocolService.processDeferredCredentialRequest(
+                            authorizationHeaders = authorizationHeaders,
+                            dpopProofHeaderValues = dpopProofHeaderValues,
+                            parameters = parameters,
+                            requestId = requestId,
+                        )
+                    }
+                call.respondCredentialResponse(response)
+            }
         }
     }
 

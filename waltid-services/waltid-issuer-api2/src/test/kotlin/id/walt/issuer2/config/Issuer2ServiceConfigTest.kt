@@ -56,6 +56,31 @@ class Issuer2ServiceConfigTest {
     }
 
     @Test
+    fun `service config defaults credential issuance mode to sync when missing`() {
+        val config = loadServiceConfig(
+            """
+                baseUrl = "http://localhost:7002"
+            """.trimIndent(),
+        )
+
+        assertEquals(IssuanceMode.SYNC, config.credentialIssuanceMode)
+    }
+
+    @Test
+    fun `service config decodes credential issuance mode`() {
+        val config = loadServiceConfig(
+            """
+                baseUrl = "http://localhost:7002"
+                credentialIssuanceMode = "DEFERRED"
+                deferredCredentialIntervalSeconds = 45
+            """.trimIndent(),
+        )
+
+        assertEquals(IssuanceMode.DEFERRED, config.credentialIssuanceMode)
+        assertEquals(45L, config.deferredCredentialIntervalSeconds)
+    }
+
+    @Test
     fun `service config decodes credential encryption key`() {
         val config = loadServiceConfig(
             """

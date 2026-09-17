@@ -8,6 +8,7 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
+import id.walt.issuer2.config.IssuanceMode
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionFailure
@@ -108,6 +109,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     /** Commits proof-key side effects only after the credential was constructed successfully. */
     private val credentialProofKeyCommitment: CredentialProofKeyCommitment? = null,
     private val credentialProofVerifier: CredentialProofVerifier = DefaultCredentialProofVerifier(),
+    private val defaultCredentialIssuanceMode: IssuanceMode = IssuanceMode.SYNC,
+    private val defaultDeferredCredentialIntervalSeconds: Long = 30L,
+    private val deferredCredentialTransactionStore: DeferredCredentialTransactionStore = InMemoryDeferredCredentialTransactionStore(),
+    val deferredFlowService: DeferredFlowService = DeferredFlowService(deferredCredentialTransactionStore),
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -719,17 +724,24 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         val authorization = parseCredentialAuthorization(authorizationHeaders)
             ?: return invalidCredentialAuthorization(requestId)
         val parameterMap = parameters.toParametersMap()
-        return processCredentialRequest(authorization.token, requestId) {
-            oauth2Provider.createCredentialRequest(
-                parameters = parameterMap,
-                accessTokenContext = CredentialAccessTokenContext(
-                    authorization = authorization,
-                    expectedIssuer = metadataService.issuerBaseUrl(),
-                    dpopProofHeaderValues = dpopProofHeaderValues,
-                    credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
-                ),
-            )
-        }
+        return processCredentialRequest(
+            accessToken = authorization.token,
+            requestId = requestId,
+            requestParameters = parameters,
+            dpopProofHeaderValues = dpopProofHeaderValues,
+            createCredentialRequest = {
+                oauth2Provider.createCredentialRequest(
+                    parameters = parameterMap,
+                    accessTokenContext = CredentialAccessTokenContext(
+                        authorization = authorization,
+                        expectedIssuer = metadataService.issuerBaseUrl(),
+                        dpopProofHeaderValues = dpopProofHeaderValues,
+                        credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
+                    ),
+                )
+            },
+            consumeRequest = false,
+        )
     }
 
     suspend fun processCredentialRequest(
@@ -740,17 +752,40 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     ): CredentialResponseHttp {
         val authorization = parseCredentialAuthorization(authorizationHeaders)
             ?: return invalidCredentialAuthorization(requestId)
-        return processCredentialRequest(authorization.token, requestId) {
-            oauth2Provider.createCredentialRequest(
-                encryptedCredentialRequest = encryptedCredentialRequest,
-                accessTokenContext = CredentialAccessTokenContext(
-                    authorization = authorization,
-                    expectedIssuer = metadataService.issuerBaseUrl(),
-                    dpopProofHeaderValues = dpopProofHeaderValues,
-                    credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
-                ),
-            )
-        }
+        return processCredentialRequest(
+            accessToken = authorization.token,
+            requestId = requestId,
+            requestParameters = JsonObject(emptyMap()),
+            dpopProofHeaderValues = dpopProofHeaderValues,
+            createCredentialRequest = {
+                oauth2Provider.createCredentialRequest(
+                    encryptedCredentialRequest = encryptedCredentialRequest,
+                    accessTokenContext = CredentialAccessTokenContext(
+                        authorization = authorization,
+                        expectedIssuer = metadataService.issuerBaseUrl(),
+                        dpopProofHeaderValues = dpopProofHeaderValues,
+                        credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
+                    ),
+                )
+            },
+            consumeRequest = false,
+        )
+    }
+    suspend fun processDeferredCredentialRequest(
+        authorizationHeaders: List<String>,
+        dpopProofHeaderValues: List<String>,
+        parameters: JsonObject,
+        requestId: String,
+    ): CredentialResponseHttp {
+        val authorization = parseCredentialAuthorization(authorizationHeaders)
+            ?: return invalidCredentialAuthorization(requestId)
+        return processDeferredCredentialRequest(
+            authorization.token,
+            authorizationHeaders,
+            dpopProofHeaderValues,
+            requestId,
+            parameters,
+        )
     }
 
     private fun parseCredentialAuthorization(authorizationHeaders: List<String>) =
@@ -775,7 +810,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     private suspend fun processCredentialRequest(
         accessToken: String,
         requestId: String,
+        requestParameters: JsonObject = JsonObject(emptyMap()),
+        dpopProofHeaderValues: List<String> = emptyList(),
         createCredentialRequest: suspend () -> CredentialRequestResult,
+        consumeRequest: Boolean = true,
     ): CredentialResponseHttp {
         val credentialRequest = when (
             val result = try {
@@ -888,6 +926,26 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
                     "Issuance session is already closed",
                 ),
+            )
+        }
+
+        val shouldStartDeferredFlow = defaultCredentialIssuanceMode == IssuanceMode.DEFERRED && !consumeRequest
+        if (shouldStartDeferredFlow) {
+            val intervalSeconds = defaultDeferredCredentialIntervalSeconds.coerceAtLeast(1L)
+            val transactionId = deferredFlowService.register(
+                sessionId = sessionId,
+                intervalSeconds = intervalSeconds,
+                requestParameters = requestParameters,
+                dpopProofHeaderValues = dpopProofHeaderValues,
+                requestId = requestId,
+            ).transactionId
+            return CredentialResponseHttp(
+                status = 202,
+                payload = mapOf(
+                    "transaction_id" to JsonPrimitive(transactionId),
+                    "interval" to JsonPrimitive(intervalSeconds),
+                ),
+                headers = mapOf("Cache-Control" to "no-store"),
             )
         }
 
@@ -1270,6 +1328,172 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 e.toCredentialServerError(),
             )
         }
+    }
+    private suspend fun processDeferredCredentialRequest(
+        accessToken: String,
+        authorizationHeaders: List<String>,
+        dpopProofHeaderValues: List<String>,
+        requestId: String,
+        parameters: JsonObject,
+    ): CredentialResponseHttp {
+        val tokenClaims = try {
+            accessToken.decodeJws().payload
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val error = OAuthError(OAuthErrorCodes.INVALID_TOKEN, e.message)
+            val response = oauth2Provider.writeCredentialError(error)
+            notificationService.notify(
+                requestId = requestId,
+                session = null,
+                event = IssuanceSessionEvent.CREDENTIAL_REQUEST_FAILED,
+                error = error.error,
+                errorDescription = error.description,
+            )
+            return response
+        }
+
+        val sessionId = tokenClaims.stringClaim("sub") ?: run {
+            val error = OAuthError(OAuthErrorCodes.INVALID_TOKEN, "Access token has no session id")
+            val response = oauth2Provider.writeCredentialError(error)
+            notificationService.notify(
+                requestId = requestId,
+                session = null,
+                event = IssuanceSessionEvent.CREDENTIAL_REQUEST_FAILED,
+                error = error.error,
+                errorDescription = error.description,
+            )
+            return response
+        }
+
+        val observedSession = try {
+            sessionService.getSession(sessionId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val error = OAuthError(OAuthErrorCodes.INVALID_TOKEN, e.message)
+            val response = oauth2Provider.writeCredentialError(error)
+            notificationService.notify(
+                requestId = requestId,
+                session = null,
+                event = IssuanceSessionEvent.CREDENTIAL_REQUEST_FAILED,
+                error = error.error,
+                errorDescription = error.description,
+            )
+            return response
+        }
+
+        val transactionId = parameters["transaction_id"]
+            ?.jsonPrimitive
+            ?.content
+            ?.takeIf { it.isNotBlank() }
+            ?: return oauth2Provider.writeCredentialError(
+                CredentialError(
+                    CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
+                    "Deferred credential request requires transaction_id",
+                ),
+            )
+
+        val deferredState = deferredFlowService.get(transactionId)
+            ?: return oauth2Provider.writeCredentialError(
+                CredentialError(
+                    CredentialErrorCodes.INVALID_TRANSACTION_ID,
+                    "Deferred credential request contains an invalid transaction_id",
+                ),
+            )
+
+        if (deferredState.status == DeferredCredentialTransactionStatus.CONSUMED ||
+            deferredState.status == DeferredCredentialTransactionStatus.EXPIRED
+        ) {
+            return oauth2Provider.writeCredentialError(
+                CredentialError(
+                    CredentialErrorCodes.INVALID_TRANSACTION_ID,
+                    "Deferred credential request contains an invalid transaction_id",
+                ),
+            )
+        }
+
+        if (deferredState.sessionId != sessionId || observedSession.sessionId != sessionId) {
+            return oauth2Provider.writeCredentialError(
+                CredentialError(
+                    CredentialErrorCodes.INVALID_TRANSACTION_ID,
+                    "Deferred credential request contains an invalid transaction_id",
+                ),
+            )
+        }
+
+        if (observedSession.isClosed || observedSession.status != IssuanceSessionStatus.ACTIVE) {
+            return oauth2Provider.writeCredentialError(
+                CredentialError(
+                    CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED,
+                    "Deferred issuance session is no longer active",
+                ),
+            )
+        }
+
+        val isIssued = deferredFlowService.isReady(deferredState)
+        if (!isIssued) {
+            return CredentialResponseHttp(
+                status = 202,
+                payload = mapOf(
+                    "transaction_id" to JsonPrimitive(transactionId),
+                    "interval" to JsonPrimitive(deferredState.intervalSeconds),
+                ),
+                headers = mapOf("Cache-Control" to "no-store"),
+            )
+        }
+
+        if (deferredState.status != DeferredCredentialTransactionStatus.READY) {
+            deferredFlowService.markReady(transactionId)
+        }
+
+        if (deferredState.response != null) {
+            deferredFlowService.remove(transactionId)
+            return deferredState.response
+        }
+
+        val response = if (deferredState.requestParameters.isNotEmpty() || deferredState.requestId.isNotBlank()) {
+            val requestResponse = processCredentialRequest(
+                accessToken = accessToken,
+                requestId = deferredState.requestId.ifBlank { requestId },
+                requestParameters = deferredState.requestParameters,
+                dpopProofHeaderValues = deferredState.dpopProofHeaderValues.ifEmpty { dpopProofHeaderValues },
+                createCredentialRequest = {
+                    oauth2Provider.createCredentialRequest(
+                        parameters = deferredState.requestParameters.toParametersMap(),
+                        accessTokenContext = CredentialAccessTokenContext(
+                            authorization = parseAccessTokenAuthorization(authorizationHeaders)
+                                ?: throw IllegalArgumentException("Invalid credential authorization"),
+                            expectedIssuer = metadataService.issuerBaseUrl(),
+                            dpopProofHeaderValues = deferredState.dpopProofHeaderValues.ifEmpty { dpopProofHeaderValues },
+                            credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
+                        ),
+                    )
+                },
+                consumeRequest = true,
+            )
+            deferredFlowService.consume(transactionId)
+            deferredFlowService.remove(transactionId)
+            requestResponse
+        } else {
+            val issuedCredential = JsonObject(
+                mapOf(
+                    "credential" to JsonPrimitive("deferred-issued-credential"),
+                )
+            )
+            val issuedResponse = CredentialResponseHttp(
+                status = 200,
+                payload = mapOf(
+                    "credentials" to JsonArray(listOf(issuedCredential)),
+                ),
+                headers = mapOf("Cache-Control" to "no-store"),
+            )
+            deferredFlowService.consume(transactionId)
+            deferredFlowService.remove(transactionId)
+            issuedResponse
+        }
+
+        return response
     }
 
     suspend fun processNonceRequest(

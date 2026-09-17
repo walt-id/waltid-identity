@@ -19,6 +19,7 @@ object CredentialErrorCodes {
     const val UNKNOWN_CREDENTIAL_IDENTIFIER = "unknown_credential_identifier"
     const val INVALID_PROOF = "invalid_proof"
     const val INVALID_NONCE = "invalid_nonce"
+    const val INVALID_TRANSACTION_ID = "invalid_transaction_id"
     const val INVALID_ENCRYPTION_PARAMETERS = "invalid_encryption_parameters"
     const val CREDENTIAL_REQUEST_DENIED = "credential_request_denied"
 }

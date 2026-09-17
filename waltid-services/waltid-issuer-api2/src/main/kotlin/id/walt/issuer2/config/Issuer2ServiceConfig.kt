@@ -8,6 +8,11 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
 import kotlinx.coroutines.runBlocking
 
+enum class IssuanceMode {
+    SYNC,
+    DEFERRED,
+}
+
 data class Issuer2ServiceConfig(
     val baseUrl: String,
     /** Legacy token key retained as the validation sidecar and in-memory migration source. */
@@ -17,6 +22,8 @@ data class Issuer2ServiceConfig(
     val clientAuthenticationConfig: ClientAuthenticationConfig? = null,
     /** Preferred encoded crypto2 StoredKey. Invalid or mismatched values fail startup. */
     val ciTokenStoredKey: String? = null,
+    val credentialIssuanceMode: IssuanceMode = IssuanceMode.SYNC,
+    val deferredCredentialIntervalSeconds: Long = 30L,
 ) : WaltConfig() {
     /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
     constructor(
@@ -32,6 +39,8 @@ data class Issuer2ServiceConfig(
         enforcePushedAuthorizationRequests,
         clientAuthenticationConfig,
         null,
+        IssuanceMode.SYNC,
+        30L,
     )
 
     init {

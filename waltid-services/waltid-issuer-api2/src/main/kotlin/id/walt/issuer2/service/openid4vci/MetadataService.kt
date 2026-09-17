@@ -61,6 +61,7 @@ class MetadataService(
                 baseUrl = baseUrl,
                 credentialConfigurationsSupported = credentialConfigurations,
                 credentialRequestEncryption = credentialRequestEncryption,
+                deferredCredentialEndpointPath = "/deferred_credential",
                 display = issuerDisplay,
             )
         }

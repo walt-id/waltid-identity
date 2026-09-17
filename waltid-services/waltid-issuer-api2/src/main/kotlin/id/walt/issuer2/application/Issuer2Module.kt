@@ -81,6 +81,8 @@ class Issuer2Module @JvmOverloads constructor(
         credentialProofKeyAcceptance = credentialProofKeyAcceptance,
         credentialProofKeyCommitment = credentialProofKeyCommitment,
         credentialNonceService = openId4VciModule.credentialNonceService,
+        defaultCredentialIssuanceMode = serviceConfig.credentialIssuanceMode,
+        defaultDeferredCredentialIntervalSeconds = serviceConfig.deferredCredentialIntervalSeconds,
     )
 
     val managementController = Issuer2ManagementController(
