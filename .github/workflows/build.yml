@@ -24,6 +24,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test macOS lane predicates
         run: .github/scripts/ci/test-macos-lane-predicates.sh
+      - name: Test iOS phase diagnostics
+        run: python3 -m unittest discover -s .github/scripts/mobile-ci -p test_ios_phase.py
   android-eligibility:
     uses: ./.github/workflows/android-eligibility.yml
     with:
