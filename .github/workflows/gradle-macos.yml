@@ -82,8 +82,9 @@ jobs:
 
       - name: Build WalletCore once and run selected consumer tests
         # One XCFramework assemble is shared by the native demo, Compose demo, and (via artifact)
-        # SDK DocC. Cold Konan cache is ~27 min; both demo suites can add ~11 min each.
-        timeout-minutes: 80
+        # SDK DocC. Include the separate bridge-fixture build and slow hosted native links.
+        # Provisional headroom while the shared iOS CI diagnostics establish phase budgets.
+        timeout-minutes: 110
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
