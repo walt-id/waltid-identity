@@ -23,19 +23,26 @@ RUN chmod +x ./gradlew \
         test -d "$RESOURCES"; \
         cp -a "$RESOURCES" /out/composeResources; \
     fi \
-    && test -d /out/composeResources
+    && test -d /out/composeResources \
+    && ENTRY="$(sed -n 's/.*<script src="\([^"]*\)".*/\1/p' /out/index.html | head -n1)" \
+    && test -n "$ENTRY" \
+    && test -f "/out/$ENTRY" \
+    && grep -q "__WALLET_API2_BASE_URL__" /out/index.html
 
 # RUN
-FROM nginx:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.27-alpine
 
 COPY --from=build /out/ /usr/share/nginx/html/
-# Webpack productionExecutable omits wasmJsMain/resources; overlay the SPA shell.
-COPY waltid-applications/waltid-wallet-demo-compose/webApp/src/wasmJsMain/resources/index.html /usr/share/nginx/html/index.html
-COPY waltid-applications/waltid-wallet-demo-compose/webApp/src/wasmJsMain/resources/branding.json /usr/share/nginx/html/branding.json
 COPY waltid-applications/waltid-wallet-demo-compose/webApp/nginx.conf /etc/nginx/conf.d/default.conf
 COPY waltid-applications/waltid-wallet-demo-compose/webApp/docker-entrypoint.d/98-wallet-branding.sh /docker-entrypoint.d/98-wallet-branding.sh
 COPY waltid-applications/waltid-wallet-demo-compose/webApp/docker-entrypoint.d/99-wallet-api2-url.sh /docker-entrypoint.d/99-wallet-api2-url.sh
 
-RUN chmod +x /docker-entrypoint.d/98-wallet-branding.sh /docker-entrypoint.d/99-wallet-api2-url.sh
+USER root
+RUN chmod +x /docker-entrypoint.d/98-wallet-branding.sh /docker-entrypoint.d/99-wallet-api2-url.sh \
+    && chown -R 10001:0 /usr/share/nginx/html /var/cache/nginx /etc/nginx
 
-EXPOSE 80
+USER 10001
+
+EXPOSE 8080
+
+CMD ["nginx", "-g", "daemon off;"]
