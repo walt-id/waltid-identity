@@ -51,6 +51,52 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testResetWaitsForLateStartupAndCloseAfterSettingsDismissal() async throws {
+        let session = FakeProximitySession(suspendClose: true)
+        let client = FakeProximityWalletClient(session: session, suspendStart: true)
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        viewModel.dismiss()
+        var deleted = false
+        let reset = Task { await viewModel.closeAndAwait(); deleted = true }
+        await Task.yield()
+        XCTAssertFalse(deleted)
+        client.resumeStart()
+        try await waitUntilAsync { await session.closeCount == 1 }
+        XCTAssertFalse(deleted)
+        await session.resumeClose()
+        await reset.value
+        XCTAssertTrue(deleted)
+    }
+
+    @MainActor
+    func testPendingReviewReservesOneDecisionAndNextReviewCanProceed() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        viewModel.start()
+        try await waitUntil { client.startCount == 1 }
+        let review = combinedProximityReview()
+        await session.emit(.reviewRequired(review))
+        try await waitUntil { viewModel.review == review }
+        viewModel.selectCredential(requestIndex: 0, credentialID: "payment-b")
+        viewModel.approve()
+        viewModel.approve()
+        viewModel.decline()
+        try await waitUntilAsync { await session.actions.count == 1 }
+        XCTAssertFalse(viewModel.canApprove)
+        let next = combinedProximityReview()
+        await session.emit(.reviewRequired(next))
+        try await waitUntil { viewModel.review == next }
+        XCTAssertNil(viewModel.pendingReviewID)
+        viewModel.selectCredential(requestIndex: 0, credentialID: "payment-b")
+        viewModel.approve()
+        try await waitUntilAsync { await session.actions.count == 2 }
+        await viewModel.closeAndAwait()
+    }
+
+    @MainActor
     func testInvalidHostConfigurationDoesNotStartSessionAndCanBeDismissed() throws {
         let client = FakeProximityWalletClient(session: FakeProximitySession())
         let viewModel = ProximityPresentationViewModel(
@@ -450,6 +496,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let next = FakeProximitySession()
         let client = FakeProximityWalletClient(session: first, nextSession: next)
         let wallet = WalletViewModel(walletID: "proximity-ui-fixture", walletClient: MockWalletClient(), proximityWalletClient: client)
+        await wallet.readerTrustSettings.awaitPendingOperations()
         wallet.selectedTab = .present
         wallet.dismissStatus()
         let viewModel = wallet.proximityPresentation
@@ -504,6 +551,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let session = FakeProximitySession()
         let client = FakeProximityWalletClient(session: session)
         let wallet = WalletViewModel(walletID: "proximity-qr-layout-fixture", walletClient: MockWalletClient(), proximityWalletClient: client)
+        await wallet.readerTrustSettings.awaitPendingOperations()
         wallet.selectedTab = .present
         wallet.dismissStatus()
         let model = wallet.proximityPresentation
@@ -548,6 +596,9 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     func testQRCodeRendererRejectsUnsupportedProximityPayloadsAndOversizeText() throws {
         XCTAssertNil(WalletQRCodeRenderer.proximityImage(payload: "https://example.com"))
         XCTAssertNil(WalletQRCodeRenderer.proximityImage(payload: "mdoc:é"))
+        for control in ["\u{0}", "\n", "\t", "\u{7f}"] {
+            XCTAssertNil(WalletQRCodeRenderer.proximityImage(payload: "mdoc:A" + control + "B"))
+        }
         XCTAssertNil(
             WalletQRCodeRenderer.proximityImage(
                 payload: "mdoc:" + String(repeating: "A", count: 4_000)
@@ -854,6 +905,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
             let next = FakeProximitySession()
             let client = FakeProximityWalletClient(session: first, nextSession: next)
             let wallet = WalletViewModel(walletID: "proximity-transport-fixture", walletClient: MockWalletClient(), proximityWalletClient: client)
+            await wallet.readerTrustSettings.awaitPendingOperations()
             let previousProfile = wallet.proximityTransportProfile
             let previousMode = wallet.proximityApprovalMode
             wallet.proximityTransportProfile = initial
@@ -892,6 +944,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let first = FakeProximitySession(suspendClose: true)
         let client = FakeProximityWalletClient(session: first)
         let wallet = WalletViewModel(walletID: "proximity-mode-latency-fixture", walletClient: MockWalletClient(), proximityWalletClient: client)
+        await wallet.readerTrustSettings.awaitPendingOperations()
         let previousMode = wallet.proximityApprovalMode
         wallet.proximityApprovalMode = .askEachTime
         let model = wallet.proximityPresentation
@@ -988,6 +1041,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let next = FakeProximitySession()
         let client = FakeProximityWalletClient(session: first, nextSession: next)
         let wallet = WalletViewModel(walletID: "proximity-preference-fixture", walletClient: MockWalletClient(), proximityWalletClient: client)
+        await wallet.readerTrustSettings.awaitPendingOperations()
         let previousMode = wallet.proximityApprovalMode
         wallet.proximityApprovalMode = .askEachTime
         wallet.selectedTab = .present

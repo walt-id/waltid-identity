@@ -58,37 +58,39 @@ internal actual fun ProximityPlatformSessionEffect(
     onInterrupted: () -> Unit,
 ) {
     val currentOnInterrupted = rememberUpdatedState(onInterrupted)
-    DisposableEffect(active) {
-        if (!active) return@DisposableEffect onDispose {}
+    DisposableEffect(active, qrVisible) {
+        if (!active && !qrVisible) return@DisposableEffect onDispose {}
         val application = UIApplication.sharedApplication
-        val previousIdleTimerDisabled = application.idleTimerDisabled
-        application.idleTimerDisabled = true
-        val token = NSNotificationCenter.defaultCenter.addObserverForName(
-            name = UIApplicationDidEnterBackgroundNotification,
-            `object` = null,
-            queue = NSOperationQueue.mainQueue,
-        ) {
-            application.idleTimerDisabled = previousIdleTimerDisabled
-            currentOnInterrupted.value()
-        }
-        onDispose {
-            NSNotificationCenter.defaultCenter.removeObserver(token)
-            application.idleTimerDisabled = previousIdleTimerDisabled
-        }
-    }
-    DisposableEffect(qrVisible) {
-        if (!qrVisible) return@DisposableEffect onDispose {}
         val screen = UIScreen.mainScreen
-        val previousBrightness = screen.brightness
-        screen.brightness = 1.0
-        val token = NSNotificationCenter.defaultCenter.addObserverForName(
-            name = UIApplicationDidEnterBackgroundNotification,
-            `object` = null,
-            queue = NSOperationQueue.mainQueue,
-        ) { screen.brightness = previousBrightness }
+        var previousIdle: Boolean? = null
+        var previousBrightness: Double? = null
+        fun applyPolicy() {
+            if (active) {
+                if (previousIdle == null) previousIdle = application.idleTimerDisabled
+                application.idleTimerDisabled = true
+            }
+            if (qrVisible) {
+                if (previousBrightness == null) previousBrightness = screen.brightness
+                screen.brightness = 1.0
+            }
+        }
+        fun restore() {
+            previousIdle?.let { application.idleTimerDisabled = it }
+            previousBrightness?.let { screen.brightness = it }
+            previousIdle = null
+            previousBrightness = null
+        }
+        applyPolicy()
+        val background = NSNotificationCenter.defaultCenter.addObserverForName(
+            UIApplicationDidEnterBackgroundNotification, null, NSOperationQueue.mainQueue,
+        ) { restore(); currentOnInterrupted.value() }
+        val activation = NSNotificationCenter.defaultCenter.addObserverForName(
+            UIApplicationDidBecomeActiveNotification, null, NSOperationQueue.mainQueue,
+        ) { applyPolicy() }
         onDispose {
-            NSNotificationCenter.defaultCenter.removeObserver(token)
-            screen.brightness = previousBrightness
+            NSNotificationCenter.defaultCenter.removeObserver(background)
+            NSNotificationCenter.defaultCenter.removeObserver(activation)
+            restore()
         }
     }
 }
