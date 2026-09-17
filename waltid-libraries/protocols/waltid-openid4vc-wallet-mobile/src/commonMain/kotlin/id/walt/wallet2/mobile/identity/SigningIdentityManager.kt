@@ -23,13 +23,14 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.mobile.MobileDidSupport
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.KeyUseAuthorizationException
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
-import id.walt.wallet2.persistence.keys.PlatformKeyFacts
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.PlatformKeyFacts
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
+import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
 import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
 import id.walt.wallet2.persistence.keys.WalletKeyProtection
 import id.walt.wallet2.persistence.keys.WalletKeyRequirements
@@ -642,12 +643,12 @@ public class SigningIdentityManager internal constructor(
             identity.publicJwk != recovery.publicJwk) return null
         val stored = keys.storedKey(record.keyId) as? StoredKey.Managed ?: return null
         return try {
-            if (native.restoreManagedKey(stored) is id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration.Missing) stored else null
+            when (native.restoreManagedKey(stored)) {
+                is PlatformManagedKeyRestoration.Missing, is PlatformManagedKeyRestoration.Invalidated -> stored
+                is PlatformManagedKeyRestoration.Restored -> null
+            }
         } catch (cause: CancellationException) { throw cause }
-        catch (cause: Exception) {
-            if (generateSequence<Throwable>(cause) { it.cause }.any { it is id.walt.crypto2.signum.SignumKeyInvalidatedException }) stored
-            else null
-        }
+        catch (_: Exception) { null }
     }
 
     private fun reserve(record: IdentityRecord) = queries.transaction {

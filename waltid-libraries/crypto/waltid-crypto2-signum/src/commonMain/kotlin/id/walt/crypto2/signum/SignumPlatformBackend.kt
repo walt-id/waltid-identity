@@ -1,5 +1,10 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.KeyProtectionLevel
+import id.walt.crypto2.keys.KeyAttestation
+import id.walt.crypto2.keys.KeyOrigin
+import id.walt.crypto2.keys.KeySecurityLevel
+
 import id.walt.crypto2.algorithms.KeyAgreementAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EncodedKey
@@ -36,16 +41,16 @@ interface SignumPlatformBackend {
 interface SignumPlatformKey {
     val alias: String
     /** Native generation and private-key import are distinct assurance claims. */
-    val origin: SignumKeyOrigin get() = SignumKeyOrigin.UNKNOWN
+    val origin: KeyOrigin get() = KeyOrigin.UNKNOWN
     /** Observed hardware tier, where the platform exposes it. */
-    val securityLevel: SignumSecurityLevel get() = SignumSecurityLevel.UNKNOWN
+    val securityLevel: KeySecurityLevel get() = KeySecurityLevel.UNKNOWN
     val spec: KeySpec
     /** Explicit capability for exportable ordinary-Keychain keys; absent for hardware and Keystore keys. */
     val privateKeyExporter: id.walt.crypto2.keys.PrivateKeyExporter? get() = null
     val publicKey: EncodedKey.SpkiDer
     /** Observed protection backing; policy requests must not be used as evidence. */
-    val protectionLevel: SignumProtectionLevel
-    val attestation: SignumKeyAttestation?
+    val protectionLevel: KeyProtectionLevel
+    val attestation: KeyAttestation?
     val signatureAlgorithms: Set<SignatureAlgorithm>
     val keyAgreementAlgorithms: Set<KeyAgreementAlgorithm>
 

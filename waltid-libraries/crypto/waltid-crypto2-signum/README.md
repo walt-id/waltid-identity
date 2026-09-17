@@ -6,7 +6,7 @@ Mobile managed-key provider for Android KeyStore and iOS Keychain/Secure Enclave
 descriptor. Use `generateSignumKey` or `restoreSignumKey` when Signum-specific protection and attestation properties are
 needed directly.
 
-`SignumHardwarePolicy.REQUIRED` requires the backend to observe hardware backing. An
+`HardwarePreference.REQUIRED` requires the backend to observe hardware backing. An
 `attestationChallenge` additionally requires attestation evidence; hardware and
 attestation are independent requirements.
 

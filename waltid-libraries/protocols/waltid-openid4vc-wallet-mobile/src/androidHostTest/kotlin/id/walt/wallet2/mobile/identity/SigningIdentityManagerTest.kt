@@ -2,7 +2,15 @@
 
 package id.walt.wallet2.mobile.identity
 
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
+
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.keys.*
+import id.walt.crypto2.serialization.BinaryData
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StoredKey
@@ -574,6 +582,64 @@ class SigningIdentityManagerTest {
         }
     }
 
+    @Test fun `only missing or permanently invalidated native material permits repair`() = runTest {
+        for (outcome in NativeFixture.Outcome.entries) {
+            val native = NativeFixture()
+            Fixture(native = native).use { fixture ->
+                val manager = fixture.wallet.signingIdentity
+                val choices = assertIs<SigningIdentityCreationOptions.Available>(manager.creationOptions(SigningIdentityIntent.Recoverable))
+                val selected = (listOf(choices.recommended) + choices.alternatives).single { it.storage == SigningIdentityKeyStorage.NativeStorage }
+                val original = assertIs<SigningIdentityOperationResult.Active>(manager.create(selected)).identity
+                val restore = manager.restorationOptions(manager.discoverRecovery().candidates.single()).single { it.storage == selected.storage }
+                native.outcome = outcome
+                val result = manager.restore(restore)
+                if (outcome == NativeFixture.Outcome.Missing || outcome == NativeFixture.Outcome.Invalidated) {
+                    assertEquals(original.publicJwk, assertIs<SigningIdentityOperationResult.Active>(result).identity.publicJwk)
+                    assertEquals(2, native.imports)
+                } else {
+                    assertIs<SigningIdentityOperationResult.Failed>(result)
+                    assertEquals(1, native.imports)
+                }
+            }
+        }
+    }
+
+    private class NativeFixture : PlatformManagedKeyProvider {
+        enum class Outcome { Available, Missing, Invalidated, TemporarilyUnavailable }
+        var outcome = Outcome.Available
+        var imports = 0
+        private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+        private val handles = mutableMapOf<String, ManagedKey>()
+        override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport =
+            if (requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None && requirements.protection == WalletKeyProtection.NativeStorage)
+                KeyUseAuthorizationSupport.Supported(KeyUseAuthorizationPolicy.None)
+            else KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
+        override fun supportsPrivateKeyImport(requirements: WalletKeyRequirements) = requirements.protection == WalletKeyProtection.NativeStorage
+        override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey = error("This fixture tests imports")
+        override suspend fun importManagedKey(request: WalletKeyCreationRequest, material: EncodedKey.Jwk): ManagedKey {
+            imports++
+            val key = runtime.restore(StoredKey.Software(StoredKey.CURRENT_VERSION, request.id, identitySpec, identityUsages, material))
+            val descriptor = StoredKey.Managed(StoredKey.CURRENT_VERSION, request.id, identitySpec, identityUsages,
+                ProviderId("fixture"), 1, BinaryData(request.nativeAlias.encodeToByteArray()))
+            val managed = object : ManagedKey {
+                override val storedKey = descriptor
+                override val capabilities = key.capabilities
+            }
+            handles[request.nativeAlias] = managed
+            outcome = Outcome.Available
+            return managed
+        }
+        override suspend fun keyFacts(stored: StoredKey.Managed) = PlatformKeyFacts(KeyOrigin.IMPORTED, KeySecurityLevel.SOFTWARE, KeyProtectionLevel.SOFTWARE)
+        override fun keyUseAuthorizationPolicy(stored: StoredKey.Managed) = KeyUseAuthorizationPolicy.None
+        override suspend fun restoreManagedKey(stored: StoredKey.Managed): PlatformManagedKeyRestoration = when (outcome) {
+            Outcome.Available -> PlatformManagedKeyRestoration.Restored(handles.getValue(stored.providerData.toByteArray().decodeToString()), KeyUseAuthorizationPolicy.None)
+            Outcome.Missing -> PlatformManagedKeyRestoration.Missing(KeyUseAuthorizationPolicy.None)
+            Outcome.Invalidated -> PlatformManagedKeyRestoration.Invalidated(KeyUseAuthorizationPolicy.None)
+            Outcome.TemporarilyUnavailable -> throw KeyUseAuthorizationException(KeyUseAuthorizationFailure.ProtectedKeyUnavailable, "Temporarily unavailable")
+        }
+        override suspend fun deleteManagedKey(stored: StoredKey.Managed) { handles.remove(stored.providerData.toByteArray().decodeToString()) }
+    }
+
     private class MemoryCustodian : IdentityKeyCustodian {
         override val id = "test-custodian"
         override val displayName = "Test custodian"
@@ -591,6 +657,7 @@ class SigningIdentityManagerTest {
         configuration: SigningIdentityConfiguration? = null,
         val provider: MemoryRecovery = MemoryRecovery(),
         registry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
+        private val native: PlatformManagedKeyProvider = NoNative,
         onRegistryChanged: suspend () -> Unit = {},
     ) : AutoCloseable {
         private val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
@@ -600,7 +667,7 @@ class SigningIdentityManagerTest {
             recoveryProviders = listOf(provider), authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)))
         init { WalletPersistenceDatabase.Schema.create(driver) }
         val wallet = reopen()
-        fun reopen(signingIdentity: SigningIdentityConfiguration = config.signingIdentity) = createSqlDelightMobileWallet(config.copy(signingIdentity = signingIdentity), ClientIdTrustConfiguration(), db, NoNative, Crypto2DidService, {})
+        fun reopen(signingIdentity: SigningIdentityConfiguration = config.signingIdentity) = createSqlDelightMobileWallet(config.copy(signingIdentity = signingIdentity), ClientIdTrustConfiguration(), db, native, Crypto2DidService, {})
         override fun close() { driver.close() }
     }
 

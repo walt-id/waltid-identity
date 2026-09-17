@@ -1,5 +1,7 @@
 package id.walt.wallet2.mobile.identity
 
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeySpec
@@ -95,10 +97,10 @@ internal sealed interface RecoverySecret {
 @Serializable
 internal data class RecoveryConstraints(
     val storage: SigningIdentityKeyStorage,
-    val authorization: id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy,
+    val authorization: id.walt.crypto2.keys.KeyUseAuthorizationPolicy,
     val confirmation: RecoveryConfirmation,
 ) {
-    fun permits(storage: SigningIdentityKeyStorage, authorization: id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy): Boolean =
+    fun permits(storage: SigningIdentityKeyStorage, authorization: id.walt.crypto2.keys.KeyUseAuthorizationPolicy): Boolean =
         authorization == this.authorization && when (this.storage) {
             SigningIdentityKeyStorage.HardwareBacked -> storage == SigningIdentityKeyStorage.HardwareBacked
             SigningIdentityKeyStorage.NativeStorage -> storage != SigningIdentityKeyStorage.EncryptedDatabase

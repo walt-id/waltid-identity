@@ -1,5 +1,11 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.KeyProtectionLevel
+import id.walt.crypto2.keys.KeyOrigin
+import id.walt.crypto2.keys.KeySecurityLevel
+
 import android.content.pm.PackageManager
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
@@ -35,14 +41,14 @@ import kotlin.uuid.Uuid
 /** Run on API 31+ targets with StrongBox, TEE only, and software-backed Keystore. */
 @RunWith(Parameterized::class)
 class AndroidStrongBoxPreferenceTest(
-    private val strongBox: SignumHardwarePolicy,
-    private val hardware: SignumHardwarePolicy,
+    private val strongBox: HardwarePreference,
+    private val hardware: HardwarePreference,
 ) {
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "strongBox={0},hardware={1}")
-        fun policies(): List<Array<SignumHardwarePolicy>> = SignumHardwarePolicy.entries.flatMap { strongBox ->
-            listOf(SignumHardwarePolicy.PREFERRED, SignumHardwarePolicy.REQUIRED).map { hardware ->
+        fun policies(): List<Array<HardwarePreference>> = HardwarePreference.entries.flatMap { strongBox ->
+            listOf(HardwarePreference.PREFERRED, HardwarePreference.REQUIRED).map { hardware ->
                 arrayOf(strongBox, hardware)
             }
         }
@@ -57,17 +63,17 @@ class AndroidStrongBoxPreferenceTest(
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val hasStrongBox = context.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE)
         val fallbackLevel = probeWithoutStrongBox()
-        val expectedLevel = if (strongBox != SignumHardwarePolicy.DISCOURAGED && hasStrongBox)
+        val expectedLevel = if (strongBox != HardwarePreference.DISCOURAGED && hasStrongBox)
             KeyProperties.SECURITY_LEVEL_STRONGBOX else fallbackLevel
-        val requiresMissingStrongBox = strongBox == SignumHardwarePolicy.REQUIRED && !hasStrongBox
-        val requiresMissingHardware = hardware == SignumHardwarePolicy.REQUIRED &&
+        val requiresMissingStrongBox = strongBox == HardwarePreference.REQUIRED && !hasStrongBox
+        val requiresMissingHardware = hardware == HardwarePreference.REQUIRED &&
             expectedLevel == KeyProperties.SECURITY_LEVEL_SOFTWARE
         val alias = "strongbox-preference-${Uuid.random()}"
         val backend = AndroidSignumKeyBackend(context)
         val spec = KeySpec.Ec(EcCurve.P256)
         val usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
         val policy = SignumKeyPolicy(hardware = hardware,
-            platform = SignumPlatformPolicy.AndroidKeystore(strongBox = strongBox))
+            platform = PlatformKeyConfiguration.AndroidKeystore(strongBox = strongBox))
         try {
             val result = runCatching {
                 if (imported) backend.importPrivateKey(alias, nativeImportTestMaterial, spec, usages, policy)
@@ -87,16 +93,16 @@ class AndroidStrongBoxPreferenceTest(
             val reopened = assertNotNull(AndroidSignumKeyBackend(context).load(alias, spec, usages, policy))
             for (handle in listOf(key, reopened)) {
                 assertEquals(originalPublicKey, handle.publicKey)
-                assertEquals(if (imported) SignumKeyOrigin.IMPORTED else SignumKeyOrigin.GENERATED, handle.origin)
+                assertEquals(if (imported) KeyOrigin.IMPORTED else KeyOrigin.GENERATED, handle.origin)
                 assertEquals(expectedLevel, nativeKeyInfo(alias).securityLevel)
                 assertEquals(when (expectedLevel) {
-                    KeyProperties.SECURITY_LEVEL_STRONGBOX -> SignumSecurityLevel.STRONGBOX
-                    KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT -> SignumSecurityLevel.TRUSTED_ENVIRONMENT
-                    KeyProperties.SECURITY_LEVEL_SOFTWARE -> SignumSecurityLevel.SOFTWARE
+                    KeyProperties.SECURITY_LEVEL_STRONGBOX -> KeySecurityLevel.STRONGBOX
+                    KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT -> KeySecurityLevel.TRUSTED_ENVIRONMENT
+                    KeyProperties.SECURITY_LEVEL_SOFTWARE -> KeySecurityLevel.SOFTWARE
                     else -> error("Unqualified native security level: $expectedLevel")
                 }, handle.securityLevel)
                 assertEquals(if (expectedLevel == KeyProperties.SECURITY_LEVEL_SOFTWARE)
-                    SignumProtectionLevel.SOFTWARE else SignumProtectionLevel.HARDWARE, handle.protectionLevel)
+                    KeyProtectionLevel.SOFTWARE else KeyProtectionLevel.HARDWARE, handle.protectionLevel)
                 assertNull(handle.privateKeyExporter)
                 val challenge = Uuid.random().toString().encodeToByteArray()
                 val signature = handle.sign(challenge, SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256))

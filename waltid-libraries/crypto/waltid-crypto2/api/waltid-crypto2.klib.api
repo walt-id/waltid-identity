@@ -143,6 +143,73 @@ final enum class id.walt.crypto2.keys/KeyUsage : kotlin/Enum<id.walt.crypto2.key
     }
 }
 
+final enum class id.walt.crypto2.keys/KeyUseAuthorizationFailure : kotlin/Enum<id.walt.crypto2.keys/KeyUseAuthorizationFailure> { // id.walt.crypto2.keys/KeyUseAuthorizationFailure|null[0]
+    enum entry AuthorizationNotCompleted // id.walt.crypto2.keys/KeyUseAuthorizationFailure.AuthorizationNotCompleted|null[0]
+    enum entry BiometricNotEnrolled // id.walt.crypto2.keys/KeyUseAuthorizationFailure.BiometricNotEnrolled|null[0]
+    enum entry BiometricUnavailable // id.walt.crypto2.keys/KeyUseAuthorizationFailure.BiometricUnavailable|null[0]
+    enum entry DeviceCredentialNotSet // id.walt.crypto2.keys/KeyUseAuthorizationFailure.DeviceCredentialNotSet|null[0]
+    enum entry InteractionContextUnavailable // id.walt.crypto2.keys/KeyUseAuthorizationFailure.InteractionContextUnavailable|null[0]
+    enum entry InvalidStoredKeyMetadata // id.walt.crypto2.keys/KeyUseAuthorizationFailure.InvalidStoredKeyMetadata|null[0]
+    enum entry ProtectedKeyUnavailable // id.walt.crypto2.keys/KeyUseAuthorizationFailure.ProtectedKeyUnavailable|null[0]
+    enum entry UnsupportedCombination // id.walt.crypto2.keys/KeyUseAuthorizationFailure.UnsupportedCombination|null[0]
+
+    final val entries // id.walt.crypto2.keys/KeyUseAuthorizationFailure.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.crypto2.keys/KeyUseAuthorizationFailure> // id.walt.crypto2.keys/KeyUseAuthorizationFailure.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.crypto2.keys/KeyUseAuthorizationFailure // id.walt.crypto2.keys/KeyUseAuthorizationFailure.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.crypto2.keys/KeyUseAuthorizationFailure> // id.walt.crypto2.keys/KeyUseAuthorizationFailure.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.crypto2.keys/KeyUseAuthorizationFailure.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.keys/KeyUseAuthorizationFailure> // id.walt.crypto2.keys/KeyUseAuthorizationFailure.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.crypto2.keys/KeyUseAuthorizationFailure.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement : kotlin/Enum<id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement> { // id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement|null[0]
+    enum entry PlatformKeyStore // id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement.PlatformKeyStore|null[0]
+    enum entry ProviderProcess // id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement.ProviderProcess|null[0]
+
+    final val entries // id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement> // id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement // id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement> // id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement> // id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation : kotlin/Enum<id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation> { // id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation|null[0]
+    enum entry IndependentReadback // id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation.IndependentReadback|null[0]
+    enum entry ProviderConfigurationOnly // id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation.ProviderConfigurationOnly|null[0]
+
+    final val entries // id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation> // id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation // id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation> // id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation> // id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
+final enum class id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason : kotlin/Enum<id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason> { // id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason|null[0]
+    enum entry BiometricNotEnrolled // id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled|null[0]
+    enum entry BiometricUnavailable // id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason.BiometricUnavailable|null[0]
+    enum entry DeviceCredentialNotSet // id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason.DeviceCredentialNotSet|null[0]
+    enum entry UnsupportedCombination // id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason.UnsupportedCombination|null[0]
+
+    final val entries // id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason> // id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason // id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason> // id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason.values|values#static(){}[0]
+}
+
 final enum class id.walt.crypto2.keys/KeychainAccessibility : kotlin/Enum<id.walt.crypto2.keys/KeychainAccessibility> { // id.walt.crypto2.keys/KeychainAccessibility|null[0]
     enum entry AFTER_FIRST_UNLOCK // id.walt.crypto2.keys/KeychainAccessibility.AFTER_FIRST_UNLOCK|null[0]
     enum entry AFTER_FIRST_UNLOCK_DEVICE_ONLY // id.walt.crypto2.keys/KeychainAccessibility.AFTER_FIRST_UNLOCK_DEVICE_ONLY|null[0]
@@ -1207,6 +1274,149 @@ sealed interface id.walt.crypto2.keys/KeySpec { // id.walt.crypto2.keys/KeySpec|
     }
 }
 
+sealed interface id.walt.crypto2.keys/KeyUseAuthorizationPolicy { // id.walt.crypto2.keys/KeyUseAuthorizationPolicy|null[0]
+    final class BiometricOrDeviceCredential : id.walt.crypto2.keys/KeyUseAuthorizationPolicy { // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential|null[0]
+        constructor <init>(kotlin/Int = ...) // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.<init>|<init>(kotlin.Int){}[0]
+
+        final val timeoutSeconds // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.timeoutSeconds|{}timeoutSeconds[0]
+            final fun <get-timeoutSeconds>(): kotlin/Int // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.timeoutSeconds.<get-timeoutSeconds>|<get-timeoutSeconds>(){}[0]
+
+        final fun component1(): kotlin/Int // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.component1|component1(){}[0]
+        final fun copy(kotlin/Int = ...): id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.copy|copy(kotlin.Int){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential> { // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.$serializer|null[0]
+            final val descriptor // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential) // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.crypto2.keys.KeyUseAuthorizationPolicy.BiometricOrDeviceCredential){}[0]
+        }
+
+        final object Companion { // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential> // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricOrDeviceCredential.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class BiometricTimedReuse : id.walt.crypto2.keys/KeyUseAuthorizationPolicy { // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse|null[0]
+        constructor <init>(kotlin/Int) // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.<init>|<init>(kotlin.Int){}[0]
+
+        final val timeoutSeconds // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.timeoutSeconds|{}timeoutSeconds[0]
+            final fun <get-timeoutSeconds>(): kotlin/Int // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.timeoutSeconds.<get-timeoutSeconds>|<get-timeoutSeconds>(){}[0]
+
+        final fun component1(): kotlin/Int // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.component1|component1(){}[0]
+        final fun copy(kotlin/Int = ...): id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.copy|copy(kotlin.Int){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse> { // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.$serializer|null[0]
+            final val descriptor // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse) // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.crypto2.keys.KeyUseAuthorizationPolicy.BiometricTimedReuse){}[0]
+        }
+
+        final object Companion { // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse> // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricTimedReuse.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class DeviceCredential : id.walt.crypto2.keys/KeyUseAuthorizationPolicy { // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential|null[0]
+        constructor <init>(kotlin/Int = ...) // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.<init>|<init>(kotlin.Int){}[0]
+
+        final val timeoutSeconds // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.timeoutSeconds|{}timeoutSeconds[0]
+            final fun <get-timeoutSeconds>(): kotlin/Int // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.timeoutSeconds.<get-timeoutSeconds>|<get-timeoutSeconds>(){}[0]
+
+        final fun component1(): kotlin/Int // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.component1|component1(){}[0]
+        final fun copy(kotlin/Int = ...): id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.copy|copy(kotlin.Int){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential> { // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.$serializer|null[0]
+            final val descriptor // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential) // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.crypto2.keys.KeyUseAuthorizationPolicy.DeviceCredential){}[0]
+        }
+
+        final object Companion { // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.Companion|null[0]
+            final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential> // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.DeviceCredential.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final object BiometricAny : id.walt.crypto2.keys/KeyUseAuthorizationPolicy, kotlinx.serialization.internal/SerializerFactory { // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricAny|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricAny.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricAny.hashCode|hashCode(){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricAny> // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricAny.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricAny.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+        final fun toString(): kotlin/String // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricAny.toString|toString(){}[0]
+    }
+
+    final object BiometricCurrentSet : id.walt.crypto2.keys/KeyUseAuthorizationPolicy, kotlinx.serialization.internal/SerializerFactory { // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricCurrentSet|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricCurrentSet.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricCurrentSet.hashCode|hashCode(){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricCurrentSet> // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricCurrentSet.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricCurrentSet.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+        final fun toString(): kotlin/String // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.BiometricCurrentSet.toString|toString(){}[0]
+    }
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.keys/KeyUseAuthorizationPolicy> // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+
+    final object None : id.walt.crypto2.keys/KeyUseAuthorizationPolicy, kotlinx.serialization.internal/SerializerFactory { // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.None|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.None.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.None.hashCode|hashCode(){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.keys/KeyUseAuthorizationPolicy.None> // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.None.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.None.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+        final fun toString(): kotlin/String // id.walt.crypto2.keys/KeyUseAuthorizationPolicy.None.toString|toString(){}[0]
+    }
+}
+
+sealed interface id.walt.crypto2.keys/KeyUseAuthorizationSupport { // id.walt.crypto2.keys/KeyUseAuthorizationSupport|null[0]
+    final class Supported : id.walt.crypto2.keys/KeyUseAuthorizationSupport { // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported|null[0]
+        constructor <init>(id.walt.crypto2.keys/KeyUseAuthorizationPolicy, id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement? = ..., id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation? = ...) // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported.<init>|<init>(id.walt.crypto2.keys.KeyUseAuthorizationPolicy;id.walt.crypto2.keys.KeyUseAuthorizationReuseEnforcement?;id.walt.crypto2.keys.KeyUseAuthorizationReuseTimeoutValidation?){}[0]
+
+        final val effectivePolicy // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported.effectivePolicy|{}effectivePolicy[0]
+            final fun <get-effectivePolicy>(): id.walt.crypto2.keys/KeyUseAuthorizationPolicy // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported.effectivePolicy.<get-effectivePolicy>|<get-effectivePolicy>(){}[0]
+        final val reuseEnforcement // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported.reuseEnforcement|{}reuseEnforcement[0]
+            final fun <get-reuseEnforcement>(): id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement? // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported.reuseEnforcement.<get-reuseEnforcement>|<get-reuseEnforcement>(){}[0]
+        final val timeoutValidation // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported.timeoutValidation|{}timeoutValidation[0]
+            final fun <get-timeoutValidation>(): id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation? // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported.timeoutValidation.<get-timeoutValidation>|<get-timeoutValidation>(){}[0]
+
+        final fun component1(): id.walt.crypto2.keys/KeyUseAuthorizationPolicy // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported.component1|component1(){}[0]
+        final fun component2(): id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement? // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported.component2|component2(){}[0]
+        final fun component3(): id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation? // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported.component3|component3(){}[0]
+        final fun copy(id.walt.crypto2.keys/KeyUseAuthorizationPolicy = ..., id.walt.crypto2.keys/KeyUseAuthorizationReuseEnforcement? = ..., id.walt.crypto2.keys/KeyUseAuthorizationReuseTimeoutValidation? = ...): id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported.copy|copy(id.walt.crypto2.keys.KeyUseAuthorizationPolicy;id.walt.crypto2.keys.KeyUseAuthorizationReuseEnforcement?;id.walt.crypto2.keys.KeyUseAuthorizationReuseTimeoutValidation?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Supported.toString|toString(){}[0]
+    }
+
+    final class Unsupported : id.walt.crypto2.keys/KeyUseAuthorizationSupport { // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Unsupported|null[0]
+        constructor <init>(id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason) // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Unsupported.<init>|<init>(id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason){}[0]
+
+        final val reason // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Unsupported.reason|{}reason[0]
+            final fun <get-reason>(): id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Unsupported.reason.<get-reason>|<get-reason>(){}[0]
+
+        final fun component1(): id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Unsupported.component1|component1(){}[0]
+        final fun copy(id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason = ...): id.walt.crypto2.keys/KeyUseAuthorizationSupport.Unsupported // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Unsupported.copy|copy(id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Unsupported.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Unsupported.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.crypto2.keys/KeyUseAuthorizationSupport.Unsupported.toString|toString(){}[0]
+    }
+}
+
 sealed interface id.walt.crypto2.keys/PlatformKeyConfiguration { // id.walt.crypto2.keys/PlatformKeyConfiguration|null[0]
     final class AndroidKeystore : id.walt.crypto2.keys/PlatformKeyConfiguration { // id.walt.crypto2.keys/PlatformKeyConfiguration.AndroidKeystore|null[0]
         constructor <init>(id.walt.crypto2.keys/HardwarePreference = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/String? = ...) // id.walt.crypto2.keys/PlatformKeyConfiguration.AndroidKeystore.<init>|<init>(id.walt.crypto2.keys.HardwarePreference;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Int?;kotlin.Long?;kotlin.Long?;kotlin.String?){}[0]
@@ -1799,6 +2009,53 @@ final class id.walt.crypto2.keys/KeyCapabilities { // id.walt.crypto2.keys/KeyCa
     final fun toString(): kotlin/String // id.walt.crypto2.keys/KeyCapabilities.toString|toString(){}[0]
 }
 
+final class id.walt.crypto2.keys/KeyUseAuthorizationException : kotlin/Exception { // id.walt.crypto2.keys/KeyUseAuthorizationException|null[0]
+    constructor <init>(id.walt.crypto2.keys/KeyUseAuthorizationFailure, kotlin/String, kotlin/Throwable? = ...) // id.walt.crypto2.keys/KeyUseAuthorizationException.<init>|<init>(id.walt.crypto2.keys.KeyUseAuthorizationFailure;kotlin.String;kotlin.Throwable?){}[0]
+
+    final val failure // id.walt.crypto2.keys/KeyUseAuthorizationException.failure|{}failure[0]
+        final fun <get-failure>(): id.walt.crypto2.keys/KeyUseAuthorizationFailure // id.walt.crypto2.keys/KeyUseAuthorizationException.failure.<get-failure>|<get-failure>(){}[0]
+}
+
+final class id.walt.crypto2.keys/PlatformKeyFacts { // id.walt.crypto2.keys/PlatformKeyFacts|null[0]
+    constructor <init>(id.walt.crypto2.keys/KeyOrigin = ..., id.walt.crypto2.keys/KeySecurityLevel = ..., id.walt.crypto2.keys/KeyProtectionLevel = ..., id.walt.crypto2.keys/KeyAttestation? = ..., id.walt.crypto2.keys/KeyAuthorizationEvidence = ...) // id.walt.crypto2.keys/PlatformKeyFacts.<init>|<init>(id.walt.crypto2.keys.KeyOrigin;id.walt.crypto2.keys.KeySecurityLevel;id.walt.crypto2.keys.KeyProtectionLevel;id.walt.crypto2.keys.KeyAttestation?;id.walt.crypto2.keys.KeyAuthorizationEvidence){}[0]
+
+    final val attestation // id.walt.crypto2.keys/PlatformKeyFacts.attestation|{}attestation[0]
+        final fun <get-attestation>(): id.walt.crypto2.keys/KeyAttestation? // id.walt.crypto2.keys/PlatformKeyFacts.attestation.<get-attestation>|<get-attestation>(){}[0]
+    final val authorizationEvidence // id.walt.crypto2.keys/PlatformKeyFacts.authorizationEvidence|{}authorizationEvidence[0]
+        final fun <get-authorizationEvidence>(): id.walt.crypto2.keys/KeyAuthorizationEvidence // id.walt.crypto2.keys/PlatformKeyFacts.authorizationEvidence.<get-authorizationEvidence>|<get-authorizationEvidence>(){}[0]
+    final val origin // id.walt.crypto2.keys/PlatformKeyFacts.origin|{}origin[0]
+        final fun <get-origin>(): id.walt.crypto2.keys/KeyOrigin // id.walt.crypto2.keys/PlatformKeyFacts.origin.<get-origin>|<get-origin>(){}[0]
+    final val protection // id.walt.crypto2.keys/PlatformKeyFacts.protection|{}protection[0]
+        final fun <get-protection>(): id.walt.crypto2.keys/KeyProtectionLevel // id.walt.crypto2.keys/PlatformKeyFacts.protection.<get-protection>|<get-protection>(){}[0]
+    final val securityLevel // id.walt.crypto2.keys/PlatformKeyFacts.securityLevel|{}securityLevel[0]
+        final fun <get-securityLevel>(): id.walt.crypto2.keys/KeySecurityLevel // id.walt.crypto2.keys/PlatformKeyFacts.securityLevel.<get-securityLevel>|<get-securityLevel>(){}[0]
+
+    final fun component1(): id.walt.crypto2.keys/KeyOrigin // id.walt.crypto2.keys/PlatformKeyFacts.component1|component1(){}[0]
+    final fun component2(): id.walt.crypto2.keys/KeySecurityLevel // id.walt.crypto2.keys/PlatformKeyFacts.component2|component2(){}[0]
+    final fun component3(): id.walt.crypto2.keys/KeyProtectionLevel // id.walt.crypto2.keys/PlatformKeyFacts.component3|component3(){}[0]
+    final fun component4(): id.walt.crypto2.keys/KeyAttestation? // id.walt.crypto2.keys/PlatformKeyFacts.component4|component4(){}[0]
+    final fun component5(): id.walt.crypto2.keys/KeyAuthorizationEvidence // id.walt.crypto2.keys/PlatformKeyFacts.component5|component5(){}[0]
+    final fun copy(id.walt.crypto2.keys/KeyOrigin = ..., id.walt.crypto2.keys/KeySecurityLevel = ..., id.walt.crypto2.keys/KeyProtectionLevel = ..., id.walt.crypto2.keys/KeyAttestation? = ..., id.walt.crypto2.keys/KeyAuthorizationEvidence = ...): id.walt.crypto2.keys/PlatformKeyFacts // id.walt.crypto2.keys/PlatformKeyFacts.copy|copy(id.walt.crypto2.keys.KeyOrigin;id.walt.crypto2.keys.KeySecurityLevel;id.walt.crypto2.keys.KeyProtectionLevel;id.walt.crypto2.keys.KeyAttestation?;id.walt.crypto2.keys.KeyAuthorizationEvidence){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.crypto2.keys/PlatformKeyFacts.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.crypto2.keys/PlatformKeyFacts.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.crypto2.keys/PlatformKeyFacts.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.crypto2.keys/PlatformKeyFacts> { // id.walt.crypto2.keys/PlatformKeyFacts.$serializer|null[0]
+        final val descriptor // id.walt.crypto2.keys/PlatformKeyFacts.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.crypto2.keys/PlatformKeyFacts.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.crypto2.keys/PlatformKeyFacts.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.crypto2.keys/PlatformKeyFacts // id.walt.crypto2.keys/PlatformKeyFacts.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.crypto2.keys/PlatformKeyFacts) // id.walt.crypto2.keys/PlatformKeyFacts.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.crypto2.keys.PlatformKeyFacts){}[0]
+    }
+
+    final object Companion { // id.walt.crypto2.keys/PlatformKeyFacts.Companion|null[0]
+        final val $childSerializers // id.walt.crypto2.keys/PlatformKeyFacts.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.crypto2.keys/PlatformKeyFacts> // id.walt.crypto2.keys/PlatformKeyFacts.Companion.serializer|serializer(){}[0]
+    }
+}
+
 final class id.walt.crypto2.providers.cryptography/CryptographyCapabilityProfile { // id.walt.crypto2.providers.cryptography/CryptographyCapabilityProfile|null[0]
     constructor <init>(kotlin.collections/Set<id.walt.crypto2.keys/KeySpec>, kotlin.collections/Set<id.walt.crypto2.algorithms/DigestAlgorithm>, kotlin.collections/Set<id.walt.crypto2.providers.cryptography/SignatureFamily>, kotlin.collections/Set<id.walt.crypto2.algorithms/EcdsaSignatureEncoding>, kotlin.collections/Set<id.walt.crypto2.algorithms/AsymmetricEncryptionAlgorithm>, kotlin.collections/Set<id.walt.crypto2.algorithms/KeyAgreementAlgorithm>, kotlin.collections/Set<id.walt.crypto2.keys/KeyEncodingFormat>, kotlin.collections/Set<id.walt.crypto2.keys/KeyEncodingFormat>, kotlin.collections/Set<id.walt.crypto2.keys/KeyEncodingFormat>, kotlin.collections/Set<id.walt.crypto2.keys/KeyEncodingFormat>, kotlin.collections/Set<id.walt.crypto2.keys/KeySpec>) // id.walt.crypto2.providers.cryptography/CryptographyCapabilityProfile.<init>|<init>(kotlin.collections.Set<id.walt.crypto2.keys.KeySpec>;kotlin.collections.Set<id.walt.crypto2.algorithms.DigestAlgorithm>;kotlin.collections.Set<id.walt.crypto2.providers.cryptography.SignatureFamily>;kotlin.collections.Set<id.walt.crypto2.algorithms.EcdsaSignatureEncoding>;kotlin.collections.Set<id.walt.crypto2.algorithms.AsymmetricEncryptionAlgorithm>;kotlin.collections.Set<id.walt.crypto2.algorithms.KeyAgreementAlgorithm>;kotlin.collections.Set<id.walt.crypto2.keys.KeyEncodingFormat>;kotlin.collections.Set<id.walt.crypto2.keys.KeyEncodingFormat>;kotlin.collections.Set<id.walt.crypto2.keys.KeyEncodingFormat>;kotlin.collections.Set<id.walt.crypto2.keys.KeyEncodingFormat>;kotlin.collections.Set<id.walt.crypto2.keys.KeySpec>){}[0]
 
@@ -2349,12 +2606,15 @@ final const val id.walt.crypto2.keys/JWK_ALGORITHM_METADATA_KEY // id.walt.crypt
 
 final val id.walt.crypto2.algorithms/outputSizeBytes // id.walt.crypto2.algorithms/outputSizeBytes|@id.walt.crypto2.algorithms.DigestAlgorithm{}outputSizeBytes[0]
     final fun (id.walt.crypto2.algorithms/DigestAlgorithm).<get-outputSizeBytes>(): kotlin/Int? // id.walt.crypto2.algorithms/outputSizeBytes.<get-outputSizeBytes>|<get-outputSizeBytes>@id.walt.crypto2.algorithms.DigestAlgorithm(){}[0]
+final val id.walt.crypto2.keys/reuseSeconds // id.walt.crypto2.keys/reuseSeconds|@id.walt.crypto2.keys.KeyUseAuthorizationPolicy{}reuseSeconds[0]
+    final fun (id.walt.crypto2.keys/KeyUseAuthorizationPolicy).<get-reuseSeconds>(): kotlin/Int // id.walt.crypto2.keys/reuseSeconds.<get-reuseSeconds>|<get-reuseSeconds>@id.walt.crypto2.keys.KeyUseAuthorizationPolicy(){}[0]
 
 final fun (id.walt.crypto2.keys/EncodedKey.Jwk).id.walt.crypto2.keys/inferKeySpec(): id.walt.crypto2.keys/KeySpec // id.walt.crypto2.keys/inferKeySpec|inferKeySpec@id.walt.crypto2.keys.EncodedKey.Jwk(){}[0]
 final fun (id.walt.crypto2.keys/EncodedKey.Jwk).id.walt.crypto2.keys/publicOnly(): id.walt.crypto2.keys/EncodedKey.Jwk // id.walt.crypto2.keys/publicOnly|publicOnly@id.walt.crypto2.keys.EncodedKey.Jwk(){}[0]
 final fun (id.walt.crypto2.keys/EncodedKey.Jwk).id.walt.crypto2.keys/toStoredSoftwareKey(id.walt.crypto2.keys/KeyId, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, kotlin.collections/Map<kotlin/String, kotlin/String> = ...): id.walt.crypto2.keys/StoredKey.Software // id.walt.crypto2.keys/toStoredSoftwareKey|toStoredSoftwareKey@id.walt.crypto2.keys.EncodedKey.Jwk(id.walt.crypto2.keys.KeyId;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;kotlin.collections.Map<kotlin.String,kotlin.String>){}[0]
 final fun (id.walt.crypto2.keys/EncodedKey.Pkcs8Der).id.walt.crypto2.keys/encodePem(): kotlin/String // id.walt.crypto2.keys/encodePem|encodePem@id.walt.crypto2.keys.EncodedKey.Pkcs8Der(){}[0]
 final fun (id.walt.crypto2.keys/EncodedKey.SpkiDer).id.walt.crypto2.keys/encodePem(): kotlin/String // id.walt.crypto2.keys/encodePem|encodePem@id.walt.crypto2.keys.EncodedKey.SpkiDer(){}[0]
+final fun (id.walt.crypto2.keys/KeyUseAuthorizationUnsupportedReason).id.walt.crypto2.keys/toAuthorizationFailure(): id.walt.crypto2.keys/KeyUseAuthorizationFailure // id.walt.crypto2.keys/toAuthorizationFailure|toAuthorizationFailure@id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason(){}[0]
 final fun (kotlin/String).id.walt.crypto2.keys/decodePrivateKeyPem(): id.walt.crypto2.keys/EncodedKey.Pkcs8Der // id.walt.crypto2.keys/decodePrivateKeyPem|decodePrivateKeyPem@kotlin.String(){}[0]
 final fun (kotlin/String).id.walt.crypto2.keys/decodePublicKeyPem(): id.walt.crypto2.keys/EncodedKey.SpkiDer // id.walt.crypto2.keys/decodePublicKeyPem|decodePublicKeyPem@kotlin.String(){}[0]
 final fun id.walt.crypto2.providers.cryptography/defaultSoftwareKeyProviders(): kotlin.collections/List<id.walt.crypto2.providers/SoftwareKeyProvider> // id.walt.crypto2.providers.cryptography/defaultSoftwareKeyProviders|defaultSoftwareKeyProviders(){}[0]

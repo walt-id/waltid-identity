@@ -1,5 +1,8 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.HardwarePreference
+
 import android.content.Intent
 import android.os.Bundle
 import androidx.fragment.app.FragmentActivity
@@ -33,8 +36,8 @@ class AndroidInteractiveAuthorizationTest {
             val material = assertIs<EncodedKey.Jwk>(assertNotNull(source.capabilities.privateKeyExporter).exportPrivateKey())
             for (importing in listOf(false, true)) {
                 val alias = "authorization-${UUID.randomUUID()}"
-                val policy = SignumKeyPolicy(hardware = SignumHardwarePolicy.PREFERRED,
-                    platform = SignumPlatformPolicy.AndroidKeystore(strongBox = SignumHardwarePolicy.DISCOURAGED),
+                val policy = SignumKeyPolicy(hardware = HardwarePreference.PREFERRED,
+                    platform = PlatformKeyConfiguration.AndroidKeystore(strongBox = HardwarePreference.DISCOURAGED),
                     authentication = SignumAuthenticationPolicy.UserPresence(allowNewBiometrics = true,
                         prompt = "WAL-749 ${if (importing) "imported" else "generated"}: $route"))
                 try {

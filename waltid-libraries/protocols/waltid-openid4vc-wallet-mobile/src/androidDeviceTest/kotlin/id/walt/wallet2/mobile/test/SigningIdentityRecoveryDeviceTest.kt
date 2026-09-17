@@ -5,7 +5,7 @@ import id.walt.crypto2.keys.KeyOrigin
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.identity.*
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 import kotlin.uuid.Uuid

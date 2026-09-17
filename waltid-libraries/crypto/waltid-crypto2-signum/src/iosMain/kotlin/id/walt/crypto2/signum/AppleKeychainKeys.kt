@@ -2,6 +2,13 @@
 
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.KeyProtectionLevel
+import id.walt.crypto2.keys.KeyAttestation
+import id.walt.crypto2.keys.KeyOrigin
+import id.walt.crypto2.keys.KeySecurityLevel
+
 import id.walt.crypto2.signum.corefoundation.waltCfEqual
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureCodec
@@ -32,14 +39,14 @@ internal interface AppleKeychainKey : SignumPlatformKey {
 /** Native Keychain import is deliberately separate from Secure Enclave generation. */
 internal object AppleKeychainKeys {
     fun supports(policy: SignumKeyPolicy, importing: Boolean): Boolean =
-        policy.platform !is SignumPlatformPolicy.AndroidKeystore && !policy.keyAgreement &&
-            policy.attestationChallenge == null && (!importing || policy.hardware != SignumHardwarePolicy.REQUIRED)
+        policy.platform !is PlatformKeyConfiguration.AndroidKeystore && !policy.keyAgreement &&
+            policy.attestationChallenge == null && (!importing || policy.hardware != HardwarePreference.REQUIRED)
 
     suspend fun create(alias: String, policy: SignumKeyPolicy, material: EncodedKey.Jwk?): AppleKeychainKey =
         withContext(Dispatchers.Default) {
             require(supports(policy, importing = material != null)) { "Unsupported iOS native key policy" }
             require(!exists(alias, policy)) { "Keychain alias already exists" }
-            val enclave = material == null && policy.hardware != SignumHardwarePolicy.DISCOURAGED
+            val enclave = material == null && policy.hardware != HardwarePreference.DISCOURAGED
             val raw = material?.let(::rawPrivateKey)
             val privateKey = try {
                 attributes().use { attributes ->
@@ -148,14 +155,14 @@ internal object AppleKeychainKeys {
         override val nativeIdentity: IosKeyIdentity,
     ) : AppleKeychainKey {
         override val spec: KeySpec = KeySpec.Ec(EcCurve.P256)
-        override val origin = if (imported) SignumKeyOrigin.IMPORTED else SignumKeyOrigin.GENERATED
-        override val securityLevel = if (nativeIdentity.secureEnclave) SignumSecurityLevel.SECURE_ENCLAVE else SignumSecurityLevel.SOFTWARE
+        override val origin = if (imported) KeyOrigin.IMPORTED else KeyOrigin.GENERATED
+        override val securityLevel = if (nativeIdentity.secureEnclave) KeySecurityLevel.SECURE_ENCLAVE else KeySecurityLevel.SOFTWARE
 
-        override val protectionLevel = if (securityLevel == SignumSecurityLevel.SECURE_ENCLAVE) {
-            SignumProtectionLevel.HARDWARE
-        } else SignumProtectionLevel.SOFTWARE
-        override val attestation: SignumKeyAttestation? = null
-        override val privateKeyExporter: PrivateKeyExporter? = if (protectionLevel == SignumProtectionLevel.SOFTWARE) {
+        override val protectionLevel = if (securityLevel == KeySecurityLevel.SECURE_ENCLAVE) {
+            KeyProtectionLevel.HARDWARE
+        } else KeyProtectionLevel.SOFTWARE
+        override val attestation: KeyAttestation? = null
+        override val privateKeyExporter: PrivateKeyExporter? = if (protectionLevel == KeyProtectionLevel.SOFTWARE) {
             PrivateKeyExporter {
                 authorization.use { context -> withKey(alias, policy, nativeIdentity, context) { key -> memScoped {
                     val error = alloc<CFErrorRefVar>(); error.value = null
@@ -278,12 +285,12 @@ internal object AppleKeychainKeys {
         put(kSecAttrKeyType, kSecAttrKeyTypeECSECPrimeRandom)
         put(kSecAttrKeyClass, kSecAttrKeyClassPrivate)
         putRetained(kSecAttrApplicationTag, "id.walt.crypto2.native:$alias".encodeToByteArray().toNSData())
-        (policy.platform as? SignumPlatformPolicy.IosKeychain)?.accessGroup?.let { putRetained(kSecAttrAccessGroup, it) }
+        (policy.platform as? PlatformKeyConfiguration.IosKeychain)?.accessGroup?.let { putRetained(kSecAttrAccessGroup, it) }
         put(kSecUseDataProtectionKeychain, kCFBooleanTrue)
     }
 
     private fun addAccessControl(dictionary: KeychainDictionary, policy: SignumKeyPolicy, enclave: Boolean) {
-        val settings = policy.platform as? SignumPlatformPolicy.IosKeychain ?: SignumPlatformPolicy.IosKeychain()
+        val settings = policy.platform as? PlatformKeyConfiguration.IosKeychain ?: PlatformKeyConfiguration.IosKeychain()
         val accessibility = settings.accessibility.nativeAccessibility
         val auth = policy.authentication as? SignumAuthenticationPolicy.UserPresence
         if (auth == null && !enclave) { dictionary.put(kSecAttrAccessible, accessibility); return }

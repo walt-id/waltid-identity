@@ -1572,6 +1572,219 @@ public final class id/walt/crypto2/keys/KeyUsage$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class id/walt/crypto2/keys/KeyUseAuthorizationException : java/lang/Exception {
+	public fun <init> (Lid/walt/crypto2/keys/KeyUseAuthorizationFailure;Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Lid/walt/crypto2/keys/KeyUseAuthorizationFailure;Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getFailure ()Lid/walt/crypto2/keys/KeyUseAuthorizationFailure;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationFailure : java/lang/Enum {
+	public static final field AuthorizationNotCompleted Lid/walt/crypto2/keys/KeyUseAuthorizationFailure;
+	public static final field BiometricNotEnrolled Lid/walt/crypto2/keys/KeyUseAuthorizationFailure;
+	public static final field BiometricUnavailable Lid/walt/crypto2/keys/KeyUseAuthorizationFailure;
+	public static final field Companion Lid/walt/crypto2/keys/KeyUseAuthorizationFailure$Companion;
+	public static final field DeviceCredentialNotSet Lid/walt/crypto2/keys/KeyUseAuthorizationFailure;
+	public static final field InteractionContextUnavailable Lid/walt/crypto2/keys/KeyUseAuthorizationFailure;
+	public static final field InvalidStoredKeyMetadata Lid/walt/crypto2/keys/KeyUseAuthorizationFailure;
+	public static final field ProtectedKeyUnavailable Lid/walt/crypto2/keys/KeyUseAuthorizationFailure;
+	public static final field UnsupportedCombination Lid/walt/crypto2/keys/KeyUseAuthorizationFailure;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/keys/KeyUseAuthorizationFailure;
+	public static fun values ()[Lid/walt/crypto2/keys/KeyUseAuthorizationFailure;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationFailure$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationKt {
+	public static final fun getReuseSeconds (Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;)I
+	public static final fun toAuthorizationFailure (Lid/walt/crypto2/keys/KeyUseAuthorizationUnsupportedReason;)Lid/walt/crypto2/keys/KeyUseAuthorizationFailure;
+}
+
+public abstract interface class id/walt/crypto2/keys/KeyUseAuthorizationPolicy {
+	public static final field Companion Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$Companion;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricAny : id/walt/crypto2/keys/KeyUseAuthorizationPolicy {
+	public static final field INSTANCE Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricAny;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricCurrentSet : id/walt/crypto2/keys/KeyUseAuthorizationPolicy {
+	public static final field INSTANCE Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricCurrentSet;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricOrDeviceCredential : id/walt/crypto2/keys/KeyUseAuthorizationPolicy {
+	public static final field Companion Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricOrDeviceCredential$Companion;
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun copy (I)Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricOrDeviceCredential;
+	public static synthetic fun copy$default (Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricOrDeviceCredential;IILjava/lang/Object;)Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricOrDeviceCredential;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTimeoutSeconds ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricOrDeviceCredential$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricOrDeviceCredential$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricOrDeviceCredential;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricOrDeviceCredential;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricOrDeviceCredential$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricTimedReuse : id/walt/crypto2/keys/KeyUseAuthorizationPolicy {
+	public static final field Companion Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricTimedReuse$Companion;
+	public fun <init> (I)V
+	public final fun component1 ()I
+	public final fun copy (I)Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricTimedReuse;
+	public static synthetic fun copy$default (Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricTimedReuse;IILjava/lang/Object;)Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricTimedReuse;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTimeoutSeconds ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricTimedReuse$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricTimedReuse$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricTimedReuse;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricTimedReuse;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationPolicy$BiometricTimedReuse$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationPolicy$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationPolicy$DeviceCredential : id/walt/crypto2/keys/KeyUseAuthorizationPolicy {
+	public static final field Companion Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$DeviceCredential$Companion;
+	public fun <init> ()V
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun copy (I)Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$DeviceCredential;
+	public static synthetic fun copy$default (Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$DeviceCredential;IILjava/lang/Object;)Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$DeviceCredential;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTimeoutSeconds ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/keys/KeyUseAuthorizationPolicy$DeviceCredential$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$DeviceCredential$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$DeviceCredential;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$DeviceCredential;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationPolicy$DeviceCredential$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationPolicy$None : id/walt/crypto2/keys/KeyUseAuthorizationPolicy {
+	public static final field INSTANCE Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy$None;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationReuseEnforcement : java/lang/Enum {
+	public static final field Companion Lid/walt/crypto2/keys/KeyUseAuthorizationReuseEnforcement$Companion;
+	public static final field PlatformKeyStore Lid/walt/crypto2/keys/KeyUseAuthorizationReuseEnforcement;
+	public static final field ProviderProcess Lid/walt/crypto2/keys/KeyUseAuthorizationReuseEnforcement;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/keys/KeyUseAuthorizationReuseEnforcement;
+	public static fun values ()[Lid/walt/crypto2/keys/KeyUseAuthorizationReuseEnforcement;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationReuseEnforcement$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationReuseTimeoutValidation : java/lang/Enum {
+	public static final field Companion Lid/walt/crypto2/keys/KeyUseAuthorizationReuseTimeoutValidation$Companion;
+	public static final field IndependentReadback Lid/walt/crypto2/keys/KeyUseAuthorizationReuseTimeoutValidation;
+	public static final field ProviderConfigurationOnly Lid/walt/crypto2/keys/KeyUseAuthorizationReuseTimeoutValidation;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/keys/KeyUseAuthorizationReuseTimeoutValidation;
+	public static fun values ()[Lid/walt/crypto2/keys/KeyUseAuthorizationReuseTimeoutValidation;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationReuseTimeoutValidation$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class id/walt/crypto2/keys/KeyUseAuthorizationSupport {
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationSupport$Supported : id/walt/crypto2/keys/KeyUseAuthorizationSupport {
+	public fun <init> (Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/crypto2/keys/KeyUseAuthorizationReuseEnforcement;Lid/walt/crypto2/keys/KeyUseAuthorizationReuseTimeoutValidation;)V
+	public synthetic fun <init> (Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/crypto2/keys/KeyUseAuthorizationReuseEnforcement;Lid/walt/crypto2/keys/KeyUseAuthorizationReuseTimeoutValidation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;
+	public final fun component2 ()Lid/walt/crypto2/keys/KeyUseAuthorizationReuseEnforcement;
+	public final fun component3 ()Lid/walt/crypto2/keys/KeyUseAuthorizationReuseTimeoutValidation;
+	public final fun copy (Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/crypto2/keys/KeyUseAuthorizationReuseEnforcement;Lid/walt/crypto2/keys/KeyUseAuthorizationReuseTimeoutValidation;)Lid/walt/crypto2/keys/KeyUseAuthorizationSupport$Supported;
+	public static synthetic fun copy$default (Lid/walt/crypto2/keys/KeyUseAuthorizationSupport$Supported;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/crypto2/keys/KeyUseAuthorizationReuseEnforcement;Lid/walt/crypto2/keys/KeyUseAuthorizationReuseTimeoutValidation;ILjava/lang/Object;)Lid/walt/crypto2/keys/KeyUseAuthorizationSupport$Supported;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEffectivePolicy ()Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;
+	public final fun getReuseEnforcement ()Lid/walt/crypto2/keys/KeyUseAuthorizationReuseEnforcement;
+	public final fun getTimeoutValidation ()Lid/walt/crypto2/keys/KeyUseAuthorizationReuseTimeoutValidation;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationSupport$Unsupported : id/walt/crypto2/keys/KeyUseAuthorizationSupport {
+	public fun <init> (Lid/walt/crypto2/keys/KeyUseAuthorizationUnsupportedReason;)V
+	public final fun component1 ()Lid/walt/crypto2/keys/KeyUseAuthorizationUnsupportedReason;
+	public final fun copy (Lid/walt/crypto2/keys/KeyUseAuthorizationUnsupportedReason;)Lid/walt/crypto2/keys/KeyUseAuthorizationSupport$Unsupported;
+	public static synthetic fun copy$default (Lid/walt/crypto2/keys/KeyUseAuthorizationSupport$Unsupported;Lid/walt/crypto2/keys/KeyUseAuthorizationUnsupportedReason;ILjava/lang/Object;)Lid/walt/crypto2/keys/KeyUseAuthorizationSupport$Unsupported;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Lid/walt/crypto2/keys/KeyUseAuthorizationUnsupportedReason;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/crypto2/keys/KeyUseAuthorizationUnsupportedReason : java/lang/Enum {
+	public static final field BiometricNotEnrolled Lid/walt/crypto2/keys/KeyUseAuthorizationUnsupportedReason;
+	public static final field BiometricUnavailable Lid/walt/crypto2/keys/KeyUseAuthorizationUnsupportedReason;
+	public static final field DeviceCredentialNotSet Lid/walt/crypto2/keys/KeyUseAuthorizationUnsupportedReason;
+	public static final field UnsupportedCombination Lid/walt/crypto2/keys/KeyUseAuthorizationUnsupportedReason;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/crypto2/keys/KeyUseAuthorizationUnsupportedReason;
+	public static fun values ()[Lid/walt/crypto2/keys/KeyUseAuthorizationUnsupportedReason;
+}
+
 public abstract interface class id/walt/crypto2/keys/KeyWrapper {
 	public abstract fun wrapKey (Lid/walt/crypto2/keys/EncodedKeyMaterial;Lid/walt/crypto2/algorithms/KeyWrappingAlgorithm;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -1747,6 +1960,43 @@ public final synthetic class id/walt/crypto2/keys/PlatformKeyConfiguration$IosKe
 }
 
 public final class id/walt/crypto2/keys/PlatformKeyConfiguration$IosKeychain$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/PlatformKeyFacts {
+	public static final field Companion Lid/walt/crypto2/keys/PlatformKeyFacts$Companion;
+	public fun <init> ()V
+	public fun <init> (Lid/walt/crypto2/keys/KeyOrigin;Lid/walt/crypto2/keys/KeySecurityLevel;Lid/walt/crypto2/keys/KeyProtectionLevel;Lid/walt/crypto2/keys/KeyAttestation;Lid/walt/crypto2/keys/KeyAuthorizationEvidence;)V
+	public synthetic fun <init> (Lid/walt/crypto2/keys/KeyOrigin;Lid/walt/crypto2/keys/KeySecurityLevel;Lid/walt/crypto2/keys/KeyProtectionLevel;Lid/walt/crypto2/keys/KeyAttestation;Lid/walt/crypto2/keys/KeyAuthorizationEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lid/walt/crypto2/keys/KeyOrigin;
+	public final fun component2 ()Lid/walt/crypto2/keys/KeySecurityLevel;
+	public final fun component3 ()Lid/walt/crypto2/keys/KeyProtectionLevel;
+	public final fun component4 ()Lid/walt/crypto2/keys/KeyAttestation;
+	public final fun component5 ()Lid/walt/crypto2/keys/KeyAuthorizationEvidence;
+	public final fun copy (Lid/walt/crypto2/keys/KeyOrigin;Lid/walt/crypto2/keys/KeySecurityLevel;Lid/walt/crypto2/keys/KeyProtectionLevel;Lid/walt/crypto2/keys/KeyAttestation;Lid/walt/crypto2/keys/KeyAuthorizationEvidence;)Lid/walt/crypto2/keys/PlatformKeyFacts;
+	public static synthetic fun copy$default (Lid/walt/crypto2/keys/PlatformKeyFacts;Lid/walt/crypto2/keys/KeyOrigin;Lid/walt/crypto2/keys/KeySecurityLevel;Lid/walt/crypto2/keys/KeyProtectionLevel;Lid/walt/crypto2/keys/KeyAttestation;Lid/walt/crypto2/keys/KeyAuthorizationEvidence;ILjava/lang/Object;)Lid/walt/crypto2/keys/PlatformKeyFacts;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAttestation ()Lid/walt/crypto2/keys/KeyAttestation;
+	public final fun getAuthorizationEvidence ()Lid/walt/crypto2/keys/KeyAuthorizationEvidence;
+	public final fun getOrigin ()Lid/walt/crypto2/keys/KeyOrigin;
+	public final fun getProtection ()Lid/walt/crypto2/keys/KeyProtectionLevel;
+	public final fun getSecurityLevel ()Lid/walt/crypto2/keys/KeySecurityLevel;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/crypto2/keys/PlatformKeyFacts$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/crypto2/keys/PlatformKeyFacts$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/crypto2/keys/PlatformKeyFacts;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/crypto2/keys/PlatformKeyFacts;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/crypto2/keys/PlatformKeyFacts$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 

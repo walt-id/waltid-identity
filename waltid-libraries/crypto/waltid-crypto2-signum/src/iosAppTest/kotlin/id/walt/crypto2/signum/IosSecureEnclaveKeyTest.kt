@@ -1,5 +1,10 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.KeychainAccessibility
+import id.walt.crypto2.keys.KeySecurityLevel
+
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EcCurve
@@ -21,14 +26,14 @@ class IosSecureEnclaveKeyTest {
         val spec = KeySpec.Ec(EcCurve.P256)
         val usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
         val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)
-        for (accessibility in SignumKeychainAccessibility.entries) {
+        for (accessibility in KeychainAccessibility.entries) {
             val alias = "enclave-no-auth-${NSUUID().UUIDString}"
-            val policy = SignumKeyPolicy(hardware = SignumHardwarePolicy.REQUIRED,
-                platform = SignumPlatformPolicy.IosKeychain(accessibility))
+            val policy = SignumKeyPolicy(hardware = HardwarePreference.REQUIRED,
+                platform = PlatformKeyConfiguration.IosKeychain(accessibility))
             val backend = IosSignumKeyBackend()
             try {
                 val created = backend.create(alias, spec, usages, policy)
-                assertEquals(SignumSecurityLevel.SECURE_ENCLAVE, created.securityLevel)
+                assertEquals(KeySecurityLevel.SECURE_ENCLAVE, created.securityLevel)
                 assertNull(created.privateKeyExporter)
                 val reopened = assertNotNull(IosSignumKeyBackend().load(alias, spec, usages, policy))
                 assertEquals(created.publicKey, reopened.publicKey)

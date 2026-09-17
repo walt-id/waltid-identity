@@ -1,5 +1,7 @@
 package id.walt.wallet2.persistence.keys
 
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+
 import id.walt.wallet2.data.WalletKeyStore
 
 /** Mobile key store that can report the immutable authorization policy of a persisted key. */

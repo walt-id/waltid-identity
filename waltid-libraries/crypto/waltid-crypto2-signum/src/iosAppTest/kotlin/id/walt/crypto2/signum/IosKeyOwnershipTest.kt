@@ -1,5 +1,10 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.KeychainAccessibility
+import id.walt.crypto2.keys.KeyOrigin
+
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EcCurve
@@ -13,7 +18,7 @@ import kotlin.test.*
 class IosKeyOwnershipTest {
     private val spec = KeySpec.Ec(EcCurve.P256)
     private val usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
-    private val policy = SignumKeyPolicy(hardware = SignumHardwarePolicy.DISCOURAGED)
+    private val policy = SignumKeyPolicy(hardware = HardwarePreference.DISCOURAGED)
     private val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)
 
     @Test
@@ -24,7 +29,7 @@ class IosKeyOwnershipTest {
             val created = backend.create(alias, spec, usages, policy)
             val reopened = assertNotNull(IosSignumKeyBackend().load(alias, spec, usages, policy))
             assertEquals(created.publicKey, reopened.publicKey)
-            assertEquals(SignumKeyOrigin.GENERATED, reopened.origin)
+            assertEquals(KeyOrigin.GENERATED, reopened.origin)
             val data = "owned key".encodeToByteArray()
             assertTrue(reopened.verify(data, reopened.sign(data, algorithm), algorithm))
             assertNotNull(reopened.privateKeyExporter).exportPrivateKey()
@@ -63,7 +68,7 @@ class IosKeyOwnershipTest {
             backend.create(alias, spec, usages, policy)
             val changed = listOf(
                 policy.copy(authentication = SignumAuthenticationPolicy.UserPresence(deviceCredential = false)),
-                policy.copy(platform = SignumPlatformPolicy.IosKeychain(SignumKeychainAccessibility.AFTER_FIRST_UNLOCK_DEVICE_ONLY)),
+                policy.copy(platform = PlatformKeyConfiguration.IosKeychain(KeychainAccessibility.AFTER_FIRST_UNLOCK_DEVICE_ONLY)),
             )
             for (requested in changed) assertFailsWith<SignumKeyPolicyMismatchException> {
                 backend.load(alias, spec, usages, requested)
@@ -124,7 +129,7 @@ class IosKeyOwnershipTest {
             val record = assertNotNull(IosKeyOwnershipStore.read(alias, policy))
             val malformed = listOf(
                 record.copy(version = 2),
-                record.copy(origin = SignumKeyOrigin.UNKNOWN),
+                record.copy(origin = KeyOrigin.UNKNOWN),
                 record.copy(native = record.native.copy(persistentReference = id.walt.crypto2.serialization.BinaryData(byteArrayOf()))),
             )
             for (replacement in malformed) {

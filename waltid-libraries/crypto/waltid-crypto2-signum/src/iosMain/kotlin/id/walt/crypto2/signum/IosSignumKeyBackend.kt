@@ -1,5 +1,12 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.KeychainAccessibility
+import id.walt.crypto2.keys.KeyProtectionLevel
+import id.walt.crypto2.keys.KeyOrigin
+import id.walt.crypto2.keys.KeySecurityLevel
+
 import at.asitplus.signum.internals.CoreFoundationException
 import at.asitplus.signum.supreme.CFCryptoOperationFailed
 import at.asitplus.signum.supreme.os.IosSigner
@@ -25,12 +32,12 @@ class IosSignumKeyBackend : SignumPlatformBackend, SignumPrivateKeyImportBackend
     override val id = ProviderId("ios-keychain-signum")
 
     override fun supports(spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy): Boolean =
-        policy.platform !is SignumPlatformPolicy.AndroidKeystore &&
+        policy.platform !is PlatformKeyConfiguration.AndroidKeystore &&
             spec.isSupportedSignumSpec() &&
             usages.all { it == KeyUsage.SIGN || it == KeyUsage.VERIFY || it == KeyUsage.KEY_AGREEMENT } &&
             (KeyUsage.KEY_AGREEMENT !in usages || spec is KeySpec.Ec) &&
             (KeyUsage.KEY_AGREEMENT in usages) == policy.keyAgreement &&
-            (policy.hardware != SignumHardwarePolicy.REQUIRED || spec == KeySpec.Ec(EcCurve.P256)) &&
+            (policy.hardware != HardwarePreference.REQUIRED || spec == KeySpec.Ec(EcCurve.P256)) &&
             (iosKeyEngine(spec, policy) != IosKeyEngine.APPLE_KEYCHAIN ||
                 (spec == KeySpec.Ec(EcCurve.P256) && AppleKeychainKeys.supports(policy, importing = false)))
 
@@ -59,8 +66,8 @@ class IosSignumKeyBackend : SignumPlatformBackend, SignumPrivateKeyImportBackend
             // Do not let Signum's orphan cleanup replace an externally created private key.
             require(IosKeyEngine.entries.none { iosKeyExists(alias, policy, it) }) { "Native key alias already exists" }
             val engine = if (material != null) IosKeyEngine.APPLE_KEYCHAIN else iosKeyEngine(spec, policy)
-            val effective = if (policy.hardware == SignumHardwarePolicy.PREFERRED && isSimulator) {
-                policy.copy(hardware = SignumHardwarePolicy.DISCOURAGED)
+            val effective = if (policy.hardware == HardwarePreference.PREFERRED && isSimulator) {
+                policy.copy(hardware = HardwarePreference.DISCOURAGED)
             } else policy
             val key = when (engine) {
                 IosKeyEngine.APPLE_KEYCHAIN -> AppleKeychainKeys.create(alias, effective, material)
@@ -70,12 +77,12 @@ class IosSignumKeyBackend : SignumPlatformBackend, SignumPrivateKeyImportBackend
                             val ios = this as IosSecureEnclaveConfiguration
                             val accessibility = policy.iosSettings().accessibility
                             ios.availability = when (accessibility) {
-                                SignumKeychainAccessibility.AFTER_FIRST_UNLOCK,
-                                SignumKeychainAccessibility.AFTER_FIRST_UNLOCK_DEVICE_ONLY -> IosSecureEnclaveConfiguration.Availability.AFTER_FIRST_UNLOCK
+                                KeychainAccessibility.AFTER_FIRST_UNLOCK,
+                                KeychainAccessibility.AFTER_FIRST_UNLOCK_DEVICE_ONLY -> IosSecureEnclaveConfiguration.Availability.AFTER_FIRST_UNLOCK
                                 else -> IosSecureEnclaveConfiguration.Availability.WHILE_UNLOCKED
                             }
-                            ios.allowBackup = accessibility == SignumKeychainAccessibility.WHEN_UNLOCKED ||
-                                accessibility == SignumKeychainAccessibility.AFTER_FIRST_UNLOCK
+                            ios.allowBackup = accessibility == KeychainAccessibility.WHEN_UNLOCKED ||
+                                accessibility == KeychainAccessibility.AFTER_FIRST_UNLOCK
                         }
                     }.getOrElse { throw it.mapSignumFailure(alias) }
                     try { signumHandle(alias, spec, usages, policy, signer) }
@@ -91,7 +98,7 @@ class IosSignumKeyBackend : SignumPlatformBackend, SignumPrivateKeyImportBackend
                     ?: iosKeyIdentity(alias, policy, engine) ?: throw SignumKeyNotFoundException(alias)
                 native.validate(alias, policy)
                 val record = IosKeyOwnership(engine = engine, policy = policy.immutableIosPolicy(), spec = spec,
-                    usages = usages, origin = if (material == null) SignumKeyOrigin.GENERATED else SignumKeyOrigin.IMPORTED, publicKey = key.publicKey, native = native)
+                    usages = usages, origin = if (material == null) KeyOrigin.GENERATED else KeyOrigin.IMPORTED, publicKey = key.publicKey, native = native)
                 IosKeyOwnershipStore.write(alias, policy, record)
                 receiptWritten = true
                 caller.ensureActive()
@@ -109,13 +116,13 @@ class IosSignumKeyBackend : SignumPlatformBackend, SignumPrivateKeyImportBackend
     }
 
     override suspend fun load(alias: String, spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy): SignumPlatformKey? =
-        loadOwned(alias, spec, usages, policy, SignumKeyOrigin.GENERATED)
+        loadOwned(alias, spec, usages, policy, KeyOrigin.GENERATED)
 
     override suspend fun loadImportedKey(alias: String, spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy): SignumPlatformKey? =
-        loadOwned(alias, spec, usages, policy, SignumKeyOrigin.IMPORTED)
+        loadOwned(alias, spec, usages, policy, KeyOrigin.IMPORTED)
 
     private suspend fun loadOwned(alias: String, spec: KeySpec, usages: Set<KeyUsage>, policy: SignumKeyPolicy,
-        origin: SignumKeyOrigin): SignumPlatformKey? = lifecycle.withLock {
+        origin: KeyOrigin): SignumPlatformKey? = lifecycle.withLock {
         // No receipt means no owned key. Do not inspect or adopt an unowned native alias;
         // callers may explicitly recover the original material into a fresh alias.
         val record = IosKeyOwnershipStore.read(alias, policy) ?: return@withLock null
@@ -123,7 +130,7 @@ class IosSignumKeyBackend : SignumPlatformBackend, SignumPrivateKeyImportBackend
         requireIosKeyBiometrics(alias, policy)
         validateOwnedEntry(alias, record)
         val key = when (record.engine) {
-            IosKeyEngine.APPLE_KEYCHAIN -> AppleKeychainKeys.load(alias, policy, origin == SignumKeyOrigin.IMPORTED, record.publicKey, record.native)
+            IosKeyEngine.APPLE_KEYCHAIN -> AppleKeychainKeys.load(alias, policy, origin == KeyOrigin.IMPORTED, record.publicKey, record.native)
                 ?: throw SignumKeyNotFoundException(alias)
             IosKeyEngine.SIGNUM -> signumHandle(alias, spec, usages, policy,
                 IosKeychainProvider.getSignerForKey(alias).getOrElse { throw it.mapSignumFailure(alias) })
@@ -173,8 +180,8 @@ class IosSignumKeyBackend : SignumPlatformBackend, SignumPrivateKeyImportBackend
 
     private fun ownedHandle(key: SignumPlatformKey, record: IosKeyOwnership): SignumPlatformKey = object : SignumPlatformKey by key {
         override val origin = record.origin
-        override val protectionLevel = if (record.native.secureEnclave) SignumProtectionLevel.HARDWARE else SignumProtectionLevel.SOFTWARE
-        override val securityLevel = if (record.native.secureEnclave) SignumSecurityLevel.SECURE_ENCLAVE else SignumSecurityLevel.SOFTWARE
+        override val protectionLevel = if (record.native.secureEnclave) KeyProtectionLevel.HARDWARE else KeyProtectionLevel.SOFTWARE
+        override val securityLevel = if (record.native.secureEnclave) KeySecurityLevel.SECURE_ENCLAVE else KeySecurityLevel.SOFTWARE
         override val privateKeyExporter = key.privateKeyExporter?.let { exporter -> PrivateKeyExporter {
             lifecycle.withLock {
                 requireIosKeyBiometrics(key.alias, record.policy)
@@ -200,7 +207,7 @@ class IosSignumKeyBackend : SignumPlatformBackend, SignumPrivateKeyImportBackend
         val native = iosKeyIdentity(alias, policy, IosKeyEngine.SIGNUM) ?: throw SignumKeyNotFoundException(alias)
         validateIosNativePolicy(alias, policy, iosSigner.needsAuthenticationForEveryUse, iosSigner.needsAuthentication, native.secureEnclave)
         return SignumPlatformKeyHandle(
-            alias = alias, spec = spec, protectionLevel = SignumProtectionLevel.UNKNOWN,
+            alias = alias, spec = spec, protectionLevel = KeyProtectionLevel.UNKNOWN,
             attestation = signer.toAttestation(), authentication = policy.authentication,
             signerFor = { algorithm -> IosKeychainProvider.getSignerForKey(alias) {
                 configureSignumOperation(algorithm, policy.authentication)
@@ -218,7 +225,7 @@ class IosSignumKeyBackend : SignumPlatformBackend, SignumPrivateKeyImportBackend
         needsAuthentication: Boolean = needsAuthenticationForEveryUse,
         isSecureEnclave: Boolean,
     ) {
-        if (policy.hardware == SignumHardwarePolicy.REQUIRED && !isSecureEnclave) {
+        if (policy.hardware == HardwarePreference.REQUIRED && !isSecureEnclave) {
             throw SignumKeyPolicyMismatchException(alias, "the native key is not Secure Enclave-backed")
         }
         val authentication = policy.authentication as? SignumAuthenticationPolicy.UserPresence
@@ -238,10 +245,10 @@ internal fun iosKeyEngine(spec: KeySpec, policy: SignumKeyPolicy): IosKeyEngine 
     val settings = policy.iosSettings()
     val timeout = (policy.authentication as? SignumAuthenticationPolicy.UserPresence)?.timeoutSeconds ?: 0
     val needsApple = settings.accessGroup != null ||
-        settings.accessibility == SignumKeychainAccessibility.WHEN_PASSCODE_SET_DEVICE_ONLY || timeout > 0 ||
+        settings.accessibility == KeychainAccessibility.WHEN_PASSCODE_SET_DEVICE_ONLY || timeout > 0 ||
         (spec == KeySpec.Ec(EcCurve.P256) && policy.authentication == SignumAuthenticationPolicy.None &&
-            policy.hardware != SignumHardwarePolicy.DISCOURAGED) ||
-        (spec == KeySpec.Ec(EcCurve.P256) && !policy.keyAgreement && policy.hardware != SignumHardwarePolicy.REQUIRED)
+            policy.hardware != HardwarePreference.DISCOURAGED) ||
+        (spec == KeySpec.Ec(EcCurve.P256) && !policy.keyAgreement && policy.hardware != HardwarePreference.REQUIRED)
     return if (needsApple) IosKeyEngine.APPLE_KEYCHAIN else IosKeyEngine.SIGNUM
 }
 

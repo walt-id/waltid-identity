@@ -6,8 +6,8 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.toSpkiDer
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.wallet2.mobile.identity.*
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.PlatformKeyFacts
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.PlatformKeyFacts
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.get

@@ -1,5 +1,10 @@
 package id.walt.wallet2.persistence.keys
 
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
+import id.walt.crypto2.keys.toAuthorizationFailure
+
 import platform.LocalAuthentication.*
 import kotlin.test.*
 

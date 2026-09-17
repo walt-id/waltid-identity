@@ -3,7 +3,7 @@
 package id.walt.wallet2.mobile
 
 import id.walt.wallet2.mobile.identity.*
-import id.walt.wallet2.persistence.keys.PlatformKeyFacts
+import id.walt.crypto2.keys.PlatformKeyFacts
 import id.walt.wallet2.persistence.keys.WalletKeyProtection
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
@@ -30,15 +30,15 @@ import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseEnforcement
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseTimeoutValidation
+import id.walt.crypto2.keys.KeyUseAuthorizationException
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationReuseEnforcement
+import id.walt.crypto2.keys.KeyUseAuthorizationReuseTimeoutValidation
 import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
 import id.walt.wallet2.persistence.keys.WalletKeyRequirements
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore

@@ -1,7 +1,7 @@
 package id.walt.wallet2.mobile.identity
 
 import id.walt.crypto2.keys.PlatformKeyConfiguration
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import kotlinx.serialization.Serializable
 
 /** Identity configuration. Native recovery integrations are opt-in dependencies and registrations. */
