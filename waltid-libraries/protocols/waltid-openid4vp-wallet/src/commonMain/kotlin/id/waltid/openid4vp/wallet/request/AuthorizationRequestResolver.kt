@@ -338,7 +338,7 @@ object AuthorizationRequestResolver {
                     }
                 }
             ),
-        ).also { it.dcqlQuery?.precheck() }
+        )
     }
 
     private fun singleValuedEntries(parameters: Parameters): List<Pair<String, String>> =
@@ -552,7 +552,7 @@ object AuthorizationRequestResolver {
         val authorizationRequest = json.decodeFromJsonElement(
             deserializer = AuthorizationRequest.serializer(),
             element = applyRedirectUriPrefixBinding(authReqJws.payload),
-        ).also { if (enforceFinalRequestObject) it.dcqlQuery?.precheck() }
+        )
         return ResolvedAuthorizationRequest.AuthenticatedRequestObject(
             authorizationRequest = authorizationRequest,
             requestObject = requestObject,
@@ -680,7 +680,7 @@ object AuthorizationRequestResolver {
         val authorizationRequest = json.decodeFromJsonElement(
             deserializer = AuthorizationRequest.serializer(),
             element = applyRedirectUriPrefixBinding(payload),
-        ).also { it.dcqlQuery?.precheck() }
+        )
         requireMatchingClientId(outerClientId, authorizationRequest.clientId)
         val registeredMetadata = authenticatePreRegisteredAuthorizationRequest(authorizationRequest, trustConfiguration)
         val client = if (registeredMetadata != null) {
