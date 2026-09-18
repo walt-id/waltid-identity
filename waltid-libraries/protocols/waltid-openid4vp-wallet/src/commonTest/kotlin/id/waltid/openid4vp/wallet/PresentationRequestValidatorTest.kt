@@ -140,6 +140,70 @@ class PresentationRequestValidatorTest {
     }
 
     @Test
+    fun mdocEs256HolderAlgorithmIsAcceptedWhenAdvertisedByVerifier() {
+        val result = validate(
+            request(
+                dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery(CredentialFormat.MSO_MDOC))),
+                clientMetadata = ClientMetadata(
+                    vpFormatsSupported = mapOf(
+                        "mso_mdoc" to buildJsonObject {
+                            put(
+                                "issuerauth_alg_values",
+                                JsonArray(listOf(JsonPrimitive(-7), JsonPrimitive(-35), JsonPrimitive(-36))),
+                            )
+                            put(
+                                "deviceauth_alg_values",
+                                JsonArray(listOf(JsonPrimitive(-7), JsonPrimitive(-35), JsonPrimitive(-36))),
+                            )
+                        },
+                    ),
+                ),
+            ),
+        )
+
+        assertIs<PresentationRequestValidationResult.Valid>(result)
+    }
+
+    @Test
+    fun mdocEsp256OnlyHolderAlgorithmIsAcceptedForP256Wallet() {
+        val result = validate(
+            request(
+                dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery(CredentialFormat.MSO_MDOC))),
+                clientMetadata = ClientMetadata(
+                    vpFormatsSupported = mapOf(
+                        "mso_mdoc" to buildJsonObject {
+                            put("deviceauth_alg_values", JsonArray(listOf(JsonPrimitive(-9))))
+                        },
+                    ),
+                ),
+            ),
+        )
+
+        assertIs<PresentationRequestValidationResult.Valid>(result)
+    }
+
+    @Test
+    fun mdocEs384OnlyHolderAlgorithmIsRejectedForP256Wallet() {
+        val result = validate(
+            request(
+                dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery(CredentialFormat.MSO_MDOC))),
+                clientMetadata = ClientMetadata(
+                    vpFormatsSupported = mapOf(
+                        "mso_mdoc" to buildJsonObject {
+                            put("deviceauth_alg_values", JsonArray(listOf(JsonPrimitive(-35))))
+                        },
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(
+            WalletPresentFunctionality2.OID4VPErrorCode.VP_FORMATS_NOT_SUPPORTED,
+            assertIs<PresentationRequestValidationResult.Invalid>(result).error.code,
+        )
+    }
+
+    @Test
     fun mdocEdDsaHolderAlgorithmIsAcceptedWhenAdvertisedByVerifier() {
         val request = request(
             dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery(CredentialFormat.MSO_MDOC))),
@@ -348,7 +412,13 @@ class PresentationRequestValidatorTest {
         assertEquals(
             WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST,
             assertIs<PresentationRequestValidationResult.Invalid>(
-                validate(request, resolvedRequest = ResolvedAuthorizationRequest.Plain(request)),
+                validate(
+                    request,
+                    resolvedRequest = ResolvedAuthorizationRequest.Plain(
+                        request,
+                        id.waltid.openid4vp.wallet.request.AuthenticatedClientFacts.redirectUriBound(request),
+                    ),
+                ),
             ).error.code,
         )
     }
@@ -391,6 +461,25 @@ class PresentationRequestValidatorTest {
     }
 
     @Test
+    fun registeredPlainClientCanSendRejection() {
+        val request = request(clientId = "verifier2", nonce = null)
+        val resolvedRequest = ResolvedAuthorizationRequest.Plain(
+            request,
+            id.waltid.openid4vp.wallet.request.AuthenticatedClientFacts.registered(
+                metadata = ClientMetadata(redirectUris = listOf("https://verifier.example/response")),
+                request = request,
+            ),
+        )
+
+        assertEquals(
+            WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST,
+            assertIs<PresentationRequestValidationResult.Invalid>(
+                validate(request, resolvedRequest = resolvedRequest),
+            ).error.code,
+        )
+    }
+
+    @Test
     fun responseBoundPlainDirectPostRequestCanReturnAnErrorSafely() {
         val responseUri = "https://verifier.example/response"
         val request = request(
@@ -402,7 +491,13 @@ class PresentationRequestValidatorTest {
         assertEquals(
             WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST,
             assertIs<PresentationRequestValidationResult.Invalid>(
-                validate(request, resolvedRequest = ResolvedAuthorizationRequest.Plain(request)),
+                validate(
+                    request,
+                    resolvedRequest = ResolvedAuthorizationRequest.Plain(
+                        request,
+                        id.waltid.openid4vp.wallet.request.AuthenticatedClientFacts.redirectUriBound(request),
+                    ),
+                ),
             ).error.code,
         )
     }

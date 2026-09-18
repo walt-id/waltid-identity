@@ -80,7 +80,7 @@ class DcApiMdocVerifier2IntegrationTest {
         vc_policies = VCPolicyList(listOf(CredentialSignaturePolicy()))
     )
 
-    /** Unsigned request, unencrypted response - the only DC API shape this wallet supports. */
+    /** Unsigned request, unencrypted response. Signed+encrypted coverage is in DcApiWalletTest. */
     private val verificationSessionSetup: VerificationSessionSetup = DcApiAnnexDFlowSetup(
         core = GeneralFlowConfig(
             dcqlQuery = mdocsDcqlQuery,
@@ -202,7 +202,7 @@ class DcApiMdocVerifier2IntegrationTest {
             preload = {
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(
-                        clientId = "verifier2",
+                        clientId = null,
                         clientMetadata = ClientMetadata(clientName = "Verifier2"),
                         urlPrefix = "http://$host:$port/verification-session",
                         urlHost = "openid4vp://authorize",

@@ -23,25 +23,23 @@ class AttestationX509CertificateValidator : X509CertificateValidator {
         x509Certificate: X509Certificate
     ) {
 
-        if (x509Certificate.data.extensionKeyUsage
-                ?.keyPurposeIdList
-                ?.contains(KeyUsage.digitalSignature) != true
-        ) {
+        // RFC 5280 §4.2.1.3: KeyUsage restricts the key only when the extension is present.
+        val keyUsage = x509Certificate.data.extensionKeyUsage
+        if (keyUsage != null && KeyUsage.digitalSignature !in keyUsage.keyPurposeIdList) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
                 "Certificate does not contain client Key Usage 'digitalSignature'"
             )
         }
 
-        if (x509Certificate.data.extensionExtendedKeyUsage
-                ?.keyPurposeList
-                ?.contains(ExtendedKeyUsageExtension.KeyUsage.clientAuth) != true
+        // RFC 5280 §4.2.1.12: ExtendedKeyUsage is unrestricted when absent. When present it must
+        // include clientAuth for this Request Object signing profile.
+        val extendedKeyUsage = x509Certificate.data.extensionExtendedKeyUsage
+        if (extendedKeyUsage != null &&
+            ExtendedKeyUsageExtension.KeyUsage.clientAuth !in extendedKeyUsage.keyPurposeList
         ) {
-            //Certificate with subjectDn='CN=Verifier Signer,C=EU,O=Niscy,organizationIdentifier=LEIEU-987654321' which is used for
-            //MobileWalletIntegrationTest doesn't have extended key usage extension
-            //Set severity to WARNING, so the test works
             context.addLogEntry(
-                ValidationResult.Severity.WARNING,
+                ValidationResult.Severity.ERROR,
                 "Certificate does not contain client auth Extended Key Usage (OID: '${ExtendedKeyUsageExtension.KeyUsage.clientAuth.id}')"
             )
         }

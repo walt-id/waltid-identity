@@ -3,7 +3,8 @@ package id.walt.dcql
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class DcqlMatcherTest {
@@ -147,10 +148,8 @@ class DcqlMatcherTest {
             """.trimIndent()
         )
 
-        assertTrue(matchResult.isSuccess)
-        val matches = matchResult.getOrThrow()
-        // Fails claim match, so no credential returned for this query
-        assertTrue(matches.isEmpty())
+        assertTrue(matchResult.isFailure)
+        assertIs<DcqlMatchException>(matchResult.exceptionOrNull())
     }
 
     @Test
@@ -213,6 +212,50 @@ class DcqlMatcherTest {
     }
 
     @Test
+    fun findMatchesOmitsMissingQueriesWhileMatchEnforcesSatisfaction() {
+        val query = DcqlParser.parse(
+            """
+            {
+              "credentials": [
+                { "id": "q_jwt", "format": "jwt_vc_json", "meta": {} },
+                { "id": "q_sdjwt", "format": "dc+sd-jwt", "meta": {} }
+              ]
+            }
+            """.trimIndent()
+        ).getOrThrow()
+
+        val discovered = DcqlMatcher.findMatches(query, allCreds).getOrThrow()
+        assertEquals(setOf("q_jwt"), discovered.keys)
+        assertEquals(listOf(cred1.id), discovered.getValue("q_jwt").map { it.credential.id })
+
+        val matchResult = DcqlMatcher.match(query, allCreds)
+        assertTrue(matchResult.isFailure)
+        val unavailable = assertIs<RequiredCredentialUnavailableException>(matchResult.exceptionOrNull())
+        assertEquals(listOf("q_sdjwt"), unavailable.queryIds)
+    }
+
+    @Test
+    fun findMatchesKeepsAnAvailableCredentialSetAlternative() {
+        val query = DcqlParser.parse(
+            """
+            {
+              "credentials": [
+                { "id": "q_jwt", "format": "jwt_vc_json", "meta": {} },
+                { "id": "q_sdjwt", "format": "dc+sd-jwt", "meta": {} }
+              ],
+              "credential_sets": [
+                { "required": true, "options": [["q_jwt"], ["q_sdjwt"]] }
+              ]
+            }
+            """.trimIndent()
+        ).getOrThrow()
+
+        val discovered = DcqlMatcher.findMatches(query, allCreds).getOrThrow()
+        assertEquals(setOf("q_jwt"), discovered.keys)
+        assertTrue(DcqlMatcher.match(query, allCreds).isSuccess)
+    }
+
+    @Test
     fun testOptionalCredentialSet() {
         // q_jwt matches cred1, q_mdoc matches cred3_mdoc.
         // The optional set isn't met, but the required one is.
@@ -263,12 +306,81 @@ class DcqlMatcherTest {
             """.trimIndent()
         )
 
-        assertTrue(matchResult.isSuccess)
-        // Current implementation returns partial matches if no sets defined.
-        // Change DcqlMatcher line `// return Result.failure...` to fail instead if needed.
-        val matches = matchResult.getOrThrow()
-        assertEquals(1, matches.size)
-        assertEquals(listOf(cred1), matches["q_jwt"])
-        assertNull(matches["q_nonexistent"])
+        assertTrue(matchResult.isFailure)
+        assertTrue(matchResult.exceptionOrNull()?.message.orEmpty().contains("q_nonexistent"))
+    }
+
+    @Test
+    fun noCredentialSetsRequiresAllQueriesAtomically() {
+        val query = DcqlParser.parse(
+            """
+            {
+              "credentials": [
+                { "id": "identity", "format": "jwt_vc_json", "meta": {} },
+                { "id": "mdoc", "format": "mso_mdoc", "meta": {} }
+              ]
+            }
+            """.trimIndent()
+        ).getOrThrow()
+
+        assertTrue(DcqlMatcher.match(query, emptyList()).isFailure)
+        assertTrue(DcqlMatcher.match(query, listOf(cred1)).isFailure)
+        val complete = DcqlMatcher.match(query, listOf(cred1, cred3_mdoc)).getOrThrow()
+        assertEquals(setOf("identity", "mdoc"), complete.keys)
+    }
+
+    @Test
+    fun sdJwtDisclosureMatchingUsesCompleteClaimPath() {
+        val customerName = DcqlDisclosure(
+            name = "name",
+            value = JsonPrimitive("Customer Name"),
+            location = listOf(JsonPrimitive("customer"), JsonPrimitive("name")),
+        )
+        val employeeName = DcqlDisclosure(
+            name = "name",
+            value = JsonPrimitive("Employee Name"),
+            location = listOf(JsonPrimitive("employee"), JsonPrimitive("name")),
+        )
+        val credential = RawDcqlCredential(
+            id = "nested-sd-jwt",
+            format = "dc+sd-jwt",
+            data = buildJsonObject { put("vct", "https://issuer.example/employee") },
+            disclosures = listOf(customerName, employeeName),
+        )
+        val query = DcqlParser.parse(
+            """
+            {
+              "credentials": [{
+                "id": "employee",
+                "format": "dc+sd-jwt",
+                "meta": { "vct_values": ["https://issuer.example/employee"] },
+                "claims": [{ "path": ["employee", "name"], "values": ["Employee Name"] }]
+              }]
+            }
+            """.trimIndent()
+        ).getOrThrow()
+
+        val selected = DcqlMatcher.match(query, listOf(credential)).getOrThrow()
+            .getValue("employee").single().selectedDisclosures.orEmpty().values.single()
+        assertEquals(employeeName, selected)
+    }
+
+    @Test
+    fun trustedAuthoritiesFailsClosedWithoutChecker() {
+        val query = DcqlParser.parse(
+            """
+            {
+              "credentials": [{
+                "id": "trusted",
+                "format": "jwt_vc_json",
+                "meta": {},
+                "trusted_authorities": [{ "type": "aki", "values": ["authority-key-id"] }]
+              }]
+            }
+            """.trimIndent()
+        ).getOrThrow()
+
+        assertTrue(DcqlMatcher.match(query, listOf(cred1)).isFailure)
+        assertTrue(DcqlMatcher.match(query, listOf(cred1)) { _, _ -> true }.isSuccess)
     }
 }
