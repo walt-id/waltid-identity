@@ -25,11 +25,11 @@ data class DcqlHolderPolicyCheck(
                 data = credential.credentialData,
                 originalCredential = credential,
                 disclosures = if (credential is SelectivelyDisclosableVerifiableCredential)
-                    credential.disclosures?.map { DcqlDisclosure(it.name, it.value) }
+                    credential.disclosures?.map { DcqlDisclosure(it.name, it.value, it.location) }
                 else null
             )
         }
-        val match = DcqlMatcher.match(dcqlQuery, dcqlCredentials)
+        val match = DcqlMatcher.findMatches(dcqlQuery, dcqlCredentials)
         return match.isSuccess && match.getOrThrow().isNotEmpty()
     }
 

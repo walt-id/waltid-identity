@@ -675,7 +675,7 @@ object WalletPresentationHandler {
                 details = decoded.details,
             )
         }
-        val responseEncryption = ResponseEncryption.resolveCrypto2(authorizationRequest)?.metadata()
+        val responseEncryption = ResponseEncryption.resolveCrypto2(resolvedAuthorizationRequest)?.metadata()
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
         val holderKeyEligibility = selectHolderKeyEligibleFromSnapshot(
             wallet = wallet,
@@ -772,7 +772,7 @@ object WalletPresentationHandler {
                 details = decoded.details,
             )
         }
-        val responseEncryption = ResponseEncryption.resolveCrypto2(authorizationRequest)?.metadata()
+        val responseEncryption = ResponseEncryption.resolveCrypto2(resolvedAuthorizationRequest)?.metadata()
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
         val holderKeyEligibility = selectHolderKeyEligibleFromSnapshot(
             wallet = wallet,
@@ -872,7 +872,7 @@ object WalletPresentationHandler {
         // to. The value is not retained: submission re-resolves it from the same immutable retained
         // Authorization Request, so there is nothing to keep in sync.
         if (authorizationRequest.responseMode == OpenID4VPResponseMode.DC_API_JWT) {
-            val encryption = requireNotNull(ResponseEncryption.resolveCrypto2(authorizationRequest)) {
+            val encryption = requireNotNull(ResponseEncryption.resolveCrypto2(resolvedRequest)) {
                 "response_mode=dc_api.jwt requires client_metadata response-encryption keys"
             }
             // Thumbprinting is what canonicalizes the published coordinates, and it is the same value
@@ -1293,7 +1293,7 @@ object WalletPresentationHandler {
         val rawCredentials = request.credentials.mapIndexed { idx, stored ->
             stored.credential.toRawDcqlCredential(idx.toString())
         }
-        val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrThrow()
+        val matched = DcqlMatcher.findMatches(request.dcqlQuery, rawCredentials).getOrThrow()
         return buildMatchResult(matched, idByIndex)
     }
 
@@ -1386,12 +1386,13 @@ object WalletPresentationHandler {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: throw IllegalArgumentException("Wallet has no key available for VP token building")
-        val authorizationRequest = resolveAndValidatePresentationRequest(
+        val resolvedAuthorizationRequest = resolveAndValidatePresentationRequest(
             requestUrl = request.requestUrl,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             formatCapabilities = { keyMaterial.presentationCapabilities() },
             resolveAuthorizationRequest = resolveAuthorizationRequest,
         )
+        val authorizationRequest = resolvedAuthorizationRequest.authorizationRequest
         val did = request.did ?: wallet.defaultDid()
 
         val dcqlQuery = authorizationRequest.dcqlQuery
@@ -1415,6 +1416,18 @@ object WalletPresentationHandler {
             useWalletCredentialIds = true,
             eligibleCredentialIds = selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId },
         )
+        val missingSelectedQueries = selectedCredentialOptions
+            .filter { option ->
+                matched[option.queryId].orEmpty().none { result -> result.credential.id == option.credentialId }
+            }
+            .map { it.queryId }
+            .distinct()
+        if (missingSelectedQueries.isNotEmpty()) {
+            throw RequiredCredentialUnavailableException(
+                missingSelectedQueries,
+                "No matches found for required credential queries: $missingSelectedQueries",
+            )
+        }
         val selected = matched.selectCredentialOptions(
             selectedCredentialOptions = selectedCredentialOptions,
             selectedDisclosureOptions = request.selectedDisclosureOptions,
@@ -1431,6 +1444,7 @@ object WalletPresentationHandler {
                 holderKey = crypto2Key,
                 holderDid = did,
                 mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(),
+                clientMetadata = resolvedAuthorizationRequest.effectiveClientMetadata,
             )
         } else {
             WalletPresentFunctionality2.buildVpToken(
@@ -1443,6 +1457,7 @@ object WalletPresentationHandler {
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                 holderCrypto2Key = null,
                 mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(),
+                clientMetadata = resolvedAuthorizationRequest.effectiveClientMetadata,
             )
         }
         val idToken = if (crypto2Key != null) {
@@ -1482,15 +1497,16 @@ object WalletPresentationHandler {
             )
         },
     ): WalletPresentResult {
-        val authorizationRequest = resolveAndValidatePresentationRequest(
+        val resolvedAuthorizationRequest = resolveAndValidatePresentationRequest(
             requestUrl = request.requestUrl,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             resolveAuthorizationRequest = resolveAuthorizationRequest,
         )
         return WalletPresentFunctionality2.sendAuthorizationResponse(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = resolvedAuthorizationRequest.authorizationRequest,
             vpToken = request.vpToken,
             idToken = request.idToken,
+            clientMetadata = resolvedAuthorizationRequest.effectiveClientMetadata,
         ).getOrThrow()
     }
 
@@ -1574,7 +1590,7 @@ object WalletPresentationHandler {
         }
 
         log.debug { "DCQL matching against ${candidates.size} stored credential(s), queries=${query.credentials.map { it.id }}" }
-        val matched = DcqlMatcher.match(query.copy(credentialSets = null), rawCredentials).getOrThrow()
+        val matched = DcqlMatcher.findMatches(query, rawCredentials).getOrThrow()
         log.trace { "DCQL match result: matchedQueryIds=${matched.keys}, matchCounts=${matched.mapValues { it.value.size }}" }
         return matched
     }
@@ -1588,7 +1604,6 @@ object WalletPresentationHandler {
         val originalQueries = query.credentials.associateBy { it.id }
         val candidateQuery = query.copy(
             credentials = query.credentials.map { it.copy(multiple = true) },
-            credentialSets = null,
         )
         val structuralMatches = selectFromSnapshot(
             wallet = wallet,
@@ -1892,7 +1907,7 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         formatCapabilities: (() -> WalletPresentationFormatRegistry.RuntimeCapabilities)? = null,
         resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest,
-    ): AuthorizationRequest {
+    ): ResolvedAuthorizationRequest {
         val resolvedAuthorizationRequest = resolveAuthorizationRequest(requestUrl)
         val validation = PresentationRequestValidator.validate(
             resolvedRequest = resolvedAuthorizationRequest,
@@ -1904,7 +1919,7 @@ object WalletPresentationHandler {
                 "Presentation request is invalid (${validation.error.code.code}): ${validation.error.message}"
             )
         }
-        return resolvedAuthorizationRequest.authorizationRequest
+        return resolvedAuthorizationRequest
     }
 
     internal suspend fun rememberPreviewedAuthorizationRequest(

@@ -12,6 +12,8 @@ import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.webdatafetching.WebDataFetcher
+import id.waltid.openid4vp.wallet.PresentationRequestValidator
+import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.request.*
@@ -32,6 +34,8 @@ import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 
@@ -991,5 +995,179 @@ class AuthorizationRequestResolverJvmTest {
             "does not match the redirect_uri client_id" in (mismatch.message ?: ""),
             "expected a binding failure, was: ${mismatch.message}",
         )
+    }
+
+    @Test
+    fun `duplicate client id cannot bypass authentication`() = runBlocking {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "redirect_uri:https://receiver.example/response")
+            parameters.append("client_id", "x509_san_dns:verifier.example")
+            parameters.append("response_type", "vp_token")
+            parameters.append("response_mode", "direct_post")
+            parameters.append("response_uri", "https://receiver.example/response")
+            parameters.append("nonce", "nonce")
+        }.build()
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            ) { _, _ -> error("request_uri fetch should not be called") }
+        }
+        assertTrue(
+            "must not be repeated" in (error.message ?: ""),
+            "expected a duplicate-parameter failure, was: ${error.message}",
+        )
+    }
+
+    @Test
+    fun `duplicate destination and response mode parameters are rejected`() = runBlocking {
+        suspend fun resolve(vararg extra: Pair<String, String>) = AuthorizationRequestResolver.resolve(
+            requestUrl = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", "redirect_uri:https://verifier.example/callback")
+                parameters.append("response_type", "vp_token")
+                extra.forEach { (key, value) -> parameters.append(key, value) }
+            }.build(),
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        ) { _, _ -> error("request_uri fetch should not be called") }
+
+        val destinationError = assertFailsWith<IllegalArgumentException> {
+            resolve(
+                "response_mode" to "direct_post",
+                "response_uri" to "https://verifier.example/callback",
+                "response_uri" to "https://attacker.example/collect",
+                "nonce" to "nonce",
+            )
+        }
+        assertTrue("must not be repeated" in (destinationError.message ?: ""))
+
+        val modeError = assertFailsWith<IllegalArgumentException> {
+            resolve(
+                "response_mode" to "direct_post",
+                "response_mode" to "fragment",
+                "nonce" to "nonce",
+            )
+        }
+        assertTrue("must not be repeated" in (modeError.message ?: ""))
+    }
+
+    @Test
+    fun `unsigned pre-registered encrypted response uses registered metadata jwks`() = runBlocking {
+        val destination = "https://verifier.example/callback"
+        val encJwk = responseEncryptionJwk()
+        val registered = ClientMetadata(
+            redirectUris = listOf(destination),
+            jwks = ClientMetadata.Jwks(listOf(encJwk)),
+            encryptedResponseEncValuesSupported = listOf("A256GCM"),
+        )
+        val resolved = AuthorizationRequestResolver.resolve(
+            requestUrl = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", "verifier2")
+                parameters.append("response_type", "vp_token")
+                parameters.append("response_mode", "direct_post.jwt")
+                parameters.append("response_uri", destination)
+                parameters.append("nonce", "nonce-123")
+            }.build(),
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            fetchRequestUri = { _, _ -> error("request_uri fetch should not be called") },
+            trustConfiguration = ClientIdTrustConfiguration(
+                preRegisteredClients = mapOf("verifier2" to registered),
+            ),
+        )
+
+        val plain = assertIs<ResolvedAuthorizationRequest.Plain>(resolved)
+        assertNull(plain.authorizationRequest.clientMetadata)
+        assertNotNull(plain.effectiveClientMetadata?.jwks)
+        assertTrue(plain.client.responseDestinationAuthenticated)
+        assertNotNull(ResponseEncryption.resolveCrypto2(plain))
+        PresentationRequestValidator.requireErrorResponseCanBeSent(plain)
+    }
+
+    @Test
+    fun `signed pre-registered encrypted response uses registered metadata jwks`() = runBlocking {
+        val destination = "https://verifier.example/callback"
+        val signingKey = JWKKey.generate(KeyType.Ed25519)
+        val encJwk = responseEncryptionJwk()
+        val requestObject = signingKey.signJws(
+            buildJsonObject {
+                put("client_id", "verifier2")
+                put("nonce", "nonce-123")
+                put("aud", "https://self-issued.me/v2")
+                put("response_type", "vp_token")
+                put("response_mode", "direct_post.jwt")
+                put("response_uri", destination)
+            }.toString().encodeToByteArray(),
+            mapOf(
+                "typ" to JsonPrimitive("oauth-authz-req+jwt"),
+                "kid" to JsonPrimitive(signingKey.getKeyId()),
+            ),
+        )
+        val resolved = AuthorizationRequestResolver.resolve(
+            requestUrl = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", "verifier2")
+                parameters.append("request", requestObject)
+            }.build(),
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            fetchRequestUri = { _, _ -> error("request_uri fetch should not be called") },
+            trustConfiguration = ClientIdTrustConfiguration(
+                preRegisteredClients = mapOf(
+                    "verifier2" to ClientMetadata(
+                        redirectUris = listOf(destination),
+                        jwks = ClientMetadata.Jwks(
+                            listOf(signingKey.getPublicKey().exportJWKObject(), encJwk),
+                        ),
+                        encryptedResponseEncValuesSupported = listOf("A256GCM"),
+                    ),
+                ),
+            ),
+        )
+
+        val authenticated = assertIs<ResolvedAuthorizationRequest.AuthenticatedRequestObject>(resolved)
+        assertNull(authenticated.authorizationRequest.clientMetadata)
+        assertNotNull(ResponseEncryption.resolveCrypto2(authenticated))
+    }
+
+    @Test
+    fun `signed pre-registered request with inline client metadata is invalid_client`() = runBlocking {
+        val signingKey = JWKKey.generate(KeyType.Ed25519)
+        val requestObject = signingKey.signJws(
+            buildJsonObject {
+                put("client_id", "verifier2")
+                put("nonce", "nonce-123")
+                put("aud", "https://self-issued.me/v2")
+                put("client_metadata", buildJsonObject { put("client_name", "spoof") })
+            }.toString().encodeToByteArray(),
+            mapOf(
+                "typ" to JsonPrimitive("oauth-authz-req+jwt"),
+                "kid" to JsonPrimitive(signingKey.getKeyId()),
+            ),
+        )
+        val error = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = URLBuilder("openid4vp://authorize").apply {
+                    parameters.append("client_id", "verifier2")
+                    parameters.append("request", requestObject)
+                }.build(),
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                fetchRequestUri = { _, _ -> error("request_uri fetch should not be called") },
+                trustConfiguration = ClientIdTrustConfiguration(
+                    preRegisteredClients = mapOf(
+                        "verifier2" to ClientMetadata(
+                            jwks = ClientMetadata.Jwks(listOf(signingKey.getPublicKey().exportJWKObject())),
+                        ),
+                    ),
+                ),
+            )
+        }
+        assertEquals(ClientIdError.InvalidClient, error.clientIdError)
+        assertEquals("invalid_client", error.errorCode)
+    }
+
+    private suspend fun responseEncryptionJwk() = buildJsonObject {
+        JWKKey.generate(KeyType.secp256r1).getPublicKey().exportJWKObject()
+            .forEach { (name, value) -> put(name, value) }
+        put("use", "enc")
+        put("alg", "ECDH-ES")
+        put("kid", "enc-key")
     }
 }

@@ -2,6 +2,7 @@ package id.waltid.openid4vp.wallet
 
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
@@ -48,8 +49,12 @@ public data class ResolvedDcApiRequest(
     public val protocol: DcApiRequestProtocol,
     public val origin: String,
     public val authorizationRequest: AuthorizationRequest,
+    public val effectiveClientMetadata: ClientMetadata? = null,
 ) {
     public val holderBindingAudience: String = "origin:$origin"
+
+    public val encryptionMetadata: ClientMetadata?
+        get() = effectiveClientMetadata ?: authorizationRequest.clientMetadata
 }
 
 /** A DigitalCredential response returned to the operating system. */
@@ -92,17 +97,26 @@ public object DcApiWallet {
     ): ResolvedDcApiRequest {
         val validatedOrigin = canonicalizePlatformOrigin(origin)
         val requestProtocol = DcApiRequestProtocol.fromValue(protocol)
-        val authorizationRequest = when (requestProtocol) {
-            DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED -> resolveUnsignedRequest(data)
+        val resolved = when (requestProtocol) {
+            DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED -> {
+                val authorizationRequest = resolveUnsignedRequest(data)
+                ResolvedDcApiRequest(
+                    protocol = requestProtocol,
+                    origin = validatedOrigin,
+                    authorizationRequest = authorizationRequest,
+                    effectiveClientMetadata = authorizationRequest.clientMetadata,
+                )
+            }
             DcApiRequestProtocol.OPENID4VP_V1_SIGNED -> resolveSignedRequest(
+                protocol = requestProtocol,
                 data = data,
                 origin = validatedOrigin,
                 trustConfiguration = trustConfiguration,
             )
         }
 
-        validateAuthorizationRequest(authorizationRequest)
-        return ResolvedDcApiRequest(requestProtocol, validatedOrigin, authorizationRequest)
+        validateAuthorizationRequest(resolved.authorizationRequest)
+        return resolved
     }
 
     /**
@@ -127,7 +141,9 @@ public object DcApiWallet {
             OpenID4VPResponseMode.DC_API_JWT -> {
                 // The same encryption metadata the mdoc session transcript was thumbprinted with, so
                 // the verifier reconstructs a transcript matching the key it decrypts with.
-                val encryption = requireNotNull(ResponseEncryption.resolveCrypto2(authorizationRequest)) {
+                val encryption = requireNotNull(
+                    ResponseEncryption.resolveCrypto2(authorizationRequest, request.encryptionMetadata)
+                ) {
                     "response_mode=dc_api.jwt requires client_metadata response-encryption keys"
                 }
                 buildJsonObject {
@@ -238,10 +254,11 @@ public object DcApiWallet {
     }
 
     private suspend fun resolveSignedRequest(
+        protocol: DcApiRequestProtocol,
         data: JsonObject,
         origin: String,
         trustConfiguration: ClientIdTrustConfiguration,
-    ): AuthorizationRequest {
+    ): ResolvedDcApiRequest {
         require(data["request_uri"] == null || data["request_uri"] == JsonNull) {
             "openid4vp-v1-signed must not fetch a Request Object from request_uri"
         }
@@ -249,12 +266,17 @@ public object DcApiWallet {
         require(!requestObject.isNullOrBlank()) {
             "openid4vp-v1-signed must contain a Request Object"
         }
-        val authorizationRequest = AuthorizationRequestResolver.resolveInlineRequestObject(
+        val resolved = AuthorizationRequestResolver.resolveInlineRequestObject(
             requestObject = requestObject,
             trustConfiguration = trustConfiguration,
-        ).authorizationRequest
-        requireExpectedOrigin(authorizationRequest, origin)
-        return authorizationRequest
+        )
+        requireExpectedOrigin(resolved.authorizationRequest, origin)
+        return ResolvedDcApiRequest(
+            protocol = protocol,
+            origin = origin,
+            authorizationRequest = resolved.authorizationRequest,
+            effectiveClientMetadata = resolved.effectiveClientMetadata,
+        )
     }
 
     /**
