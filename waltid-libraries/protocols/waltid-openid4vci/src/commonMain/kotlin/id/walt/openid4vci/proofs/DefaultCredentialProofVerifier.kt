@@ -286,10 +286,8 @@ class DefaultCredentialProofVerifier(
             }
             return
         }
-        issuer?.let {
-            requireCredentialProof(context.clientId != null && it == context.clientId) {
-                "Credential proof issuer claim must match the access token client_id"
-            }
+        requireCredentialProof(issuer != null && context.clientId != null && issuer == context.clientId) {
+            "Credential proof issuer claim must match the access token client_id"
         }
     }
 
