@@ -212,6 +212,50 @@ class DcqlMatcherTest {
     }
 
     @Test
+    fun findMatchesOmitsMissingQueriesWhileMatchEnforcesSatisfaction() {
+        val query = DcqlParser.parse(
+            """
+            {
+              "credentials": [
+                { "id": "q_jwt", "format": "jwt_vc_json", "meta": {} },
+                { "id": "q_sdjwt", "format": "dc+sd-jwt", "meta": {} }
+              ]
+            }
+            """.trimIndent()
+        ).getOrThrow()
+
+        val discovered = DcqlMatcher.findMatches(query, allCreds).getOrThrow()
+        assertEquals(setOf("q_jwt"), discovered.keys)
+        assertEquals(listOf(cred1.id), discovered.getValue("q_jwt").map { it.credential.id })
+
+        val matchResult = DcqlMatcher.match(query, allCreds)
+        assertTrue(matchResult.isFailure)
+        val unavailable = assertIs<RequiredCredentialUnavailableException>(matchResult.exceptionOrNull())
+        assertEquals(listOf("q_sdjwt"), unavailable.queryIds)
+    }
+
+    @Test
+    fun findMatchesKeepsAnAvailableCredentialSetAlternative() {
+        val query = DcqlParser.parse(
+            """
+            {
+              "credentials": [
+                { "id": "q_jwt", "format": "jwt_vc_json", "meta": {} },
+                { "id": "q_sdjwt", "format": "dc+sd-jwt", "meta": {} }
+              ],
+              "credential_sets": [
+                { "required": true, "options": [["q_jwt"], ["q_sdjwt"]] }
+              ]
+            }
+            """.trimIndent()
+        ).getOrThrow()
+
+        val discovered = DcqlMatcher.findMatches(query, allCreds).getOrThrow()
+        assertEquals(setOf("q_jwt"), discovered.keys)
+        assertTrue(DcqlMatcher.match(query, allCreds).isSuccess)
+    }
+
+    @Test
     fun testOptionalCredentialSet() {
         // q_jwt matches cred1, q_mdoc matches cred3_mdoc.
         // The optional set isn't met, but the required one is.

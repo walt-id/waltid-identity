@@ -18,6 +18,7 @@ import id.walt.holderpolicies.HolderPolicyEngine
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.sdjwt.SDJwt
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
@@ -474,8 +475,9 @@ object WalletPresentFunctionality2 {
         holderCrypto2Key: Crypto2Key?,
         dcApiOrigin: String? = null,
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        clientMetadata: ClientMetadata? = authorizationRequest.clientMetadata,
     ): String {
-        val verifierJwkThumbprint = ResponseEncryption.resolveCrypto2(authorizationRequest)?.thumbprint()
+        val verifierJwkThumbprint = ResponseEncryption.resolveCrypto2(authorizationRequest, clientMetadata)?.thumbprint()
         return generateVpTokenForRequest(
             authorizationRequest = authorizationRequest,
             matchedData = matchedCredentials,
@@ -497,8 +499,9 @@ object WalletPresentFunctionality2 {
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
         dcApiOrigin: String? = null,
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        clientMetadata: ClientMetadata? = authorizationRequest.clientMetadata,
     ): String {
-        val verifierJwkThumbprint = ResponseEncryption.resolveCrypto2(authorizationRequest)?.thumbprint()
+        val verifierJwkThumbprint = ResponseEncryption.resolveCrypto2(authorizationRequest, clientMetadata)?.thumbprint()
         return generateVpTokenForRequest(
             authorizationRequest = authorizationRequest,
             matchedData = matchedCredentials,
@@ -584,6 +587,7 @@ object WalletPresentFunctionality2 {
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             dcApiOrigin = request.origin,
             mdocHolderKeyResolver = mdocHolderKeyResolver,
+            clientMetadata = request.encryptionMetadata,
         )
         val idToken = buildIdToken(
             authorizationRequest = authorizationRequest,
@@ -609,6 +613,7 @@ object WalletPresentFunctionality2 {
         authorizationRequest: AuthorizationRequest,
         vpToken: String,
         idToken: String? = null,
+        clientMetadata: ClientMetadata? = authorizationRequest.clientMetadata,
     ): Result<WalletPresentResult> = runCatching {
         // Infer response_mode from response_type if not explicitly set
         if (authorizationRequest.responseMode == null) {
@@ -687,7 +692,9 @@ object WalletPresentFunctionality2 {
                 requireNotNull(responseUri) {
                     "Invalid AuthorizationRequest: 'response_uri' is required for response_mode 'direct_post.jwt'."
                 }
-                val encryption = requireNotNull(ResponseEncryption.resolveCrypto2(authorizationRequest))
+                val encryption = requireNotNull(
+                    ResponseEncryption.resolveCrypto2(authorizationRequest, clientMetadata)
+                )
                 val vpTokenElement = Json.parseToJsonElement(vpToken)
                 val payloadJson = buildJsonObject {
                     put("vp_token", vpTokenElement)
@@ -1049,6 +1056,7 @@ object WalletPresentFunctionality2 {
                 holderDid,
                 transactionDataTypeRegistry,
                 mdocHolderKeyResolver = mdocHolderKeyResolver,
+                clientMetadata = resolvedRequest.effectiveClientMetadata,
             )
         } ?: buildVpToken(
             authorizationRequest,
@@ -1058,6 +1066,7 @@ object WalletPresentFunctionality2 {
             transactionDataTypeRegistry,
             holderCrypto2Key = null,
             mdocHolderKeyResolver = mdocHolderKeyResolver,
+            clientMetadata = resolvedRequest.effectiveClientMetadata,
         )
         val idToken = if (holderCrypto2Key != null) {
             buildIdToken(authorizationRequest, holderCrypto2Key, holderDid)
@@ -1067,7 +1076,12 @@ object WalletPresentFunctionality2 {
 
         // Step 4: Send response.
         val afterVpToken = walletPhaseStart.elapsedNow()
-        return sendAuthorizationResponse(authorizationRequest, vpToken, idToken).also {
+        return sendAuthorizationResponse(
+            authorizationRequest,
+            vpToken,
+            idToken,
+            clientMetadata = resolvedRequest.effectiveClientMetadata,
+        ).also {
             log.debug {
                 "Wallet phases: selection=$afterSelection, " +
                     "vpTokenBuild=${afterVpToken - afterSelection}, " +

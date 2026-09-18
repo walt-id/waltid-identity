@@ -1,3 +1,9 @@
+# Unreleased
+
+### Breaking: `waltid-dcql-jvm` ABI
+
+`DcqlDisclosure` now includes optional `location: List<JsonElement>? = null`. Kotlin source that used the two-argument constructor or `copy` remains valid because of the default. JVM consumers compiled against `waltid-dcql-jvm` 1.0.0 must rebuild: constructor and `copy` descriptors change from `(Ljava/lang/String;Lkotlinx/serialization/json/JsonElement;)` to three-argument forms. This is an approved breaking release; there is no dual-ABI shim.
+
 # 2025.1:
 
 Here's a look at what's new in our latest update! We've been busy aligning with major industry

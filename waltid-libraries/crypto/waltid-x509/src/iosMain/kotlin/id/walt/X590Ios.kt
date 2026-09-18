@@ -25,8 +25,8 @@ import platform.Security.SecPolicyCreateBasicX509
 import platform.Security.SecPolicyCreateRevocation
 import platform.Security.SecPolicyRef
 import platform.Security.SecTrustCreateWithCertificates
-import platform.Security.SecTrustEvaluate
-import platform.Security.SecTrustResultTypeVar
+import platform.CoreFoundation.CFErrorRefVar
+import platform.Security.SecTrustEvaluateWithError
 import platform.Security.SecTrustRef
 import platform.Security.SecTrustRefVar
 import platform.Security.SecTrustSetAnchorCertificates
@@ -46,7 +46,8 @@ actual fun validateCertificateChain(
     enableTrustedChainRoot: Boolean,
     enableSystemTrustAnchors: Boolean,
     enableRevocation: Boolean
-) = memScoped {
+) {
+    memScoped {
     val certificateReferences = mutableListOf<SecCertificateRef>()
     val policyReferences = mutableListOf<SecPolicyRef>()
     val arrayReferences = mutableListOf<CFArrayRef>()
@@ -120,32 +121,24 @@ actual fun validateCertificateChain(
         }
 
         /*
-         * Kotlin/Native's Security interop does not reliably expose the
-         * SecTrustResultType out-parameter on the current SDK. Keep the
-         * Security.framework evaluation as the platform boundary and run the
-         * common explicit-chain verifier below to fail closed when the native
-         * result cannot be inspected.
+         * SecTrustEvaluateWithError is the iOS PKIX verdict. A successful
+         * OSStatus from the older SecTrustEvaluate API is not enough: Kotlin
+         * Native does not reliably expose that function's result out-parameter,
+         * and falling through to the common explicit-chain verifier would accept
+         * chains Apple already rejected (for example name-constrained
+         * intermediates). Use the boolean + CFError API, and keep the common
+         * verifier for platforms that cannot run Security.framework evaluation.
          */
-        val result = alloc<SecTrustResultTypeVar>().apply { value = 0u }
-        val status = SecTrustEvaluate(trustReference, result.ptr)
-        if (status != errSecSuccess) {
-            val securityError = NSError(
-                domain = "NSOSStatusErrorDomain",
-                code = status.toLong(),
-                userInfo = null,
-            )
-            val description =
-                "${securityError.domain}(${securityError.code}): ${securityError.localizedDescription}"
-            throw X509ValidationException(
-                "Certificate path invalid: $description"
-            )
+        val evaluationError = alloc<CFErrorRefVar>().apply { value = null }
+        val trusted = SecTrustEvaluateWithError(trustReference, evaluationError.ptr)
+        if (!trusted) {
+            val securityError = evaluationError.value?.let { CFBridgingRelease(it) as? NSError }
+            val description = securityError?.let { error ->
+                "${error.domain}(${error.code}): ${error.localizedDescription}"
+            } ?: "SecTrustEvaluateWithError rejected the certificate chain"
+            throw X509ValidationException("Certificate path invalid: $description")
         }
-        validateCertificateChainWithExplicitTrust(
-            leaf = leaf,
-            chain = chain,
-            trustAnchors = trustAnchors,
-            enableTrustedChainRoot = enableTrustedChainRoot,
-        )
+        evaluationError.value?.let(::CFRelease)
     } catch (cause: X509ValidationException) {
         throw cause
     } catch (cause: Exception) {
@@ -155,6 +148,7 @@ actual fun validateCertificateChain(
         arrayReferences.forEach(::CFRelease)
         policyReferences.forEach(::CFRelease)
         certificateReferences.forEach(::CFRelease)
+    }
     }
 }
 

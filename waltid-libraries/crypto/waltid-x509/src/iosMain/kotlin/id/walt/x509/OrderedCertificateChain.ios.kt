@@ -74,14 +74,16 @@ internal actual fun validatePlatformClientAuthenticationCertificateChain(
     leaf: CertificateDer,
     chain: List<CertificateDer>,
     trustAnchors: List<CertificateDer>,
-) = validateCertificateChain(
-    leaf = leaf,
-    chain = chain,
-    trustAnchors = trustAnchors,
-    enableTrustedChainRoot = false,
-    enableSystemTrustAnchors = false,
-    enableRevocation = false,
-)
+) {
+    validateCertificateChain(
+        leaf = leaf,
+        chain = chain,
+        trustAnchors = trustAnchors,
+        enableTrustedChainRoot = false,
+        enableSystemTrustAnchors = false,
+        enableRevocation = false,
+    )
+}
 
 private val subjectKeyIdentifierOid = ObjectIdentifier("2.5.29.14")
 private val authorityKeyIdentifierOid = ObjectIdentifier("2.5.29.35")

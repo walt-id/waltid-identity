@@ -97,7 +97,7 @@ object PresentationRequestValidator {
                 .mapNotNull { credentialQuery -> WalletPresentationFormatRegistry.resolve(credentialQuery.format.id.first()) }
                 .toSet()
             val capabilities = formatCapabilities()
-            val verifierFormats = request.clientMetadata?.vpFormatsSupported
+            val verifierFormats = resolvedRequest.effectiveClientMetadata?.vpFormatsSupported
             val walletSupportsRequestedFormat = requestedFormats.any(capabilities.supportedFormats::contains)
             val verifierSupportsRequestedFormat = verifierFormats?.let {
                 WalletPresentationFormatRegistry.supportsAny(
@@ -180,17 +180,8 @@ object PresentationRequestValidator {
     fun requireErrorResponseCanBeSent(resolvedRequest: ResolvedAuthorizationRequest) {
         val request = resolvedRequest.authorizationRequest
         requireUsableResponse(request)
-        if (resolvedRequest is ResolvedAuthorizationRequest.Plain) {
-            val responseDestination = when (request.walletResponseMode()) {
-                OpenID4VPResponseMode.DIRECT_POST,
-                OpenID4VPResponseMode.DIRECT_POST_JWT,
-                -> request.responseUri
-
-                else -> request.redirectUri
-            }
-            require(responseDestination != null && request.clientId == "redirect_uri:$responseDestination") {
-                "A plain Authorization Request must bind client_id to its response destination before an error response can be sent safely"
-            }
+        require(resolvedRequest.client.responseDestinationAuthenticated) {
+            "An Authorization Request must bind its response destination before an error response can be sent safely"
         }
     }
 

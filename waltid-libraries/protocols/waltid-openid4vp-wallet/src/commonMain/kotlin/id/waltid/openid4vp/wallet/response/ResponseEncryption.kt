@@ -11,7 +11,10 @@ import id.walt.crypto2.jose.JwkUse
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
+import id.waltid.openid4vp.wallet.ResolvedDcApiRequest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -88,11 +91,20 @@ object ResponseEncryption {
         }
     }
 
-    suspend fun resolveCrypto2(authorizationRequest: AuthorizationRequest): Crypto2Config? {
+    suspend fun resolveCrypto2(resolvedRequest: ResolvedAuthorizationRequest): Crypto2Config? =
+        resolveCrypto2(resolvedRequest.authorizationRequest, resolvedRequest.effectiveClientMetadata)
+
+    suspend fun resolveCrypto2(request: ResolvedDcApiRequest): Crypto2Config? =
+        resolveCrypto2(request.authorizationRequest, request.encryptionMetadata)
+
+    suspend fun resolveCrypto2(
+        authorizationRequest: AuthorizationRequest,
+        clientMetadata: ClientMetadata? = authorizationRequest.clientMetadata,
+    ): Crypto2Config? {
         if (authorizationRequest.responseMode !in OpenID4VPResponseMode.ENCRYPTED_RESPONSES) return null
 
         // 1. Get Encryption Metadata
-        val metadata = requireNotNull(authorizationRequest.clientMetadata) {
+        val metadata = requireNotNull(clientMetadata) {
             "client_metadata is required for encrypted responses"
         }
 

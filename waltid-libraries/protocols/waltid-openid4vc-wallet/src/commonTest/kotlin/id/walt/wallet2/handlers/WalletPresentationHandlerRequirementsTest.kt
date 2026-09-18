@@ -34,6 +34,7 @@ import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
+import id.waltid.openid4vp.wallet.request.AuthenticatedClientFacts
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.ktor.http.Url
@@ -326,7 +327,10 @@ class WalletPresentationHandlerRequirementsTest {
                 transactionDataTypeRegistry = TransactionDataTypeRegistry("payment"),
                 resolveAuthorizationRequest = {
                     resolveCalls += 1
-                    ResolvedAuthorizationRequest.Plain(authorizationRequest)
+                    ResolvedAuthorizationRequest.Plain(
+                        authorizationRequest,
+                        AuthenticatedClientFacts.redirectUriBound(authorizationRequest),
+                    )
                 },
             )
         }
@@ -368,7 +372,10 @@ class WalletPresentationHandlerRequirementsTest {
                 transactionDataTypeRegistry = TransactionDataTypeRegistry("payment"),
                 resolveAuthorizationRequest = {
                     resolveCalls += 1
-                    ResolvedAuthorizationRequest.Plain(authorizationRequest)
+                    ResolvedAuthorizationRequest.Plain(
+                        authorizationRequest,
+                        AuthenticatedClientFacts.redirectUriBound(authorizationRequest),
+                    )
                 },
             )
         }
@@ -453,6 +460,66 @@ class WalletPresentationHandlerRequirementsTest {
             "https://verifier.example/callback#error=access_denied&state=state-123",
             rejection.getUrl,
         )
+    }
+
+    @Test
+    fun oneAvailableAlternativeIsEnoughForCandidateSelection() = runTest {
+        val wallet = Wallet(
+            id = "wallet-credential-alternatives",
+            staticKey = JWKKey.generate(KeyType.Ed25519),
+            credentialStores = listOf(
+                InMemoryCredentialStore().also {
+                    it.addCredential(
+                        StoredCredential(
+                            id = "jwt-credential",
+                            credential = W3C11(
+                                credentialData = buildJsonObject {
+                                    put("credentialSubject", buildJsonObject { put("given_name", "Ada") })
+                                },
+                                issuer = "https://issuer.example",
+                                subject = "did:example:holder",
+                                signature = JwtCredentialSignature(
+                                    "signature",
+                                    buildJsonObject {},
+                                ),
+                                signed = "issuer.jwt.signature",
+                            ),
+                        )
+                    )
+                }
+            ),
+        )
+        val requestUrl = AuthorizationRequest(
+            clientId = "redirect_uri:https://verifier.example/callback",
+            redirectUri = "https://verifier.example/callback",
+            responseMode = OpenID4VPResponseMode.FRAGMENT,
+            nonce = "nonce",
+            state = "state-123",
+            dcqlQuery = DcqlQuery(
+                credentials = listOf(
+                    credentialQuery("pid"),
+                    credentialQuery("sd-jwt", format = CredentialFormat.DC_SD_JWT),
+                ),
+                credentialSets = listOf(
+                    CredentialSetQuery(
+                        options = listOf(
+                            listOf("pid"),
+                            listOf("sd-jwt"),
+                        )
+                    )
+                ),
+            ),
+        ).toHttpUrl()
+
+        val preview = WalletPresentationHandler.previewPresentationStateless(
+            wallet = wallet,
+            request = PreviewPresentationRequest(requestUrl),
+            transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+        )
+
+        val ready = assertIs<StatelessPreviewPresentationResult.Ready>(preview)
+        assertEquals(listOf("pid"), ready.credentialOptions.map { it.queryId })
+        assertEquals("jwt-credential", ready.credentialOptions.single().credentialId)
     }
 
     @Test
@@ -614,15 +681,18 @@ class WalletPresentationHandlerRequirementsTest {
     }
 
     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-    private fun resolvedRequest(state: String): ResolvedAuthorizationRequest =
-        ResolvedAuthorizationRequest.Plain(
-            AuthorizationRequest(
-                clientId = "redirect_uri:https://verifier.example/callback",
-                redirectUri = "https://verifier.example/callback",
-                responseMode = OpenID4VPResponseMode.FRAGMENT,
-                state = state,
-            )
+    private fun resolvedRequest(state: String): ResolvedAuthorizationRequest {
+        val request = AuthorizationRequest(
+            clientId = "redirect_uri:https://verifier.example/callback",
+            redirectUri = "https://verifier.example/callback",
+            responseMode = OpenID4VPResponseMode.FRAGMENT,
+            state = state,
         )
+        return ResolvedAuthorizationRequest.Plain(
+            request,
+            AuthenticatedClientFacts.redirectUriBound(request),
+        )
+    }
 
     private fun readyPreview(requestUrl: Url, state: String, keyId: String = "preview-key") =
         WalletPresentationHandler.PreviewedPresentation.Ready(
@@ -632,16 +702,19 @@ class WalletPresentationHandlerRequirementsTest {
         )
 
     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-    private fun resolvedPreviewRequest(state: String): ResolvedAuthorizationRequest =
-        ResolvedAuthorizationRequest.Plain(
-            AuthorizationRequest(
-                clientId = "redirect_uri:https://verifier.example/callback",
-                redirectUri = "https://verifier.example/callback",
-                responseMode = OpenID4VPResponseMode.FRAGMENT,
-                state = state,
-                dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery("pid"))),
-            )
+    private fun resolvedPreviewRequest(state: String): ResolvedAuthorizationRequest {
+        val request = AuthorizationRequest(
+            clientId = "redirect_uri:https://verifier.example/callback",
+            redirectUri = "https://verifier.example/callback",
+            responseMode = OpenID4VPResponseMode.FRAGMENT,
+            state = state,
+            dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery("pid"))),
         )
+        return ResolvedAuthorizationRequest.Plain(
+            request,
+            AuthenticatedClientFacts.redirectUriBound(request),
+        )
+    }
 
     @Test
     fun presentationSelectionAllowsMultipleCredentialsForOneQueryWhenMatched() {
@@ -1264,13 +1337,14 @@ class WalletPresentationHandlerRequirementsTest {
 
     private fun credentialQuery(
         id: String,
+        format: CredentialFormat = CredentialFormat.JWT_VC_JSON,
         multiple: Boolean = false,
         claims: List<ClaimsQuery>? = null,
         claimSets: List<List<String>>? = null,
     ): CredentialQuery =
         CredentialQuery(
             id = id,
-            format = CredentialFormat.JWT_VC_JSON,
+            format = format,
             multiple = multiple,
             meta = NoMeta,
             claims = claims,
