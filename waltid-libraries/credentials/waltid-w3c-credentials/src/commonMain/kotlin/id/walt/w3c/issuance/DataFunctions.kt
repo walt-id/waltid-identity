@@ -4,6 +4,8 @@ import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.w3c.utils.CredentialDataMergeUtils
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
@@ -34,24 +36,21 @@ val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.Functi
                         display["locale"]?.let { put("locale", it) }
                         display["logo"]?.jsonObject?.let { logo ->
                             put(
-                                "logo", JsonObject(
-                                    mapOf(
-                                        "url" to logo["url"]!!,
-                                        "altText" to logo["alt_text"]!!,
-                                    )
-                                )
+                                "logo", buildJsonObject {
+                                    // LogoProperties (id.walt.oid4vc) uses "url"; CredentialDisplayLogo uses "uri"
+                                    put("url", (logo["url"] ?: logo["uri"])!!)
+                                    logo["alt_text"]?.let { put("altText", it) }
+                                }
                             )
                         }
                         display["background_color"]?.let { put("backgroundColor", it) }
                         display["text_color"]?.let { put("textColor", it) }
                         display["background_image"]?.jsonObject?.let { bgImage ->
                             put(
-                                "backgroundImage", JsonObject(
-                                    mapOf(
-                                        "url" to bgImage["url"]!!,
-                                        "altText" to bgImage["alt_text"]!!,
-                                    )
-                                )
+                                "backgroundImage", buildJsonObject {
+                                    // LogoProperties uses "url"; CredentialDisplayBackgroundImage uses "uri"
+                                    put("url", (bgImage["url"] ?: bgImage["uri"])!!)
+                                }
                             )
                         }
                         display["customParameters"]?.jsonObject?.get("secondary_image")?.jsonObject?.let { secImage ->
@@ -83,6 +82,13 @@ val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.Functi
 
     "timestamp-before" to { JsonPrimitive((Clock.System.now() - Duration.parse(it.args!!)).toString()) },
     "timestamp-before-seconds" to { JsonPrimitive((Clock.System.now() - Duration.parse(it.args!!)).epochSeconds) },
+
+    // Date-only functions (YYYY-MM-DD) — required for ISO 18013-5 full-date fields such as
+    // issue_date and expiry_date; <timestamp> and its variants produce ISO Instant strings that
+    // LocalDate.parse() rejects.
+    "date" to { JsonPrimitive(Clock.System.now().toLocalDateTime(TimeZone.UTC).date.toString()) },
+    "date-in" to { JsonPrimitive((Clock.System.now() + Duration.parse(it.args!!)).toLocalDateTime(TimeZone.UTC).date.toString()) },
+    "date-before" to { JsonPrimitive((Clock.System.now() - Duration.parse(it.args!!)).toLocalDateTime(TimeZone.UTC).date.toString()) },
 
     "uuid" to { JsonPrimitive("urn:uuid:${randomUUID()}") },
     "webhook" to { JsonPrimitive(webDataFetcher.fetch<String>(it.args!!).body) },

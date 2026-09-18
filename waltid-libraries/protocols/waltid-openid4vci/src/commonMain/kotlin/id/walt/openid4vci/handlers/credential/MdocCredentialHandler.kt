@@ -19,10 +19,21 @@ import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.sdjwt.SDMap
+import id.walt.w3c.issuance.dataFunctions
+import id.walt.w3c.utils.CredentialDataMergeUtils.getTemplateData
+import id.walt.w3c.utils.CredentialDataMergeUtils.isTemplate
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -67,14 +78,14 @@ class MdocCredentialHandler(
                     )
                 )
             }
-
             computeCredentialResult(
                 request = request,
                 configuration = configuration,
                 issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, verifiedProof ->
+                    val mappedCredentialData = credentialData.mergeMdocPayloadWithMapping(dataMapping, issuerId, display, verifiedProof?.holderDid)
                     MdocCredentialSigner.generateMdocCredential(
                         credentialRequest = request,
-                        credentialData = credentialData,
+                        credentialData = mappedCredentialData,
                         issuerKey = issuerKey,
                         issuerCertificate = certificateChain,
                         docType = docType,
@@ -129,9 +140,10 @@ class MdocCredentialHandler(
             validUntil = validUntil,
             verifiedProofs = verifiedProofs,
             issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, verifiedProof ->
+                val mappedCredentialData = credentialData.mergeMdocPayloadWithMapping(dataMapping, issuerId, display, verifiedProof?.holderDid)
                 MdocCredentialSigner.generateMdocCredential(
                     credentialRequest = request,
-                    credentialData = credentialData,
+                    credentialData = mappedCredentialData,
                     issuerKey = issuerKey.key,
                     signatureAlgorithm = issuerKey.requireCoseAlgorithm(),
                     issuerCertificate = certificateChain,
@@ -150,6 +162,77 @@ class MdocCredentialHandler(
         throw e
     } catch (e: Exception) {
         CredentialResponseResult.Failure(e.toCredentialHandlerError())
+    }
+
+    private suspend fun JsonObject.mergeMdocPayloadWithMapping(
+        dataMapping: JsonObject?,
+        issuerId: String,
+        display: List<CredentialDisplay>?,
+        subjectDid: String?,
+    ): JsonObject {
+        val mapping = dataMapping
+            ?.filter { (key, value) -> this[key] is JsonObject && value is JsonObject }
+            ?.let(::JsonObject)
+            ?.takeIf { it.isNotEmpty() }
+            ?: return this
+        val context = mapOf(
+            "issuerId" to issuerId,
+            "issuerDid" to issuerId,
+            "subjectDid" to subjectDid,
+            "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
+        ).filterValues {
+            when (it) {
+                is JsonElement -> it !is JsonNull && (it !is JsonObject || it.isNotEmpty()) && (it !is JsonArray || it.isNotEmpty())
+                else -> it?.toString()?.isNotEmpty() == true
+            }
+        }.mapValues { (_, value) ->
+            when (value) {
+                is JsonElement -> value
+                else -> JsonPrimitive(value.toString())
+            }
+        }
+        return mergeMdocJsonObject(this, mapping, context, HashMap())
+    }
+
+    private suspend fun mergeMdocJsonObject(
+        credentialData: JsonObject,
+        mapping: JsonObject,
+        context: Map<String, JsonElement>,
+        functionHistory: MutableMap<String, JsonElement>,
+    ): JsonObject = buildJsonObject {
+        credentialData.forEach { (key, value) -> put(key, value) }
+        mapping.forEach { (key, value) ->
+            put(key, mergeMdocJsonElement(credentialData[key], value, context, functionHistory))
+        }
+    }
+
+    private suspend fun mergeMdocJsonArray(
+        mapping: JsonArray,
+        context: Map<String, JsonElement>,
+        functionHistory: MutableMap<String, JsonElement>,
+    ): JsonArray = buildJsonArray {
+        mapping.forEach { value ->
+            add(mergeMdocJsonElement(null, value, context, functionHistory))
+        }
+    }
+
+    private suspend fun mergeMdocJsonElement(
+        original: JsonElement?,
+        mapping: JsonElement,
+        context: Map<String, JsonElement>,
+        functionHistory: MutableMap<String, JsonElement>,
+    ): JsonElement = when (mapping) {
+        is JsonPrimitive -> when {
+            mapping.isString && mapping.isTemplate() -> getTemplateData(
+                functionCall = mapping.content,
+                dataFunctions = dataFunctions,
+                context = context,
+                functionHistory = functionHistory,
+            )
+            else -> mapping
+        }
+        is JsonObject -> mergeMdocJsonObject(original as? JsonObject ?: JsonObject(emptyMap()), mapping, context, functionHistory)
+        is JsonArray -> mergeMdocJsonArray(mapping, context, functionHistory)
     }
 
     @OptIn(ExperimentalSerializationApi::class)
