@@ -78,6 +78,19 @@ public final class id/walt/crypto2/jvm/JavaGenerateManagedKeyRequest {
 	public fun getUsages ()Ljava/util/Set;
 }
 
+public final class id/walt/crypto2/jvm/JavaGenerateSoftwareKeyRequest : java/lang/Record {
+	public fun <init> (Ljava/lang/String;Lid/walt/crypto2/jvm/JavaKeySpec;Ljava/util/Set;Lid/walt/crypto2/keys/KeyEncodingFormat;Ljava/util/Map;)V
+	public final fun equals (Ljava/lang/Object;)Z
+	public final fun hashCode ()I
+	public fun id ()Ljava/lang/String;
+	public fun keyEncoding ()Lid/walt/crypto2/keys/KeyEncodingFormat;
+	public fun metadata ()Ljava/util/Map;
+	public static fun of (Ljava/lang/String;Lid/walt/crypto2/jvm/JavaKeySpec;Ljava/util/Set;)Lid/walt/crypto2/jvm/JavaGenerateSoftwareKeyRequest;
+	public fun spec ()Lid/walt/crypto2/jvm/JavaKeySpec;
+	public final fun toString ()Ljava/lang/String;
+	public fun usages ()Ljava/util/Set;
+}
+
 public abstract interface class id/walt/crypto2/jvm/JavaKeyAgreement {
 	public abstract fun generateSharedSecret (Lid/walt/crypto2/keys/EncodedKey;Lid/walt/crypto2/jvm/JavaNamedAlgorithm;)Ljava/util/concurrent/CompletionStage;
 }
@@ -225,6 +238,22 @@ public final class id/walt/crypto2/jvm/JavaSignatureAlgorithm$Type : java/lang/E
 
 public abstract interface class id/walt/crypto2/jvm/JavaSigner {
 	public abstract fun sign ([BLid/walt/crypto2/jvm/JavaSignatureAlgorithm;)Ljava/util/concurrent/CompletionStage;
+}
+
+public abstract interface class id/walt/crypto2/jvm/JavaSoftwareKey {
+	public abstract fun id ()Ljava/lang/String;
+	public abstract fun signer ()Lid/walt/crypto2/jvm/JavaSigner;
+	public abstract fun storedKeyJson ()Ljava/lang/String;
+	public abstract fun verifier ()Lid/walt/crypto2/jvm/JavaVerifier;
+}
+
+public final class id/walt/crypto2/jvm/JavaSoftwareKeys {
+	public static final field INSTANCE Lid/walt/crypto2/jvm/JavaSoftwareKeys;
+	public static final fun close (Lid/walt/crypto2/CryptoRuntime;)Ljava/util/concurrent/CompletionStage;
+	public static final fun defaultRuntime ()Lid/walt/crypto2/CryptoRuntime;
+	public static final fun generate (Lid/walt/crypto2/CryptoRuntime;Lid/walt/crypto2/jvm/JavaGenerateSoftwareKeyRequest;)Ljava/util/concurrent/CompletionStage;
+	public static final fun generateKey (Lid/walt/crypto2/CryptoRuntime;Lid/walt/crypto2/jvm/JavaGenerateSoftwareKeyRequest;)Ljava/util/concurrent/CompletionStage;
+	public static final fun toKotlin (Lid/walt/crypto2/jvm/JavaSignatureAlgorithm;)Lid/walt/crypto2/algorithms/SignatureAlgorithm;
 }
 
 public abstract interface class id/walt/crypto2/jvm/JavaVerifier {

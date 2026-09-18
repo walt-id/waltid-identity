@@ -24,6 +24,9 @@ object SignumExtensionFactory {
             IssuerAlternativeNameExtension.OID -> SignumIssuerAlternativeNameExtension(extension)
             SubjectKeyIdentifierExtension.OID -> SignumSubjectKeyIdentifierExtension(extension)
             CrlDistributionPointsExtension.OID -> SignumCrlDistributionPointsExtension(extension)
+            CertificatePoliciesExtension.OID -> SignumCertificatePoliciesExtension(extension)
+            AuthorityInfoAccessExtension.OID -> SignumAuthorityInfoAccessExtension(extension)
+            QcStatementsExtension.OID -> SignumQcStatementsExtension(extension)
             else -> SignumGenericExtension(extension)
         }
 
@@ -58,6 +61,20 @@ object SignumExtensionFactory {
             SignumCrlDistributionPointsExtension.createExtension(extension as CrlDistributionPointsExtension)
         )
 
+        CertificatePoliciesExtension.OID -> createExtension(
+            extension,
+            SignumCertificatePoliciesExtension.createExtension(extension as CertificatePoliciesExtension)
+        )
+
+        AuthorityInfoAccessExtension.OID -> createExtension(
+            extension,
+            SignumAuthorityInfoAccessExtension.createExtension(extension as AuthorityInfoAccessExtension)
+        )
+
+        QcStatementsExtension.OID -> createExtension(
+            extension,
+            SignumQcStatementsExtension.createExtension(extension as QcStatementsExtension)
+        )
 
         else -> error("Unknown Signum Extension type OID: ${extension.oid}")
     }
