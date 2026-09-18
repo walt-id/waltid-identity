@@ -1,0 +1,9 @@
+{
+  "appTitle": "walt.id Wallet",
+  "primary": "#0573F0",
+  "onPrimary": "#FFFFFF",
+  "secondary": "#ADC6FF",
+  "onSecondary": "#002E69",
+  "primaryContainer": "#D8E2FF",
+  "onPrimaryContainer": "#002E69"
+}

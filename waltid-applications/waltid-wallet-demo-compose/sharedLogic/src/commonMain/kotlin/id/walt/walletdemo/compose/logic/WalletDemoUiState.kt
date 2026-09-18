@@ -33,6 +33,7 @@ data class WalletDemoUiState(
     val statusExpanded: Boolean = false,
     val statusOccurrenceId: Long = 0,
     val showDcApiPresentationPreview: Boolean = true,
+    val pinLockEnabled: Boolean = true,
 ) {
     val presentationPreview: WalletDemoPresentationPreview?
         get() = (presentationReview as? WalletDemoPresentationPreviewResult.Ready)?.preview
