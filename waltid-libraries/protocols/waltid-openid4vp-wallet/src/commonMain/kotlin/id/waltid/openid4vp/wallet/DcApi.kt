@@ -250,7 +250,6 @@ public object DcApiWallet {
             data.filterKeys { it != "client_id" && it != "expected_origins" && it != "request" },
         )
         return json.decodeFromJsonElement(AuthorizationRequest.serializer(), effectiveData)
-            .also { it.dcqlQuery?.precheck() }
     }
 
     private suspend fun resolveSignedRequest(

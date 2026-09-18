@@ -297,10 +297,15 @@ class MobileWalletDigitalCredentialPresentationTest {
     @Test
     fun aSignedEncryptedRequestAuthenticatesTheClientAndReturnsOnlyAJwe() = runTest {
         val verifierKey = JWKKey.generate(KeyType.Ed25519)
+        val encryptionMetadata = ClientMetadata.fromJson(ENCRYPTION_CLIENT_METADATA).getOrThrow()
         val trust = ClientIdTrustConfiguration(
             preRegisteredClients = mapOf(
                 "verifier2" to ClientMetadata(
-                    jwks = ClientMetadata.Jwks(listOf(verifierKey.getPublicKey().exportJWKObject())),
+                    jwks = ClientMetadata.Jwks(
+                        listOf(verifierKey.getPublicKey().exportJWKObject()) +
+                            encryptionMetadata.jwks?.keys.orEmpty(),
+                    ),
+                    encryptedResponseEncValuesSupported = encryptionMetadata.encryptedResponseEncValuesSupported,
                 )
             ),
         )
@@ -311,7 +316,7 @@ class MobileWalletDigitalCredentialPresentationTest {
                 data = signedRequestObject(
                     key = verifierKey,
                     unsignedPayload = Json.parseToJsonElement(
-                        sdJwtQuery(responseMode = "dc_api.jwt", clientMetadata = ENCRYPTION_CLIENT_METADATA),
+                        sdJwtQuery(responseMode = "dc_api.jwt"),
                     ).jsonObject,
                 ),
                 selectedRegistryEntryIds = listOf(fixture.registryEntryId("pid-1")),
