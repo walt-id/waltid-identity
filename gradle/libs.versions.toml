@@ -90,7 +90,7 @@ kedis = "0.0.12"
 # One Bouncy Castle flavour for the whole repo: the mainline jdk18on line. The lts8on line (2.7x) publishes the
 # same org.bouncycastle packages, so having both on a classpath duplicates every class - which is what broke the
 # Android device tests. jdk18on is also what Signum and web3j pull in, and it is what crypto2 needs for secp256k1.
-bouncycastle = "1.84"
+bouncycastle = "1.86"
 nimbus-jose = "10.9.1"
 jose-npm = "5.10.0"
 kotlincrypto = "0.8.0"
