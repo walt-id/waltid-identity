@@ -14,11 +14,13 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -33,6 +35,11 @@ import androidx.compose.ui.test.v2.runComposeUiTest
 import id.walt.walletdemo.compose.logic.DemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.DemoBiometricResult
 import id.walt.walletdemo.compose.logic.DemoPinStore
+import id.walt.walletdemo.compose.logic.WalletDemoKeyChoice
+import id.walt.walletdemo.compose.logic.WalletDemoKeySetupOption
+import id.walt.walletdemo.compose.logic.WalletDemoIdentitySetup
+import id.walt.walletdemo.compose.logic.WalletDemoIdentityDetails
+import id.walt.walletdemo.compose.ui.screens.IdentitySetupScreen
 import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.InMemoryDemoPinStore
 import id.walt.walletdemo.compose.logic.WalletDemoBootstrapResult
@@ -124,7 +131,7 @@ class WalletDemoAppTestScenarios(
         controller.refreshBiometricUnlockAvailability()
         waitForIdle()
 
-        onNodeWithText("Use Face ID or fingerprint instead of typing the PIN. The PIN remains a fallback.")
+        onNodeWithText("Use biometrics to open the app instead of typing the PIN. Signing approval is set up next.")
             .performScrollTo()
             .assertIsDisplayed()
     }
@@ -139,7 +146,41 @@ class WalletDemoAppTestScenarios(
             .assertIsDisplayed()
     }
 
-    fun unavailableBiometricSigningIsDisabledButNoneRemainsAvailable() = runComposeUiTest {
+    fun keySetupGroupsChoicesAndConfirmsSelectedConfiguration() = runComposeUiTest {
+        fun value(name: String) = WalletDemoKeyChoice(name, name, "Details for $name")
+        fun option(recovery: String, storage: String, approval: String) = WalletDemoKeySetupOption(
+            "$recovery-$storage-$approval", value(recovery), value(storage), value(approval),
+        )
+        val options = listOf(option("new", "hardware", "biometric"), option("new", "native", "biometric"),
+            option("new", "native", "none"), option("backup", "native", "biometric"), option("backup", "database", "none"))
+        var submitted: String? = null
+        setWalletContent {
+            IdentitySetupScreen(
+                WalletDemoIdentitySetup.Choose(options), null,
+                onChoose = { submitted = it }, onResume = {}, onCancel = {}, onRefresh = {},
+            )
+        }
+        onAllNodesWithText("new").assertCountEquals(1)
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Recovery", 1)).performScrollTo().performClick().assertIsSelected()
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        onAllNodesWithText("hardware").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        onAllNodesWithText("biometric").assertCountEquals(0)
+        onAllNodesWithText("Refresh available options").assertCountEquals(0)
+        if (hasSystemBackNavigation) {
+            onAllNodesWithText("Back").assertCountEquals(0)
+        } else {
+            onNodeWithText("Back").performClick()
+            onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).assertIsSelected()
+            onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        }
+        assertEquals(null, submitted)
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        assertEquals("backup-database-none", submitted)
+    }
+
+    fun pinSetupDoesNotAskForSigningApproval() = runComposeUiTest {
         val wallet = FakeDemoWallet(
             signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled,
         )
@@ -152,13 +193,8 @@ class WalletDemoAppTestScenarios(
                 WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
         }
 
-        onNodeWithTag(WalletUiTestTags.SigningProtectionBiometric)
-            .performScrollTo()
-            .assertIsNotEnabled()
-        onNodeWithTag(WalletUiTestTags.SigningProtectionNone)
-            .performScrollTo()
-            .assertIsEnabled()
-            .performClick()
+        onAllNodesWithTag(WalletUiTestTags.SigningProtectionBiometric).assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.SigningProtectionNone).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.PinSubmitButton)
             .performScrollTo()
             .assertIsEnabled()
@@ -1056,6 +1092,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsButton).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsScreen).assertIsDisplayed()
+        onNodeWithText("Technical details").performClick()
         onNodeWithTag(WalletUiTestTags.SettingsDid).assertTextContains("did:key:test")
         onNodeWithTag(WalletUiTestTags.SettingsKeyId).assertTextContains("key-1")
         val session = controller.state.value.session as WalletSessionState.Ready
@@ -1064,6 +1101,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsPublicJwk)
             .performScrollTo()
             .assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsCredentialSharing)
             .performScrollTo()
             .assertIsDisplayed()
@@ -1120,14 +1158,33 @@ class WalletDemoAppTestScenarios(
 
     fun settingsConfirmsAndAppliesSigningProtectionChange() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val identityDetailsRequested = CompletableDeferred<Unit>()
+        val identityDetailsResponse = CompletableDeferred<WalletDemoIdentityDetails?>()
+        val delayedWallet = object : DemoWallet by wallet {
+            override suspend fun identityDetails(): WalletDemoIdentityDetails? {
+                identityDetailsRequested.complete(Unit)
+                return identityDetailsResponse.await()
+            }
+        }
         val pinStore = InMemoryDemoPinStore()
-        val controller = WalletDemoController(wallet, pinStore)
+        val controller = WalletDemoController(delayedWallet, pinStore)
 
         setWalletContent { WalletDemoApp(controller) }
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { identityDetailsRequested.isCompleted }
+        onNodeWithTag(WalletUiTestTags.SettingsScreen).assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.SigningProtectionNone).assertCountEquals(0)
+
+        onNodeWithText("Protection and recovery").performClick()
+        identityDetailsResponse.complete(null)
+        // Identity details load on the controller's dispatcher, outside Compose's idle tracking.
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodes(hasTestTag(WalletUiTestTags.SigningProtectionNone) and isEnabled())
+                .fetchSemanticsNodes().size == 1
+        }
         onNodeWithTag(WalletUiTestTags.SigningProtectionNone)
             .performScrollTo()
             .performClick()

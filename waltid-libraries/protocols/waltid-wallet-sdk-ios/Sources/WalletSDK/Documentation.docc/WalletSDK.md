@@ -8,7 +8,7 @@ Swift-friendly iOS facade for the walt.id mobile wallet SDK.
 OpenID4VCI credential issuance, local credential listing, OpenID4VP
 presentation, and progress events.
 
-Create a ``Wallet`` in an app process, bootstrap wallet key material, and
+Create a ``Wallet`` in an app process, initialize a signing identity, and
 then call the async wallet operations with Foundation-native `URL` values:
 
 ```swift
@@ -16,7 +16,10 @@ let wallet = try await Wallet(
     configuration: WalletConfiguration(walletID: "consumer-wallet")
 )
 
-let bootstrap = try await wallet.bootstrap(didMethod: "key")
+guard case .active(let identity) = try await wallet.signingIdentity.initialize() else {
+    // Show pending setup or an unavailable identity before continuing.
+    return
+}
 let session = try await wallet.startIssuance(
     IssuanceRequest(
         offer: credentialOfferURL,
@@ -27,7 +30,7 @@ let outcome = try await wallet.continuePreAuthorizedIssuance(sessionID: session.
 let credentials = try await wallet.credentials()
 let presentation = try await wallet.present(
     request: authorizationRequestURL,
-    did: bootstrap.did
+    did: identity.did
 )
 ```
 
@@ -104,6 +107,13 @@ reset; plaintext-to-encrypted migration is not performed.
 
 ## Topics
 
+### Signing identity
+
+- <doc:IdentityRecovery>
+- ``SigningIdentityManager``
+- ``SigningIdentityConfiguration``
+- ``IdentityRecoveryProvider``
+
 ### Integration Guides
 
 - <doc:GettingStarted>
@@ -128,7 +138,7 @@ reset; plaintext-to-encrypted migration is not performed.
 - ``Credential``
 - ``StoredCredential``
 - ``StoredDid``
-- ``WalletBootstrapResult``
+- ``SigningIdentity``
 - ``PresentationResult``
 
 ### Events

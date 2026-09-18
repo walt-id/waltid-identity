@@ -30,7 +30,13 @@
         "waltid-libraries/*/build.gradle.kts",
         "waltid-libraries/*/*/build.gradle.kts",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
-        "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*"
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
+        "scripts/*recovery*",
+        "scripts/ios_simulator_test.py",
+        "scripts/tests/test_*recovery*",
+        ".github/scripts/mobile-ci/run-ios-wallet-recovery-tests.sh",
+        "*/src/recoveryTest/*",
+        "*/src/iosRecoveryTest/*"
       ]
     },
     "native": {

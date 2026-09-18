@@ -1,0 +1,19 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <id.walt.protocols:waltid-openid4vc-wallet-custody-enterprise>
+final class id.walt.wallet2.custody.enterprise/EnterpriseIdentityKeyCustodian : id.walt.wallet2.mobile.identity/IdentityKeyCustodian, kotlin/AutoCloseable { // id.walt.wallet2.custody.enterprise/EnterpriseIdentityKeyCustodian|null[0]
+    constructor <init>(io.ktor.client/HttpClient, io.ktor.http/Url, kotlin/String = ..., kotlin/String = ...) // id.walt.wallet2.custody.enterprise/EnterpriseIdentityKeyCustodian.<init>|<init>(io.ktor.client.HttpClient;io.ktor.http.Url;kotlin.String;kotlin.String){}[0]
+
+    final val displayName // id.walt.wallet2.custody.enterprise/EnterpriseIdentityKeyCustodian.displayName|{}displayName[0]
+        final fun <get-displayName>(): kotlin/String // id.walt.wallet2.custody.enterprise/EnterpriseIdentityKeyCustodian.displayName.<get-displayName>|<get-displayName>(){}[0]
+    final val id // id.walt.wallet2.custody.enterprise/EnterpriseIdentityKeyCustodian.id|{}id[0]
+        final fun <get-id>(): kotlin/String // id.walt.wallet2.custody.enterprise/EnterpriseIdentityKeyCustodian.id.<get-id>|<get-id>(){}[0]
+
+    final fun close() // id.walt.wallet2.custody.enterprise/EnterpriseIdentityKeyCustodian.close|close(){}[0]
+    final suspend fun importKey(id.walt.wallet2.mobile.identity/SigningIdentity, id.walt.crypto2.keys/EncodedKey.Jwk): id.walt.wallet2.mobile.identity/IdentityCustodyReceipt // id.walt.wallet2.custody.enterprise/EnterpriseIdentityKeyCustodian.importKey|importKey(id.walt.wallet2.mobile.identity.SigningIdentity;id.walt.crypto2.keys.EncodedKey.Jwk){}[0]
+}

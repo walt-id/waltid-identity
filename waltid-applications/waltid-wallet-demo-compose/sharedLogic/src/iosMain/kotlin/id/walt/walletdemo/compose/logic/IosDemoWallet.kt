@@ -1,6 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
@@ -31,6 +31,12 @@ fun createIosDemoWallet(
             MobileWalletFactory().create(
                 MobileWalletConfig(
                     walletId = config.walletId,
+                    signingIdentity = id.walt.wallet2.mobile.identity.SigningIdentityConfiguration(
+                        recoveryProviders = listOf(id.walt.wallet2.recovery.keychain.KeychainIdentityRecovery("wallet-demo", crossProcessAccess.keychainAccessGroup)),
+                        alternativeAuthorizations = if (config.signingProtectionMode.allows(WalletDemoSigningProtection.None))
+                        listOf(KeyUseAuthorizationPolicy.None) else emptyList(),
+                        platform = id.walt.crypto2.keys.PlatformKeyConfiguration.IosKeychain(accessGroup = crossProcessAccess.keychainAccessGroup),
+                    ),
                     attestationConfig = config.toWalletAttestationConfig(),
                     transactionDataProfiles = transactionDataProfiles.profiles,
                     preferredLocales = NSLocale.preferredLanguages.mapNotNull { it as? String },
@@ -45,6 +51,7 @@ fun createIosDemoWallet(
                 )
             ),
             warning = transactionDataProfiles.warning,
+            isIos = true,
         )
     }
 }

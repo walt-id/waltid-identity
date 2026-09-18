@@ -26,6 +26,19 @@ For setup, IDE guidance, and mobile integration test commands, see the [Mobile W
 
 The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM linkage package for native iOS linkage.
 
+## Signing key setup
+
+PIN setup controls access to the app, with optional biometric unlock. Key setup then asks three separate questions: whether to back up or restore a signing key, where to store it, and when to request system approval for signing. Each screen groups the SDK's supported options into selectable cards; Continue keeps the selection local until Create signing key or Restore signing key is pressed. The SDK revalidates the selected option before executing it.
+
+Key recovery restores the original key and DID, not credentials. A local save does not prove delivery to another device. Unavailable providers show their reported reason and can be checked again; returning to the app also refreshes the choices.
+
+Android offers encrypted-cloud backup and device transfer separately. Cloud backup requires Google to report end-to-end encryption available. Device transfer is performed by a supported Android phone setup or migration flow, requires the source device and does not request a cloud copy. Hardware-required storage must pass the hardware check; Android Keystore without that requirement leaves the protection level to the platform.
+
+On iOS, choose Create without a key backup to use Secure Enclave. Recoverable keys use Keychain or the encrypted wallet database because existing keys cannot be imported into Secure Enclave.
+
+Settings → Protection and recovery shows the storage requirement, observed signing protection, key origin, signing approval and recovery status. Technical identifiers are available separately. To replace a key or its signing policy, use Reset wallet and repeat setup; this removes local credentials, which must be issued again.
+
+
 ## Local wallet data
 
 Android and iOS demo targets use the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in platform-protected storage. During local development, reset wallet state through `MobileWallet.deleteWallet()`, by uninstalling the app, or by deleting the app's local data.

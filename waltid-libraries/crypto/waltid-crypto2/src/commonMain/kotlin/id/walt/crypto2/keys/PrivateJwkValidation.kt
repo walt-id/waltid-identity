@@ -1,5 +1,7 @@
 package id.walt.crypto2.keys
 
+import dev.whyoleg.cryptography.random.CryptographyRandom
+import id.walt.crypto2.providers.cryptography.useEcPairwiseValidation
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.EC
 import dev.whyoleg.cryptography.algorithms.ECDH
@@ -43,6 +45,10 @@ internal suspend fun EncodedKey.Jwk.validatePrivatePublicConsistency(
     provider: CryptographyProvider,
 ) {
     if (!privateMaterial) return
+    if (spec is KeySpec.Ec && useEcPairwiseValidation) {
+        validateEcKeyPair(spec, provider)
+        return
+    }
     val cacheKey = validationCacheKey(spec)
     if (validationCacheMutex.withLock { validatedMaterial.containsKey(cacheKey) }) return
     val claimed = canonicalPublicJwk()
@@ -78,6 +84,24 @@ internal suspend fun resetValidationCacheForTesting() {
 
 private fun EncodedKey.Jwk.validationCacheKey(spec: KeySpec): String =
     "$spec|${normalizeJwk(data.toByteArray()).decodeToString()}"
+
+/** Pairwise consistency when a provider can sign but cannot derive a public point. */
+internal suspend fun EncodedKey.Jwk.validateEcKeyPair(spec: KeySpec.Ec, provider: CryptographyProvider) {
+    val algorithm = provider.get(ECDSA)
+    val curve = EC.Curve(spec.curve.name)
+    val privateKey = algorithm.privateKeyDecoder(curve)
+        .decodeFromByteArray(EC.PrivateKey.Format.JWK, data.toByteArray())
+    val publicKey = algorithm.publicKeyDecoder(curve)
+        .decodeFromByteArray(EC.PublicKey.Format.JWK, publicOnly().data.toByteArray())
+    // A fresh challenge avoids accepting a malicious pair chosen for a fixed validation message.
+    val challenge = CryptographyRandom.nextBytes(32)
+    val signature = privateKey.signatureGenerator(SHA256, ECDSA.SignatureFormat.DER)
+        .generateSignature(challenge)
+    require(publicKey.signatureVerifier(SHA256, ECDSA.SignatureFormat.DER)
+        .tryVerifySignature(challenge, signature)) {
+        "Private JWK public members do not match its private material"
+    }
+}
 
 private suspend fun EncodedKey.Jwk.derivePublicJwk(
     spec: KeySpec,

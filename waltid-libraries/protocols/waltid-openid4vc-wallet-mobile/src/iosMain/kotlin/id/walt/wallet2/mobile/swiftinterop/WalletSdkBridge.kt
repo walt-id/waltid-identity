@@ -1,7 +1,7 @@
 package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.MobileWalletBootstrapResult
+import id.walt.wallet2.mobile.identity.*
 import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
 import id.walt.wallet2.mobile.MobileWalletAnnexCRequest
 import id.walt.wallet2.mobile.MobileWalletAnnexCSubmission
@@ -9,8 +9,8 @@ import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
@@ -58,21 +58,66 @@ public class WalletSdkBridge private constructor(
      */
     public val events: Flow<MobileWalletEvent> = eventFlow
 
-    /**
-     * Initializes the bridged wallet and returns the persisted key and DID information.
-     */
-    public suspend fun bootstrap(
-        keyType: MobileWalletKeyType? = null,
-        didMethod: String = "key",
-        keyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy? = null,
-    ): WalletBridgeResult<MobileWalletBootstrapResult> =
-        walletBridgeCall {
-            operations.bootstrap(
-                keyType = keyType,
-                didMethod = didMethod,
-                keyUseAuthorizationPolicy = keyUseAuthorizationPolicy?.toCorePolicy(),
-            )
-        }
+    /** Reopens the selected identity or creates the configured default through the shared lifecycle. */
+    public suspend fun initializeSigningIdentity(): WalletBridgeResult<SigningIdentityOperationResult> =
+        walletBridgeCall { operations.signingIdentity.initialize() }
+
+    /** Reports current provider prerequisites, including unavailable integrations. */
+    public suspend fun signingIdentityRecoveryProviderStatuses(): WalletBridgeResult<List<IdentityRecoveryProviderStatus>> =
+        walletBridgeCall { operations.signingIdentity.recoveryProviderStatuses() }
+
+    /** Enumerates complete SDK-owned identity choices. */
+    public suspend fun signingIdentityCreationOptions(intent: SigningIdentityIntent = SigningIdentityIntent.WithoutRecovery,
+        attestation: SigningIdentityAttestationRequest = SigningIdentityAttestationRequest.None): WalletBridgeResult<SigningIdentityCreationOptions> =
+        walletBridgeCall { operations.signingIdentity.creationOptions(intent, attestation) }
+
+    /** Creates the identity described by an SDK-issued option. */
+    public suspend fun createSigningIdentity(option: SigningIdentityCreationOption): WalletBridgeResult<SigningIdentityOperationResult> =
+        walletBridgeCall { operations.signingIdentity.create(option) }
+
+    /** Reads the active, pending or unavailable identity state. */
+    public suspend fun signingIdentityState(): WalletBridgeResult<SigningIdentityState> =
+        walletBridgeCall { operations.signingIdentity.state() }
+
+    /** Requests deletion without claiming that every synchronized copy has disappeared. */
+    public suspend fun deleteSigningIdentityRecovery(candidate: SigningIdentityRecoveryCandidate): WalletBridgeResult<RecoveryReceipt> =
+        walletBridgeCall { operations.signingIdentity.deleteRecovery(candidate) }
+
+    /** Resumes an interrupted identity operation. */
+    public suspend fun resumeSigningIdentity(identityId: String): WalletBridgeResult<SigningIdentityOperationResult> =
+        walletBridgeCall { operations.signingIdentity.resumePending(identityId) }
+
+    /** Cancels pending local setup without deleting an already submitted provider record. */
+    public suspend fun cancelPendingSigningIdentity(identityId: String): WalletBridgeResult<Unit> =
+        walletBridgeCall { operations.signingIdentity.cancelPending(identityId) }
+
+    /** Offers backup only for an existing exportable key or retained recovery secret. */
+    public suspend fun signingIdentityBackupOptions(identityId: String): WalletBridgeResult<List<SigningIdentityBackupOption>> =
+        walletBridgeCall { operations.signingIdentity.backupOptions(identityId) }
+
+    /** Submits a selected identity backup. */
+    public suspend fun backupSigningIdentity(option: SigningIdentityBackupOption): WalletBridgeResult<SigningIdentityOperationResult> =
+        walletBridgeCall { operations.signingIdentity.backup(option) }
+
+    /** Lists explicitly configured private-key custodians under the current export policy. */
+    public suspend fun signingIdentityCustodyOptions(identityId: String): WalletBridgeResult<List<SigningIdentityCustodyOption>> =
+        walletBridgeCall { operations.signingIdentity.custodyOptions(identityId) }
+
+    /** Imports a copy into an explicit custodian without claiming portable recovery. */
+    public suspend fun copySigningIdentityToCustody(option: SigningIdentityCustodyOption): WalletBridgeResult<SigningIdentityCustodyResult> =
+        walletBridgeCall { operations.signingIdentity.copyToCustody(option) }
+
+    /** Discovers safe backup references from registered providers. */
+    public suspend fun signingIdentityRecoveryDiscovery(): WalletBridgeResult<SigningIdentityRecoveryDiscovery> =
+        walletBridgeCall { operations.signingIdentity.discoverRecovery() }
+
+    /** Validates a backup and offers supported restoration destinations. */
+    public suspend fun signingIdentityRestorationOptions(candidate: SigningIdentityRecoveryCandidate): WalletBridgeResult<List<SigningIdentityRestorationOption>> =
+        walletBridgeCall { operations.signingIdentity.restorationOptions(candidate) }
+
+    /** Restores the exact original signing identity. */
+    public suspend fun restoreSigningIdentity(option: SigningIdentityRestorationOption): WalletBridgeResult<SigningIdentityOperationResult> =
+        walletBridgeCall { operations.signingIdentity.restore(option) }
 
     /** Checks whether a key-use authorization request is supported without creating a key. */
     public suspend fun keyUseAuthorizationPreflight(
@@ -236,6 +281,7 @@ public class WalletSdkBridge private constructor(
 }
 
 internal interface WalletSdkBridgeOperations {
+    val signingIdentity: SigningIdentityManager get() = error("Identity lifecycle is not supplied by this test double")
     fun digitalCredentialCapabilities(): MobileWalletDigitalCredentialCapabilities =
         error("Digital Credentials are not implemented by this test bridge")
 
@@ -245,12 +291,6 @@ internal interface WalletSdkBridgeOperations {
     suspend fun submitAnnexCPresentation(
         submission: MobileWalletAnnexCSubmission,
     ): MobileWalletDigitalCredentialResponse = error("Annex C is not implemented by this test bridge")
-
-    suspend fun bootstrap(
-        keyType: MobileWalletKeyType?,
-        didMethod: String,
-        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy?,
-    ): MobileWalletBootstrapResult
 
     suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType,
@@ -311,6 +351,8 @@ internal interface WalletSdkBridgeOperations {
 internal class MobileWalletSdkBridgeOperations(
     private val wallet: MobileWallet,
 ) : WalletSdkBridgeOperations {
+    override val signingIdentity: SigningIdentityManager get() = wallet.signingIdentity
+
     override fun digitalCredentialCapabilities(): MobileWalletDigitalCredentialCapabilities =
         wallet.digitalCredentialCapabilities()
 
@@ -320,17 +362,6 @@ internal class MobileWalletSdkBridgeOperations(
     override suspend fun submitAnnexCPresentation(
         submission: MobileWalletAnnexCSubmission,
     ): MobileWalletDigitalCredentialResponse = wallet.submitAnnexCPresentation(submission)
-
-    override suspend fun bootstrap(
-        keyType: MobileWalletKeyType?,
-        didMethod: String,
-        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy?,
-    ): MobileWalletBootstrapResult =
-        wallet.bootstrap(
-            keyType = keyType,
-            didMethod = didMethod,
-            keyUseAuthorizationPolicy = keyUseAuthorizationPolicy,
-        )
 
     override suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType,

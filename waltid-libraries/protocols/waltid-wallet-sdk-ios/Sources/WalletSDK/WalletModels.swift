@@ -4,9 +4,8 @@ import Foundation
 public struct WalletConfiguration: Sendable {
     /// Stable local wallet identifier used by the underlying wallet store.
     public var walletID: String
-
-    /// Default key type used when bootstrapping a new wallet DID.
-    public var defaultKeyType: WalletKeyType
+    /// Signing identity lifecycle and opt-in recovery integrations.
+    public var signingIdentity: SigningIdentityConfiguration
 
     /// Default authorization policy for newly created wallet signing keys.
     public var defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
@@ -40,8 +39,6 @@ public struct WalletConfiguration: Sendable {
     /// - Parameters:
     ///   - walletID: Stable local wallet identifier used for database naming
     ///     and persisted wallet state.
-    ///   - defaultKeyType: Key type used by ``Wallet/bootstrap(keyType:didMethod:)``
-    ///     when no operation-specific override is supplied.
     ///   - attestation: Optional wallet attestation configuration for issuers
     ///     that require client attestation.
     ///   - clientIDTrustConfiguration: Trust anchors used to authenticate verifier
@@ -59,9 +56,9 @@ public struct WalletConfiguration: Sendable {
     ///   - defaultKeyUseAuthorizationPolicy: Default authorization policy for newly
     ///     created wallet signing keys.
     ///   - keyUseAuthorizationPrompt: Prompt text used for protected signing operations.
+    ///   - signingIdentity: Signing identity constraints and optional recovery providers.
     public init(
         walletID: String = "default",
-        defaultKeyType: WalletKeyType = .secp256r1,
         attestation: WalletAttestationConfiguration? = nil,
         clientIDTrustConfiguration: WalletClientIDTrustConfiguration = .init(),
         issuerMetadataTrustResolver: (any IssuerMetadataTrustResolver)? = nil,
@@ -70,10 +67,11 @@ public struct WalletConfiguration: Sendable {
         preferredLocales: [String] = Locale.preferredLanguages,
         crossProcessAccess: WalletCrossProcessAccess? = nil,
         defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .biometricCurrentSet,
-        keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt = .init()
+        keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt = .init(),
+        signingIdentity: SigningIdentityConfiguration = .init()
     ) {
         self.walletID = walletID
-        self.defaultKeyType = defaultKeyType
+        self.signingIdentity = signingIdentity
         self.defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy
         self.keyUseAuthorizationPrompt = keyUseAuthorizationPrompt
         self.attestation = attestation
@@ -113,12 +111,19 @@ public enum WalletKeyUseAuthorizationPolicy: Equatable, Sendable {
 
     /// Strong biometric authentication for every operation; new biometric enrollment invalidates the key.
     case biometricCurrentSet
+    /// Accepts newly enrolled strong biometrics. Protected-key access is deferred while biometrics are unavailable.
+    /// This policy does not guarantee key recovery.
+    case biometricAny
+    /// Uses the device credential; zero means authorization for each use.
+    case deviceCredential(timeoutSeconds: Int)
+    /// Accepts either a strong biometric or the device credential.
+    case biometricOrDeviceCredential(timeoutSeconds: Int)
 
     ///
     /// Strong biometric authentication reusable for a fixed, non-sliding interval after authorization.
-    /// Android verifies the native KeyStore interval. iOS configures the interval in Signum but cannot
-    /// independently inspect its effective positive timeout after restoration. This is recent platform
-    /// or provider authentication, not consent for issuance, presentation, or another wallet action.
+    /// iOS retains a per-key LocalAuthentication context; native Keychain metadata cannot independently
+    /// verify the interval. Uses the same biometric availability guard as `biometricAny`.
+    /// This is recent authentication, not consent for issuance, presentation, or another wallet action.
     case biometricTimedReuse(timeoutSeconds: Int)
 }
 
@@ -151,6 +156,8 @@ public enum WalletKeyUseAuthorizationFailure: Equatable, Sendable {
     case biometricUnavailable
     /// No biometric is enrolled on the device.
     case biometricNotEnrolled
+    /// The device has no passcode configured.
+    case deviceCredentialNotSet
     /// The host application did not provide a usable interaction context.
     case interactionContextUnavailable
     /// The user cancelled or did not complete authorization.
@@ -169,6 +176,8 @@ public enum WalletKeyUseAuthorizationUnsupportedReason: Equatable, Sendable {
     case biometricUnavailable
     /// No biometric is enrolled on the device.
     case biometricNotEnrolled
+    /// The device has no passcode configured.
+    case deviceCredentialNotSet
 }
 
 /// Result of checking whether a protected-key request is supported.
@@ -704,39 +713,7 @@ public struct Credential: Equatable, Identifiable, Sendable {
     }
 }
 
-/// Result of bootstrapping wallet key material and DID state.
-public struct WalletBootstrapResult: Equatable, Sendable {
-    /// Identifier of the created or selected wallet key.
-    public let keyID: String
 
-    /// DID created for the wallet.
-    public let did: String
-
-    /// Public JWK of ``keyID`` as a JSON object string. Private material is never included.
-    public let publicJWK: String
-
-    /// Immutable authorization policy of the persisted signing key.
-    public let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
-
-    /// Creates a bootstrap result.
-    ///
-    /// - Parameters:
-    ///   - keyID: Identifier of the created or selected wallet key.
-    ///   - did: DID created for the wallet.
-    ///   - publicJWK: Public JWK of the wallet key as a JSON object string.
-    ///   - keyUseAuthorizationPolicy: Authorization required for private-key use.
-    public init(
-        keyID: String,
-        did: String,
-        publicJWK: String,
-        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
-    ) {
-        self.keyID = keyID
-        self.did = did
-        self.publicJWK = publicJWK
-        self.keyUseAuthorizationPolicy = keyUseAuthorizationPolicy
-    }
-}
 
 /// Input used to start either OpenID4VCI issuance grant.
 public struct IssuanceRequest: Equatable, Sendable {
@@ -754,6 +731,8 @@ public struct IssuanceRequest: Equatable, Sendable {
 
     /// Optional holder DID URL used when the credential requires DID binding.
     public let did: String?
+    /// Minimum host/issuer policy required of the identity's retained key policy.
+    public let keyPolicy: SigningIdentityKeyPolicy
 
     /// Creates an issuance request.
     ///
@@ -763,18 +742,21 @@ public struct IssuanceRequest: Equatable, Sendable {
     ///   - redirectURI: Exact registered callback URI.
     ///   - keyID: Optional identifier of the selected holder key.
     ///   - did: Optional holder DID URL identifying the selected key.
+    ///   - keyPolicy: Minimum required identity policy; this does not claim ecosystem certification.
     public init(
         offer: URL,
         clientID: String = "eudiw-abca",
         redirectURI: URL,
         keyID: String? = nil,
-        did: String? = nil
+        did: String? = nil,
+        keyPolicy: SigningIdentityKeyPolicy = .generalPurpose
     ) {
         self.offer = offer
         self.clientID = clientID
         self.redirectURI = redirectURI
         self.keyID = keyID
         self.did = did
+        self.keyPolicy = keyPolicy
     }
 
 }

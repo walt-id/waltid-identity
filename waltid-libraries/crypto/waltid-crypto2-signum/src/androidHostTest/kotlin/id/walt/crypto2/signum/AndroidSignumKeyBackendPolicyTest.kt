@@ -1,5 +1,7 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.KeyProtectionLevel
 import android.security.keystore.KeyProperties
 import at.asitplus.signum.indispensable.CryptoPublicKey
 import id.walt.crypto2.algorithms.DigestAlgorithm
@@ -25,7 +27,7 @@ class AndroidSignumKeyBackendPolicyTest {
             validateAndroidNativePolicy(
                 alias = "hardware-required",
                 policy = SignumKeyPolicy(
-                    hardware = SignumHardwarePolicy.REQUIRED,
+                    hardware = HardwarePreference.REQUIRED,
                     authentication = SignumAuthenticationPolicy.UserPresence(
                         biometric = true,
                         allowNewBiometrics = false,
@@ -47,7 +49,7 @@ class AndroidSignumKeyBackendPolicyTest {
     fun `required hardware accepts a trusted-environment key`() {
         validateAndroidNativePolicy(
             alias = "hardware-required",
-            policy = SignumKeyPolicy(hardware = SignumHardwarePolicy.REQUIRED),
+            policy = SignumKeyPolicy(hardware = HardwarePreference.REQUIRED),
             isInsideSecureHardware = true,
             securityLevel = KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT,
             isUserAuthenticationRequired = false,
@@ -61,7 +63,7 @@ class AndroidSignumKeyBackendPolicyTest {
     fun `required hardware accepts an unknown secure hardware level`() {
         validateAndroidNativePolicy(
             alias = "hardware-required",
-            policy = SignumKeyPolicy(hardware = SignumHardwarePolicy.REQUIRED),
+            policy = SignumKeyPolicy(hardware = HardwarePreference.REQUIRED),
             isInsideSecureHardware = true,
             securityLevel = KeyProperties.SECURITY_LEVEL_UNKNOWN_SECURE,
             isUserAuthenticationRequired = false,
@@ -76,7 +78,7 @@ class AndroidSignumKeyBackendPolicyTest {
         assertFailsWith<SignumKeyPolicyMismatchException> {
             validateAndroidNativePolicy(
                 alias = "hardware-required",
-                policy = SignumKeyPolicy(hardware = SignumHardwarePolicy.REQUIRED),
+                policy = SignumKeyPolicy(hardware = HardwarePreference.REQUIRED),
                 isInsideSecureHardware = true,
                 securityLevel = KeyProperties.SECURITY_LEVEL_UNKNOWN,
                 isUserAuthenticationRequired = false,
@@ -90,7 +92,7 @@ class AndroidSignumKeyBackendPolicyTest {
     @Test
     fun `biometric current set rejects a non per-operation native policy`() {
         val policy = SignumKeyPolicy(
-            hardware = SignumHardwarePolicy.REQUIRED,
+            hardware = HardwarePreference.REQUIRED,
             authentication = SignumAuthenticationPolicy.UserPresence(
                 biometric = true,
                 allowNewBiometrics = false,
@@ -167,7 +169,7 @@ class AndroidSignumKeyBackendPolicyTest {
             validateAndroidNativePolicy(
                 alias = "biometric-$duration",
                 policy = SignumKeyPolicy(
-                    hardware = SignumHardwarePolicy.REQUIRED,
+                    hardware = HardwarePreference.REQUIRED,
                     authentication = SignumAuthenticationPolicy.UserPresence(
                         biometric = true,
                         allowNewBiometrics = false,
@@ -188,7 +190,7 @@ class AndroidSignumKeyBackendPolicyTest {
     @Test
     fun `timed biometric reuse requires the exact Keystore policy`() {
         val policy = SignumKeyPolicy(
-            hardware = SignumHardwarePolicy.REQUIRED,
+            hardware = HardwarePreference.REQUIRED,
             authentication = SignumAuthenticationPolicy.UserPresence(
                 biometric = true,
                 allowNewBiometrics = true,
@@ -277,7 +279,7 @@ class AndroidSignumKeyBackendPolicyTest {
         val handle = SignumPlatformKeyHandle(
             alias = "verification-source",
             spec = spec,
-            protectionLevel = SignumProtectionLevel.UNKNOWN,
+            protectionLevel = KeyProtectionLevel.UNKNOWN,
             attestation = null,
             authentication = SignumAuthenticationPolicy.UserPresence(),
             signerFor = { error("verification must not request a signer") },
