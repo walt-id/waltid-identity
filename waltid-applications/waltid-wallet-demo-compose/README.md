@@ -26,6 +26,104 @@ For setup, IDE guidance, and mobile integration test commands, see the [Mobile W
 
 The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM linkage package for native iOS linkage.
 
+## In-person presentation
+
+The Android and iOS apps expose a dedicated **Present in person** journey for holder-side ISO mdoc
+proximity presentation. The Wallet SDK remains the source of session, request, reader-authentication,
+trust, disclosure, and terminal-state meaning; the shared Compose UI renders those facts and performs
+only platform-owned permission, settings, lifecycle, screen-awake, and brightness actions.
+Before creating a session, the Compose demo queries the SDK capabilities and offers an explicit action for any
+runtime permission required by the selected proximity configuration. A permission that Android no
+longer allows the app to request is shown as an explicit **Open app settings** action; returning from
+Settings rechecks the selected configuration before session creation. Radio, power, and settings
+remediation otherwise remains an explicit user action.
+
+The sharing screen offers **Hold near the reader** and **Show QR code** only for engagements actually prepared
+by the SDK. A single ready QR method opens directly. On iOS, choosing NFC explicitly opens the system
+presentation sheet, including when NFC is the only available method.
+It does not depend on the optional short-lived presentment assertion. Choosing an already prepared
+engagement preserves the session and payload. Once connecting starts, method controls disappear;
+reader consent remains the focus, and the actual route is available under **Connection details**.
+Completion shows the result and **Done**, without radio controls.
+
+Permission setup explains the required action before opening an OS prompt. Users can skip optional
+setup only when the SDK reports another complete route that can start. Returning from Settings rechecks
+availability; declined permissions are not requested again automatically. QR visibility alone controls
+temporary screen brightness, and the QR is hidden once connecting begins.
+
+**Settings → Credential Sharing → Nearby sharing** stores the connection profile. Changing it
+before connection or approval replaces the open engagement and rechecks availability. The previous
+QR and choices remain hidden until the new profile is ready. Connected exchanges and approved shares
+keep their configuration. New presentations use the latest preference.
+
+Automatic uses the available reader-compatible routes. Compatibility profiles narrow transfer to
+Bluetooth or Wi-Fi Aware, or select provisional NFCv2 direct/handover modes. These choices stay in Settings.
+Device support and permissions are checked at startup; NFCv2 retains its mandatory NFC channel.
+
+**Approval** in Nearby sharing settings stores **Ask each time** (default) or
+**Prepare sharing**, independently of the connection profile. The same choice is
+available before connecting. Both switches update one saved preference, retained
+for subsequent shares. Changing it before connection refreshes the engagement in
+place; the previous QR is hidden until its replacement is ready. Changes made
+during an exchange apply to the next presentation. Preparation first identifies a
+named authenticated trusted reader and collects its request without sharing credentials. After the
+connection closes, review the reader, purpose, retention and selected data, then
+choose **Approve and get ready**. Several matching credentials require an explicit
+choice; requested mDL portrait data is marked required. Missing required data
+prevents approval and explains why another credential is needed.
+
+The ready screen shows a cancellable 60-second, one-use approval and its scope.
+Approval automatically reopens the previous engagement method when available.
+The reader must start a fresh request; additional data, another reader or changed
+purpose/retention requires another decision. While the Core NFC sheet owns the
+screen, the SDK uses this review/reconnect flow even if NFC v2 has an alternate
+bearer. Conventional handover permits connected review after the sheet closes. Only an actively owned NFC sheet exempts background cancellation.
+
+Completion shows the locally shared selection and **Prepare another share** while
+the recent request remains valid. Preparing again requires a new review and approval;
+retry never reuses an armed approval. **Done** forgets the plan. Plans expire after
+ten minutes, approvals after 60 seconds, and neither is persisted. Reader/key checks
+remain in the SDK. A local receipt does not confirm the reader's verification result.
+
+The current journey selects Bluetooth Low Energy, conventional NFC, and Wi-Fi Aware as alternative
+retrieval methods. Capability and permission failures are explained during setup. Eligible Android API 33+
+devices may advertise the NCS-SK-128 Wi-Fi Aware holder path after runtime permissions and radio
+resources pass; iOS shows the precise unsupported result while retaining BLE/NFC fallback. The
+journey displays Device Engagement as an accessible QR code and supports per-document credential and element selection,
+shows reader-stated purpose and retention intent, and presents authentication scope, signature
+validity, certificate-path, revocation, optional RICAL, and product-trust evidence as separate facts.
+It requests fresh consent for repeated exchanges and restores temporary display changes on every exit
+path. Raw engagement data is never exposed through accessibility labels.
+
+QR rendering remains a demo-host concern rather than a Wallet SDK API. The shared Compose renderer
+uses ZXing on Android and ZXing-C++ on iOS for Device Engagement only. It accepts bounded ASCII
+`mdoc:` text, uses low error correction without ECI, and fails closed instead of truncating an
+oversized payload. Compose iOS pins the resulting module fingerprint to the native SwiftUI renderer,
+and both renderers add an exact four-module quiet zone.
+
+This demo proves the wallet-side SDK integration. Wi-Fi Aware physical discovery/data-path/HTTP
+interoperability, external reader interoperability, prolonged
+reliability, and release qualification are tracked separately and must not be inferred from the demo.
+
+The mobile settings screen exposes **Credential Sharing → Reader Authentication** on Compose Android
+and Compose iOS. It supports a permissive or trusted-reader-only policy, lists and removes configured
+Reader CAs/RICAL providers, and imports DER, certificate-only PEM, or versioned walt.id JSON trust
+bundles through the platform document picker. Every import is validated and previewed before an atomic
+save to app-private storage; private keys and PKCS#12/PFX reader identities are deliberately rejected.
+Each new proximity session freezes the current settings, so an active exchange cannot be reconfigured.
+
+The ready screen prioritizes the full QR within the available space. **Prepare sharing** is a single
+switch: off means review each request; on means review, approve, then reconnect. Selecting the mode
+does not authorize disclosure. The same switch is available in Nearby sharing settings. Once armed,
+the reader and expiry countdown stay visible, and **Approved data** opens the already reviewed
+selection. Cancel stays separate from scrolling content. Short screens and larger text retain
+scrolling for secondary controls; landscape places the QR beside the controls.
+
+Review actions carry the identity of the displayed review. Each new review resets
+holder choices and continuation. Selected permissions are offered explicitly; an optional
+permission can be skipped only when the SDK reports a complete viable alternative route.
+Terminal recovery creates a new single-use session.
+
 ## Local wallet data
 
 Android and iOS demo targets use the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in platform-protected storage. During local development, reset wallet state through `MobileWallet.deleteWallet()`, by uninstalling the app, or by deleting the app's local data.
@@ -54,6 +152,7 @@ Android builds can override it with `-PtransactionDataProfiles.url=...`. Compose
 
 - Android and iOS are the supported mobile demo targets for wallet SDK issuance, presentation, platform-backed keys, and persistence.
 - Web/Wasm is currently a mock UI preview wired to `createMockDemoWallet()`. It does not exercise the mobile wallet SDK, platform key storage, SQLDelight persistence, EUDI flows, or Enterprise flows.
+- Web/Wasm does not expose the in-person proximity journey.
 - Production web wallet support is expected to live outside this mobile demo app. If a shared web UI is needed later, the shared UI module may need to move or split around the final web architecture.
 
 ## Release APK

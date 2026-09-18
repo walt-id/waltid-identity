@@ -90,6 +90,27 @@
         "waltid-services/waltid-issuer-api2/src/main/kotlin/id/walt/issuer/Issuer.kt"
       ],
       "lanes": []
+    },
+    {
+      "name": "proximity manifest selects its Kotlin and Swift consumers",
+      "files": [
+        ".github/scripts/mobile-ci/proximity-test-suites.json"
+      ],
+      "lanes": ["ios-simulator", "native"]
+    },
+    {
+      "name": "Swift bridge runner selects the native consumer lane",
+      "files": [
+        ".github/scripts/mobile-ci/run-ios-wallet-sdk-tests.sh"
+      ],
+      "lanes": ["native"]
+    },
+    {
+      "name": "physical controller changes use hardware-free checks only",
+      "files": [
+        "scripts/proximity-physical/run.py"
+      ],
+      "lanes": []
     }
   ]
 }

@@ -255,6 +255,9 @@ be overridden with repeated `--doctype` arguments.
 
 ## Enterprise mobile platform tests
 
+For proximity regression ownership, exact discovery guards, independent-reader provenance
+and optional local hardware entry points, see [Proximity test automation](proximity-test-automation.md).
+
 Enterprise mobile platform coverage is owned by the Enterprise integration test
 module in the coordinated unified-build checkout. These tests are
 self-contained: the Gradle tasks start an Enterprise mobile fixture server,
