@@ -134,6 +134,14 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       tag: ${{ needs.tag.outputs.tag }}
       make_latest: false
+  testflight:
+    uses: ./.github/workflows/distribute-ios-testflight.yml
+    secrets: inherit
+    needs: [ version, tag ]
+    with:
+      version_name: ${{ needs.version.outputs.release_version }}
+      release_tag: ${{ needs.tag.outputs.tag }}
+      app: both
   enterprise-release:
     name: Create Enterprise Release
     runs-on: ubuntu-latest
