@@ -143,6 +143,26 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
         )
     }
 
+    /**
+     * Source-compatible overload for existing [JwtProofBuilder] callers. Overrides cannot carry
+     * the interface default, so this 4-arg form still omits `iss`.
+     */
+    @Deprecated("Use the Crypto2Key overload")
+    suspend fun buildProof(
+        key: Key,
+        audience: String,
+        nonce: String?,
+        binding: ProofKeyBinding,
+    ): Proofs = buildProof(key, audience, nonce, binding, clientId = null)
+
+    suspend fun buildProof(
+        key: Crypto2Key,
+        algorithm: JwsAlgorithm,
+        audience: String,
+        nonce: String?,
+        binding: ProofKeyBinding,
+    ): Proofs = buildProof(key, algorithm, audience, nonce, binding, clientId = null)
+
     private fun proofPayload(audience: String, nonce: String?, clientId: String?): JsonObject =
         buildJsonObject {
             clientId?.let { put("iss", it) }
