@@ -63,6 +63,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
@@ -302,7 +303,7 @@ class MobileWalletDigitalCredentialPresentationTest {
             preRegisteredClients = mapOf(
                 "verifier2" to ClientMetadata(
                     jwks = ClientMetadata.Jwks(
-                        listOf(verifierKey.getPublicKey().exportJWKObject()) +
+                        listOf(jwkWithKid(verifierKey.getPublicKey().exportJWKObject(), verifierKey.getKeyId())) +
                             encryptionMetadata.jwks?.keys.orEmpty(),
                     ),
                     encryptedResponseEncValuesSupported = encryptionMetadata.encryptedResponseEncValuesSupported,
@@ -875,6 +876,11 @@ class MobileWalletDigitalCredentialPresentationTest {
 
     private fun List<MobileWalletPresentationCredentialOption>.selections() =
         map { MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId) }
+
+    /** iOS public-key export omits kid; ResponseEncryption requires one on every JWKS entry. */
+    private fun jwkWithKid(jwk: JsonObject, kid: String): JsonObject =
+        if (!jwk["kid"]?.jsonPrimitive?.contentOrNull.isNullOrBlank()) jwk
+        else JsonObject(jwk.toMap() + ("kid" to JsonPrimitive(kid)))
 
     /**
      * Credential store that counts reads, so a test can assert a request was refused *before* the wallet
