@@ -55,6 +55,7 @@ jobs:
       # Test klogging.conf defaults to TRACE and fills the 76MB GitHub log cap.
       KLOGGING_MIN_LOG_LEVEL: INFO
       KLOGGING_MIN_DIRECT_LOG_LEVEL: INFO
+      JUNIT_TIMEOUT_DEFAULT: 10m
     strategy:
       matrix:
         os: [ ubuntu-22.04 ]

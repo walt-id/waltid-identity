@@ -36,8 +36,8 @@ force those specific lanes.
 
 Main and release keep a cacheless Gradle rebuild (`clean cleanAllTests --rerun-tasks --no-daemon`).
 PR Gradle runs `build allTests` with the setup-gradle daemon and cached outputs.
-The Linux Gradle job times out after 90 minutes. JVM tests default to a 10-minute
-per-test timeout, and every test task times out after 25 minutes.
+The Linux Gradle job times out after 90 minutes. Library JVM tests default to a
+10-minute per-test timeout; live conformance / e2e / integration suites are excluded.
 
 ## Measurements
 
