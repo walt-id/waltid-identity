@@ -30,8 +30,6 @@ class IssuerTestPlanRunner(
     private val conformanceHost = conformance.conformanceHost
     private val conformancePort = conformance.conformancePort
     private val moduleSelection = IssuerModuleSelection.fromEnvironment()
-    private val excludePreAuthorizedMultipleClients = System.getenv(EXCLUDE_PREAUTH_MULTIPLE_CLIENTS_ENV)
-        ?.equals("true", ignoreCase = true) == true
     private val browserAutomationConfig = IssuerBrowserAutomationConfig.fromEnvironment()
     private val browserAutomation = IssuerConformanceBrowserAutomation(
         config = browserAutomationConfig,
@@ -235,21 +233,12 @@ class IssuerTestPlanRunner(
 
     private fun knownSuiteBugExclusionReason(variant: IssuerVariant, testModule: String): String? {
         if (
-            excludePreAuthorizedMultipleClients &&
-            variant.grantType == PRE_AUTHORIZATION_CODE &&
-            testModule == MULTIPLE_CLIENTS_MODULE
-        ) {
-            return "upstream module reuses client 1's consumed pre-authorized code for client 2."
-        }
-
-        if (
             variant.grantType == PRE_AUTHORIZATION_CODE &&
             variant.clientAuthType == CLIENT_ATTESTATION &&
             testModule in PREAUTH_CLIENT_ATTESTATION_NEGATIVE_MODULES
         ) {
-            return "upstream module falls back to the positive token response check for " +
-                "pre_authorization_code, expecting HTTP 200 after issuer correctly rejects invalid " +
-                "client attestation with invalid_client."
+            return "upstream db1080a does not correctly exercise this client-attestation negative " +
+                "case for pre_authorization_code; authorization_code still covers it at PAR."
         }
 
         return null
@@ -281,26 +270,25 @@ class IssuerTestPlanRunner(
         listOfNotNull(javaClass.simpleName, message).joinToString(": ")
 
     private companion object {
-        const val EXCLUDE_PREAUTH_MULTIPLE_CLIENTS_ENV =
-            "OPENID4VCI_CONFORMANCE_EXCLUDE_PREAUTH_MULTIPLE_CLIENTS"
-        const val MULTIPLE_CLIENTS_MODULE = "oid4vci-1_0-issuer-happy-flow-multiple-clients"
         const val PRE_AUTHORIZATION_CODE = "pre_authorization_code"
         const val CLIENT_ATTESTATION = "client_attestation"
 
         /*
-         * These current upstream negative modules mutate client-attestation input, and issuer2
-         * correctly rejects the pre-authorized token request with invalid_client. In the
-         * pre_authorization_code variant, however, the suite continues with the base positive token
-         * response validator and expects HTTP 200, so these produce false failures for issuer2.
+         * At suite revision db1080a, these negative modules either continue after finishing the
+         * test, expect a positive token response after invalid_client, or only mutate the PAR
+         * request and therefore do not exercise the intended condition in a pre-authorized flow.
          * Keep the exclusion scoped to pre_authorization_code + client_attestation; authorization
          * code variants still exercise these checks at PAR and should remain runnable.
          */
         val PREAUTH_CLIENT_ATTESTATION_NEGATIVE_MODULES = setOf(
+            // Validates 401 invalid_client, then continues into requestProtectedResource() after
+            // fireTestFinished(): CreateEmptyResourceEndpointRequestHeaders fails in WAITING state.
             "oid4vci-1_0-issuer-fail-invalid-client-attestation-signature",
             "oid4vci-1_0-issuer-fail-invalid-client-attestation-pop-signature",
             "oid4vci-1_0-issuer-fail-client-attestation-exp-in-past",
             "oid4vci-1_0-issuer-fail-client-attestation-no-sub",
             "oid4vci-1_0-issuer-fail-client-attestation-pop-wrong-aud",
+            "oid4vci-1_0-issuer-fail-mismatched-client-attestation-pop-key",
         )
     }
 
@@ -330,7 +318,7 @@ class IssuerTestPlanRunner(
     ) {
         var counter = 0
         val attemptedBrowserUrls = mutableSetOf<String>()
-        val attemptedCredentialOfferEndpoints = mutableSetOf<String>()
+        val credentialOfferDelivery = IssuerCredentialOfferDelivery()
         while (true) {
             counter++
             val testRunInfo = conformance.getTestRunInfo(testId)
@@ -354,7 +342,7 @@ class IssuerTestPlanRunner(
                 attemptCredentialOfferDelivery(
                     testId,
                     credentialOfferProvider,
-                    attemptedCredentialOfferEndpoints,
+                    credentialOfferDelivery,
                     shouldLog = counter == 1 || counter % 10 == 0,
                 )
             ) {
@@ -365,7 +353,7 @@ class IssuerTestPlanRunner(
                 if (testRunInfo.status == "WAITING") {
                     throw IllegalStateException(
                         "Test $testId is stuck in WAITING status after ${counter - 1} seconds. " +
-                        "This typically means the test requires user interaction (OAuth login). " +
+                        "The suite may be waiting for a credential offer, transaction code, or OAuth login. " +
                         "Please complete the test manually at https://$conformanceHost:$conformancePort/test-info/$testId " +
                         "or set OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION=true to let Playwright complete the login."
                     )
@@ -380,7 +368,7 @@ class IssuerTestPlanRunner(
     private suspend fun attemptCredentialOfferDelivery(
         testId: String,
         credentialOfferProvider: suspend () -> String,
-        attemptedCredentialOfferEndpoints: MutableSet<String>,
+        credentialOfferDelivery: IssuerCredentialOfferDelivery,
         shouldLog: Boolean,
     ): Boolean {
         val testRun = runCatching { conformance.getTestRun(testId) }
@@ -402,23 +390,28 @@ class IssuerTestPlanRunner(
                 return false
             }
 
-        if (credentialOfferEndpoint in attemptedCredentialOfferEndpoints) {
-            if (shouldLog) {
-                println("Credential offer was already delivered to $credentialOfferEndpoint; waiting for suite status to change.")
+        val testLog = runCatching { conformance.getTestLog(testId) }
+            .getOrElse {
+                if (shouldLog) {
+                    println("Credential offer delivery is pending, but test log is not available yet: ${it.compactMessage()}")
+                }
+                return false
             }
-            return false
-        }
 
-        val credentialOffer = credentialOfferProvider()
-        val delivery = credentialOffer.toConformanceCredentialOfferDelivery()
-        println("Delivering issuer credential offer to conformance suite: $credentialOfferEndpoint")
-        conformance.deliverCredentialOffer(
-            credentialOfferEndpoint = credentialOfferEndpoint,
-            parameterName = delivery.parameterName,
-            parameterValue = delivery.parameterValue,
-        )
-        attemptedCredentialOfferEndpoints += credentialOfferEndpoint
-        return true
+        val delivered = credentialOfferDelivery.deliverIfRequested(testLog) {
+            val credentialOffer = credentialOfferProvider()
+            val delivery = credentialOffer.toConformanceCredentialOfferDelivery()
+            println("Delivering issuer credential offer to conformance suite: $credentialOfferEndpoint")
+            conformance.deliverCredentialOffer(
+                credentialOfferEndpoint = credentialOfferEndpoint,
+                parameterName = delivery.parameterName,
+                parameterValue = delivery.parameterValue,
+            )
+        }
+        if (!delivered && shouldLog) {
+            println("No new credential-offer request at $credentialOfferEndpoint; waiting for suite progress.")
+        }
+        return delivered
     }
 
     private suspend fun attemptBrowserAutomation(

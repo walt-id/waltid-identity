@@ -6,6 +6,7 @@ import com.microsoft.playwright.BrowserType
 import com.microsoft.playwright.Locator
 import com.microsoft.playwright.Page
 import com.microsoft.playwright.Playwright
+import com.microsoft.playwright.options.WaitUntilState
 import id.walt.openid4vp.conformance.testplans.httpdata.TestRunResult
 import java.net.URI
 import java.nio.file.Files
@@ -61,19 +62,24 @@ internal class IssuerConformanceBrowserAutomation(
         val browser = ConformanceBrowser.open()
         try {
             val page = browser.page
-            page.setDefaultTimeout(Duration.ofSeconds(30).toMillis().toDouble())
-            page.setDefaultNavigationTimeout(Duration.ofSeconds(30).toMillis().toDouble())
+            val timeoutMillis = Duration.ofSeconds(config.timeoutSeconds).toMillis()
+            val timeoutAt = System.currentTimeMillis() + timeoutMillis
+            page.setDefaultTimeout(timeoutMillis.toDouble())
+            page.setDefaultNavigationTimeout(timeoutMillis.toDouble())
 
             println("Opening conformance browser interaction via ${interaction.method}: ${interaction.url}")
-            openBrowserInteraction(page, interaction)
+            // The login DOM can be ready while unrelated page resources are still loading.
+            openBrowserInteraction(page, interaction, WaitUntilState.DOMCONTENTLOADED)
 
-            val timeoutAt = System.currentTimeMillis() + Duration.ofSeconds(config.timeoutSeconds).toMillis()
             var loginSubmitted = false
             var lastSeenUrl = page.url().orEmpty()
             var nextProgressLogAt = 0L
 
             while (System.currentTimeMillis() < timeoutAt) {
                 val now = System.currentTimeMillis()
+                val remainingMillis = (timeoutAt - now).coerceAtLeast(1).toDouble()
+                page.setDefaultTimeout(remainingMillis)
+                page.setDefaultNavigationTimeout(remainingMillis)
                 val currentUrl = page.url().orEmpty()
                 if (currentUrl.isNotBlank()) {
                     lastSeenUrl = currentUrl
@@ -353,4 +359,3 @@ private enum class PlaywrightBrowserName {
         }
     }
 }
-

@@ -2,6 +2,18 @@
 
 This document covers setup, execution, and status of OpenID4VCI Issuer conformance tests.
 
+The local stack is pinned to the same source revision as
+`https://conformance.waltid.cloud`:
+
+```text
+tag=release-v5.2.3 version=5.2.4 revision=db1080a
+```
+
+This is 73 commits after the `release-v5.2.3` tag, so pulling the release tag is
+not equivalent. The wrapper builds the server image from the sibling
+`conformance-suite` clone and rejects any other revision. A local rebuild has a
+new `build_time`; the tag, application version, revision, and test code match.
+
 ## Test Plan
 
 | Profile | Test Plan | Variants |
@@ -56,18 +68,26 @@ mdoc credential configuration IDs.
    getent hosts localhost.emobix.co.uk
    ```
 
-2. **Host commands:** `docker` with Docker Compose, `openssl`, `keytool` from the JDK, and `curl`.
+2. **Exact conformance-suite checkout.** Clone it next to `waltid-identity` and
+   detach it at the hosted revision:
+
+   ```bash
+   git clone https://gitlab.com/openid/conformance-suite.git conformance-suite
+   git -C conformance-suite switch --detach db1080a4821eac6952beaed369904c862c98dd82
+   ```
+
+3. **Host commands:** `docker` with Docker Compose, Maven, Git, `openssl`, `keytool` from the JDK, and `curl`.
    The wrapper uses them to start the suite, generate the local TLS certificate, prepare the temporary
    truststore, and verify connectivity.
 
-3. **issuer2 authentication service.** No conformance-specific Keycloak setup is needed when issuer2 is
+4. **issuer2 authentication service.** No conformance-specific Keycloak setup is needed when issuer2 is
    already configured to use its normal reachable Keycloak realm. The wrapper completes the existing
    authorization-code login with the issuer2 integration-test account. Pre-authorized-code variants do not
    use the authorization server.
 
-4. **issuer2** running directly on the host at `0.0.0.0:7005`.
+5. **issuer2** running directly on the host at `0.0.0.0:7005`.
 
-5. **Playwright** for authorization-code variants. The wrapper installs Chromium by default, but does not
+6. **Playwright** for authorization-code variants. The wrapper installs Chromium by default, but does not
    install operating-system packages because Gradle cannot answer an interactive `sudo` prompt. Provision
    missing browser libraries once in an interactive terminal before running the wrapper.
 
@@ -109,6 +129,11 @@ baseUrl = "https://localhost.emobix.co.uk:9443"
 ciTokenKey = """{"type":"jwk","jwk":{"kty":"EC","d":"KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}}"""
 
 credentialEncryptionKey = """{"type":"jwk","jwk":{"kty":"EC","d":"ZSHgIcRvbwV9s224kHUaFqkEPShCAdwXocGl_w3M42Q","crv":"P-256","kid":"issuer2-credential-encryption-key","x":"GWKpdL3jPoPJ5wKgSA-jxS2jgp-ZUDE6sIQbeB86vF0","y":"F3xAwH96_xVciV7mFQslU_eRQgP-5pSZiNf8bjMoGfo"}}"""
+
+# Batch conformance is temporarily disabled.
+# batchCredentialIssuance {
+#   batchSize = 10
+# }
 
 clientAuthenticationConfig {
   supportedMethods = [
@@ -196,8 +221,9 @@ Leave issuer2 running. In Terminal 2, from
 ```
 
 The wrapper creates the local TLS truststore, starts the conformance-suite and
-Nginx containers, then runs the issuer conformance test. It does not start
-issuer2 or Keycloak.
+Nginx containers, then runs the issuer conformance test. On the first run it
+also builds the suite JAR and image from revision `db1080a`; later runs reuse the
+matching build. It does not start issuer2 or Keycloak.
 
 It copies the committed `conformance-truststore.jks` to
 `build/conformance/conformance-truststore.jks` before importing the generated
@@ -267,6 +293,13 @@ OPENID4VCI_CONFORMANCE_PRESET=all-basic-plan \
 OPENID4VCI_CONFORMANCE_MODULE_GROUPS=all \
   ./run-issuer-conformance-local.sh
 ```
+
+`all-basic-plan` is the suite's complete theoretical 288-variant base matrix.
+It includes `private_key_jwt` and mTLS client authentication as well as mTLS
+sender constraints. The current wrapper does not provision issuer2 client
+registrations or client certificates for those combinations. Use the default
+client-attestation/DPoP preset for the supported issuer2 setup, or add that
+material before treating `all-basic-plan` as executable end to end.
 
 Use `OPENID4VCI_CONFORMANCE_PRESET=custom` with the filter variables in
 [Useful Controls](#useful-controls) for a narrower selection.
@@ -488,6 +521,7 @@ export OPENID4VCI_CONFORMANCE_FILTER_CREDENTIAL_ENCRYPTION="plain"
 # Select module groups or exact suite modules
 export OPENID4VCI_CONFORMANCE_MODULE_GROUPS="metadata,positive"
 export OPENID4VCI_CONFORMANCE_MODULES="oid4vci-1_0-issuer-happy-flow,oid4vci-1_0-issuer-batch-issuance"
+export OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES=""
 
 # Static transaction code for pre-authorized happy-flow modules
 export OPENID4VCI_CONFORMANCE_STATIC_TX_CODE="493536"
@@ -541,10 +575,54 @@ For pre-authorized-code variants, the wrapper sets
 issuer2 while creating the offer and to the conformance suite. This avoids a
 manual `/tx_code` interaction.
 
-The wrapper excludes `oid4vci-1_0-issuer-happy-flow-multiple-clients` only for
-`pre_authorization_code` variants. The upstream module reuses client 1's consumed
-pre-authorized code for client 2; issuer2 correctly rejects it with
-`invalid_grant`. The same module remains enabled for `authorization_code`.
+Revision `db1080a` fixes the old pre-authorized multiple-client offer reuse, so
+`oid4vci-1_0-issuer-happy-flow-multiple-clients` now runs for both grant types.
+For pre-authorized multiple-client tests, the runner delivers a fresh offer for
+each `VCIWaitForCredentialOffer` log event, even when the suite reuses the same
+endpoint URL for client 2. Repeated polls of the same event do not resend offers.
+The runner still excludes six client-attestation negative modules only for
+`pre_authorization_code` with `client_attestation`: at this revision those modules
+either continue after finishing the test, validate the wrong positive response,
+or only apply their mutation to PAR. Their
+`authorization_code` variants remain enabled and provide the intended coverage.
+
+Specifically, `oid4vci-1_0-issuer-fail-invalid-client-attestation-signature` correctly
+validates issuer2's `401 invalid_client` response, but its parent flow continues
+into `requestProtectedResource()` after `fireTestFinished()`. This produces
+`CreateEmptyResourceEndpointRequestHeaders` called in `WAITING` state, a suite
+lifecycle failure rather than an issuer rejection failure.
+
+## Batch Issuance
+
+Revision `db1080a` adds `oid4vci-1_0-issuer-batch-issuance` to the positive group
+of both issuer plans. It is temporarily excluded by the local wrapper and the
+issuer2 batch metadata setting is commented out. The rest of the positive group
+continues to run normally.
+
+The module reads `batch_credential_issuance.batch_size`, caps the request at 20,
+sends one JWT proof per requested credential, and checks that issuer2 returns
+the same credential dataset bound to distinct proof keys. It also checks
+format-specific unlinkability properties, including SD-JWT disclosures/time
+claims and status references. To opt back in, uncomment
+`batchCredentialIssuance.batchSize` and run with
+`OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES=""`. If issuer2 omits the metadata, the
+suite skips the test. The runner accepts finished/skipped modules in the overall
+result, but a skip does not establish batch coverage.
+
+The protocol path already verifies every JWT proof and emits one credential per
+verified proof for SD-JWT VC and mdoc. Enabling the module is intentionally not
+the same as claiming it passes. Code review shows likely first findings for the
+default profiles:
+
+- SD-JWT profile mapping is evaluated once per proof, so dynamic dataset values
+  such as `id = "<uuid>"` can differ inside one batch.
+- `iat`, `nbf`, and `exp` use precise current timestamps; this suite revision
+  requires batch time claims to be rounded or randomized to prevent linkability.
+- If a profile supplies one session-level status-list reference, each issued
+  credential needs a distinct status index/reference.
+
+Those are issuer2 issuance-policy changes to address when batch testing is
+re-enabled.
 
 For local issuer tests, Docker Nginx exposes
 `https://localhost.emobix.co.uk:9443` and proxies to issuer2 at

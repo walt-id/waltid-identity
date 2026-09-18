@@ -3,7 +3,14 @@ set -euo pipefail
 
 RUNNER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IDENTITY_ROOT="$(cd "$RUNNER_DIR/../.." && pwd)"
+UNIFIED_ROOT="$(cd "$IDENTITY_ROOT/.." && pwd)"
 COMPOSE_FILE="${CONFORMANCE_COMPOSE_FILE:-$RUNNER_DIR/docker-compose-walt.yml}"
+CONFORMANCE_SUITE_SOURCE_DIR="${CONFORMANCE_SUITE_SOURCE_DIR:-$UNIFIED_ROOT/conformance-suite}"
+CONFORMANCE_SUITE_EXPECTED_REVISION="db1080a4821eac6952beaed369904c862c98dd82"
+CONFORMANCE_SUITE_EXPECTED_SHORT_REVISION="db1080a"
+CONFORMANCE_SUITE_EXPECTED_TAG="release-v5.2.3"
+CONFORMANCE_SUITE_EXPECTED_VERSION="5.2.4"
+export CONFORMANCE_SUITE_SOURCE_DIR
 BASE_TRUSTSTORE="$RUNNER_DIR/conformance-truststore.jks"
 TRUSTSTORE="$RUNNER_DIR/build/conformance/conformance-truststore.jks"
 CLIENT_ATTESTER_JWK_FILE="$RUNNER_DIR/src/test/resources/keys/attester-key.json"
@@ -137,28 +144,13 @@ if [[ -z "${OPENID4VCI_CONFORMANCE_MODULE_GROUPS+x}" && -z "${OPENID4VCI_CONFORM
   export OPENID4VCI_CONFORMANCE_MODULE_GROUPS="metadata,positive"
 fi
 
+# Batch issuance is present in db1080a but temporarily disabled for issuer2 runs.
+# Explicitly set this variable to an empty value to opt back into the module.
+export OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES="${OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES-oid4vci-1_0-issuer-batch-issuance}"
+
 if [[ -n "${OPENID4VCI_CONFORMANCE_VARIANT_ID:-}" ]]; then
   export OPENID4VCI_CONFORMANCE_VARIANTS="$OPENID4VCI_CONFORMANCE_VARIANT_ID"
 fi
-
-###############################################################################
-# TEMPORARY UPSTREAM CONFORMANCE-SUITE EXCLUSION
-#
-# Exclude oid4vci-1_0-issuer-happy-flow-multiple-clients ONLY for the
-# pre_authorization_code variant. After client 1 consumes its one-time code, the
-# upstream module starts an authorization-endpoint flow for client 2 and then
-# submits client 1's already-consumed pre-authorized code again. issuer2 correctly
-# rejects that request with HTTP 400 invalid_grant. Allowing pre-authorized-code
-# reuse in issuer2 would be a protocol and security regression, not a valid way
-# to satisfy this test.
-#
-# Keep this exclusion until the upstream module either obtains a fresh credential
-# offer/pre-authorized code for client 2 or declares that variant inapplicable.
-# The authorization_code variant is valid and MUST remain enabled. The Kotlin
-# runner therefore applies this rule to the module-and-grant combination, not to
-# the module globally. This also works for matrices containing both grant types.
-###############################################################################
-export OPENID4VCI_CONFORMANCE_EXCLUDE_PREAUTH_MULTIPLE_CLIENTS="true"
 
 if [[ -z "${OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION+x}" ]] && module_selection_can_require_browser_automation; then
   BROWSER_AUTOMATION_DEFAULT="true"
@@ -199,6 +191,46 @@ require_command docker
 require_command openssl
 require_command keytool
 require_command curl
+require_command git
+require_command mvn
+
+prepare_exact_conformance_suite() {
+  local actual_revision
+  local generated_revision=""
+  local jar="$CONFORMANCE_SUITE_SOURCE_DIR/target/fapi-test-suite.jar"
+  local git_properties="$CONFORMANCE_SUITE_SOURCE_DIR/target/classes/git.properties"
+
+  if [[ ! -d "$CONFORMANCE_SUITE_SOURCE_DIR/.git" ]]; then
+    echo "Cannot find the conformance-suite clone at: $CONFORMANCE_SUITE_SOURCE_DIR" >&2
+    echo "Set CONFORMANCE_SUITE_SOURCE_DIR to the clone containing revision $CONFORMANCE_SUITE_EXPECTED_REVISION." >&2
+    exit 1
+  fi
+
+  actual_revision="$(git -C "$CONFORMANCE_SUITE_SOURCE_DIR" rev-parse HEAD)"
+  if [[ "$actual_revision" != "$CONFORMANCE_SUITE_EXPECTED_REVISION" ]]; then
+    echo "The local conformance suite is at $actual_revision, not the hosted revision." >&2
+    echo "Run: git -C \"$CONFORMANCE_SUITE_SOURCE_DIR\" switch --detach $CONFORMANCE_SUITE_EXPECTED_REVISION" >&2
+    exit 1
+  fi
+
+  if ! git -C "$CONFORMANCE_SUITE_SOURCE_DIR" diff --quiet ||
+    ! git -C "$CONFORMANCE_SUITE_SOURCE_DIR" diff --cached --quiet; then
+    echo "The conformance-suite checkout has tracked changes; refusing to label it as the exact hosted revision." >&2
+    exit 1
+  fi
+
+  if [[ -f "$git_properties" ]]; then
+    generated_revision="$(sed -n 's/^git.commit.id.abbrev=//p' "$git_properties" | head -n 1)"
+  fi
+
+  if [[ ! -f "$jar" || "$generated_revision" != "$CONFORMANCE_SUITE_EXPECTED_SHORT_REVISION" ]]; then
+    echo "Building conformance suite revision $CONFORMANCE_SUITE_EXPECTED_SHORT_REVISION..."
+    (
+      cd "$CONFORMANCE_SUITE_SOURCE_DIR"
+      mvn -B -Dmaven.test.skip -Dpmd.skip clean package
+    )
+  fi
+}
 
 load_optional_pem_file() {
   local file_env="$1"
@@ -291,6 +323,8 @@ if [[ "$OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL" == "$LOCAL_CREDENTIAL_ISSU
   fi
 fi
 
+prepare_exact_conformance_suite
+
 echo "Starting local OpenID conformance suite..."
 docker compose -f "$COMPOSE_FILE" up -d --build
 
@@ -334,8 +368,9 @@ keytool -importcert \
   -noprompt
 
 echo "Checking conformance suite health..."
+CONFORMANCE_SERVER_INFO=""
 for attempt in $(seq 1 60); do
-  if curl -ksf "https://$CONFORMANCE_HOST:$CONFORMANCE_PORT/api/server" >/dev/null; then
+  if CONFORMANCE_SERVER_INFO="$(curl -ksf "https://$CONFORMANCE_HOST:$CONFORMANCE_PORT/api/server")"; then
     echo "Conformance suite is reachable at https://$CONFORMANCE_HOST:$CONFORMANCE_PORT"
     break
   fi
@@ -349,6 +384,15 @@ for attempt in $(seq 1 60); do
 
   sleep 2
 done
+
+if [[ "$CONFORMANCE_SERVER_INFO" != *"\"tag\":\"$CONFORMANCE_SUITE_EXPECTED_TAG\""* ||
+  "$CONFORMANCE_SERVER_INFO" != *"\"version\":\"$CONFORMANCE_SUITE_EXPECTED_VERSION\""* ||
+  "$CONFORMANCE_SERVER_INFO" != *"\"revision\":\"$CONFORMANCE_SUITE_EXPECTED_SHORT_REVISION\""* ]]; then
+  echo "Unexpected conformance suite build: $CONFORMANCE_SERVER_INFO" >&2
+  echo "Expected tag=$CONFORMANCE_SUITE_EXPECTED_TAG version=$CONFORMANCE_SUITE_EXPECTED_VERSION revision=$CONFORMANCE_SUITE_EXPECTED_SHORT_REVISION." >&2
+  exit 1
+fi
+echo "Conformance suite build: $CONFORMANCE_SERVER_INFO"
 
 echo "Checking issuer metadata through the configured HTTPS endpoint..."
 if ! curl -ksf --connect-timeout 5 --max-time 15 "$ISSUER_METADATA_URL" >/dev/null; then
@@ -398,7 +442,7 @@ print_secret_env OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM
 print_secret_env OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM
 print_env OPENID4VCI_CONFORMANCE_MODULE_GROUPS
 print_env OPENID4VCI_CONFORMANCE_MODULES
-print_env OPENID4VCI_CONFORMANCE_EXCLUDE_PREAUTH_MULTIPLE_CLIENTS
+print_env OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES
 print_env OPENID4VCI_CONFORMANCE_STATIC_TX_CODE
 print_env OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION
 print_env OPENID4VCI_CONFORMANCE_AUTH_USERNAME
