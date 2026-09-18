@@ -31,9 +31,11 @@ interface StopwatchInterface {
 
 private object VoidStopwatch : StopwatchInterface {
     override fun startTimer(timerId: String) {
+        // no-op: stopwatch feature disabled
     }
 
     override fun addTiming(timerId: String, timeMarkId: String) {
+        // no-op: stopwatch feature disabled
     }
 
     override fun report(): Map<String, StopwatchInterface.TimeMarkReport> {

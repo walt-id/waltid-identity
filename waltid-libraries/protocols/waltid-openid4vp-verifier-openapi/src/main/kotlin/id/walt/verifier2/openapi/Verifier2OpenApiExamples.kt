@@ -39,6 +39,9 @@ object Verifier2OpenApiExamples {
     private const val IDENTITY_CREDENTIAL_VCT =
         "http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential"
 
+    private const val MDOC_NAMESPACE_ISO_18013_5_1 = "org.iso.18013.5.1"
+    private const val MDOC_DOCTYPE_ISO_23220_PHOTOID_1 = "org.iso.23220.photoid.1"
+
     val openid4vpHttpW3cVcDefault = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
             DcqlQuery(
@@ -102,8 +105,8 @@ object Verifier2OpenApiExamples {
                             doctypeValue = "org.iso.18013.5.1.mDL"
                         ),
                         claims = listOf(
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name"))
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "family_name")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "given_name"))
                         )
                     )
                 )
@@ -133,8 +136,8 @@ object Verifier2OpenApiExamples {
                             doctypeValue = "org.iso.18013.5.1.mDL"
                         ),
                         claims = listOf(
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name"))
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "family_name")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "given_name"))
                         )
                     )
                 )
@@ -277,7 +280,7 @@ object Verifier2OpenApiExamples {
             policies = DefinedVerificationPolicies(
                 vc_policies = VCPolicyList(
                     listOf(
-                        WebhookPolicy("http://your-backend.com")
+                        WebhookPolicy("https://your-backend.com")
                     )
                 )
             )
@@ -534,17 +537,17 @@ object Verifier2OpenApiExamples {
                         id = "my_photoid",
                         format = CredentialFormat.MSO_MDOC,
                         meta = MsoMdocMeta(
-                            doctypeValue = "org.iso.23220.photoid.1"
+                            doctypeValue = MDOC_DOCTYPE_ISO_23220_PHOTOID_1
                         ),
                         claims = listOf(
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name_unicode")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name_unicode")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "issuing_authority_unicode")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "family_name_unicode")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "given_name_unicode")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "issuing_authority_unicode")),
                             ClaimsQuery(
-                                pathStrings = listOf("org.iso.18013.5.1", "issuing_country"),
+                                pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "issuing_country"),
                                 values = listOf("AT").map { JsonPrimitive(it) }
                             ),
-                            ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "travel_document_number"))
+                            ClaimsQuery(pathStrings = listOf(MDOC_DOCTYPE_ISO_23220_PHOTOID_1, "travel_document_number"))
                         )
                     )
                 )
@@ -561,24 +564,24 @@ object Verifier2OpenApiExamples {
                         id = "my_photoid",
                         format = CredentialFormat.MSO_MDOC,
                         meta = MsoMdocMeta(
-                            doctypeValue = "org.iso.23220.photoid.1"
+                            doctypeValue = MDOC_DOCTYPE_ISO_23220_PHOTOID_1
                         ),
                         claims = listOf(
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name_unicode")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name_unicode")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "issuing_authority_unicode")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "family_name_unicode")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "given_name_unicode")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "issuing_authority_unicode")),
                             ClaimsQuery(
-                                pathStrings = listOf("org.iso.18013.5.1", "resident_postal_code"),
+                                pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "resident_postal_code"),
                                 values = listOf(1180, 1190, 1200, 1210).map { JsonPrimitive(it) }
                             ),
                             ClaimsQuery(
-                                pathStrings = listOf("org.iso.18013.5.1", "issuing_country"),
+                                pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "issuing_country"),
                                 values = listOf("AT").map { JsonPrimitive(it) }
                             ),
-                            ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "person_id")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "resident_street")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "administrative_number")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "travel_document_number")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_DOCTYPE_ISO_23220_PHOTOID_1, "person_id")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_DOCTYPE_ISO_23220_PHOTOID_1, "resident_street")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_DOCTYPE_ISO_23220_PHOTOID_1, "administrative_number")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_DOCTYPE_ISO_23220_PHOTOID_1, "travel_document_number")),
                             ClaimsQuery(pathStrings = listOf("org.iso.23220.dtc.1", "dtc_version")),
                             ClaimsQuery(pathStrings = listOf("org.iso.23220.dtc.1", "dtc_dg1"))
                         )

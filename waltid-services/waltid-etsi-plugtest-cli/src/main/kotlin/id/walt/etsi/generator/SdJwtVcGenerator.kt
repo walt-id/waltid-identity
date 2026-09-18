@@ -19,6 +19,8 @@ object SdJwtVcGenerator {
     /** qcStatements extension OID (RFC 3739 / ETSI EN 319 412-5) marking a qualified certificate. */
     private const val QC_STATEMENTS_OID = "1.3.6.1.5.5.7.1.3"
 
+    private const val PEM_CERTIFICATE_FOOTER = "-----END CERTIFICATE-----"
+
     // Per-tier credential types (vct) for the ETSI plugtest, matching the provided Type Metadata /
     // JSON Schemas: EAA -> PID, QEAA -> Medical License, PuB-EAA -> Birth Certificate.
     private const val VCT_PID = "urn:eudi:pid:1"
@@ -165,14 +167,14 @@ object SdJwtVcGenerator {
     private fun buildX5cChain(certificatePem: String): List<String> {
         val certificates = mutableListOf<String>()
 
-        val pemBlocks = certificatePem.split("-----END CERTIFICATE-----")
+        val pemBlocks = certificatePem.split(PEM_CERTIFICATE_FOOTER)
             .filter { it.contains("-----BEGIN CERTIFICATE-----") }
-            .map { it + "-----END CERTIFICATE-----" }
+            .map { it + PEM_CERTIFICATE_FOOTER }
 
         for (pemBlock in pemBlocks) {
             val certBytes = pemBlock
                 .replace("-----BEGIN CERTIFICATE-----", "")
-                .replace("-----END CERTIFICATE-----", "")
+                .replace(PEM_CERTIFICATE_FOOTER, "")
                 .replace("\n", "")
                 .replace("\r", "")
                 .trim()
@@ -182,7 +184,7 @@ object SdJwtVcGenerator {
         return certificates.ifEmpty {
             val singleCert = certificatePem
                 .replace("-----BEGIN CERTIFICATE-----", "")
-                .replace("-----END CERTIFICATE-----", "")
+                .replace(PEM_CERTIFICATE_FOOTER, "")
                 .replace("\n", "")
                 .replace("\r", "")
                 .trim()
@@ -193,7 +195,7 @@ object SdJwtVcGenerator {
     private fun parseCertificate(certificatePem: String): X509Certificate? = try {
         val pemContent = certificatePem
             .replace("-----BEGIN CERTIFICATE-----", "")
-            .replace("-----END CERTIFICATE-----", "")
+            .replace(PEM_CERTIFICATE_FOOTER, "")
             .replace("\n", "")
             .replace("\r", "")
             .trim()

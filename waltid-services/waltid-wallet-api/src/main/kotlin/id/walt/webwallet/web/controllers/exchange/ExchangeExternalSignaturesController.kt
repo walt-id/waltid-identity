@@ -55,6 +55,8 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 
 private const val W_3_C_VERIFIABLE_CREDENTIAL = "W3C Verifiable Credential"
+private const val IETF_SD_JWT_VERIFIABLE_CREDENTIAL = "IETF SD-JWT Verifiable Credential"
+private const val W_3_C_SD_JWT_VERIFIABLE_CREDENTIAL = "W3C SD-JWT Verifiable Credential"
 
 fun Application.exchangeExternalSignatures() = walletRoute {
     val logger = KotlinLogging.logger { }
@@ -73,11 +75,11 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         ExchangeExternalSignaturesExamples.prepareOid4vpRequestW3CVCExample(),
                     )
                     example(
-                        "W3C SD-JWT Verifiable Credential",
+                        W_3_C_SD_JWT_VERIFIABLE_CREDENTIAL,
                         ExchangeExternalSignaturesExamples.prepareOid4vpRequestW3CSDJWTVCExample(),
                     )
                     example(
-                        "IETF SD-JWT Verifiable Credential",
+                        IETF_SD_JWT_VERIFIABLE_CREDENTIAL,
                         ExchangeExternalSignaturesExamples.prepareOid4vpRequestIETFSDJWTVCExample(),
                     )
                 }
@@ -98,7 +100,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                             ExchangeExternalSignaturesExamples.prepareOid4vpResponseW3CSDJWTVCExample(),
                         )
                         example(
-                            "IETF SD-JWT Verifiable Credential",
+                            IETF_SD_JWT_VERIFIABLE_CREDENTIAL,
                             ExchangeExternalSignaturesExamples.prepareOid4vpResponseIETFSDJWTVCExample(),
                         )
                     }
@@ -249,7 +251,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         ExchangeExternalSignaturesExamples.submitOid4vpRequestW3CSDJWTVCExample(),
                     )
                     example(
-                        "IETF SD-JWT Verifiable Credential",
+                        IETF_SD_JWT_VERIFIABLE_CREDENTIAL,
                         ExchangeExternalSignaturesExamples.submitOid4vpRequestIETFSDJWTVCExample(),
                     )
                 }
@@ -444,7 +446,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                             ExchangeExternalSignaturesExamples.prepareOid4vciResponseW3CVCExample(),
                         )
                         example(
-                            "IETF SD-JWT Verifiable Credential",
+                            IETF_SD_JWT_VERIFIABLE_CREDENTIAL,
                             ExchangeExternalSignaturesExamples.prepareOid4vciResponseIETFSDJWTVCExample(),
                         )
                         example(
@@ -524,7 +526,7 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                         ExchangeExternalSignaturesExamples.submitOid4vciRequestW3CVCExample(),
                     )
                     example(
-                        "IETF SD-JWT Verifiable Credential",
+                        IETF_SD_JWT_VERIFIABLE_CREDENTIAL,
                         ExchangeExternalSignaturesExamples.submitOid4vciRequestIETFSDJWTVCExample(),
                     )
                     example(
