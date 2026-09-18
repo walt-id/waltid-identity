@@ -17,6 +17,11 @@ require(walletSigningProtectionMode in setOf("required", "optional", "disabled")
 
 val appVersionName: String = (findProperty("appVersionName") as String?)?.takeIf { it.isNotBlank() } ?: "0.1.0"
 val appVersionCode: Int = run {
+    val override = (findProperty("appVersionCode") as String?)?.toIntOrNull()
+    if (override != null) {
+        require(override > 0) { "appVersionCode must be a positive integer" }
+        return@run override
+    }
     val core = appVersionName.trimStart('v', 'V').substringBefore('-').substringBefore('+')
     val parts = core.split('.')
     fun slot(i: Int) = (parts.getOrNull(i)?.toIntOrNull() ?: 0).coerceIn(0, 999)

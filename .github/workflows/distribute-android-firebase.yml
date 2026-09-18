@@ -1,0 +1,177 @@
+name: Distribute Android Firebase
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: "Android flavor to build and upload"
+        required: true
+        type: choice
+        options:
+          - preview
+          - production
+        default: preview
+      version_name:
+        description: "versionName (numeric X.Y.Z for production, 1.0.0-dev for preview)"
+        required: false
+        type: string
+        default: ""
+      version_code:
+        description: "versionCode override. Defaults to GITHUB_RUN_NUMBER."
+        required: false
+        type: string
+        default: ""
+      groups:
+        description: "Firebase App Distribution group. Defaults from the variant."
+        required: false
+        type: string
+        default: ""
+      release_tag:
+        description: "Release tag to include in the Firebase changelog"
+        required: false
+        type: string
+        default: ""
+  workflow_call:
+    inputs:
+      variant:
+        description: "Android flavor to build and upload"
+        required: true
+        type: string
+      version_name:
+        description: "versionName (numeric X.Y.Z for production, 1.0.0-dev for preview)"
+        required: false
+        type: string
+        default: ""
+      version_code:
+        description: "versionCode override. Defaults to the caller GITHUB_RUN_NUMBER."
+        required: false
+        type: string
+        default: ""
+      groups:
+        description: "Firebase App Distribution group. Defaults from the variant."
+        required: false
+        type: string
+        default: ""
+      release_tag:
+        description: "Release tag to include in the Firebase changelog"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  distribute:
+    name: distribute-android-${{ inputs.variant }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Resolve distribution settings
+        id: settings
+        env:
+          VARIANT: ${{ inputs.variant }}
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          GROUPS: ${{ inputs.groups }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          case "$VARIANT" in
+            preview)
+              echo "assemble_task=:waltid-applications:waltid-wallet-demo-compose:androidApp:assemblePreviewDebug" >> "$GITHUB_OUTPUT"
+              echo "apk_dir=waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/apk/preview/debug" >> "$GITHUB_OUTPUT"
+              echo "app_id=1:548517295104:android:2c76aeb56f61c26de154e5" >> "$GITHUB_OUTPUT"
+              echo "groups=${GROUPS:-Testing}" >> "$GITHUB_OUTPUT"
+              echo "version_name=${VERSION_NAME:-1.0.0-dev}" >> "$GITHUB_OUTPUT"
+              ;;
+            production)
+              echo "assemble_task=:waltid-applications:waltid-wallet-demo-compose:androidApp:assembleProductionDebug" >> "$GITHUB_OUTPUT"
+              echo "apk_dir=waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/apk/production/debug" >> "$GITHUB_OUTPUT"
+              echo "app_id=1:548517295104:android:cb044a978d7d49e7e154e5" >> "$GITHUB_OUTPUT"
+              echo "groups=${GROUPS:-General}" >> "$GITHUB_OUTPUT"
+              echo "version_name=${VERSION_NAME:-0.1.0}" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::variant must be preview or production"
+              exit 1
+              ;;
+          esac
+          echo "version_code=${VERSION_CODE:-$RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve merged pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          number="$(gh api "repos/${REPO}/commits/${SHA}/pulls" --jq '.[0].number // empty' || true)"
+          echo "number=${number}" >> "$GITHUB_OUTPUT"
+
+      - name: Write release notes
+        env:
+          VARIANT: ${{ inputs.variant }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          COMMIT_SHA: ${{ github.sha }}
+          AUTHOR: ${{ github.event.head_commit.author.name || github.actor }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: bash waltid-identity/.github/scripts/mobile-ci/write-mobile-release-notes.sh "$RUNNER_TEMP/firebase-release-notes.txt"
+
+      - name: Configure gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+
+      - name: Enable Android build in identity repo
+        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        with:
+          file: 'waltid-identity/gradle.properties'
+          properties: 'enableAndroidBuild=true'
+
+      - name: Enable Android build in unified-build root
+        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        with:
+          file: 'gradle.properties'
+          properties: 'enableAndroidBuild=true'
+
+      - name: Write Google services config
+        env:
+          GOOGLE_SERVICES_PREVIEW_JSON: ${{ secrets.GOOGLE_SERVICES_PREVIEW_JSON }}
+          GOOGLE_SERVICES_PRODUCTION_JSON: ${{ secrets.GOOGLE_SERVICES_PRODUCTION_JSON }}
+        run: bash waltid-identity/.github/scripts/mobile-ci/write-google-services.sh
+
+      - name: Build Android APK
+        run: ./gradlew ${{ steps.settings.outputs.assemble_task }} -PappVersionName=${{ steps.settings.outputs.version_name }} -PappVersionCode=${{ steps.settings.outputs.version_code }} --no-daemon --console=plain --warning-mode=summary
+        env:
+          CI: "true"
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
+      - name: Locate APK
+        id: apk
+        env:
+          APK_DIR: ${{ steps.settings.outputs.apk_dir }}
+        run: |
+          set -euo pipefail
+          apk=$(find "$APK_DIR" -name '*.apk' | head -n 1)
+          if [ -z "$apk" ]; then
+            echo "::error::No APK found"
+            exit 1
+          fi
+          echo "path=$apk" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Firebase App Distribution
+        env:
+          APK_PATH: ${{ steps.apk.outputs.path }}
+          FIREBASE_APP_ID: ${{ steps.settings.outputs.app_id }}
+          FIREBASE_GROUPS: ${{ steps.settings.outputs.groups }}
+          FIREBASE_PROJECT: waltid-compose-app
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          RELEASE_NOTES_FILE: ${{ runner.temp }}/firebase-release-notes.txt
+        run: bash waltid-identity/.github/scripts/mobile-ci/distribute-firebase-android.sh
