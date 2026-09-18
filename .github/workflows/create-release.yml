@@ -61,9 +61,23 @@ jobs:
           file: 'gradle.properties'
           properties: 'enableAndroidBuild=true'
 
+      - name: Write Google services config
+        if: ${{ steps.detect.outputs.exists == 'true' }}
+        env:
+          GOOGLE_SERVICES_PREVIEW_JSON: ${{ secrets.GOOGLE_SERVICES_PREVIEW_JSON }}
+          GOOGLE_SERVICES_PRODUCTION_JSON: ${{ secrets.GOOGLE_SERVICES_PRODUCTION_JSON }}
+        run: |
+          set -euo pipefail
+          script="waltid-identity/.github/scripts/mobile-ci/write-google-services.sh"
+          if [ -f "$script" ]; then
+            bash "$script"
+          else
+            echo "::notice::Google services write script not present on this ref; skipping."
+          fi
+
       - name: Build debug APK
         if: ${{ steps.detect.outputs.exists == 'true' }}
-        run: ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug -PappVersionName=${{ inputs.version }} --no-daemon --console=plain --warning-mode=summary
+        run: ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleProductionDebug -PappVersionName=${{ inputs.version }} --no-daemon --console=plain --warning-mode=summary
         env:
           CI: "true"
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
@@ -74,7 +88,7 @@ jobs:
         if: ${{ steps.detect.outputs.exists == 'true' }}
         run: |
           set -euo pipefail
-          apk=$(find waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/apk/debug -name '*.apk' | head -n 1)
+          apk=$(find waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/apk/production/debug -name '*.apk' | head -n 1)
           if [ -z "$apk" ]; then
             echo "::error::No APK found"
             exit 1

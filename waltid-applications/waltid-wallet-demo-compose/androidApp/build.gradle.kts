@@ -1,8 +1,10 @@
+import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
     kotlin("plugin.compose")
+    alias(identityLibs.plugins.google.services)
 }
 
 val javaVersion = identityLibs.versions.java.library.get().toInt()
@@ -39,6 +41,18 @@ android {
         buildConfigField("String", "ATTESTATION_HOST_HEADER", "\"${findProperty("attestation.hostHeader") ?: ""}\"")
         buildConfigField("String", "TRANSACTION_DATA_PROFILES_URL", "\"${findProperty("transactionDataProfiles.url") ?: publicDemoTransactionDataProfilesUrl}\"")
         buildConfigField("String", "WALLET_SIGNING_PROTECTION_MODE", "\"$walletSigningProtectionMode\"")
+    }
+
+    flavorDimensions += "environment"
+    productFlavors {
+        create("production") {
+            dimension = "environment"
+            isDefault = true
+        }
+        create("preview") {
+            dimension = "environment"
+            applicationId = "id.walt.wallet.compose.test"
+        }
     }
 
     buildFeatures {
@@ -80,6 +94,7 @@ dependencies {
     implementation(identityLibs.kotlinx.coroutines.android)
     implementation(identityLibs.kotlinx.serialization.json)
     implementation(identityLibs.androidx.fragment)
+    implementation(platform(identityLibs.firebase.bom))
 
     testImplementation(kotlin("test"))
     testImplementation(identityLibs.junit)
@@ -97,4 +112,8 @@ dependencies {
     androidTestImplementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     androidTestImplementation(project(":waltid-libraries:crypto:waltid-crypto2"))
     androidTestImplementation(project(":waltid-libraries:crypto:waltid-cose"))
+}
+
+googleServices {
+    missingGoogleServicesStrategy = MissingGoogleServicesStrategy.IGNORE
 }
