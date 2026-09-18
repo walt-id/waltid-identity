@@ -673,6 +673,7 @@ class MobileWalletDigitalCredentialPresentationTest {
             keys = listOf(signingKey("dc-api-holder-key")),
             credentials = credentials,
             transactionDataProfiles = transactionDataProfiles,
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
         )
     }
 
@@ -682,6 +683,7 @@ class MobileWalletDigitalCredentialPresentationTest {
         transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
         bindMdocs: Boolean = true,
         registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
     ): Fixture {
         val registry = CapturingRegistry()
         val keyStore = InMemoryMobileWalletKeyStore().also { store ->

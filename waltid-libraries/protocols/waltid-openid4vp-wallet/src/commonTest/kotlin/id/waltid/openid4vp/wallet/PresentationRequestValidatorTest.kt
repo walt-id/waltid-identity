@@ -412,7 +412,13 @@ class PresentationRequestValidatorTest {
         assertEquals(
             WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST,
             assertIs<PresentationRequestValidationResult.Invalid>(
-                validate(request, resolvedRequest = ResolvedAuthorizationRequest.Plain(request)),
+                validate(
+                    request,
+                    resolvedRequest = ResolvedAuthorizationRequest.Plain(
+                        request,
+                        id.waltid.openid4vp.wallet.request.AuthenticatedClientFacts.redirectUriBound(request),
+                    ),
+                ),
             ).error.code,
         )
     }
@@ -455,6 +461,25 @@ class PresentationRequestValidatorTest {
     }
 
     @Test
+    fun registeredPlainClientCanSendRejection() {
+        val request = request(clientId = "verifier2", nonce = null)
+        val resolvedRequest = ResolvedAuthorizationRequest.Plain(
+            request,
+            id.waltid.openid4vp.wallet.request.AuthenticatedClientFacts.registered(
+                metadata = ClientMetadata(redirectUris = listOf("https://verifier.example/response")),
+                request = request,
+            ),
+        )
+
+        assertEquals(
+            WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST,
+            assertIs<PresentationRequestValidationResult.Invalid>(
+                validate(request, resolvedRequest = resolvedRequest),
+            ).error.code,
+        )
+    }
+
+    @Test
     fun responseBoundPlainDirectPostRequestCanReturnAnErrorSafely() {
         val responseUri = "https://verifier.example/response"
         val request = request(
@@ -466,7 +491,13 @@ class PresentationRequestValidatorTest {
         assertEquals(
             WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST,
             assertIs<PresentationRequestValidationResult.Invalid>(
-                validate(request, resolvedRequest = ResolvedAuthorizationRequest.Plain(request)),
+                validate(
+                    request,
+                    resolvedRequest = ResolvedAuthorizationRequest.Plain(
+                        request,
+                        id.waltid.openid4vp.wallet.request.AuthenticatedClientFacts.redirectUriBound(request),
+                    ),
+                ),
             ).error.code,
         )
     }

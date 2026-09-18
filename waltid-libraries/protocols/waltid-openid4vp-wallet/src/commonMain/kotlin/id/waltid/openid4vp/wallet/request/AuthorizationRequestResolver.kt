@@ -281,15 +281,18 @@ object AuthorizationRequestResolver {
             requireOuterClientId = true,
         )
 
+        if (!enforceFinalRequestObject) {
+            return ResolvedAuthorizationRequest.Plain(parseParametersLegacy(parameters))
+        }
+        requireUnsignedRequestObjectAllowed(
+            clientId = parameters["client_id"],
+            policy = unsignedRequestObjectPolicy,
+            trustConfiguration = trustConfiguration,
+        )
+        val authenticated = parsePlainRequest(parameters, trustConfiguration)
         return ResolvedAuthorizationRequest.Plain(
-            if (enforceFinalRequestObject) {
-                requireUnsignedRequestObjectAllowed(
-                    clientId = parameters["client_id"],
-                    policy = unsignedRequestObjectPolicy,
-                    trustConfiguration = trustConfiguration,
-                )
-                parsePlainRequest(parameters, trustConfiguration)
-            } else parseParametersLegacy(parameters),
+            authorizationRequest = authenticated.request,
+            client = authenticated.client,
         )
     }
 
@@ -315,6 +318,9 @@ object AuthorizationRequestResolver {
         Parameters.build {
             parseQueryString(requestUrl.encodedQuery, decode = false).forEach { name, values ->
                 val decodedName = name.decodeURLQueryComponent(plusIsSpace = false)
+                require(values.size <= 1) {
+                    "Authorization Request parameter '$decodedName' must not be repeated"
+                }
                 values.forEach { value ->
                     append(decodedName, value.decodeURLQueryComponent(plusIsSpace = false))
                 }
@@ -327,18 +333,23 @@ object AuthorizationRequestResolver {
             AuthorizationRequest.serializer(),
             applyRedirectUriPrefixBinding(
                 buildJsonObject {
-                    parameters.entries()
-                        .mapNotNull { (key, values) -> values.lastOrNull()?.let { key to it } }
-                        .forEach { (key, value) ->
-                            put(
-                                key,
-                                AuthorizationRequestParameterCodec.parse(json, value)
-                            )
-                        }
+                    singleValuedEntries(parameters).forEach { (key, value) ->
+                        put(key, AuthorizationRequestParameterCodec.parse(json, value))
+                    }
                 }
             ),
         ).also { it.dcqlQuery?.precheck() }
     }
+
+    private fun singleValuedEntries(parameters: Parameters): List<Pair<String, String>> =
+        parameters.entries().map { (key, values) ->
+            require(values.size <= 1) {
+                "Authorization Request parameter '$key' must not be repeated"
+            }
+            key to requireNotNull(values.singleOrNull()) {
+                "Authorization Request parameter '$key' is missing a value"
+            }
+        }
 
     /**
      * Plain requests are authenticated by the `redirect_uri` client identifier, or by a
@@ -346,10 +357,15 @@ object AuthorizationRequestResolver {
      * [ClientIdTrustConfiguration.preRegisteredClients]). Other prefixes require a signed Request
      * Object.
      */
+    private data class AuthenticatedPlainRequest(
+        val request: AuthorizationRequest,
+        val client: AuthenticatedClientFacts,
+    )
+
     private suspend fun parsePlainRequest(
         parameters: Parameters,
         trustConfiguration: ClientIdTrustConfiguration,
-    ): AuthorizationRequest {
+    ): AuthenticatedPlainRequest {
         val clientId = requireNotNull(parameters["client_id"]) {
             "client_id is required in an Authorization Request"
         }
@@ -370,28 +386,29 @@ object AuthorizationRequestResolver {
                         "redirect_uri client_id '$embeddedUri'"
                 }
             }
-            return parseParameters(Parameters.build {
+            val request = parseParameters(Parameters.build {
                 appendAll(parameters)
                 if (parameters[deliveryParameter] == null) append(deliveryParameter, embeddedUri)
             })
+            return AuthenticatedPlainRequest(request, AuthenticatedClientFacts.redirectUriBound(request))
         }
         require(isPreRegisteredClientId(client, trustConfiguration)) {
             "Client Identifier '$clientId' cannot be authenticated as a plain request"
         }
         val request = parseParameters(parameters)
-        authenticatePreRegisteredAuthorizationRequest(request, trustConfiguration)
-        return request
+        val metadata = requireNotNull(authenticatePreRegisteredAuthorizationRequest(request, trustConfiguration)) {
+            "Client Identifier '$clientId' cannot be authenticated as a plain request"
+        }
+        return AuthenticatedPlainRequest(request, AuthenticatedClientFacts.registered(metadata, request))
     }
 
     private fun parseParametersLegacy(parameters: Parameters): AuthorizationRequest =
         json.decodeFromJsonElement(
             AuthorizationRequest.serializer(),
             buildJsonObject {
-                parameters.entries()
-                    .mapNotNull { (key, values) -> values.lastOrNull()?.let { key to it } }
-                    .forEach { (key, value) ->
-                        put(key, AuthorizationRequestParameterCodec.parse(json, value))
-                    }
+                singleValuedEntries(parameters).forEach { (key, value) ->
+                    put(key, AuthorizationRequestParameterCodec.parse(json, value))
+                }
             },
         )
 
@@ -515,10 +532,11 @@ object AuthorizationRequestResolver {
                 deserializer = AuthorizationRequest.serializer(),
                 element = applyRedirectUriPrefixBinding(authReqJws.payload),
             )
-            authenticatePreRegisteredAuthorizationRequest(authorizationRequest, trustConfiguration)
+            val registeredMetadata = authenticatePreRegisteredAuthorizationRequest(authorizationRequest, trustConfiguration)
             return ResolvedAuthorizationRequest.UnsignedRequestObject(
                 authorizationRequest = authorizationRequest,
                 requestObject = requestObject,
+                client = AuthenticatedClientFacts.unsignedRequestObject(registeredMetadata, authorizationRequest),
             )
         }
 
@@ -531,13 +549,15 @@ object AuthorizationRequestResolver {
             trustConfiguration = trustConfiguration,
         )
 
+        val authorizationRequest = json.decodeFromJsonElement(
+            deserializer = AuthorizationRequest.serializer(),
+            element = applyRedirectUriPrefixBinding(authReqJws.payload),
+        ).also { if (enforceFinalRequestObject) it.dcqlQuery?.precheck() }
         return ResolvedAuthorizationRequest.AuthenticatedRequestObject(
-            authorizationRequest = json.decodeFromJsonElement(
-                deserializer = AuthorizationRequest.serializer(),
-                element = applyRedirectUriPrefixBinding(authReqJws.payload),
-            ).also { if (enforceFinalRequestObject) it.dcqlQuery?.precheck() },
+            authorizationRequest = authorizationRequest,
             requestObject = requestObject,
-            authentication = authentication,
+            authentication = authentication.result,
+            client = AuthenticatedClientFacts.signed(authentication.clientMetadata, authorizationRequest),
         )
     }
 
@@ -573,6 +593,11 @@ object AuthorizationRequestResolver {
         }
     }
 
+    private data class SignedRequestAuthentication(
+        val result: RequestObjectAuthentication,
+        val clientMetadata: ClientMetadata?,
+    )
+
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun authenticateSignedRequestObject(
         requestObject: String,
@@ -580,7 +605,7 @@ object AuthorizationRequestResolver {
         algorithm: String,
         keyId: String?,
         trustConfiguration: ClientIdTrustConfiguration,
-    ): RequestObjectAuthentication {
+    ): SignedRequestAuthentication {
         val clientId = requireNotNull(payload["client_id"]?.jsonPrimitive?.contentOrNull) {
             "Missing client_id for signed AuthorizationRequest"
         }
@@ -599,7 +624,7 @@ object AuthorizationRequestResolver {
             responseUri = payload["response_uri"]?.jsonPrimitive?.contentOrNull,
         )
 
-        when (val validationResult = ClientIdPrefixAuthenticator.authenticate(
+        val establishedMetadata = when (val validationResult = ClientIdPrefixAuthenticator.authenticate(
             parsedClientId,
             context,
             preRegisteredMetadataProvider = { clientId ->
@@ -611,14 +636,18 @@ object AuthorizationRequestResolver {
         )) {
             is ClientValidationResult.Success -> {
                 log.trace { "Signed AuthorizationRequest authentication succeeded for client_id scheme ${parsedClientId::class.simpleName}" }
+                validationResult.clientMetadata
             }
 
             is ClientValidationResult.Failure -> throw SignedAuthorizationRequestValidationException(validationResult.error)
         }
-        return RequestObjectAuthentication(
-            clientId = parsedClientId,
-            algorithm = algorithm,
-            keyId = keyId,
+        return SignedRequestAuthentication(
+            result = RequestObjectAuthentication(
+                clientId = parsedClientId,
+                algorithm = algorithm,
+                keyId = keyId,
+            ),
+            clientMetadata = establishedMetadata,
         )
     }
 
@@ -653,8 +682,13 @@ object AuthorizationRequestResolver {
             element = applyRedirectUriPrefixBinding(payload),
         ).also { it.dcqlQuery?.precheck() }
         requireMatchingClientId(outerClientId, authorizationRequest.clientId)
-        authenticatePreRegisteredAuthorizationRequest(authorizationRequest, trustConfiguration)
-        return ResolvedAuthorizationRequest.Plain(authorizationRequest)
+        val registeredMetadata = authenticatePreRegisteredAuthorizationRequest(authorizationRequest, trustConfiguration)
+        val client = if (registeredMetadata != null) {
+            AuthenticatedClientFacts.registered(registeredMetadata, authorizationRequest)
+        } else {
+            AuthenticatedClientFacts.redirectUriBound(authorizationRequest)
+        }
+        return ResolvedAuthorizationRequest.Plain(authorizationRequest, client)
     }
 
     /**
@@ -701,10 +735,10 @@ object AuthorizationRequestResolver {
         request: AuthorizationRequest,
         trustConfiguration: ClientIdTrustConfiguration,
         requestObjectJws: String? = null,
-    ) {
-        val clientId = request.clientId ?: return
-        val parsed = ClientIdPrefixParser.parse(clientId).getOrNull() ?: return
-        if (!isPreRegisteredClientId(parsed, trustConfiguration)) return
+    ): ClientMetadata? {
+        val clientId = request.clientId ?: return null
+        val parsed = ClientIdPrefixParser.parse(clientId).getOrNull() ?: return null
+        if (!isPreRegisteredClientId(parsed, trustConfiguration)) return null
         val context = RequestContext(
             clientId = clientId,
             clientMetadata = request.clientMetadata,
@@ -712,7 +746,7 @@ object AuthorizationRequestResolver {
             redirectUri = request.redirectUri,
             responseUri = request.responseUri,
         )
-        when (
+        return when (
             val validationResult = ClientIdPrefixAuthenticator.authenticate(
                 parsed,
                 context,
@@ -724,7 +758,7 @@ object AuthorizationRequestResolver {
                 trustConfiguration = trustConfiguration,
             )
         ) {
-            is ClientValidationResult.Success -> Unit
+            is ClientValidationResult.Success -> validationResult.clientMetadata
             is ClientValidationResult.Failure -> throw SignedAuthorizationRequestValidationException(validationResult.error)
         }
     }

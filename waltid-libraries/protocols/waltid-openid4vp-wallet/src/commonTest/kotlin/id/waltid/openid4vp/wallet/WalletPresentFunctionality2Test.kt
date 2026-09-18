@@ -27,6 +27,7 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.waltid.openid4vp.wallet.request.AuthenticatedClientFacts
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.ktor.http.*
@@ -48,6 +49,13 @@ class WalletPresentFunctionality2Test {
 
     @Test
     fun resolvedAuthorizationRequestBypassesRequestUriResolution() = runTest {
+        val request = AuthorizationRequest(
+            clientId = "redirect_uri:https://wallet.example/callback",
+            responseMode = OpenID4VPResponseMode.FRAGMENT,
+            redirectUri = "https://wallet.example/callback",
+            nonce = "nonce-from-preview",
+            dcqlQuery = DcqlQuery(credentials = emptyList()),
+        )
         val result = WalletPresentFunctionality2.walletPresentHandling(
             holderKey = JWKKey.generate(KeyType.Ed25519),
             holderDid = "did:example:holder",
@@ -55,13 +63,8 @@ class WalletPresentFunctionality2Test {
                 "openid4vp://authorize?request_uri=https%3A%2F%2Fverifier.invalid%2Frequest.jwt&request_uri_method=post",
             ),
             resolvedAuthorizationRequest = ResolvedAuthorizationRequest.Plain(
-                AuthorizationRequest(
-                    clientId = "redirect_uri:https://wallet.example/callback",
-                    responseMode = OpenID4VPResponseMode.FRAGMENT,
-                    redirectUri = "https://wallet.example/callback",
-                    nonce = "nonce-from-preview",
-                    dcqlQuery = DcqlQuery(credentials = emptyList()),
-                )
+                request,
+                AuthenticatedClientFacts.redirectUriBound(request),
             ),
             selectCredentialsForQuery = { emptyMap() },
             holderPoliciesToRun = null,
@@ -108,7 +111,7 @@ class WalletPresentFunctionality2Test {
         }
 
         assertTrue(credentialsSelected)
-        assertTrue(failure.message.orEmpty().contains("must bind client_id"))
+        assertTrue(failure.message.orEmpty().contains("must bind its response destination"))
     }
 
     @Test
@@ -120,19 +123,21 @@ class WalletPresentFunctionality2Test {
                 usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
             )
         )
+        val request = AuthorizationRequest(
+            clientId = "redirect_uri:https://wallet.example/callback",
+            responseType = OpenID4VPResponseType.VP_TOKEN,
+            responseMode = OpenID4VPResponseMode.FRAGMENT,
+            redirectUri = "https://wallet.example/callback",
+            nonce = "nonce",
+            dcqlQuery = DcqlQuery(credentials = emptyList()),
+        )
         val result = WalletPresentFunctionality2.walletPresentHandling(
             holderKey = holderKey,
             holderDid = null,
             presentationRequestUrl = Url("openid4vp://authorize"),
             resolvedAuthorizationRequest = ResolvedAuthorizationRequest.Plain(
-                AuthorizationRequest(
-                    clientId = "redirect_uri:https://wallet.example/callback",
-                    responseType = OpenID4VPResponseType.VP_TOKEN,
-                    responseMode = OpenID4VPResponseMode.FRAGMENT,
-                    redirectUri = "https://wallet.example/callback",
-                    nonce = "nonce",
-                    dcqlQuery = DcqlQuery(credentials = emptyList()),
-                )
+                request,
+                AuthenticatedClientFacts.redirectUriBound(request),
             ),
             selectCredentialsForQuery = { emptyMap() },
             holderPoliciesToRun = null,
@@ -190,7 +195,10 @@ class WalletPresentFunctionality2Test {
             holderKey = holderKey,
             holderDid = did,
             presentationRequestUrl = Url("openid4vp://authorize"),
-            resolvedAuthorizationRequest = ResolvedAuthorizationRequest.Plain(request),
+            resolvedAuthorizationRequest = ResolvedAuthorizationRequest.Plain(
+                request,
+                AuthenticatedClientFacts.redirectUriBound(request),
+            ),
             selectCredentialsForQuery = {
                 mapOf(
                     "pid" to listOf(

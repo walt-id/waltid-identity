@@ -147,7 +147,7 @@ class DcApiWalletTest {
         val (data, trust) = signedRequest(
             key = key,
             responseMode = "dc_api.jwt",
-            clientMetadata = encryptionClientMetadata(),
+            registeredMetadata = encryptionClientMetadata(),
         )
         val request = DcApiWallet.resolveRequest(
             protocol = "openid4vp-v1-signed",
@@ -513,6 +513,7 @@ class DcApiWalletTest {
         clientId: String = "verifier2",
         responseMode: String = "dc_api",
         clientMetadata: ClientMetadata? = null,
+        registeredMetadata: ClientMetadata? = null,
     ): Pair<JsonObject, ClientIdTrustConfiguration> {
         val payload = buildJsonObject {
             put("client_id", clientId)
@@ -530,12 +531,14 @@ class DcApiWalletTest {
             payload.toString().encodeToByteArray(),
             mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
         )
-        return buildJsonObject { put("request", JsonPrimitive(requestObject)) } to ClientIdTrustConfiguration(
-            preRegisteredClients = mapOf(
-                clientId to ClientMetadata(
-                    jwks = ClientMetadata.Jwks(listOf(key.getPublicKey().exportJWKObject())),
-                )
+        val signingJwk = key.getPublicKey().exportJWKObject()
+        val registered = (registeredMetadata ?: ClientMetadata()).copy(
+            jwks = ClientMetadata.Jwks(
+                listOf(signingJwk) + registeredMetadata?.jwks?.keys.orEmpty(),
             ),
+        )
+        return buildJsonObject { put("request", JsonPrimitive(requestObject)) } to ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(clientId to registered),
         )
     }
 
