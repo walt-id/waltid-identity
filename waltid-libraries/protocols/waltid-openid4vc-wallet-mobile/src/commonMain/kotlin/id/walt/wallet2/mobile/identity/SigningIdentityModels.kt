@@ -90,7 +90,7 @@ public sealed interface SigningIdentityCreationOptions {
     public data class Unavailable(public val reasons: List<String>) : SigningIdentityCreationOptions
 }
 
-/** SDK-issued backup choice for an existing exportable identity.
+/** SDK-issued backup choice using retained recovery material or an exportable signing key.
  * @property identityId Identity whose signing secret will be backed up.
  * @property providerName Selected provider's display name.
  * @property recoveryAvailability Provider protection and route, rechecked before submission. */

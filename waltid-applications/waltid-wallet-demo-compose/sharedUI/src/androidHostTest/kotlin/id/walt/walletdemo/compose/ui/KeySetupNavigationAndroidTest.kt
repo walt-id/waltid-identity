@@ -35,6 +35,7 @@ class KeySetupNavigationAndroidTest {
         setContent {
             SettingsScreen(state.value, {}, {}, {}, {}, {}, {}, {}, {}, {})
         }
+        onNodeWithText("Protection and recovery").performClick()
         onAllNodesWithText("Signing protection").assertCountEquals(0)
         runOnUiThread {
             state.value = state.value.copy(identityDetails = WalletDemoIdentityDetailsState.Failed("Provider unavailable"))
@@ -46,11 +47,54 @@ class KeySetupNavigationAndroidTest {
                 WalletDemoIdentityDetails("Hardware", "Generated", "No signing prompt", "No backup", emptyList())))
         }
         onNodeWithText("Wallet signing key").performScrollTo().assertIsDisplayed()
-        onAllNodesWithText("Signing protection").assertCountEquals(0)
+        onNodeWithText("Signing protection").performScrollTo().assertIsDisplayed()
+        onAllNodesWithText("Changing signing protection creates a new wallet key and DID.").assertCountEquals(0)
         runOnUiThread {
             state.value = state.value.copy(identityDetails = WalletDemoIdentityDetailsState.Unsupported)
         }
         onNodeWithText("Signing protection").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun pendingConflictExplainsCancellationWithoutOfferingBlindRetry() = runAndroidComposeUiTest<ComponentActivity> {
+        var cancelled = false
+        setContent {
+            IdentitySetupScreen(WalletDemoIdentitySetup.Pending("pending", "A different backup uses this identifier.", false),
+                null, {}, {}, { cancelled = it == "pending" }, {})
+        }
+        onNodeWithText("A different backup uses this identifier.").assertIsDisplayed()
+        onAllNodesWithText("Retry setup").assertCountEquals(0)
+        onNodeWithText("Cancel pending setup").performClick()
+        kotlin.test.assertTrue(cancelled)
+    }
+
+    @Test
+    fun activeKeyShowsProviderFailuresWithRefreshInProtectionSettings() = runAndroidComposeUiTest<ComponentActivity> {
+        var refreshed = false
+        val state = WalletDemoUiState(identityDetails = WalletDemoIdentityDetailsState.Available(
+            WalletDemoIdentityDetails("Android Keystore", "Imported", "No signing prompt", "Saved locally", emptyList(),
+                protection = "StrongBox", providerFailures = listOf("Backup provider requires sign-in."))))
+        setContent { SettingsScreen(state, {}, {}, {}, { refreshed = true }, {}, {}, {}, {}, {}) }
+        onNodeWithText("Protection and recovery").performClick()
+        onNodeWithText("StrongBox").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Backup provider requires sign-in.").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Check again").performScrollTo().performClick()
+        kotlin.test.assertTrue(refreshed)
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
+        onNodeWithText("Technical details").assertIsDisplayed()
+    }
+
+    @Test
+    fun emptyOptionsStillShowProviderFailureAndAllowRefresh() = runAndroidComposeUiTest<ComponentActivity> {
+        var refreshed = false
+        setContent {
+            IdentitySetupScreen(WalletDemoIdentitySetup.Choose(emptyList(), recoveryUnavailableReasons = listOf("Sign in to your backup provider.")),
+                null, {}, {}, {}, { refreshed = true })
+        }
+        onNodeWithText("Sign in to your backup provider.").assertIsDisplayed()
+        onNodeWithText("Check again").performClick()
+        kotlin.test.assertTrue(refreshed)
+        onAllNodesWithText("Continue").assertCountEquals(0)
     }
 
     @Test
@@ -66,10 +110,11 @@ class KeySetupNavigationAndroidTest {
             warning.value = null
             setup.value = setup.value.copy(recoveryUnavailableReasons = emptyList())
         }) }
-        onAllNodesWithText("Try again").assertCountEquals(1)
+        onAllNodesWithText("Try again").assertCountEquals(0)
+        onAllNodesWithText("Check again").assertCountEquals(1)
         onNodeWithText("Encrypted cloud backup: Google reports encryption unavailable.").performScrollTo().assertIsDisplayed()
         onNodeWithText("Prepare device transfer").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Try again").performScrollTo().performClick()
+        onNodeWithText("Check again").performScrollTo().performClick()
         kotlin.test.assertTrue(refreshed)
         onAllNodesWithText("Try again").assertCountEquals(0)
         onNodeWithText("Prepare device transfer").performScrollTo().assertIsDisplayed()

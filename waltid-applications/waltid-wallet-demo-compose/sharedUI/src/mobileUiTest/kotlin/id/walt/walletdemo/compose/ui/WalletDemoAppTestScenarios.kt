@@ -1227,6 +1227,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsButton).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsScreen).assertIsDisplayed()
+        onNodeWithText("Technical details").performClick()
         onNodeWithTag(WalletUiTestTags.SettingsDid).assertTextContains("did:key:test")
         onNodeWithTag(WalletUiTestTags.SettingsKeyId).assertTextContains("key-1")
         val session = controller.state.value.session as WalletSessionState.Ready
@@ -1235,6 +1236,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsPublicJwk)
             .performScrollTo()
             .assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsCredentialSharing)
             .performScrollTo()
             .assertIsDisplayed()
@@ -1441,6 +1443,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsScreen).assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.SigningProtectionNone).assertCountEquals(0)
 
+        onNodeWithText("Protection and recovery").performClick()
         identityDetailsResponse.complete(null)
         // Identity details load on the controller's dispatcher, outside Compose's idle tracking.
         waitUntil(timeoutMillis = 5_000) {

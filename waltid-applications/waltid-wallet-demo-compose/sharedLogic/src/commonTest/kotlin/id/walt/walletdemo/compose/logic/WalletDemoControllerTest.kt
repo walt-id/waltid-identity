@@ -22,6 +22,38 @@ private val presentationPreviewHandle = WalletDemoPresentationPreviewHandle("pre
 class WalletDemoControllerTest {
 
     @Test
+    fun cancelledKeyApprovalRetainsSetupAndReleasesBusyStateForRetry() = runTest {
+        val option = WalletDemoKeySetupOption("create", WalletDemoKeyChoice("new", "No backup", ""),
+            WalletDemoKeyChoice("native", "Native", ""), WalletDemoKeyChoice("approval", "Approval", ""))
+        val setup = WalletDemoIdentitySetup.Choose(listOf(option))
+        val gate = CompletableDeferred<Unit>()
+        var calls = 0
+        val wallet = object : DemoWallet by FakeDemoWallet() {
+            override suspend fun identitySetup() = setup
+            override suspend fun chooseIdentity(choiceId: String) {
+                calls++
+                gate.await()
+                throw WalletDemoKeyOperationException("Signing approval was not completed. Try again.")
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this)
+        controller.chooseIdentity("create")
+        controller.chooseIdentity("create")
+        runCurrent()
+        assertEquals(1, calls)
+        assertEquals("Creating key…", controller.state.value.identityProgress)
+        assertEquals(setup, (controller.state.value.session as WalletSessionState.IdentitySetup).setup)
+        gate.complete(Unit)
+        runCurrent()
+        assertFalse(controller.state.value.identityBusy)
+        assertEquals(setup, (controller.state.value.session as WalletSessionState.IdentitySetup).setup)
+        assertEquals("Signing approval was not completed. Try again.", controller.state.value.warning)
+        controller.chooseIdentity("create")
+        runCurrent()
+        assertEquals(2, calls)
+    }
+
+    @Test
     fun signingDetailsFailureStaysDistinctFromUnsupportedAndCanBeRetried() = runTest {
         val wallet = FakeDemoWallet()
         val controller = unlockedControllerWith(wallet, this)
@@ -90,7 +122,7 @@ class WalletDemoControllerTest {
         controller.refreshIdentityChoices()
         runCurrent()
         assertEquals(original, (controller.state.value.session as WalletSessionState.IdentitySetup).setup)
-        assertTrue(controller.state.value.warning!!.contains("Provider offline"))
+        assertEquals("Signing key options could not be loaded. Try again.", controller.state.value.warning)
         assertFalse(controller.state.value.identityBusy)
 
         wallet.identitySetupError = null

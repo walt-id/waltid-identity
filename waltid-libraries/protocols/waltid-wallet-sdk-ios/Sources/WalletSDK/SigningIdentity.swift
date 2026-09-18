@@ -113,7 +113,8 @@ public struct KeychainConfiguration: Sendable {
 public enum WalletLocalRecoveryMaterialRetention: Sendable {
     /// Keeps the additional recovery record in the encrypted database.
     case retain
-    /// Discards the additional local record after verified provider submission.
+    /// Discards the additional local record after the configured provider-confirmation requirement is met.
+    /// Local acceptance does not establish cloud delivery.
     case discardAfterConfirmation
 }
 

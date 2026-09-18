@@ -1,6 +1,6 @@
 # Signing identity and recovery
 
-Create, reopen and recover the wallet's signing identity through ``Wallet/identities``.
+Create, reopen and recover the wallet's signing identity through ``Wallet/signingIdentity``.
 The service preserves the exact key identifier, public key and DID across recovery.
 It never replaces a missing key or rebinds existing credentials automatically.
 
@@ -60,7 +60,9 @@ authorizer for a body-free request. Select an option from ``SigningIdentityManag
 and pass it to ``SigningIdentityManager/copyToCustody(_:)`` to import the original signing key.
 The SDK verifies the destination public key and records a public reference. The local key remains
 available and recovery status stays unchanged. This integration does not store an identity recovery
-record or configure remote signing. Device-bound and hardware-generated policies prohibit custody.
+record or configure remote signing. The ``SigningIdentityKeyPolicy/backupAndCustodyDisabled`` and
+``SigningIdentityKeyPolicy/hardwareGenerated`` policies prohibit custody through the manager.
+Disabling backup and custody does not establish physical non-exportability.
 
 ### Authorization evidence
 
