@@ -19,6 +19,9 @@ object BouncyExtensionFactory {
         IssuerAlternativeNameExtension.OID -> BouncyIssuerAlternativeNameExtension(extension)
         SubjectKeyIdentifierExtension.OID -> BouncySubjectKeyIdentifierExtension(extension)
         CrlDistributionPointsExtension.OID -> BouncyCrlDistributionPointsExtension(extension)
+        CertificatePoliciesExtension.OID -> BouncyCertificatePoliciesExtension(extension)
+        AuthorityInfoAccessExtension.OID -> BouncyAuthorityInfoAccessExtension(extension)
+        QcStatementsExtension.OID -> BouncyQcStatementsExtension(extension)
         else -> BouncyGenericExtension(extension)
     }
 
@@ -47,6 +50,21 @@ object BouncyExtensionFactory {
         is CrlDistributionPointsExtension -> createExtension(
             extension,
             BouncyCrlDistributionPointsExtension.createExtension(extension)
+        )
+
+        is CertificatePoliciesExtension -> createExtension(
+            extension,
+            BouncyCertificatePoliciesExtension.createExtension(extension)
+        )
+
+        is AuthorityInfoAccessExtension -> createExtension(
+            extension,
+            BouncyAuthorityInfoAccessExtension.createExtension(extension)
+        )
+
+        is QcStatementsExtension -> createExtension(
+            extension,
+            BouncyQcStatementsExtension.createExtension(extension)
         )
 
         else -> error("Unknown BouncyCastleExtension type: ${extension::class.qualifiedName}")

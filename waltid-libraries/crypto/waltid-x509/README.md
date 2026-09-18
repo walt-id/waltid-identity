@@ -33,10 +33,15 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
 - **[ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) X.509 certificate tooling (JVM)**:
   - IACA and Document Signer X.509 certificate generation and parsing.
   - Configurable validators with profile-compliant defaults.
+- **ETSI TS 119 412-6 X.509 certificate tooling**:
+  - PID Provider and Wallet Provider end-entity certificate generation and parsing, for EUDI Wallet PID issuance (SD-JWT VC / mdoc) and Wallet Instance/Unit Attestation signing.
+- **ETSI TS 119 411-8 / TS 119 475 X.509 certificate tooling (Wallet Relying Party)**:
+  - Wallet Relying Party Access Certificate (WRPAC) generation and parsing, for authenticating a Relying Party's presentation requests.
+  - Wallet Relying Party Registration Certificate (WRPRC) generation and parsing - **draft**, doesn't yet validate the certificate's registered intended use.
 - **CSR Support**: Support for creating and fulfilling Certificate Signing Requests (CSRs) using the PKCS#10 standard.
 - **Crypto2 signing**: Generic, ISO IACA, and Document Signer certificates plus PKCS#10 CSRs use native crypto2 keys.
 - **Crypto2 parsing**: Parsed certificate and CSR public keys are available as typed `id.walt.crypto2.keys.Key` values.
-- **Certificate extensions**: Support of most common X509 certificate extensions `KeyUsage`, `Basic Constraints`and `Subject Alternative Names` and more.
+- **Certificate extensions**: Support of most common X509 certificate extensions `KeyUsage`, `Basic Constraints`, `Subject Alternative Names`, `Certificate Policies`, `Authority Information Access`, `QC Statements` and more.
 - **Extensible certificate chain validation**: Basic validation is platform independently implemented, easy to add additional checks.
 
 ---
@@ -308,6 +313,167 @@ check(dsValidationResult.valid) { "Not a valid Document Signer certificate: ${ds
 > regardless of whether that certificate was ever a legitimate IACA root. See
 > `IsoMdlOnboardingExample.kt` in [waltid-examples](https://github.com/walt-id/waltid-examples/tree/main/src/main/kotlin/x509)
 > for a runnable demonstration, including a rejected non-compliant root.
+
+---
+
+## ETSI TS 119 412-6 X.509 certificate tooling (PID Provider and Wallet Provider)
+
+PID Provider and Wallet Provider certificates - used to sign EUDI Wallet PID attestations
+(SD-JWT VC / mdoc) and Wallet Instance/Unit Attestations (WIA/WUA) respectively - follow the same
+pattern as the ISO profiles above: build with `X509CertificateUtil.createSelfSignedCertificate`/
+`createCertificate` using a profile-specific DSL helper, validate by adding the profile object as
+a validator.
+
+### PID Provider certificate generation and validation
+
+```kotlin
+import id.walt.certificate.x509.profile.EtsiPidProviderX509CertificateProfile
+import id.walt.certificate.x509.profile.EtsiPidProviderX509CertificateProfile.profilePidProviderCertificate
+
+val pidProviderCertUtil = X509CertificateUtil {
+    addValidators(
+        EtsiPidProviderX509CertificateProfile,
+        X509CertificateValidityValidator(allowValidityInFuture = true)
+    )
+}
+
+val rootKey = cryptoRuntime.generateSoftwareKey(keyGen)
+val rootCert = X509CertificateUtil.createSelfSignedCertificate(rootKey, certSigningAlg) {
+    subjectDn = "CN=Example Root CA,O=Walt.id,OrganizationIdentifier=VATAT-U12345678,C=AT"
+    extensionBasicConstraints { critical = true; cA = true }
+}
+
+val pidProviderKey = cryptoRuntime.generateSoftwareKey(keyGen)
+val pidProviderCert = X509CertificateUtil.createCertificate(rootKey, rootCert, certSigningAlg) {
+    profilePidProviderCertificate(
+        subjectKey = pidProviderKey,
+        subjectDn = "CN=Example PID Provider,O=Walt.id,OrganizationIdentifier=VATAT-U87654321,C=AT",
+        certificatePolicyOids = listOf("0.4.0.194112.1.1"),
+        caIssuerUri = "https://ca.example.com/root.crt",
+    )
+}
+
+val result = pidProviderCertUtil.validateCertificateChain(listOf(pidProviderCert), rootCert)
+check(result.valid) { "Not a valid PID Provider certificate: ${result.log}" }
+```
+
+`profileEtsiPidProviderCertificate` sets the mandatory extensions (`basicConstraints` cA=false,
+`keyUsage` digitalSignature-only, `subjectKeyIdentifier`, `certificatePolicies`, `qcStatements`
+with `QcCompliance` + the `id-etsi-qct-pid` `QcType`, and `authorityInfoAccess` when the issuing
+certificate isn't self-signed), and validates the issuer/subject DN as either a natural or legal
+person (detected by the presence of `organizationIdentifier`). `EtsiPidProviderX509CertificateProfile`
+then re-validates all of that on demand.
+
+Pass `subjectKey = null` (the default) instead to issue a **self-signed** PID Provider certificate
+directly - a LoTE (ETSI TS 119 602) PID Provider list accepts either an end-entity or a CA
+certificate as its trust anchor, so both shapes are valid.
+
+### Wallet Provider certificate generation and validation
+
+`EtsiWalletProviderX509CertificateProfile` / `profileEtsiWalletProviderCertificate` are identical in
+shape - the only difference is the `QcType` OID carried (`id-etsi-qct-wal` instead of
+`id-etsi-qct-pid`):
+
+```kotlin
+import id.walt.certificate.x509.profile.EtsiWalletProviderX509CertificateProfile.profileWalletProviderCertificate
+
+val walletProviderCert = X509CertificateUtil.createCertificate(rootKey, rootCert, certSigningAlg) {
+    profileWalletProviderCertificate(
+        subjectKey = cryptoRuntime.generateSoftwareKey(keyGen),
+        subjectDn = "CN=Example Wallet Provider,O=Walt.id,OrganizationIdentifier=VATAT-U11223344,C=AT",
+        certificatePolicyOids = listOf("0.4.0.194112.1.2"),
+        caIssuerUri = "https://ca.example.com/root.crt",
+    )
+}
+```
+
+> Both profiles enforce ETSI TS 119 412-6 (clause 4 for PID Providers, clause 5.1/WAL-5.1-01 for
+> Wallet Providers) - end-entity only, restricted extension criticality (only `keyUsage` and
+> `basicConstraints` may be critical), RSA ≥2048/EC ≥256-bit keys, and the mandatory `QcCompliance`
+> statement - cross-checked against the
+> [eudi-lib-kmp-etsi-1196x2](https://github.com/eu-digital-identity-wallet/eudi-lib-kmp-etsi-1196x2)
+> reference implementation. Signature algorithm selection (EN 319 412-1 GEN-4.2.2-1) is advisory
+> ("should", not "shall") and intentionally not validated, matching that reference.
+
+---
+
+## ETSI TS 119 411-8 / TS 119 475 X.509 certificate tooling (Wallet Relying Party certificates)
+
+Two more certificate types close the loop on the EUDI trust chain: the **Wallet Relying Party
+Access Certificate (WRPAC)**, which a Relying Party uses to authenticate a presentation request so
+the wallet can confirm it's talking to a registered Relying Party before releasing any credential,
+and the **Wallet Relying Party Registration Certificate (WRPRC)**, meant to encode the Relying
+Party's registered attribute scope / purpose so the wallet can explain *why* a request is allowed.
+
+### WRPAC certificate generation and validation
+
+```kotlin
+import id.walt.certificate.x509.profile.Etsi119411Part8
+import id.walt.certificate.x509.profile.EtsiWrpacX509CertificateProfile
+import id.walt.certificate.x509.profile.EtsiWrpacX509CertificateProfile.profileWrpAccessCertificate
+
+val wrpacCertUtil = X509CertificateUtil {
+    addValidators(
+        EtsiWrpacX509CertificateProfile,
+        X509CertificateValidityValidator(allowValidityInFuture = true)
+    )
+}
+
+val relyingPartyKey = cryptoRuntime.generateSoftwareKey(keyGen)
+val wrpacCert = X509CertificateUtil.createCertificate(rootKey, rootCert, certSigningAlg) {
+    profileWrpAccessCertificate(
+        subjectKey = relyingPartyKey,
+        subjectDn = "CN=Example Relying Party,O=Walt.id,OrganizationIdentifier=VATAT-U55667788,C=AT",
+        policyOid = Etsi119411Part8.NCP_L_EUDIWRP,
+        contactEmail = "relying-party@example.com",
+        caIssuerUri = "https://ca.example.com/root.crt",
+        crlDistributionPointUri = "https://ca.example.com/crl",
+    )
+}
+
+val wrpacResult = wrpacCertUtil.validateCertificateChain(listOf(wrpacCert), rootCert)
+check(wrpacResult.valid) { "Not a valid WRPAC certificate: ${wrpacResult.log}" }
+```
+
+`profileWrpAccessCertificate` requires exactly one of the four `Etsi119411Part8` policy OIDs
+(`NORMALIZED_CERT_POLICY_NATURAL_PERSON`/`NORMALIZED_CERT_POLICY_ID_LEGAL_PERSON`/`QUALIFIED_CERT_POLICY_NATURAL_PERSON`/`QUALIFIED_CERT_POLICY_LEGAL_PERSON` - natural/legal person crossed with
+non-qualified/qualified), at least one contact method (`contactEmail`/`contactUri`) for the
+mandatory `subjectAltName`, and a revocation mechanism (`crlDistributionPointUri` or
+`ocspResponderUri`). `EtsiWrpAcX509CertificateProfile` re-validates all of that, plus the
+policy-conditional `qcStatements` (required for the QCP policies only, with `QcType` required
+additionally for QCP-l) and the policy-driven natural/legal person subject DN shape - cross-checked
+against the [eudi-lib-kmp-etsi-1196x2](https://github.com/eu-digital-identity-wallet/eudi-lib-kmp-etsi-1196x2)
+reference implementation.
+
+> Not implemented: the validity-assured short-term certificate exemption
+> (`ext-etsi-valassured-ST-certs` / `noRevocationAvail`, RFC 9608), which would let a short-lived
+> (≤7 day) WRPAC skip the revocation mechanism above, and telephone contact info in
+> `subjectAltName` (no confirmed ASN.1 encoding yet). WRPAC certificates issued through this
+> profile always need a CRL/OCSP endpoint and use URI/email contact info.
+
+### WRPRC certificate generation - draft, incomplete
+
+> **`EtsiWrpRcX509CertificateProfile` is a draft.** Unlike every other profile in this library,
+> there is no reference implementation to cross-check WRPRC (ETSI TS 119 475) against, and the
+> encoding of its defining feature - the Relying Party's *registered intended use* - isn't
+> confirmed (it likely needs a new custom X.509 extension). This profile only implements the
+> baseline end-entity shape shared by every ETSI EUDI profile here; `validate()` always emits a
+> `WARNING` log entry flagging that the registered intended use itself is not checked, rather than
+> silently passing a certificate a real WRPRC issuer might reject.
+
+```kotlin
+import id.walt.certificate.x509.profile.EtsiWrprcX509CertificateProfile
+import id.walt.certificate.x509.profile.EtsiWrprcX509CertificateProfile.profileWrpRegistrationCertificate
+
+val wrprcCert = X509CertificateUtil.createCertificate(rootKey, rootCert, certSigningAlg) {
+    profileWrpRegistrationCertificate(
+        subjectKey = cryptoRuntime.generateSoftwareKey(keyGen),
+        subjectDn = "CN=Example Relying Party,O=Walt.id,OrganizationIdentifier=VATAT-U55667788,C=AT",
+        certificatePolicyOids = listOf("0.4.0.194118.1.2"),
+        caIssuerUri = "https://ca.example.com/root.crt",
+    )
+}
+```
 
 ---
 

@@ -16,6 +16,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
 private const val HTTP_LOCALHOST_PORT = "http://localhost:22222"
+private const val IETF_SDJWT_VC_CREDENTIAL_ID = "4a55eb7a-6fdb-4ed6-8f3d-161994ada9d0"
 
 object ExchangeExternalSignaturesExamples {
 
@@ -45,10 +46,10 @@ object ExchangeExternalSignaturesExamples {
         did = "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2Iiwia2lkIjoiS2V1bzRITDUwTV8wdFU5U2xYdnhQbUgwQmNHYkFBRVBKVEZCaGItYVhObyIsIngiOiJpZHhJWVFmT1ltRDFQTzB3WFBwQWtTQ0lJOExqbFhkWXpWbG83d0tZZFU0IiwieSI6ImNGZVJacHdQRHc1aTY4czNCajAwb01VVWRLcjhqMlg3UjZrWUxueFlaOFUifQ",
         presentationRequest = "openid4vp://?response_type=vp_token&client_id=http%3A%2F%2Flocalhost%3A22222%2Fopenid4vc%2Fverify&response_mode=direct_post&state=3yydz2ROSuwl&presentation_definition_uri=http%3A%2F%2Flocalhost%3A22222%2Fopenid4vc%2Fpd%2F3yydz2ROSuwl&client_id_scheme=redirect_uri&client_metadata=%7B%22authorization_encrypted_response_alg%22%3A%22ECDH-ES%22%2C%22authorization_encrypted_response_enc%22%3A%22A256GCM%22%7D&nonce=67871ae6-3c15-47d8-bad9-5661453a5b60&response_uri=http%3A%2F%2Flocalhost%3A22222%2Fopenid4vc%2Fverify%2F3yydz2ROSuwl",
         selectedCredentialIdList = listOf(
-            "4a55eb7a-6fdb-4ed6-8f3d-161994ada9d0",
+            IETF_SDJWT_VC_CREDENTIAL_ID,
         ),
         disclosures = mapOf(
-            "4a55eb7a-6fdb-4ed6-8f3d-161994ada9d0" to listOf("WyIxYi1aNzVhOVgwRTVZRU9VOUY3dXFBPT0iLCJiaXJ0aGRhdGUiLCIxOTQwLTAxLTAxIl0"),
+            IETF_SDJWT_VC_CREDENTIAL_ID to listOf("WyIxYi1aNzVhOVgwRTVZRU9VOUY3dXFBPT0iLCJiaXJ0aGRhdGUiLCIxOTQwLTAxLTAxIl0"),
         ),
     )
 
@@ -184,7 +185,7 @@ object ExchangeExternalSignaturesExamples {
         w3CJwtVpProofParameters = null,
         ietfSdJwtVpProofParameters = listOf(
             IETFSdJwtVpProofParameters(
-                credentialId = "4a55eb7a-6fdb-4ed6-8f3d-161994ada9d0",
+                credentialId = IETF_SDJWT_VC_CREDENTIAL_ID,
                 sdJwtVc = "eyJraWQiOiJkaWQ6andrOmV5SnJkSGtpT2lKRlF5SXNJbU55ZGlJNklsQXRNalUySWl3aWVDSTZJa2N3VWtsT1FtbEdMVzlSVlVRelpEVkVSMjVsWjFGMVdHVnVTVEk1U2tSaFRVZHZUWFpwYjB0U1FrMGlMQ0o1SWpvaVpXUXpaVVpIY3pKd1JYUnljRGQyUVZvM1FreGpZbkpWZEhCTGExbFhRVlF5U2xCVlVVczBiRTQwUlNKOSIsInR5cCI6InZjK3NkLWp3dCIsImFsZyI6IkVTMjU2In0.eyJmYW1pbHlfbmFtZSI6IkRvZSIsImdpdmVuX25hbWUiOiJKb2huIiwiaXNzIjoiZGlkOmp3azpleUpyZEhraU9pSkZReUlzSW1OeWRpSTZJbEF0TWpVMklpd2llQ0k2SWtjd1VrbE9RbWxHTFc5UlZVUXpaRFZFUjI1bFoxRjFXR1Z1U1RJNVNrUmhUVWR2VFhacGIwdFNRazBpTENKNUlqb2laV1F6WlVaSGN6SndSWFJ5Y0RkMlFWbzNRa3hqWW5KVmRIQkxhMWxYUVZReVNsQlZVVXMwYkU0MFJTSjkiLCJjbmYiOnsiandrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJraWQiOiJLZXVvNEhMNTBNXzB0VTlTbFh2eFBtSDBCY0diQUFFUEpURkJoYi1hWE5vIiwieCI6ImlkeElZUWZPWW1EMVBPMHdYUHBBa1NDSUk4TGpsWGRZelZsbzd3S1lkVTQiLCJ5IjoiY0ZlUlpwd1BEdzVpNjhzM0JqMDBvTVVVZEtyOGoyWDdSNmtZTG54WVo4VSJ9fSwidmN0IjoiaHR0cDovL2xvY2FsaG9zdDoyMjIyMi9pZGVudGl0eV9jcmVkZW50aWFsIiwic3ViIjoiS2V1bzRITDUwTV8wdFU5U2xYdnhQbUgwQmNHYkFBRVBKVEZCaGItYVhObyIsIl9zZCI6WyJtWU1nTUtEWnZ4ZDBDeVZHbTZpa2Z5VkxzTTVyZC0wLWhTdW5sT1Nfc29JIl19.Nr9dAmu62Mg5G8B-C-aubE7GvbVgGT6Mq91f0bdRF4XW1H72JqN0hxt38v1tPozd7tKqWlm1EJlP_u-gavHhUQ~WyIxYi1aNzVhOVgwRTVZRU9VOUY3dXFBPT0iLCJiaXJ0aGRhdGUiLCIxOTQwLTAxLTAxIl0~",
                 header = Json.decodeFromString<Map<String, JsonElement>>(
                     """{
@@ -233,12 +234,12 @@ object ExchangeExternalSignaturesExamples {
     private val submitOid4vpRequestIETFSDJWTVCExample = SubmitOID4VPRequest.build(
         response = prepareOid4vpResponseIETFSDJWTVCExample,
         disclosures = mapOf(
-            "4a55eb7a-6fdb-4ed6-8f3d-161994ada9d0" to listOf("WyIxYi1aNzVhOVgwRTVZRU9VOUY3dXFBPT0iLCJiaXJ0aGRhdGUiLCIxOTQwLTAxLTAxIl0"),
+            IETF_SDJWT_VC_CREDENTIAL_ID to listOf("WyIxYi1aNzVhOVgwRTVZRU9VOUY3dXFBPT0iLCJiaXJ0aGRhdGUiLCIxOTQwLTAxLTAxIl0"),
         ),
         w3cJwtVpProof = null,
         ietfSdJwtVpProofs = listOf(
             IETFSdJwtVpTokenProof(
-                credentialId = "4a55eb7a-6fdb-4ed6-8f3d-161994ada9d0",
+                credentialId = IETF_SDJWT_VC_CREDENTIAL_ID,
                 sdJwtVc = "eyJraWQiOiJkaWQ6andrOmV5SnJkSGtpT2lKRlF5SXNJbU55ZGlJNklsQXRNalUySWl3aWVDSTZJa2N3VWtsT1FtbEdMVzlSVlVRelpEVkVSMjVsWjFGMVdHVnVTVEk1U2tSaFRVZHZUWFpwYjB0U1FrMGlMQ0o1SWpvaVpXUXpaVVpIY3pKd1JYUnljRGQyUVZvM1FreGpZbkpWZEhCTGExbFhRVlF5U2xCVlVVczBiRTQwUlNKOSIsInR5cCI6InZjK3NkLWp3dCIsImFsZyI6IkVTMjU2In0.eyJmYW1pbHlfbmFtZSI6IkRvZSIsImdpdmVuX25hbWUiOiJKb2huIiwiaXNzIjoiZGlkOmp3azpleUpyZEhraU9pSkZReUlzSW1OeWRpSTZJbEF0TWpVMklpd2llQ0k2SWtjd1VrbE9RbWxHTFc5UlZVUXpaRFZFUjI1bFoxRjFXR1Z1U1RJNVNrUmhUVWR2VFhacGIwdFNRazBpTENKNUlqb2laV1F6WlVaSGN6SndSWFJ5Y0RkMlFWbzNRa3hqWW5KVmRIQkxhMWxYUVZReVNsQlZVVXMwYkU0MFJTSjkiLCJjbmYiOnsiandrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJraWQiOiJLZXVvNEhMNTBNXzB0VTlTbFh2eFBtSDBCY0diQUFFUEpURkJoYi1hWE5vIiwieCI6ImlkeElZUWZPWW1EMVBPMHdYUHBBa1NDSUk4TGpsWGRZelZsbzd3S1lkVTQiLCJ5IjoiY0ZlUlpwd1BEdzVpNjhzM0JqMDBvTVVVZEtyOGoyWDdSNmtZTG54WVo4VSJ9fSwidmN0IjoiaHR0cDovL2xvY2FsaG9zdDoyMjIyMi9pZGVudGl0eV9jcmVkZW50aWFsIiwic3ViIjoiS2V1bzRITDUwTV8wdFU5U2xYdnhQbUgwQmNHYkFBRVBKVEZCaGItYVhObyIsIl9zZCI6WyJtWU1nTUtEWnZ4ZDBDeVZHbTZpa2Z5VkxzTTVyZC0wLWhTdW5sT1Nfc29JIl19.Nr9dAmu62Mg5G8B-C-aubE7GvbVgGT6Mq91f0bdRF4XW1H72JqN0hxt38v1tPozd7tKqWlm1EJlP_u-gavHhUQ~WyIxYi1aNzVhOVgwRTVZRU9VOUY3dXFBPT0iLCJiaXJ0aGRhdGUiLCIxOTQwLTAxLTAxIl0~",
                 vpTokenProof = "eyJraWQiOiJLZXVvNEhMNTBNXzB0VTlTbFh2eFBtSDBCY0diQUFFUEpURkJoYi1hWE5vIiwidHlwIjoia2Irand0IiwiYWxnIjoiRVMyNTYifQ.eyJpYXQiOjE3Mjc0MzE0NzIsImF1ZCI6Imh0dHA6Ly9sb2NhbGhvc3Q6MjIyMjIvb3BlbmlkNHZjL3ZlcmlmeSIsIm5vbmNlIjoiNjc4NzFhZTYtM2MxNS00N2Q4LWJhZDktNTY2MTQ1M2E1YjYwIiwic2RfaGFzaCI6IlFmbGNscjdBRjJNRXBZUWZKT1U2b0ZHellJOXU4U3htT0o1YlhNYVNSNlkifQ.Tiy7HiBZFOB2_txrqxve5gLajYqGdznY17qBJiOxVB5kb5RCLM313BsuAGReUnIiIdSy5yY1F2q102c9K6YN4Q",
             )
@@ -298,7 +299,7 @@ object ExchangeExternalSignaturesExamples {
             )
         ),
         accessToken = "eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiI4MDMwZWI4Ny1mYTg5LTQ4MjAtYWQzNi04ZTg5Y2M5Y2NkZmUiLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjIyMjIyIiwiYXVkIjoiQUNDRVNTIn0.GpB9QZ-ZgCSNxBzlnkf_RBKmfMI15wH5rR2gW4EfLa640gOo9taaMLgYKax8f8kOgd5byvEf6hmGhWyGt7xTCQ",
-        credentialIssuer = "http://localhost:22222",
+        credentialIssuer = HTTP_LOCALHOST_PORT,
     )
 
     private val prepareOid4vciResponseIETFSDJWTVCExample = PrepareOID4VCIResponse.build(
@@ -335,7 +336,7 @@ object ExchangeExternalSignaturesExamples {
             )
         ),
         accessToken = "eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiI4MDMwZWI4Ny1mYTg5LTQ4MjAtYWQzNi04ZTg5Y2M5Y2NkZmUiLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjIyMjIyIiwiYXVkIjoiQUNDRVNTIn0.GpB9QZ-ZgCSNxBzlnkf_RBKmfMI15wH5rR2gW4EfLa640gOo9taaMLgYKax8f8kOgd5byvEf6hmGhWyGt7xTCQ",
-        credentialIssuer = "http://localhost:22222",
+        credentialIssuer = HTTP_LOCALHOST_PORT,
     )
 
     private val prepareOid4vciResponseMDocVCExample = PrepareOID4VCIResponse.build(
@@ -358,7 +359,7 @@ object ExchangeExternalSignaturesExamples {
             )
         ),
         accessToken = "eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiIwYWUyYThjZS00MThmLTQxYmQtOGYyMi0zZWIyNDUxMjdiZmYiLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjIyMjIyIiwiYXVkIjoiQUNDRVNTIn0.EBsSIl8wlkLTenGrUb5kD6DCTgC1yzBc2MB1cQ-tUWXuTP_WjXRtSZq6MasAzFdavdeEu4_4v5RtZ79-covACA",
-        credentialIssuer = "http://localhost:22222",
+        credentialIssuer = HTTP_LOCALHOST_PORT,
     )
 
     fun prepareOid4vciResponseW3CVCExample(): ValueExampleDescriptorConfig<PrepareOID4VCIResponse>.() -> Unit = {
@@ -388,7 +389,7 @@ object ExchangeExternalSignaturesExamples {
                 signedProofOfPossession = "eyJraWQiOiJkaWQ6andrOmV5SnJkSGtpT2lKRlF5SXNJbU55ZGlJNklsQXRNalUySWl3aWEybGtJam9pUTNabFV6RlpkV2RVTldWMlZub3hPR3N3V0hCalZHUXRVVlZzUzFBeFJ6ZENkVEpKTWtwb1NqRjJZeUlzSW5naU9pSkNlR04yZDBsQlZEaHVkelJ0ZGpWdFVEaFNUemxyWW1jM04yNXNiVlpvT0c1UmNXWlZVRXR1UkRWQklpd2llU0k2SWt0aFUwMXNlVEJSUVVoU1F6WktNWEZEUkRsb1JrWm5WMGRYTVhwMWNFeHdVM1p0Vkd0SE1ESm1OSGNpZlEjMCIsInR5cCI6Im9wZW5pZDR2Y2ktcHJvb2Yrand0IiwiYWxnIjoiRVMyNTYifQ.eyJhdWQiOiJodHRwOi8vbG9jYWxob3N0OjIyMjIyIiwiaWF0IjoxNzI3NDE3OTcxLCJub25jZSI6IjRkNTEzMTk0LWZhNjEtNDA5OS05YmJjLTNmYjA4MDhjYTRmMSJ9.-NOvj6bfl0l8_BSxPR3UAyO-KkZ4zdfPZ401GNZl8DWg4MCtZN3lWIdnPBsqTY1aAiYfN3symtMzhdtCqpivAA",
             )
         ),
-        credentialIssuer = "http://localhost:22222",
+        credentialIssuer = HTTP_LOCALHOST_PORT,
     )
 
     private val submitOid4vciRequestIETFSDJWTVCExample = SubmitOID4VCIRequest.build(
@@ -404,7 +405,7 @@ object ExchangeExternalSignaturesExamples {
                 signedProofOfPossession = "eyJ0eXAiOiJvcGVuaWQ0dmNpLXByb29mK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7Imt0eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJraWQiOiJZQ201emhfUnVNeHNKSV9tem1ybTd3ZnQwZnhLcFJ1QTBEZy1FVlhCTnhrIiwieCI6InVxVXRkQmFWRnJScHdYWS0tRDFUUVlqMEVYckdXSlZpaDVidkhnYi1VSjgiLCJ5IjoidGg2a1lwUG1sTUlHRElHejFRb0Y4ektqeXVNa3FxSDFQaHhfRERUc0RiZyJ9fQ.eyJhdWQiOiJodHRwOi8vbG9jYWxob3N0OjIyMjIyIiwiaWF0IjoxNzI3NDIxNzQ5LCJub25jZSI6Ijg0ZGJhODFhLWMwYTItNDFiYS1hYmU3LTFmNzU1MTRhZTUyZCJ9.y2X40DKyUXCfHb1gGzdGaz3__xfAk1Tss0cj3M4oxooI0edHUhuKUknS7yIe7bRQErqc8s0neIM53w0XQSpFbA",
             )
         ),
-        credentialIssuer = "http://localhost:22222",
+        credentialIssuer = HTTP_LOCALHOST_PORT,
     )
 
     private val submitOid4vciRequestMDocVCExample = SubmitOID4VCIRequest.build(
@@ -423,7 +424,7 @@ object ExchangeExternalSignaturesExamples {
                 signedProofOfPossession = "eyJraWQiOiJkaWQ6andrOmV5SnJkSGtpT2lKRlF5SXNJbU55ZGlJNklsQXRNalUySWl3aWEybGtJam9pUTNabFV6RlpkV2RVTldWMlZub3hPR3N3V0hCalZHUXRVVlZzUzFBeFJ6ZENkVEpKTWtwb1NqRjJZeUlzSW5naU9pSkNlR04yZDBsQlZEaHVkelJ0ZGpWdFVEaFNUemxyWW1jM04yNXNiVlpvT0c1UmNXWlZVRXR1UkRWQklpd2llU0k2SWt0aFUwMXNlVEJSUVVoU1F6WktNWEZEUkRsb1JrWm5WMGRYTVhwMWNFeHdVM1p0Vkd0SE1ESm1OSGNpZlEjMCIsInR5cCI6Im9wZW5pZDR2Y2ktcHJvb2Yrand0IiwiYWxnIjoiRVMyNTYifQ.eyJhdWQiOiJodHRwOi8vbG9jYWxob3N0OjIyMjIyIiwiaWF0IjoxNzI3NDE3OTcxLCJub25jZSI6IjRkNTEzMTk0LWZhNjEtNDA5OS05YmJjLTNmYjA4MDhjYTRmMSJ9.-NOvj6bfl0l8_BSxPR3UAyO-KkZ4zdfPZ401GNZl8DWg4MCtZN3lWIdnPBsqTY1aAiYfN3symtMzhdtCqpivAA",
             )
         ),
-        credentialIssuer = "http://localhost:22222",
+        credentialIssuer = HTTP_LOCALHOST_PORT,
     )
 
     fun submitOid4vciRequestW3CVCExample(): ValueExampleDescriptorConfig<SubmitOID4VCIRequest>.() -> Unit = {
