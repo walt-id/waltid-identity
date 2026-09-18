@@ -225,7 +225,13 @@ class DefaultTrustRegistryService(
             )
         }
 
-        return buildDecisionFromIdentities(matchedIdentities, instant, expectedEntityType, expectedServiceType)
+        return buildDecisionFromIdentities(
+            matchedIdentities,
+            instant,
+            expectedEntityType,
+            expectedServiceType,
+            matchEvidenceType = "PUBLIC_KEY_MATCH"
+        )
     }
 
     override suspend fun resolveByProviderId(
@@ -657,7 +663,8 @@ class DefaultTrustRegistryService(
         identities: List<ServiceIdentity>,
         instant: Instant,
         expectedEntityType: TrustedEntityType?,
-        expectedServiceType: String?
+        expectedServiceType: String?,
+        matchEvidenceType: String = "CERTIFICATE_MATCH"
     ): TrustDecision {
         if (identities.size > 1) {
             // Multiple matches — check if they're all from the same entity
@@ -676,7 +683,7 @@ class DefaultTrustRegistryService(
         // Evaluate ALL matching identities and pick the best result
         // Priority: TRUSTED > STALE_SOURCE > NOT_TRUSTED (with matching types preferred)
         val candidates = identities.mapNotNull { identity ->
-            evaluateIdentity(identity, instant, expectedEntityType, expectedServiceType)
+            evaluateIdentity(identity, instant, expectedEntityType, expectedServiceType, matchEvidenceType)
         }
 
         if (candidates.isEmpty()) {
@@ -711,7 +718,8 @@ class DefaultTrustRegistryService(
         identity: ServiceIdentity,
         instant: Instant,
         expectedEntityType: TrustedEntityType?,
-        expectedServiceType: String?
+        expectedServiceType: String?,
+        matchEvidenceType: String = "CERTIFICATE_MATCH"
     ): TrustDecision? {
         val entity = store.getEntity(identity.entityId) ?: return null
         val source = store.getSource(entity.sourceId)
@@ -760,7 +768,7 @@ class DefaultTrustRegistryService(
             matchedEntity = entity,
             matchedService = service,
             evidence = buildList {
-                add(TrustEvidence("CERTIFICATE_MATCH", "Identity: ${identity.identityId}"))
+                add(TrustEvidence(matchEvidenceType, "Identity: ${identity.identityId}"))
                 service?.let { add(TrustEvidence("STATUS", "Service status: ${it.status}")) }
             },
             warnings = if (freshness == FreshnessState.STALE) listOf("Source is stale") else emptyList()

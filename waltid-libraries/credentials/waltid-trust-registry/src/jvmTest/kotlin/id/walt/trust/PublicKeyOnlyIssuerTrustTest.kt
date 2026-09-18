@@ -62,6 +62,11 @@ class PublicKeyOnlyIssuerTrustTest {
 
         assertEquals(TrustDecisionCode.TRUSTED, decision.decision)
         assertEquals("Example Credential Issuer", decision.matchedEntity?.legalName)
+        assertTrue(
+            decision.evidence.any { it.type == "PUBLIC_KEY_MATCH" },
+            "Expected PUBLIC_KEY_MATCH evidence, got: ${decision.evidence.map { it.type }}"
+        )
+        assertTrue(decision.evidence.none { it.type == "CERTIFICATE_MATCH" })
     }
 
     @Test
