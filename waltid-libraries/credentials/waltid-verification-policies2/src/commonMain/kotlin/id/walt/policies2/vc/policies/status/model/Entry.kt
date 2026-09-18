@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 
-//todo: maybe use waltid-credential-status domain?
+//todo: maybe use waltid-status-list models?
 sealed class StatusEntry {
     abstract val index: ULong
     abstract val uri: String
