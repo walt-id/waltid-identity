@@ -31,6 +31,7 @@ import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -531,7 +532,7 @@ class DcApiWalletTest {
             payload.toString().encodeToByteArray(),
             mapOf("typ" to JsonPrimitive("oauth-authz-req+jwt")),
         )
-        val signingJwk = key.getPublicKey().exportJWKObject()
+        val signingJwk = jwkWithKid(key.getPublicKey().exportJWKObject(), key.getKeyId())
         val registered = (registeredMetadata ?: ClientMetadata()).copy(
             jwks = ClientMetadata.Jwks(
                 listOf(signingJwk) + registeredMetadata?.jwks?.keys.orEmpty(),
@@ -575,6 +576,11 @@ class DcApiWalletTest {
             responseUri?.let { this["response_uri"] = JsonPrimitive(it) }
         }.let(::JsonObject),
     ).copy(clientMetadata = clientMetadata)
+
+    /** iOS public-key export omits kid; ResponseEncryption requires one on every JWKS entry. */
+    private fun jwkWithKid(jwk: JsonObject, kid: String): JsonObject =
+        if (!jwk["kid"]?.jsonPrimitive?.contentOrNull.isNullOrBlank()) jwk
+        else JsonObject(jwk.toMap() + ("kid" to JsonPrimitive(kid)))
 
     /** Verifier response-encryption metadata in the shape `ResponseEncryption.resolveCrypto2` needs. */
     private fun encryptionClientMetadata(): ClientMetadata = ClientMetadata(
