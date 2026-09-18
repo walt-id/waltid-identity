@@ -69,6 +69,26 @@ class WalletIssuanceCrypto2ProofJvmTest {
         assertFalse("d" in bindingJwk)
         assertEquals(ISSUER, payload["aud"]?.jsonPrimitive?.content)
         assertEquals("nonce", payload["nonce"]?.jsonPrimitive?.content)
+        assertFalse("iss" in payload)
+    }
+
+    @Test
+    fun `sign-proof writes client_id as iss when supplied`() = runTest {
+        val legacyKey = JWKKey.generate(KeyType.secp256r1)
+        val proof = WalletIssuanceHandler.signProof(
+            wallet = Wallet(id = "wallet", staticKey = legacyKey),
+            request = SignProofRequest(
+                issuerUrl = Url(ISSUER),
+                credentialConfigurationId = CONFIG_ID,
+                nonce = "nonce",
+                clientId = "eudiw-abca",
+            ),
+            httpClient = issuerMetadataClient(),
+        ).proofJwt
+        val payload = Json.parseToJsonElement(
+            CompactJws.decodeUnverified(proof).payload.decodeToString()
+        ).jsonObject
+        assertEquals("eudiw-abca", payload["iss"]?.jsonPrimitive?.content)
     }
 
     @Test

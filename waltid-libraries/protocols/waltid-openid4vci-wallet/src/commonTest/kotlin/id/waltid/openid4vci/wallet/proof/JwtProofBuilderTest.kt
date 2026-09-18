@@ -8,8 +8,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 
@@ -59,6 +61,7 @@ class JwtProofBuilderTest {
             audience = audience,
             nonce = nonce,
             binding = ProofKeyBinding.KeyId(keyId),
+            clientId = null,
         )
 
         assertNotNull(proof.jwt)
@@ -74,6 +77,7 @@ class JwtProofBuilderTest {
             audience = audience,
             nonce = nonce,
             binding = ProofKeyBinding.Jwk,
+            clientId = null,
         )
 
         assertNotNull(proof.jwt)
@@ -89,9 +93,42 @@ class JwtProofBuilderTest {
             audience = audience,
             nonce = null,
             binding = ProofKeyBinding.Jwk,
+            clientId = null,
         )
 
         assertEquals("mock.jwt.proof", proof.jwt!!.first())
         assertFalse("nonce" in requireNotNull(mockKey.signedPayload))
+        assertFalse("iss" in mockKey.signedPayload!!)
+    }
+
+    @Test
+    fun proofWithClientIdWritesIssClaim() = runTest {
+        val mockKey = MockKey()
+
+        builder.buildProof(
+            key = mockKey,
+            audience = audience,
+            nonce = nonce,
+            binding = ProofKeyBinding.Jwk,
+            clientId = "eudiw-abca",
+        )
+
+        assertEquals("eudiw-abca", requireNotNull(mockKey.signedPayload)["iss"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun blankClientIdIsRejected() = runTest {
+        val mockKey = MockKey()
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            builder.buildProof(
+                key = mockKey,
+                audience = audience,
+                nonce = nonce,
+                binding = ProofKeyBinding.Jwk,
+                clientId = "  ",
+            )
+        }
+        assertEquals("Client id (iss) cannot be blank", error.message)
     }
 }
