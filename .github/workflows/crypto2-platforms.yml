@@ -18,7 +18,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
 
       - name: Configure Gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Run Windows native tests
         shell: bash
@@ -37,7 +37,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
 
       - name: Configure Gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Run macOS x64 tests
         run: >-
@@ -55,7 +55,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
 
       - name: Configure Gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Run macOS arm64 and iOS simulator tests
         run: >-

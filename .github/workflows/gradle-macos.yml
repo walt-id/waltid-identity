@@ -48,11 +48,11 @@ jobs:
           ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Compile iOS targets and run Kotlin iOS simulator tests
         timeout-minutes: 40
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@6586fd276e3631e06162f72c0897bef404d3150c
+        uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -77,13 +77,13 @@ jobs:
           ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Build WalletCore once and run selected consumer tests
         # One XCFramework assemble is shared by the native demo, Compose demo, and (via artifact)
         # SDK DocC. Cold Konan cache is ~27 min; both demo suites can add ~11 min each.
         timeout-minutes: 80
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@6586fd276e3631e06162f72c0897bef404d3150c
+        uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -101,7 +101,7 @@ jobs:
           test-result-artifact-name: wallet-core-consumer-test-results
 
       - name: Upload WalletCore XCFramework
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wallet-core-release-xcframework
           path: waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework
@@ -119,7 +119,7 @@ jobs:
           ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Execute Enterprise iOS mobile platform tests
         id: enterprise_ios_mobile_tests
@@ -147,6 +147,9 @@ jobs:
           xcode_report_count=0
           while IFS= read -r -d '' bundle; do
             if ! command -v xcresultparser >/dev/null 2>&1; then
+              # See install-and-run-kdoctor: the runner image's untrusted aws/tap makes every
+              # `brew install` emit a tap-trust warning. Drop it first.
+              brew untap aws/tap 2>/dev/null || true
               brew install xcresultparser
             fi
 
@@ -191,7 +194,7 @@ jobs:
 
       - name: Upload Enterprise iOS mobile test results
         if: always() && steps.enterprise_ios_mobile_tests.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: enterprise-ios-mobile-test-results
           path: |

@@ -47,7 +47,7 @@ jobs:
           ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Check mobile SDK documentation snippets
         working-directory: waltid-identity
@@ -77,16 +77,17 @@ jobs:
           ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Restore WalletCore XCFramework
         if: ${{ inputs.restore-wallet-core-artifact }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: wallet-core-release-xcframework
-          # upload-artifact v4 stores the *contents* of WalletCore.xcframework at the
-          # artifact root. Download into that directory so Info.plist and slices land
-          # under WalletCore.xcframework/, not beside it.
+          # upload-artifact (v4 through v7) stores the *contents* of WalletCore.xcframework at
+          # the artifact root, since the directory itself is the least common ancestor of the
+          # uploaded path. Download into that directory so Info.plist and slices land under
+          # WalletCore.xcframework/, not beside it.
           path: waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework
 
       - name: Detect restored WalletCore XCFramework
@@ -172,7 +173,7 @@ jobs:
             WalletSDK.doccarchive
 
       - name: Upload Swift WalletSDK DocC archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: walletsdk-doccarchive
           path: waltid-identity/waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc/WalletSDK.doccarchive.tar.gz
@@ -184,14 +185,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout waltid-identity
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.head_ref || github.ref_name }}
           path: waltid-identity
           sparse-checkout: docs/mobile-sdk-api
 
       - name: Download SDK docs HTML artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: sdk-docs-html
           path: waltid-identity/docs/mobile-sdk-api/html
