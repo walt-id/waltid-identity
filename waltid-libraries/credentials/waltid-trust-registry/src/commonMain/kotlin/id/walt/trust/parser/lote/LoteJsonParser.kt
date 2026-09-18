@@ -2,6 +2,7 @@ package id.walt.trust.parser.lote
 
 import id.walt.trust.model.*
 import id.walt.trust.utils.HashUtils.computeCertificateSha256
+import id.walt.trust.utils.HashUtils.computeJwkSha256Thumbprint
 import id.walt.trust.utils.HashUtils.normalizeCertificateDerBase64
 import io.github.optimumcode.json.schema.JsonSchema
 import io.github.optimumcode.json.schema.ValidationError
@@ -178,6 +179,7 @@ object LoteJsonParser {
             add(ServiceIdentity(
                 identityId = "$serviceId::id-${index++}", sourceId = sourceId,
                 entityId = entityId, serviceId = serviceId,
+                publicKeyJwkThumbprint = computeJwkSha256Thumbprint(value),
                 metadata = mapOf("publicKeyJwk" to json.encodeToString(JsonElement.serializer(), value))
             ))
         }
