@@ -48,7 +48,7 @@ fun Application.keys() = walletRoute {
                         value = KeyGenerationRequest(
                             backend = "tse",
                             config = buildJsonObject {
-                                put("server", JsonPrimitive("http://0.0.0.0:8200/v1/transit"))
+                                put("server", JsonPrimitive("http://0.0.0.0:8200/v1/transit")) // NOSONAR: local Vault/TSE dev server, does not run TLS
                                 put("accessKey", JsonPrimitive("dev-only-token"))
                             }
                         )
