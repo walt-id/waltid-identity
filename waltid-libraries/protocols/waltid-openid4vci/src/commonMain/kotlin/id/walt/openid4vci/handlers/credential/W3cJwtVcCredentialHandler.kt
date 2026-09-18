@@ -2,24 +2,22 @@ package id.walt.openid4vci.handlers.credential
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.crypto.keys.Key
-import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceBatch
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInstance
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpointHandler
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
+import id.walt.openid4vci.handlers.endpoints.credential.signEach
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
-import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
-import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.sdjwt.SDMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Instant
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 
@@ -35,13 +33,12 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         )
     }
 
-    @Deprecated("Use the Crypto2CredentialSigningKey overload")
     override suspend fun sign(
         request: CredentialRequest,
         configuration: CredentialConfiguration,
         issuerKey: Key,
         issuerId: String,
-        credentialData: JsonObject,
+        issuanceBatch: CredentialIssuanceBatch,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
         x5Chain: List<X509Certificate>?,
@@ -49,14 +46,12 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         authorizedTransactionDataTypes: List<String>?,
-        credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
-        verifiedProofs: List<VerifiedCredentialProof>,
-    ): CredentialResponseResult = sign(configuration, verifiedProofs) { verifiedProof ->
+    ): CredentialResponseResult = sign(configuration, issuanceBatch) { instance ->
         W3cJwtVcCredentialSigner.generateW3CJwtVC(
             credentialRequest = request,
-            credentialData = credentialData,
+            credentialData = instance.input.credentialData,
             issuerId = issuerId,
             issuerKey = issuerKey,
             selectiveDisclosure = selectiveDisclosure,
@@ -64,7 +59,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
             x5Chain = x5Chain,
             display = display,
             w3cVersion = w3cVersion,
-            verifiedProof = verifiedProof,
+            verifiedProof = instance.verifiedProof,
         )
     }
 
@@ -73,7 +68,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         configuration: CredentialConfiguration,
         issuerKey: Crypto2CredentialSigningKey,
         issuerId: String,
-        credentialData: JsonObject,
+        issuanceBatch: CredentialIssuanceBatch,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
         x5Chain: List<X509Certificate>?,
@@ -81,14 +76,12 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         authorizedTransactionDataTypes: List<String>?,
-        credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
-        verifiedProofs: List<VerifiedCredentialProof>,
-    ): CredentialResponseResult = sign(configuration, verifiedProofs) { verifiedProof ->
+    ): CredentialResponseResult = sign(configuration, issuanceBatch) { instance ->
         W3cJwtVcCredentialSigner.generateW3CJwtVC(
             credentialRequest = request,
-            credentialData = credentialData,
+            credentialData = instance.input.credentialData,
             issuerId = issuerId,
             issuerKey = issuerKey.key,
             algorithm = issuerKey.requireJwsAlgorithm(),
@@ -97,18 +90,17 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
             x5Chain = x5Chain,
             display = display,
             w3cVersion = w3cVersion,
-            verifiedProof = verifiedProof,
+            verifiedProof = instance.verifiedProof,
         )
     }
 
     /**
-     * Issues one credential per verified proof, or a single credential bound to the
-     * request proof when no proof was verified upfront.
+     * Issues one credential per ordered batch instance.
      */
     private suspend fun sign(
         configuration: CredentialConfiguration,
-        verifiedProofs: List<VerifiedCredentialProof>,
-        issue: suspend (VerifiedCredentialProof?) -> String,
+        issuanceBatch: CredentialIssuanceBatch,
+        issue: suspend (CredentialIssuanceInstance) -> String,
     ): CredentialResponseResult {
         return try {
             if (configuration.format !in supportedFormats) {
@@ -120,14 +112,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
                 )
             }
 
-            val proofsToIssue = verifiedProofs.ifEmpty { listOf(null) }
-            val jwtVcs = proofsToIssue.map { verifiedProof -> issue(verifiedProof) }
-
-            CredentialResponseResult.Success(
-                CredentialResponse(
-                    credentials = jwtVcs.map { IssuedCredential(credential = JsonPrimitive(it)) },
-                )
-            )
+            issuanceBatch.signEach(issue)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

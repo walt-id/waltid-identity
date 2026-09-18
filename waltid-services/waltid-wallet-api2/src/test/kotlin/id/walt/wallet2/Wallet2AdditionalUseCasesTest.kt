@@ -459,12 +459,12 @@ class Wallet2AdditionalUseCasesTest {
                         configuration = configuration,
                         issuerKey = issuerKey,
                         issuerId = issuerBase,
-                        credentialData = buildJsonObject {
+                        issuanceInputData = testIssuanceInputData(buildJsonObject {
                             put("given_name", "Bob"); put("family_name", "Builder"); put(
                             "age_over_18",
                             true
                         ); put("issuing_country", "AT")
-                        },
+                        }),
                         selectiveDisclosure = null,
                         proofValidationContext = proofSupport.validationContext(request)
                     )
@@ -805,12 +805,12 @@ class Wallet2AdditionalUseCasesTest {
                         configuration = configuration,
                         issuerKey = issuerKey,
                         issuerId = issuerBase,
-                        credentialData = buildJsonObject {
+                        issuanceInputData = testIssuanceInputData(buildJsonObject {
                             put("given_name", "Charlie"); put(
                             "family_name",
                             "AuthCode"
                         ); put("issuing_country", "AT")
-                        },
+                        }),
                         selectiveDisclosure = null,
                         proofValidationContext = proofSupport.validationContext(request)
                     )

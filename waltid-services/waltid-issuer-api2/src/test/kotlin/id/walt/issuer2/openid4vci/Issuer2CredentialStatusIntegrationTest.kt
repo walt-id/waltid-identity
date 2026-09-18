@@ -11,6 +11,8 @@ import id.walt.issuer2.testsupport.createCredentialOffer
 import id.walt.issuer2.testsupport.credentialRequest
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.openid4vci.handlers.credential.JwtUtils
+import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOfferValueMode
 import id.walt.sdjwt.SDJwt
@@ -112,6 +114,59 @@ class Issuer2CredentialStatusIntegrationTest {
         assertEquals("revocation", embeddedStatus["statusPurpose"]?.jsonPrimitive?.content)
         assertEquals("94567", embeddedStatus["statusListIndex"]?.jsonPrimitive?.content)
         assertEquals("https://issuer.example.com/status/1", embeddedStatus["statusListCredential"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun batchIssuanceRejectsReusingOneConfiguredCredentialStatus() = testApplication {
+        installIssuer2WithConfigFiles {
+            it.copy(batchCredentialIssuance = BatchCredentialIssuance(batchSize = 2))
+        }
+        val client = apiClient()
+        val walletFlow = Issuer2WalletFlowDriver(client)
+        val offerRequest = CredentialOfferCreateRequest(
+            profileId = JWT_VC_PROFILE_ID,
+            authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            valueMode = CredentialOfferValueMode.BY_REFERENCE,
+            runtimeOverrides = CredentialOfferRuntimeOverrides(
+                credentialStatus = buildJsonObject {
+                    put("id", "https://issuer.example.com/status/1#94567")
+                    put("type", "BitstringStatusListEntry")
+                    put("statusPurpose", "revocation")
+                    put("statusListIndex", "94567")
+                    put("statusListCredential", "https://issuer.example.com/status/1")
+                },
+            ),
+        )
+        val createdOffer = client.createCredentialOffer(offerRequest)
+        val resolvedOffer = walletFlow.resolve(createdOffer)
+        val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
+        val firstProofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
+        val secondProofs = walletFlow.buildJwtProofs(
+            issuerMetadata = resolvedOffer.issuerMetadata,
+            credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+        )
+
+        val response = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
+            bearerAuth(tokenResponse.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(
+                credentialRequest(
+                    credentialConfigurationId = resolvedOffer.offer.credentialConfigurationIds.single(),
+                    proofs = firstProofs.copy(
+                        jwt = requireNotNull(firstProofs.jwt) + requireNotNull(secondProofs.jwt),
+                    ),
+                )
+            )
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+        val body = response.body<JsonObject>()
+        assertEquals(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, body["error"]?.jsonPrimitive?.content)
+        assertNull(body["credentials"])
+        assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
     }
 
     @Test
@@ -363,6 +418,9 @@ class Issuer2CredentialStatusIntegrationTest {
 
         val embeddedStatus = sdJwtPayload["status"]
         assertNull(embeddedStatus, "SD-JWT VC should not contain status claim when not configured")
+        assertEquals(0L, sdJwtPayload["iat"]!!.jsonPrimitive.long % 86_400L)
+        assertEquals(sdJwtPayload["iat"], sdJwtPayload["nbf"])
+        assertEquals(0L, sdJwtPayload["exp"]!!.jsonPrimitive.long % 3_600L)
     }
 
     // ==================== mDoc Tests ====================

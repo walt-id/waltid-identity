@@ -32,19 +32,50 @@ data class CredentialOfferRuntimeOverrides(
 )
 
 @Serializable
-data class CredentialOfferCreateRequest(
+data class CredentialOfferCredential(
     val profileId: String,
+    val runtimeOverrides: CredentialOfferRuntimeOverrides? = null,
+) {
+    init {
+        require(profileId.isNotBlank()) { "profileId must not be blank" }
+    }
+}
+
+@Serializable
+data class CredentialOfferCreateRequest(
+    val credentials: List<CredentialOfferCredential>,
     val authMethod: AuthenticationMethod,
     val issuerStateMode: IssuerStateMode? = null,
     val valueMode: CredentialOfferValueMode = CredentialOfferValueMode.BY_REFERENCE,
     val expiresInSeconds: Long = 5.minutes.inWholeSeconds,
     val txCode: TxCode? = null,
     val txCodeValue: String? = null,
-    val runtimeOverrides: CredentialOfferRuntimeOverrides? = null,
     val sessionId: String? = null,
 ) {
+    /** Source-level convenience for callers issuing one credential; JSON always uses `credentials`. */
+    constructor(
+        profileId: String,
+        authMethod: AuthenticationMethod,
+        issuerStateMode: IssuerStateMode? = null,
+        valueMode: CredentialOfferValueMode = CredentialOfferValueMode.BY_REFERENCE,
+        expiresInSeconds: Long = 5.minutes.inWholeSeconds,
+        txCode: TxCode? = null,
+        txCodeValue: String? = null,
+        sessionId: String? = null,
+        runtimeOverrides: CredentialOfferRuntimeOverrides? = null,
+    ) : this(
+        credentials = listOf(CredentialOfferCredential(profileId, runtimeOverrides)),
+        authMethod = authMethod,
+        issuerStateMode = issuerStateMode,
+        valueMode = valueMode,
+        expiresInSeconds = expiresInSeconds,
+        txCode = txCode,
+        txCodeValue = txCodeValue,
+        sessionId = sessionId,
+    )
+
     init {
-        require(profileId.isNotBlank()) { "profileId must not be blank" }
+        require(credentials.isNotEmpty()) { "credentials must not be empty" }
         require(expiresInSeconds == -1L || expiresInSeconds > 0) {
             "expiresInSeconds must be positive, or -1 for no expiry"
         }
@@ -60,7 +91,7 @@ data class CredentialOfferCreateRequest(
         require(
             authMethod != AuthenticationMethod.AUTHORIZED ||
                     (issuerStateMode ?: IssuerStateMode.INCLUDE) != IssuerStateMode.OMIT ||
-                    runtimeOverrides == null
+                    credentials.none { it.runtimeOverrides != null }
         ) {
             "runtimeOverrides require issuerStateMode INCLUDE for AUTHORIZED credential offers"
         }
@@ -69,9 +100,15 @@ data class CredentialOfferCreateRequest(
 }
 
 @Serializable
+data class CredentialOfferCredentialResponse(
+    val profileId: String,
+    val credentialConfigurationId: String,
+)
+
+@Serializable
 data class CredentialOfferCreateResponse(
     val offerId: String,
-    val profileId: String,
+    val credentials: List<CredentialOfferCredentialResponse>,
     val authMethod: AuthenticationMethod,
     val issuerStateMode: IssuerStateMode? = null,
     val expiresAt: Long,

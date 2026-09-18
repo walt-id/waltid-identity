@@ -1,6 +1,7 @@
 package id.walt.issuer2.notifications
 
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.ktornotifications.SseNotifier
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.openid4vci.offers.AuthenticationMethod
@@ -12,11 +13,13 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.milliseconds
 
 class IssuanceNotificationServiceTest {
@@ -44,9 +47,13 @@ class IssuanceNotificationServiceTest {
         assertEquals("session-123", payload.requestId)
         assertEquals("token_request_pre_authorized_code_succeeded", payload.event)
         assertEquals("session-123", payload.session["sessionId"]?.jsonPrimitive?.contentOrNull)
-        assertEquals("identity_credential", payload.session["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull)
         assertEquals("PRE_AUTHORIZED", payload.session["authenticationMethod"]?.jsonPrimitive?.contentOrNull)
-        assertEquals("redacted", payload.session["issuerKey"]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull)
+        val issuanceRequest = assertNotNull(payload.session["issuanceRequests"])
+            .jsonArray
+            .single()
+            .jsonObject
+        assertEquals("identity_credential", issuanceRequest["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("redacted", issuanceRequest["issuerKey"]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull)
     }
 
     @Test
@@ -112,11 +119,16 @@ class IssuanceNotificationServiceTest {
     private fun testSession(webhookUrl: String? = null): IssuanceSession =
         IssuanceSession(
             sessionId = "session-123",
-            profileId = "identity-profile",
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
-            credentialConfigurationId = "identity_credential",
-            issuerKey = buildJsonObject { put("type", "jwk") },
-            credentialData = buildJsonObject { put("given_name", "Jane") },
+            issuanceRequests = listOf(
+                IssuanceRequest(
+                    credentialIdentifier = "credential",
+                    profileId = "identity-profile",
+                    credentialConfigurationId = "identity_credential",
+                    issuerKey = buildJsonObject { put("type", "jwk") },
+                    credentialData = buildJsonObject { put("given_name", "Jane") },
+                )
+            ),
             expiresAt = kotlin.time.Instant.DISTANT_FUTURE,
             notifications = webhookUrl?.let {
                 IssuanceNotifications(

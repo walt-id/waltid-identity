@@ -4,41 +4,43 @@ import id.walt.certificate.x509.X509Certificate
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceBatch
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInstance
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpointHandler
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
+import id.walt.openid4vci.handlers.endpoints.credential.signEach
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
-import id.walt.openid4vci.responses.credential.CredentialResponse
-import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
-import id.walt.mdoc.objects.mso.Status
 import id.walt.sdjwt.SDMap
-import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.CancellationException
+import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 /**
  * SD-JWT VC credential response handler.
  */
-class SdJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpointHandler {
+class SdJwtVcCredentialHandler(
+    private val roundGeneratedTimeClaims: Boolean = false,
+    private val now: () -> Instant = { Clock.System.now() },
+) : CredentialEndpointHandler, Crypto2CredentialEndpointHandler {
     private companion object {
         val supportedFormats = setOf(CredentialFormat.SD_JWT_VC)
     }
 
-    @Deprecated("Use the Crypto2CredentialSigningKey overload")
     override suspend fun sign(
         request: CredentialRequest,
         configuration: CredentialConfiguration,
         issuerKey: Key,
         issuerId: String,
-        credentialData: JsonObject,
+        issuanceBatch: CredentialIssuanceBatch,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
         x5Chain: List<X509Certificate>?,
@@ -46,23 +48,21 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEnd
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         authorizedTransactionDataTypes: List<String>?,
-        credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
-        verifiedProofs: List<VerifiedCredentialProof>,
-    ): CredentialResponseResult = sign(configuration, verifiedProofs) { vct, verifiedProof ->
+    ): CredentialResponseResult = sign(configuration, issuanceBatch, dataMapping) { vct, instance, effectiveMapping ->
         SdJwtVcCredentialSigner.generateSdJwtVC(
             credentialRequest = request,
-            credentialData = credentialData,
+            credentialData = instance.input.credentialData,
             issuerId = issuerId,
             issuerKey = issuerKey,
             vct = vct,
             selectiveDisclosure = selectiveDisclosure,
-            dataMapping = dataMapping,
+            dataMapping = effectiveMapping,
             x5Chain = x5Chain,
             display = display,
             sdJwtTypeHeader = configuration.format.value,
-            verifiedProof = verifiedProof,
+            verifiedProof = instance.verifiedProof,
         )
     }
 
@@ -71,7 +71,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEnd
         configuration: CredentialConfiguration,
         issuerKey: Crypto2CredentialSigningKey,
         issuerId: String,
-        credentialData: JsonObject,
+        issuanceBatch: CredentialIssuanceBatch,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
         x5Chain: List<X509Certificate>?,
@@ -79,35 +79,37 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEnd
         w3cVersion: String?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         authorizedTransactionDataTypes: List<String>?,
-        credentialStatus: Status?,
         validFrom: Instant?,
         validUntil: Instant?,
-        verifiedProofs: List<VerifiedCredentialProof>,
-    ): CredentialResponseResult = sign(configuration, verifiedProofs) { vct, verifiedProof ->
+    ): CredentialResponseResult = sign(configuration, issuanceBatch, dataMapping) { vct, instance, effectiveMapping ->
         SdJwtVcCredentialSigner.generateSdJwtVC(
             credentialRequest = request,
-            credentialData = credentialData,
+            credentialData = instance.input.credentialData,
             issuerId = issuerId,
             issuerKey = issuerKey.key,
             algorithm = issuerKey.requireJwsAlgorithm(),
             vct = vct,
             selectiveDisclosure = selectiveDisclosure,
-            dataMapping = dataMapping,
+            dataMapping = effectiveMapping,
             x5Chain = x5Chain,
             display = display,
             sdJwtTypeHeader = configuration.format.value,
-            verifiedProof = verifiedProof,
+            verifiedProof = instance.verifiedProof,
         )
     }
 
     /**
-     * Issues one credential per verified proof, or a single credential bound to the
-     * request proof when no proof was verified upfront.
+     * Issues one credential per ordered batch instance.
      */
     private suspend fun sign(
         configuration: CredentialConfiguration,
-        verifiedProofs: List<VerifiedCredentialProof>,
-        issue: suspend (vct: String, verifiedProof: VerifiedCredentialProof?) -> String,
+        issuanceBatch: CredentialIssuanceBatch,
+        dataMapping: JsonObject?,
+        issue: suspend (
+            vct: String,
+            instance: CredentialIssuanceInstance,
+            effectiveMapping: JsonObject?,
+        ) -> String,
     ): CredentialResponseResult {
         return try {
             if (configuration.format !in supportedFormats) {
@@ -127,18 +129,40 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEnd
                     ),
                 )
 
-            val proofsToIssue = verifiedProofs.ifEmpty { listOf(null) }
-            val sdJwts = proofsToIssue.map { verifiedProof -> issue(vct, verifiedProof) }
-
-            CredentialResponseResult.Success(
-                CredentialResponse(
-                    credentials = sdJwts.map { IssuedCredential(credential = JsonPrimitive(it)) },
-                )
-            )
+            val effectiveMapping = if (roundGeneratedTimeClaims && dataMapping != null) {
+                roundedTimeClaimMapping(dataMapping, now())
+            } else dataMapping
+            issuanceBatch.signEach { instance -> issue(vct, instance, effectiveMapping) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             CredentialResponseResult.Failure(e.toCredentialHandlerError())
         }
     }
+
+    private fun roundedTimeClaimMapping(mapping: JsonObject, now: Instant): JsonObject =
+        JsonObject(mapping.mapValues { (claim, value) ->
+            val template = (value as? JsonPrimitive)?.takeIf { it.isString }?.content
+            when {
+                // Round generated issuance times to UTC days and expiry to UTC hours to reduce linkability.
+                (claim == "iat" || claim == "nbf") && template == "<timestamp-seconds>" ->
+                    JsonPrimitive(now.epochSeconds.floorDiv(86_400L) * 86_400L)
+
+                claim == "exp" && template != null &&
+                    template.startsWith("<timestamp-in-seconds:") && template.endsWith(">") -> {
+                    val lifetime = Duration.parse(template.removePrefix("<timestamp-in-seconds:").removeSuffix(">"))
+                    require(lifetime.isFinite() && lifetime > Duration.ZERO) {
+                        "Generated SD-JWT expiry requires a finite, positive lifetime"
+                    }
+                    val expiry = (now + lifetime).epochSeconds.floorDiv(3_600L) * 3_600L
+                    require(expiry > now.epochSeconds) {
+                        "Generated SD-JWT expiry is not in the future after hourly rounding; use a longer lifetime or an explicit expiry"
+                    }
+                    JsonPrimitive(expiry)
+                }
+
+                // Explicit dates, custom functions, and unrelated claims are not rounded.
+                else -> value
+            }
+        })
 }
