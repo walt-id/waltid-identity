@@ -20,7 +20,7 @@ import id.walt.walletdemo.compose.logic.WalletSessionState
 internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {
     val setup = state.session as? WalletSessionState.IdentitySetup
     if (setup != null) {
-        IdentitySetupScreen(setup.setup, state.warning, controller::chooseIdentity, controller::resumeSigningIdentity, controller::cancelIdentity, controller::refreshIdentityChoices, refreshing = state.identityBusy)
+        IdentitySetupScreen(setup.setup, state.warning, controller::chooseIdentity, controller::resumeSigningIdentity, controller::cancelIdentity, controller::refreshIdentityChoices, progress = state.identityProgress)
         return
     }
     val uriHandler = LocalUriHandler.current

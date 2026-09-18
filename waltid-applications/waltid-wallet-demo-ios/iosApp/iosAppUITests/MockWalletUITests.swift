@@ -1,3 +1,4 @@
+import CryptoKit
 import XCTest
 
 @MainActor
@@ -923,7 +924,7 @@ final class WalletIdentitySetupUITests: XCTestCase {
         ui.launch(environment: environment, initializeSigningIdentity: false)
         let next = app.buttons["wallet.keySetupContinue"]
         XCTAssertTrue(next.waitForExistence(timeout: 30))
-        ui.tapButton(identifier: "wallet.keySetupChoice.recovery.1", fallbackLabel: "Back up with iCloud Keychain recovery")
+        ui.tapButton(identifier: "wallet.keySetupChoice.recovery.1", fallbackLabel: "Back up with iCloud Keychain")
         next.tap()
         XCTAssertTrue(app.staticTexts["2 of 3 · Key storage"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Secure Enclave")).count, 0)
@@ -932,10 +933,12 @@ final class WalletIdentitySetupUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["3 of 3 · Signing approval"].waitForExistence(timeout: 10))
         next.tap()
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
+        app.buttons["Technical details"].tap()
         let did = app.staticTexts["wallet.settingsDid"].label
+        app.navigationBars.buttons.firstMatch.tap()
         XCTAssertTrue(did.hasPrefix("did:jwk:"))
         app.buttons["Protection and recovery"].tap()
-        XCTAssertTrue(app.staticTexts["Recovery record accepted locally; delivery to another device is not confirmed."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Saved on this device. Delivery to another device is not confirmed."].waitForExistence(timeout: 10))
         capture("backup-receipt", app: app)
         app.navigationBars.buttons.firstMatch.tap()
         for _ in 0..<8 where !app.buttons["wallet.settingsReset"].isHittable { app.swipeUp() }
@@ -949,13 +952,13 @@ final class WalletIdentitySetupUITests: XCTestCase {
         app.terminate()
         ui.launch(environment: environment, initializeSigningIdentity: false)
         XCTAssertTrue(next.waitForExistence(timeout: 30))
-        let restore = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", did)).firstMatch
+        let restore = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", SHA256.hash(data: Data(did.utf8)).prefix(6).map { String(format: "%02x", $0) }.joined())).firstMatch
         for _ in 0..<20 {
             if restore.exists && restore.frame.minY < next.frame.minY - 120 && restore.frame.maxY > 240 { break }
             app.swipeUp()
         }
         XCTAssertTrue(restore.isHittable, "Original recovery record must be selectable")
-        // A long DID can make the card extend below the fixed footer. Tap its visible portion.
+        // Scroll to the matching key and wait for the list to settle before selecting it.
         var previousFrame = CGRect.zero
         let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             let frame = restore.frame
@@ -978,20 +981,24 @@ final class WalletIdentitySetupUITests: XCTestCase {
         XCTAssertEqual(next.label, "Restore signing key")
         next.tap()
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
+        app.buttons["Technical details"].tap()
         XCTAssertEqual(app.staticTexts["wallet.settingsDid"].label, did)
+        app.navigationBars.buttons.firstMatch.tap()
         capture("restored-key", app: app)
         app.terminate()
         ui.launch(environment: environment)
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
+        app.buttons["Technical details"].tap()
         XCTAssertEqual(app.staticTexts["wallet.settingsDid"].label, did)
+        app.navigationBars.buttons.firstMatch.tap()
         app.buttons["Protection and recovery"].tap()
-        app.buttons["Delete recovery record"].tap()
+        app.buttons["Delete key backup"].tap()
         capture("delete-recovery-warning", app: app)
         app.buttons["Cancel"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["Delete recovery record"].exists)
-        app.buttons["Delete recovery record"].tap()
-        app.alerts.buttons["Delete recovery record"].firstMatch.tap()
-        let removed = app.staticTexts["Recovery record deletion requested; removal from other devices is not verified."]
+        XCTAssertTrue(app.buttons["Delete key backup"].exists)
+        app.buttons["Delete key backup"].tap()
+        app.alerts.buttons["Delete key backup"].firstMatch.tap()
+        let removed = app.staticTexts["Backup deletion requested. Removal from other devices is not confirmed."]
         XCTAssertTrue(removed.waitForExistence(timeout: 20))
         app.navigationBars.buttons.firstMatch.tap()
         for _ in 0..<8 where !app.buttons["wallet.settingsReset"].isHittable { app.swipeUp() }
@@ -1030,7 +1037,7 @@ final class WalletIdentitySetupUITests: XCTestCase {
         let details = app.buttons["Protection and recovery"]
         XCTAssertTrue(details.waitForExistence(timeout: 10))
         details.tap()
-        XCTAssertTrue(app.staticTexts["No recovery backup submitted."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["No key backup submitted."].waitForExistence(timeout: 10))
         let active = XCTAttachment(screenshot: app.screenshot())
         active.name = "wal749-native-ios-identity-details"
         active.lifetime = .keepAlways

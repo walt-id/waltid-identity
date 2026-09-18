@@ -1443,7 +1443,7 @@ class WalletDemoController(
         fun isCurrentWallet(): Boolean = (_state.value.session as? WalletSessionState.Ready)?.let {
             it.did == session.did && it.keyId == session.keyId
         } == true
-        _state.update { it.copy(identityBusy = true, identityDetails = WalletDemoIdentityDetailsState.Loading) }
+        _state.update { it.copy(identityProgress = "Loading key details…", identityDetails = WalletDemoIdentityDetailsState.Loading) }
         scope.launch(dispatcher) {
             try {
                 val details = wallet.identityDetails()
@@ -1455,15 +1455,15 @@ class WalletDemoController(
             catch (cause: Exception) {
                 if (isCurrentWallet()) _state.update {
                     it.copy(identityDetails = WalletDemoIdentityDetailsState.Failed(
-                        WalletDisplayText.failure("Signing key details unavailable", cause)))
+                        "Signing key details could not be loaded. Try again."))
                 }
-            } finally { _state.update { it.copy(identityBusy = false) } }
+            } finally { _state.update { it.copy(identityProgress = null) } }
         }
     }
 
     fun performIdentityAction(choiceId: String) {
         if (_state.value.identityBusy || _state.value.session !is WalletSessionState.Ready) return
-        _state.update { it.copy(identityBusy = true) }
+        _state.update { it.copy(identityProgress = if ((_state.value.identityDetails as? WalletDemoIdentityDetailsState.Available)?.details?.choices?.find { choice -> choice.id == choiceId }?.destructive == true) "Deleting backup…" else "Saving backup…") }
         scope.launch(dispatcher) {
             try {
                 wallet.chooseIdentity(choiceId)
@@ -1471,18 +1471,22 @@ class WalletDemoController(
                 _state.update { it.copy(identityDetails = details?.let(WalletDemoIdentityDetailsState::Available)
                     ?: WalletDemoIdentityDetailsState.Unsupported) }
             } catch (cause: kotlinx.coroutines.CancellationException) { throw cause }
-            catch (cause: Exception) { _state.update { it.copy(warning = WalletDisplayText.failure("Recovery operation failed", cause)) } }
-            finally { _state.update { it.copy(identityBusy = false) } }
+            catch (cause: Exception) { _state.update { it.copy(warning = keyOperationFailure(cause)) } }
+            finally { _state.update { it.copy(identityProgress = null) } }
         }
     }
 
-    fun chooseIdentity(choiceId: String) = runIdentityChoice { wallet.chooseIdentity(choiceId) }
-    fun cancelIdentity(identityId: String) = runIdentityChoice { wallet.cancelIdentity(identityId) }
-    fun resumeSigningIdentity(identityId: String) = runIdentityChoice { wallet.resumeSigningIdentity(identityId) }
+    fun chooseIdentity(choiceId: String) {
+        val setup = (_state.value.session as? WalletSessionState.IdentitySetup)?.setup as? WalletDemoIdentitySetup.Choose
+        val restoring = setup?.options?.find { it.id == choiceId }?.restoring == true
+        runIdentityChoice(if (restoring) "Restoring key…" else "Creating key…") { wallet.chooseIdentity(choiceId) }
+    }
+    fun cancelIdentity(identityId: String) = runIdentityChoice("Cancelling setup…") { wallet.cancelIdentity(identityId) }
+    fun resumeSigningIdentity(identityId: String) = runIdentityChoice("Resuming setup…") { wallet.resumeSigningIdentity(identityId) }
     fun refreshIdentityChoices() {
         val session = _state.value.session as? WalletSessionState.IdentitySetup ?: return
         if (_state.value.identityBusy) return
-        _state.update { it.copy(identityBusy = true) }
+        _state.update { it.copy(identityProgress = "Checking signing key options…") }
         scope.launch(dispatcher) {
             try {
                 val setup = wallet.identitySetup()
@@ -1493,21 +1497,26 @@ class WalletDemoController(
             } catch (cause: CancellationException) { throw cause }
             catch (cause: Exception) {
                 if (_state.value.session === session) _state.update {
-                    it.copy(warning = WalletDisplayText.failure("Key options unavailable", cause))
+                    it.copy(warning = "Signing key options could not be loaded. Try again.")
                 }
-            } finally { _state.update { it.copy(identityBusy = false) } }
+            } finally { _state.update { it.copy(identityProgress = null) } }
         }
     }
 
-    private fun runIdentityChoice(action: suspend () -> Unit) {
+    private fun runIdentityChoice(progress: String, action: suspend () -> Unit) {
         if (_state.value.identityBusy || _state.value.session !is WalletSessionState.IdentitySetup) return
-        _state.update { it.copy(session = WalletSessionState.Bootstrapping) }
+        _state.update { it.copy(identityProgress = progress, warning = null) }
         scope.launch(dispatcher) {
-            try { action() }
-            catch (cause: kotlinx.coroutines.CancellationException) { throw cause }
-            catch (cause: Exception) { _state.update { it.copy(warning = WalletDisplayText.failure("Identity setup failed", cause)) } }
-            _state.update { it.copy(session = WalletSessionState.NotBootstrapped) }
-            bootstrapIfNeeded()
+            try {
+                try { action() }
+                catch (cause: CancellationException) { throw cause }
+                catch (cause: Exception) { _state.update { it.copy(warning = keyOperationFailure(cause)) } }
+                val setup = wallet.identitySetup()
+                _state.update { it.copy(session = setup?.let(WalletSessionState::IdentitySetup) ?: WalletSessionState.NotBootstrapped) }
+                if (setup == null) bootstrapIfNeeded()
+            } catch (cause: CancellationException) { throw cause }
+            catch (cause: Exception) { _state.update { it.copy(warning = keyOperationFailure(cause)) } }
+            finally { _state.update { it.copy(identityProgress = null) } }
         }
     }
 
@@ -1527,7 +1536,7 @@ class WalletDemoController(
             }
             val setup = runCatching { wallet.identitySetup() }.getOrElse { error ->
                 if (error is CancellationException) throw error
-                _state.update { it.copy(session = WalletSessionState.Failed(WalletDisplayText.failure("Identity setup failed", error))) }
+                _state.update { it.copy(session = WalletSessionState.Failed(keyOperationFailure(error))) }
                 return@launch
             }
             if (setup != null) {

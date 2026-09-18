@@ -30,11 +30,9 @@ PIN setup controls access to the app, with optional biometric unlock. Key setup 
 
 Key recovery restores the original key and DID, not credentials. A local save does not prove delivery to another device. Unavailable providers show their reported reason and can be checked again; returning to the app also refreshes the choices.
 
-Android offers encrypted-cloud backup and device transfer separately. Cloud backup requires Google to report end-to-end encryption available. Device transfer requires the source device and does not request a cloud copy. Hardware-required storage must pass the hardware check; Android Keystore without that requirement leaves the protection level to the platform.
+On iOS, choose Create without a key backup to use Secure Enclave. Recoverable keys use Keychain or the encrypted wallet database because existing keys cannot be imported into Secure Enclave.
 
-On iOS, choose No recovery backup to use Secure Enclave. Recoverable keys use Keychain or the encrypted wallet database because existing keys cannot be imported into Secure Enclave.
-
-Settings show the current key and recovery status. To replace a key or its signing policy, use Reset wallet and repeat setup; this removes local credentials, which must be issued again.
+Settings → Protection and recovery shows the storage requirement, observed signing protection, key origin, signing approval and recovery status. Technical identifiers are available separately. To replace a key or its signing policy, use Reset wallet and repeat setup; this removes local credentials, which must be issued again.
 
 
 ## Local wallet data

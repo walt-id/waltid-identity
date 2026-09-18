@@ -5,7 +5,7 @@ data class WalletDemoUiState(
     val isAuthenticating: Boolean = false,
     val biometricUnlockAvailable: Boolean = false,
     val identityDetails: WalletDemoIdentityDetailsState = WalletDemoIdentityDetailsState.Loading,
-    val identityBusy: Boolean = false,
+    val identityProgress: String? = null,
     val session: WalletSessionState = WalletSessionState.NotBootstrapped,
     val signingProtectionMode: WalletDemoSigningProtectionMode = WalletDemoSigningProtectionMode.Optional,
     val selectedSigningProtection: WalletDemoSigningProtection = WalletDemoSigningProtection.Biometric,
@@ -36,6 +36,8 @@ data class WalletDemoUiState(
     val statusOccurrenceId: Long = 0,
     val showDcApiPresentationPreview: Boolean = true,
 ) {
+    val identityBusy: Boolean get() = identityProgress != null
+
     val presentationPreview: WalletDemoPresentationPreview?
         get() = (presentationReview as? WalletDemoPresentationPreviewResult.Ready)?.preview
 

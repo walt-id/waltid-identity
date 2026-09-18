@@ -7,17 +7,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -25,6 +29,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,6 +52,10 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.SigningProtectionChoice
 import id.walt.walletdemo.compose.ui.components.title
 
+private enum class SettingsPage(val title: String) {
+    Main("Settings"), Protection("Protection and recovery"), Technical("Technical details")
+}
+
 @Composable
 internal fun SettingsScreen(
     state: WalletDemoUiState,
@@ -64,15 +73,18 @@ internal fun SettingsScreen(
     val clipboard = LocalClipboardManager.current
     var deleteRecovery by remember { mutableStateOf<String?>(null) }
     var confirmReset by remember { mutableStateOf(false) }
+    var page by rememberSaveable { mutableStateOf(SettingsPage.Main) }
+    val scroll = remember(page) { ScrollState(0) }
+    val back = { if (page == SettingsPage.Main) onBack() else page = SettingsPage.Main }
 
     deleteRecovery?.let { id ->
-        AlertDialog(onDismissRequest = { deleteRecovery = null }, title = { Text("Delete recovery record?") },
-            text = { Text("This requests deletion from the provider. It does not erase signing keys already restored on other devices.") },
-            confirmButton = { TextButton(onClick = { deleteRecovery = null; onIdentityAction(id) }) { Text("Delete recovery record") } },
+        AlertDialog(onDismissRequest = { deleteRecovery = null }, title = { Text("Delete key backup?") },
+            text = { Text("This requests deletion of the key backup from the provider. You may lose the ability to recover this key. Keys already restored on other devices are not erased.") },
+            confirmButton = { TextButton(onClick = { deleteRecovery = null; onIdentityAction(id) }) { Text("Delete key backup") } },
             dismissButton = { TextButton(onClick = { deleteRecovery = null }) { Text("Cancel") } })
     }
 
-    SystemBackHandler(enabled = true, onBack = onBack)
+    SystemBackHandler(enabled = true, onBack = back)
 
     Column(
         modifier = Modifier
@@ -89,7 +101,7 @@ internal fun SettingsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(
-                onClick = onBack,
+                onClick = back,
                 modifier = Modifier.testTag(WalletUiTestTags.SettingsBack),
             ) {
                 Icon(
@@ -98,7 +110,7 @@ internal fun SettingsScreen(
                 )
             }
             Text(
-                "Settings",
+                page.title,
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
@@ -107,115 +119,136 @@ internal fun SettingsScreen(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scroll)
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            SettingsCopyRow(
-                title = "Wallet DID",
-                value = ready?.did.orEmpty().ifBlank { "Not available" },
-                valueTag = WalletUiTestTags.SettingsDid,
-                copyTag = WalletUiTestTags.SettingsDidCopy,
-                onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
-            )
-            SettingsCopyRow(
-                title = "Wallet key",
-                value = ready?.keyId.orEmpty().ifBlank { "Not available" },
-                valueTag = WalletUiTestTags.SettingsKeyId,
-                copyTag = WalletUiTestTags.SettingsKeyIdCopy,
-                onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
-            )
-            SettingsCopyRow(
-                title = "Public JWK",
-                value = ready?.publicJwk.orEmpty().ifBlank { "Not available" },
-                valueTag = WalletUiTestTags.SettingsPublicJwk,
-                copyTag = WalletUiTestTags.SettingsPublicJwkCopy,
-                onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
-            )
-            (state.identityDetails as? WalletDemoIdentityDetailsState.Available)?.details?.let { identity ->
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Wallet signing key", style = MaterialTheme.typography.titleMedium)
-                    Text("${identity.storage} · ${identity.origin}")
-                    Text(identity.authorization)
-                    Text(identity.recovery)
-                    for (choice in identity.choices) {
-                        Text(choice.detail, style = MaterialTheme.typography.bodySmall)
-                        OutlinedButton(enabled = !state.identityBusy, onClick = {
-                            if (choice.destructive) deleteRecovery = choice.id else onIdentityAction(choice.id)
-                        }) { Text(choice.title) }
-                    }
-                    if (state.identityBusy) CircularProgressIndicator()
+            if (page == SettingsPage.Main) {
+                for (destination in listOf(SettingsPage.Protection, SettingsPage.Technical)) {
+                    ListItem(headlineContent = { Text(destination.title) },
+                        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                        modifier = Modifier.clickable { page = destination })
                 }
             }
-            when (val details = state.identityDetails) {
-                WalletDemoIdentityDetailsState.Loading -> CircularProgressIndicator()
-                WalletDemoIdentityDetailsState.Unsupported ->
-                    SigningProtectionSettings(state = state, ready = ready, onRequestChange = onRequestSigningProtectionChange)
-                is WalletDemoIdentityDetailsState.Failed -> Column {
-                    Text(details.message)
-                    TextButton(onClick = onRefreshIdentityDetails) { Text("Try again") }
-                }
-                is WalletDemoIdentityDetailsState.Available ->
-                    Text("Reset this wallet to choose different key storage or signing approval. This removes local credentials; key recovery does not restore them.",
-                        style = MaterialTheme.typography.bodySmall)
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(WalletUiTestTags.SettingsCredentialSharing),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    "Credential Sharing",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+            if (page == SettingsPage.Technical) {
+                SettingsCopyRow(
+                    title = "Wallet DID",
+                    value = ready?.did.orEmpty().ifBlank { "Not available" },
+                    valueTag = WalletUiTestTags.SettingsDid,
+                    copyTag = WalletUiTestTags.SettingsDidCopy,
+                    onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                SettingsCopyRow(
+                    title = "Wallet key",
+                    value = ready?.keyId.orEmpty().ifBlank { "Not available" },
+                    valueTag = WalletUiTestTags.SettingsKeyId,
+                    copyTag = WalletUiTestTags.SettingsKeyIdCopy,
+                    onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
+                )
+                SettingsCopyRow(
+                    title = "Public JWK",
+                    value = ready?.publicJwk.orEmpty().ifBlank { "Not available" },
+                    valueTag = WalletUiTestTags.SettingsPublicJwk,
+                    copyTag = WalletUiTestTags.SettingsPublicJwkCopy,
+                    onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
+                )
+            }
+            if (page == SettingsPage.Protection) {
+                (state.identityDetails as? WalletDemoIdentityDetailsState.Available)?.details?.let { identity ->
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        OutlinedCard(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Text("Wallet signing key", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                KeyDetailRow("Storage requirement", identity.storage)
+                                KeyDetailRow("Signing protection", identity.protection)
+                                KeyDetailRow("Key origin", identity.origin)
+                                KeyDetailRow("Signing approval", identity.authorization)
+                                KeyDetailRow("Recovery", identity.recovery)
+                            }
+                        }
+                        if (identity.choices.isNotEmpty()) Text("Key backups", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        if (identity.providerFailures.isNotEmpty()) ProviderAvailability(identity.providerFailures, !state.identityBusy, onRefreshIdentityDetails)
+                        for (choice in identity.choices) {
+                            Text(choice.detail, style = MaterialTheme.typography.bodySmall)
+                            OutlinedButton(enabled = !state.identityBusy, onClick = {
+                                if (choice.destructive) deleteRecovery = choice.id else onIdentityAction(choice.id)
+                            }) { Text(choice.title) }
+                        }
+                        state.identityProgress?.let { Text(it, style = MaterialTheme.typography.bodySmall); CircularProgressIndicator() }
+                    }
+                }
+                when (val details = state.identityDetails) {
+                    WalletDemoIdentityDetailsState.Loading -> CircularProgressIndicator()
+                    WalletDemoIdentityDetailsState.Unsupported ->
+                        SigningProtectionSettings(state = state, ready = ready, onRequestChange = onRequestSigningProtectionChange)
+                    is WalletDemoIdentityDetailsState.Failed -> Column {
+                        Text(details.message)
+                        TextButton(onClick = onRefreshIdentityDetails) { Text("Try again") }
+                    }
+                    is WalletDemoIdentityDetailsState.Available ->
+                        Text("Reset this wallet to choose different key storage or signing approval. This removes local credentials; key recovery does not restore them.",
+                            style = MaterialTheme.typography.bodySmall)
+                }
+
+            }
+            if (page == SettingsPage.Main) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(WalletUiTestTags.SettingsCredentialSharing),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    Text(
+                        "Credential Sharing",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            "Show Walt Wallet preview for DC API Presentation",
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Text(
-                            "When off, Digital Credentials presentations skip the wallet review and continue from the system picker to biometrics.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                "Show Walt Wallet preview for DC API Presentation",
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Text(
+                                "When off, Digital Credentials presentations skip the wallet review and continue from the system picker to biometrics.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = state.showDcApiPresentationPreview,
+                            onCheckedChange = onShowDcApiPresentationPreviewChange,
+                            modifier = Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview),
                         )
                     }
-                    Switch(
-                        checked = state.showDcApiPresentationPreview,
-                        onCheckedChange = onShowDcApiPresentationPreviewChange,
-                        modifier = Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview),
-                    )
                 }
-            }
-            OutlinedButton(
-                onClick = onLock,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(WalletUiTestTags.SettingsLock),
-            ) {
-                Text("Lock")
-            }
-            Button(
-                onClick = { confirmReset = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(WalletUiTestTags.SettingsReset),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError,
-                ),
-            ) {
-                Text("Reset wallet")
+                OutlinedButton(
+                    onClick = onLock,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(WalletUiTestTags.SettingsLock),
+                ) {
+                    Text("Lock")
+                }
+                Button(
+                    onClick = { confirmReset = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(WalletUiTestTags.SettingsReset),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
+                ) {
+                    Text("Reset wallet")
+                }
             }
         }
     }
@@ -250,7 +283,7 @@ internal fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { confirmReset = false },
             title = { Text("Reset wallet?") },
-            text = { Text("This removes local wallet keys, credentials and the app PIN. Saved key recovery records remain. Key recovery does not restore credentials.") },
+            text = { Text("This removes local wallet keys, credentials and the app PIN. Saved key backups remain. Key recovery does not restore credentials.") },
             confirmButton = {
                 TextButton(
                     onClick = {

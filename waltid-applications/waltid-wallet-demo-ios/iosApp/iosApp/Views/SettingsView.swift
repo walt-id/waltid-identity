@@ -19,35 +19,41 @@ struct SettingsView: View {
                     NavigationLink("Protection and recovery") { WalletIdentityView(model: model) }
                 }
             }
-            Section("Wallet DID") {
-                Text(viewModel.did.isEmpty ? "Not available" : viewModel.did)
-                    .font(.footnote)
-                    .textSelection(.enabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.settingsDid)
-                Button("Copy DID") {
-                    UIPasteboard.general.string = viewModel.did
+            Section {
+                NavigationLink("Technical details") {
+                    List {
+                        Section("Wallet DID") {
+                            Text(viewModel.did.isEmpty ? "Not available" : viewModel.did)
+                                .font(.footnote)
+                                .textSelection(.enabled)
+                                .accessibilityIdentifier(WalletAccessibilityID.settingsDid)
+                            Button("Copy DID") {
+                                UIPasteboard.general.string = viewModel.did
+                            }
+                            .accessibilityIdentifier(WalletAccessibilityID.settingsDidCopy)
+                        }
+                        Section("Wallet key") {
+                            Text(viewModel.keyID.isEmpty ? "Not available" : viewModel.keyID)
+                                .font(.footnote)
+                                .textSelection(.enabled)
+                                .accessibilityIdentifier(WalletAccessibilityID.settingsKeyId)
+                            Button("Copy key ID") {
+                                UIPasteboard.general.string = viewModel.keyID
+                            }
+                            .accessibilityIdentifier(WalletAccessibilityID.settingsKeyIdCopy)
+                        }
+                        Section("Public JWK") {
+                            Text(viewModel.publicJWK.isEmpty ? "Not available" : viewModel.publicJWK)
+                                .font(.footnote)
+                                .textSelection(.enabled)
+                                .accessibilityIdentifier(WalletAccessibilityID.settingsPublicJwk)
+                            Button("Copy public JWK") {
+                                UIPasteboard.general.string = viewModel.publicJWK
+                            }
+                            .accessibilityIdentifier(WalletAccessibilityID.settingsPublicJwkCopy)
+                        }
+                    }.navigationTitle("Technical details")
                 }
-                .accessibilityIdentifier(WalletAccessibilityID.settingsDidCopy)
-            }
-            Section("Wallet key") {
-                Text(viewModel.keyID.isEmpty ? "Not available" : viewModel.keyID)
-                    .font(.footnote)
-                    .textSelection(.enabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.settingsKeyId)
-                Button("Copy key ID") {
-                    UIPasteboard.general.string = viewModel.keyID
-                }
-                .accessibilityIdentifier(WalletAccessibilityID.settingsKeyIdCopy)
-            }
-            Section("Public JWK") {
-                Text(viewModel.publicJWK.isEmpty ? "Not available" : viewModel.publicJWK)
-                    .font(.footnote)
-                    .textSelection(.enabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.settingsPublicJwk)
-                Button("Copy public JWK") {
-                    UIPasteboard.general.string = viewModel.publicJWK
-                }
-                .accessibilityIdentifier(WalletAccessibilityID.settingsPublicJwkCopy)
             }
             if viewModel.identityScreen == nil { signingProtectionSection }
             else {
@@ -89,7 +95,7 @@ struct SettingsView: View {
             .accessibilityIdentifier(WalletAccessibilityID.settingsResetConfirm)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes local wallet keys, credentials and the app PIN. Saved key recovery records remain. Key recovery does not restore credentials.")
+            Text("This removes local wallet keys, credentials and the app PIN. Saved key backups remain. Key recovery does not restore credentials.")
         }
         .confirmationDialog(
             "Change signing protection?",
