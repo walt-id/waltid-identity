@@ -65,6 +65,7 @@ class ProviderCredentialProofVerificationTest {
 
     private suspend fun createProof(key: JWKKey): String = key.signJws(
         plaintext = buildJsonObject {
+            put(JwtPayloadClaims.ISSUER, "client")
             put(JwtPayloadClaims.AUDIENCE, CREDENTIAL_ISSUER)
             put(JwtPayloadClaims.ISSUED_AT, NOW.epochSeconds)
         }.toString().encodeToByteArray(),

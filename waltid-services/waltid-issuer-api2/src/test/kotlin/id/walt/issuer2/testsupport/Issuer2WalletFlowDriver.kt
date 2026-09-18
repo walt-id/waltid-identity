@@ -245,11 +245,13 @@ class Issuer2WalletFlowDriver(
         accessToken: String,
         credentialConfigurationId: String = resolvedOffer.offer.credentialConfigurationIds.single(),
         includeDidInProof: Boolean? = null,
+        clientId: String? = walletClientConfig.clientId,
     ): JsonObject {
         val proofs = buildJwtProofs(
             issuerMetadata = resolvedOffer.issuerMetadata,
             credentialConfigurationId = credentialConfigurationId,
             includeDidInProof = includeDidInProof,
+            clientId = clientId,
         )
         val response = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(accessToken)
@@ -362,6 +364,7 @@ class Issuer2WalletFlowDriver(
         issuerMetadata: CredentialIssuerMetadata,
         credentialConfigurationId: String,
         includeDidInProof: Boolean? = null,
+        clientId: String? = null,
     ): Proofs {
         val nonceResponse = client.post(requireNotNull(issuerMetadata.nonceEndpoint)).body<JsonObject>()
         val proofKey = JWKKey.generate(KeyType.secp256r1)
@@ -380,6 +383,7 @@ class Issuer2WalletFlowDriver(
             audience = issuerMetadata.credentialIssuer,
             nonce = requireNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull),
             binding = holderDid?.let { ProofKeyBinding.KeyId("$it#0") } ?: ProofKeyBinding.Jwk,
+            clientId = clientId,
         )
     }
 

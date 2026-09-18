@@ -618,6 +618,7 @@ class WalletIssuanceSessionServiceTest {
                     val proofPayload = jwtPart(proof, 1)
                     assertEquals("endpoint-nonce", proofPayload["nonce"]?.jsonPrimitive?.content)
                     assertEquals(ISSUER, proofPayload["aud"]?.jsonPrimitive?.content)
+                    assertEquals("wallet-client", proofPayload["iss"]?.jsonPrimitive?.content)
                     assertEquals(
                         Json.parseToJsonElement(key.getPublicKey().exportJWK()).jsonObject,
                         proofHeader["jwk"],
@@ -681,6 +682,7 @@ class WalletIssuanceSessionServiceTest {
                     val proofPayload = jwtPart(proof, 1)
                     assertEquals(null, proofPayload["nonce"])
                     assertEquals(ISSUER, proofPayload["aud"]?.jsonPrimitive?.content)
+                    assertEquals("wallet-client", proofPayload["iss"]?.jsonPrimitive?.content)
                     jsonResponse(
                         """{"transaction_id":"transaction-1","interval":7}""",
                         HttpStatusCode.Accepted,
@@ -693,6 +695,70 @@ class WalletIssuanceSessionServiceTest {
 
         val session = service.start(preAuthorizedRequest())
         assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+        assertEquals(1, credentialCalls)
+    }
+
+    @Test
+    fun anonymousPreAuthorizedProofOmitsIssClaim() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        var credentialCalls = 0
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = true, nonceEndpoint = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false, anonymousPreAuthorized = true))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access-token","token_type":"Bearer"}""")
+                CREDENTIAL_ENDPOINT -> {
+                    credentialCalls += 1
+                    val body = Json.parseToJsonElement(request.bodyText()).jsonObject
+                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proofPayload = jwtPart(proof, 1)
+                    assertEquals(null, proofPayload["iss"])
+                    jsonResponse(
+                        """{"transaction_id":"transaction-1","interval":7}""",
+                        HttpStatusCode.Accepted,
+                    )
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(Wallet("test", staticKey = key), httpClient = client)
+
+        val session = service.start(preAuthorizedRequest())
+        assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+        assertEquals(1, credentialCalls)
+    }
+
+    @Test
+    fun authorizationCodeProofWritesClientIdAsIss() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        var credentialCalls = 0
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = true, nonceEndpoint = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata())
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access-token","token_type":"Bearer"}""")
+                CREDENTIAL_ENDPOINT -> {
+                    credentialCalls += 1
+                    val body = Json.parseToJsonElement(request.bodyText()).jsonObject
+                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proofPayload = jwtPart(proof, 1)
+                    assertEquals("wallet-client", proofPayload["iss"]?.jsonPrimitive?.content)
+                    jsonResponse(
+                        """{"transaction_id":"transaction-1","interval":7}""",
+                        HttpStatusCode.Accepted,
+                    )
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(Wallet("test", staticKey = key), httpClient = client)
+        val session = service.start(authRequest())
+        val authorization = service.beginAuthorization(session.id)
+        assertIs<WalletIssuanceOutcome.Deferred>(
+            service.continueAuthorization(
+                WalletIssuanceAuthorizationCallback(session.id, callback(authorization, "authorization-code")),
+            )
+        )
         assertEquals(1, credentialCalls)
     }
 
@@ -2064,6 +2130,7 @@ class WalletIssuanceSessionServiceTest {
         responseIssuer: Boolean = false,
         advertiseSelectedGrant: Boolean = true,
         dpopAlgorithms: List<String>? = null,
+        anonymousPreAuthorized: Boolean = false,
     ) = """
         {
           "issuer":"$ISSUER",
@@ -2073,6 +2140,7 @@ class WalletIssuanceSessionServiceTest {
           "grant_types_supported":["${if (authorizationCode || !advertiseSelectedGrant) "authorization_code" else "urn:ietf:params:oauth:grant-type:pre-authorized_code"}"]
           ${if (dpop) ",\"dpop_signing_alg_values_supported\":[${(dpopAlgorithms ?: listOf("ES256")).joinToString(",") { "\"$it\"" }}]" else ""}
           ${if (responseIssuer) ",\"authorization_response_iss_parameter_supported\":true" else ""}
+          ${if (anonymousPreAuthorized) ",\"pre-authorized_grant_anonymous_access_supported\":true" else ""}
         }
     """.trimIndent()
 
