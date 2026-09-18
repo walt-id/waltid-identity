@@ -50,7 +50,12 @@ on:
 jobs:
   gradle:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 360
+    timeout-minutes: 90
+    env:
+      # Test klogging.conf defaults to TRACE and fills the 76MB GitHub log cap.
+      KLOGGING_MIN_LOG_LEVEL: INFO
+      KLOGGING_MIN_DIRECT_LOG_LEVEL: INFO
+      JUNIT_TIMEOUT_DEFAULT: 10m
     strategy:
       matrix:
         os: [ ubuntu-22.04 ]
@@ -117,7 +122,7 @@ jobs:
         if: ${{ !inputs.cacheless }}
         run: |
           set -o pipefail
-          ./gradlew clean cleanAllTests build allTests -PskipLiveConformance=true --no-daemon --continue --console=plain --warning-mode=summary | tee "$RUNNER_TEMP/gradle-build.log"
+          ./gradlew build allTests -PskipLiveConformance=true --continue --console=plain --warning-mode=summary | tee "$RUNNER_TEMP/gradle-build.log"
         env:
           CI: "true"
           SKIP_LIVE_CONFORMANCE: "true"
@@ -176,6 +181,9 @@ jobs:
     name: conformance (ubuntu-22.04)
     if: ${{ inputs.run-conformance || inputs.run-issuer-conformance || inputs.run-haip-conformance }}
     runs-on: ubuntu-22.04
+    env:
+      KLOGGING_MIN_LOG_LEVEL: INFO
+      KLOGGING_MIN_DIRECT_LOG_LEVEL: INFO
     steps:
       - name: Set up swap space
         run: |
