@@ -1,6 +1,8 @@
 import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 import org.gradle.api.tasks.testing.AbstractTestTask
+import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import java.time.Duration
 
 plugins {
     id("com.github.ben-manes.versions")
@@ -27,12 +29,17 @@ configurations.configureEach {
 // particular leave no HTML report to inspect on a CI runner, so the message - e.g. the OSStatus behind an iOS
 // keychain failure - was lost entirely.
 tasks.withType<AbstractTestTask>().configureEach {
+    timeout.set(Duration.ofMinutes(25))
     testLogging {
         exceptionFormat = TestExceptionFormat.FULL
         showExceptions = true
         showCauses = true
         showStackTraces = true
     }
+}
+
+tasks.withType<Test>().configureEach {
+    systemProperty("junit.jupiter.execution.timeout.default", "10m")
 }
 
 tasks.withType<ProcessResources> {
