@@ -13,7 +13,7 @@ if [[ -n "${ANDROID_TEST_NOT_CLASS:-}" ]]; then
 fi
 
 "$identity_dir/gradlew" -p "$identity_dir" \
-  :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedDebugAndroidTest \
+  :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedProductionDebugAndroidTest \
   "${instrumentation_args[@]}" \
   -PtransactionDataProfiles.url=https://wallet.demo.walt.id/wallet-api/transaction-data-profiles \
   --info

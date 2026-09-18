@@ -190,5 +190,8 @@ iOSInjectionProject/
 waltid-applications/waltid-wallet-demo-ios/scripts/e2e.env
 waltid-applications/waltid-wallet-demo-android/scripts/e2e.env
 
+# Firebase Android client configs. CI writes these from GitHub secrets.
+**/google-services.json
+
 # OpenID conformance runner local state
 waltid-services/waltid-openid4vp-conformance-runners/mongo/
