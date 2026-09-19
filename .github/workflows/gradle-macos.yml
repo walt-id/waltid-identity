@@ -2,6 +2,11 @@ name: iOS build and test
 
 on:
   workflow_dispatch:
+    inputs:
+      link-benchmark:
+        description: 'Temporary: run only the controlled native link experiment'
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       job_name_prefix:
@@ -38,7 +43,7 @@ env:
 
 jobs:
   ios-simulator-tests:
-    if: ${{ github.event_name == 'workflow_dispatch' || inputs.run-ios-simulator }}
+    if: ${{ !inputs.link-benchmark && (github.event_name == 'workflow_dispatch' || inputs.run-ios-simulator) }}
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
@@ -67,7 +72,7 @@ jobs:
           test-result-artifact-name: ios-simulator-test-results
 
   wallet-core-consumer-tests:
-    if: ${{ github.event_name == 'workflow_dispatch' || inputs.run-native || inputs.run-compose }}
+    if: ${{ !inputs.link-benchmark && (github.event_name == 'workflow_dispatch' || inputs.run-native || inputs.run-compose) }}
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
@@ -131,7 +136,7 @@ jobs:
 
   enterprise-ios-mobile-tests:
     timeout-minutes: 90
-    if: ${{ github.event_name == 'workflow_dispatch' || inputs.run-enterprise }}
+    if: ${{ !inputs.link-benchmark && (github.event_name == 'workflow_dispatch' || inputs.run-enterprise) }}
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
@@ -257,3 +262,47 @@ jobs:
         run: |
           echo "::error::Enterprise iOS tests did not complete successfully with a test report"
           exit 1
+
+  native-link-benchmark:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.link-benchmark }}
+    runs-on: macos-26
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        round: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: waltid-identity
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-read-only: true
+      - name: Restore the same native dependency cache for each experiment
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.konan
+          key: konan-macOS-ARM64-0dab4b5ebdc6c754ac0478cd4a625232d19c4298672adf125dbb680d7dd922d4
+      - name: Select the CI Xcode toolchain
+        run: |
+          test -d "$XCODE_DEVELOPER_DIR"
+          echo "DEVELOPER_DIR=$XCODE_DEVELOPER_DIR" >> "$GITHUB_ENV"
+      - name: Compare release link scheduling
+        timeout-minutes: 110
+        working-directory: waltid-identity
+        run: |
+          python3 .github/scripts/mobile-ci/benchmark-native-links.py \
+            --round ${{ matrix.round }} --output-dir "$RUNNER_TEMP/native-link-benchmark"
+      - name: Preserve experiment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-link-benchmark-${{ matrix.round }}
+          path: ${{ runner.temp }}/native-link-benchmark/
+          retention-days: 7
