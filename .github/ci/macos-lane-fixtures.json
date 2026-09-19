@@ -92,7 +92,7 @@
       "lanes": []
     },
     {
-      "name": "iOS phase diagnostics affect all macOS lanes",
+      "name": "iOS phase runner affects all macOS lanes",
       "files": [".github/scripts/mobile-ci/run-ios-phase.py"],
       "lanes": ["ios-simulator", "native", "compose", "enterprise", "sdk-docs"]
     }

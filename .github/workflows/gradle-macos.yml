@@ -23,10 +23,6 @@ on:
         description: 'Run macOS SDK docs and ABI checks'
         type: boolean
         default: true
-      link-benchmark:
-        description: 'Temporary: run only the controlled native link experiment'
-        type: boolean
-        default: false
   workflow_call:
     inputs:
       job_name_prefix:
@@ -60,7 +56,6 @@ on:
         required: false
         default: false
 
-# Pinned to the gradle-ios revision validated by this workflow.
 env:
   XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
   IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=latest
@@ -68,14 +63,16 @@ env:
 
 jobs:
   ios-simulator-tests:
-    if: ${{ !inputs.link-benchmark && (inputs.run-ios-simulator) }}
+    if: ${{ inputs.run-ios-simulator }}
     runs-on: macos-26
+    timeout-minutes: 50
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6cf69001d859d67687353466f1ad2fb006f574e0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
+          identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
@@ -97,7 +94,7 @@ jobs:
           test-result-artifact-name: ios-simulator-test-results
 
   wallet-core-framework:
-    if: ${{ !inputs.link-benchmark && (inputs.run-native || inputs.run-compose || inputs.run-enterprise || inputs.run-sdk-docs) }}
+    if: ${{ inputs.run-native || inputs.run-compose || inputs.run-enterprise || inputs.run-sdk-docs }}
     runs-on: macos-26
     timeout-minutes: 50
     outputs:
@@ -105,10 +102,11 @@ jobs:
       artifact-name: wallet-core-release-${{ github.run_attempt }}
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6d2710eecbcb88433df7d573f49432e770cd13c9
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6cf69001d859d67687353466f1ad2fb006f574e0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
+          identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Record the resolved source revisions
         id: revisions
         run: |
@@ -137,9 +135,9 @@ jobs:
         timeout-minutes: 40
         working-directory: waltid-identity
         run: |
-          python3 .github/scripts/mobile-ci/run-ios-phase.py \
+          exec python3 .github/scripts/mobile-ci/run-ios-phase.py \
             --output-dir "$RUNNER_TEMP/wallet-core-build" wallet-core-framework \
-            ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true --profile
+            ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true
       - name: Package the framework and its build identity
         working-directory: waltid-identity
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py pack --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
@@ -150,23 +148,23 @@ jobs:
           path: ${{ runner.temp }}/wallet-core-artifact/
           if-no-files-found: error
           retention-days: 1
-      - name: Preserve framework build evidence
-        if: always()
+      - name: Retain failed framework build logs
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
-          name: wallet-core-framework-diagnostics
+          name: wallet-core-framework-failure-logs
           path: |
             ${{ runner.temp }}/wallet-core-build/
-            waltid-identity/build/reports/profile/
           retention-days: 7
 
   wallet-core-consumer-tests:
     needs: wallet-core-framework
-    if: ${{ !inputs.link-benchmark && (inputs.run-native || inputs.run-compose) }}
+    if: ${{ inputs.run-native || inputs.run-compose }}
     runs-on: macos-26
+    timeout-minutes: 70
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6d2710eecbcb88433df7d573f49432e770cd13c9
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6cf69001d859d67687353466f1ad2fb006f574e0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           resolved-refs: ${{ needs.wallet-core-framework.outputs.checkout-refs }}
@@ -186,7 +184,7 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
 
       - name: Run selected WalletCore consumer tests
-        timeout-minutes: 80
+        timeout-minutes: 60
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
@@ -204,15 +202,14 @@ jobs:
           test-report-require-tests: ${{ (inputs.run-native) && 'true' || 'false' }}
           test-result-artifact-name: wallet-core-consumer-test-results
 
-      # Outside the timed composite action so its deadline cannot skip diagnostics.
-      - name: Retain WalletCore build diagnostics
-        if: always()
+      # Outside the timed composite action so logs survive its deadline.
+      - name: Retain failed WalletCore consumer logs
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
-          name: wallet-core-build-diagnostics
+          name: wallet-core-consumer-failure-logs
           path: |
-            ios-ci-diagnostics/**
-            waltid-identity/build/reports/profile/**
+            ios-ci-logs/**
           retention-days: 7
 
       - name: Retain incomplete WalletCore test results
@@ -227,12 +224,12 @@ jobs:
 
   enterprise-ios-mobile-tests:
     needs: wallet-core-framework
-    timeout-minutes: 90
-    if: ${{ !inputs.link-benchmark && (inputs.run-enterprise) }}
+    timeout-minutes: 60
+    if: ${{ inputs.run-enterprise }}
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6d2710eecbcb88433df7d573f49432e770cd13c9
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6cf69001d859d67687353466f1ad2fb006f574e0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           resolved-refs: ${{ needs.wallet-core-framework.outputs.checkout-refs }}
@@ -258,25 +255,15 @@ jobs:
           echo "DEVELOPER_DIR=$XCODE_DEVELOPER_DIR" >> "$GITHUB_ENV"
           xcodebuild -version
 
-      - name: Cache Enterprise Kotlin Native dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.konan
-          # Match the consumer lane's ios-build-setup cache, without its build-property edits.
-          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            konan-${{ runner.os }}-${{ runner.arch }}-
-            konan-${{ runner.os }}-
-
       - name: Execute Enterprise iOS mobile platform tests
         id: enterprise_ios_mobile_tests
         continue-on-error: true
-        timeout-minutes: 75
+        timeout-minutes: 45
         run: |
-          python3 waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py \
-            --output-dir "$GITHUB_WORKSPACE/ios-ci-diagnostics" enterprise \
+          exec python3 waltid-identity/.github/scripts/mobile-ci/run-ios-phase.py \
+            --output-dir "$GITHUB_WORKSPACE/ios-ci-logs" enterprise \
             ./gradlew :waltid-enterprise-integration-tests:enterpriseIosMobileIntegrationTest \
-            --no-configuration-cache --profile \
+            --no-configuration-cache \
             -Penterprise.ios.destination="${IOS_SIMULATOR_DESTINATION}" \
             -Penterprise.ios.walletCoreArtifact="$RUNNER_TEMP/wallet-core-artifact"
         env:
@@ -300,7 +287,7 @@ jobs:
               brew install xcresultparser
             fi
 
-            relative_bundle="${bundle#$SOURCE_ROOT/}"
+            relative_bundle="${bundle#"$SOURCE_ROOT"/}"
             safe_name=$(printf '%s' "$relative_bundle" | tr '/ ' '__' | LC_ALL=C tr -c '[:alnum:]_.-' '_')
             report_file="$XCODE_REPORT_DIR/${xcode_report_count}-${safe_name}.xml"
 
@@ -349,16 +336,13 @@ jobs:
             waltid-identity-enterprise/waltid-enterprise-integration-tests/build/ios-test-results/**
           retention-days: 7
 
-      - name: Retain Enterprise iOS build diagnostics
-        if: always()
+      - name: Retain failed Enterprise iOS logs
+        if: failure() || cancelled() || steps.enterprise_ios_mobile_tests.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
-          name: enterprise-ios-build-diagnostics
+          name: enterprise-ios-failure-logs
           path: |
-            ios-ci-diagnostics/**
-            build/reports/profile/**
-            waltid-identity/build/reports/profile/**
-            waltid-identity-enterprise/waltid-enterprise-integration-tests/build/ios-ci-diagnostics/**
+            ios-ci-logs/**
           retention-days: 7
 
       - name: Require successful Enterprise iOS tests and reports
@@ -369,7 +353,7 @@ jobs:
 
   macos-sdk-docs:
     needs: wallet-core-framework
-    if: ${{ !inputs.link-benchmark && (inputs.run-sdk-docs) }}
+    if: ${{ inputs.run-sdk-docs }}
     uses: ./.github/workflows/mobile-sdk-docs.yml
     secrets: inherit
     with:
@@ -377,47 +361,3 @@ jobs:
       generate-macos-docs: true
       checkout-refs: ${{ needs.wallet-core-framework.outputs.checkout-refs }}
       wallet-core-artifact: ${{ needs.wallet-core-framework.outputs.artifact-name }}
-
-  native-link-benchmark:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.link-benchmark }}
-    runs-on: macos-26
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        round: [0, 1, 2]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          path: waltid-identity
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-      - uses: gradle/actions/setup-gradle@v5
-        with:
-          cache-read-only: true
-      - name: Restore the same native dependency cache for each experiment
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.konan
-          key: konan-macOS-ARM64-0dab4b5ebdc6c754ac0478cd4a625232d19c4298672adf125dbb680d7dd922d4
-      - name: Select the CI Xcode toolchain
-        run: |
-          test -d "$XCODE_DEVELOPER_DIR"
-          echo "DEVELOPER_DIR=$XCODE_DEVELOPER_DIR" >> "$GITHUB_ENV"
-      - name: Compare release link scheduling
-        timeout-minutes: 110
-        working-directory: waltid-identity
-        run: |
-          python3 .github/scripts/mobile-ci/benchmark-native-links.py \
-            --round ${{ matrix.round }} --output-dir "$RUNNER_TEMP/native-link-benchmark"
-      - name: Preserve experiment evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: native-link-benchmark-${{ matrix.round }}
-          path: ${{ runner.temp }}/native-link-benchmark/
-          retention-days: 7
