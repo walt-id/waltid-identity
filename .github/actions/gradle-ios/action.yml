@@ -130,7 +130,9 @@ runs:
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
-        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework
+        exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
+          --output-dir "${{ github.workspace }}/ios-ci-logs" wallet-core-framework \
+          ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework
 
     - name: Resolve iOS simulator destination
       if: ${{ inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true' }}
@@ -169,7 +171,9 @@ runs:
       continue-on-error: true
       shell: bash
       run: |
-        "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh" \
+        exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
+          --output-dir "${{ github.workspace }}/ios-ci-logs" native-provider \
+          "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh" \
           --project-dir "${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp" \
           --destination "${{ steps.resolve-simulator.outputs.destination }}" \
           --derived-data /tmp/xcode-derived \
@@ -186,7 +190,9 @@ runs:
       continue-on-error: true
       shell: bash
       run: |
-        "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh" \
+        exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
+          --output-dir "${{ github.workspace }}/ios-ci-logs" compose-provider \
+          "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh" \
           --project-dir "${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-compose/iosApp" \
           --destination "${{ steps.resolve-simulator.outputs.destination }}" \
           --derived-data /tmp/xcode-derived-compose \
@@ -203,7 +209,9 @@ runs:
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
       shell: bash
       run: |
-        xcodebuild test \
+        exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
+          --output-dir "${{ github.workspace }}/ios-ci-logs" native-demo \
+          xcodebuild test \
           -project iosApp.xcodeproj \
           -scheme iosApp \
           -destination "${{ steps.resolve-simulator.outputs.destination }}" \
@@ -222,7 +230,9 @@ runs:
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-compose/iosApp
       shell: bash
       run: |
-        xcodebuild test \
+        exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
+          --output-dir "${{ github.workspace }}/ios-ci-logs" compose-demo \
+          xcodebuild test \
           -project iosApp.xcodeproj \
           -scheme iosApp \
           -destination "${{ steps.resolve-simulator.outputs.destination }}" \
