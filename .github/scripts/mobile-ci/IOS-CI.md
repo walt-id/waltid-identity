@@ -8,7 +8,8 @@ do not need it. Linux docs and Kotlin simulator tests can start independently.
 ## Shared release framework
 
 One producer assembles the full release `WalletCore.xcframework`, including device
-and simulator arm64 slices. It records the four resolved repository revisions.
+and simulator arm64 slices. Its worker limit avoids concurrent native links on
+the small hosted runner. It records the four resolved repository revisions.
 Downstream consumers check out those exact revisions and restore the same-run
 artifact. The manifest verifies the Identity commit, Xcode version, release
 configuration, platform coverage and file hashes before the framework is used.
