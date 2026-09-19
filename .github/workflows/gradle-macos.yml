@@ -131,13 +131,14 @@ jobs:
           key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties') }}
           restore-keys: |
             konan-${{ runner.os }}-${{ runner.arch }}-
+      # Concurrent device/simulator links cause heavy swapping on the hosted runner.
       - name: Build the full release WalletCore
         timeout-minutes: 40
         working-directory: waltid-identity
         run: |
           exec python3 .github/scripts/mobile-ci/run-ios-phase.py \
             --output-dir "$RUNNER_TEMP/wallet-core-build" wallet-core-framework \
-            ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true
+            ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true --max-workers=1
       - name: Package the framework and its build identity
         working-directory: waltid-identity
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py pack --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
