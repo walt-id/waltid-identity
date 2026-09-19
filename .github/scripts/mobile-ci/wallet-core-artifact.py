@@ -47,13 +47,18 @@ def identity():
             "xcode": command("xcodebuild", "-version"), "configuration": "release"}
 
 
-def verify(artifact_dir):
+def read_manifest(artifact_dir):
     manifest = json.loads((artifact_dir / MANIFEST).read_text())
     if manifest.get("schema") != 1:
         raise ValueError("Unsupported WalletCore artifact manifest")
     for key, expected in identity().items():
         if manifest.get(key) != expected:
             raise ValueError(f"WalletCore {key} mismatch: expected {expected!r}, got {manifest.get(key)!r}")
+    return manifest
+
+
+def verify(artifact_dir):
+    manifest = read_manifest(artifact_dir)
     if inventory(FRAMEWORK) != manifest["files"]:
         raise ValueError("WalletCore contents differ from the producing build")
     print(f"Verified full release WalletCore for {manifest['identity_sha']}", flush=True)
@@ -75,7 +80,7 @@ def main():
         (directory / MANIFEST).write_text(json.dumps(manifest, indent=2) + "\n")
         print(f"Packed full release WalletCore for {manifest['identity_sha']}", flush=True)
     elif args.operation == "restore":
-        manifest = json.loads((directory / MANIFEST).read_text())
+        manifest = read_manifest(directory)
         if digest(archive) != manifest["archive_sha256"]:
             raise ValueError("WalletCore archive checksum mismatch")
         if FRAMEWORK.exists():

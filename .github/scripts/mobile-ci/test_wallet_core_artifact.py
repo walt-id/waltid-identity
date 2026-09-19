@@ -53,6 +53,10 @@ class ArtifactTest(unittest.TestCase):
             with self.subTest(key=key), patch.object(artifact, "identity", return_value={**self.identity, key: value}):
                 with self.assertRaisesRegex(ValueError, "mismatch"):
                     self.run_operation("verify")
+                before = artifact.inventory(self.framework)
+                with self.assertRaisesRegex(ValueError, "mismatch"):
+                    self.run_operation("restore")
+                self.assertEqual(before, artifact.inventory(self.framework))
 
     def test_reject_changed_framework(self):
         self.run_operation("pack")
