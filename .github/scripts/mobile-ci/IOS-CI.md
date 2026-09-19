@@ -1,29 +1,36 @@
-# iOS build diagnostics
+# iOS CI
 
-The consumer and enterprise jobs retain `wallet-core-build-diagnostics` and
-`enterprise-ios-build-diagnostics` artifacts for seven days. Uploads run outside
-the timed build action so its timeout does not skip collection.
+The macOS workflow selects Kotlin simulator tests, native consumers, Compose
+consumers, Enterprise integration tests and SDK docs independently. A docs-only or
+Enterprise-only selection also runs the framework producer; simulator-only runs
+do not need it. Linux docs and Kotlin simulator tests can start independently.
 
-Each wrapped phase produces a command log, JSON start/end/exit metadata and JSONL
-resource samples every 30 seconds. Samples include process CPU/RSS, VM page
-counters, swap and filesystem usage, but not process arguments or environment
-values. The console emits a heartbeat; detailed command output is in the artifact.
-Resource probes are best-effort and bounded. Command failures and cancellation
-remain failures even if the child exits successfully while handling termination.
+## Shared release framework
 
-Enterprise diagnostics additionally separate framework compilation, fixture
-readiness, Xcode build/tests and fixture cleanup. Gradle HTML profiles are retained
-alongside these logs. An incomplete phase record identifies interruption; it is
-not a successful test result. Compare exact source/toolchain revisions and cache
-restore keys before attributing a timing difference to code.
+One producer assembles the full release `WalletCore.xcframework`, including device
+and simulator arm64 slices. It records the four resolved repository revisions.
+Downstream consumers check out those exact revisions and restore the same-run
+artifact. The manifest verifies the Identity commit, Xcode version, release
+configuration, platform coverage and file hashes before the framework is used.
+The archive is retained for one day; rerun the producer if it has expired.
 
-The enterprise execution budget is provisionally 75 minutes, with a 90-minute job
-limit to allow setup and report collection. This supplies headroom while native
-cache and resource behavior are measured; it is not a build speed improvement.
-The selected tests and release framework variants remain unchanged.
+The Enterprise task accepts `-Penterprise.ios.walletCoreArtifact=<directory>` to
+verify an already restored artifact. Without that property, it builds the release
+framework itself. In both paths, its fixture starts only after framework
+preparation succeeds and is stopped after XCTest.
 
-Run the diagnostic-runner regression checks with:
+## Failure handling
+
+Build/test steps and jobs have separate time limits, leaving time to collect
+reports after a step fails. A small phase runner retains command output and
+start/end/exit metadata; it propagates command failures and terminates the command's
+process group on cancellation. Failed or cancelled jobs upload these logs for seven days.
+There is no periodic resource sampling or unconditional Gradle profiling.
+Missing required test reports fail the affected lane and the aggregate CI gate.
+
+Run the local helper checks with:
 
 ```sh
-python3 -m unittest discover -s .github/scripts/mobile-ci -p test_ios_phase.py
+python3 -m unittest discover -s .github/scripts/mobile-ci -p 'test_*.py'
+.github/scripts/ci/test-macos-lane-predicates.sh
 ```

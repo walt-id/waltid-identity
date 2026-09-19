@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import signal
 import subprocess
@@ -63,11 +64,54 @@ class IosPhaseTest(unittest.TestCase):
                 metadata = json.loads((Path(directory) / "test.json").read_text())
                 self.assertEqual(metadata["status"], "cancelled")
                 self.assertEqual(metadata["exit_code"], 143)
-                self.assertTrue((Path(directory) / "test.resources.jsonl").exists())
             finally:
                 if process.poll() is None:
                     process.kill()
                     process.wait()
+
+    def test_cancellation_kills_descendant_after_parent_exits(self):
+        with tempfile.TemporaryDirectory() as directory:
+            child_pid_file = Path(directory) / "child-pid"
+            child = (
+                "import os,signal,time,pathlib; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                f"pathlib.Path({str(child_pid_file)!r}).write_text(str(os.getpid())); time.sleep(60)"
+            )
+            parent = (
+                "import signal,subprocess,sys,time; "
+                "signal.signal(signal.SIGTERM, lambda *_: sys.exit(0)); "
+                f"subprocess.Popen([sys.executable, '-c', {child!r}]); time.sleep(60)"
+            )
+            process = subprocess.Popen(
+                [sys.executable, str(SCRIPT), "--output-dir", directory, "test", sys.executable, "-c", parent],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            )
+            child_pid = None
+            try:
+                deadline = time.monotonic() + 10
+                while not child_pid_file.exists() and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                self.assertTrue(child_pid_file.exists())
+                child_pid = int(child_pid_file.read_text())
+                process.send_signal(signal.SIGTERM)
+                _, stderr = process.communicate(timeout=10)
+                self.assertEqual(process.returncode, 143, stderr)
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline:
+                    status = subprocess.run(["ps", "-p", str(child_pid), "-o", "stat="], capture_output=True, text=True)
+                    if status.returncode != 0 or status.stdout.strip().startswith("Z"):
+                        break
+                    time.sleep(0.05)
+                else:
+                    self.fail("Descendant remained running after phase cancellation")
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait()
+                if child_pid is not None:
+                    try:
+                        os.kill(child_pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
 
     def test_phase_cannot_escape_output_directory(self):
         with tempfile.TemporaryDirectory() as directory:

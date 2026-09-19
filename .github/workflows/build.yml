@@ -17,8 +17,6 @@ permissions:
 
 jobs:
   macos-predicate-tests:
-    needs: [gradle-eligibility, macos-eligibility]
-    if: ${{ needs.gradle-eligibility.outputs.should-run == 'true' || needs.macos-eligibility.outputs.run-ios-simulator == 'true' || needs.macos-eligibility.outputs.run-native == 'true' || needs.macos-eligibility.outputs.run-compose == 'true' || needs.macos-eligibility.outputs.run-enterprise == 'true' || needs.macos-eligibility.outputs.run-sdk-docs == 'true' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

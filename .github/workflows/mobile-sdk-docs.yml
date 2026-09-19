@@ -44,12 +44,14 @@ jobs:
   linux-sdk-docs:
     if: ${{ inputs.generate-linux-docs }}
     runs-on: ubuntu-22.04
+    timeout-minutes: 55
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6d2710eecbcb88433df7d573f49432e770cd13c9
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6cf69001d859d67687353466f1ad2fb006f574e0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
+          identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
           resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Configure gradle
@@ -73,14 +75,16 @@ jobs:
   mobile-sdk-docs:
     if: ${{ github.event_name == 'workflow_dispatch' || inputs.generate-macos-docs }}
     runs-on: macos-26
+    timeout-minutes: 80
     env:
-      XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6d2710eecbcb88433df7d573f49432e770cd13c9
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6cf69001d859d67687353466f1ad2fb006f574e0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
+          identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
           resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Configure gradle
@@ -96,8 +100,6 @@ jobs:
       - name: Verify the shared release framework
         if: ${{ inputs.wallet-core-artifact != '' }}
         working-directory: waltid-identity
-        env:
-          DEVELOPER_DIR: ${{ env.XCODE_DEVELOPER_DIR }}
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
 
       - name: Check mobile SDK API contract
@@ -124,7 +126,7 @@ jobs:
         uses: ./waltid-identity/.github/actions/gradle-mobile-sdk-docs
         with:
           waltid-directory: 'waltid-identity'
-          xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
+          xcode-developer-dir: ${{ env.DEVELOPER_DIR }}
           generate-dokka: true
           check-snippets: ${{ inputs.generate-linux-docs && 'false' || 'true' }}
           skip-wallet-core-assemble: ${{ inputs.wallet-core-artifact != '' && 'true' || 'false' }}
@@ -185,7 +187,7 @@ jobs:
       - name: Checkout waltid-identity
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: waltid-identity
           sparse-checkout: docs/mobile-sdk-api
 
@@ -211,7 +213,7 @@ jobs:
           for tag in $(echo '${{ inputs.tags }}' | jq -r '.[]'); do
             TAGS="$TAGS, waltid/waltid-sdk-docs:$tag"
           done
-          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
 
       - name: Build and push sdk-docs image
         uses: docker/build-push-action@v7
