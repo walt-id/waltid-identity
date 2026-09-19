@@ -29,11 +29,16 @@ on:
         required: false
         type: boolean
         default: true
-      restore-wallet-core-artifact:
-        description: "Download the WalletCore XCFramework produced by the consumer job"
+      wallet-core-artifact:
+        description: "Same-run full release WalletCore artifact from the framework producer"
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: ''
+      checkout-refs:
+        description: "Exact coordinated revisions resolved by the framework producer"
+        required: false
+        type: string
+        default: ''
 
 jobs:
   linux-sdk-docs:
@@ -41,10 +46,11 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6d2710eecbcb88433df7d573f49432e770cd13c9
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
+          resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
@@ -71,35 +77,28 @@ jobs:
       XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6d2710eecbcb88433df7d573f49432e770cd13c9
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
+          resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
 
-      - name: Restore WalletCore XCFramework
-        if: ${{ inputs.restore-wallet-core-artifact }}
+      - name: Restore the shared release framework
+        if: ${{ inputs.wallet-core-artifact != '' }}
         uses: actions/download-artifact@v4
         with:
-          name: wallet-core-release-xcframework
-          # upload-artifact v4 stores the *contents* of WalletCore.xcframework at the
-          # artifact root. Download into that directory so Info.plist and slices land
-          # under WalletCore.xcframework/, not beside it.
-          path: waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework
+          name: ${{ inputs.wallet-core-artifact }}
+          path: ${{ runner.temp }}/wallet-core-artifact
 
-      - name: Detect restored WalletCore XCFramework
-        id: restore-wallet-core
-        run: |
-          xcframework="waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework"
-          if [[ -d "$xcframework" ]]; then
-            echo "skip_assemble=true" >> "$GITHUB_OUTPUT"
-            echo "Reusing WalletCore XCFramework from the consumer job artifact."
-          else
-            echo "skip_assemble=false" >> "$GITHUB_OUTPUT"
-            echo "No WalletCore artifact present; this job will assemble it."
-          fi
+      - name: Verify the shared release framework
+        if: ${{ inputs.wallet-core-artifact != '' }}
+        working-directory: waltid-identity
+        env:
+          DEVELOPER_DIR: ${{ env.XCODE_DEVELOPER_DIR }}
+        run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
 
       - name: Check mobile SDK API contract
         timeout-minutes: 20
@@ -128,7 +127,7 @@ jobs:
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
           generate-dokka: true
           check-snippets: ${{ inputs.generate-linux-docs && 'false' || 'true' }}
-          skip-wallet-core-assemble: ${{ steps.restore-wallet-core.outputs.skip_assemble }}
+          skip-wallet-core-assemble: ${{ inputs.wallet-core-artifact != '' && 'true' || 'false' }}
 
       - name: Collect generated HTML
         if: ${{ inputs.deploy }}

@@ -7,6 +7,8 @@
     ".github/ci/*",
     ".github/scripts/ci/*",
     ".github/scripts/mobile-ci/run-ios-phase.py",
+    ".github/scripts/mobile-ci/wallet-core-artifact.py",
+    ".github/scripts/mobile-ci/test_wallet_core_artifact.py",
     ".github/actions/checkout-repos/*",
     ".github/actions/gradle-ios/*",
     ".github/actions/gradle-setup-action/*",
