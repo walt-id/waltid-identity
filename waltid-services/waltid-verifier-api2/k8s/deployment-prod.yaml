@@ -47,6 +47,25 @@ spec:
             capabilities:
               drop:
                 - ALL
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=50.0 -XX:+ExitOnOutOfMemoryError
+          resources:
+            requests:
+              memory: "1Gi"
+            limits:
+              memory: "2Gi"
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: 3000
+              scheme: HTTP
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 3000
+              scheme: HTTP
           volumeMounts:
             - name: verifier2-web-config
               mountPath: "/waltid-verifier-api2/config/web.conf"
