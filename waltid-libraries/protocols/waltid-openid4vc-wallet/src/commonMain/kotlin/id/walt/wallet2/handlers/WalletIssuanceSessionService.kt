@@ -1143,7 +1143,7 @@ class WalletIssuanceSessionService(
             audience = active.resolved.offer.credentialIssuer,
             nonce = nonce,
             binding = binding,
-            clientId = active.request.clientId.takeUnless { active.tokenRequestAnonymous == true },
+            clientId = active.request.clientId.takeUnless { active.tokenRequestAnonymous },
         )
         return proofs.jwt?.singleOrNull() ?: error("Credential proof builder returned no JWT")
     }
@@ -1786,10 +1786,12 @@ class WalletIssuanceSessionService(
         var attestationChallenge: String? = null,
         /**
          * Whether the token request for this session used anonymous pre-authorized access.
-         * Set during token exchange so credential proofs can omit `iss` without re-running
-         * attestation (which has side effects).
+         * Both token-exchange paths assign this before any proof is built, and token exchange and
+         * proof building run in the same `complete()` call (no persist/restore in between), so the
+         * default only applies before a token has been obtained. Recording it here lets credential
+         * proofs omit `iss` without re-running attestation (which has side effects).
          */
-        var tokenRequestAnonymous: Boolean? = null,
+        var tokenRequestAnonymous: Boolean = false,
     ) {
         val persistable: Boolean get() = request.key == null
     }

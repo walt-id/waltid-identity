@@ -359,7 +359,7 @@ data class SignProofRequest(
     val did: String? = null,
     /**
      * OAuth `client_id` written as the proof `iss` claim for client-bound token requests.
-     * Leave unset for anonymous pre-authorized access (OpenID4VCI 1.0 §8.2.1.1).
+     * Leave unset for anonymous pre-authorized access (OpenID4VCI 1.0 Appendix F.1).
      */
     val clientId: String? = null,
 ) {

@@ -132,18 +132,24 @@ class DefaultCredentialProofVerifierTest {
     }
 
     @Test
-    fun `requires iss to match access token client_id for client-bound grants`() = runTest {
+    fun `iss is optional for client-bound grants but must match the client_id when present`() = runTest {
         val holderKey = JWKKey.generate(KeyType.secp256r1)
 
-        val missingIss = assertFailsWith<CredentialProofValidationException> {
-            verifier.verify(
-                credentialRequest = credentialRequest(createProof(holderKey, issuer = null)),
-                credentialConfiguration = credentialConfiguration(),
-                context = context(),
-            )
-        }
-        assertEquals(CredentialErrorCodes.INVALID_PROOF, missingIss.errorCode)
+        // OpenID4VCI 1.0 Appendix F.1: iss is OPTIONAL, so an omitted iss is accepted.
+        verifier.verify(
+            credentialRequest = credentialRequest(createProof(holderKey, issuer = null)),
+            credentialConfiguration = credentialConfiguration(),
+            context = context(),
+        )
 
+        // A matching iss is accepted.
+        verifier.verify(
+            credentialRequest = credentialRequest(createProof(holderKey, issuer = "client")),
+            credentialConfiguration = credentialConfiguration(),
+            context = context(),
+        )
+
+        // A present but mismatched iss is rejected.
         val mismatchedIss = assertFailsWith<CredentialProofValidationException> {
             verifier.verify(
                 credentialRequest = credentialRequest(createProof(holderKey, issuer = "other-client")),
