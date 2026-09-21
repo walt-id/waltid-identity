@@ -41,13 +41,16 @@ object ConformanceConfig {
     // ================================
 
     /**
-     * Local verifier host for embedded test server.
+     * Local verifier host for the in-process embedded server started by [id.walt.openid4vp.conformance.testplans.ConformanceTestRunner]
+     * (the CI path, exposed via a pre-configured Cloudflare tunnel - see this module's README CI section).
+     *
+     * Unrelated to the port a manually-run `:waltid-services:waltid-verifier-api2:run` binds to for
+     * local interactive testing (see config/web.conf there, and docs/VP-VERIFIER.md); that one is not
+     * read from here.
      */
     const val VERIFIER_LOCAL_HOST = "127.0.0.1"
 
-    /**
-     * Local verifier port for embedded test server.
-     */
+    /** @see VERIFIER_LOCAL_HOST */
     const val VERIFIER_LOCAL_PORT = 7003
 
     /**

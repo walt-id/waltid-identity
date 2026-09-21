@@ -1,103 +1,159 @@
 # VP-Verifier Conformance Test Documentation
 
-## Overview
+Tests OpenID4VP verifier compliance (verifier-api2 / "Verifier2") against the OpenID Foundation
+Conformance Suite. One Gradle test run drives all 14 applicable variants
+(`VerifierVariantMatrix.all()` — SD-JWT VC and mDL, every client-id scheme, request method and
+response mode, plus the two HAIP points) automatically, no browser needed: the suite acts as the
+wallet and verifier-api2 answers over HTTP.
 
-This document covers OpenID4VP Verifier conformance testing against the OpenID Foundation Conformance Suite.
+## Quick Start
 
-## Test Profiles
+1. **Start the conformance suite** 
 
-| Profile | Plan | Format | Client ID | Response Mode | Status |
-|---------|------|--------|-----------|---------------|--------|
-| MdlX509SanDnsRequestUriSignedDirectPost | `oid4vp-1final-verifier-test-plan` | mDL (mso_mdoc) | x509_san_dns | direct_post | ✅ **PASSED** |
-| SdJwtVcX509SanDnsRequestUriSignedDirectPostPlain | `oid4vp-1final-verifier-test-plan` | SD-JWT VC | x509_san_dns | direct_post | ⏳ Not yet tested |
-| SdJwtVcX509SanDnsRequestUriSignedDirectPost | `oid4vp-1final-verifier-haip-test-plan` | SD-JWT VC | x509_san_dns | direct_post.jwt | ❌ **FAILED** |
-| MdlX509HashRequestUriSignedDirectPostHaip | `oid4vp-1final-verifier-test-plan` | mDL (mso_mdoc) | x509_hash | direct_post.jwt | ❌ **FAILED** |
-| SdJwtVcX509HashRequestUriSignedDirectPostHaip | `oid4vp-1final-verifier-haip-test-plan` | SD-JWT VC | x509_hash | direct_post.jwt | ❌ **FAILED** |
+   ```bash
+   cd ~/dev/openid/conformance-suite
+   docker compose -f docker-compose-prebuilt.yml up -d
+   ```
 
-## Current Status
+   The suite's own self-signed nginx cert only covers `CN=localhost` with no SAN, but the suite is
+   accessed as `localhost.emobix.co.uk` (matches `/etc/hosts` and `BASE_URL`). Modern JDKs reject
+   that on hostname verification. This bug is in the upstream repo too, so patch it once per
+   checkout of `~/dev/openid/conformance-suite` (already fixed in this repo's own
+   `nginx/Dockerfile*` for the `docker-compose-walt.yml` fallback):
 
-**Summary: 1 passed, 3 failed out of 4 tests (as of 2026-07-08)**
+   ```diff
+   -		-subj "/CN=localhost" \
+   +		-subj "/CN=localhost.emobix.co.uk" \
+   +		-addext "subjectAltName=DNS:localhost.emobix.co.uk,DNS:localhost" \
+   ```
 
-### ✅ Passing Tests
+   in `nginx/Dockerfile`, then rebuild and recreate just that container:
 
-#### MdlX509SanDnsRequestUriSignedDirectPost
-- **Plan**: `oid4vp-1final-verifier-test-plan`
-- **Variant**: `iso_mdl`, `x509_san_dns`, `request_uri_signed`, `plain_vp`, `direct_post`
-- **Result**: PASSED
-- **Notes**: Non-HAIP baseline test. Proves the mdoc DCQL claims parsing fix works.
+   ```bash
+   docker build -t registry.gitlab.com/openid/conformance-suite/nginx:latest ./nginx
+   docker compose -f docker-compose-prebuilt.yml up -d --force-recreate nginx
+   ```
 
-### ❌ Failing Tests
+2. **Trust that cert for the Gradle JVM** (self-signed, not in any public CA bundle):
 
-All HAIP tests fail with the same root cause: **audience mismatch**.
+   ```bash
+   echo | openssl s_client -connect localhost.emobix.co.uk:8443 -servername localhost.emobix.co.uk 2>/dev/null \
+     | openssl x509 > /tmp/conformance-suite-cert.pem
+   export CONFORMANCE_EXTRA_CA_PEM=/tmp/conformance-suite-cert.pem
+   ```
 
-#### SdJwtVcX509SanDnsRequestUriSignedDirectPost (HAIP)
-- **Plan**: `oid4vp-1final-verifier-haip-test-plan`
-- **Variant**: `sd_jwt_vc`, `response_mode=direct_post.jwt`
-- **Result**: FAILED
-- **Error**: `AUDIENCE_MISMATCH: KB-JWT 'aud' claim mismatch. Expected verifier2, got x509_hash:L8zOHpvIslIfw3enc7DpZtmZhBUh9OY3DPCdEUz9KPc`
+3. **Start verifier-api2** — check the log for the port it actually binds
+   ([config/web.conf](../../waltid-verifier-api2/config/web.conf) currently says `7004`, older docs said `7003`):
 
-#### MdlX509HashRequestUriSignedDirectPostHaip
-- **Plan**: `oid4vp-1final-verifier-test-plan`  
-- **Variant**: `iso_mdl`, `x509_hash`, `request_uri_signed`, `haip`, `direct_post.jwt`
-- **Result**: FAILED (same audience mismatch)
+   ```bash
+   cd ~/dev/walt-id/waltid-unified-build
+   ./gradlew :waltid-services:waltid-verifier-api2:run
+   ```
 
-#### SdJwtVcX509HashRequestUriSignedDirectPostHaip
-- **Plan**: `oid4vp-1final-verifier-haip-test-plan`
-- **Variant**: `sd_jwt_vc`, `x509_hash`, `direct_post.jwt`
-- **Result**: FAILED (same audience mismatch)
+4. **Tunnel it**:
 
-## Root Cause Analysis
+   ```bash
+   ngrok http 7004
+   ```
 
-### Audience Mismatch in HAIP Mode
+5. **Run the whole suite** (~9 minutes for all 14 variants):
 
-In HAIP profile, the conformance suite's wallet uses the **X.509 certificate hash** as the audience:
-```
-aud: x509_hash:L8zOHpvIslIfw3enc7DpZtmZhBUh9OY3DPCdEUz9KPc
-```
+   ```bash
+   cd ~/dev/walt-id/waltid-unified-build
+   export VERIFIER_NGROK_URL="https://<your-ngrok-url>.ngrok-free.app"
+   ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VerifierConformanceTests" --rerun
+   ```
 
-But the verifier-api2 is validating against a static `client_id`:
-```
-expected: verifier2
-```
+   `--rerun` matters: Gradle doesn't see `VERIFIER_NGROK_URL`/`CONFORMANCE_EXTRA_CA_PEM` as task
+   inputs, so a cached `test` task silently no-ops without it.
 
-**HAIP Requirement**: Per HAIP §5, when using `x509_hash` client_id scheme, the audience in KB-JWT/DeviceAuth must be the SHA-256 hash of the verifier's leaf certificate, prefixed with `x509_hash:`.
+6. **Read the results**:
+   - `build/reports/openid-conformance/vp-verifier/summary.md` and `results.json`
+   - Per-module suite logs: `https://localhost.emobix.co.uk:8443/log-detail.html?log=<test_id>`
 
-### Required Fix
+## Test Profiles (last run: 2026-09-21, suite v5.3.1)
 
-The verifier-api2 `AudienceCheckSdJwtVPPolicy` needs to:
-1. Detect when `x509_hash` client_id scheme is in use
-2. Calculate the expected audience from the verifier's certificate chain
-3. Accept `x509_hash:<hash>` format as valid audience
+14 variants × up to 8 test modules each = 106 total: **49 passed, 56 failed, 1 skipped**.
 
-**Location**: `waltid-libraries/credentials/waltid-verification-policies2-vp/src/commonMain/kotlin/id/walt/policies2/vp/policies/AudienceCheckSdJwtVPPolicy.kt`
+Every variant follows the same pattern: all positive (ACCEPT) modules pass, every negative
+(REJECT) module comes back `WARNING` from the suite instead of the expected `PASSED` — see
+[Open Issues](#open-issues) below.
+
+| Variant (format-clientIdScheme-requestMethod-responseMode-profile) | Positive modules | Negative modules |
+|---|---|---|
+| sdjwt-redirecturi-urlquery-directpost-plainvp | 4/4 ✅ | 0/7 ❌ |
+| sdjwt-redirecturi-urlquery-directpostjwt-plainvp | 4/4 ✅ | 0/7 ❌ |
+| sdjwt-x509sandns-requrisigned-directpost-plainvp | 4/4 ✅ | 0/7 ❌ |
+| sdjwt-x509sandns-requrisigned-directpostjwt-plainvp | 4/4 ✅ | 0/7 ❌ |
+| sdjwt-x509hash-requrisigned-directpost-plainvp | 4/4 ✅ | 0/7 ❌ |
+| sdjwt-x509hash-requrisigned-directpostjwt-plainvp | 4/4 ✅ | 0/7 ❌ |
+| sdjwt-x509hash-requrisigned-directpostjwt-haip | 4/4 ✅ | 0/7 ❌ |
+| mdl-redirecturi-urlquery-directpost-plainvp | 3/3 ✅ | 0/1 ❌ |
+| mdl-redirecturi-urlquery-directpostjwt-plainvp | 3/3 ✅ | 0/1 ❌ |
+| mdl-x509sandns-requrisigned-directpost-plainvp | 3/3 ✅ | 0/1 ❌ |
+| mdl-x509sandns-requrisigned-directpostjwt-plainvp | 3/3 ✅ | 0/1 ❌ |
+| mdl-x509hash-requrisigned-directpost-plainvp | 3/3 ✅ | 0/1 ❌ |
+| mdl-x509hash-requrisigned-directpostjwt-plainvp | 3/3 ✅ | 0/1 ❌ |
+| mdl-x509hash-requrisigned-directpostjwt-haip | 3/3 ✅ | 0/1 ❌ |
+
+Positive modules (all pass, every variant): `happy-flow`, `minimal-cnf-jwk`,
+`request-uri-method-post`, `request-uri-fetched-twice`.
+
+Negative modules (all `WARNING`, every SD-JWT variant): `invalid-kb-jwt-signature`,
+`invalid-credential-signature`, `invalid-sd-hash`, `invalid-kb-jwt-nonce`, `invalid-kb-jwt-aud`,
+`kb-jwt-iat-in-past`, `kb-jwt-iat-in-future`. mDL variants only run `invalid-session-transcript`.
+
+Good news: the two HAIP variants (`x509_hash` client-id scheme + encrypted response) now pass
+their `happy-flow` module, meaning the KB-JWT/DeviceAuth audience is accepted correctly under
+`x509_hash`. The `AUDIENCE_MISMATCH` bug this doc used to describe here (as of 2026-07-08) is no
+longer reproducing — worth a deliberate re-check before closing it out, since nothing yet directly
+tests the encrypted-response `aud` path in isolation.
+
+## Open Issues
+
+1. **Negative/REJECT modules return `WARNING`, not `PASSED`, everywhere.** `ExpectedModuleOutcome`
+   ([src/main/kotlin/.../runner/req/ExpectedModuleOutcome.kt](../src/main/kotlin/id/walt/openid4vp/conformance/testplans/runner/req/ExpectedModuleOutcome.kt))
+   expects a `REJECT` module to reach suite result `PASSED` because "the verifier's 4xx is itself
+   the pass criterion." Getting `WARNING` instead on *every single one* of these modules, across
+   every variant, needs isolating: is verifier-api2 actually failing to reject the bad KB-JWT
+   signature / credential signature / SD-hash / nonce / audience / iat / mdoc session transcript
+   presentations, or has the suite's module behavior changed (e.g. it now always parks on
+   `WARNING` for manual review instead of resolving straight to `PASSED`)? Check one log via the
+   suite UI and correlate with the verifier's own session status first.
+2. **Upstream `~/dev/openid/conformance-suite/nginx/Dockerfile` has no SAN on its self-signed
+   cert.** Fixed locally per checkout (see Quick Start step 1); not something walt.id can fix by
+   editing this repo. Worth a merge request upstream, or at minimum re-applying after every
+   `git pull` there.
+3. **`config/web.conf` for verifier-api2 now defaults to port 7004, was 7003.** Docs and env-var
+   guidance (`VERIFIER_NGROK_URL`, `ngrok http <port>`) updated to match; confirm this is the
+   intended stable port before anyone automates around it.
+
+### Fixed this pass (for context, not follow-up)
+
+- `nginx/Dockerfile`, `-static`, `-nodocker` in this repo: added the same SAN fix as the upstream
+  one above, so `docker-compose-walt.yml` works without the manual patch.
+- `VerifierConformanceTests.kt` used `kotlinx.coroutines.test.runTest` instead of `runBlocking` +
+  `withTimeout` (every sibling test class — issuer, VCI wallet, VP wallet — already used the
+  latter). `runTest`'s virtual-time dispatcher does not reliably wait for real async I/O completions
+  arriving off its dispatcher: every second real HTTP call in a run hung for the full 60s timeout
+  even though the server had already answered. Now matches the sibling pattern.
+- `ConformanceInterface.kt` pins the CIO engine explicitly instead of relying on Ktor's classpath-order
+  auto-selection between `ktor-client-cio` and `ktor-client-java` (both are on the classpath). This
+  turned out not to be the cause of the hang above, but is a reasonable pin to keep regardless.
 
 ## Prerequisites
 
-### Services Required
-1. **verifier-api2** running on port 7003
-2. **ngrok** exposing port 7003 to the internet
-3. **Conformance Suite** Docker container running
-
-### Start Commands
-
-```bash
-# Terminal 1: Start verifier-api2
-cd ~/dev/walt-id/waltid-unified-build
-./gradlew :waltid-services:waltid-verifier-api2:run
-
-# Terminal 2: Start ngrok
-ngrok http 7003
-
-# Terminal 3: Run tests
-export VERIFIER_NGROK_URL="https://<your-ngrok-url>.ngrok-free.app"
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VerifierConformanceTests"
-```
+- **verifier-api2** running (see Quick Start for the current port)
+- **ngrok** exposing that port to the internet
+- **Conformance Suite** running locally via Docker (see Quick Start)
 
 ## Environment Variables
 
 | Variable | Description | Example |
-|----------|-------------|---------|
+|----------|--------------|---------|
 | `VERIFIER_NGROK_URL` | ngrok HTTPS URL for verifier-api2 | `https://844a-xxx.ngrok-free.app` |
+| `CONFORMANCE_EXTRA_CA_PEM` | Extra CA/cert to trust in addition to the committed truststore (needed for a devenv- or manually-run suite whose cert isn't the one baked into `conformance-truststore.jks`) | `/tmp/conformance-suite-cert.pem` |
+| `CONFORMANCE_HOST` / `CONFORMANCE_PORT` | Override the suite's host/port | default `localhost.emobix.co.uk:8443` |
 
 ## Test Configuration Details
 
@@ -151,15 +207,13 @@ All tests use the same verifier certificate chain:
 
 This occurs when the conformance suite doesn't receive the authorization request from the verifier. Check:
 1. ngrok is running and URL is correct
-2. verifier-api2 is listening on port 7003
-3. VERIFIER_NGROK_URL environment variable is set
+2. verifier-api2 is listening on the port ngrok is forwarding (check its startup log)
+3. `VERIFIER_NGROK_URL` environment variable is set
 
-### Audience Mismatch in HAIP Tests
+### `PKIX path building failed` / `No name matching localhost.emobix.co.uk found`
 
-This is a **known issue** requiring a code fix. The verifier needs to:
-1. Support `x509_hash` client_id scheme
-2. Calculate expected audience from certificate chain
-3. Accept `x509_hash:<sha256>` format in audience check
+The suite's self-signed cert isn't trusted, or lacks a SAN for `localhost.emobix.co.uk`. See
+Quick Start steps 1–2.
 
 ### Test Logs
 
@@ -167,25 +221,6 @@ View detailed test logs in the conformance suite UI:
 ```
 https://localhost.emobix.co.uk:8443/log-detail.html?log=<test_id>
 ```
-
-## HAIP Requirements Checklist
-
-| Requirement | Status | Notes |
-|-------------|--------|-------|
-| Signed Authorization Request (JAR) | ✅ | Working |
-| x509_san_dns client_id scheme | ✅ | Working in plain_vp mode |
-| x509_hash client_id scheme | ❌ | Audience validation broken |
-| direct_post response mode | ✅ | Working |
-| direct_post.jwt (encrypted) response | ⚠️ | Needs x509_hash fix first |
-| P-256 key curve | ✅ | Configured correctly |
-| SHA-256 hash algorithm | ✅ | Used for certificate hash |
-
-## Next Steps
-
-1. **Fix audience validation** in `AudienceCheckSdJwtVPPolicy` to support `x509_hash` scheme
-2. **Rerun HAIP tests** after the fix
-3. **Add plain SD-JWT test** to confirm baseline SD-JWT functionality
-4. **Update documentation** with final test results
 
 ## CI reports and soft-fail
 
@@ -199,18 +234,6 @@ build/reports/openid-conformance/vp-verifier/results.json
 The OSS Gradle workflow appends these to the GitHub Actions job summary.
 Soft-fail is controlled by the repo Actions variable `CONFORMANCE_ALLOW_FAILURE`
 (see the module [README](../README.md#ci-summaries-and-soft-fail)).
-
-## Code Fixes Made (2026-07-08)
-
-### ClaimsQuery Model
-- Added `namespace` and `claimName` fields for mdoc credential queries
-- Made `path` nullable to support both SD-JWT (path-based) and mdoc (namespace-based) formats
-
-**Files Modified**:
-- `waltid-dcql/src/commonMain/kotlin/id/walt/dcql/models/ClaimsQuery.kt`
-- `waltid-dcql/src/commonMain/kotlin/id/walt/dcql/DcqlMatcher.kt`
-- `waltid-digital-credentials/src/commonMain/kotlin/id/walt/credentials/presentations/formats/DcSdJwtPresentation.kt`
-- `waltid-openid4vp-wallet/src/commonMain/kotlin/id/waltid/openid4vp/wallet/presentation/MdocPresenter.kt`
 
 ## References
 

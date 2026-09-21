@@ -6,6 +6,7 @@ import id.walt.openid4vp.conformance.utils.JsonUtils.fromJson
 import id.walt.openid4vp.conformance.utils.JsonUtils.lenientJson
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
@@ -52,7 +53,7 @@ class ConformanceInterface(
 
     // Use simple HttpClient - relies on javax.net.ssl.trustStore system property
     // set in build.gradle.kts for SSL certificate trust
-    val conformanceHttp = HttpClient {
+    val conformanceHttp = HttpClient(CIO) {
         followRedirects = false
 
         defaultRequest {

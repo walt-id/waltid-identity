@@ -22,9 +22,11 @@ import kotlin.test.assertNotNull
  *
  * Prerequisites:
  * 1. Start verifier-api2: ./gradlew :waltid-services:waltid-verifier-api2:run
- * 2. Start ngrok: ngrok http 7003
+ *    (check its startup log for the port it actually binds - see config/web.conf,
+ *    which has moved before, e.g. 7003 -> 7004)
+ * 2. Start ngrok on that port: ngrok http <port>
  * 3. Set VERIFIER_NGROK_URL environment variable to the ngrok HTTPS URL
- * 4. Start conformance suite (Docker)
+ * 4. Start conformance suite (Docker) - see docs/VP-VERIFIER.md for the current recommended setup
  */
 class VerifierConformanceTestRunner(
     private val verifierNgrokUrl: String,
@@ -108,7 +110,8 @@ class VerifierConformanceTestRunner(
         } catch (e: Exception) {
             throw IllegalStateException(
                 "Cannot reach verifier at $verifierNgrokUrl. " +
-                        "Ensure verifier-api2 is running and ngrok is forwarding to port 7003.\n" +
+                        "Ensure verifier-api2 is running and ngrok is forwarding to the port it bound " +
+                        "(check verifier-api2's startup log; see config/web.conf).\n" +
                         "Error: ${e.message}"
             )
         }

@@ -181,7 +181,7 @@ class Oid4vpVerifierVariantPlan(
         """.trimIndent()
 
         /**
-         * Expected verifier behaviour per conformance-suite module.
+         * Expected verifier behavior per conformance-suite module.
          *
          * Declared explicitly so a module the suite adds later shows up as undeclared in the run
          * output instead of silently defaulting to a pass. Modules the suite does not include for a

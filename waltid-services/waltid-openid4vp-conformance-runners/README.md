@@ -85,7 +85,7 @@ OpenID4VP verifier report:
 GitHub-hosted CI points the wallet suites at `conformance.waltid.cloud` and
 exposes the in-process adapters through Cloudflare tunnels (OpenID4VP adapter
 on port 7006, OpenID4VCI adapter on port 7007), alongside the existing verifier
-tunnel on 7003. Those wallet suites therefore run live. The OpenID4VCI issuer
+tunnel on 7004. Those wallet suites therefore run live. The OpenID4VCI issuer
 matrix still only runs when its dedicated workflow inputs and issuer URL are
 configured.
 
