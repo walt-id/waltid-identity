@@ -30,4 +30,10 @@ interface DemoWallet {
     suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle)
     suspend fun deleteCredential(credentialId: String): Boolean
     suspend fun deleteWallet()
+
+    /**
+     * Web hosts persist authorization-code issuance across a full-page issuer redirect.
+     * Mobile keeps the session in memory, so the default is no pending session.
+     */
+    fun pendingAuthorizationIssuance(): WalletDemoIssuanceSession? = null
 }
