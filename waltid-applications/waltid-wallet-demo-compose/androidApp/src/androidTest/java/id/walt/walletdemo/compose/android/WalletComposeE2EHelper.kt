@@ -333,7 +333,7 @@ internal object WalletComposeE2EHelper {
                 node.isVisibleOn(device) && runCatching { node.resourceName == tag }.getOrDefault(false)
             }
 
-    private fun findResourceAfterScrolling(device: UiDevice, tag: String): UiObject2? {
+    fun findResourceAfterScrolling(device: UiDevice, tag: String): UiObject2? {
         findVisibleResource(device, tag)?.let { return it }
         repeat(6) {
             device.scrollDown()

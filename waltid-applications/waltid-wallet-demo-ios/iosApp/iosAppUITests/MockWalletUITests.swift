@@ -51,6 +51,8 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertEqual(requireTrusted.value as? String, "Selected")
         XCTAssertEqual(allowUntrusted.value as? String, "Not selected")
 
+        // List creates off-screen rows lazily; the strict-policy warning can push Reset below the viewport.
+        ui.assertExists(identifier: "wallet.settingsReaderTrustReset")
         ui.tapButton(
             identifier: "wallet.settingsReaderTrustReset",
             fallbackLabel: "Reset reader trust"
@@ -62,6 +64,7 @@ final class MockWalletUITests: XCTestCase {
         )
         XCTAssertEqual(XCTWaiter.wait(for: [resetReady], timeout: 10), .completed)
         resetConfirmation.tap()
+        for _ in 0..<4 where !allowUntrusted.isHittable { app.swipeDown() }
         let resetApplied = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "value == %@", "Selected"),
             object: allowUntrusted

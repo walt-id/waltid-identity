@@ -8,8 +8,10 @@ import androidx.test.uiautomator.Until
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchExpectingSetupAndUnlock
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.findResourceAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.relaunchAndUnlock
 import org.junit.After
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -53,9 +55,10 @@ class PinPersistenceTest {
             assertTrue(device.wait(Until.hasObject(By.res("wallet.settingsReaderPolicyAllowUntrusted")), 10_000))
             assertTrue(!device.hasObject(By.res("wallet.pinInput")))
             WalletComposeE2EHelper.clickByTag(device, "wallet.settingsBack")
-            assertTrue(device.wait(Until.hasObject(By.res("wallet.settingsConnectionMethod")), 5_000))
+            // Small landscape viewports require scrolling to reveal these destination rows.
+            assertNotNull("Nearby sharing was not restored", findResourceAfterScrolling(device, "wallet.settingsConnectionMethod"))
             WalletComposeE2EHelper.clickByTag(device, "wallet.settingsBack")
-            assertTrue(device.wait(Until.hasObject(By.res("wallet.settingsSigningKey")), 5_000))
+            assertNotNull("Settings root was not restored", findResourceAfterScrolling(device, "wallet.settingsSigningKey"))
         } finally {
             device.setOrientationNatural()
             device.unfreezeRotation()
