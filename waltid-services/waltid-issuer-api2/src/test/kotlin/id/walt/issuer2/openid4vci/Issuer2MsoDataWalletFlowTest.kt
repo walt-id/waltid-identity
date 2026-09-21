@@ -16,16 +16,26 @@ import id.walt.issuer2.testsupport.createWalletFlowCredentialOffer
 import id.walt.issuer2.testsupport.getSession
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.issuer2.testsupport.listSessions
+import id.walt.cose.coseCompliantCbor
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.issuer2.testsupport.mdocValidityInfo
+import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.mso.ValidityInfo
 import id.walt.openid4vci.mdoc.MsoData
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.IssuerStateMode
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -87,6 +97,28 @@ class Issuer2MsoDataWalletFlowTest {
         assertEquals(validFrom.epochSeconds, validity.validFrom.epochSeconds)
         assertEquals(validUntil.epochSeconds, validity.validUntil.epochSeconds)
         assertEquals(expectedUpdate.epochSeconds, validity.expectedUpdate?.epochSeconds)
+    }
+
+    @Test
+    fun issuedMdocAppliesNamespaceDateMapping() = testApplication {
+        val credentialPayload = issueIsoMdlCredential(
+            CredentialOfferRuntimeOverrides(
+                mapping = buildJsonObject {
+                    putJsonObject(ISO_MDL_NAMESPACE) {
+                        put("issue_date", JsonPrimitive("<date>"))
+                        put("expiry_date", JsonPrimitive("<date-in:365d>"))
+                        put("issuing_authority", JsonPrimitive("<issuerId>"))
+                    }
+                }
+            )
+        )
+        val namespace = mdocNamespaceJson(credentialPayload, ISO_MDL_NAMESPACE)
+        val issueDate = assertNotNull(namespace["issue_date"]).jsonPrimitive.content
+        val expiryDate = assertNotNull(namespace["expiry_date"]).jsonPrimitive.content
+        assertEquals(10, issueDate.length, issueDate)
+        assertEquals(10, expiryDate.length, expiryDate)
+        assertTrue(expiryDate > issueDate)
+        assertTrue(assertNotNull(namespace["issuing_authority"]).jsonPrimitive.content.isNotBlank())
     }
 
     @Test
@@ -180,7 +212,12 @@ class Issuer2MsoDataWalletFlowTest {
     private suspend fun ApplicationTestBuilder.issueIsoMdl(
         runtimeOverrides: CredentialOfferRuntimeOverrides? = null,
         configureProfiles: (Issuer2ProfilesConfig) -> Issuer2ProfilesConfig = { it },
-    ): ValidityInfo {
+    ): ValidityInfo = mdocValidityInfo(issueIsoMdlCredential(runtimeOverrides, configureProfiles))
+
+    private suspend fun ApplicationTestBuilder.issueIsoMdlCredential(
+        runtimeOverrides: CredentialOfferRuntimeOverrides? = null,
+        configureProfiles: (Issuer2ProfilesConfig) -> Issuer2ProfilesConfig = { it },
+    ): JsonObject {
         val scenario = Issuer2CredentialScenarios.isoMdl
         installIssuer2WithConfigFiles(configureProfilesConfig = configureProfiles)
         val client = apiClient()
@@ -206,7 +243,21 @@ class Issuer2MsoDataWalletFlowTest {
         )
         assertIsoMdlCredentialPayload(credentialPayload)
         assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
-        return mdocValidityInfo(credentialPayload)
+        return credentialPayload
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun mdocNamespaceJson(credentialPayload: JsonObject, namespace: String): JsonObject {
+        val issuedCredentialBytes = credentialPayload.getValue("credentials")
+            .let { it as JsonArray }
+            .single()
+            .jsonObject
+            .getValue("credential")
+            .jsonPrimitive
+            .content
+            .decodeFromBase64Url()
+        val issuerSigned = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(issuedCredentialBytes)
+        return issuerSigned.namespacesToJson().getValue(namespace).jsonObject
     }
 
     private fun withIsoMdlMsoData(): (Issuer2ProfilesConfig) -> Issuer2ProfilesConfig = { config ->
@@ -217,6 +268,7 @@ class Issuer2MsoDataWalletFlowTest {
     }
 
     private companion object {
+        const val ISO_MDL_NAMESPACE = "org.iso.18013.5.1"
         val PROFILE_MSO_DATA = MsoData(
             validFrom = "<timestamp>",
             validUntil = "<timestamp-in:365d>",
