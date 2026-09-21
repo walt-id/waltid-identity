@@ -2,8 +2,8 @@
 
 This document covers setup, execution, and status of OpenID4VCI Issuer conformance tests.
 
-The local stack is pinned to the same source revision as
-`https://conformance.waltid.cloud`:
+The local stack is pinned to this previously verified hosted-suite build
+(not a claim about the current build at `https://conformance.waltid.cloud`):
 
 ```text
 tag=release-v5.2.3 version=5.2.4 revision=db1080a
@@ -41,8 +41,53 @@ guide. The resulting config includes:
 - `client.jwks` and `client2.jwks` for DPoP
 
 For issuer-initiated variants, the runner creates a fresh issuer2 credential offer
-for each conformance module and delivers it when the suite exposes its credential
-offer endpoint.
+for each new `VCIWaitForCredentialOffer` event and delivers it when the suite
+exposes its credential offer endpoint. Wallet-initiated authorization-code
+variants have no management offer provider.
+
+### OSS management setup versus protocol batching
+
+The management helper uses the **original single-profile contract** at
+`POST /issuer2/credential-offers` for both grants:
+
+```json
+{"profileId":"identityCredentialSdJwt","authMethod":"AUTHORIZED"}
+```
+
+```json
+{
+  "profileId": "isoMdl",
+  "authMethod": "PRE_AUTHORIZED",
+  "txCode": {
+    "input_mode": "numeric",
+    "length": 6,
+    "description": "OpenID4VCI conformance transaction code"
+  },
+  "txCodeValue": "493536"
+}
+```
+
+The original 201 receipt includes `offerId`, `profileId`, `authMethod`,
+epoch-millisecond `expiresAt`, the complete `credentialOffer` string, and applicable
+`txCodeValue`/`issuerStateMode`. The runner leaves value mode, issuer-state mode,
+and expiry at the product defaults; it sends tx-code fields only for pre-authorized
+offers. HTTP failures and receipts missing required legacy fields fail explicitly;
+there is no fallback POST using another contract.
+
+One profile selects one dataset/format. It does **not** limit a Credential Request
+to one copy: the suite can send multiple `proofs.jwt` values to `/credential` using
+the same offer. `identityCredentialSdJwt` maps to `identity_credential`, and `isoMdl`
+maps to `org.iso.18013.5.1.mDL`; the existing HAIP mappings remain separate.
+
+The product's new `credentials[]` management request/flat receipt is covered by
+separate issuer HTTP/integration tests, not this conformance script. Passing these
+suite runs does not verify multi-selection management, stored-session migration,
+or webhook/SSE compatibility. The runner does not change OSS/ES lifecycle policies.
+
+This management adapter is **OSS-specific**: it takes the issuer URL's scheme and
+authority and appends `/issuer2/credential-offers`. An ES protocol URL alone does
+not configure ES management targets or authentication. An ES management adapter
+is separate work, not part of these commands.
 
 The conformance suite does not tell issuer2 that a credential request belongs to
 HAIP. issuer2 selects HAIP behavior through the credential configuration/profile
@@ -68,13 +113,26 @@ mdoc credential configuration IDs.
    getent hosts localhost.emobix.co.uk
    ```
 
-2. **Exact conformance-suite checkout.** Clone it next to `waltid-identity` and
-   detach it at the hosted revision:
+2. **Exact conformance-suite checkout.** Use a new, separate clone next to
+   `waltid-identity`; do not switch/reset an existing user checkout:
 
    ```bash
-   git clone https://gitlab.com/openid/conformance-suite.git conformance-suite
-   git -C conformance-suite switch --detach db1080a4821eac6952beaed369904c862c98dd82
+   # From the conformance unified root; destination must not already exist.
+   git clone --no-checkout https://gitlab.com/openid/conformance-suite.git conformance-suite-db1080a
+   git -C conformance-suite-db1080a switch --detach db1080a4821eac6952beaed369904c862c98dd82
+   export CONFORMANCE_SUITE_SOURCE_DIR="$PWD/conformance-suite-db1080a"
+   git -C "$CONFORMANCE_SUITE_SOURCE_DIR" rev-parse HEAD
+   git -C "$CONFORMANCE_SUITE_SOURCE_DIR" status --short
    ```
+
+   The wrapper defaults to the sibling `conformance-suite` directory and checks
+   both source revision and server build. In the `testreposforpr` workspace that
+   default directory was absent; `openid/conformance-suite` was at `ad1c3a8…`,
+   without the required commit object. Merely pointing at that checkout does not
+   fix the mismatch. Keep it untouched and set the override to the separate pinned
+   clone. A local clone containing the commit may be used as the clone source with
+   `--no-hardlinks --no-checkout`, without changing the source checkout. Do not
+   bypass revision checks or assume the release tag alone is sufficient.
 
 3. **Host commands:** `docker` with Docker Compose, Maven, Git, `openssl`, `keytool` from the JDK, and `curl`.
    The wrapper uses them to start the suite, generate the local TLS certificate, prepare the temporary
@@ -85,7 +143,10 @@ mdoc credential configuration IDs.
    authorization-code login with the issuer2 integration-test account. Pre-authorized-code variants do not
    use the authorization server.
 
-5. **issuer2** running directly on the host at `0.0.0.0:7005`.
+5. **issuer2** running directly on the host at `0.0.0.0:7005`, built from the
+   completed offer-compatibility implementation. Record its commit/artifact and
+   effective configuration; the runner branch's own issuer code is not necessarily
+   that implementation. Coordinate the instance with its owner before live runs.
 
 6. **Playwright** for authorization-code variants. The wrapper installs Chromium by default, but does not
    install operating-system packages because Gradle cannot answer an interactive `sudo` prompt. Provision
@@ -130,7 +191,7 @@ ciTokenKey = """{"type":"jwk","jwk":{"kty":"EC","d":"KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPo
 
 credentialEncryptionKey = """{"type":"jwk","jwk":{"kty":"EC","d":"ZSHgIcRvbwV9s224kHUaFqkEPShCAdwXocGl_w3M42Q","crv":"P-256","kid":"issuer2-credential-encryption-key","x":"GWKpdL3jPoPJ5wKgSA-jxS2jgp-ZUDE6sIQbeB86vF0","y":"F3xAwH96_xVciV7mFQslU_eRQgP-5pSZiNf8bjMoGfo"}}"""
 
-# Batch conformance is temporarily disabled.
+# Capability-disabled baseline: omit this block. For batch verification, enable it.
 # batchCredentialIssuance {
 #   batchSize = 10
 # }
@@ -204,10 +265,11 @@ export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE=/path/to/status-
 
 ### 4. Start Services
 
-Start issuer2 separately on the host. The wrapper starts the conformance-suite
+Start the completed compatibility issuer separately on the host. The wrapper starts the conformance-suite
 and Nginx Docker Compose stack itself; do not run `docker compose up` manually.
 
-In Terminal 1, from the `waltid-identity` repository root, start issuer2:
+In Terminal 1, from the completed issuer build's `waltid-identity` repository root
+(not automatically the runner checkout), start issuer2:
 
 ```bash
 ./gradlew :waltid-services:waltid-issuer-api2:run
@@ -489,7 +551,8 @@ Result states have these meanings:
 - `not_applicable`: the suite created a plan with no modules
 - `blocked`: required local setup is missing, such as an offer, login automation, mTLS material, or a reachable endpoint
 - `failed`: suite modules ran but did not pass
-- `passed`: suite modules ran and passed
+- `passed`: all executed modules were accepted; ordinary runs can include legitimate
+  capability-based `SKIPPED` results, so this alone does not establish batch coverage
 
 ### Useful Controls
 
@@ -523,6 +586,10 @@ export OPENID4VCI_CONFORMANCE_MODULE_GROUPS="metadata,positive"
 export OPENID4VCI_CONFORMANCE_MODULES="oid4vci-1_0-issuer-happy-flow,oid4vci-1_0-issuer-batch-issuance"
 export OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES=""
 
+# Opt-in batch acceptance: each applicable selected variant must execute batch and pass.
+# Use only for batch-enabled verification, not ordinary baseline/discovery runs.
+export OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true
+
 # Static transaction code for pre-authorized happy-flow modules
 export OPENID4VCI_CONFORMANCE_STATIC_TX_CODE="493536"
 
@@ -542,6 +609,17 @@ For `authorization_code` modules, the runner opens conformance-suite
 front-channel authorization URLs with Playwright and completes the existing
 Keycloak login. The browser must follow the redirect back to the conformance
 suite callback because the suite, not issuer2, is the OAuth client/wallet.
+
+Browser failures include the last browser URL and up to 12 recent main-frame
+navigation events (destinations, HTTP statuses, and transport error codes).
+Chrome/Firefox error pages are detected without waiting for the full login timeout.
+URL user information, query parameters, and fragments are removed from these
+diagnostics; page HTML and request bodies are not captured. Subresource failures
+do not fail the login, and HTTP error responses are recorded without overriding
+the suite's expected negative-test behavior. There is no automatic OAuth retry.
+The matrix `summary.md` includes unaccepted module names, test IDs, and their
+errors; `results.json` retains the per-module details. A browser failure can leave
+the suite `WAITING` and the variant `BLOCKED`, even without a failed suite assertion.
 
 The wrapper defaults for authorization-code runs are:
 
@@ -595,34 +673,143 @@ lifecycle failure rather than an issuer rejection failure.
 ## Batch Issuance
 
 Revision `db1080a` adds `oid4vci-1_0-issuer-batch-issuance` to the positive group
-of both issuer plans. It is temporarily excluded by the local wrapper and the
-issuer2 batch metadata setting is commented out. The rest of the positive group
-continues to run normally.
+of the base issuer plan (plain and encrypted) and the HAIP plan (plain only).
+Encrypted HAIP does not offer a batch module at this pin.
+The local wrapper excludes it by default; the capability-disabled
+configuration above is a baseline example, not a statement about every issuer's
+shipped default. Check the actual running issuer's metadata.
 
 The module reads `batch_credential_issuance.batch_size`, caps the request at 20,
 sends one JWT proof per requested credential, and checks that issuer2 returns
 the same credential dataset bound to distinct proof keys. It also checks
 format-specific unlinkability properties, including SD-JWT disclosures/time
-claims and status references. To opt back in, uncomment
-`batchCredentialIssuance.batchSize` and run with
-`OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES=""`. If issuer2 omits the metadata, the
-suite skips the test. The runner accepts finished/skipped modules in the overall
-result, but a skip does not establish batch coverage.
+claims and status references. At this pin, missing batch metadata, no cryptographic
+binding, or fewer than two returned credentials leads to `SKIPPED`. Returning fewer
+credentials than requested (but at least two) raises a warning rather than necessarily
+failing. Record requested and returned counts, not just the aggregate status.
 
-The protocol path already verifies every JWT proof and emits one credential per
-verified proof for SD-JWT VC and mdoc. Enabling the module is intentionally not
-the same as claiming it passes. Code review shows likely first findings for the
-default profiles:
+### Baseline, then explicit batch acceptance
 
-- SD-JWT profile mapping is evaluated once per proof, so dynamic dataset values
-  such as `id = "<uuid>"` can differ inside one batch.
-- `iat`, `nbf`, and `exp` use precise current timestamps; this suite revision
-  requires batch time claims to be rounded or randomized to prevent linkability.
-- If a profile supplies one session-level status-list reference, each issued
-  credential needs a distinct status index/reference.
+First confirm the running issuer's compatibility artifact and use the verified
+`CONFORMANCE_SUITE_SOURCE_DIR` from prerequisites. These commands run from this
+runner directory, preserve the existing TLS/client-attestation/login setup, and
+use different report directories. The wrapper starts infrastructure: do not run it
+against another agent's shared stack without coordination.
 
-Those are issuer2 issuance-policy changes to address when batch testing is
-re-enabled.
+For a capability-disabled baseline, omit `batchCredentialIssuance` from the test
+issuer's effective configuration and verify the metadata omits it. Do not change a
+shared issuer's configuration without its owner's agreement.
+
+```bash
+unset OPENID4VCI_CONFORMANCE_VARIANT_ID OPENID4VCI_CONFORMANCE_VARIANTS SKIP_LIVE_CONFORMANCE
+OPENID4VCI_CONFORMANCE_PRESET=vci-client-attestation-dpop-simple-unsigned \
+OPENID4VCI_CONFORMANCE_MATRIX=all \
+OPENID4VCI_CONFORMANCE_MODULE_GROUPS=metadata,positive,negative \
+OPENID4VCI_CONFORMANCE_MODULES='' \
+OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES=oid4vci-1_0-issuer-batch-issuance \
+OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=false \
+OPENID4VCI_CONFORMANCE_STRICT=true \
+OPENID4VCI_CONFORMANCE_STATIC_TX_CODE=493536 \
+OPENID4VCI_CONFORMANCE_REPORT_DIR="$PWD/build/reports/issuer-baseline" \
+./run-issuer-conformance-local.sh
+```
+
+For batch verification, enable `batchCredentialIssuance { batchSize = 10 }` on the
+test issuer and verify served metadata contains `batch_credential_issuance.batch_size`
+at least 2. Use a proof-bound profile without OSS's preconfigured-status batch
+restriction. This is still a single-profile management offer, not `credentials[]`.
+
+```bash
+unset OPENID4VCI_CONFORMANCE_VARIANT_ID OPENID4VCI_CONFORMANCE_VARIANTS SKIP_LIVE_CONFORMANCE
+OPENID4VCI_CONFORMANCE_PRESET=vci-client-attestation-dpop-simple-unsigned \
+OPENID4VCI_CONFORMANCE_MATRIX=all \
+OPENID4VCI_CONFORMANCE_MODULE_GROUPS=positive \
+OPENID4VCI_CONFORMANCE_MODULES=oid4vci-1_0-issuer-batch-issuance \
+OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES='' \
+OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true \
+OPENID4VCI_CONFORMANCE_STRICT=true \
+OPENID4VCI_CONFORMANCE_STATIC_TX_CODE=493536 \
+OPENID4VCI_CONFORMANCE_REPORT_DIR="$PWD/build/reports/issuer-batch" \
+./run-issuer-conformance-local.sh
+```
+
+This preset selects 12 base variants: SD-JWT VC/mdoc, pre-authorized issuer-initiated,
+authorization-code issuer-initiated, and authorization-code wallet-initiated, each
+with plain/encrypted credential responses. It is not the entire 296-variant matrix.
+For a narrow first run, set
+`OPENID4VCI_CONFORMANCE_VARIANT_ID=vci-sdjwt-preauth-issuer-clientatt-dpop-simple-unsigned-plain`
+alongside the batch command; then clear it for the expanded run. HAIP remains a
+separate preset with the certificate/profile configuration described above.
+
+`OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true` checks raw module results after
+writing the reports. Every selected variant where the pinned suite offers batch must contain an executed batch module
+with a test ID and `FINISHED` / `PASSED`, accepted without a runner error. Missing,
+excluded, unselected, skipped, blocked, or failed modules fail this acceptance
+check even if ordinary aggregation would accept a skip. The only absent-module
+exception is HAIP + authorization code + encrypted responses in suite `db1080a`.
+It is reported as `NOT_OFFERED_BY_PINNED_SUITE`, never as passed batch coverage.
+If a batch result is present even in that combination, it must pass normally.
+At least one executed batch pass is required, and all selected variants must have
+successful results; the exception cannot hide a failed or blocked encrypted HAIP run.
+An encrypted-HAIP-only run therefore cannot satisfy batch acceptance by itself.
+Discovery-only mode is
+not compatible with this flag. Ordinary capability-based skips and the six scoped
+pre-authorized client-attestation suite exclusions remain unchanged.
+
+The console and `summary.md` show batch coverage counts, the summary has a
+per-variant **Batch coverage** column, and `matrix.json` includes `batchCoverage`.
+`results.json` keeps the raw module outcomes. No external `jq` acceptance check is needed.
+The local wrapper disables Gradle configuration caching so each invocation configures
+the test process with the current run's environment.
+
+### Combined basic VCI and HAIP in one invocation
+
+With the issuer URL, dedicated HAIP profile IDs, trust anchors, and browser login
+configured as above, run from the runner directory:
+
+```bash
+unset OPENID4VCI_CONFORMANCE_VARIANT_ID OPENID4VCI_CONFORMANCE_VARIANTS SKIP_LIVE_CONFORMANCE
+OPENID4VCI_CONFORMANCE_PRESET=custom \
+OPENID4VCI_CONFORMANCE_MATRIX=all \
+OPENID4VCI_CONFORMANCE_DISCOVERY_ONLY=false \
+OPENID4VCI_CONFORMANCE_FILTER_FAPI_PROFILES=vci,vci_haip \
+OPENID4VCI_CONFORMANCE_FILTER_FORMATS=sd_jwt_vc,mdoc \
+OPENID4VCI_CONFORMANCE_FILTER_GRANT_TYPES=authorization_code,pre_authorization_code \
+OPENID4VCI_CONFORMANCE_FILTER_FLOW_VARIANTS=wallet_initiated,issuer_initiated \
+OPENID4VCI_CONFORMANCE_FILTER_CLIENT_AUTH_TYPES=client_attestation \
+OPENID4VCI_CONFORMANCE_FILTER_SENDER_CONSTRAINTS=dpop \
+OPENID4VCI_CONFORMANCE_FILTER_AUTH_REQUEST_TYPES=simple \
+OPENID4VCI_CONFORMANCE_FILTER_REQUEST_METHODS=unsigned \
+OPENID4VCI_CONFORMANCE_FILTER_CREDENTIAL_ENCRYPTION=plain,encrypted \
+OPENID4VCI_CONFORMANCE_MODULE_GROUPS=metadata,positive,negative \
+OPENID4VCI_CONFORMANCE_MODULES='' \
+OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES='' \
+OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true \
+OPENID4VCI_CONFORMANCE_STRICT=true \
+OPENID4VCI_CONFORMANCE_STATIC_TX_CODE=493536 \
+OPENID4VCI_CONFORMANCE_REPORT_DIR="$PWD/build/reports/issuer-combined" \
+./run-issuer-conformance-local.sh
+```
+
+This selects 20 variants (12 basic VCI and 8 HAIP), excluding dedicated FAPI modules.
+A successful run reports 16 batch passes and 4 encrypted HAIP variants where batch
+is not offered. The runner derives applicability from the selected variants, not
+hardcoded matrix counts, so narrowed runs work too. Update the applicability rule
+when upgrading the pinned suite if its HAIP encrypted plan gains batch support.
+
+Retain the raw per-module status/result and suite log URLs from `results.json`.
+Also record the runner revision/diff, issuer commit/artifact and profile/configuration
+versions, suite source revision and `/api/server` build, served batch metadata,
+selected variants/modules, and exclusions with reasons. Preserve requested-proof
+and returned-credential counts from the batch module's suite log. Redact tokens,
+private keys, credentials, and authentication secrets before sharing evidence.
+
+Earlier suspicions about generated IDs, precise timestamps, and status references
+are not established defects of the completed compatibility build. Reproduce a
+failure against that build before coordinating a fix with its owning agent. Do not
+alter issuer lifecycle, authorization, status allocation, or notification policies
+in the runner. The suite's use of distinct proof keys does not test or prohibit
+the product's separate duplicate-holder-key support.
 
 For local issuer tests, Docker Nginx exposes
 `https://localhost.emobix.co.uk:9443` and proxies to issuer2 at
