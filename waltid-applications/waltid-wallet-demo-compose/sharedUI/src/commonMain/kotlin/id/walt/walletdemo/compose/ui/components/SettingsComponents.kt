@@ -178,7 +178,7 @@ internal fun SettingsIconButton(
     val scope = rememberCoroutineScope()
     val showTooltip = stringResource(Res.string.settings_show_tooltip)
     TooltipBox(
-        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
         tooltip = { PlainTooltip { Text(label) } },
         state = tooltip,
         // Expose one action: Material's separate wrapper otherwise becomes an empty iOS focus target.
