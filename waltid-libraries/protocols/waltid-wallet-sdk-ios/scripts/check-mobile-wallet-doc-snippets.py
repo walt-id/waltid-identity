@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Checks that mobile wallet docs embed the compiled persistence snippets."""
+"""Checks that mobile wallet docs embed the compiled persistence and proximity snippets."""
 
 from __future__ import annotations
 
@@ -22,6 +22,35 @@ class Snippet:
 
 
 SNIPPETS = (
+    Snippet(
+        "kotlin-proximity-session",
+        REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/MobileWalletProximitySnippets.kt",
+        (
+            REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md",
+        ),
+    ),
+    Snippet(
+        "kotlin-proximity-preparation",
+        REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/MobileWalletProximitySnippets.kt",
+        (
+            REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md",
+        ),
+    ),
+    Snippet(
+        "swift-proximity-session",
+        REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/ProximityDocumentationSnippets.swift",
+        (
+            REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/README.md",
+            REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Sources/WalletSDK/Documentation.docc/ProximityPresentation.md",
+        ),
+    ),
+    Snippet(
+        "swift-proximity-preparation",
+        REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/ProximityDocumentationSnippets.swift",
+        (
+            REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Sources/WalletSDK/Documentation.docc/ProximityPresentation.md",
+        ),
+    ),
     Snippet(
         "kotlin-default-persistence",
         REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/MobileWalletPersistenceSnippetsTest.kt",

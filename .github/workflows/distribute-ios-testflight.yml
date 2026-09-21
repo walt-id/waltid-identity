@@ -1,0 +1,234 @@
+name: Distribute iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: "CFBundleShortVersionString (numeric X.Y.Z)"
+        required: true
+        type: string
+      version_code:
+        description: "CFBundleVersion override. Defaults to GITHUB_RUN_NUMBER."
+        required: false
+        type: string
+        default: ""
+      release_tag:
+        description: "Release tag to include in TestFlight notes"
+        required: false
+        type: string
+        default: ""
+      app:
+        description: "Which iOS app to upload"
+        required: true
+        type: choice
+        options:
+          - both
+          - compose
+          - native
+        default: both
+  workflow_call:
+    inputs:
+      version_name:
+        description: "CFBundleShortVersionString (numeric X.Y.Z)"
+        required: true
+        type: string
+      version_code:
+        description: "CFBundleVersion override. Defaults to the caller GITHUB_RUN_NUMBER."
+        required: false
+        type: string
+        default: ""
+      release_tag:
+        description: "Release tag to include in TestFlight notes"
+        required: false
+        type: string
+        default: ""
+      app:
+        description: "Which iOS app to upload"
+        required: false
+        type: string
+        default: both
+
+env:
+  XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  wallet-core:
+    name: assemble-wallet-core
+    runs-on: macos-26
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s "$XCODE_DEVELOPER_DIR"
+          xcodebuild -version
+
+      - name: Configure gradle
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
+
+      - name: Configure iOS build environment
+        uses: ./waltid-identity/.github/actions/ios-build-setup
+        with:
+          gradle-properties-path: waltid-identity/gradle.properties
+
+      - name: Assemble WalletCore XCFramework
+        working-directory: waltid-identity
+        env:
+          CI: "true"
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+        run: ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework --no-daemon --console=plain --warning-mode=summary
+
+      - name: Upload WalletCore XCFramework
+        uses: actions/upload-artifact@v7
+        with:
+          name: wallet-core-xcframework
+          path: waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework
+          if-no-files-found: error
+
+  testflight:
+    name: testflight-${{ matrix.app }}
+    needs: wallet-core
+    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(inputs.app == 'both' && '["compose","native"]' || format('["{0}"]', inputs.app)) }}
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s "$XCODE_DEVELOPER_DIR"
+          xcodebuild -version
+
+      - name: Download WalletCore XCFramework
+        uses: actions/download-artifact@v8
+        with:
+          name: wallet-core-xcframework
+          path: waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework
+
+      - name: Resolve app settings
+        id: settings
+        env:
+          APP: ${{ matrix.app }}
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          version_name="$(printf '%s' "$VERSION_NAME" | sed 's/^v//;s/^V//' | cut -d- -f1 | cut -d+ -f1)"
+          case "$APP" in
+            compose)
+              echo "project_dir=waltid-identity/waltid-applications/waltid-wallet-demo-compose/iosApp" >> "$GITHUB_OUTPUT"
+              echo "app_bundle_id=id.walt.wallet.compose" >> "$GITHUB_OUTPUT"
+              echo "provider_bundle_id=id.walt.wallet.compose.identitydocumentprovider" >> "$GITHUB_OUTPUT"
+              ;;
+            native)
+              echo "project_dir=waltid-identity/waltid-applications/waltid-wallet-demo-ios/iosApp" >> "$GITHUB_OUTPUT"
+              echo "app_bundle_id=id.walt.wallet.native" >> "$GITHUB_OUTPUT"
+              echo "provider_bundle_id=id.walt.wallet.native.identitydocumentprovider" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::app must be compose or native"
+              exit 1
+              ;;
+          esac
+          echo "version_name=${version_name}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${VERSION_CODE:-$RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve merged pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          number="$(gh api "repos/${REPO}/commits/${SHA}/pulls" --jq '.[0].number // empty' || true)"
+          echo "number=${number}" >> "$GITHUB_OUTPUT"
+
+      - name: Write TestFlight notes
+        env:
+          VARIANT: ${{ matrix.app }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          COMMIT_SHA: ${{ github.sha }}
+          AUTHOR: ${{ github.event.head_commit.author.name || github.actor }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: bash waltid-identity/.github/scripts/mobile-ci/write-mobile-release-notes.sh "$RUNNER_TEMP/testflight-release-notes.txt"
+
+      - name: Write App Store Connect API key
+        id: api-key
+        env:
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${APP_STORE_CONNECT_PRIVATE_KEY}" || -z "${APP_STORE_CONNECT_KEY_ID}" || -z "${APP_STORE_CONNECT_ISSUER_ID}" ]]; then
+            echo "::error::Set APP_STORE_CONNECT_PRIVATE_KEY, APP_STORE_CONNECT_KEY_ID, and APP_STORE_CONNECT_ISSUER_ID."
+            exit 1
+          fi
+          umask 077
+          key_path="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s\n' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$key_path"
+          echo "path=${key_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Import signing materials
+        id: signing
+        env:
+          APP: ${{ matrix.app }}
+          IOS_DISTRIBUTION_CERTIFICATE_P12: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_P12 }}
+          IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          IOS_PROFILE_COMPOSE_APP: ${{ secrets.IOS_PROFILE_COMPOSE_APP }}
+          IOS_PROFILE_COMPOSE_PROVIDER: ${{ secrets.IOS_PROFILE_COMPOSE_PROVIDER }}
+          IOS_PROFILE_NATIVE_APP: ${{ secrets.IOS_PROFILE_NATIVE_APP }}
+          IOS_PROFILE_NATIVE_PROVIDER: ${{ secrets.IOS_PROFILE_NATIVE_PROVIDER }}
+        run: |
+          set -euo pipefail
+          if [[ "$APP" == compose ]]; then
+            export IOS_PROFILE_APP="${IOS_PROFILE_COMPOSE_APP:-}"
+            export IOS_PROFILE_PROVIDER="${IOS_PROFILE_COMPOSE_PROVIDER:-}"
+          else
+            export IOS_PROFILE_APP="${IOS_PROFILE_NATIVE_APP:-}"
+            export IOS_PROFILE_PROVIDER="${IOS_PROFILE_NATIVE_PROVIDER:-}"
+          fi
+          bash waltid-identity/.github/scripts/mobile-ci/import-ios-signing.sh
+
+      - name: Archive and export IPA
+        id: archive
+        env:
+          PROJECT_DIR: ${{ steps.settings.outputs.project_dir }}
+          VERSION_NAME: ${{ steps.settings.outputs.version_name }}
+          VERSION_CODE: ${{ steps.settings.outputs.version_code }}
+          ARCHIVE_PATH: ${{ runner.temp }}/${{ matrix.app }}.xcarchive
+          EXPORT_PATH: ${{ runner.temp }}/${{ matrix.app }}-export
+          APP_BUNDLE_ID: ${{ steps.settings.outputs.app_bundle_id }}
+          PROVIDER_BUNDLE_ID: ${{ steps.settings.outputs.provider_bundle_id }}
+          APP_PROFILE_NAME: ${{ steps.signing.outputs.APP_PROFILE_NAME }}
+          PROVIDER_PROFILE_NAME: ${{ steps.signing.outputs.PROVIDER_PROFILE_NAME }}
+          APP_STORE_CONNECT_KEY_PATH: ${{ steps.api-key.outputs.path }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: bash waltid-identity/.github/scripts/mobile-ci/archive-ios-app.sh
+
+      - name: Upload to TestFlight
+        env:
+          IPA_PATH: ${{ steps.archive.outputs.ipa_path }}
+          RELEASE_NOTES_FILE: ${{ runner.temp }}/testflight-release-notes.txt
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: bash waltid-identity/.github/scripts/mobile-ci/upload-ios-testflight.sh

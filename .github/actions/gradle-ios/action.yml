@@ -31,6 +31,15 @@ inputs:
     required: false
     type: string
     default: 'true'
+  run-wallet-sdk-tests:
+    description: 'Run real WalletCore-to-Swift package projections on iOS Simulator'
+    required: false
+    type: string
+    default: 'false'
+  wallet-core-artifact:
+    description: 'Restored release artifact directory to verify and reuse for WalletSDK bridge tests'
+    required: false
+    default: ''
   run-native-demo-tests:
     description: 'Run native iOS WalletSDK demo tests'
     required: false
@@ -64,7 +73,7 @@ inputs:
     type: string
     default: 'iOS Test Report'
   test-report-require-tests:
-    description: 'Fail test report publishing if matching reports contain no tests'
+    description: 'Require reports containing tests for selected test suites'
     required: false
     type: string
     default: 'true'
@@ -109,7 +118,7 @@ runs:
       run: ./gradlew :waltid-libraries:crypto:waltid-crypto:compileKotlinIosSimulatorArm64
 
     - name: Cleanup simulators before tests
-      if: ${{ inputs.run-ios-simulator-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' }}
+      if: ${{ inputs.run-ios-simulator-tests == 'true' || inputs.run-wallet-sdk-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' }}
       shell: bash
       run: |
         echo "Shutting down running simulators..."
@@ -125,15 +134,23 @@ runs:
       shell: bash
       run: ./gradlew iosSimulatorArm64Test
 
+    - name: Require proximity Kotlin simulator test discovery
+      if: ${{ always() && inputs.run-ios-simulator-tests == 'true' }}
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: python3 .github/scripts/mobile-ci/verify_proximity_suites.py --platform ios-simulator
+
     - name: Assemble Swift wallet SDK core XCFramework
       if: ${{ inputs.run-wallet-core-xcframework == 'true' }}
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
-        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework
+        exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
+          --output-dir "${{ github.workspace }}/ios-ci-logs" wallet-core-framework \
+          ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework
 
     - name: Resolve iOS simulator destination
-      if: ${{ inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true' }}
+      if: ${{ inputs.run-wallet-sdk-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true' }}
       id: resolve-simulator
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
       shell: bash
@@ -169,7 +186,9 @@ runs:
       continue-on-error: true
       shell: bash
       run: |
-        "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh" \
+        exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
+          --output-dir "${{ github.workspace }}/ios-ci-logs" native-provider \
+          "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh" \
           --project-dir "${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp" \
           --destination "${{ steps.resolve-simulator.outputs.destination }}" \
           --derived-data /tmp/xcode-derived \
@@ -186,7 +205,9 @@ runs:
       continue-on-error: true
       shell: bash
       run: |
-        "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh" \
+        exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
+          --output-dir "${{ github.workspace }}/ios-ci-logs" compose-provider \
+          "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh" \
           --project-dir "${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-compose/iosApp" \
           --destination "${{ steps.resolve-simulator.outputs.destination }}" \
           --derived-data /tmp/xcode-derived-compose \
@@ -196,6 +217,29 @@ runs:
           --appex-bundle-id id.walt.wallet.compose.identitydocumentprovider \
           --development-team 9BB78CFW7Y
 
+    - name: Execute WalletSDK package bridge tests
+      if: ${{ inputs.run-wallet-sdk-tests == 'true' }}
+      id: wallet_sdk_tests
+      continue-on-error: true
+      shell: bash
+      run: |
+        exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
+          --output-dir "${{ github.workspace }}/ios-ci-logs" wallet-sdk-bridge \
+          "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-wallet-sdk-tests.sh" \
+          "${{ steps.resolve-simulator.outputs.destination }}" "${{ inputs.wallet-core-artifact }}"
+
+    - name: Upload WalletSDK bridge discovery evidence
+      if: ${{ always() && inputs.run-wallet-sdk-tests == 'true' && steps.wallet_sdk_tests.outcome != 'skipped' }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: wallet-sdk-bridge-${{ inputs.test-result-artifact-name }}
+        path: |
+          ${{ inputs.waltid-directory }}/build/proximity-tests/swift-bridge.*/*.json
+          ${{ inputs.waltid-directory }}/build/proximity-tests/swift-bridge.*/*.xml
+          ${{ inputs.waltid-directory }}/build/proximity-tests/swift-bridge.*/*.log
+        if-no-files-found: error
+        retention-days: 7
+
     - name: Execute iOS demo app integration tests
       if: ${{ inputs.run-native-demo-tests == 'true' }}
       id: ios_demo_app_tests
@@ -203,7 +247,9 @@ runs:
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
       shell: bash
       run: |
-        xcodebuild test \
+        exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
+          --output-dir "${{ github.workspace }}/ios-ci-logs" native-demo \
+          xcodebuild test \
           -project iosApp.xcodeproj \
           -scheme iosApp \
           -destination "${{ steps.resolve-simulator.outputs.destination }}" \
@@ -222,7 +268,9 @@ runs:
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-compose/iosApp
       shell: bash
       run: |
-        xcodebuild test \
+        exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
+          --output-dir "${{ github.workspace }}/ios-ci-logs" compose-demo \
+          xcodebuild test \
           -project iosApp.xcodeproj \
           -scheme iosApp \
           -destination "${{ steps.resolve-simulator.outputs.destination }}" \
@@ -232,7 +280,7 @@ runs:
           -parallel-testing-enabled NO
 
     - name: Collect iOS test reports
-      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true') }}
+      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-wallet-sdk-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true') }}
       id: ios_test_report
       shell: bash
       run: |
@@ -298,12 +346,25 @@ runs:
         } >> "$GITHUB_STEP_SUMMARY"
 
         if (( xcode_report_count == 0 && gradle_report_count == 0 )); then
-          echo "::warning::No iOS test reports found under $WALTID_DIR"
           echo "has_report=false" >> "$GITHUB_OUTPUT"
+          if [[ "${{ inputs.test-report-require-tests }}" == "true" ]]; then
+            echo "::error::Required iOS test reports are missing under $WALTID_DIR"
+            exit 1
+          fi
+          echo "::warning::No iOS test reports found under $WALTID_DIR"
           exit 0
         fi
 
         echo "has_report=true" >> "$GITHUB_OUTPUT"
+
+    - name: Require native demo consent test discovery
+      if: ${{ always() && inputs.run-native-demo-tests == 'true' }}
+      shell: bash
+      run: |
+        python3 "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify_test_results.py" \
+          --manifest "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/proximity-test-suites.json" \
+          --suite native-demo-consent \
+          --reports "${{ inputs.waltid-directory }}/build/ios-test-reports/xcresult/*.xml"
 
     - name: Publish iOS test report
       if: always() && steps.ios_test_report.outputs.has_report == 'true'
@@ -319,14 +380,14 @@ runs:
         require_tests: ${{ inputs.test-report-require-tests }}
 
     - name: Cleanup simulators after tests
-      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true') }}
+      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-wallet-sdk-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true') }}
       shell: bash
       run: |
         echo "Shutting down all simulators..."
         xcrun simctl shutdown all || true
 
     - name: Upload iOS test results
-      if: always() && (failure() || steps.ios_simulator_tests.outcome == 'failure' || steps.ios_demo_app_tests.outcome == 'failure' || steps.compose_ios_demo_app_tests.outcome == 'failure')
+      if: always() && (failure() || steps.wallet_sdk_tests.outcome == 'failure' || steps.ios_simulator_tests.outcome == 'failure' || steps.ios_demo_app_tests.outcome == 'failure' || steps.compose_ios_demo_app_tests.outcome == 'failure')
       uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.test-result-artifact-name }}
@@ -338,10 +399,14 @@ runs:
         retention-days: 7
 
     - name: Fail if iOS tests failed
-      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true') }}
+      if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-wallet-sdk-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true') }}
       shell: bash
       run: |
         failed=()
+
+        if [[ "${{ inputs.run-wallet-sdk-tests }}" == "true" && "${{ steps.wallet_sdk_tests.outcome }}" != "success" ]]; then
+          failed+=("WalletSDK package bridge tests")
+        fi
 
         if [[ "${{ inputs.run-ios-simulator-tests }}" == "true" && "${{ steps.ios_simulator_tests.outcome }}" == "failure" ]]; then
           failed+=("iosSimulatorArm64Test")

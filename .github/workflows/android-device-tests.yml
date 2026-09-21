@@ -66,6 +66,12 @@ jobs:
           file: 'gradle.properties'
           properties: 'enableAndroidBuild=true'
 
+      - name: Write Google services config
+        env:
+          GOOGLE_SERVICES_PREVIEW_JSON: ${{ secrets.GOOGLE_SERVICES_PREVIEW_JSON }}
+          GOOGLE_SERVICES_PRODUCTION_JSON: ${{ secrets.GOOGLE_SERVICES_PRODUCTION_JSON }}
+        run: bash waltid-identity/.github/scripts/mobile-ci/write-google-services.sh
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -158,7 +164,7 @@ jobs:
 
       - name: Run Android device tests
         if: matrix.phase != 'dc-api-compose'
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
           api-level: ${{ steps.android-device-phase.outputs.emulator_api_level }}
           arch: x86_64

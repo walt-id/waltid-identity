@@ -8,6 +8,7 @@ plugins {
     alias(identityLibs.plugins.buildconfig) apply false
     alias(identityLibs.plugins.sqldelight) apply false
     id("waltid.licensereport") apply false
+    alias(identityLibs.plugins.google.services) apply false
 }
 
 // License reporting resolves every runtime classpath and downloads every POM in the parent

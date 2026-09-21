@@ -8,10 +8,12 @@ import id.walt.mdoc.verification.MdocVerifier
 import id.walt.mdoc.verification.verifyDeviceAuthentication
 import id.walt.mdoc.verification.verifyIssuerSignedItemDigests
 import kotlinx.coroutines.test.runTest
+import kotlin.test.assertNotNull
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class VerifyConformanceMdoc {
@@ -42,7 +44,7 @@ class VerifyConformanceMdoc {
         }
 
         val deviceSigned = requireNotNull(document.deviceSigned)
-        val signature = requireNotNull(deviceSigned.deviceAuth.deviceSignature)
+        val signature = assertNotNull(deviceSigned.deviceAuth.deviceSignature)
         val tamperedSignature = signature.copy(
             signature = signature.signature.copyOf().also { it[0] = (it[0].toInt() xor 1).toByte() }
         )

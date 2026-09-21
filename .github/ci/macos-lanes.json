@@ -6,6 +6,8 @@
     ".github/workflows/platform-eligibility.yml",
     ".github/ci/*",
     ".github/scripts/ci/*",
+    ".github/scripts/mobile-ci/run-ios-phase.py",
+    ".github/scripts/mobile-ci/wallet-core-artifact.py",
     ".github/actions/checkout-repos/*",
     ".github/actions/gradle-ios/*",
     ".github/actions/gradle-setup-action/*",
@@ -30,13 +32,20 @@
         "waltid-libraries/*/build.gradle.kts",
         "waltid-libraries/*/*/build.gradle.kts",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
-        "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*"
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
+        "*/src/iosSimulatorArm64Test/*",
+        ".github/scripts/mobile-ci/verify_proximity_suites.py",
+        ".github/scripts/mobile-ci/verify_test_results.py",
+        ".github/scripts/mobile-ci/proximity-test-suites.json"
       ]
     },
     "native": {
       "description": "WalletCore XCFramework, Swift package, and native Xcode demo",
       "patterns": [
         "*/Package.swift",
+        ".github/scripts/mobile-ci/run-ios-wallet-sdk-tests.sh",
+        ".github/scripts/mobile-ci/verify_test_results.py",
+        ".github/scripts/mobile-ci/proximity-test-suites.json",
         "scripts/check-mobile-swift-parity-decision.sh",
         "waltid-applications/waltid-wallet-demo-ios/*",
         "waltid-applications/waltid-wallet-demo-shared-ios/*",

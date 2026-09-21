@@ -33,6 +33,7 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientCon
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.readRawBytes
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -162,7 +163,9 @@ class Issuer2MetadataEndpointTest {
         assertCredentialEncryptionMetadata(credentialIssuerMetadata)
         assertConfiguredCredentialScenariosAreAdvertised(credentialIssuerMetadata)
         assertSdJwtCatalogConfigurations(credentialIssuerMetadata)
+        assertCredentialCardDisplayMetadata(credentialIssuerMetadata)
         assertSelfHostedSdJwtVcTypeMetadata(client, credentialIssuerMetadata)
+        assertCredentialCardArtIsServed(client)
     }
 
     @Test
@@ -230,6 +233,47 @@ class Issuer2MetadataEndpointTest {
         assertNull(jwtVcIssuerMetadata.jwks)
 
         assertEquals(HttpStatusCode.NotFound, client.get(NESTED_JWT_VC_ISSUER_METADATA_PATH).status)
+    }
+
+    private fun assertCredentialCardDisplayMetadata(
+        credentialIssuerMetadata: CredentialIssuerMetadata,
+    ) {
+        val expectedPrefix = "$ISSUER_AUTHORITY_BASE_URL/static/credential-cards/"
+        credentialIssuerMetadata.credentialConfigurationsSupported.forEach { (configurationId, configuration) ->
+            val display = assertNotNull(
+                configuration.credentialMetadata?.display?.firstOrNull(),
+                "Expected display metadata for $configurationId",
+            )
+            assertTrue(display.name.isNotBlank(), "Expected display name for $configurationId")
+            val backgroundUri = assertNotNull(
+                display.backgroundImage?.uri,
+                "Expected background_image for $configurationId",
+            )
+            assertTrue(
+                backgroundUri.startsWith(expectedPrefix) && backgroundUri.endsWith(".png"),
+                "Expected rewritten card art URI for $configurationId, got $backgroundUri",
+            )
+            val logoUri = assertNotNull(display.logo?.uri, "Expected logo for $configurationId")
+            assertEquals("$expectedPrefix$WALTID_MARK_FILE", logoUri)
+        }
+        val sdJwtPidDisplay = credentialIssuerMetadata.credentialConfigurationsSupported
+            .getValue("urn:eudi:pid:1")
+            .credentialMetadata
+            ?.display
+            ?.first()
+        assertEquals(
+            "$expectedPrefix$PID_SD_JWT_CARD_ART_FILE",
+            sdJwtPidDisplay?.backgroundImage?.uri,
+            "SD-JWT PID must use format-correct card art",
+        )
+    }
+
+    private suspend fun assertCredentialCardArtIsServed(client: HttpClient) {
+        listOf(PID_CARD_ART_FILE, PID_SD_JWT_CARD_ART_FILE, WALTID_MARK_FILE).forEach { fileName ->
+            val response = client.get("/static/credential-cards/$fileName")
+            assertEquals(HttpStatusCode.OK, response.status, "Expected $fileName to be served")
+            assertTrue(response.readRawBytes().isNotEmpty(), "Expected $fileName to have content")
+        }
     }
 
     private fun assertConfiguredCredentialScenariosAreAdvertised(
@@ -443,23 +487,23 @@ class Issuer2MetadataEndpointTest {
         const val JWT_VC_ISSUER_METADATA_PATH = "/.well-known/jwt-vc-issuer/openid4vci"
         const val NESTED_JWT_VC_ISSUER_METADATA_PATH = "$OPENID4VCI_PREFIX/.well-known/jwt-vc-issuer"
         const val OPEN_BADGE_CONFIG_ID = "OpenBadgeCredential_jwt_vc_json"
+        const val PID_CARD_ART_FILE = "pid-mdoc.png"
+        const val PID_SD_JWT_CARD_ART_FILE = "pid-sd-jwt.png"
+        const val WALTID_MARK_FILE = "waltid-mark.png"
         const val SD_JWT_INTERNAL_CONFIG_ID = "identity_credential"
         val INTERNAL_SD_JWT_VCT: String get() = "$ISSUER_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
 
         val MDOC_CATALOG_CONFIG_IDS = listOf(
             "org.iso.18013.5.1.mDL" to "org.iso.18013.5.1.mDL",
-            "org.iso.18013.5.1.mDL.aamva" to "org.iso.18013.5.1.mDL",
             "org.iso.23220.photoid.1" to "org.iso.23220.photoid.1",
             "eu.europa.ec.eudi.pid.1" to "eu.europa.ec.eudi.pid.1",
             "eu.europa.ec.av.1" to "eu.europa.ec.av.1",
-            "at.gv.id-austria.2023.iso" to "at.gv.id-austria.2023.iso",
-            "com.google.wallet.idcard.1" to "com.google.wallet.idcard.1",
+            "sca_payment_card_mso_mdoc" to "eu.europa.ec.eudi.sca.payment_card.1",
+            "emvco_dpc_mso_mdoc" to "org.emvco.dpc.1",
         )
 
         val SD_JWT_CATALOG_CONFIG_IDS = listOf(
-            "asit.tax-id-credential",
             "urn:eu.europa.ec.eudi:cor:1",
-            "urn:eu.europa.ec.eudi:por:1",
             "urn:eudi:ehic:1",
             "urn:eudi:pid:1",
             SD_JWT_INTERNAL_CONFIG_ID,

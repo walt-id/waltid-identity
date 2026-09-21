@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,10 +16,12 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,11 +36,15 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionAvailability
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletDemoProximityTransportProfile
+import id.walt.walletdemo.compose.logic.WalletDemoProximityApprovalMode
+import id.walt.walletdemo.compose.ui.components.ProximityApprovalModeChoice
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.displayMessage
 import id.walt.walletdemo.compose.logic.isBusy
@@ -50,12 +57,15 @@ import id.walt.walletdemo.compose.ui.components.title
 internal fun SettingsScreen(
     state: WalletDemoUiState,
     onShowDcApiPresentationPreviewChange: (Boolean) -> Unit,
+    onProximityTransportProfileChange: ((WalletDemoProximityTransportProfile) -> Unit)?,
     onBack: () -> Unit,
     onLock: () -> Unit,
     onResetWallet: () -> Unit,
     onRequestSigningProtectionChange: (WalletDemoSigningProtection) -> Unit,
     onConfirmSigningProtectionChange: () -> Unit,
     onCancelSigningProtectionChange: () -> Unit,
+    sharingSettingsContent: (@Composable () -> Unit)? = null,
+    onProximityApprovalModeChange: ((WalletDemoProximityApprovalMode) -> Unit)? = null,
 ) {
     val ready = state.session as? WalletSessionState.Ready
     val clipboard = LocalClipboardManager.current
@@ -162,6 +172,16 @@ internal fun SettingsScreen(
                         modifier = Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview),
                     )
                 }
+                if (onProximityTransportProfileChange != null) {
+                    HorizontalDivider()
+                    ProximityPresentationSettings(
+                        selected = state.proximityTransportProfile,
+                        onSelect = onProximityTransportProfileChange,
+                        approvalMode = state.proximityApprovalMode,
+                        onSelectApprovalMode = onProximityApprovalModeChange,
+                    )
+                }
+                sharingSettingsContent?.invoke()
             }
             OutlinedButton(
                 onClick = onLock,
@@ -235,6 +255,89 @@ internal fun SettingsScreen(
             },
         )
     }
+}
+
+@Composable
+private fun ProximityPresentationSettings(
+    selected: WalletDemoProximityTransportProfile,
+    onSelect: (WalletDemoProximityTransportProfile) -> Unit,
+    approvalMode: WalletDemoProximityApprovalMode,
+    onSelectApprovalMode: ((WalletDemoProximityApprovalMode) -> Unit)?,
+) {
+    var choosing by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        TextButton(
+            onClick = { choosing = true },
+            modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.SettingsProximityPresentation),
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Nearby sharing", modifier = Modifier.weight(1f))
+                Text(selected.title(), modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+            }
+        }
+        Text(
+            "Updates sharing before connection or approval. Otherwise applies to your next presentation.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    if (choosing) {
+        AlertDialog(
+            onDismissRequest = { choosing = false },
+            title = { Text("Nearby sharing") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    if (onSelectApprovalMode != null) {
+                        ProximityApprovalModeChoice(approvalMode, onSelectApprovalMode)
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                    }
+                    Text("Connection", style = MaterialTheme.typography.titleSmall)
+                    Text("Use Automatic unless your reader requires a specific connection.")
+                    WalletDemoProximityTransportProfile.entries.forEach { profile ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                onSelect(profile)
+                                choosing = false
+                            }.padding(vertical = 8.dp).testTag(profile.testTag()),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = profile == selected, onClick = null)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(profile.title(), style = MaterialTheme.typography.bodyLarge)
+                                Text(profile.description(), style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { choosing = false }) { Text("Done") } },
+        )
+    }
+}
+
+private fun WalletDemoProximityTransportProfile.title(): String = when (this) {
+    WalletDemoProximityTransportProfile.Default -> "Automatic"
+    WalletDemoProximityTransportProfile.Bluetooth -> "Bluetooth transfer"
+    WalletDemoProximityTransportProfile.WifiAware -> "Wi-Fi Aware transfer"
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid -> "NFCv2 + Bluetooth"
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct -> "NFCv2 direct"
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2WifiAware -> "NFCv2 + Wi-Fi Aware"
+}
+
+private fun WalletDemoProximityTransportProfile.description(): String = when (this) {
+    WalletDemoProximityTransportProfile.Default -> "Use available connections supported by the reader."
+    WalletDemoProximityTransportProfile.Bluetooth -> "Start with NFC or QR; transfer over Bluetooth."
+    WalletDemoProximityTransportProfile.WifiAware -> "Start with NFC or QR; requires Wi-Fi Aware on both devices."
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid -> "Provisional profile. Start with NFCv2; transfer over Bluetooth."
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct -> "Provisional profile. Keep the connection on NFCv2."
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2WifiAware -> "Provisional profile. Start with NFCv2; allow Wi-Fi Aware transfer."
+}
+
+private fun WalletDemoProximityTransportProfile.testTag(): String = when (this) {
+    WalletDemoProximityTransportProfile.Default -> WalletUiTestTags.SettingsProximityDefault
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid -> WalletUiTestTags.SettingsProximityNfcV2Hybrid
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct -> WalletUiTestTags.SettingsProximityNfcV2Direct
+    else -> "wallet.settingsProximity$name"
 }
 
 @Composable

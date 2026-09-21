@@ -69,8 +69,8 @@ All of our APIs are hosted at demo.walt.id. Depending on the service you are int
 - **Verifier API** - ([Portal](https://portal2.demo.walt.id) | [Swagger](https://verifier2.demo.walt.id/swagger) | [Docs](https://docs.walt.id/community-stack/verifier2/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-verifier-api2)) - enable apps to verify credentials (W3C VCs, SD-JWT VCs, mdoc/mDL) via OID4VP 1.0.
 - **Wallet API** - ([Web App (coming soon)] | [Swagger](https://wallet-api2.demo.walt.id/swagger) | [Docs](https://docs.walt.id/community-stack/wallet2/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-wallet-api2)) - extend apps with wallet capabilities to collect, store, manage and share credentials.
 - **Wallet SDK** - ([Docs (coming soon)] | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc-wallet)) - a complete wallet library supporting both OpenID4VCI 1.0 and OpenID4VP 1.0.
-  - **Compose Wallet** - ([APK via GH Releases](https://github.com/walt-id/waltid-identity/releases) | [Github](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-wallet-demo-compose))
-  - **iOS Wallet** - (Reach out to [contact@walt.id](mailto:contact@walt.id) for access | [Github](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-wallet-demo-ios))
+  - **Compose Wallet** - ([Android via APK](https://github.com/walt-id/waltid-identity/releases) | [Android via Firebase](https://appdistribution.firebase.dev/i/c44f974707e7c1be) | [iOS Testflight](https://testflight.apple.com/join/QUyV6wT2) | [Github](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-wallet-demo-compose))
+  - **iOS Wallet** - ([iOS Testflight](https://testflight.apple.com/join/Ug3kRbQX) | [Github](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-wallet-demo-ios))
 
 We are still in the process of building new open source portals as well as the new web wallet app to allow you to quickly test out the products!
 
