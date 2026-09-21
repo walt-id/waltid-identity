@@ -484,18 +484,15 @@ class Issuer2MetadataEndpointTest {
 
         val MDOC_CATALOG_CONFIG_IDS = listOf(
             "org.iso.18013.5.1.mDL" to "org.iso.18013.5.1.mDL",
-            "org.iso.18013.5.1.mDL.aamva" to "org.iso.18013.5.1.mDL",
             "org.iso.23220.photoid.1" to "org.iso.23220.photoid.1",
             "eu.europa.ec.eudi.pid.1" to "eu.europa.ec.eudi.pid.1",
             "eu.europa.ec.av.1" to "eu.europa.ec.av.1",
-            "at.gv.id-austria.2023.iso" to "at.gv.id-austria.2023.iso",
-            "com.google.wallet.idcard.1" to "com.google.wallet.idcard.1",
+            "sca_payment_card_mso_mdoc" to "eu.europa.ec.eudi.sca.payment_card.1",
+            "emvco_dpc_mso_mdoc" to "org.emvco.dpc.1",
         )
 
         val SD_JWT_CATALOG_CONFIG_IDS = listOf(
-            "asit.tax-id-credential",
             "urn:eu.europa.ec.eudi:cor:1",
-            "urn:eu.europa.ec.eudi:por:1",
             "urn:eudi:ehic:1",
             "urn:eudi:pid:1",
             SD_JWT_INTERNAL_CONFIG_ID,

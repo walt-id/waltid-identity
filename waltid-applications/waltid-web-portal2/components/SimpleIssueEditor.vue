@@ -48,8 +48,6 @@ interface ProfileCard {
   profileId: string;
   name: string;
   credentialConfigurationId: string;
-  format: string;
-  formatLabel: string;
   description?: string;
   backgroundImageUri?: string;
   backgroundColor: string;
@@ -60,29 +58,6 @@ function firstDisplay(
   configuration?: IssuerCredentialConfiguration,
 ): IssuerCredentialDisplay | undefined {
   return configuration?.credential_metadata?.display?.[0];
-}
-
-function formatLabel(format?: string): string {
-  if (format === "jwt_vc_json") return "W3C VC";
-  if (format === "dc+sd-jwt") return "dc+sd-jwt";
-  if (format === "mso_mdoc") return "mso_mdoc";
-  return format || "credential";
-}
-
-function formatTone(format?: string): string {
-  if (format === "jwt_vc_json") return "blue";
-  if (format === "dc+sd-jwt") return "green";
-  if (format === "mso_mdoc") return "purple";
-  return "slate";
-}
-
-function pillClass(tone: string) {
-  return {
-    "bg-blue-50 text-blue-700 border-blue-200": tone === "blue",
-    "bg-green-50 text-green-700 border-green-200": tone === "green",
-    "bg-purple-50 text-purple-700 border-purple-200": tone === "purple",
-    "bg-slate-50 text-slate-700 border-slate-200": tone === "slate",
-  };
 }
 
 const profileCards = computed<ProfileCard[]>(() =>
@@ -96,8 +71,6 @@ const profileCards = computed<ProfileCard[]>(() =>
       profileId: profile.profileId,
       name: display?.name || profile.name || profile.profileId,
       credentialConfigurationId,
-      format: configuration?.format || "",
-      formatLabel: formatLabel(configuration?.format),
       description: display?.description,
       backgroundImageUri: display?.background_image?.uri,
       backgroundColor: display?.background_color || "#0f172a",
@@ -172,41 +145,29 @@ async function submit() {
           enlarges.
         </p>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <button
             v-for="card in profileCards"
             :key="card.profileId"
             type="button"
-            class="text-left rounded-xl border border-[--color-border] bg-white p-3 transition-colors hover:border-[--color-border-strong]"
+            class="group relative w-full overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5 transition duration-150 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
+            :style="{ backgroundColor: card.backgroundColor }"
+            :aria-label="card.name"
             @click="selectCard(card.profileId)"
           >
-            <div
-              class="relative w-full overflow-hidden rounded-lg"
-              :style="{ backgroundColor: card.backgroundColor }"
-              style="aspect-ratio: 1.586"
+            <span class="block w-full" style="aspect-ratio: 1.586" />
+            <img
+              v-if="card.backgroundImageUri"
+              :src="card.backgroundImageUri"
+              :alt="card.name"
+              class="absolute inset-0 h-full w-full object-cover"
+            />
+            <span
+              v-else
+              class="absolute inset-0 flex items-end p-4 text-white font-semibold"
             >
-              <img
-                v-if="card.backgroundImageUri"
-                :src="card.backgroundImageUri"
-                :alt="card.name"
-                class="absolute inset-0 h-full w-full object-cover"
-              />
-              <div
-                v-else
-                class="absolute inset-0 flex items-end p-3 text-white font-semibold"
-              >
-                {{ card.name }}
-              </div>
-            </div>
-            <div class="mt-3 flex items-start justify-between gap-2">
-              <h3 class="font-semibold text-sm leading-snug">{{ card.name }}</h3>
-              <span
-                class="inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium"
-                :class="pillClass(formatTone(card.format))"
-              >
-                {{ card.formatLabel }}
-              </span>
-            </div>
+              {{ card.name }}
+            </span>
           </button>
         </div>
       </section>
@@ -223,10 +184,10 @@ async function submit() {
         </button>
 
         <div
-          class="relative w-full overflow-hidden rounded-xl border border-[--color-border]"
+          class="relative w-full overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5"
           :style="{ backgroundColor: selectedCard.backgroundColor }"
-          style="aspect-ratio: 1.586"
         >
+          <span class="block w-full" style="aspect-ratio: 1.586" />
           <img
             v-if="selectedCard.backgroundImageUri"
             :src="selectedCard.backgroundImageUri"
@@ -235,22 +196,14 @@ async function submit() {
           />
         </div>
 
-        <div class="mt-3 flex items-center justify-between gap-3">
-          <div>
-            <h2 class="text-lg font-semibold">{{ selectedCard.name }}</h2>
-            <p
-              v-if="selectedCard.description"
-              class="text-sm text-[--color-text-muted] mt-1"
-            >
-              {{ selectedCard.description }}
-            </p>
-          </div>
-          <span
-            class="inline-flex shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium"
-            :class="pillClass(formatTone(selectedCard.format))"
+        <div class="mt-4">
+          <h2 class="text-lg font-semibold">{{ selectedCard.name }}</h2>
+          <p
+            v-if="selectedCard.description"
+            class="text-sm text-[--color-text-muted] mt-1"
           >
-            {{ selectedCard.formatLabel }}
-          </span>
+            {{ selectedCard.description }}
+          </p>
         </div>
       </div>
 

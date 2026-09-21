@@ -86,7 +86,7 @@ const effectiveMode = computed(() =>
 </script>
 
 <template>
-  <main class="max-w-[1100px] mx-auto px-4 sm:px-5 pt-5 sm:pt-8 pb-10 sm:pb-12">
+  <main class="max-w-[1440px] mx-auto px-4 sm:px-6 pt-5 sm:pt-8 pb-10 sm:pb-12">
     <header
       class="flex items-center justify-between gap-3 sm:gap-4 flex-wrap mb-2"
     >
