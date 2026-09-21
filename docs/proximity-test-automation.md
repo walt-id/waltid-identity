@@ -32,8 +32,8 @@ Similar names and declared test counts alone do not establish that a test execut
 
 `verify_proximity_suites.py` checks the named suites assigned to `jvm`, `android-host`,
 `ios-simulator` or `js-node`. The standard Gradle workflows invoke it after their
-tests. The iOS Kotlin and consumer lanes invoke the action from their checked-out
-revision, so editing that action changes the code actually executed by those lanes.
+tests. The iOS Kotlin and consumer lanes pin the `gradle-ios` action; update both workflow
+pins when changing that action. Application sources and test scripts use the selected checkout.
 Path eligibility includes the guard scripts and native simulator test sources.
 
 `run-ios-wallet-sdk-tests.sh` reuses the verified shared release framework in CI and

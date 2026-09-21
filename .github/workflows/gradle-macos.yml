@@ -56,6 +56,7 @@ on:
         required: false
         default: false
 
+# Keep both gradle-ios metadata pins in sync with action changes; scripts use the selected checkout.
 env:
   XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
   IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=latest
@@ -79,7 +80,7 @@ jobs:
 
       - name: Compile iOS targets and run Kotlin iOS simulator tests
         timeout-minutes: 40
-        uses: ./waltid-identity/.github/actions/gradle-ios
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@23c6890329c1e9ddfc9448d047ea31d267933646
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -187,7 +188,7 @@ jobs:
       - name: Run selected WalletCore consumer tests
         # Main budgets 60 minutes for demos/providers; allow 40 more for the isolated bridge fixture and tests.
         timeout-minutes: 100
-        uses: ./waltid-identity/.github/actions/gradle-ios
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@23c6890329c1e9ddfc9448d047ea31d267933646
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
