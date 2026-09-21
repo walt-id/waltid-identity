@@ -6,6 +6,7 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
+import id.walt.verifier2.handlers.sessioncreation.withoutPreRegisteredInBandMetadata
 import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -89,7 +90,9 @@ object Verifier2AuthorizationRequestHandler {
 
             isDcApi && !isSigned -> dcApiWrapper(
                 "openid4vp-v1-unsigned",
-                Json.encodeToJsonElement(verificationSession.authorizationRequest).jsonObject
+                Json.encodeToJsonElement(
+                    verificationSession.authorizationRequest.withoutPreRegisteredInBandMetadata(),
+                ).jsonObject
             )
 
 
@@ -98,7 +101,9 @@ object Verifier2AuthorizationRequestHandler {
                 JWTStringResponse(jwt = verificationSession.signedAuthorizationRequestJwt)
 
             // Unsigned
-            else -> RawAuthorizationRequestResponse(authorizationRequest = verificationSession.authorizationRequest)
+            else -> RawAuthorizationRequestResponse(
+                authorizationRequest = verificationSession.authorizationRequest.withoutPreRegisteredInBandMetadata(),
+            )
         }
     }
 }

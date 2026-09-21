@@ -342,6 +342,91 @@ class MobileWalletDigitalCredentialPresentationTest {
         assertFalse(jwe.contains("vp_token"), "the response members leaked outside the JWE ciphertext")
     }
 
+    @Test
+    fun emptyDcqlClaimsAreRejectedBeforeAPreviewSessionIsCreated() = runTest {
+        val fixture = walletFixture(sdJwtCredential())
+
+        assertFailsWith<IllegalArgumentException> {
+            fixture.wallet.previewDigitalCredentialPresentation(
+                dcApiRequest(
+                    data = dcApiRequestData(
+                        credentialQuery = """{
+                          "id":"pid","format":"jwt_vc_json","meta":{},"claims":[]
+                        }""",
+                    ),
+                    selectedRegistryEntryIds = listOf(fixture.registryEntryId("pid-1")),
+                )
+            )
+        }
+    }
+
+    @Test
+    fun signedDcApiPreviewRejectsRegisteredAlgorithmsTheHolderKeyCannotSatisfy() = runTest {
+        val verifierKey = JWKKey.generate(KeyType.Ed25519)
+        val trust = ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(
+                "verifier2" to ClientMetadata(
+                    jwks = ClientMetadata.Jwks(
+                        listOf(jwkWithKid(verifierKey.getPublicKey().exportJWKObject(), verifierKey.getKeyId())),
+                    ),
+                    vpFormatsSupported = mapOf(
+                        "dc+sd-jwt" to buildJsonObject {
+                            put("sd-jwt_alg_values", buildJsonArray { add(JsonPrimitive("EdDSA")) })
+                            put("kb-jwt_alg_values", buildJsonArray { add(JsonPrimitive("EdDSA")) })
+                        },
+                    ),
+                ),
+            ),
+        )
+        val fixture = walletFixture(sdJwtCredential(), clientIdTrustConfiguration = trust)
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            fixture.wallet.previewDigitalCredentialPresentation(
+                dcApiRequest(
+                    protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
+                    data = signedRequestObject(
+                        key = verifierKey,
+                        unsignedPayload = Json.parseToJsonElement(sdJwtQuery()).jsonObject,
+                    ),
+                    selectedRegistryEntryIds = listOf(fixture.registryEntryId("pid-1")),
+                )
+            )
+        }
+        assertTrue(error.message.orEmpty().contains("presentation formats", ignoreCase = true))
+    }
+
+    @Test
+    fun signedDcApiPreviewAcceptsRegisteredAlgorithmsTheHolderKeyCanSatisfy() = runTest {
+        val verifierKey = JWKKey.generate(KeyType.Ed25519)
+        val trust = ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(
+                "verifier2" to ClientMetadata(
+                    jwks = ClientMetadata.Jwks(
+                        listOf(jwkWithKid(verifierKey.getPublicKey().exportJWKObject(), verifierKey.getKeyId())),
+                    ),
+                    vpFormatsSupported = mapOf(
+                        "dc+sd-jwt" to buildJsonObject {
+                            put("sd-jwt_alg_values", buildJsonArray { add(JsonPrimitive("ES256")) })
+                            put("kb-jwt_alg_values", buildJsonArray { add(JsonPrimitive("ES256")) })
+                        },
+                    ),
+                ),
+            ),
+        )
+        val fixture = walletFixture(sdJwtCredential(), clientIdTrustConfiguration = trust)
+        val preview = fixture.wallet.previewDigitalCredentialPresentation(
+            dcApiRequest(
+                protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
+                data = signedRequestObject(
+                    key = verifierKey,
+                    unsignedPayload = Json.parseToJsonElement(sdJwtQuery()).jsonObject,
+                ),
+                selectedRegistryEntryIds = listOf(fixture.registryEntryId("pid-1")),
+            )
+        )
+        assertEquals("pid-1", preview.credentialOptions.single().credentialId)
+    }
+
     /**
      * `dc_api.jwt` without usable verifier encryption keys must fail rather than degrade to a
      * cleartext response, which the verifier would still accept as an answer to its encrypted request.

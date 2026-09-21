@@ -81,6 +81,40 @@ class PresentationRequestValidatorTest {
     }
 
     @Test
+    fun dcApiTransportReportsFormatErrorsWithoutHttpDestinationBinding() {
+        val request = request(
+            responseMode = OpenID4VPResponseMode.DC_API,
+            responseUri = null,
+            clientMetadata = ClientMetadata(
+                vpFormatsSupported = mapOf(
+                    "dc+sd-jwt" to buildJsonObject {
+                        put("kb-jwt_alg_values", JsonArray(listOf(JsonPrimitive("EdDSA"))))
+                    },
+                ),
+            ),
+        )
+
+        assertEquals(
+            WalletPresentFunctionality2.OID4VPErrorCode.VP_FORMATS_NOT_SUPPORTED,
+            assertIs<PresentationRequestValidationResult.Invalid>(
+                PresentationRequestValidator.validate(
+                    resolvedRequest = ResolvedAuthorizationRequest.Plain(
+                        authorizationRequest = request,
+                        client = id.waltid.openid4vp.wallet.request.AuthenticatedClientFacts(
+                            effectiveClientMetadata = request.clientMetadata,
+                            responseDestinationAuthenticated = true,
+                            boundResponseDestination = "https://verifier.example",
+                        ),
+                    ),
+                    transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                    formatCapabilities = { p256Capabilities },
+                    transport = PresentationValidationTransport.DigitalCredentialsApi,
+                ),
+            ).error.code,
+        )
+    }
+
+    @Test
     fun incompatibleHolderAlgorithmsReturnProtocolError() {
         val result = validate(
             request(

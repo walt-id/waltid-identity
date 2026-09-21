@@ -239,7 +239,8 @@ public object DcApiWallet {
             "DC API Authorization Request response_mode must be dc_api or dc_api.jwt"
         }
         require(!request.nonce.isNullOrBlank()) { "DC API Authorization Request nonce is required" }
-        require(request.dcqlQuery != null) { "DC API Authorization Request must contain dcql_query" }
+        val query = requireNotNull(request.dcqlQuery) { "DC API Authorization Request must contain dcql_query" }
+        query.precheck()
     }
 
     private fun resolveUnsignedRequest(data: JsonObject): AuthorizationRequest {

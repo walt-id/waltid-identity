@@ -12,6 +12,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -275,14 +276,12 @@ class OpenId4VpPresentationServiceTest {
             ),
         )
 
-        val error = assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
+        val error = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
             runBlocking { resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$requestObject") }
         }
 
-        assertEquals(
-            "Unsigned Authorization Request is only allowed for the redirect_uri client identifier prefix",
-            error.message,
-        )
+        assertEquals(ClientIdError.PreRegisteredClientNotFound("verifier2"), error.clientIdError)
+        assertEquals("invalid_client", error.errorCode)
     }
 
     @Test

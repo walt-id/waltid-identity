@@ -169,6 +169,48 @@ class DcApiWalletTest {
     }
 
     @Test
+    fun `empty claims fail structural dcql precheck for unsigned and signed dc api`() = runTest {
+        val malformed = json.parseToJsonElement(
+            """
+            {
+              "response_type": "vp_token",
+              "response_mode": "dc_api",
+              "nonce": "nonce-123",
+              "dcql_query": {
+                "credentials": [{
+                  "id": "pid",
+                  "format": "jwt_vc_json",
+                  "meta": {},
+                  "claims": []
+                }]
+              }
+            }
+            """.trimIndent(),
+        ).jsonObject
+        assertFailsWith<IllegalArgumentException> {
+            DcApiWallet.resolveRequest(
+                protocol = "openid4vp-v1-unsigned",
+                data = malformed,
+                origin = "https://verifier.example",
+            )
+        }
+
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val (data, trust) = signedRequest(
+            key = key,
+            dcqlQuery = malformed["dcql_query"]!!.jsonObject,
+        )
+        assertFailsWith<IllegalArgumentException> {
+            DcApiWallet.resolveRequest(
+                protocol = "openid4vp-v1-signed",
+                data = data,
+                origin = "https://verifier.example",
+                trustConfiguration = trust,
+            )
+        }
+    }
+
+    @Test
     fun `only the two dc api response modes are accepted`() {
         listOf(OpenID4VPResponseMode.DC_API, OpenID4VPResponseMode.DC_API_JWT).forEach { responseMode ->
             DcApiWallet.validateAuthorizationRequest(
@@ -515,6 +557,7 @@ class DcApiWalletTest {
         responseMode: String = "dc_api",
         clientMetadata: ClientMetadata? = null,
         registeredMetadata: ClientMetadata? = null,
+        dcqlQuery: JsonObject? = null,
     ): Pair<JsonObject, ClientIdTrustConfiguration> {
         val payload = buildJsonObject {
             put("client_id", clientId)
@@ -523,7 +566,7 @@ class DcApiWalletTest {
             put("nonce", "nonce-123")
             put("aud", AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE)
             put("expected_origins", buildJsonArray { add(JsonPrimitive(origin)) })
-            put("dcql_query", unsignedRequestData()["dcql_query"]!!)
+            put("dcql_query", dcqlQuery ?: unsignedRequestData()["dcql_query"]!!)
             clientMetadata?.let {
                 put("client_metadata", json.encodeToJsonElement(ClientMetadata.serializer(), it))
             }
