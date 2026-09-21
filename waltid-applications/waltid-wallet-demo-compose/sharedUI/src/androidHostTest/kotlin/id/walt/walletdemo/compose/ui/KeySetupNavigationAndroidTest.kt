@@ -72,6 +72,42 @@ class KeySetupNavigationAndroidTest {
     }
 
     @Test
+    fun pinFreeSettingsKeepAccountActionsAndHideDeviceControls() = runAndroidComposeUiTest<ComponentActivity> {
+        var signedOut = false
+        var reset = false
+        setContent {
+            SettingsScreen(
+                state = WalletDemoUiState(pinLockEnabled = false, identityDetails = WalletDemoIdentityDetailsState.Unsupported),
+                onShowDcApiPresentationPreviewChange = {},
+                onProximityTransportProfileChange = null,
+                onBack = {},
+                onIdentityAction = {},
+                onRefreshIdentityDetails = {},
+                onLock = { error("PIN-free wallets must not expose Lock") },
+                onResetWallet = { reset = true },
+                onRequestSigningProtectionChange = {},
+                onConfirmSigningProtectionChange = {},
+                onCancelSigningProtectionChange = {},
+                onSignOut = { signedOut = true },
+                resetWalletDescription = "Delete the current server wallet and create an empty wallet.",
+            )
+        }
+        for (tag in listOf(WalletUiTestTags.SettingsLock, WalletUiTestTags.SettingsSigningKey,
+            WalletUiTestTags.SettingsCredentialSharing, WalletUiTestTags.SettingsDigitalCredentialsApi)) {
+            onAllNodesWithTag(tag).assertCountEquals(0)
+        }
+        onNodeWithTag(WalletUiTestTags.SettingsTechnicalDetails).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsSignOut).performScrollTo().performClick()
+        kotlin.test.assertTrue(signedOut)
+        onNodeWithTag(WalletUiTestTags.SettingsReset).performScrollTo().performClick()
+        kotlin.test.assertFalse(reset)
+        onNodeWithText("Delete the current server wallet and create an empty wallet.").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsResetConfirm).performClick()
+        kotlin.test.assertTrue(reset)
+    }
+
+    @Test
     fun settingsRestoresNestedDestinationAndShowsLivePreferenceAndOperationErrors() = runAndroidComposeUiTest<ComponentActivity> {
         val state = mutableStateOf(WalletDemoUiState(identityDetails = WalletDemoIdentityDetailsState.Available(
             WalletDemoIdentityDetails("Native", "Generated", "None", "No backup", emptyList()))))

@@ -56,6 +56,7 @@ internal fun SettingsScreen(
     readerTrustSettingsContent: (@Composable () -> Unit)? = null,
     readerTrustPolicySummary: String? = null,
     onProximityApprovalModeChange: ((WalletDemoProximityApprovalMode) -> Unit)? = null,
+    resetWalletDescription: String? = null,
 ) {
     val currentState by rememberUpdatedState(state)
     val currentReaderPolicy by rememberUpdatedState(readerTrustPolicySummary)
@@ -243,7 +244,7 @@ internal fun SettingsScreen(
             dismissButton = { TextButton(onCancelSigningProtectionChange) { Text(stringResource(Res.string.settings_cancel)) } })
     }
     if (confirmReset) AlertDialog(onDismissRequest = { confirmReset = false },
-        title = { Text(stringResource(Res.string.settings_reset_question)) }, text = { Text(stringResource(Res.string.settings_reset_description)) },
+        title = { Text(stringResource(Res.string.settings_reset_question)) }, text = { Text(resetWalletDescription ?: stringResource(Res.string.settings_reset_description)) },
         confirmButton = { TextButton({ confirmReset = false; onResetWallet() }, Modifier.testTag(WalletUiTestTags.SettingsResetConfirm)) { Text(stringResource(Res.string.settings_reset)) } },
         dismissButton = { TextButton({ confirmReset = false }) { Text(stringResource(Res.string.settings_cancel)) } })
 }

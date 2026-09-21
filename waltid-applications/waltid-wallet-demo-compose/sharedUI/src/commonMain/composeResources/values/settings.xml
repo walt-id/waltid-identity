@@ -120,4 +120,5 @@
     <string name="settings_dc_requirements_ios">Requires iOS 26 or later and a compatible app or browser. This setting controls wallet review only.</string>
     <string name="settings_dc_requirements_web">System credential sharing is not available in this web demo.</string>
     <string name="settings_show_tooltip">Show tooltip</string>
+    <string name="settings_sign_out">Sign out</string>
 </resources>

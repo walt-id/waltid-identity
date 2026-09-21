@@ -51,7 +51,7 @@ setup only when the SDK reports another complete route that can start. Returning
 availability; declined permissions are not requested again automatically. QR visibility alone controls
 temporary screen brightness, and the QR is hidden once connecting begins.
 
-**Settings → Credential Sharing → Nearby sharing** stores the connection profile. Changing it
+**Settings → Nearby sharing → Connection method** stores the connection profile. Changing it
 before connection or approval replaces the open engagement and rechecks availability. The previous
 QR and choices remain hidden until the new profile is ready. Connected exchanges and approved shares
 keep their configuration. New presentations use the latest preference.
@@ -105,7 +105,7 @@ This demo proves the wallet-side SDK integration. Wi-Fi Aware physical discovery
 interoperability, external reader interoperability, prolonged
 reliability, and release qualification are tracked separately and must not be inferred from the demo.
 
-The mobile settings screen exposes **Credential Sharing → Reader Authentication** on Compose Android
+The mobile settings screen exposes **Settings → Nearby sharing → Reader authentication** on Compose Android
 and Compose iOS. It supports a permissive or trusted-reader-only policy, lists and removes configured
 Reader CAs/RICAL providers, and imports DER, certificate-only PEM, or versioned walt.id JSON trust
 bundles through the platform document picker. Every import is validated and previewed before an atomic
@@ -136,6 +136,8 @@ On iOS, choose Without a backup under Create a new key to use Secure Enclave. Re
 
 Settings → Signing key shows the storage policy, observed key protection, key origin, signing approval, and key backup status. The Technical details page shows the wallet DID, key ID, and public key (JWK), with copy controls. Nearby sharing groups sharing approval, connection methods, and reader authentication. Reader-trust imports are reviewed before saving; resets and removals require confirmation. The Digital Credentials API page controls the additional wallet review, while Lock wallet and Reset wallet remain on the Settings root. To replace a key or its signing policy, use Reset wallet and repeat setup; this removes local credentials, which must be issued again.
 
+
+The web demo uses account sign-in instead of a local PIN. Its Settings root retains Technical details, Sign out, and Reset wallet; device-only signing and sharing controls are hidden.
 
 ## Local wallet data
 

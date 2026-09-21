@@ -30,6 +30,7 @@ internal fun WalletScreen(
     onOpenSettings: () -> Unit = {},
     onResetWallet: () -> Unit = { controller.resetWallet() },
     onSignOut: (() -> Unit)? = null,
+    resetWalletDescription: String? = null,
 ) {
     val setup = state.session as? WalletSessionState.IdentitySetup
     if (setup != null) {
@@ -64,11 +65,12 @@ internal fun WalletScreen(
             onLock = controller::lock,
             onResetWallet = onResetWallet,
             onSignOut = onSignOut,
+            resetWalletDescription = resetWalletDescription,
             onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
             onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
             onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,
             readerTrustSettingsContent = readerTrustSettingsContent,
-                        readerTrustPolicySummary = readerTrustPolicySummary,
+            readerTrustPolicySummary = readerTrustPolicySummary,
             onProximityApprovalModeChange = onStartProximityPresentation?.let { controller::setProximityApprovalMode },
         )
         return

@@ -167,5 +167,4 @@
     <string name="reader_trust_effect_allow">Untrusted readers may still reach holder consent</string>
     <string name="reader_trust_effect_require">Only readers trusted by the configured material may reach holder consent</string>
     <string name="proximity_verifier">Verifier</string>
-    <string name="settings_sign_out">Sign out</string>
 </resources>
