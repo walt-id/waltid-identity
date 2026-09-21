@@ -24,6 +24,8 @@ zxing-cpp = "3.1.1"
 compose-navigation3 = "1.1.1"
 dokka = "2.2.0"
 coil = "3.5.0"
+firebase-bom = "34.19.0"
+google-services = "4.5.0"
 
 # Plugins / Dependencies
 ktor = "3.5.0"
@@ -296,6 +298,7 @@ androidx-credentials-registry-provider = { module = "androidx.credentials.regist
 androidx-credentials-registry-provider-play-services = { module = "androidx.credentials.registry:registry-provider-play-services", version.ref = "androidx-credentials-registry" }
 androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "androidx-credentials" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
 
 ## HTTP
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" } # should be replaced with kotlinx-io
@@ -440,3 +443,4 @@ versions = { id = "com.github.ben-manes.versions", version = "0.54.0" }
 license = { id = "com.github.jk1.dependency-license-report", version = "3.1.2" }
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
 skie = { id = "co.touchlab.skie", version.ref = "skie" }
+google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }

@@ -151,6 +151,16 @@ jobs:
       report-check-name: 'gradle-build / gradle (ubuntu-22.04)'
       conformance-report-check-name: 'gradle-build / conformance (ubuntu-22.04)'
       run-conformance: ${{ needs.conformance-eligibility.outputs.should-run == 'true' }}
+  distribute-android-preview:
+    name: distribute-android-preview
+    needs: ci-gate
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-gate.result == 'success' }}
+    uses: ./.github/workflows/distribute-android-firebase.yml
+    secrets: inherit
+    with:
+      variant: preview
+      version_name: 1.0.0-dev
+
   ci-gate:
     name: ci-gate
     if: always() && !cancelled()

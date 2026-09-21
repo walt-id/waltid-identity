@@ -157,15 +157,17 @@ Android builds can override it with `-PtransactionDataProfiles.url=...`. Compose
 
 ## Release APK
 
-Each GitHub release attaches a debug-signed `waltid-wallet-demo-compose-<version>.apk`, built with `assembleDebug`. Because CI signs with a fresh, throwaway debug key per release, a release APK **cannot upgrade a previously installed one** — uninstall the existing app first, then install the new one. Uninstalling resets local wallet data (see [Local wallet data](#local-wallet-data)).
+Each GitHub release attaches a debug-signed `waltid-wallet-demo-compose-<version>.apk`, built with `assembleProductionDebug`. Because CI signs with a fresh, throwaway debug key per release, a release APK **cannot upgrade a previously installed one** — uninstall the existing app first, then install the new one. Uninstalling resets local wallet data (see [Local wallet data](#local-wallet-data)).
 
 ## Common commands
 
 Android and shared UI:
 
 ```bash
-./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug
-./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:installDebug
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleProductionDebug
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:installProductionDebug
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assemblePreviewDebug
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:installPreviewDebug
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:allTests
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:webApp:wasmJsBrowserDevelopmentRun -PenableWalletDemoComposeWeb=true
 ```

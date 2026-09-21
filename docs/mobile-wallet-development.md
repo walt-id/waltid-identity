@@ -173,12 +173,21 @@ shared Keychain group resolves against a simulated `AppIdentifierPrefix`.
 
 ## Common checks
 
-Android:
+
+Android (Preview Debug):
 
 ```bash
-./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assemblePreviewDebug
 ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest -PenableAndroidBuild=true
-./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedDebugAndroidTest -PenableAndroidBuild=true
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedPreviewDebugAndroidTest -PenableAndroidBuild=true
+```
+
+Android (Production Debug):
+
+```bash
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleProductionDebug
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest -PenableAndroidBuild=true
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedProductionDebugAndroidTest -PenableAndroidBuild=true
 ```
 
 iOS (Compose):

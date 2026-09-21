@@ -17,6 +17,8 @@
 	<string>Present credentials to nearby readers over Bluetooth.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID to unlock the demo wallet or authorize wallet signing.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

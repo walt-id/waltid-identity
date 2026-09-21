@@ -98,6 +98,13 @@ jobs:
           file: 'gradle.properties'
           properties: 'enableAndroidBuild=true'
 
+      - name: Write Google services config
+        if: ${{ inputs.enable-android-build }}
+        env:
+          GOOGLE_SERVICES_PREVIEW_JSON: ${{ secrets.GOOGLE_SERVICES_PREVIEW_JSON }}
+          GOOGLE_SERVICES_PRODUCTION_JSON: ${{ secrets.GOOGLE_SERVICES_PRODUCTION_JSON }}
+        run: bash waltid-identity/.github/scripts/mobile-ci/write-google-services.sh
+
       # `playwright install --with-deps` shells out to apt-get, and three modules register an
       # installPlaywrightBrowsers task that the build runs in parallel. They then race for
       # /var/lib/dpkg/lock-frontend and whichever loses fails with "Failed to install browsers".
@@ -438,6 +445,13 @@ jobs:
         with:
           file: 'gradle.properties'
           properties: 'enableAndroidBuild=true'
+
+      - name: Write Google services config
+        if: ${{ inputs.enable-android-build }}
+        env:
+          GOOGLE_SERVICES_PREVIEW_JSON: ${{ secrets.GOOGLE_SERVICES_PREVIEW_JSON }}
+          GOOGLE_SERVICES_PRODUCTION_JSON: ${{ secrets.GOOGLE_SERVICES_PRODUCTION_JSON }}
+        run: bash waltid-identity/.github/scripts/mobile-ci/write-google-services.sh
 
       - name: Set version
         run: |
