@@ -406,7 +406,7 @@ class Issuer2ProfileEndpointTest {
         }
 
         assertSdJwtProfile(assertNotNull(profilesById[IDENTITY_SD_JWT_PROFILE_ID]))
-        assertSdJwtX5Profile(assertNotNull(profilesById[TAX_ID_SD_JWT_PROFILE_ID]))
+        assertSdJwtX5Profile(assertNotNull(profilesById[EHIC_SD_JWT_PROFILE_ID]))
     }
 
     private fun assertSdJwtProfile(profile: CredentialProfile) {
@@ -425,16 +425,14 @@ class Issuer2ProfileEndpointTest {
     }
 
     private fun assertSdJwtX5Profile(profile: CredentialProfile) {
-        assertEquals(TAX_ID_SD_JWT_PROFILE_ID, profile.profileId)
-        assertEquals(TAX_ID_SD_JWT_CONFIGURATION_ID, profile.credentialConfigurationId)
-        assertEquals("Tax ID Credential", profile.name)
+        assertEquals(EHIC_SD_JWT_PROFILE_ID, profile.profileId)
+        assertEquals(EHIC_SD_JWT_CONFIGURATION_ID, profile.credentialConfigurationId)
+        assertEquals("European Health Insurance Card (EHIC)", profile.name)
         assertNull(profile.issuerDid, "Expected x5-chain SD-JWT VC profile not to be DID based")
         assertNotNull(profile.x5Chain, "Expected x5-chain SD-JWT VC profile to use issuer1 sample certificate")
-        assertEquals("91-287/6543", profile.credentialData["tax_number"]?.jsonPrimitive?.content)
-        assertEquals("Musterfrau", profile.credentialData["registered_family_name"]?.jsonPrimitive?.content)
-        assertEquals(setOf("$.family_name", "$.given_name"), profile.idTokenClaimsMapping?.keys)
-        assertEquals("$.registered_family_name", profile.idTokenClaimsMapping?.get("$.family_name"))
-        assertEquals("$.registered_given_name", profile.idTokenClaimsMapping?.get("$.given_name"))
+        assertEquals("1234 250888", profile.credentialData["social_security_number"]?.jsonPrimitive?.content)
+        assertEquals("9876543210", profile.credentialData["personal_administrative_number"]?.jsonPrimitive?.content)
+        assertNull(profile.idTokenClaimsMapping)
     }
 
     private fun assertProfileHasConfiguredIssuerKey(
@@ -621,15 +619,13 @@ class Issuer2ProfileEndpointTest {
         const val ISO_MDL_PROFILE_ID = "isoMdl"
         const val ISO_MDL_CONFIGURATION_ID = "org.iso.18013.5.1.mDL"
         const val ISO_MDL_HAIP_PROFILE_ID = "isoMdlHaip"
-        const val ISO_MDL_HAIP_CONFIGURATION_ID = "org.iso.18013.5.1.mDL.haip"
         const val ISO_MDL_NAMESPACE_ID = "org.iso.18013.5.1"
         const val SCA_PAYMENT_CARD_MDOC_PROFILE_ID = "scaPaymentCardMdoc"
         const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
         const val IDENTITY_SD_JWT_CONFIGURATION_ID = "identity_credential"
         const val IDENTITY_HAIP_SD_JWT_PROFILE_ID = "identityCredentialHaipSdJwt"
-        const val IDENTITY_HAIP_SD_JWT_CONFIGURATION_ID = "identity_credential_haip"
-        const val TAX_ID_SD_JWT_PROFILE_ID = "taxIdCredentialSdJwt"
-        const val TAX_ID_SD_JWT_CONFIGURATION_ID = "asit.tax-id-credential"
+        const val EHIC_SD_JWT_PROFILE_ID = "ehicSdJwt"
+        const val EHIC_SD_JWT_CONFIGURATION_ID = "urn:eudi:ehic:1"
         const val JWT_VC_JSON_FORMAT = "jwt_vc_json"
         const val MSO_MDOC_FORMAT = "mso_mdoc"
         const val SD_JWT_VC_FORMAT = "dc+sd-jwt"
@@ -643,13 +639,11 @@ class Issuer2ProfileEndpointTest {
         val HAIP_PROFILE_IDS = setOf(ISO_MDL_HAIP_PROFILE_ID, IDENTITY_HAIP_SD_JWT_PROFILE_ID)
         val MDOC_PROFILE_IDS = setOf(
             ISO_MDL_PROFILE_ID,
-            "isoMdlAamva",
             ISO_PHOTO_ID_PROFILE_ID,
             "eudiPidMdoc",
             SCA_PAYMENT_CARD_MDOC_PROFILE_ID,
+            "emvcoDpcMdoc",
             "euAgeVerificationMdoc",
-            "idAustriaMdoc",
-            "googleIdCardMdoc",
         )
 
         val MDOC_CATALOG_PROFILE_EXPECTATIONS = listOf(
@@ -660,22 +654,6 @@ class Issuer2ProfileEndpointTest {
                 sampleNamespace = ISO_MDL_NAMESPACE_ID,
                 sampleClaim = "family_name",
                 sampleClaimValue = JsonPrimitive("Musterfrau"),
-            ),
-            MdocProfileExpectation(
-                profileId = ISO_MDL_HAIP_PROFILE_ID,
-                name = "ISO 18013-5 Mobile Driving License HAIP",
-                credentialConfigurationId = ISO_MDL_HAIP_CONFIGURATION_ID,
-                sampleNamespace = ISO_MDL_NAMESPACE_ID,
-                sampleClaim = "family_name",
-                sampleClaimValue = JsonPrimitive("Musterfrau"),
-            ),
-            MdocProfileExpectation(
-                profileId = "isoMdlAamva",
-                name = "ISO 18013-5 mDL + AAMVA",
-                credentialConfigurationId = "org.iso.18013.5.1.mDL.aamva",
-                sampleNamespace = "org.iso.18013.5.1.aamva",
-                sampleClaim = "name_suffix",
-                sampleClaimValue = JsonPrimitive("Jr III"),
             ),
             MdocProfileExpectation(
                 profileId = ISO_PHOTO_ID_PROFILE_ID,
@@ -702,6 +680,14 @@ class Issuer2ProfileEndpointTest {
                 sampleClaimValue = JsonPrimitive("4242"),
             ),
             MdocProfileExpectation(
+                profileId = "emvcoDpcMdoc",
+                name = "EMVCo Digital Payment Credential",
+                credentialConfigurationId = "emvco_dpc_mso_mdoc",
+                sampleNamespace = "org.emvco.dpc.1",
+                sampleClaim = "card_last4",
+                sampleClaimValue = JsonPrimitive("4444"),
+            ),
+            MdocProfileExpectation(
                 profileId = "euAgeVerificationMdoc",
                 name = "EU Age Verification",
                 credentialConfigurationId = "eu.europa.ec.av.1",
@@ -709,45 +695,15 @@ class Issuer2ProfileEndpointTest {
                 sampleClaim = "age_over_18",
                 sampleClaimValue = JsonPrimitive(true),
             ),
-            MdocProfileExpectation(
-                profileId = "idAustriaMdoc",
-                name = "ID Austria",
-                credentialConfigurationId = "at.gv.id-austria.2023.iso",
-                sampleNamespace = "at.gv.id-austria.2023",
-                sampleClaim = "bpk",
-                sampleClaimValue = JsonPrimitive("AT:BPK:9f4c2a87d1b64d53a7e8c913e4b7f120"),
-            ),
-            MdocProfileExpectation(
-                profileId = "googleIdCardMdoc",
-                name = "Google ID Card",
-                credentialConfigurationId = "com.google.wallet.idcard.1",
-                sampleNamespace = ISO_MDL_NAMESPACE_ID,
-                sampleClaim = "family_name",
-                sampleClaimValue = JsonPrimitive("Mustermann"),
-            ),
         )
 
         val SD_JWT_CATALOG_PROFILE_EXPECTATIONS = listOf(
-            SdJwtProfileExpectation(
-                profileId = TAX_ID_SD_JWT_PROFILE_ID,
-                name = "Tax ID Credential",
-                credentialConfigurationId = TAX_ID_SD_JWT_CONFIGURATION_ID,
-                sampleClaim = "tax_number",
-                sampleClaimValue = "91-287/6543",
-            ),
             SdJwtProfileExpectation(
                 profileId = "certificateOfResidenceSdJwt",
                 name = "Certificate of Residence",
                 credentialConfigurationId = "urn:eu.europa.ec.eudi:cor:1",
                 sampleClaim = "family_name",
                 sampleClaimValue = "Musterfrau",
-            ),
-            SdJwtProfileExpectation(
-                profileId = "powerOfRepresentationSdJwt",
-                name = "Power of Representation",
-                credentialConfigurationId = "urn:eu.europa.ec.eudi:por:1",
-                sampleClaim = "legal_name",
-                sampleClaimValue = "Musterfirma GmbH",
             ),
             SdJwtProfileExpectation(
                 profileId = "ehicSdJwt",
@@ -770,13 +726,6 @@ class Issuer2ProfileEndpointTest {
                 sampleClaim = "given_name",
                 sampleClaimValue = "John",
                 usesIssuerDid = true,
-            ),
-            SdJwtProfileExpectation(
-                profileId = IDENTITY_HAIP_SD_JWT_PROFILE_ID,
-                name = "Identity Credential HAIP",
-                credentialConfigurationId = IDENTITY_HAIP_SD_JWT_CONFIGURATION_ID,
-                sampleClaim = "given_name",
-                sampleClaimValue = "John",
             ),
         )
 

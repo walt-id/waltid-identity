@@ -17,6 +17,20 @@ fun createAndroidDemoSharingSettingsStore(context: Context): DemoSharingSettings
                 "DC API presentation preview preference could not be persisted"
             }
         },
+        readProximityTransportProfile = {
+            preferences.getString(PROXIMITY_TRANSPORT_PROFILE_KEY, null)
+        },
+        writeProximityTransportProfile = { profile ->
+            check(preferences.edit().putString(PROXIMITY_TRANSPORT_PROFILE_KEY, profile).commit()) {
+                "Proximity transport profile preference could not be persisted"
+            }
+        },
+        readProximityApprovalMode = { preferences.getString(PROXIMITY_APPROVAL_MODE_KEY, null) },
+        writeProximityApprovalMode = { mode ->
+            check(preferences.edit().putString(PROXIMITY_APPROVAL_MODE_KEY, mode).commit()) {
+                "Proximity approval preference could not be persisted"
+            }
+        },
     )
 }
 

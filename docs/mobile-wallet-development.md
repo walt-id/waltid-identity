@@ -173,12 +173,21 @@ shared Keychain group resolves against a simulated `AppIdentifierPrefix`.
 
 ## Common checks
 
-Android:
+
+Android (Preview Debug):
 
 ```bash
-./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assemblePreviewDebug
 ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest -PenableAndroidBuild=true
-./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedDebugAndroidTest -PenableAndroidBuild=true
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedPreviewDebugAndroidTest -PenableAndroidBuild=true
+```
+
+Android (Production Debug):
+
+```bash
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleProductionDebug
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest -PenableAndroidBuild=true
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedProductionDebugAndroidTest -PenableAndroidBuild=true
 ```
 
 iOS (Compose):
@@ -254,6 +263,9 @@ Walt team with automatic signing, in both Debug and Release. Doctypes default to
 be overridden with repeated `--doctype` arguments.
 
 ## Enterprise mobile platform tests
+
+For proximity regression ownership, exact discovery guards, independent-reader provenance
+and optional local hardware entry points, see [Proximity test automation](proximity-test-automation.md).
 
 Enterprise mobile platform coverage is owned by the Enterprise integration test
 module in the coordinated unified-build checkout. These tests are

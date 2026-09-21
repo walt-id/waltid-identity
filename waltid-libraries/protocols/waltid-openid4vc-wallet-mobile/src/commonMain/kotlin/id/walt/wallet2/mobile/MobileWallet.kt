@@ -3,6 +3,9 @@
 package id.walt.wallet2.mobile
 
 import id.walt.credentials.formats.MdocsCredential
+import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
+import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
+import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.utils.ShaUtils
 import id.walt.crypto2.keys.Key
@@ -230,6 +233,9 @@ public class MobileWallet internal constructor(
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
+    private val proximityTransportFactory: BleProximityTransportFactory? = null,
+    private val proximityNfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
+    private val proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     /** Issuance transport override. Only tests set this; production uses the configured engine. */
     issuanceHttpClient: HttpClient? = null,
 ) {
@@ -263,6 +269,30 @@ public class MobileWallet internal constructor(
         readerTrustEvaluator = readerTrustEvaluator,
         registryRecords = { registryRecords() },
     )
+    private val proximityCoordinator = ProximityCoordinator(
+        wallet = wallet,
+        bleTransportFactory = proximityTransportFactory,
+        nfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
+        wifiAwareTransportFactory = proximityWifiAwareTransportFactory,
+    )
+
+    /**
+     * Checks the exact BLE roles selected by [configuration] without creating keys, UUIDs, listeners,
+     * scanners, or advertisers.
+     */
+    public suspend fun proximityPresentationCapabilities(
+        configuration: ProximityConfiguration = ProximityConfiguration(),
+    ): ProximityCapabilities = proximityCoordinator.capabilities(configuration)
+
+    /**
+     * Starts one single-use in-person presentation session.
+     *
+     * Only one proximity session may be active for this wallet. A second start fails before any
+     * transaction material or radio resource is created.
+     */
+    public suspend fun startProximityPresentation(
+        configuration: ProximityConfiguration = ProximityConfiguration(),
+    ): ProximitySession = proximityCoordinator.start(configuration)
 
     private val issuanceSessions = WalletIssuanceSessionService(
         wallet = wallet,
@@ -873,11 +903,14 @@ public class MobileWallet internal constructor(
     /**
      * Deletes local wallet material owned by this mobile wallet instance.
      *
+     * Proximity admission is permanently closed and active proximity cleanup is awaited first.
+     * Use a newly opened wallet instance after deletion.
      * Active issuance continuations are invalidated before the key, credential, and DID stores receive
      * store-level remove calls. The wallet then closes and deletes the encrypted local database and deletes
      * the configured database key.
      */
     public suspend fun deleteWallet() {
+        proximityCoordinator.shutdown()
         WalletPresentationHandler.clearPreviews(wallet)
         issuanceSessions.clearSessions()
         keyStore.listKeys().toList().forEach { key ->
