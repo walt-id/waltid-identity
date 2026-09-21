@@ -37,6 +37,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -76,6 +77,16 @@ class MdocCredentialValidityTest {
         val explicit = fixture.issue("2026-09-08T19:18:17Z", from, until)
         assertEquals(from, explicit.validFrom)
         assertEquals(until, explicit.validUntil)
+    }
+
+    @Test
+    fun `default validUntil uses the injected clock when rounding is disabled`() = runTest {
+        val frozen = Instant.parse("2026-09-08T19:18:10Z")
+        val validity = fixture().issueCredential(
+            now = frozen.toString(),
+            roundValidityToTwelveHours = false,
+        ).decodeMobileSecurityObject().validityInfo
+        assertEquals(frozen.plus(365.days), validity.validUntil)
     }
 
     @Test
@@ -300,6 +311,7 @@ class MdocCredentialValidityTest {
             display: List<CredentialDisplay>? = null,
             validFrom: Instant? = null,
             validUntil: Instant? = null,
+            roundValidityToTwelveHours: Boolean = true,
         ): IssuerSigned {
             val result = issueResult(
                 now = now,
@@ -309,6 +321,7 @@ class MdocCredentialValidityTest {
                 display = display,
                 validFrom = validFrom,
                 validUntil = validUntil,
+                roundValidityToTwelveHours = roundValidityToTwelveHours,
             )
             val response = assertIs<CredentialResponseResult.Success>(result).response
             val encoded = assertNotNull(response.credentials).single().credential.jsonPrimitive.content
@@ -326,9 +339,10 @@ class MdocCredentialValidityTest {
             validFrom: Instant? = null,
             validUntil: Instant? = null,
             credentialCount: Int = 1,
+            roundValidityToTwelveHours: Boolean = true,
         ): CredentialResponseResult {
             val configuration = CredentialConfiguration(CredentialFormat.MSO_MDOC, doctype = "org.example.mdoc")
-            return MdocCredentialHandler(roundValidityToTwelveHours = true, now = { Instant.parse(now) }).sign(
+            return MdocCredentialHandler(roundValidityToTwelveHours = roundValidityToTwelveHours, now = { Instant.parse(now) }).sign(
                 request = DefaultCredentialRequest(
                     client = DefaultClient("test-client", emptyList(), emptySet(), emptySet()),
                     credentialIdentifier = null, credentialConfigurationId = "mdoc", proofs = null,
