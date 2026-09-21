@@ -9,17 +9,22 @@ import id.walt.openid4vp.conformance.testplans.runner.IssuerCredentialOfferDeliv
 import id.walt.openid4vp.conformance.testplans.runner.BrowserInteraction
 import id.walt.openid4vp.conformance.testplans.runner.IssuerBrowserAutomationConfig
 import id.walt.openid4vp.conformance.testplans.runner.IssuerConformanceBrowserAutomation
+import id.walt.openid4vp.conformance.testplans.runner.browserDiagnosticUrl
 import id.walt.openid4vp.conformance.testplans.runner.req.CredentialOfferAuthMethod
 import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.ServerResponseException
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
+import io.ktor.serialization.JsonConvertException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import java.net.InetSocketAddress
+import java.net.ServerSocket
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -28,6 +33,58 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IssuerCredentialOfferDeliveryTest {
+    @Test
+    fun browserDiagnosticsRemoveOAuthParametersAndUserInfo() {
+        assertEquals(
+            "https://issuer.example:9443/callback [parameters redacted]",
+            browserDiagnosticUrl("https://user:password@issuer.example:9443/callback?code=secret&state=private#token"),
+        )
+        assertEquals("<non-HTTP URL>", browserDiagnosticUrl("data:text/html,secret"))
+        assertEquals("<unavailable URL>", browserDiagnosticUrl("not a URL?secret"))
+    }
+
+    @Test
+    fun issuerBrowserReportsFailedNavigationAfterLoginWithoutLeakingOAuthParameters() {
+        val unavailablePort = ServerSocket(0).use { it.localPort }
+        withBrowserStub { server, _ ->
+            server.createContext("/authorize") { exchange ->
+                exchange.respondHtml(
+                    """
+                    <html><body><form method="post" action="/login?state=private-state">
+                    <input id="username" name="username"><input id="password" name="password" type="password">
+                    <input id="kc-login" type="submit" value="Sign in">
+                    </form></body></html>
+                    """.trimIndent()
+                )
+            }
+            server.createContext("/login") { exchange ->
+                exchange.use {
+                    it.requestBody.readBytes()
+                    it.responseHeaders.add("Location", "http://127.0.0.1:$unavailablePort/broken-callback?code=private-code#private-fragment")
+                    it.sendResponseHeaders(302, -1)
+                }
+            }
+            server.start()
+            val automation = IssuerConformanceBrowserAutomation(
+                IssuerBrowserAutomationConfig(true, "runner-user", "runner-password", 10),
+                "suite.invalid", 443,
+            )
+            val started = System.nanoTime()
+            val error = assertFailsWith<IllegalStateException> {
+                automation.complete(BrowserInteraction("http://localhost:${server.address.port}/authorize?state=initial-secret", "GET"))
+            }
+            val message = error.message.orEmpty()
+            assertTrue(message.contains("FAILED GET http://127.0.0.1:$unavailablePort/broken-callback"), message)
+            assertTrue(message.contains("ERR_CONNECTION_REFUSED"), message)
+            assertTrue(message.contains("HTTP 302"), message)
+            assertTrue((System.nanoTime() - started) / 1_000_000 < 10_000, "Must detect the error without exhausting login timeout")
+            for (secret in listOf("initial-secret", "private-state", "private-code", "private-fragment", "runner-password")) {
+                assertFalse(message.contains(secret), "Diagnostic must not contain $secret")
+            }
+            assertNull(error.cause, "Raw Playwright call logs must not leak through the cause")
+        }
+    }
+
     @Test
     fun issuerBrowserCompletesLoginWithoutWaitingForAnUnfinishedImage() {
         for (method in listOf("GET", "POST")) {
@@ -98,50 +155,59 @@ class IssuerCredentialOfferDeliveryTest {
     }
 
     @Test
-    fun issuerManagementOffersUseCredentialsForBothFormatsAndGrantTypes() = runTest {
-        val profiles = mapOf(
-            "identityCredentialSdJwt" to "identity_credential",
-            "isoMdl" to "org.iso.18013.5.1.mDL",
-        )
-        for ((profileId, configurationId) in profiles) {
+    fun issuerManagementOffersUseOriginalProfileContractForBothFormatsAndGrantTypes() = runTest {
+        for (profileId in listOf("identityCredentialSdJwt", "isoMdl")) {
             for (authMethod in listOf(CredentialOfferAuthMethod.AUTHORIZED, CredentialOfferAuthMethod.PRE_AUTHORIZED)) {
-                val preAuthorized = authMethod == CredentialOfferAuthMethod.PRE_AUTHORIZED
-                val responseBody = buildJsonObject {
-                    put("offerId", "test-offer")
-                    putJsonArray("credentials") {
-                        addJsonObject {
+                for (staticTxCode in listOf(null, "493536", "test-code")) {
+                    for (offer in listOf(
+                        "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer",
+                        "openid-credential-offer://?credential_offer=%7B%22credential_issuer%22%3A%22https%3A%2F%2Fissuer.example%22%7D",
+                    )) {
+                        val preAuthorized = authMethod == CredentialOfferAuthMethod.PRE_AUTHORIZED
+                        val expectedTxCode = staticTxCode.takeIf { preAuthorized }
+                        val responseBody = buildJsonObject {
+                            put("offerId", "test-offer")
                             put("profileId", profileId)
-                            put("credentialConfigurationId", configurationId)
+                            put("authMethod", authMethod.name)
+                            put("expiresAt", 1_800_000_000_000L)
+                            put("credentialOffer", offer)
+                            put("issuerStateMode", "INCLUDE")
+                            expectedTxCode?.let { put("txCodeValue", it) }
+                        }
+                        withIssuerManagementStub(201, responseBody.toString()) { issuer, capturedRequest ->
+                            val response = issuer.createCredentialOffer(profileId, authMethod, staticTxCode)
+                            val captured = capturedRequest.await()
+                            assertEquals("POST", captured.method)
+                            assertEquals("/issuer2/credential-offers", captured.path)
+                            val request = captured.body
+                            assertEquals(profileId, request["profileId"]!!.jsonPrimitive.content)
+                            assertNull(request["credentials"])
+                            assertEquals(authMethod.name, request["authMethod"]!!.jsonPrimitive.content)
+                            // Leave issuer-state, value mode, expiry, and override defaults to the issuer.
+                            assertEquals(
+                                setOf("profileId", "authMethod") +
+                                    if (expectedTxCode != null) setOf("txCode", "txCodeValue") else emptySet(),
+                                request.keys,
+                            )
+                            if (expectedTxCode != null) {
+                                assertEquals(expectedTxCode, request["txCodeValue"]!!.jsonPrimitive.content)
+                                val txCode = request["txCode"]!!.jsonObject
+                                assertEquals(if (expectedTxCode.all(Char::isDigit)) "numeric" else "text", txCode["input_mode"]!!.jsonPrimitive.content)
+                                assertEquals(expectedTxCode.length, txCode["length"]!!.jsonPrimitive.int)
+                                assertEquals("OpenID4VCI conformance transaction code", txCode["description"]!!.jsonPrimitive.content)
+                            } else {
+                                assertNull(request["txCode"])
+                                assertNull(request["txCodeValue"])
+                                assertNull(response.txCodeValue)
+                            }
+                            assertEquals(expectedTxCode, response.txCodeValue)
+                            assertEquals("test-offer", response.offerId)
+                            assertEquals(profileId, response.profileId)
+                            assertEquals(authMethod.name, response.authMethod)
+                            assertEquals(1_800_000_000_000L, response.expiresAt)
+                            assertEquals(offer, response.credentialOffer)
                         }
                     }
-                    put("authMethod", authMethod.name)
-                    put("expiresAt", 1_800_000_000_000L)
-                    put("credentialOffer", "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer")
-                    put("issuerStateMode", "INCLUDE")
-                    if (preAuthorized) put("txCodeValue", "493536")
-                }
-                withIssuerManagementStub(201, responseBody.toString()) { issuer, capturedRequest ->
-                    val response = issuer.createCredentialOffer(profileId, authMethod, staticTxCode = "493536")
-                    val request = capturedRequest.await()
-                    assertNull(request["profileId"], "The API no longer accepts a top-level profileId")
-                    val credential = request["credentials"]!!.jsonArray.single().jsonObject
-                    assertEquals(profileId, credential["profileId"]!!.jsonPrimitive.content)
-                    assertEquals(authMethod.name, request["authMethod"]!!.jsonPrimitive.content)
-                    if (preAuthorized) {
-                        assertEquals("493536", request["txCodeValue"]!!.jsonPrimitive.content)
-                        val txCode = request["txCode"]!!.jsonObject
-                        assertEquals("numeric", txCode["input_mode"]!!.jsonPrimitive.content)
-                        assertEquals(6, txCode["length"]!!.jsonPrimitive.int)
-                        assertEquals("493536", response.txCodeValue)
-                    } else {
-                        assertNull(request["txCode"])
-                        assertNull(request["txCodeValue"])
-                        assertNull(response.txCodeValue)
-                    }
-                    assertEquals("test-offer", response.offerId)
-                    assertEquals(profileId, response.credentials.single().profileId)
-                    assertEquals(configurationId, response.credentials.single().credentialConfigurationId)
-                    assertEquals(responseBody["credentialOffer"]!!.jsonPrimitive.content, response.credentialOffer)
                 }
             }
         }
@@ -149,7 +215,7 @@ class IssuerCredentialOfferDeliveryTest {
 
     @Test
     fun issuerManagementErrorsAreReportedBeforeOfferDeserialization() = runTest {
-        val errorBody = """{"error":"Bad Request","message":"Field 'credentials' is required"}"""
+        val errorBody = """{"error":"Bad Request","message":"Unknown credential profile"}"""
         withIssuerManagementStub(400, errorBody) { issuer, _ ->
             val error = assertFailsWith<ClientRequestException> {
                 issuer.createCredentialOffer("identityCredentialSdJwt", CredentialOfferAuthMethod.AUTHORIZED)
@@ -157,7 +223,34 @@ class IssuerCredentialOfferDeliveryTest {
             assertEquals(HttpStatusCode.BadRequest, error.response.status)
             assertEquals(errorBody, error.response.bodyAsText())
             assertTrue(error.message.contains("400"))
-            assertTrue(error.message.contains("credentials"))
+            assertTrue(error.message.contains("Unknown credential profile"))
+        }
+    }
+
+    @Test
+    fun issuerManagementServerErrorsRetainStatusAndBody() = runTest {
+        val errorBody = """{"error":"Internal Server Error","message":"Offer storage unavailable"}"""
+        withIssuerManagementStub(500, errorBody) { issuer, _ ->
+            val error = assertFailsWith<ServerResponseException> {
+                issuer.createCredentialOffer("isoMdl", CredentialOfferAuthMethod.PRE_AUTHORIZED)
+            }
+            assertEquals(HttpStatusCode.InternalServerError, error.response.status)
+            assertEquals(errorBody, error.response.bodyAsText())
+        }
+    }
+
+    @Test
+    fun issuerManagementRejectsIncompatibleReceiptWithoutRetryingCreation() = runTest {
+        // This is not a test of array management requests: the legacy helper must reject
+        // a success receipt missing its required profileId instead of posting a fallback offer.
+        val receipt = """{"offerId":"test-offer","authMethod":"AUTHORIZED","expiresAt":1800000000000,"credentialOffer":"openid-credential-offer://test"}"""
+        val requestCount = AtomicInteger()
+        withIssuerManagementStub(201, receipt, requestCount) { issuer, _ ->
+            val error = assertFailsWith<JsonConvertException> {
+                issuer.createCredentialOffer("identityCredentialSdJwt", CredentialOfferAuthMethod.AUTHORIZED)
+            }
+            assertTrue(error.message.orEmpty().contains("profileId"))
+            assertEquals(1, requestCount.get())
         }
     }
 
@@ -234,14 +327,16 @@ class IssuerCredentialOfferDeliveryTest {
     private suspend fun withIssuerManagementStub(
         status: Int,
         responseBody: String,
-        block: suspend (IssuerInterface, CompletableDeferred<JsonObject>) -> Unit,
+        requestCount: AtomicInteger = AtomicInteger(),
+        block: suspend (IssuerInterface, CompletableDeferred<CapturedOfferRequest>) -> Unit,
     ) {
-        val request = CompletableDeferred<JsonObject>()
+        val request = CompletableDeferred<CapturedOfferRequest>()
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/issuer2/credential-offers") { exchange ->
             exchange.use {
                 val body = exchange.requestBody.bufferedReader().use { it.readText() }
-                request.complete(Json.parseToJsonElement(body).jsonObject)
+                requestCount.incrementAndGet()
+                request.complete(CapturedOfferRequest(exchange.requestMethod, exchange.requestURI.path, Json.parseToJsonElement(body).jsonObject))
                 val bytes = responseBody.toByteArray(Charsets.UTF_8)
                 exchange.responseHeaders.set("Content-Type", "application/json")
                 exchange.sendResponseHeaders(status, bytes.size.toLong())
@@ -255,6 +350,8 @@ class IssuerCredentialOfferDeliveryTest {
             server.stop(0)
         }
     }
+
+    private data class CapturedOfferRequest(val method: String, val path: String, val body: JsonObject)
 
     private fun waitEvent(id: String) = TestLogEntry(id = id, src = "VCIWaitForCredentialOffer")
 }

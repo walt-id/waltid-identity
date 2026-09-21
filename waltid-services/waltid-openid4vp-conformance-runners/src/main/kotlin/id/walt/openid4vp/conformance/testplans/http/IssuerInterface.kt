@@ -28,7 +28,10 @@ class IssuerInterface(private val issuerBaseUrl: String) : AutoCloseable {
         }
     }
 
-    /** Create a credential offer using the authentication method required by the variant. */
+    /**
+     * Use the original single-profile OSS management contract for either grant.
+     * The suite can still request a protocol batch with multiple proofs at /credential.
+     */
     suspend fun createCredentialOffer(
         profileId: String,
         authMethod: CredentialOfferAuthMethod,
@@ -38,7 +41,7 @@ class IssuerInterface(private val issuerBaseUrl: String) : AutoCloseable {
         val response = httpClient.post("$issuerBaseUrl/issuer2/credential-offers") {
             contentType(ContentType.Application.Json)
             setBody(CredentialOfferRequest(
-                credentials = listOf(CredentialOfferCredential(profileId)),
+                profileId = profileId,
                 authMethod = authMethod,
                 txCode = preAuthorizedTxCode?.toTxCodeMetadata(),
                 txCodeValue = preAuthorizedTxCode,
@@ -62,15 +65,10 @@ class IssuerInterface(private val issuerBaseUrl: String) : AutoCloseable {
 
 @Serializable
 data class CredentialOfferRequest(
-    val credentials: List<CredentialOfferCredential>,
+    val profileId: String,
     val authMethod: CredentialOfferAuthMethod,
     val txCode: TxCode? = null,
     val txCodeValue: String? = null,
-)
-
-@Serializable
-data class CredentialOfferCredential(
-    val profileId: String,
 )
 
 @Serializable
@@ -84,17 +82,11 @@ data class TxCode(
 @Serializable
 data class CredentialOfferResponse(
     val offerId: String,
-    val credentials: List<CredentialOfferCredentialResponse>,
+    val profileId: String,
     val authMethod: String,
     val expiresAt: Long,
     val credentialOffer: String,
     val txCodeValue: String? = null,
-)
-
-@Serializable
-data class CredentialOfferCredentialResponse(
-    val profileId: String,
-    val credentialConfigurationId: String,
 )
 
 @Serializable
