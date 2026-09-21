@@ -86,6 +86,7 @@ dependencies {
 
     implementation(identityLibs.kotlintest)
     testImplementation(identityLibs.kotlinx.coroutines.test)
+    testImplementation(identityLibs.ktor.client.mock)
     implementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
     implementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
 
@@ -309,7 +310,6 @@ configurations[itbTestSourceSet.runtimeOnlyConfigurationName].extendsFrom(
     configurations.runtimeOnly.get(), configurations.testRuntimeOnly.get(),
 )
 dependencies {
-    add(itbTestSourceSet.implementationConfigurationName, identityLibs.ktor.client.mock)
     add(itbTestSourceSet.implementationConfigurationName, identityLibs.bouncycastle.pkix)
 }
 tasks.register<Test>("itbTest") {
@@ -324,4 +324,11 @@ tasks.register<Test>("itbTest") {
     }.getOrElse(false)
     // Fresh per-run cryptographic material and result reports, even if inputs are unchanged.
     outputs.upToDateWhen { false }
+}
+
+tasks.register<JavaExec>("itbWallet") {
+    group = "verification"
+    description = "Run the deployed WAL-1423 ITB cases through the production wallet and portal interaction bridge."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("id.walt.itb.ItbMainKt")
 }
