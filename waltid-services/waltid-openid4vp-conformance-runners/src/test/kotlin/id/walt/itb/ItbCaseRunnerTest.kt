@@ -136,4 +136,28 @@ class ItbCaseRunnerTest {
             assertEquals(ItbSessionReport.Verdict.UNDEFINED, result.testBedVerdict)
         }
     }
+
+    @Test
+    fun walletRejectionRemainsFailedEvenWhenTheIssuerSideReportIsSuccessful() = runBlocking<Unit> {
+        val bridge = Bridge()
+        HttpClient(MockEngine { request ->
+            respond(when (request.url.encodedPath.substringAfterLast('/')) {
+                "start" -> """{"createdSessions":[{"testSuite":"cs01v1","testCase":"tc_vci_006","session":"$session"}]}"""
+                "status" -> status(true)
+                session -> report
+                else -> error("A terminal session must not be stopped")
+            })
+        }).use { client ->
+            val result = ItbCaseRunner(
+                ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), bridge,
+                { throw IllegalArgumentException("credential parsing failed") },
+            ).run("system", "actor", "cs01v1", "tc_vci_006")
+            assertEquals(ItbCaseResult.Outcome.WALLET_FAILED, result.outcome)
+            assertEquals(ItbSessionReport.Verdict.SUCCESS, result.testBedVerdict)
+            assertTrue(result.testBedCompleted)
+            assertFalse(result.walletSucceeded)
+            assertFalse(bridge.completed)
+            assertFalse(result.cleanupFailed)
+        }
+    }
 }

@@ -56,11 +56,13 @@ observed independently. No required cases are skipped or allowlisted.
   the baseline P-256 wallet advertises ESP256 (`-9`). The inspected #2141 head
   `511e0b779f236396f0019dcf12493b5754c08dee` adds ES256 (`-7`) support alongside
   ESP256. This confirms the dependency, not that its complete live matrix passes.
-- **mdoc issuance interoperability:** VCI005 and VCI008 fail parsing the issued
-  `DeviceKeyInfo.CoseKey`: expected a CBOR byte string but encountered a text
-  string. Inspect the issued COSE key encoding before assigning wallet versus
-  reference-issuer ownership. No existing blocking ticket was confirmed;
-  WAL-781 describes a different digest-integrity issue and is not linked as a blocker.
+- **Reference-issuer mdoc encoding:** VCI005 and VCI008 fail parsing the issued
+  `DeviceKeyInfo.CoseKey`. Fresh captures confirmed that the issuer encodes COSE
+  label `2` (`kid`) as a CBOR text string. [RFC 9052 section 7.1](https://www.rfc-editor.org/rfc/rfc9052.html#section-7.1)
+  requires a byte string. Labels `-2` and `-3` (P-256 coordinates) are correctly
+  encoded as 32-byte strings. This defect belongs to the reference issuer;
+  changing the wallet to accept malformed COSE keys is not part of this runner.
+  No existing owning ticket was confirmed. WAL-781 concerns a different issue.
 - **TS12 encrypted request delivery:** the three ordinary payment requests return
   HTTP 400 requiring request-encryption keys in the wallet metadata for POST
   Request Object delivery. The baseline advertises algorithms without supplying
@@ -71,6 +73,28 @@ observed independently. No required cases are skipped or allowlisted.
   deployed SD-JWT VCI cases passed without it; it is not a demonstrated blocker
   for this deployed matrix. [#2222](https://github.com/walt-id/waltid-identity/pull/2222)
   remains independent identity/recovery work.
+
+## Targeted mdoc confirmation
+
+The following follow-ups used the same production wallet baseline plus a temporary
+HTTP response observer that recorded only CBOR field types and coordinate lengths.
+Both credential endpoints returned HTTP 200 and malformed `kid` values. No raw
+credential, key value or account secret is included in this evidence.
+
+| Case | Session | Wallet | Terminal ITB |
+| --- | --- | --- | --- |
+| VCI005 | `5fc7e07d-a88f-463b-9d17-57621115a08a` | Credential parsing failed | `SUCCESS` |
+| VCI008 | `b6df33f7-44d4-4b19-b9e8-b3831b13da68` | Credential parsing failed | `SUCCESS` |
+
+An issuer-side ITB success therefore does not prove successful wallet receipt.
+The runner correctly retains `WALLET_FAILED` alongside that ITB verdict; a
+regression test covers this observed combination. The overall matrix remains
+11 passing and 10 non-passing cases.
+
+An earlier diagnostic attempt, VCI008 session
+`e8d9b773-20a4-46bf-aea8-258dff8126d3`, failed in ITB's QR decoding step before an
+offer was available. The subsequent run above succeeded at setup. Treat that
+attempt as a transient test-bed setup failure, not another wallet decoding result.
 
 ## Resolved uncertainties and remaining acceptance
 
