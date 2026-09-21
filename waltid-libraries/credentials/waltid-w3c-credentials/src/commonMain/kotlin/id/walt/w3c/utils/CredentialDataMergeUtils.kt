@@ -16,8 +16,10 @@ object CredentialDataMergeUtils {
 
     private val log = KotlinLogging.logger { }
 
-    fun JsonPrimitive.isTemplate() =
-        this.content.let { it.first() == '<' && it.last() == '>' && it.length > 2 && !it.contains(" ") }
+    fun JsonPrimitive.isTemplate(): Boolean {
+        val content = this.content
+        return content.length > 2 && content.first() == '<' && content.last() == '>' && !content.contains(' ')
+    }
 
     @JvmBlocking
     @JvmAsync
@@ -174,5 +176,79 @@ object CredentialDataMergeUtils {
             }
         }
         return vcm.toJsonObject()
+    }
+
+    /**
+     * Keep only mapping keys that already exist as JSON objects in [credentialData].
+     * Primitive or non-object namespace mappings are dropped so they cannot replace a
+     * namespace object before mDoc CBOR encoding.
+     */
+    fun JsonObject.mdocNamespaceMapping(credentialData: JsonObject): JsonObject? =
+        JsonObject(filter { (key, value) -> credentialData[key] is JsonObject && value is JsonObject })
+            .takeIf { it.isNotEmpty() }
+
+    /**
+     * Replace-merge for mDoc namespace payloads. Mapping arrays replace existing arrays
+     * and templates inside array items are evaluated. SD-JWT merge appends arrays and
+     * leaves nested templates unevaluated.
+     */
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun JsonObject.mergeMdocPayloadWithMapping(
+        mapping: JsonObject,
+        context: Map<String, JsonElement>,
+        data: Map<String, suspend (FunctionCall) -> JsonElement>,
+    ): JsonObject = mergeMdocJsonObject(this, mapping, context, data, HashMap())
+
+    private suspend fun mergeMdocJsonObject(
+        credentialData: JsonObject,
+        mapping: JsonObject,
+        context: Map<String, JsonElement>,
+        data: Map<String, suspend (FunctionCall) -> JsonElement>,
+        functionHistory: MutableMap<String, JsonElement>,
+    ): JsonObject = buildJsonObject {
+        credentialData.forEach { (key, value) -> put(key, value) }
+        mapping.forEach { (key, value) ->
+            put(key, mergeMdocJsonElement(credentialData[key], value, context, data, functionHistory))
+        }
+    }
+
+    private suspend fun mergeMdocJsonArray(
+        mapping: JsonArray,
+        context: Map<String, JsonElement>,
+        data: Map<String, suspend (FunctionCall) -> JsonElement>,
+        functionHistory: MutableMap<String, JsonElement>,
+    ): JsonArray = buildJsonArray {
+        mapping.forEach { value ->
+            add(mergeMdocJsonElement(null, value, context, data, functionHistory))
+        }
+    }
+
+    private suspend fun mergeMdocJsonElement(
+        original: JsonElement?,
+        mapping: JsonElement,
+        context: Map<String, JsonElement>,
+        data: Map<String, suspend (FunctionCall) -> JsonElement>,
+        functionHistory: MutableMap<String, JsonElement>,
+    ): JsonElement = when (mapping) {
+        is JsonPrimitive -> when {
+            mapping.isString && mapping.isTemplate() -> getTemplateData(
+                functionCall = mapping.content,
+                dataFunctions = data,
+                context = context,
+                functionHistory = functionHistory,
+            )
+            else -> mapping
+        }
+        is JsonObject -> mergeMdocJsonObject(
+            credentialData = original as? JsonObject ?: JsonObject(emptyMap()),
+            mapping = mapping,
+            context = context,
+            data = data,
+            functionHistory = functionHistory,
+        )
+        is JsonArray -> mergeMdocJsonArray(mapping, context, data, functionHistory)
     }
 }

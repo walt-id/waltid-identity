@@ -20,12 +20,15 @@ import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.sdjwt.SDMap
 import id.walt.w3c.issuance.dataFunctions
-import id.walt.w3c.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
+import id.walt.w3c.utils.CredentialDataMergeUtils.mdocNamespaceMapping
+import id.walt.w3c.utils.CredentialDataMergeUtils.mergeMdocPayloadWithMapping
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -75,7 +78,7 @@ class MdocCredentialHandler(
                 issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                     MdocCredentialSigner.generateMdocCredential(
                         credentialRequest = request,
-                        credentialData = mapMdocData(instance.input.credentialData, dataMapping, issuerId, instance.verifiedProof),
+                        credentialData = mapMdocData(instance.input.credentialData, dataMapping, issuerId, display, instance.verifiedProof),
                         issuerKey = issuerKey,
                         issuerCertificate = certificateChain,
                         docType = docType,
@@ -130,7 +133,7 @@ class MdocCredentialHandler(
             issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                 MdocCredentialSigner.generateMdocCredential(
                     credentialRequest = request,
-                    credentialData = mapMdocData(instance.input.credentialData, dataMapping, issuerId, instance.verifiedProof),
+                    credentialData = mapMdocData(instance.input.credentialData, dataMapping, issuerId, display, instance.verifiedProof),
                     issuerKey = issuerKey.key,
                     signatureAlgorithm = issuerKey.requireCoseAlgorithm(),
                     issuerCertificate = certificateChain,
@@ -157,22 +160,29 @@ class MdocCredentialHandler(
         credentialData: JsonObject,
         dataMapping: JsonObject?,
         issuerId: String,
+        display: List<CredentialDisplay>?,
         verifiedProof: VerifiedCredentialProof?,
     ): JsonObject {
         if (dataMapping == null || dataMapping.isEmpty()) return credentialData
         // Legacy top-level mappings (for example validFrom) are not mdoc namespaces.
         // MSO validity is controlled by msoData, so only apply mappings for existing namespaces.
-        val namespaceMapping = JsonObject(dataMapping.filterKeys { it in credentialData })
-        if (namespaceMapping.isEmpty()) return credentialData
-        return credentialData.mergeSDJwtVCPayloadWithMapping(
+        val namespaceMapping = dataMapping.mdocNamespaceMapping(credentialData) ?: return credentialData
+        return credentialData.mergeMdocPayloadWithMapping(
             mapping = namespaceMapping,
-            context = mapOf(
-                "issuerId" to JsonPrimitive(issuerId),
-                "issuerDid" to JsonPrimitive(issuerId),
-                "subjectDid" to (verifiedProof?.holderDid?.let(::JsonPrimitive) ?: JsonNull),
-            ),
+            context = mdocMappingContext(issuerId, display, verifiedProof?.holderDid),
             data = dataFunctions,
         )
+    }
+
+    private fun mdocMappingContext(
+        issuerId: String,
+        display: List<CredentialDisplay>?,
+        subjectDid: String?,
+    ): Map<String, JsonElement> = buildMap {
+        put("issuerId", JsonPrimitive(issuerId))
+        put("issuerDid", JsonPrimitive(issuerId))
+        subjectDid?.takeIf { it.isNotBlank() }?.let { put("subjectDid", JsonPrimitive(it)) }
+        display?.takeIf { it.isNotEmpty() }?.let { put("display", Json.encodeToJsonElement(it)) }
     }
 
     @OptIn(ExperimentalSerializationApi::class)

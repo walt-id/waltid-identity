@@ -96,6 +96,9 @@ object Issuer2ManagementRoutesDocs {
             msoData, x5Chain, notifications, and credentialStatus.
             runtimeOverrides.msoData is rejected unless the profile credential configuration
             format is mso_mdoc.
+            For mDoc profiles, put namespace value functions in mapping (including <date>,
+            <date-in>, and <date-before> for ISO full-date fields such as issue_date) and MSO
+            validity functions in msoData. Top-level W3C-style mapping keys are ignored for mDoc.
             credentialData is applied as a partial object patch over the configured profile data:
             nested objects are merged, while primitive, array, and null values replace the configured value.
             Each offered credential uses its configured `credentialStatus` for all copies issued from it.
