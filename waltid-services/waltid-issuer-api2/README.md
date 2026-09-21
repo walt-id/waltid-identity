@@ -71,7 +71,7 @@ batchCredentialIssuance {
 }
 ```
 
-The initial OSS implementation issues the same credential configuration and dataset once for each holder proof. Holder keys may repeat; using distinct cryptographic data is recommended by OpenID4VCI, not required. Sessions containing one preconfigured credential-status entry remain single-issuance only because every batched credential requires its own status entry.
+Each Credential Request selects one configuration and dataset and issues one copy for each holder proof. A multi-selection offer is redeemed through separate Credential Requests. Holder keys may repeat; using distinct cryptographic data is recommended by OpenID4VCI, not required. Selections containing one preconfigured credential-status entry remain single-issuance only because every batched credential requires its own status entry.
 
 ## API Endpoints
 
@@ -162,23 +162,70 @@ This catalogue replaces the legacy mixed names. `credential_offer_resolved` beco
 
 ## Creating a Credential Offer
 
-Create offers by selecting a configured profile:
+The original request remains supported on `POST /issuer2/credential-offers`:
 
-```bash
-curl -X POST http://localhost:7005/issuer2/credential-offers \
-  -H "Content-Type: application/json" \
-  -d '{
-    "profileId": "UniversityDegree",
-    "credentialData": {
-      "credentialSubject": {
-        "givenName": "Jane",
-        "familyName": "Doe"
-      }
-    }
-  }'
+```json
+{
+  "profileId": "openBadgeCredential",
+  "authMethod": "PRE_AUTHORIZED",
+  "runtimeOverrides": {
+    "credentialData": {"credentialSubject": {"name": "Alice"}}
+  }
+}
 ```
 
-The response contains the credential offer URL or offer reference that a wallet can use to start the OpenID4VCI flow.
+Its flat receipt includes `profileId`, `offerId`, `credentialOffer`, `authMethod`,
+`issuerStateMode`, `valueMode`, `expiresAt`, and `txCodeValue`, subject to the existing
+optional-field serialization settings.
+
+For several selections, or multiple datasets under one profile, use the array contract:
+
+```json
+{
+  "credentials": [
+    {"profileId": "identityCredentialSdJwt", "runtimeOverrides": {"credentialData": {"given_name": "Alice"}}},
+    {"profileId": "identityCredentialSdJwt", "runtimeOverrides": {"credentialData": {"given_name": "Bob"}}}
+  ],
+  "authMethod": "PRE_AUTHORIZED"
+}
+```
+
+The array must contain at least one entry. There is no discriminator. Mixing `profileId`
+and `credentials`, or putting `runtimeOverrides` at the top level of an array request,
+is rejected even when the conflicting field is null. Each entry is resolved to a saved
+profile snapshot. The array receipt contains only the common flat receipt fields; it
+has no `profileId`, selection array, or configuration inventory, even for one entry.
+The wallet resolves the returned offer to obtain its OpenID4VCI configuration IDs.
+
+`AUTHORIZED` offers default to `issuerStateMode = INCLUDE` in OSS. An explicit `OMIT`
+cannot be combined with runtime overrides. Defaults for reference/value mode, expiry,
+and transaction codes are shared by both request forms.
+
+### Sessions, authorization and proof copies
+
+Public session reads and webhook/SSE snapshots depend on original selection count:
+
+- One original selection uses the original flat session shape. A one-entry array offer
+  also uses this shape, although its create-offer receipt follows the array contract.
+- Several original selections use `issuanceRequests` and `issuanceResults`, even when
+  the grant selects only one of them. Original identifiers and request order are retained.
+- A single proof key uses `expectedCredentialProofKeyJwk`. Multiple proof copies use
+  `expectedCredentialProofKeyJwks` in response order, preserving duplicate keys.
+
+`authorizedCredentialIdentifiers` records the established session selection in the
+current stored model. Absent/null means unrecorded; an empty list authorizes nothing.
+Each access token independently limits which selections can be issued. A refresh
+narrowed from A+B to A does not revoke an earlier valid token for B or reduce the
+session completion target. An initial A-only authorization completes after A.
+OSS successful sessions remain open under the existing repeat-issuance policy.
+Result objects have no `issuedAt` field. Notifications preserve key redaction and the
+existing envelope and event counts.
+
+Storage reads accept original flat snapshots and current request/result snapshots.
+Crypto2 sidecars accept both the original single stored key and the map indexed by
+selection identifier. Writes use the current representation. A migrated original
+selection uses its configuration ID as its stable identifier, matching old tokens;
+loading does not issue credentials or replace profile snapshots.
 
 ## Persistence
 
