@@ -90,6 +90,11 @@
         "waltid-services/waltid-issuer-api2/src/main/kotlin/id/walt/issuer/Issuer.kt"
       ],
       "lanes": []
+    },
+    {
+      "name": "iOS phase runner affects all macOS lanes",
+      "files": [".github/scripts/mobile-ci/run-ios-phase.py"],
+      "lanes": ["ios-simulator", "native", "compose", "enterprise", "sdk-docs"]
     }
   ]
 }

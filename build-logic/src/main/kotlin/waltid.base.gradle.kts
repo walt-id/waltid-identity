@@ -1,5 +1,6 @@
 import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
 import org.gradle.api.tasks.testing.AbstractTestTask
+import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
@@ -32,6 +33,20 @@ tasks.withType<AbstractTestTask>().configureEach {
         showExceptions = true
         showCauses = true
         showStackTraces = true
+    }
+}
+
+// Live suites (OpenID conformance, e2e, integration) are one Gradle Test task wrapping
+// many minutes of work. A global JUnit/task timeout kills those. Opt in from CI instead.
+tasks.withType<Test>().configureEach {
+    val junitTimeout = providers.environmentVariable("JUNIT_TIMEOUT_DEFAULT").orNull
+    val longRunning = project.name in setOf(
+        "waltid-openid4vp-conformance-runners",
+        "waltid-e2e-tests",
+        "waltid-integration-tests",
+    )
+    if (!junitTimeout.isNullOrBlank() && junitTimeout != "none" && !longRunning) {
+        systemProperty("junit.jupiter.execution.timeout.default", junitTimeout)
     }
 }
 
