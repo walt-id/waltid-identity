@@ -28,12 +28,14 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 
@@ -44,6 +46,7 @@ class MdocCredentialHandlerValidUntilAuthorityTest {
     fun `holder requestForm validUntil does not override configured expiry`() = runTest {
         val now = Clock.System.now()
         val configuredValidUntil = now.plus(365.days)
+        val expectedUpdate = now.plus(180.days)
         val holderValidUntil = now.plus(3650.days)
         val issuerKey = generateP256Key("mdoc-issuer")
         val certificate = X509CertificateUtil.createSelfSignedCertificate(
@@ -90,7 +93,13 @@ class MdocCredentialHandlerValidUntilAuthorityTest {
                 ),
                 verifiedProofs = listOf(verifiedProof()),
             ),
-            dataMapping = null,
+            dataMapping = buildJsonObject {
+                put("validFrom", "<timestamp-before:30d>")
+                put("validUntil", "<timestamp-in:10d>")
+                putJsonObject(DOC_TYPE) {
+                    put("given_name", "<uuid>")
+                }
+            },
             selectiveDisclosure = null,
             x5Chain = listOf(certificate),
             display = null,
@@ -99,16 +108,20 @@ class MdocCredentialHandlerValidUntilAuthorityTest {
             authorizedTransactionDataTypes = null,
             validFrom = now,
             validUntil = configuredValidUntil,
-            expectedUpdate = null,
+            expectedUpdate = expectedUpdate,
         )
 
         val success = assertIs<CredentialResponseResult.Success>(result)
         val credential = requireNotNull(success.response.credentials).single().credential.jsonPrimitive.content
-        val validity = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(credential.base64UrlDecode())
-            .decodeMobileSecurityObject()
-            .validityInfo
+        val issuerSigned = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(credential.base64UrlDecode())
+        val validity = issuerSigned.decodeMobileSecurityObject().validityInfo
 
         assertEquals(configuredValidUntil.epochSeconds, validity.validUntil.epochSeconds)
+        assertEquals(expectedUpdate.epochSeconds, validity.expectedUpdate?.epochSeconds)
+        assertTrue(
+            issuerSigned.namespacesToJson().getValue(DOC_TYPE).jsonObject.getValue("given_name")
+                .jsonPrimitive.content.startsWith("urn:uuid:"),
+        )
     }
 
     private suspend fun verifiedProof() = VerifiedCredentialProof(

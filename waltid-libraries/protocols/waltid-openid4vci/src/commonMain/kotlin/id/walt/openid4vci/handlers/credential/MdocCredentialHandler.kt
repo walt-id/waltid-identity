@@ -17,10 +17,15 @@ import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
+import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.sdjwt.SDMap
+import id.walt.w3c.issuance.dataFunctions
+import id.walt.w3c.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -70,7 +75,7 @@ class MdocCredentialHandler(
                 issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                     MdocCredentialSigner.generateMdocCredential(
                         credentialRequest = request,
-                        credentialData = instance.input.credentialData,
+                        credentialData = mapMdocData(instance.input.credentialData, dataMapping, issuerId, instance.verifiedProof),
                         issuerKey = issuerKey,
                         issuerCertificate = certificateChain,
                         docType = docType,
@@ -125,7 +130,7 @@ class MdocCredentialHandler(
             issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                 MdocCredentialSigner.generateMdocCredential(
                     credentialRequest = request,
-                    credentialData = instance.input.credentialData,
+                    credentialData = mapMdocData(instance.input.credentialData, dataMapping, issuerId, instance.verifiedProof),
                     issuerKey = issuerKey.key,
                     signatureAlgorithm = issuerKey.requireCoseAlgorithm(),
                     issuerCertificate = certificateChain,
@@ -145,6 +150,29 @@ class MdocCredentialHandler(
         throw e
     } catch (e: Exception) {
         CredentialResponseResult.Failure(e.toCredentialHandlerError())
+    }
+
+    /** Resolve namespace element mappings before mdoc-specific JSON-to-CBOR conversions. */
+    private suspend fun mapMdocData(
+        credentialData: JsonObject,
+        dataMapping: JsonObject?,
+        issuerId: String,
+        verifiedProof: VerifiedCredentialProof?,
+    ): JsonObject {
+        if (dataMapping == null || dataMapping.isEmpty()) return credentialData
+        // Legacy top-level mappings (for example validFrom) are not mdoc namespaces.
+        // MSO validity is controlled by msoData, so only apply mappings for existing namespaces.
+        val namespaceMapping = JsonObject(dataMapping.filterKeys { it in credentialData })
+        if (namespaceMapping.isEmpty()) return credentialData
+        return credentialData.mergeSDJwtVCPayloadWithMapping(
+            mapping = namespaceMapping,
+            context = mapOf(
+                "issuerId" to JsonPrimitive(issuerId),
+                "issuerDid" to JsonPrimitive(issuerId),
+                "subjectDid" to (verifiedProof?.holderDid?.let(::JsonPrimitive) ?: JsonNull),
+            ),
+            data = dataFunctions,
+        )
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -173,7 +201,7 @@ class MdocCredentialHandler(
         }
         val issuerCertificateChain = certificates.map { CoseCertificate(it.encodedDer.toByteArray()) }
 
-        // Issuer/session policy is authoritative; holder requestForm["validUntil"] is ignored.
+        // The issuer's resolved MSO validity is authoritative over holder request parameters.
         val roundedValidity = if (roundValidityToTwelveHours) {
             roundedMdocValidity(now(), certificates.first().data.validity, validFrom, validUntil)
         } else null
