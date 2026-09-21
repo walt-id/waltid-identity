@@ -207,6 +207,7 @@ const effectiveMode = computed(() =>
             <SimpleIssueEditor
               v-if="effectiveMode === 'simple' && activeTab === 'issue'"
               :session="issuerSession"
+              :profiles="issuerProfiles"
             />
             <SimpleVerifyEditor
               v-else-if="effectiveMode === 'simple' && activeTab === 'verify'"
