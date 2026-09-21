@@ -443,6 +443,7 @@ print_secret_env OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM
 print_env OPENID4VCI_CONFORMANCE_MODULE_GROUPS
 print_env OPENID4VCI_CONFORMANCE_MODULES
 print_env OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES
+print_env OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS
 print_env OPENID4VCI_CONFORMANCE_STATIC_TX_CODE
 print_env OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION
 print_env OPENID4VCI_CONFORMANCE_AUTH_USERNAME
@@ -487,6 +488,7 @@ case "${OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION,,}" in
         echo "Installing Playwright browser for authorization-code conformance tests..."
         ./gradlew "${PLAYWRIGHT_GRADLE_ARGS[@]}" \
           :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers \
+          --no-configuration-cache \
           --no-build-cache
         ;;
       false|0|no)
@@ -508,6 +510,7 @@ set +e
   :waltid-services:waltid-openid4vp-conformance-runners:test \
   --tests "id.walt.openid4vp.conformance.IssuerConformanceTests.runIssuerConformanceTests" \
   --rerun-tasks \
+  --no-configuration-cache \
   --no-build-cache
 GRADLE_EXIT=$?
 set -e
@@ -516,6 +519,11 @@ echo
 echo "Result summary:"
 if [[ -f "$RESULT_XML" ]]; then
   grep -E 'tests=|skipped=|failures=|errors=' "$RESULT_XML"
+  # Test stdout is captured by Gradle; surface the runner's batch coverage summary here too.
+  grep -m1 'Batch issuance coverage:' "$RESULT_XML" || true
+  if [[ -n "${OPENID4VCI_CONFORMANCE_REPORT_DIR:-}" ]]; then
+    echo "Detailed issuer results: $OPENID4VCI_CONFORMANCE_REPORT_DIR/summary.md"
+  fi
 
   if grep -q 'skipped="1"' "$RESULT_XML"; then
     echo

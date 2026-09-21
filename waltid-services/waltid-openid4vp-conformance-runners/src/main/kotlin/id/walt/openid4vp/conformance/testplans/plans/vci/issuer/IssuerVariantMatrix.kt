@@ -8,6 +8,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.nio.file.Files
 import java.nio.file.Path
@@ -305,6 +306,14 @@ data class IssuerVariantModuleRunResult(
 )
 
 @Serializable
+enum class IssuerBatchCoverageStatus {
+    PASSED,
+    MISSING,
+    NOT_PASSED,
+    NOT_OFFERED_BY_PINNED_SUITE,
+}
+
+@Serializable
 data class IssuerVariantRunResult(
     val variantId: String,
     val variant: JsonObject,
@@ -312,7 +321,29 @@ data class IssuerVariantRunResult(
     val planId: String? = null,
     val modules: List<IssuerVariantModuleRunResult> = emptyList(),
     val error: String? = null,
-)
+) {
+    // Derived from the raw results; never convert SKIPPED or absent modules into a pass.
+    val batchCoverage: IssuerBatchCoverageStatus
+        get() {
+            val batchModules = modules.filter { it.testModule == "oid4vci-1_0-issuer-batch-issuance" }
+            if (batchModules.isEmpty()) {
+                // VCIIssuerTestPlanHaip at db1080a offers batch only for plain responses.
+                // Revisit this narrow exception when updating the suite pin.
+                val notOffered = variant["fapi_profile"]?.jsonPrimitive?.content == "vci_haip" &&
+                    variant["vci_grant_type"]?.jsonPrimitive?.content == "authorization_code" &&
+                    variant["vci_credential_encryption"]?.jsonPrimitive?.content == "encrypted"
+                return if (notOffered) {
+                    IssuerBatchCoverageStatus.NOT_OFFERED_BY_PINNED_SUITE
+                } else {
+                    IssuerBatchCoverageStatus.MISSING
+                }
+            }
+            return if (batchModules.all {
+                !it.testId.isNullOrBlank() && it.status == "FINISHED" && it.result == "PASSED" &&
+                    it.accepted && it.error == null
+            }) IssuerBatchCoverageStatus.PASSED else IssuerBatchCoverageStatus.NOT_PASSED
+        }
+}
 
 @Serializable
 data class IssuerVariantMatrixEntry(
@@ -321,6 +352,7 @@ data class IssuerVariantMatrixEntry(
     val status: IssuerVariantRunStatus,
     val planId: String? = null,
     val error: String? = null,
+    val batchCoverage: IssuerBatchCoverageStatus? = null,
 )
 
 object IssuerVariantReportWriter {
@@ -339,6 +371,7 @@ object IssuerVariantReportWriter {
                 status = result?.status ?: IssuerVariantRunStatus.GENERATED,
                 planId = result?.planId,
                 error = result?.error,
+                batchCoverage = result?.batchCoverage,
             )
         }
 
@@ -353,7 +386,7 @@ object IssuerVariantReportWriter {
         Files.writeString(dir.resolve("summary.md"), buildSummary(results))
     }
 
-    private fun buildSummary(results: List<IssuerVariantRunResult>): String = buildString {
+    internal fun buildSummary(results: List<IssuerVariantRunResult>): String = buildString {
         appendLine("# OpenID4VCI Issuer Matrix Summary")
         appendLine()
         appendLine("- Soft-fail (`CONFORMANCE_ALLOW_FAILURE`): `${if (ConformanceCiFlags.allowFailure()) "enabled" else "disabled"}`")
@@ -364,15 +397,30 @@ object IssuerVariantReportWriter {
             appendLine("| `${status.name.lowercase()}` | ${results.count { it.status == status }} |")
         }
         appendLine()
-        appendLine("| Variant | Status | Plan | Modules | Error |")
-        appendLine("|---------|--------|------|---------|-------|")
+        appendLine(batchCoverageSummary(results))
+        appendLine()
+        appendLine("`not_offered_by_pinned_suite` means encrypted HAIP batch is absent from db1080a's plan; it is not batch coverage.")
+        appendLine()
+        appendLine("| Variant | Status | Plan | Modules | Batch coverage | Error |")
+        appendLine("|---------|--------|------|---------|----------------|-------|")
         results.forEach { result ->
+            val errors = listOfNotNull(result.error) + result.modules.filter { !it.accepted }.map { module ->
+                "${module.testModule} (test=${module.testId ?: "not created"}, " +
+                    "status=${module.status ?: "unknown"}, result=${module.result ?: "none"}): " +
+                    (module.error ?: "Module did not produce an accepted result")
+            }
             appendLine(
                 "| `${result.variantId}` | `${result.status.name.lowercase()}` | " +
-                    "${result.planId ?: ""} | ${result.modules.size} | ${result.error?.sanitizeMarkdownCell() ?: ""} |"
+                    "${result.planId ?: ""} | ${result.modules.size} | `${result.batchCoverage.name.lowercase()}` | " +
+                    "${errors.joinToString("; ").sanitizeMarkdownCell()} |"
             )
         }
     }
+
+    internal fun batchCoverageSummary(results: List<IssuerVariantRunResult>): String =
+        "Batch issuance coverage: " + IssuerBatchCoverageStatus.entries.joinToString("; ") { coverage ->
+            "${results.count { it.batchCoverage == coverage }} ${coverage.name.lowercase()}"
+        }
 
     private fun String.sanitizeMarkdownCell(): String = replace("\n", " ").replace("|", "\\|")
 }
