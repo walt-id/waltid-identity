@@ -19,7 +19,7 @@ object CliDcql {
         validate(query)
         val matches = query.credentials.mapNotNull { credentialQuery ->
             val queryMatches = credentials.flatMap { credential ->
-                DcqlMatcher.match(
+                DcqlMatcher.findMatches(
                     query = DcqlQuery(credentials = listOf(credentialQuery)),
                     availableCredentials = listOf(credential),
                     trustedAuthoritiesChecker = trustedAuthoritiesChecker,

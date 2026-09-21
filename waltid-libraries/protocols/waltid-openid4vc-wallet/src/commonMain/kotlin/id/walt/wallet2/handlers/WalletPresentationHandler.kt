@@ -36,6 +36,8 @@ import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vp.wallet.PresentationRequestError
 import id.waltid.openid4vp.wallet.PresentationRequestValidationResult
 import id.waltid.openid4vp.wallet.PresentationRequestValidator
+import id.waltid.openid4vp.wallet.PresentationValidationTransport
+import id.waltid.openid4vp.wallet.request.AuthenticatedClientFacts
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
@@ -858,12 +860,29 @@ object WalletPresentationHandler {
             trustConfiguration = clientIdTrustConfiguration,
         )
         val authorizationRequest = resolvedRequest.authorizationRequest
-        val query = requireNotNull(authorizationRequest.dcqlQuery)
-        val transactionDataItems = validateRequestTransactionData(
-            transactionData = authorizationRequest.transactionData,
-            typeRegistry = transactionDataTypeRegistry,
-            credentialQueriesById = query.credentials.associateBy { it.id },
+        val keyMaterial = wallet.resolveKeyMaterial(keyId = null, crypto2Usages = setOf(KeyUsage.SIGN))
+        val validation = PresentationRequestValidator.validate(
+            resolvedRequest = ResolvedAuthorizationRequest.Plain(
+                authorizationRequest = authorizationRequest,
+                client = AuthenticatedClientFacts(
+                    effectiveClientMetadata = resolvedRequest.effectiveClientMetadata,
+                    responseDestinationAuthenticated = true,
+                    boundResponseDestination = resolvedRequest.origin,
+                ),
+            ),
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            formatCapabilities = {
+                keyMaterial?.presentationCapabilities()
+                    ?: WalletPresentationFormatRegistry.defaultCapabilities()
+            },
+            transport = PresentationValidationTransport.DigitalCredentialsApi,
         )
+        if (validation is PresentationRequestValidationResult.Invalid) {
+            throw IllegalArgumentException(validation.error.message)
+        }
+        val valid = validation as PresentationRequestValidationResult.Valid
+        val query = requireNotNull(authorizationRequest.dcqlQuery)
+        val transactionDataItems = valid.transactionData
         // response_mode=dc_api.jwt is unanswerable without usable verifier encryption metadata, and
         // the mdoc session transcript is thumbprinted from the same key. Resolving it here rather
         // than at response-build time means an unusable configuration is rejected before any
