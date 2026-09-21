@@ -72,6 +72,7 @@ private data class StoredRefreshTokenRecord(
     val grantedAudience: Set<String>,
     val session: StoredSession,
     val expiresAt: Long,
+    val grantedAuthorizationDetails: List<AuthorizationDetail>? = null,
 )
 
 @Serializable
@@ -119,6 +120,7 @@ private fun RefreshTokenRecord.toStoredRecord(): StoredRefreshTokenRecord =
         grantedAudience = grantedAudience,
         session = session.toStoredSession(),
         expiresAt = expiresAt.toEpochMilliseconds(),
+        grantedAuthorizationDetails = grantedAuthorizationDetails,
     )
 
 private fun StoredRefreshTokenRecord.toLibraryRecord(): DefaultRefreshTokenRecord =
@@ -132,6 +134,7 @@ private fun StoredRefreshTokenRecord.toLibraryRecord(): DefaultRefreshTokenRecor
         grantedAudience = grantedAudience,
         session = session.toSession(),
         expiresAt = Instant.fromEpochMilliseconds(expiresAt),
+        grantedAuthorizationDetails = grantedAuthorizationDetails,
     )
 
 private fun AccessTokenRequest.toStoredRequest(): StoredAccessTokenRequest =

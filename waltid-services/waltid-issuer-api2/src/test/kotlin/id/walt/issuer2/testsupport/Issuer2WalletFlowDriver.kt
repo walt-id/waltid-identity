@@ -240,10 +240,12 @@ class Issuer2WalletFlowDriver(
     suspend fun refreshAccessToken(
         resolvedOffer: ResolvedCredentialOffer,
         refreshToken: String,
+        additionalParameters: Map<String, String> = emptyMap(),
     ): TokenRequestBuilder.TokenResponse =
         TokenRequestBuilder(walletClientConfig, client).refreshAccessToken(
             tokenEndpoint = requireNotNull(resolvedOffer.authorizationServerMetadata.tokenEndpoint),
             refreshToken = refreshToken,
+            additionalParameters = additionalParameters,
             attestationHeaders = buildAttestationHeaders(resolvedOffer),
         )
 

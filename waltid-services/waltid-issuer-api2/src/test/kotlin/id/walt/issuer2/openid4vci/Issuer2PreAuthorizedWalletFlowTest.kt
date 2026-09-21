@@ -242,6 +242,65 @@ class Issuer2PreAuthorizedWalletFlowTest {
     }
 
     @Test
+    fun narrowerRefreshPreservesOriginalSelectionAndOlderTokenRights() = testApplication {
+        val a = Issuer2CredentialScenarios.identitySdJwt
+        val b = Issuer2CredentialScenarios.isoMdl
+        val clientAttestation = createIssuer2ClientAttestationTestMaterial()
+        installIssuer2WithConfigFiles { it.copy(clientAuthenticationConfig = clientAttestation.clientAuthenticationConfig) }
+        val client = apiClient()
+        val wallet = Issuer2WalletFlowDriver(client, attestationAssembler = clientAttestation.attestationAssembler)
+        fun details(vararg configurations: String) = buildJsonArray {
+            configurations.forEach { configuration -> add(buildJsonObject {
+                put("type", OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE)
+                put("credential_configuration_id", configuration)
+            }) }
+        }.toString()
+
+        for (initialSubset in listOf(false, true)) {
+            val created = client.createCredentialOffer(MultiCredentialOfferCreateRequest(
+                credentials = listOf(CredentialOfferCredential(a.profileId), CredentialOfferCredential(b.profileId)),
+                authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            ))
+            val offered = client.getSession(created.offerId)
+            assertNull(offered.authorizedCredentialIdentifiers)
+            val identifiers = offered.issuanceRequests.map { it.credentialIdentifier }
+            val resolved = wallet.resolve(created)
+            val configurations = if (initialSubset) listOf(a.credentialConfigurationId) else listOf(a.credentialConfigurationId, b.credentialConfigurationId)
+            val t1 = wallet.exchangePreAuthorizedCode(resolved, null, additionalParameters = mapOf(
+                "authorization_details" to details(*configurations.toTypedArray()),
+            ))
+            val t2 = if (initialSubset) t1 else wallet.refreshAccessToken(resolved, assertRefreshToken(t1), mapOf(
+                "authorization_details" to details(a.credentialConfigurationId),
+            ))
+            assertEquals(listOf(a.credentialConfigurationId), assertNotNull(t2.authorization_details).map { it.credentialConfigurationId })
+            val established = if (initialSubset) identifiers.take(1) else identifiers
+            assertEquals(established, client.getSession(created.offerId).authorizedCredentialIdentifiers)
+            val rejected = client.post(resolved.issuerMetadata.credentialEndpoint) {
+                bearerAuth(t2.access_token)
+                contentType(ContentType.Application.Json)
+                setBody(credentialRequest(b.credentialConfigurationId, wallet.buildJwtProofs(resolved.issuerMetadata, b.credentialConfigurationId)))
+            }
+            assertEquals(HttpStatusCode.BadRequest, rejected.status, rejected.bodyAsText())
+            assertTrue(client.getSession(created.offerId).issuanceResults.isEmpty())
+            wallet.requestCredential(resolved, t2.access_token, a.credentialConfigurationId, includeDidInProof = false)
+            val afterA = client.getSession(created.offerId)
+            assertEquals(identifiers, afterA.issuanceRequests.map { it.credentialIdentifier })
+            assertEquals(established, afterA.authorizedCredentialIdentifiers)
+            assertEquals(if (initialSubset) IssuanceSessionStatus.SUCCESSFUL else IssuanceSessionStatus.ACTIVE, afterA.status)
+            assertFalse(afterA.isClosed)
+            assertEquals(setOf(identifiers.first()), afterA.issuanceResults.keys)
+            if (!initialSubset) {
+                wallet.requestCredential(resolved, t1.access_token, b.credentialConfigurationId)
+                val complete = client.getSession(created.offerId)
+                assertEquals(IssuanceSessionStatus.SUCCESSFUL, complete.status)
+                assertFalse(complete.isClosed)
+                assertEquals(identifiers.toSet(), complete.issuanceResults.keys)
+                assertEquals(identifiers, complete.authorizedCredentialIdentifiers)
+            }
+        }
+    }
+
+    @Test
     fun walletCanIssueDifferentDatasetsForOneConfigurationUsingCredentialIdentifiers() = testApplication {
         val scenario = Issuer2CredentialScenarios.identitySdJwt
         installIssuer2WithConfigFiles()
