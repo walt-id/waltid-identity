@@ -1304,7 +1304,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             val response = oauth2Provider.writeCredentialResponse(requestWithSession, credentialResponse)
             val issuanceResults = session.issuanceResults + (
                 issuanceRequest.credentialIdentifier to IssuanceResult(
-                    issuedAt = Clock.System.now(),
                     issuedCredentialFormat = configuration.format.value,
                 )
             )
