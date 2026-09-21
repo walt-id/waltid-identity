@@ -8,6 +8,28 @@ import XCTest
 @MainActor
 final class PublicDemoBackendE2ETests: XCTestCase {
 
+    func testSettingsCopyControlsAreAccessible() throws {
+        guard #available(iOS 17.0, *) else { throw XCTSkip("Accessibility audit requires iOS 17") }
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: isolatedWalletEnvironment())
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+        ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
+        XCTAssertTrue(app.buttons["wallet.settingsTechnicalDetails"].waitForExistence(timeout: 10))
+        try app.performAccessibilityAudit(for: [.elementDetection, .hitRegion, .sufficientElementDescription, .trait])
+
+        ui.tapButton(identifier: "wallet.settingsTechnicalDetails", fallbackLabel: "Technical details")
+        let copy = app.buttons["wallet.settingsDidCopy"]
+        XCTAssertTrue(copy.waitForExistence(timeout: 10))
+        XCTAssertEqual(copy.label, "Copy wallet DID")
+        XCTAssertEqual(app.buttons["wallet.settingsKeyIdCopy"].label, "Copy key ID")
+        XCTAssertEqual(app.buttons["wallet.settingsPublicJwkCopy"].label, "Copy public key as JWK")
+        // Auditing the native tree also catches unlabeled tooltip wrappers beside labeled buttons.
+        try app.performAccessibilityAudit(for: [.elementDetection, .hitRegion, .sufficientElementDescription, .trait])
+        copy.tap()
+        XCTAssertTrue(app.otherElements["Wallet DID copied"].waitForExistence(timeout: 5))
+    }
+
     private let backend = DemoBackend.shared
 
     // Timeouts (aligned with Android for cross-platform consistency)

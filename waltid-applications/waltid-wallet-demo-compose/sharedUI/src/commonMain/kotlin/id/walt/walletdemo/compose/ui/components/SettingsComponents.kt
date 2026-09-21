@@ -21,6 +21,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.ui.resources.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import org.jetbrains.compose.resources.DrawableResource
@@ -166,6 +167,33 @@ internal fun SettingsNotice(message: String, error: Boolean = false, modifier: M
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+internal fun SettingsIconButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    val tooltip = rememberTooltipState()
+    val scope = rememberCoroutineScope()
+    val showTooltip = stringResource(Res.string.settings_show_tooltip)
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(label) } },
+        state = tooltip,
+        // Expose one action: Material's separate wrapper otherwise becomes an empty iOS focus target.
+        modifier = modifier.semantics(mergeDescendants = true) {}.clearAndSetSemantics {
+            contentDescription = label
+            role = Role.Button
+            if (enabled) this.onClick { onClick(); true } else disabled()
+            onLongClick(label = showTooltip) { scope.launch { tooltip.show() }; true }
+        },
+    ) {
+        IconButton(onClick = onClick, enabled = enabled, content = content)
+    }
+}
+
+@Composable
 internal fun SettingsCopyRow(
     title: String,
     value: String?,
@@ -195,13 +223,10 @@ internal fun SettingsCopyRow(
                         Icon(if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                             if (expanded) disclosureLabels.second else disclosureLabels.first)
                     }
-                    TooltipBox(positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                        tooltip = { PlainTooltip { Text(copyLabel) } }, state = rememberTooltipState()) {
-                        IconButton(enabled = !value.isNullOrBlank(), onClick = {
-                            value?.let { clipboard.setText(AnnotatedString(it)); copied = true }
-                        }, modifier = Modifier.testTag(copyTag)) {
-                            Icon(painterResource(Res.drawable.settings_copy), copyLabel)
-                        }
+                    SettingsIconButton(copyLabel, enabled = !value.isNullOrBlank(), onClick = {
+                        value?.let { clipboard.setText(AnnotatedString(it)); copied = true }
+                    }, modifier = Modifier.testTag(copyTag)) {
+                        Icon(painterResource(Res.drawable.settings_copy), contentDescription = null)
                     }
                 }
             },

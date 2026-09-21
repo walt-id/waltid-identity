@@ -1311,6 +1311,8 @@ class WalletDemoAppTestScenarios(
             }
         }
         onAllNodesWithTag("jwk-value").assertCountEquals(0)
+        onNodeWithTag("jwk-copy").assertHasClickAction().assertIsEnabled()
+        assertTrue(!onNodeWithTag("jwk-copy").fetchSemanticsNode().config.contains(SemanticsProperties.HideFromAccessibility))
         onNodeWithTag("jwk-copy").performClick()
         runOnIdle { assertEquals(original, clipboard.getText()?.text) }
         onNodeWithText("Copied").assertIsDisplayed()
@@ -1322,6 +1324,8 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag("jwk-value").assertIsDisplayed()
         onNodeWithContentDescription("Hide public key").performClick()
         onAllNodesWithTag("jwk-value").assertCountEquals(0)
+        onNodeWithTag("jwk-copy").performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        onNodeWithText("Copy public key as JWK").assertIsDisplayed()
     }
 
     fun readerTrustSettingsReviewAndPersistPublicCa() = runComposeUiTest {

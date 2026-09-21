@@ -163,18 +163,14 @@ internal fun handleReaderTrustImportPickerResult(controller: DemoReaderTrustSett
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TrustMaterialRow(title: String, detail: String, enabled: Boolean, onRemove: () -> Unit) {
     ListItem(headlineContent = { Text(title) }, supportingContent = { Text(detail) },
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         trailingContent = {
             val removeLabel = stringResource(Res.string.reader_trust_remove_named, title)
-            TooltipBox(positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                tooltip = { PlainTooltip { Text(removeLabel) } }, state = rememberTooltipState()) {
-                IconButton(onClick = onRemove, enabled = enabled) {
-                    Icon(Icons.Default.Delete, removeLabel, tint = MaterialTheme.colorScheme.error)
-                }
+            SettingsIconButton(removeLabel, onClick = onRemove, enabled = enabled) {
+                Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
             }
         })
 }
