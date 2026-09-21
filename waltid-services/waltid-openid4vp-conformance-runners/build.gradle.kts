@@ -295,3 +295,33 @@ registerWalletProfileTestTask(
     testFilter = "id.walt.openid4vp.conformance.VciWalletConformanceTests.vciWalletSdJwtVcAuthorizationCodeHaipFullTarget",
     descriptionText = "Run the HAIP full-target VCI wallet conformance profile."
 )
+
+// ITB profile checks are intentionally separate from the ordinary regression suite:
+// unresolved external product dependencies must remain failing assertions, not expected failures.
+val itbTestSourceSet = sourceSets.create("itbTest") {
+    compileClasspath += sourceSets.main.get().output
+    runtimeClasspath += output + compileClasspath
+}
+configurations[itbTestSourceSet.implementationConfigurationName].extendsFrom(
+    configurations.implementation.get(), configurations.testImplementation.get(),
+)
+configurations[itbTestSourceSet.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.runtimeOnly.get(), configurations.testRuntimeOnly.get(),
+)
+dependencies {
+    add(itbTestSourceSet.implementationConfigurationName, identityLibs.ktor.client.mock)
+    add(itbTestSourceSet.implementationConfigurationName, identityLibs.bouncycastle.pkix)
+}
+tasks.register<Test>("itbTest") {
+    group = "verification"
+    description = "Check the initial WeBuild wallet protocol requirements (not hosted ITB sign-off)."
+    testClassesDirs = itbTestSourceSet.output.classesDirs
+    classpath = itbTestSourceSet.runtimeClasspath
+    useJUnitPlatform()
+    ignoreFailures = providers.gradleProperty("itbAllowFailures").map {
+        require(it == "true" || it == "false") { "itbAllowFailures must be true or false" }
+        it.toBoolean()
+    }.getOrElse(false)
+    // Fresh per-run cryptographic material and result reports, even if inputs are unchanged.
+    outputs.upToDateWhen { false }
+}
