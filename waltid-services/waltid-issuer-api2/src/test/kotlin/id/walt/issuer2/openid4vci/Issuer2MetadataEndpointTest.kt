@@ -256,10 +256,20 @@ class Issuer2MetadataEndpointTest {
             val logoUri = assertNotNull(display.logo?.uri, "Expected logo for $configurationId")
             assertEquals("$expectedPrefix$WALTID_MARK_FILE", logoUri)
         }
+        val sdJwtPidDisplay = credentialIssuerMetadata.credentialConfigurationsSupported
+            .getValue("urn:eudi:pid:1")
+            .credentialMetadata
+            ?.display
+            ?.first()
+        assertEquals(
+            "$expectedPrefix$PID_SD_JWT_CARD_ART_FILE",
+            sdJwtPidDisplay?.backgroundImage?.uri,
+            "SD-JWT PID must use format-correct card art",
+        )
     }
 
     private suspend fun assertCredentialCardArtIsServed(client: HttpClient) {
-        listOf(PID_CARD_ART_FILE, WALTID_MARK_FILE).forEach { fileName ->
+        listOf(PID_CARD_ART_FILE, PID_SD_JWT_CARD_ART_FILE, WALTID_MARK_FILE).forEach { fileName ->
             val response = client.get("/static/credential-cards/$fileName")
             assertEquals(HttpStatusCode.OK, response.status, "Expected $fileName to be served")
             assertTrue(response.readRawBytes().isNotEmpty(), "Expected $fileName to have content")
@@ -478,6 +488,7 @@ class Issuer2MetadataEndpointTest {
         const val NESTED_JWT_VC_ISSUER_METADATA_PATH = "$OPENID4VCI_PREFIX/.well-known/jwt-vc-issuer"
         const val OPEN_BADGE_CONFIG_ID = "OpenBadgeCredential_jwt_vc_json"
         const val PID_CARD_ART_FILE = "pid-mdoc.png"
+        const val PID_SD_JWT_CARD_ART_FILE = "pid-sd-jwt.png"
         const val WALTID_MARK_FILE = "waltid-mark.png"
         const val SD_JWT_INTERNAL_CONFIG_ID = "identity_credential"
         val INTERNAL_SD_JWT_VCT: String get() = "$ISSUER_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
