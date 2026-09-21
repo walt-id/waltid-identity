@@ -20,6 +20,39 @@
 
 ## Getting Started
 
+### Proximity protocol models and released APIs
+
+The expanded ISO/IEC DIS 18013-5 edition-2 wire models live in
+`id.walt.mdoc.objects.edition2` within this artifact. The proximity engine uses
+that family for typed request information, extension-preserving serialization,
+response lists and validated signature/MAC alternatives. Shared CBOR, cryptography,
+MSO and session-transcript types remain in their existing packages.
+
+The released `id.walt.mdoc.objects` constructors, data-class `copy` methods,
+serializers and array-based `DeviceResponse` remain available. Existing issuance,
+storage and remote-presentation callers keep their existing imports. Deprecated
+legacy crypto overloads remain callable; the legacy key backend still cannot
+perform ECDH. Use crypto2 keys for MAC authentication.
+
+Only callers of the new proximity engine need the edition-2 types:
+
+```kotlin
+// Existing callers keep their released API.
+import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
+val existing = DeviceResponse(version = "1.0", documents = emptyArray(), status = 0u)
+
+// Proximity consumers use the explicitly versioned protocol family.
+val proximity = id.walt.mdoc.objects.edition2.deviceretrieval.DeviceResponse(
+    version = "1.0", status = 0u,
+)
+```
+
+`MdocParser.parseToEdition2Document(signed)` reads an original stored credential
+for the proximity path. It retains unknown document/issuer/item fields and exact
+`IssuerSignedItemBytes`; do not convert signed items by reconstructing their maps.
+`MdocParser.parseToDocument` continues to return the released `Document` type.
+No stored credential rewrite is required.
+
 ### Portrait capture timestamps and compatibility
 
 `Mdl.portraitCaptureDate` and `PhotoId.portraitCaptureDate` retain their `LocalDate?`

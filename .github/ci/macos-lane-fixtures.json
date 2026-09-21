@@ -92,6 +92,27 @@
       "lanes": []
     },
     {
+      "name": "proximity manifest selects its Kotlin and Swift consumers",
+      "files": [
+        ".github/scripts/mobile-ci/proximity-test-suites.json"
+      ],
+      "lanes": ["ios-simulator", "native"]
+    },
+    {
+      "name": "Swift bridge runner selects the native consumer lane",
+      "files": [
+        ".github/scripts/mobile-ci/run-ios-wallet-sdk-tests.sh"
+      ],
+      "lanes": ["native"]
+    },
+    {
+      "name": "physical controller changes use hardware-free checks only",
+      "files": [
+        "scripts/proximity-physical/run.py"
+      ],
+      "lanes": []
+    },
+    {
       "name": "iOS phase runner affects all macOS lanes",
       "files": [".github/scripts/mobile-ci/run-ios-phase.py"],
       "lanes": ["ios-simulator", "native", "compose", "enterprise", "sdk-docs"]

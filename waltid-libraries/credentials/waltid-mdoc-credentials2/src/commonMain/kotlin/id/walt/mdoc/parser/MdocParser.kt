@@ -49,4 +49,27 @@ object MdocParser {
         return document
     }
 
+    /**
+     * Parses a stored credential for the edition-2 protocol without changing the released model API.
+     * Reads the original credential so unknown fields and exact IssuerSignedItemBytes survive.
+     */
+    @OptIn(ExperimentalSerializationApi::class)
+    fun parseToEdition2Document(signed: String): id.walt.mdoc.objects.edition2.document.Document {
+        val bytes = when {
+            signed.matchesHex() -> signed.hexToByteArray()
+            signed.matchesBase64Url() -> signed.decodeFromBase64Url()
+            else -> throw IllegalArgumentException("Signed is neither hex nor base64")
+        }
+        return runCatching {
+            coseCompliantCbor.decodeFromByteArray<id.walt.mdoc.objects.edition2.deviceretrieval.DeviceResponse>(bytes)
+                .documents?.single() ?: throw IllegalArgumentException("Expected one stored mdoc document")
+        }.recoverCatching {
+            coseCompliantCbor.decodeFromByteArray<id.walt.mdoc.objects.edition2.document.Document>(bytes)
+        }.recoverCatching {
+            val issuerSigned = coseCompliantCbor
+                .decodeFromByteArray<id.walt.mdoc.objects.edition2.document.IssuerSigned>(bytes)
+            id.walt.mdoc.objects.edition2.document.Document(issuerSigned.decodeMobileSecurityObject().docType, issuerSigned)
+        }.getOrElse { throw IllegalArgumentException("Unable to parse edition-2 mdoc credential", it) }
+    }
+
 }

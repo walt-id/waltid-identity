@@ -24,7 +24,7 @@ import kotlinx.serialization.cbor.ValueTags
  * properties and a private constructor. Instances **must be created** using the provided companion
  * object factory methods (`forNfc`, `forQr`, `forOpenId`, etc.) to ensure a valid state.
  *
- * @see ISO/IEC 18013-5:xxxx(E), 9.1.5.1
+ * @see ISO/IEC 18013-5, SessionTranscript CDDL
  * @see ISO/IEC TS 18013-7:2024(en), Annex B.4.4 & C.5
  */
 @OptIn(ExperimentalSerializationApi::class)
@@ -85,7 +85,7 @@ data class SessionTranscript private constructor(
             nfcHandover = nfcHandover
         )
 
-        /** Creates a SessionTranscript for an OID4VP Handover flow based on the outdated ISO/IEC TS 18013-7 spec. */
+        /** Creates a SessionTranscript for the deprecated pre-OpenID4VP-1.0 ISO handover shape. */
         fun forIsoOpenId(
             handover: IsoOID4VPHandover,
         ): SessionTranscript = SessionTranscript(
@@ -121,6 +121,20 @@ data class SessionTranscript private constructor(
             eReaderKeyBytes = eReaderKeyBytes,
             deviceEngagementBytesOid = null
         )
+    }
+
+    /**
+     * Replaces the second device-retrieval transcript element with exact EncryptionParameters bytes.
+     * ISO document-response encryption uses this transcript for both HPKE info and mdoc authentication.
+     */
+    fun withDocumentEncryptionParameters(encryptionParametersBytes: ByteArray): SessionTranscript {
+        require(encryptionParametersBytes.isNotEmpty()) { "EncryptionParameters bytes must not be empty" }
+        val engagement = requireNotNull(deviceEngagementBytes) {
+            "Document response encryption requires a device-retrieval session transcript"
+        }
+        return nfcHandover?.let {
+            forNfc(engagement.copyOf(), encryptionParametersBytes.copyOf(), it)
+        } ?: forQr(engagement.copyOf(), encryptionParametersBytes.copyOf())
     }
 
     override fun equals(other: Any?): Boolean {

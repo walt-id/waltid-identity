@@ -15,6 +15,12 @@ artifact. The manifest verifies the Identity commit, Xcode version, release
 configuration, platform coverage and file hashes before the framework is used.
 The archive is retained for one day; rerun the producer if it has expired.
 
+Proximity bridge tests verify and reuse that release artifact, then build their
+isolated simulator fixture with one Gradle worker. They verify the release again
+afterwards to ensure the fixture build did not replace it. The consumer step allows
+100 minutes: the existing 60-minute demo/provider budget plus 40 minutes for the
+fixture and bridge tests; the 110-minute job leaves time to retain failure evidence.
+
 The Enterprise task accepts `-Penterprise.ios.walletCoreArtifact=<directory>` to
 verify an already restored artifact. Without that property, it builds the release
 framework itself. In both paths, its fixture starts only after framework
