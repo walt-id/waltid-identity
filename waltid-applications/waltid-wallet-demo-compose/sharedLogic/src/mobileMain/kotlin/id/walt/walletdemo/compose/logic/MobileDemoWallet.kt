@@ -61,7 +61,7 @@ internal class MobileDemoWallet(
             val id = Uuid.random().toString()
             identityChoices[id] = IdentityAction.Backup(option)
             val recovery = recoveryChoice(option.providerName, option.recoveryAvailability.scope)
-            choices += WalletDemoIdentityChoice(id, recovery.title, recovery.detail, true)
+            choices += WalletDemoIdentityChoice(id, if (option.recoveryAvailability.scope == RecoveryScope.DeviceTransfer) "Save key for device transfer" else recovery.title, recovery.detail, true)
         }
         val discovery = mobileWallet.signingIdentity.discoverRecovery()
         for (candidate in discovery.candidates.filter { it.reference.recordId == identity.id }) {
@@ -78,8 +78,8 @@ internal class MobileDemoWallet(
                 SigningIdentityRecoveryState.Disabled -> "No key backup submitted."
                 is SigningIdentityRecoveryState.Submitted -> if (recovery.receipt == RecoveryReceipt.AcceptedLocally)
                     "Saved on this device. Delivery to another device is not confirmed." else "Backup confirmed by the provider."
-                is SigningIdentityRecoveryState.Recovered -> "The original signing key was restored on this installation."
-                is SigningIdentityRecoveryState.RemovalRequested -> "Backup deletion requested. Removal from other devices is not confirmed."
+                is SigningIdentityRecoveryState.Recovered -> "The original signing key was restored in this wallet."
+                is SigningIdentityRecoveryState.RemovalRequested -> "Backup deletion requested. Keys already restored on other devices are not deleted."
             }, choices, protection = when (identity.keyFacts.securityLevel) {
                 KeySecurityLevel.SOFTWARE -> "Software"
                 KeySecurityLevel.TRUSTED_ENVIRONMENT -> "Trusted execution environment (TEE)"
@@ -110,7 +110,7 @@ internal class MobileDemoWallet(
                     setupActions[id] = IdentityAction.Create(option)
                     val recovery = option.recoveryProviderName?.let { provider ->
                         recoveryChoice(provider, option.recoveryAvailability?.scope)
-                    } ?: WalletDemoKeyChoice("new", "Create without a key backup",
+                    } ?: WalletDemoKeyChoice("new", "Without a backup",
                         "No recovery backup is created. If the key is lost, credentials using it may need to be issued again.")
                     choices += WalletDemoKeySetupOption(id, recovery,
                         storageChoice(option.storage, option.recoverable), option.authorization.approvalChoice(isIos))
@@ -158,10 +158,10 @@ internal class MobileDemoWallet(
             else "Generates and uses the key inside secure hardware. Setup fails if hardware protection is unavailable.")
         SigningIdentityKeyStorage.NativeStorage -> WalletDemoKeyChoice(storage.name,
             if (isIos) "Keychain" else "Android Keystore",
-            if (isIos) "Stores the key in the iOS Keychain. Signing runs outside the Secure Enclave."
+            if (isIos) "The key is stored in the iOS Keychain. Signing takes place outside the Secure Enclave."
             else "The operating system manages the key. Hardware protection is not required.")
         SigningIdentityKeyStorage.EncryptedDatabase -> WalletDemoKeyChoice(storage.name, "Encrypted wallet database",
-            "Stores the key in the encrypted wallet database and signs in software. No hardware protection or system signing prompt.")
+            "The key is stored in the encrypted wallet database and used for software signing. Hardware protection and system signing prompts are not available.")
     }
 
     override suspend fun chooseIdentity(choiceId: String) {
@@ -489,24 +489,26 @@ internal fun MobileWalletVerifierMetadata.toDemoMetadata(): WalletDemoVerifierMe
 private fun KeyUseAuthorizationPolicy.approvalChoice(isIos: Boolean): WalletDemoKeyChoice = WalletDemoKeyChoice(
     toString(), when (this) {
         KeyUseAuthorizationPolicy.None -> "No signing prompt"
-        KeyUseAuthorizationPolicy.BiometricCurrentSet -> "Biometrics · current enrollment"
-        KeyUseAuthorizationPolicy.BiometricAny -> "Biometrics · allow new enrollment"
-        is KeyUseAuthorizationPolicy.BiometricTimedReuse -> "Biometrics · ${timeoutSeconds}s reuse"
+        KeyUseAuthorizationPolicy.BiometricCurrentSet -> "Current biometrics only"
+        KeyUseAuthorizationPolicy.BiometricAny -> "Current and future biometrics"
+        is KeyUseAuthorizationPolicy.BiometricTimedReuse -> "Biometrics with timed approval"
         is KeyUseAuthorizationPolicy.DeviceCredential -> if (isIos) "Device passcode" else "Device screen lock"
         is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential -> if (isIos) "Biometrics or device passcode" else "Biometrics or screen lock"
     }, identityDescription(isIos),
 )
 
 private fun KeyUseAuthorizationPolicy.identityDescription(isIos: Boolean): String = when (this) {
-    KeyUseAuthorizationPolicy.None -> "Signing does not ask for system approval. The wallet PIN and app-unlock biometrics are separate."
+    KeyUseAuthorizationPolicy.None -> "Signing does not require system approval."
     KeyUseAuthorizationPolicy.BiometricCurrentSet -> "Approve each signature with biometrics. Changing enrolled biometrics makes this key unusable."
     KeyUseAuthorizationPolicy.BiometricAny -> "Approve each use with biometrics, including newly enrolled biometrics. Security changes can still make the key unavailable."
-    is KeyUseAuthorizationPolicy.BiometricTimedReuse -> "Approve signing with biometrics. The system can reuse approval for $timeoutSeconds seconds."
+    is KeyUseAuthorizationPolicy.BiometricTimedReuse -> "Approve signing with biometrics. The system may reuse that approval for ${durationSeconds(timeoutSeconds)}."
     is KeyUseAuthorizationPolicy.DeviceCredential -> (if (isIos) "Approve signing with the device passcode. " else "Approve signing with the device PIN, pattern, or password. ") + approvalReuse(timeoutSeconds)
     is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential -> (if (isIos) "Approve signing with biometrics or the device passcode. " else "Approve signing with biometrics or the device PIN, pattern, or password. ") + approvalReuse(timeoutSeconds)
 }
 
-private fun approvalReuse(seconds: Int): String = if (seconds == 0) "Approval is required for each use." else "Approval can be reused for $seconds seconds."
+private fun durationSeconds(seconds: Int): String = if (seconds == 1) "1 second" else "$seconds seconds"
+
+private fun approvalReuse(seconds: Int): String = if (seconds == 0) "Approval is required for each use." else "The system may reuse that approval for ${durationSeconds(seconds)}."
 
 private fun providerTitle(name: String): String = if (name == "iCloud Keychain recovery") "iCloud Keychain" else name
 
@@ -518,7 +520,7 @@ internal val SigningIdentityFailure.canRetry: Boolean
 internal fun SigningIdentityFailure.explanation(): String = when (this) {
     SigningIdentityFailure.UnsupportedPolicy -> "This device cannot use the selected protection. Choose another supported option."
     SigningIdentityFailure.StaleOption -> "The available options have changed. Check the options again before continuing."
-    SigningIdentityFailure.KeyUnavailable -> "The signing key is unavailable. Restore its backup to use this key again."
+    SigningIdentityFailure.KeyUnavailable -> "The signing key is unavailable."
     SigningIdentityFailure.InvalidRecoveryRecord -> "This backup could not be validated. Choose another backup; no replacement key was created."
     SigningIdentityFailure.AuthorizationNotCompleted -> "Signing approval was not completed. Try again and approve the system prompt."
     SigningIdentityFailure.NativeOperationFailed -> "The device could not complete the key operation. Try again; protection has not been reduced."
@@ -527,5 +529,5 @@ internal fun SigningIdentityFailure.explanation(): String = when (this) {
     SigningIdentityFailure.ProviderInteractionRequired -> "Unlock or sign in to your backup provider, then retry setup."
     SigningIdentityFailure.ProviderRejected -> "The backup provider rejected this request. Check its access and storage settings, or choose another backup option."
     SigningIdentityFailure.ProviderConflict -> "A different backup already uses this identifier. Choose another backup destination. The existing backup has not been overwritten."
-    SigningIdentityFailure.ProviderConfirmationPending -> "The provider has not met the required backup confirmation. Check again later to continue setup with the same key."
+    SigningIdentityFailure.ProviderConfirmationPending -> "The backup provider has not confirmed the backup yet. Check again later to continue setup with the same key."
 }

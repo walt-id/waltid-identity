@@ -244,6 +244,7 @@ private struct SharingClaimsSheet: View {
                 .padding()
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsDialog)
     }
 }

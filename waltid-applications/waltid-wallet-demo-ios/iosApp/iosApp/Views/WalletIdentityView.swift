@@ -126,14 +126,14 @@ final class WalletIdentityScreenModel: ObservableObject {
                 self.identity = identity
                 for option in try await service.backupOptions(identityID: identity.id) {
                     choices.append(Choice(title: "Back up with \(Self.providerTitle(option.providerName))",
-                        detail: "Saves a backup of your signing key. Credentials are not included.", destructive: false, progress: "Saving backup…") { [service] in
+                        detail: "Saves a backup of your signing key. Credentials are not included.", destructive: false, progress: "Backing up signing key…") { [service] in
                         try Self.check(await service.backup(option))
                     })
                 }
                 let discovery = try await service.discoverRecovery()
                 recoveryUnavailableReasons = discovery.failures.map { "\(Self.providerTitle($0.providerName)): \($0.message)" }
                 for candidate in discovery.candidates where candidate.reference.recordID == identity.id {
-                    choices.append(Choice(title: "Delete key backup", detail: Self.providerTitle(candidate.providerName), destructive: true, progress: "Deleting backup…") { [service] in
+                    choices.append(Choice(title: "Delete key backup", detail: Self.providerTitle(candidate.providerName), destructive: true, progress: "Deleting key backup…") { [service] in
                         _ = try await service.deleteRecovery(candidate)
                     })
                 }
@@ -159,7 +159,7 @@ final class WalletIdentityScreenModel: ObservableObject {
                             let recovery = option.recoveryProviderName.map { provider in
                                 Selection(id: "backup:\(provider)", title: "Back up with \(Self.providerTitle(provider))",
                                     detail: "Save a backup of your signing key. Credentials are not included. Saving on this device does not confirm cloud delivery.")
-                            } ?? Selection(id: "new", title: "Create without a key backup",
+                            } ?? Selection(id: "new", title: "Without a backup",
                                 detail: "No recovery backup is created. If the key is lost, credentials using it may need to be issued again.")
                             setupOptions.append(SetupOption(recovery: recovery,
                                 storage: Self.storageChoice(option.storage), approval: Self.approvalChoice(option.authorization), restoring: false) { [service] in
@@ -184,7 +184,7 @@ final class WalletIdentityScreenModel: ObservableObject {
             recoveryUnavailableReasons = previousUnavailableReasons
             if error is CancellationError { return }
             loadFailed = true
-            message = "Signing key options could not be loaded. Try again."
+            message = previousIdentity == nil ? "Could not load signing key options. Try again." : "Could not load signing key details. Try again."
         }
     }
 
@@ -241,9 +241,9 @@ final class WalletIdentityScreenModel: ObservableObject {
         case .hardwareBacked: Selection(id: "hardware", title: "Secure Enclave",
             detail: "Generates and uses the key inside the Secure Enclave. This key cannot be restored on another device.")
         case .nativeStorage: Selection(id: "native", title: "Keychain",
-            detail: "Stores the key in the iOS Keychain. Signing runs outside the Secure Enclave.")
+            detail: "The key is stored in the iOS Keychain. Signing takes place outside the Secure Enclave.")
         case .encryptedDatabase: Selection(id: "database", title: "Encrypted wallet database",
-            detail: "Stores the key in the encrypted wallet database and signs in software. No hardware protection or system signing prompt.")
+            detail: "The key is stored in the encrypted wallet database and used for software signing. Hardware protection and system signing prompts are not available.")
         }
     }
 
@@ -251,9 +251,9 @@ final class WalletIdentityScreenModel: ObservableObject {
         let title: String
         switch policy {
         case .none: title = "No signing prompt"
-        case .biometricCurrentSet: title = "Biometrics · current enrollment"
-        case .biometricAny: title = "Biometrics · allow new enrollment"
-        case .biometricTimedReuse(let seconds): title = "Biometrics · \(seconds)s reuse"
+        case .biometricCurrentSet: title = "Current biometrics only"
+        case .biometricAny: title = "Current and future biometrics"
+        case .biometricTimedReuse: title = "Biometrics with timed approval"
         case .deviceCredential: title = "Device passcode"
         case .biometricOrDeviceCredential: title = "Biometrics or device passcode"
         }
@@ -262,17 +262,19 @@ final class WalletIdentityScreenModel: ObservableObject {
 
     static func authorization(_ policy: WalletKeyUseAuthorizationPolicy) -> String {
         switch policy {
-        case .none: "Signing does not ask for system approval. The wallet PIN and app-unlock biometrics are separate."
+        case .none: "Signing does not require system approval."
         case .biometricCurrentSet: "Approve each signature with biometrics. Changing enrolled biometrics makes this key unusable."
         case .biometricAny: "Approve each use with biometrics, including newly enrolled biometrics. Security changes can still make the key unavailable."
-        case .biometricTimedReuse(let seconds): "Approve signing with biometrics. The system can reuse approval for \(seconds) seconds."
+        case .biometricTimedReuse(let seconds): "Approve signing with biometrics. The system may reuse that approval for \(duration(seconds))."
         case .deviceCredential(let seconds): "Approve signing with the device passcode. " + reuse(seconds)
         case .biometricOrDeviceCredential(let seconds): "Approve signing with biometrics or the device passcode. " + reuse(seconds)
         }
     }
 
+    private static func duration(_ seconds: Int) -> String { seconds == 1 ? "1 second" : "\(seconds) seconds" }
+
     private static func reuse(_ seconds: Int) -> String {
-        seconds == 0 ? "Approval is required for each use." : "Approval can be reused for \(seconds) seconds."
+        seconds == 0 ? "Approval is required for each use." : "The system may reuse that approval for \(duration(seconds))."
     }
 }
 
@@ -285,16 +287,19 @@ struct WalletIdentityView: View {
         ScrollViewReader { proxy in
             List {
                 if let identity = model.identity {
-                    Section("Wallet signing key") {
-                        detailRow("Storage requirement", WalletIdentityScreenModel.storage(identity.storage))
-                        detailRow("Signing protection", identity.securityLevel.displayName)
+                    Section {
+                        detailRow("Storage policy", WalletIdentityScreenModel.storage(identity.storage))
+                        detailRow("Key protection", identity.securityLevel.displayName)
                         detailRow("Key origin", identity.origin.displayName)
                         detailRow("Signing approval", WalletIdentityScreenModel.authorization(identity.authorization))
-                        detailRow("Recovery", recoveryDescription(identity.recovery))
+                    } header: { Text("Key protection") } footer: {
+                        Text("Reset the wallet to change key storage or signing approval. This removes local credentials. Restoring a key does not restore them.")
                     }
-                    Section {
-                        Text("Reset this wallet to choose different key storage or signing approval. This removes local credentials; key recovery does not restore them.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                    Section("Key backup") {
+                        detailRow("Backup status", recoveryDescription(identity.recovery))
+                        identityActions
+                        if let message = model.message { Text(message).foregroundStyle(.red) }
+                        if model.busy { ProgressView(model.progress) }
                     }
                 } else if let selected = model.selected {
                     Section {
@@ -315,15 +320,15 @@ struct WalletIdentityView: View {
                             Section("Restore an existing key") { selectionRows(restoring: true) }
                         }
                     } else {
-                        Section { selectionRows() }
+                        Section(model.step.title) { selectionRows() }
                     }
                     if model.step == .approval {
-                        Section("Your selection") {
-                            detailRow("Recovery", selected.recovery.title)
+                        Section {
+                            detailRow("Recovery", selected.recovery.id == "new" ? String(localized: "No key backup") : selected.recovery.title)
                             detailRow("Key storage", selected.storage.title)
                             detailRow("Signing approval", selected.approval.title)
-                            Text("\(selected.restoring ? "Restores" : "Creates") your signing key. Key recovery does not restore credentials.")
-                                .font(.footnote).foregroundStyle(.secondary)
+                        } header: { Text("Your selection") } footer: {
+                            Text("Restoring a signing key does not restore credentials.")
                         }
                     }
                 }
@@ -333,24 +338,17 @@ struct WalletIdentityView: View {
                         Button("Check again") { Task { await model.refresh() } }
                     }
                 }
-                if let message = model.message { Section { Text(message).foregroundStyle(.secondary) } }
-                if !model.choices.isEmpty {
-                    Section(model.identity == nil ? "Pending setup" : "Recovery") {
-                        ForEach(model.choices) { choice in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(choice.detail).font(.caption).foregroundStyle(.secondary)
-                                Button(choice.title, role: choice.destructive ? .destructive : nil) {
-                                    if choice.destructive { deletion = choice } else { model.perform(choice) }
-                                }
-                            }
-                        }
-                    }
+                if model.identity == nil, let message = model.message { Section { Text(message).foregroundStyle(.red) } }
+                if model.identity == nil && !model.choices.isEmpty {
+                    Section("Pending setup") { identityActions }
                 }
                 Section {
-                    if model.busy { ProgressView(model.progress) }
-                    else if model.refreshing || !model.loaded { ProgressView("Checking signing key options…") }
+                    if model.busy && model.identity == nil { ProgressView(model.progress) }
+                    else if model.refreshing || !model.loaded {
+                        ProgressView(model.identity == nil ? "Loading signing key options…" : "Loading signing key details…")
+                    }
                     if model.loaded && !model.refreshing && model.identity == nil && model.setupOptions.isEmpty && model.choices.isEmpty && model.message == nil {
-                        Text("No signing-key option is currently available for this device and app configuration.")
+                        Text("No signing key options are available for this device and app configuration.")
                     }
                     if model.loadFailed || (model.loaded && !model.refreshing && model.identity == nil && model.setupOptions.isEmpty && model.choices.isEmpty) {
                         Button("Try again") { Task { await model.refresh() } }
@@ -363,6 +361,9 @@ struct WalletIdentityView: View {
                     }
                 }
             }
+            .frame(maxWidth: 640)
+            .frame(maxWidth: .infinity)
+            .background(Color(uiColor: .systemGroupedBackground))
             .disabled(model.busy || model.refreshing)
             .onChange(of: model.step) { _ in proxy.scrollTo("setup-top", anchor: .top) }
             .safeAreaInset(edge: .bottom) {
@@ -385,7 +386,7 @@ struct WalletIdentityView: View {
                 }
             }
         }
-        .navigationTitle(model.identity == nil ? "Set up your wallet" : "Protection and recovery")
+        .navigationTitle(model.identity == nil ? "Set up your wallet" : "Signing key")
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.refresh() }
         .onChange(of: scenePhase) { phase in
@@ -395,15 +396,15 @@ struct WalletIdentityView: View {
             if let choice = deletion { Button("Delete key backup", role: .destructive) { model.perform(choice); deletion = nil } }
             Button("Cancel", role: .cancel) { deletion = nil }
         } message: {
-            Text("This requests deletion of the key backup from the provider. You may lose the ability to recover this key. Keys already restored on other devices are not erased.")
+            Text("This asks \(deletion?.detail ?? String(localized: "the backup provider")) to delete the key backup. You may lose the ability to recover the key. Keys already restored on other devices are not deleted.")
         }
     }
 
     private var stepDescription: String {
         switch model.step {
-        case .recovery: "Choose whether to back up a new signing key or restore an existing one."
-        case .storage: "Choose where signing happens. Only storage compatible with your recovery choice is shown."
-        case .approval: "Choose when the system asks you to approve signing. This is separate from unlocking the app."
+        case .recovery: "Create a new signing key, with or without a backup, or restore an existing key."
+        case .storage: "Choose how to store and protect your signing key. Only options compatible with your recovery choice are shown."
+        case .approval: "Choose how to approve signing. This is separate from unlocking the app."
         }
     }
 
@@ -422,44 +423,64 @@ struct WalletIdentityView: View {
                 selectionCard(choice, selected: model.selected.map { model.step.choice($0).id == choice.id } ?? false)
                     .accessibilityIdentifier("wallet.keySetupChoice.\(model.step).\(index)")
                 if let identifier = choice.identifier {
-                    DisclosureGroup("Show full identifier") {
-                        Text(identifier).font(.caption).textSelection(.enabled)
-                    }.font(.caption).padding(.horizontal, 16)
+                    SettingsCopyContent(title: "Wallet DID", value: identifier, copyLabel: "Copy wallet DID", copyAnnouncement: String(localized: "Wallet DID copied"),
+                        valueID: "wallet.recoveryDid.\(choice.id)", copyID: "wallet.recoveryDidCopy.\(choice.id)", disclosureLabels: ("Show full DID", "Hide full DID"))
                 }
             }
-            .listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+            .listRowBackground(model.selections.count > 1 && model.selected.map { model.step.choice($0).id == choice.id } == true
+                ? Color.accentColor.opacity(0.08) : Color(uiColor: .secondarySystemGroupedBackground))
         }
     }
 
+    @ViewBuilder
     private func selectionCard(_ choice: WalletIdentityScreenModel.Selection, selected: Bool) -> some View {
-        Button { model.select(choice.id) } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(selected ? Color.accentColor : .secondary)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(choice.title).font(.headline).foregroundStyle(.primary)
-                    Text(choice.detail).font(.callout).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
+        if model.selections.count == 1 {
+            VStack(alignment: .leading, spacing: 6) {
+                selectionText(choice)
+                Text("This is the only supported option for your current configuration.").font(.footnote).foregroundStyle(.secondary)
             }
-            .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-            .background(selected ? Color.accentColor.opacity(0.1) : Color(uiColor: .secondarySystemGroupedBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(selected ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: selected ? 2 : 1))
-            .contentShape(Rectangle())
+        } else {
+            Button { model.select(choice.id) } label: {
+                HStack(alignment: .center, spacing: 12) {
+                    selectionText(choice)
+                    Spacer(minLength: 0)
+                    Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                        .foregroundStyle(.tint).accessibilityHidden(true)
+                }
+                .frame(minHeight: 44).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(selected ? "Selected" : "Not selected")
+            .accessibilityAddTraits(selected ? [.isSelected] : [])
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
+    private func selectionText(_ choice: WalletIdentityScreenModel.Selection) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(choice.title).font(.headline).foregroundStyle(.primary)
+            Text(choice.detail).font(.callout).foregroundStyle(.secondary)
+        }
+    }
+
+    private var identityActions: some View {
+        ForEach(model.choices) { choice in
+            VStack(alignment: .leading, spacing: 8) {
+                Button(role: choice.destructive ? .destructive : nil) {
+                    if choice.destructive { deletion = choice } else { model.perform(choice) }
+                } label: {
+                    Label(choice.title, systemImage: choice.destructive ? "trash" : "square.and.arrow.down")
+                }
+                Text(choice.detail).font(.caption).foregroundStyle(.secondary)
+            }
+        }
     }
 
     private func recoveryDescription(_ state: SigningIdentityRecoveryState) -> String {
         switch state {
         case .disabled: "No key backup submitted."
         case .submitted(_, let receipt): receipt == .acceptedLocally ? "Saved on this device. Delivery to another device is not confirmed." : "Backup confirmed by the provider."
-        case .recovered: "The original signing key was restored on this installation."
-        case .removalRequested: "Backup deletion requested. Removal from other devices is not confirmed."
+        case .recovered: "The original signing key was restored in this wallet."
+        case .removalRequested: "Backup deletion requested. Keys already restored on other devices are not deleted."
         }
     }
 }
@@ -480,7 +501,7 @@ private extension SigningIdentityFailure {
         switch self {
         case .unsupportedPolicy: "This device cannot use the selected protection. Choose another supported option."
         case .staleOption: "The available options have changed. Check the options again before continuing."
-        case .keyUnavailable: "The signing key is unavailable. Restore its backup to use this key again."
+        case .keyUnavailable: "The signing key is unavailable."
         case .invalidRecoveryRecord: "This backup could not be validated. Choose another backup; no replacement key was created."
         case .authorizationNotCompleted: "Signing approval was not completed. Try again and approve the system prompt."
         case .nativeOperationFailed: "The device could not complete the key operation. Try again; protection has not been reduced."
@@ -489,7 +510,7 @@ private extension SigningIdentityFailure {
         case .providerInteractionRequired: "Unlock or sign in to your backup provider, then retry setup."
         case .providerRejected: "The backup provider rejected this request. Check its access and storage settings, or choose another backup option."
         case .providerConflict: "A different backup already uses this identifier. Choose another backup destination. The existing backup has not been overwritten."
-        case .providerConfirmationPending: "The provider has not met the required backup confirmation. Check again later to continue setup with the same key."
+        case .providerConfirmationPending: "The backup provider has not confirmed the backup yet. Check again later to continue setup with the same key."
         }
     }
 }

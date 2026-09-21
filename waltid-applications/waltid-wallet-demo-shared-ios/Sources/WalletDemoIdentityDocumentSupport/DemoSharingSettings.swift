@@ -11,8 +11,8 @@ public enum WalletDemoProximityApprovalMode: String, CaseIterable, Identifiable,
     }
     public var explanation: String {
         self == .askEachTime
-            ? String(localized: "Review the reader and requested data before sharing. NFC on iPhone may require a second tap after approval.")
-            : String(localized: "Approve a recent request from a known reader, then connect within 60 seconds. Each approval works once.")
+            ? String(localized: "Review each request before sharing. Some NFC connections require a second tap after approval.")
+            : String(localized: "Approve a recent request from a known reader, then connect within 60 seconds. Each approval can be used once.")
     }
     public var approval: ProximityApproval {
         self == .askEachTime ? .askEachTime : .prepareBeforeSharing

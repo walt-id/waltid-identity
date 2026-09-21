@@ -199,6 +199,7 @@ final class WalletViewModelPinTests: XCTestCase {
         let viewModel = WalletViewModel(
             walletID: "pin-cold-launch-\(UUID().uuidString)",
             walletClient: walletClient,
+            identityDocumentRegistrationUpdate: {},
             pinStore: pinStore,
             biometricAuthenticator: biometrics
         )

@@ -62,6 +62,9 @@
 		E2E00019AAAA000100000019 /* synthetic-signature.png in Resources */ = {isa = PBXBuildFile; fileRef = E2E00006AAAA000000000006 /* synthetic-signature.png */; };
 		A74900000000000000000021 /* KeychainRecoveryContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A74900000000000000000020 /* KeychainRecoveryContractTests.swift */; };
 		A74900000000000000000023 /* WalletPersistenceSnippetsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A74900000000000000000022 /* WalletPersistenceSnippetsTests.swift */; };
+		BB7491000000000000000001 /* NearbySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7490000000000000000001 /* NearbySettingsView.swift */; };
+		BB7491000000000000000002 /* ReaderTrustSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7490000000000000000002 /* ReaderTrustSettingsView.swift */; };
+		BB7491000000000000000003 /* TechnicalDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7490000000000000000003 /* TechnicalDetailsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -175,6 +178,9 @@
 		E2E00014AAAA000000000014 /* MockWalletUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockWalletUITests.swift; sourceTree = "<group>"; };
 		A74900000000000000000020 /* KeychainRecoveryContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = KeychainRecoveryContractTests.swift; path = "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/KeychainRecoveryContractTests.swift"; sourceTree = SOURCE_ROOT; };
 		A74900000000000000000022 /* WalletPersistenceSnippetsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WalletPersistenceSnippetsTests.swift; path = "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/WalletPersistenceSnippetsTests.swift"; sourceTree = SOURCE_ROOT; };
+		BB7490000000000000000001 /* NearbySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbySettingsView.swift; sourceTree = "<group>"; };
+		BB7490000000000000000002 /* ReaderTrustSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderTrustSettingsView.swift; sourceTree = "<group>"; };
+		BB7490000000000000000003 /* TechnicalDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TechnicalDetailsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -276,6 +282,9 @@
 				A1000003AAAA000000000003 /* ReceiveView.swift */,
 				A1000004AAAA000000000004 /* PresentView.swift */,
 				A1000440AAAA000000000040 /* SettingsView.swift */,
+				BB7490000000000000000003 /* TechnicalDetailsView.swift */,
+				BB7490000000000000000002 /* ReaderTrustSettingsView.swift */,
+				BB7490000000000000000001 /* NearbySettingsView.swift */,
 				A1000442AAAA000000000042 /* PinView.swift */,
 			);
 			path = Views;
@@ -681,6 +690,9 @@
 				A1000424AAAA000100000024 /* EmptyCredentialsView.swift in Sources */,
 				A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */,
 				A1000440AAAA000100000040 /* SettingsView.swift in Sources */,
+				BB7491000000000000000003 /* TechnicalDetailsView.swift in Sources */,
+				BB7491000000000000000002 /* ReaderTrustSettingsView.swift in Sources */,
+				BB7491000000000000000001 /* NearbySettingsView.swift in Sources */,
 				A1000441AAAA000100000041 /* WalletTabChrome.swift in Sources */,
 				A1000442AAAA000100000042 /* PinView.swift in Sources */,
 				A1000443AAAA000100000043 /* DemoPinStore.swift in Sources */,

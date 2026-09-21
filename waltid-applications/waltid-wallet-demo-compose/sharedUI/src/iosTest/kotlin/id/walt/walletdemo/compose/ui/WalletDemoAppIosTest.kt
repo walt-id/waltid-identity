@@ -152,6 +152,10 @@ class WalletDemoAppIosTest {
         scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
 
     @Test
+    fun technicalCopyPreservesFullValueWithoutChangingExpansion() =
+        scenarios.technicalCopyPreservesFullValueWithoutChangingExpansion()
+
+    @Test
     fun readerTrustSettingsReviewAndPersistPublicCa() =
         scenarios.readerTrustSettingsReviewAndPersistPublicCa()
 

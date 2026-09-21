@@ -1,6 +1,10 @@
 package id.walt.walletdemo.compose.ui.screens
 
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
+import id.walt.walletdemo.compose.ui.components.SettingsSection
+import id.walt.walletdemo.compose.ui.components.SettingsToggleRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -101,7 +105,9 @@ internal fun PinScreen(
             .nestedScroll(dismissKeyboardOnScroll)
             .verticalScroll(scrollState)
             .testTag(WalletUiTestTags.PinScreen)
-            .padding(24.dp),
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .widthIn(max = 640.dp)
+            .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Spacer(Modifier.height(12.dp))
@@ -116,76 +122,62 @@ internal fun PinScreen(
         )
         Text(
             if (setup != null) {
-                "Use 4 to 8 digits for this local demo unlock flow."
+                "Use 4 to 8 digits to unlock this wallet."
             } else {
-                "Unlock the local demo wallet."
+                "Enter your PIN to unlock this wallet."
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        OutlinedTextField(
-            value = pin,
-            onValueChange = controller::updatePin,
-            label = { Text("PIN") },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.NumberPassword,
-                imeAction = if (setup != null) ImeAction.Next else ImeAction.Done,
-            ),
-            keyboardActions = KeyboardActions(onDone = { dismissKeyboard() }),
-            isError = error != null,
-            modifier = Modifier
-                .fillMaxWidth()
-                .onFocusChanged { hasInputFocus = it.isFocused }
-                .testTag(WalletUiTestTags.PinInput),
-            singleLine = true,
-        )
+        SettingsSection {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = controller::updatePin,
+                    label = { Text("PIN") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.NumberPassword,
+                        imeAction = if (setup != null) ImeAction.Next else ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { dismissKeyboard() }),
+                    isError = error != null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged { hasInputFocus = it.isFocused }
+                        .testTag(WalletUiTestTags.PinInput),
+                    singleLine = true,
+                )
 
-        if (setup != null) {
-            OutlinedTextField(
-                value = setup.confirmation,
-                onValueChange = controller::updatePinConfirmation,
-                label = { Text("Confirm PIN") },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.NumberPassword,
-                    imeAction = ImeAction.Done,
-                ),
-                keyboardActions = KeyboardActions(onDone = { dismissKeyboard() }),
-                isError = error != null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onFocusChanged { hasInputFocus = it.isFocused }
-                    .testTag(WalletUiTestTags.PinConfirmationInput),
-                singleLine = true,
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(WalletUiTestTags.PinBiometricToggle),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Unlock with biometrics", style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        if (biometricAvailable) {
-                            "Use biometrics to open the app instead of typing the PIN. Signing approval is set up next."
-                        } else {
-                            "Biometrics are not available on this device."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                if (setup != null) {
+                    OutlinedTextField(
+                        value = setup.confirmation,
+                        onValueChange = controller::updatePinConfirmation,
+                        label = { Text("Confirm PIN") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.NumberPassword,
+                            imeAction = ImeAction.Done,
+                        ),
+                        keyboardActions = KeyboardActions(onDone = { dismissKeyboard() }),
+                        isError = error != null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { hasInputFocus = it.isFocused }
+                            .testTag(WalletUiTestTags.PinConfirmationInput),
+                        singleLine = true,
                     )
                 }
-                Switch(
-                    checked = setup.useBiometrics && biometricAvailable,
-                    onCheckedChange = controller::updateUseBiometrics,
-                    enabled = biometricAvailable && !isBusy,
-                )
             }
-
+        }
+        if (setup != null) {
+            SettingsSection {
+                SettingsToggleRow("Unlock with biometrics", setup.useBiometrics && biometricAvailable,
+                    controller::updateUseBiometrics, Modifier.testTag(WalletUiTestTags.PinBiometricToggle),
+                    detail = if (biometricAvailable) "Use biometrics to open the app instead of typing the PIN. Signing approval is set up next."
+                        else "Biometrics are not available on this device.", enabled = biometricAvailable && !isBusy)
+            }
         }
 
         error?.let { error ->

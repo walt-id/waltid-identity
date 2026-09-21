@@ -6,6 +6,7 @@ data class WalletDemoUiState(
     val biometricUnlockAvailable: Boolean = false,
     val identityDetails: WalletDemoIdentityDetailsState = WalletDemoIdentityDetailsState.Loading,
     val identityProgress: String? = null,
+    val identityError: String? = null,
     val session: WalletSessionState = WalletSessionState.NotBootstrapped,
     val signingProtectionMode: WalletDemoSigningProtectionMode = WalletDemoSigningProtectionMode.Optional,
     val selectedSigningProtection: WalletDemoSigningProtection = WalletDemoSigningProtection.Biometric,
@@ -34,6 +35,7 @@ data class WalletDemoUiState(
     val statusDismissedKey: String? = null,
     val statusExpanded: Boolean = false,
     val statusOccurrenceId: Long = 0,
+    val sharingSettingsError: String? = null,
     val showDcApiPresentationPreview: Boolean = true,
     val proximityTransportProfile: WalletDemoProximityTransportProfile =
         WalletDemoProximityTransportProfile.Default,

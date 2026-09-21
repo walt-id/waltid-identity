@@ -88,18 +88,30 @@ final class WalletE2EUI {
     }
 
     func openDeepLink(_ value: String) {
-        guard let url = URL(string: value) else {
+        guard URL(string: value) != nil else {
             XCTFail("Invalid deep link URL: \(value)")
             return
         }
 
-        guard #available(iOS 16.4, *) else {
-            XCTFail("Opening deep links from UI tests requires iOS 16.4 or newer")
-            return
+        // XCUIApplication.open launches a new process. Enter the link in Safari
+        // to exercise delivery to the running wallet and its navigation state.
+        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
+        safari.activate()
+        let address = safari.textFields.firstMatch
+        if !address.waitForExistence(timeout: 5), safari.buttons["Continue"].exists {
+            safari.buttons["Continue"].tap()
         }
-
-        app.open(url)
-        app.activate()
+        XCTAssertTrue(address.waitForExistence(timeout: 10), safari.debugDescription)
+        address.tap()
+        address.typeText(value + XCUIKeyboardKey.return.rawValue)
+        let open = safari.buttons["Open"]
+        if open.waitForExistence(timeout: 5) {
+            // Safari's external-app confirmation reports no XCTest hit point on
+            // iOS 26. Tap the visible button's own frame, not a fixed coordinate.
+            XCTAssertFalse(open.frame.isEmpty)
+            open.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
     }
 
     func waitForTextInputValue(identifier: String, fallbackLabel: String, value: String, timeout: TimeInterval) -> Bool {
@@ -327,7 +339,18 @@ final class WalletE2EUI {
         return app.descendants(matching: .any)
             .matching(predicate)
             .allElementsBoundByIndex
-            .first { $0.exists && $0.isHittable }
+            .first { element in
+                guard element.exists, element.isHittable else { return false }
+                // XCTest considers a partly visible card hittable even when its center is
+                // covered by the pinned review actions. Scroll before tapping that card.
+                if element.identifier.hasPrefix("wallet.presentationClaimsToggle.") {
+                    let submit = app.buttons["wallet.presentationSubmitButton"]
+                    if submit.exists && submit.isHittable {
+                        return element.frame.midY < submit.frame.minY
+                    }
+                }
+                return true
+            }
     }
 
     private func firstExisting(_ elements: [XCUIElement]) -> XCUIElement {

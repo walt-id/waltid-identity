@@ -175,19 +175,30 @@ class WalletDemoController(
         _state.update { it.copy(signingProtectionWarning = null) }
     }
 
-    fun setShowDcApiPresentationPreview(enabled: Boolean) {
-        sharingSettings.setShowDcApiPresentationPreview(enabled)
-        _state.update { it.copy(showDcApiPresentationPreview = enabled) }
-    }
+    fun setShowDcApiPresentationPreview(enabled: Boolean) = saveSharingPreference(
+        "Could not save the wallet review preference. Try again.",
+        { sharingSettings.setShowDcApiPresentationPreview(enabled) },
+        { it.copy(showDcApiPresentationPreview = enabled) },
+    )
 
-    fun setProximityTransportProfile(profile: WalletDemoProximityTransportProfile) {
-        sharingSettings.setProximityTransportProfile(profile)
-        _state.update { it.copy(proximityTransportProfile = profile) }
-    }
+    fun setProximityTransportProfile(profile: WalletDemoProximityTransportProfile) = saveSharingPreference(
+        "Could not save the connection method. Try again.",
+        { sharingSettings.setProximityTransportProfile(profile) },
+        { it.copy(proximityTransportProfile = profile) },
+    )
 
-    fun setProximityApprovalMode(mode: WalletDemoProximityApprovalMode) {
-        sharingSettings.setProximityApprovalMode(mode)
-        _state.update { it.copy(proximityApprovalMode = mode) }
+    fun setProximityApprovalMode(mode: WalletDemoProximityApprovalMode) = saveSharingPreference(
+        "Could not save sharing approval. Try again.",
+        { sharingSettings.setProximityApprovalMode(mode) },
+        { it.copy(proximityApprovalMode = mode) },
+    )
+
+    private fun saveSharingPreference(message: String, persist: () -> Unit, update: (WalletDemoUiState) -> WalletDemoUiState) {
+        try {
+            persist()
+            _state.update { update(it).copy(sharingSettingsError = null) }
+        } catch (cause: CancellationException) { throw cause }
+        catch (_: Exception) { _state.update { it.copy(sharingSettingsError = message) } }
     }
 
     fun unlockWithBiometrics(force: Boolean = false) {
@@ -1509,7 +1520,7 @@ class WalletDemoController(
         fun isCurrentWallet(): Boolean = (_state.value.session as? WalletSessionState.Ready)?.let {
             it.did == session.did && it.keyId == session.keyId
         } == true
-        _state.update { it.copy(identityProgress = "Loading key details…", identityDetails = WalletDemoIdentityDetailsState.Loading) }
+        _state.update { it.copy(identityProgress = "Loading signing key details…", identityError = null, identityDetails = WalletDemoIdentityDetailsState.Loading) }
         scope.launch(dispatcher) {
             try {
                 val details = wallet.identityDetails()
@@ -1521,24 +1532,33 @@ class WalletDemoController(
             catch (cause: Exception) {
                 if (isCurrentWallet()) _state.update {
                     it.copy(identityDetails = WalletDemoIdentityDetailsState.Failed(
-                        "Signing key details could not be loaded. Try again."))
+                        "Could not load signing key details. Try again."))
                 }
             } finally { _state.update { it.copy(identityProgress = null) } }
         }
     }
 
     fun performIdentityAction(choiceId: String) {
-        if (_state.value.identityBusy || _state.value.session !is WalletSessionState.Ready) return
-        _state.update { it.copy(identityProgress = if ((_state.value.identityDetails as? WalletDemoIdentityDetailsState.Available)?.details?.choices?.find { choice -> choice.id == choiceId }?.destructive == true) "Deleting backup…" else "Saving backup…") }
+        val session = _state.value.session as? WalletSessionState.Ready ?: return
+        if (_state.value.identityBusy) return
+        val choice = (_state.value.identityDetails as? WalletDemoIdentityDetailsState.Available)
+            ?.details?.choices?.find { it.id == choiceId } ?: return
+        fun isCurrentWallet(): Boolean = (_state.value.session as? WalletSessionState.Ready)?.let {
+            it.did == session.did && it.keyId == session.keyId
+        } == true
+        _state.update { it.copy(identityError = null,
+            identityProgress = if (choice.destructive) "Deleting key backup…" else "Backing up signing key…") }
         scope.launch(dispatcher) {
             try {
                 wallet.chooseIdentity(choiceId)
                 val details = wallet.identityDetails()
-                _state.update { it.copy(identityDetails = details?.let(WalletDemoIdentityDetailsState::Available)
+                if (isCurrentWallet()) _state.update { it.copy(identityDetails = details?.let(WalletDemoIdentityDetailsState::Available)
                     ?: WalletDemoIdentityDetailsState.Unsupported) }
-            } catch (cause: kotlinx.coroutines.CancellationException) { throw cause }
-            catch (cause: Exception) { _state.update { it.copy(warning = keyOperationFailure(cause)) } }
-            finally { _state.update { it.copy(identityProgress = null) } }
+            } catch (cause: CancellationException) { throw cause }
+            catch (cause: Exception) {
+                if (isCurrentWallet()) _state.update { it.copy(identityError = (cause as? WalletDemoKeyOperationException)?.message
+                    ?: if (choice.destructive) "Could not delete the key backup. Try again." else "Could not back up the signing key. Try again.") }
+            } finally { if (isCurrentWallet()) _state.update { it.copy(identityProgress = null) } }
         }
     }
 
@@ -1552,7 +1572,7 @@ class WalletDemoController(
     fun refreshIdentityChoices() {
         val session = _state.value.session as? WalletSessionState.IdentitySetup ?: return
         if (_state.value.identityBusy) return
-        _state.update { it.copy(identityProgress = "Checking signing key options…") }
+        _state.update { it.copy(identityProgress = "Loading signing key options…") }
         scope.launch(dispatcher) {
             try {
                 val setup = wallet.identitySetup()

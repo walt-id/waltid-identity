@@ -189,8 +189,8 @@ final class DemoReaderTrustSettingsController: ObservableObject {
 
     func cancelImport() {
         importGeneration += 1
-        importInProgress = pendingWrites > 0
-        pendingImport = nil
+        if importInProgress != (pendingWrites > 0) { importInProgress = pendingWrites > 0 }
+        if pendingImport != nil { pendingImport = nil }
     }
 
     func removeReaderAuthority(id: String) {
@@ -207,7 +207,7 @@ final class DemoReaderTrustSettingsController: ObservableObject {
     }
 
     func dismissError() {
-        errorMessage = nil
+        if errorMessage != nil { errorMessage = nil }
     }
 
     func reportImportError(_ message: String) {

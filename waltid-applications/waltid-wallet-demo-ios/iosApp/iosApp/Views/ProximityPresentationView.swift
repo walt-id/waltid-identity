@@ -235,25 +235,45 @@ private extension ProximityCapabilities {
     }
 }
 
-struct ProximityApprovalModeToggle: View {
+struct ProximityApprovalModeChoice: View {
     @Binding var mode: WalletDemoProximityApprovalMode
     var compact = true
 
     var body: some View {
-        Toggle(isOn: Binding(get: { mode == .prepareSharing }, set: { mode = $0 ? .prepareSharing : .askEachTime })) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Prepare sharing")
-                Text(compact
-                    ? mode == .prepareSharing
-                        ? String(localized: "Review, approve, then reconnect to share.")
-                        : String(localized: "Review each request before sharing.")
-                    : mode.explanation)
-                    .font(.footnote).foregroundStyle(.secondary)
+        Group {
+            if compact {
+                HStack(spacing: 12) {
+                    choice(.askEachTime, title: "Ask each time")
+                    choice(.prepareSharing, title: "Prepare sharing")
+                }
+            } else {
+                VStack(spacing: 0) {
+                    choice(.askEachTime, title: "Ask each time")
+                    Divider()
+                    choice(.prepareSharing, title: "Prepare sharing")
+                }
             }
-            .fixedSize(horizontal: false, vertical: true)
         }
-        .toggleStyle(.switch).frame(minHeight: 44)
-        .accessibilityIdentifier("proximity-approval-mode")
+    }
+
+    private func choice(_ choice: WalletDemoProximityApprovalMode, title: LocalizedStringKey) -> some View {
+        Button { mode = choice } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).foregroundStyle(.primary)
+                    if !compact { Text(choice.explanation).font(.footnote).foregroundStyle(.secondary) }
+                }
+                Spacer()
+                Image(systemName: mode == choice ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(.tint).accessibilityHidden(true)
+            }
+            .frame(minHeight: 44).padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(choice == .prepareSharing ? "proximity-approval-prepare" : "proximity-approval-ask")
+        .accessibilityValue(mode == choice ? "Selected" : "Not selected")
+        .accessibilityAddTraits(mode == choice ? .isSelected : [])
     }
 }
 
@@ -380,7 +400,7 @@ private struct ProximityEngagementContent: View {
     private var footer: some View {
         VStack(alignment: .leading, spacing: 4) {
             if viewModel.preparedSharing == nil {
-                ProximityApprovalModeToggle(mode: $approvalMode)
+                ProximityApprovalModeChoice(mode: $approvalMode)
                     .disabled(viewModel.refreshingEngagement)
             } else {
                 Button("Approved data") { showApprovedData = true }.frame(maxWidth: .infinity, minHeight: 44)

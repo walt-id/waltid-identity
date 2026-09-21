@@ -4,6 +4,7 @@ import WalletDemoSharingUI
 struct HomeView: View {
     @ObservedObject var viewModel: WalletViewModel
     @State private var selectedCredentialDetailsID: String?
+    @State private var showingSettings = false
 
     var body: some View {
         Group {
@@ -13,34 +14,50 @@ struct HomeView: View {
                 }.navigationViewStyle(.stack)
             } else { walletTabs }
         }
+        .fullScreenCover(isPresented: $showingSettings) {
+            NavigationView {
+                SettingsView(viewModel: viewModel)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button { showingSettings = false } label: {
+                                Label("Back", systemImage: "chevron.backward")
+                            }
+                            .accessibilityIdentifier("wallet.settingsBack")
+                        }
+                    }
+            }.navigationViewStyle(.stack)
+        }
+        .onChange(of: viewModel.isReady) { ready in if !ready { showingSettings = false } }
+    }
+
+    private func openSettings() {
+        viewModel.proximityPresentation.dismiss()
+        showingSettings = true
     }
 
     private var walletTabs: some View {
         TabView(selection: $viewModel.selectedTab) {
             CredentialsTabView(
                 viewModel: viewModel,
-                selectedDetailsID: $selectedCredentialDetailsID
+                selectedDetailsID: $selectedCredentialDetailsID,
+                onOpenSettings: openSettings
             )
             .tabItem {
                 Label("Credentials", systemImage: "wallet.pass")
             }
             .tag(WalletTab.credentials)
 
-            ReceiveView(
-                viewModel: viewModel
-            )
-            .tabItem {
-                Label("Receive", systemImage: "tray.and.arrow.down")
-            }
-            .tag(WalletTab.receive)
+            ReceiveView(viewModel: viewModel, onOpenSettings: openSettings)
+                .tabItem {
+                    Label("Receive", systemImage: "tray.and.arrow.down")
+                }
+                .tag(WalletTab.receive)
 
-            PresentView(
-                viewModel: viewModel
-            )
-            .tabItem {
-                Label("Present", systemImage: "person.badge.key")
-            }
-            .tag(WalletTab.present)
+            PresentView(viewModel: viewModel, onOpenSettings: openSettings)
+                .tabItem {
+                    Label("Present", systemImage: "person.badge.key")
+                }
+                .tag(WalletTab.present)
         }
     }
 }

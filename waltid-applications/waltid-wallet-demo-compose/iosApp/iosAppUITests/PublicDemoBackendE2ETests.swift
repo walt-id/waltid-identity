@@ -38,7 +38,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
-        app.buttons["Technical details"].tap()
+        app.buttons["wallet.settingsTechnicalDetails"].tap()
         let didLabel = app.staticTexts["wallet.settingsDid"]
         XCTAssertTrue(didLabel.waitForExistence(timeout: 10), "Bootstrapped DID label was not exposed")
         XCTAssertTrue(didLabel.label.starts(with: "did:"), "DID should start with 'did:', got: \(didLabel.label)")
@@ -335,11 +335,11 @@ final class WalletIdentitySetupUITests: XCTestCase {
         next.tap()
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: 30), "Wallet ready")
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
-        app.buttons["Technical details"].tap()
+        app.buttons["wallet.settingsTechnicalDetails"].tap()
         let did = app.staticTexts["wallet.settingsDid"].label
         ui.tapButton(identifier: "wallet.settingsBack", fallbackLabel: "Back")
         XCTAssertTrue(did.hasPrefix("did:jwk:"))
-        app.buttons["Protection and recovery"].tap()
+        app.buttons["wallet.settingsSigningKey"].tap()
         let receipt = app.staticTexts["Saved on this device. Delivery to another device is not confirmed."]
         for _ in 0..<5 where !receipt.isHittable { app.swipeUp() }
         XCTAssertTrue(receipt.exists)
@@ -387,7 +387,7 @@ final class WalletIdentitySetupUITests: XCTestCase {
         next.tap()
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: 30), "Wallet ready")
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
-        app.buttons["Technical details"].tap()
+        app.buttons["wallet.settingsTechnicalDetails"].tap()
         XCTAssertEqual(app.staticTexts["wallet.settingsDid"].label, did)
         ui.tapButton(identifier: "wallet.settingsBack", fallbackLabel: "Back")
         capture("restored-key", app: app)
@@ -395,11 +395,11 @@ final class WalletIdentitySetupUITests: XCTestCase {
         ui.launch(environment: environment)
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: 30), "Wallet ready")
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
-        app.buttons["Technical details"].tap()
+        app.buttons["wallet.settingsTechnicalDetails"].tap()
         XCTAssertEqual(app.staticTexts["wallet.settingsDid"].label, did)
         ui.tapButton(identifier: "wallet.settingsBack", fallbackLabel: "Back")
-        app.buttons["Protection and recovery"].tap()
-        let delete = app.buttons["Delete key backup"]
+        app.buttons["wallet.settingsSigningKey"].tap()
+        let delete = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Delete key backup,")).firstMatch
         for _ in 0..<10 {
             if delete.exists && delete.frame.minY > 100 && delete.frame.maxY < app.frame.maxY - 100 { break }
             app.swipeUp()
@@ -415,10 +415,10 @@ final class WalletIdentitySetupUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5))
         capture("delete-recovery-warning", app: app)
         app.buttons["Cancel"].firstMatch.tap()
-        XCTAssertTrue(app.buttons["Delete key backup"].exists)
+        XCTAssertTrue(delete.exists)
+        delete.tap()
         app.buttons["Delete key backup"].tap()
-        app.buttons["Delete key backup"].firstMatch.tap()
-        let removed = app.staticTexts["Backup deletion requested. Removal from other devices is not confirmed."]
+        let removed = app.staticTexts["Backup deletion requested. Keys already restored on other devices are not deleted."]
         XCTAssertTrue(removed.waitForExistence(timeout: 20))
         ui.tapButton(identifier: "wallet.settingsBack", fallbackLabel: "Back")
         for _ in 0..<8 where !app.buttons["wallet.settingsReset"].isHittable { app.swipeUp() }
@@ -428,7 +428,10 @@ final class WalletIdentitySetupUITests: XCTestCase {
     }
 
     private func capture(_ name: String, app: XCUIApplication) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+        // Compose navigation/rotation animations are not part of XCTest's
+        // UIKit idling. Let the rendered frame settle before taking evidence.
+        RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = "wal749-\(name)"
         attachment.lifetime = .keepAlways
         add(attachment)
@@ -454,7 +457,7 @@ final class WalletIdentitySetupUITests: XCTestCase {
         }
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: 30), "Wallet ready")
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
-        app.buttons["Protection and recovery"].tap()
+        app.buttons["wallet.settingsSigningKey"].tap()
         let recovery = app.staticTexts["No key backup submitted."]
         for _ in 0..<4 where !recovery.isHittable { app.swipeUp() }
         XCTAssertTrue(recovery.waitForExistence(timeout: 10))
@@ -462,5 +465,44 @@ final class WalletIdentitySetupUITests: XCTestCase {
         active.name = "wal749-compose-ios-identity-details"
         active.lifetime = .keepAlways
         add(active)
+        ui.tapButton(identifier: "wallet.settingsBack", fallbackLabel: "Back")
+        capture("settings-root", app: app)
+        ui.tapButton(identifier: "wallet.settingsTechnicalDetails", fallbackLabel: "Technical details")
+        let did = app.staticTexts["wallet.settingsDid"]
+        XCTAssertTrue(did.waitForExistence(timeout: 10))
+        XCTAssertTrue(did.label.hasPrefix("did:jwk:"))
+        ui.tapButton(identifier: "wallet.settingsDidCopy", fallbackLabel: "Copy wallet DID")
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Wallet DID copied")).firstMatch.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["wallet.settingsPublicJwk"].exists)
+        capture("technical-copy", app: app)
+        app.buttons["Show public key"].tap()
+        XCTAssertTrue(app.staticTexts["wallet.settingsPublicJwk"].waitForExistence(timeout: 3))
+        capture("technical-expanded", app: app)
+        ui.tapButton(identifier: "wallet.settingsBack", fallbackLabel: "Back")
+        ui.tapButton(identifier: "wallet.settingsDigitalCredentialsApi", fallbackLabel: "Digital Credentials API")
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.settingsShowDcApiPreview"].waitForExistence(timeout: 5))
+        capture("digital-credentials-api", app: app)
+        ui.tapButton(identifier: "wallet.settingsBack", fallbackLabel: "Back")
+        ui.tapButton(identifier: "wallet.settingsProximityPresentation", fallbackLabel: "Nearby sharing")
+        capture("nearby-sharing", app: app)
+        ui.tapButton(identifier: "wallet.settingsReaderAuthentication", fallbackLabel: "Reader authentication")
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.settingsReaderPolicyAllowUntrusted"].waitForExistence(timeout: 5))
+        capture("reader-authentication", app: app)
+        ui.tapButton(identifier: "wallet.settingsBack", fallbackLabel: "Back")
+        ui.tapButton(identifier: "wallet.settingsConnectionMethod", fallbackLabel: "Connection method")
+        capture("connection-method", app: app)
+        #if targetEnvironment(simulator)
+        // A physical device may have rotation lock enabled. Exercise layout
+        // rotation on the simulator; the device run verifies the real key flow.
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        let landscape = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            app.frame.width > app.frame.height
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [landscape], timeout: 5), .completed)
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.settingsProximityDefault"].waitForExistence(timeout: 5))
+        capture("connection-landscape", app: app)
+        #endif
+
     }
 }

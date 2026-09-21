@@ -90,6 +90,64 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun sharingPreferenceFailureKeepsTheCommittedValueAndAllowsRetry() = runTest {
+        val saved = InMemoryDemoSharingSettingsStore()
+        var fail = true
+        val store = object : DemoSharingSettingsStore by saved {
+            override fun setProximityApprovalMode(mode: WalletDemoProximityApprovalMode) {
+                check(!fail) { "Disk unavailable" }
+                saved.setProximityApprovalMode(mode)
+            }
+        }
+        val controller = WalletDemoController(FakeDemoWallet(), InMemoryDemoPinStore(), sharingSettings = store)
+        controller.setProximityApprovalMode(WalletDemoProximityApprovalMode.PrepareSharing)
+        assertEquals(WalletDemoProximityApprovalMode.AskEachTime, controller.state.value.proximityApprovalMode)
+        assertEquals(WalletDemoProximityApprovalMode.AskEachTime, saved.proximityApprovalMode())
+        assertEquals("Could not save sharing approval. Try again.", controller.state.value.sharingSettingsError)
+        fail = false
+        controller.setProximityApprovalMode(WalletDemoProximityApprovalMode.PrepareSharing)
+        assertEquals(WalletDemoProximityApprovalMode.PrepareSharing, controller.state.value.proximityApprovalMode)
+        assertEquals(WalletDemoProximityApprovalMode.PrepareSharing, saved.proximityApprovalMode())
+        assertNull(controller.state.value.sharingSettingsError)
+    }
+
+    @Test
+    fun backupFailureIsScopedToSigningKeyAndRetryClearsIt() = runTest {
+        val delegate = FakeDemoWallet()
+        val gate = CompletableDeferred<Unit>()
+        var attempts = 0
+        val details = WalletDemoIdentityDetails("Native", "Generated", "None", "No backup",
+            listOf(WalletDemoIdentityChoice("backup", "Back up signing key", "Provider", true)))
+        val wallet = object : DemoWallet by delegate {
+            override suspend fun identityDetails() = details
+            override suspend fun chooseIdentity(choiceId: String) {
+                attempts++
+                if (attempts == 1) throw WalletDemoKeyOperationException("The backup provider is unavailable. Try again later.")
+                gate.await()
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this)
+        controller.refreshIdentityDetails()
+        runCurrent()
+        val warning = controller.state.value.warning
+        controller.performIdentityAction("backup")
+        runCurrent()
+        assertEquals("The backup provider is unavailable. Try again later.", controller.state.value.identityError)
+        assertEquals(warning, controller.state.value.warning)
+        assertFalse(controller.state.value.identityBusy)
+        controller.performIdentityAction("backup")
+        runCurrent()
+        assertNull(controller.state.value.identityError)
+        assertTrue(controller.state.value.identityBusy)
+        controller.performIdentityAction("backup")
+        assertEquals(2, attempts)
+        gate.complete(Unit)
+        runCurrent()
+        assertFalse(controller.state.value.identityBusy)
+        assertEquals(WalletDemoIdentityDetailsState.Available(details), controller.state.value.identityDetails)
+    }
+
+    @Test
     fun foregroundRefreshKeepsSetupVisibleAndDoesNotBootstrapOrDuplicateRequests() = runTest {
         val original = WalletDemoIdentitySetup.Choose(emptyList())
         val wallet = FakeDemoWallet().apply { identitySetupValue = original }

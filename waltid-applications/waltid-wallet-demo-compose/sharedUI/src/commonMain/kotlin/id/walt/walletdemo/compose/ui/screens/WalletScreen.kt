@@ -2,10 +2,13 @@ package id.walt.walletdemo.compose.ui.screens
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
+import id.walt.walletdemo.compose.ui.components.SettingsNotice
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Scaffold
@@ -22,7 +25,8 @@ internal fun WalletScreen(
     state: WalletDemoUiState,
     onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
-    sharingSettingsContent: (@Composable () -> Unit)? = null,
+    readerTrustSettingsContent: (@Composable () -> Unit)? = null,
+    readerTrustPolicySummary: String? = null,
     onOpenSettings: () -> Unit = {},
     onResetWallet: () -> Unit = { controller.resetWallet() },
     onSignOut: (() -> Unit)? = null,
@@ -33,7 +37,7 @@ internal fun WalletScreen(
         return
     }
     val openAuthorizationRequest = rememberAuthorizationRequestOpener()
-    var showingSettings by remember { mutableStateOf(false) }
+    var showingSettings by rememberSaveable { mutableStateOf(false) }
     var detailsChrome by remember { mutableStateOf<CredentialDetailsChrome?>(null) }
 
     LaunchedEffect(state.authorizationRequestUrl) {
@@ -63,7 +67,8 @@ internal fun WalletScreen(
             onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
             onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
             onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,
-            sharingSettingsContent = sharingSettingsContent,
+            readerTrustSettingsContent = readerTrustSettingsContent,
+                        readerTrustPolicySummary = readerTrustPolicySummary,
             onProximityApprovalModeChange = onStartProximityPresentation?.let { controller::setProximityApprovalMode },
         )
         return
@@ -75,12 +80,15 @@ internal fun WalletScreen(
             if (chrome != null) {
                 CredentialDetailsTopBar(chrome)
             } else {
-                WalletHeader(
-                    state = state,
-                    onSettings = { onOpenSettings(); showingSettings = true },
-                    onDismissStatus = controller::dismissStatus,
-                    onToggleStatusExpanded = controller::toggleStatusExpanded,
-                )
+                Column {
+                    WalletHeader(
+                        state = state,
+                        onSettings = { onOpenSettings(); showingSettings = true },
+                        onDismissStatus = controller::dismissStatus,
+                        onToggleStatusExpanded = controller::toggleStatusExpanded,
+                    )
+                    state.sharingSettingsError?.let { SettingsNotice(it, error = true) }
+                }
             }
         },
         bottomBar = {

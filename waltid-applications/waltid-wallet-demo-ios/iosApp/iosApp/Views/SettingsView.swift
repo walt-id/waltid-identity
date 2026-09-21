@@ -1,165 +1,85 @@
 import SwiftUI
-import UIKit
-import UniformTypeIdentifiers
-import WalletDemoIdentityDocumentSupport
 import WalletDemoSharingUI
 import WalletSDK
 
 struct SettingsView: View {
     @ObservedObject var viewModel: WalletViewModel
-    @Environment(\.walletDemoBranding) private var branding
+    @Environment(\.dismiss) private var dismiss
     @State private var confirmReset = false
 
     var body: some View {
         List {
             Section("Wallet") {
-                Text(branding.appTitle)
-                    .font(.headline)
-                    .accessibilityIdentifier(WalletAccessibilityID.settingsAppTitle)
-            }
-            if let model = viewModel.identityScreen {
-                Section("Wallet signing key") {
-                    NavigationLink("Protection and recovery") { WalletIdentityView(model: model) }
+                NavigationLink {
+                    if let model = viewModel.identityScreen { WalletIdentityView(model: model) }
+                    else { List { signingProtectionSection }.navigationTitle("Signing key").navigationBarTitleDisplayMode(.inline) }
+                } label: {
+                    SettingsDestinationLabel("Signing key", systemImage: "key", summary: String(localized: "Protection and key backup"))
                 }
+                .accessibilityIdentifier("wallet.settingsSigningKey")
+                NavigationLink { TechnicalDetailsView(viewModel: viewModel) } label: {
+                    SettingsDestinationLabel("Technical details", systemImage: "doc.text", summary: String(localized: "DID, key ID, and public key"))
+                }
+                .accessibilityIdentifier("wallet.settingsTechnicalDetails")
             }
             Section {
-                NavigationLink("Technical details") {
+                NavigationLink { NearbySettingsView(viewModel: viewModel) } label: {
+                    SettingsDestinationLabel("Nearby sharing", systemImage: "antenna.radiowaves.left.and.right", summary: viewModel.proximityTransportProfile.title)
+                }
+                .accessibilityIdentifier(WalletAccessibilityID.settingsProximityPresentation)
+                NavigationLink {
                     List {
-                        Section("Wallet DID") {
-                            Text(viewModel.did.isEmpty ? "Not available" : viewModel.did)
-                                .font(.footnote)
-                                .textSelection(.enabled)
-                                .accessibilityIdentifier(WalletAccessibilityID.settingsDid)
-                            Button("Copy DID") {
-                                UIPasteboard.general.string = viewModel.did
+                        Section {
+                            Toggle("Show wallet review", isOn: $viewModel.showDcApiPresentationPreview)
+                                .accessibilityIdentifier(WalletAccessibilityID.settingsShowDcApiPreview)
+                        } footer: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Show the wallet review after you select a credential in the system picker. Turning this off skips only the wallet review. System consent and any required signing approval still apply.")
+                                Text("Requires iOS 26 or later and a compatible app or browser. This setting controls wallet review only.")
                             }
-                            .accessibilityIdentifier(WalletAccessibilityID.settingsDidCopy)
                         }
-                        Section("Wallet key") {
-                            Text(viewModel.keyID.isEmpty ? "Not available" : viewModel.keyID)
-                                .font(.footnote)
-                                .textSelection(.enabled)
-                                .accessibilityIdentifier(WalletAccessibilityID.settingsKeyId)
-                            Button("Copy key ID") {
-                                UIPasteboard.general.string = viewModel.keyID
-                            }
-                            .accessibilityIdentifier(WalletAccessibilityID.settingsKeyIdCopy)
-                        }
-                        Section("Public JWK") {
-                            Text(viewModel.publicJWK.isEmpty ? "Not available" : viewModel.publicJWK)
-                                .font(.footnote)
-                                .textSelection(.enabled)
-                                .accessibilityIdentifier(WalletAccessibilityID.settingsPublicJwk)
-                            Button("Copy public JWK") {
-                                UIPasteboard.general.string = viewModel.publicJWK
-                            }
-                            .accessibilityIdentifier(WalletAccessibilityID.settingsPublicJwkCopy)
-                        }
-                    }.navigationTitle("Technical details")
+                    }
+                    .frame(maxWidth: 640)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(uiColor: .systemGroupedBackground))
+                    .navigationTitle("Digital Credentials API")
+                    .navigationBarTitleDisplayMode(.inline)
+                } label: {
+                    SettingsDestinationLabel("Digital Credentials API", systemImage: "person.text.rectangle",
+                                             summary: viewModel.showDcApiPresentationPreview ? String(localized: "Wallet review on") : String(localized: "Wallet review off"))
                 }
-            }
-            if viewModel.identityScreen == nil { signingProtectionSection }
-            Section {
-                Toggle(
-                    "Show Walt Wallet preview for DC API Presentation",
-                    isOn: $viewModel.showDcApiPresentationPreview
-                )
-                .accessibilityIdentifier(WalletAccessibilityID.settingsShowDcApiPreview)
-                Text("When off, Digital Credentials presentations skip the wallet review and continue from the system picker to biometrics.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                proximityPresentationSettings
-                NavigationLink("Reader Authentication") {
-                    ReaderTrustSettingsView(controller: viewModel.readerTrustSettings)
-                }
-                .accessibilityIdentifier(WalletAccessibilityID.settingsReaderAuthentication)
+                .accessibilityIdentifier("wallet.settingsDigitalCredentialsApi")
             } header: {
-                Text("Credential Sharing")
-                    .accessibilityIdentifier(WalletAccessibilityID.settingsCredentialSharing)
+                Text("Sharing").accessibilityIdentifier(WalletAccessibilityID.settingsCredentialSharing)
             }
             Section {
-                Button("Lock") {
-                    viewModel.lock()
-                }
-                .accessibilityIdentifier(WalletAccessibilityID.settingsLock)
-                Button("Reset wallet", role: .destructive) {
-                    confirmReset = true
+                Button { dismiss(); viewModel.lock() } label: { Label("Lock wallet", systemImage: "lock") }
+                    .accessibilityIdentifier(WalletAccessibilityID.settingsLock)
+                Button(role: .destructive) { confirmReset = true } label: {
+                    Label("Reset wallet", systemImage: "arrow.counterclockwise").foregroundStyle(.red)
                 }
                 .accessibilityIdentifier(WalletAccessibilityID.settingsReset)
             }
         }
+        .listStyle(.insetGrouped)
+        .frame(maxWidth: 640)
+        .frame(maxWidth: .infinity)
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Settings")
-        .alert(
-            "Reset wallet?",
-            isPresented: $confirmReset
-        ) {
-            Button("Reset", role: .destructive) {
-                viewModel.resetWallet()
-            }
-            .accessibilityIdentifier(WalletAccessibilityID.settingsResetConfirm)
+        .alert("Reset wallet?", isPresented: $confirmReset) {
+            Button("Reset wallet", role: .destructive, action: viewModel.resetWallet)
+                .accessibilityIdentifier(WalletAccessibilityID.settingsResetConfirm)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes local wallet keys, credentials and the app PIN. Saved key backups remain. Key recovery does not restore credentials.")
+            Text("This removes the wallet’s local keys, credentials, and wallet PIN. Saved key backups remain. Restoring a key does not restore credentials.")
         }
-        .confirmationDialog(
-            "Change signing protection?",
-            isPresented: signingProtectionConfirmationPresented,
-            titleVisibility: .visible
-        ) {
-            Button("Create new wallet", role: .destructive) {
-                viewModel.confirmSigningProtectionChange()
-            }
-            .accessibilityIdentifier(WalletAccessibilityID.signingProtectionConfirm)
-            Button("Cancel", role: .cancel) {
-                viewModel.cancelSigningProtectionChange()
-            }
+        .confirmationDialog("Change signing protection?", isPresented: signingProtectionConfirmationPresented, titleVisibility: .visible) {
+            Button("Create new wallet", role: .destructive, action: viewModel.confirmSigningProtectionChange)
+                .accessibilityIdentifier(WalletAccessibilityID.signingProtectionConfirm)
+            Button("Cancel", role: .cancel, action: viewModel.cancelSigningProtectionChange)
         } message: {
             Text("This creates a new key and DID, and removes all credentials. Credentials must be issued again.")
         }
-    }
-
-    private var proximityPresentationSettings: some View {
-        NavigationLink {
-            List {
-                Section("Approval") {
-                    ProximityApprovalModeToggle(mode: $viewModel.proximityApprovalMode, compact: false)
-                    Text("Only the mode is remembered. Each prepared share needs a new approval.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
-                Section {
-                    ForEach(WalletDemoProximityTransportProfile.allCases) { profile in
-                        Button {
-                            viewModel.proximityTransportProfile = profile
-                        } label: {
-                            HStack(spacing: 12) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(profile.title).foregroundStyle(.primary)
-                                    Text(profile.description).font(.footnote).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if viewModel.proximityTransportProfile == profile {
-                                    Image(systemName: "checkmark").accessibilityHidden(true)
-                                }
-                            }
-                        }
-                        .accessibilityIdentifier(profile.accessibilityIdentifier)
-                        .accessibilityValue(viewModel.proximityTransportProfile == profile ? "Selected" : "Not selected")
-                    }
-                } header: {
-                    Text("Connection")
-                } footer: {
-                    Text("Use Automatic unless your reader requires a specific connection. Changes update sharing before connection or approval. Otherwise they apply to your next presentation.")
-                }
-            }
-            .navigationTitle("Nearby sharing")
-        } label: {
-            HStack {
-                Text("Nearby sharing")
-                Spacer()
-                Text(viewModel.proximityTransportProfile.title).foregroundStyle(.secondary)
-            }
-        }
-        .accessibilityIdentifier(WalletAccessibilityID.settingsProximityPresentation)
     }
 
     @ViewBuilder
@@ -257,317 +177,5 @@ struct SettingsView: View {
                 }
             }
         )
-    }
-}
-
-private struct ReaderTrustSettingsView: View {
-    @ObservedObject var controller: DemoReaderTrustSettingsController
-    @State private var importing = false
-    @State private var importTask: Task<Void, Never>?
-    @State private var confirmReset = false
-
-    var body: some View {
-        List {
-            Section {
-                policyChoice(
-                    .allowAnonymousOrUntrusted,
-                    title: "Allow anonymous or untrusted readers",
-                    detail: "Reader Authentication remains visible during holder review."
-                )
-                .accessibilityIdentifier(WalletAccessibilityID.readerTrustAllowUntrusted)
-                policyChoice(
-                    .requireTrusted,
-                    title: "Require a trusted reader",
-                    detail: "Only readers accepted by configured Reader CAs or RICALs may reach review."
-                )
-                .accessibilityIdentifier(WalletAccessibilityID.readerTrustRequireTrusted)
-                if controller.settings.readerPolicy == .requireTrusted,
-                   controller.settings.trustAnchors.isEmpty,
-                   controller.settings.ricalProviders.isEmpty {
-                    Text("No trust material is configured, so all readers will be rejected.")
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                }
-            } header: {
-                Text("Reader policy")
-                    .accessibilityIdentifier(WalletAccessibilityID.readerTrustPolicy)
-            }
-
-            Section("Configured trust material") {
-                if controller.settings.trustAnchors.isEmpty,
-                   controller.settings.ricalProviders.isEmpty {
-                    Text("No Reader CAs or RICAL providers configured")
-                        .foregroundStyle(.secondary)
-                }
-                ForEach(controller.settings.trustAnchors) { anchor in
-                    configuredMaterialRow(
-                        title: anchor.displayName,
-                        detail: "Reader CA",
-                        remove: { controller.removeReaderAuthority(id: anchor.id) }
-                    )
-                }
-                ForEach(controller.settings.ricalProviders) { provider in
-                    configuredMaterialRow(
-                        title: provider.providerID,
-                        detail: provider.establishesReaderTrust
-                            ? "RICAL provider · establishes reader trust"
-                            : "RICAL provider · evidence only",
-                        remove: { controller.removeRICALProvider(id: provider.id) }
-                    )
-                }
-            }
-
-            Section("Import") {
-                Button("Import Reader CA or trust bundle") {
-                    importing = true
-                }
-                .disabled(controller.importInProgress || controller.loading)
-                .accessibilityIdentifier(WalletAccessibilityID.readerTrustImport)
-                Text("Accepted: DER or certificate-only PEM Reader CAs, and versioned walt.id JSON trust bundles. Private keys and PKCS#12 files are rejected.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                if controller.importInProgress {
-                    ProgressView("Validating trust material...")
-                        .accessibilityIdentifier(WalletAccessibilityID.readerTrustImportProgress)
-                }
-            }
-
-            if !controller.settings.trustAnchors.isEmpty ||
-                !controller.settings.ricalProviders.isEmpty ||
-                controller.settings.readerPolicy != .allowAnonymousOrUntrusted {
-                Section {
-                    Button("Reset Reader Authentication settings", role: .destructive) {
-                        confirmReset = true
-                    }
-                    .accessibilityIdentifier(WalletAccessibilityID.readerTrustReset)
-                }
-            }
-        }
-        .navigationTitle("Reader Authentication")
-        .onDisappear { importTask?.cancel(); controller.cancelImport() }
-        .fileImporter(
-            isPresented: $importing,
-            allowedContentTypes: [.data],
-            allowsMultipleSelection: false,
-            onCompletion: handleImportResult
-        )
-        .sheet(isPresented: importReviewPresented) {
-            if let preview = controller.pendingImport {
-                ReaderTrustImportReviewView(
-                    preview: preview,
-                    confirm: controller.confirmImport,
-                    cancel: controller.cancelImport
-                )
-            }
-        }
-        .confirmationDialog(
-            "Reset Reader Authentication settings?",
-            isPresented: $confirmReset,
-            titleVisibility: .visible
-        ) {
-            Button("Reset", role: .destructive, action: controller.reset)
-                .accessibilityIdentifier(WalletAccessibilityID.readerTrustResetConfirm)
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This removes all imported Reader CAs and RICAL providers and restores the permissive reader policy.")
-        }
-        .alert("Reader Authentication import failed", isPresented: errorPresented) {
-            Button("OK", action: controller.dismissError)
-        } message: {
-            Text(controller.errorMessage ?? "Unknown error")
-                .accessibilityIdentifier(WalletAccessibilityID.readerTrustError)
-        }
-    }
-
-    private func policyChoice(
-        _ policy: ProximityStoredReaderPolicy,
-        title: LocalizedStringKey,
-        detail: LocalizedStringKey
-    ) -> some View {
-        Button {
-            controller.setReaderPolicy(policy)
-        } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: controller.settings.readerPolicy == policy
-                    ? "largecircle.fill.circle"
-                    : "circle")
-                    .foregroundStyle(.tint)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title).foregroundStyle(.primary)
-                    Text(detail).font(.footnote).foregroundStyle(.secondary)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityValue(
-            controller.settings.readerPolicy == policy ? "Selected" : "Not selected"
-        )
-        .accessibilityAddTraits(
-            controller.settings.readerPolicy == policy ? .isSelected : []
-        )
-    }
-
-    private func configuredMaterialRow(
-        title: String,
-        detail: LocalizedStringKey,
-        remove: @escaping () -> Void
-    ) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                Text(detail).font(.footnote).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button(role: .destructive, action: remove) {
-                Image(systemName: "trash")
-            }
-            .accessibilityLabel("Remove \(title)")
-        }
-    }
-
-    private func handleImportResult(_ result: Result<[URL], Error>) {
-        importTask?.cancel()
-        importTask = Task {
-            do {
-                switch try await ReaderTrustImportFileLoader.loadOffMain(result) {
-                case .cancelled: return
-                case let .selected(sourceName, data):
-                    await controller.prepareImport(sourceName: sourceName, data: data)
-                }
-            } catch is CancellationError { return }
-            catch { controller.reportImportError(error.localizedDescription) }
-        }
-    }
-
-    private var importReviewPresented: Binding<Bool> {
-        Binding(
-            get: { controller.pendingImport != nil },
-            set: { if !$0 { controller.cancelImport() } }
-        )
-    }
-
-    private var errorPresented: Binding<Bool> {
-        Binding(
-            get: { controller.errorMessage != nil },
-            set: { if !$0 { controller.dismissError() } }
-        )
-    }
-}
-
-private struct ReaderTrustImportReviewView: View {
-    let preview: ProximityReaderTrustImportPreview
-    let confirm: () -> Void
-    let cancel: () -> Void
-
-    var body: some View {
-        NavigationView {
-            List {
-                Section("Import") {
-                    reviewDetail("File", preview.sourceName)
-                    reviewDetail(
-                        "Kind",
-                        preview.kind == .readerCA ? String(localized: "Reader CA") : String(localized: "Trust bundle")
-                    )
-                    Text(preview.resultingSettings.readerPolicy == .requireTrusted
-                        ? String(localized: "Only readers trusted by the configured material may reach holder consent")
-                        : String(localized: "Untrusted readers may still reach holder consent"))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                if !preview.readerAuthorities.isEmpty {
-                    Section("Reader authorities") {
-                        ForEach(preview.readerAuthorities) { authority in
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(authority.displayName).font(.headline)
-                                reviewDetail("Type", String(localized: "X.509 CA certificate"))
-                                reviewDetail("Role", String(localized: "Reader trust anchor"))
-                                reviewDetail("Subject", authority.subject)
-                                reviewDetail("Issuer", authority.issuer)
-                                reviewDate("Valid from", authority.validFrom)
-                                reviewDate("Valid until", authority.validUntil)
-                                Text(authority.sha256Fingerprint)
-                                    .font(.caption.monospaced())
-                                    .textSelection(.enabled)
-                            }
-                        }
-                    }
-                }
-                if !preview.ricalProviders.isEmpty {
-                    Section("RICAL providers") {
-                        ForEach(preview.ricalProviders) { provider in
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(provider.providerID).font(.headline)
-                                reviewDetail("Type", provider.type)
-                                reviewDetail(
-                                    "Trust effect",
-                                    provider.establishesReaderTrust
-                                        ? String(localized: "May establish reader trust")
-                                        : String(localized: "Evidence only")
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Review import")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: cancel)
-                        .accessibilityIdentifier(WalletAccessibilityID.readerTrustImportCancel)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Import", action: confirm)
-                        .accessibilityIdentifier(WalletAccessibilityID.readerTrustImportConfirm)
-                }
-            }
-            .accessibilityIdentifier(WalletAccessibilityID.readerTrustImportReview)
-        }
-    }
-
-    private func reviewDetail(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.footnote)
-        }
-    }
-
-    private func reviewDate(_ label: String, _ value: Date) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            Text(value, style: .date).font(.footnote)
-        }
-    }
-}
-
-private extension WalletDemoProximityTransportProfile {
-    var title: String {
-        switch self {
-        case .defaultProfile: String(localized: "Automatic")
-        case .bluetooth: String(localized: "Bluetooth transfer")
-        case .wifiAware: String(localized: "Wi-Fi Aware transfer")
-        case .provisionalNfcV2Hybrid: String(localized: "NFCv2 + Bluetooth")
-        case .provisionalNfcV2Direct: String(localized: "NFCv2 direct")
-        case .provisionalNfcV2WifiAware: String(localized: "NFCv2 + Wi-Fi Aware")
-        }
-    }
-
-    var description: String {
-        switch self {
-        case .defaultProfile: String(localized: "Use available connections supported by the reader.")
-        case .bluetooth: String(localized: "Start with NFC or QR; transfer over Bluetooth.")
-        case .wifiAware: String(localized: "Start with NFC or QR; requires Wi-Fi Aware on both devices.")
-        case .provisionalNfcV2Hybrid: String(localized: "Provisional profile. Start with NFCv2; transfer over Bluetooth.")
-        case .provisionalNfcV2Direct: String(localized: "Provisional profile. Keep the connection on NFCv2.")
-        case .provisionalNfcV2WifiAware: String(localized: "Provisional profile. Start with NFCv2; allow Wi-Fi Aware transfer.")
-        }
-    }
-
-    var accessibilityIdentifier: String {
-        switch self {
-        case .defaultProfile: WalletAccessibilityID.settingsProximityDefault
-        case .provisionalNfcV2Hybrid: WalletAccessibilityID.settingsProximityNfcV2Hybrid
-        case .provisionalNfcV2Direct: WalletAccessibilityID.settingsProximityNfcV2Direct
-        default: "wallet.settingsProximity.\(rawValue)"
-        }
     }
 }

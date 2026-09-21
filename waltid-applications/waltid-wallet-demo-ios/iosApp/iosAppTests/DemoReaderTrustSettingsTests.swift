@@ -1,9 +1,84 @@
 import Foundation
 import XCTest
+import SwiftUI
+import UIKit
 @testable import iosApp
 @testable import WalletSDK
 
 final class DemoReaderTrustSettingsTests: XCTestCase {
+    @MainActor
+    func testImportReviewPresentationKeepsUncommittedMaterialUntilConfirmation() async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previousWindow = scene.windows.first { $0.isKeyWindow }
+        let window = UIWindow(windowScene: scene)
+        defer { window.isHidden = true; previousWindow?.makeKeyAndVisible() }
+
+        for (name, style, textSize) in [
+            ("light", UIUserInterfaceStyle.light, DynamicTypeSize.large),
+            ("dark-large-text", UIUserInterfaceStyle.dark, DynamicTypeSize.accessibility3),
+        ] {
+            let persistence = InMemoryDemoReaderTrustSettingsPersistence()
+            let controller = DemoReaderTrustSettingsController(persistence: persistence)
+            await controller.awaitPendingOperations()
+            let host = UIHostingController(rootView: NavigationView {
+                ReaderTrustSettingsView(controller: controller)
+            }.dynamicTypeSize(textSize))
+            window.rootViewController = host
+            window.overrideUserInterfaceStyle = style
+            if #available(iOS 17.0, *) {
+                window.traitOverrides.preferredContentSizeCategory = name == "light" ? .large : .accessibilityExtraExtraExtraLarge
+            }
+            window.makeKeyAndVisible()
+
+            func capture(_ state: String) async throws {
+                try await Task.sleep(nanoseconds: 500_000_000)
+                window.layoutIfNeeded()
+                let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                    XCTAssertTrue(window.drawHierarchy(in: window.bounds, afterScreenUpdates: true))
+                }
+                let attachment = XCTAttachment(image: image)
+                attachment.name = "reader-trust-\(state)-\(name)"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+            }
+
+            try await capture("empty")
+            await controller.prepareImport(sourceName: "reader-ca.der", data: try XCTUnwrap(Data(base64Encoded: Self.testReaderCaDerBase64)))
+            try await capture("review")
+            // Presentation must not trigger the screen's departure cleanup and
+            // silently discard the preview, or commit anything before approval.
+            XCTAssertNotNil(host.presentedViewController)
+            XCTAssertNotNil(controller.pendingImport)
+            XCTAssertTrue(controller.settings.trustAnchors.isEmpty)
+            XCTAssertNil(persistence.encodedSettings)
+
+            controller.cancelImport()
+            for _ in 0..<100 where host.presentedViewController != nil {
+                try await Task.sleep(nanoseconds: 20_000_000)
+            }
+            try await capture("cancelled")
+            XCTAssertNil(host.presentedViewController)
+            XCTAssertTrue(controller.settings.trustAnchors.isEmpty)
+            XCTAssertNil(persistence.encodedSettings)
+
+            await controller.prepareImport(sourceName: "reader-ca.der", data: try XCTUnwrap(Data(base64Encoded: Self.testReaderCaDerBase64)))
+            controller.confirmImport()
+            await controller.awaitPendingOperations()
+            try await capture("configured")
+            XCTAssertEqual(controller.settings.trustAnchors.count, 1)
+
+            await controller.prepareImport(sourceName: "invalid.der", data: Data("not a certificate".utf8))
+            try await capture("error")
+            XCTAssertNotNil(controller.errorMessage)
+            XCTAssertEqual(controller.settings.trustAnchors.count, 1)
+            controller.dismissError()
+            for _ in 0..<100 where host.presentedViewController != nil {
+                try await Task.sleep(nanoseconds: 20_000_000)
+            }
+            window.isHidden = true
+        }
+    }
+
     @MainActor
     func testPolicyPersistsWithCanonicalCodecAndLoadsInNewController() async throws {
         let persistence = InMemoryDemoReaderTrustSettingsPersistence()
