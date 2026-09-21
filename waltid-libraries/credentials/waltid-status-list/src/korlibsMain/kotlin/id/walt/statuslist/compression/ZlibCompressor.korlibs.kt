@@ -18,7 +18,7 @@ private val EMPTY_ZLIB = byteArrayOf(
 
 actual object ZlibCompressor {
     actual fun compress(data: ByteArray): ByteArray =
-        if (data.isEmpty()) EMPTY_ZLIB
+        if (data.isEmpty()) EMPTY_ZLIB.copyOf()
         else ZLib.compress(data, outputSizeHint = data.size + COMPRESS_OUTPUT_HEADROOM)
 
     actual fun decompress(data: ByteArray): ByteArray = ZLib.uncompress(data)

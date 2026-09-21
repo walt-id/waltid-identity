@@ -20,4 +20,16 @@ class CompressionRoundTripTest {
             assertContentEquals(input, ZlibCompressor.decompress(compressed))
         }
     }
+
+    @Test
+    fun `mutating one empty gzip result does not affect the next`() {
+        GzipCompressor.compress(byteArrayOf()).fill(0)
+        assertContentEquals(byteArrayOf(), GzipCompressor.decompress(GzipCompressor.compress(byteArrayOf())))
+    }
+
+    @Test
+    fun `mutating one empty zlib result does not affect the next`() {
+        ZlibCompressor.compress(byteArrayOf()).fill(0)
+        assertContentEquals(byteArrayOf(), ZlibCompressor.decompress(ZlibCompressor.compress(byteArrayOf())))
+    }
 }

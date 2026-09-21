@@ -19,7 +19,7 @@ private val EMPTY_GZIP = byteArrayOf(
 
 actual object GzipCompressor {
     actual fun compress(data: ByteArray): ByteArray =
-        if (data.isEmpty()) EMPTY_GZIP
+        if (data.isEmpty()) EMPTY_GZIP.copyOf()
         else GZIP.compress(data, outputSizeHint = data.size + COMPRESS_OUTPUT_HEADROOM)
 
     actual fun decompress(data: ByteArray): ByteArray = GZIP.uncompress(data)
