@@ -52,9 +52,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env:
-      # Test klogging.conf defaults to TRACE and fills the 76MB GitHub log cap.
-      KLOGGING_MIN_LOG_LEVEL: INFO
-      KLOGGING_MIN_DIRECT_LOG_LEVEL: INFO
+      # KLOGGING_MIN_* only affect Klogging internals / delivery path. Application TRACE comes
+      # from test klogging.conf; this file is loaded first and keeps CI at INFO+.
+      KLOGGING_CONFIG_PATH: ${{ github.workspace }}/waltid-identity/.github/ci/klogging.conf
       JUNIT_TIMEOUT_DEFAULT: 10m
     strategy:
       matrix:
@@ -72,6 +72,9 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Verify CI klogging config
+        run: test -f "$KLOGGING_CONFIG_PATH"
 
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
@@ -182,8 +185,7 @@ jobs:
     if: ${{ inputs.run-conformance || inputs.run-issuer-conformance || inputs.run-haip-conformance }}
     runs-on: ubuntu-22.04
     env:
-      KLOGGING_MIN_LOG_LEVEL: INFO
-      KLOGGING_MIN_DIRECT_LOG_LEVEL: INFO
+      KLOGGING_CONFIG_PATH: ${{ github.workspace }}/waltid-identity/.github/ci/klogging.conf
     steps:
       - name: Set up swap space
         run: |
@@ -197,6 +199,9 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Verify CI klogging config
+        run: test -f "$KLOGGING_CONFIG_PATH"
 
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
