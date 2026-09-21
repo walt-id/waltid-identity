@@ -301,6 +301,64 @@ class Issuer2PreAuthorizedWalletFlowTest {
     }
 
     @Test
+    fun walletCannotSelectSameConfigurationDatasetsWithoutAuthorizationDetails() = testApplication {
+        val scenario = Issuer2CredentialScenarios.identitySdJwt
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val walletFlow = Issuer2WalletFlowDriver(client)
+
+        for (includeScope in listOf(false, true)) {
+            val createdOffer = client.createCredentialOffer(
+                MultiCredentialOfferCreateRequest(
+                    credentials = listOf("Alice", "Bob").map { name ->
+                        CredentialOfferCredential(
+                            profileId = scenario.profileId,
+                            runtimeOverrides = CredentialOfferRuntimeOverrides(
+                                credentialData = buildJsonObject { put("given_name", name) },
+                            ),
+                        )
+                    },
+                    authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+                )
+            )
+            val resolvedOffer = walletFlow.resolve(createdOffer)
+            assertEquals(listOf(scenario.credentialConfigurationId), resolvedOffer.offer.credentialConfigurationIds)
+
+            val tokenResponse = walletFlow.exchangePreAuthorizedCode(
+                resolvedOffer = resolvedOffer,
+                txCode = null,
+                additionalParameters = if (includeScope) mapOf("scope" to scenario.credentialConfigurationId) else emptyMap(),
+            )
+            assertNull(tokenResponse.authorization_details)
+
+            val response = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
+                bearerAuth(tokenResponse.access_token)
+                contentType(ContentType.Application.Json)
+                setBody(
+                    credentialRequest(
+                        credentialConfigurationId = scenario.credentialConfigurationId,
+                        proofs = walletFlow.buildJwtProofs(
+                            issuerMetadata = resolvedOffer.issuerMetadata,
+                            credentialConfigurationId = scenario.credentialConfigurationId,
+                        ),
+                    )
+                )
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+            val error = response.body<CredentialError>()
+            assertEquals(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, error.error)
+            assertTrue(error.description.orEmpty().contains("ambiguous"))
+
+            val session = client.getSession(createdOffer.offerId)
+            assertEquals(2, session.issuanceRequests.size)
+            assertEquals(2, session.issuanceRequests.map { it.credentialIdentifier }.toSet().size)
+            assertTrue(session.issuanceResults.isEmpty())
+            assertEquals(IssuanceSessionStatus.ACTIVE, session.status)
+            assertFalse(session.isClosed)
+        }
+    }
+
+    @Test
     fun walletCanIssueDifferentDatasetsForOneConfigurationUsingCredentialIdentifiers() = testApplication {
         val scenario = Issuer2CredentialScenarios.identitySdJwt
         installIssuer2WithConfigFiles()

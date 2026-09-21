@@ -188,6 +188,11 @@ object OpenId4VciRoutesDocs {
             A selection with a preconfigured `credentialStatus` accepts only one proof per request:
             OSS cannot allocate a separate status entry per copy, so multiple proof copies return
             `invalid_credential_request` even when batch issuance is enabled.
+
+            When several authorized datasets share a configuration, selecting it by
+            `credential_configuration_id` is ambiguous and returns `invalid_credential_request`.
+            Request `authorization_details` during authorization or token exchange to obtain dataset
+            identifiers, then send a separate request using `credential_identifier` for each dataset.
         """.trimIndent()
         request {
             headerParameter<String>("Authorization") {
