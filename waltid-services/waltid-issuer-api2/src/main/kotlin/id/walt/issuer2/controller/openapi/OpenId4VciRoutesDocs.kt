@@ -185,6 +185,8 @@ object OpenId4VciRoutesDocs {
             formats or datasets. The maximum accepted batch size is advertised as
             `batch_credential_issuance.batch_size` in Credential Issuer metadata.
 
+            Multiple proofs when batch issuance is disabled, or more proofs than the advertised limit,
+            return `invalid_credential_request`. Invalid proof signatures return `invalid_proof`.
             A selection with a preconfigured `credentialStatus` accepts only one proof per request:
             OSS cannot allocate a separate status entry per copy, so multiple proof copies return
             `invalid_credential_request` even when batch issuance is enabled.

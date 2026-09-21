@@ -560,6 +560,55 @@ class Issuer2PreAuthorizedWalletFlowTest {
     }
 
     @Test
+    fun credentialEndpointRejectsDisabledBatchAndAllowsSingleProofRetry() = assertBatchLimitRejectionAndRetry(null)
+
+    @Test
+    fun credentialEndpointRejectsOversizedBatchAndAllowsSingleProofRetry() = assertBatchLimitRejectionAndRetry(2)
+
+    private fun assertBatchLimitRejectionAndRetry(batchSize: Int?) = testApplication {
+        val scenario = Issuer2CredentialScenarios.openBadgeCredential
+        installIssuer2WithConfigFiles {
+            it.copy(batchCredentialIssuance = batchSize?.let(::BatchCredentialIssuance))
+        }
+        val client = apiClient()
+        val walletFlow = Issuer2WalletFlowDriver(client)
+        val offer = client.createWalletFlowCredentialOffer(
+            scenario = scenario,
+            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            txCodeMode = Issuer2TxCodeMode.NONE,
+        )
+        val resolved = walletFlow.resolve(offer)
+        assertEquals(batchSize, resolved.issuerMetadata.batchCredentialIssuance?.batchSize)
+        val token = walletFlow.exchangePreAuthorizedCode(resolved, txCode = null)
+        val proof = walletFlow.buildJwtProofs(resolved.issuerMetadata, scenario.credentialConfigurationId)
+        val response = client.post(resolved.issuerMetadata.credentialEndpoint) {
+            bearerAuth(token.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(
+                credentialRequest(
+                    credentialConfigurationId = scenario.credentialConfigurationId,
+                    proofs = proof.copy(jwt = List((batchSize ?: 1) + 1) { requireNotNull(proof.jwt).single() }),
+                )
+            )
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+        assertEquals(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, response.body<CredentialError>().error)
+        val rejectedSession = client.getSession(offer.offerId)
+        assertEquals(IssuanceSessionStatus.ACTIVE, rejectedSession.status)
+        assertFalse(rejectedSession.isClosed)
+        assertTrue(rejectedSession.issuanceResults.isEmpty())
+
+        val credential = walletFlow.requestCredential(
+            resolvedOffer = resolved,
+            accessToken = token.access_token,
+            credentialConfigurationId = scenario.credentialConfigurationId,
+        )
+        assertJwtVcJsonCredentialPayload(credential)
+        assertSessionStatus(client, offer.offerId, "SUCCESSFUL")
+        assertFalse(client.getSession(offer.offerId).isClosed)
+    }
+
+    @Test
     fun credentialEndpointRejectsTamperedProofSignature() = testApplication {
         val scenario = Issuer2CredentialScenarios.openBadgeCredential
         installIssuer2WithConfigFiles()
