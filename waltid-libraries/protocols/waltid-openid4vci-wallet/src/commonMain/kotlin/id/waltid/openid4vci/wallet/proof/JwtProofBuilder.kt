@@ -51,7 +51,7 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
      * @return Proofs object containing the JWT proof
      */
     @Deprecated("Use the Crypto2Key overload")
-    override suspend fun buildProof(
+    suspend fun buildProof(
         key: Key,
         audience: String,
         nonce: String?,
@@ -113,7 +113,7 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
         )
     }
 
-    override suspend fun buildProof(
+    suspend fun buildProof(
         key: Crypto2Key,
         algorithm: JwsAlgorithm,
         audience: String,
@@ -144,18 +144,24 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
     }
 
     /**
-     * Source-compatible overload for existing [JwtProofBuilder] callers. Overrides cannot carry
-     * the interface default, so this 4-arg form still omits `iss`.
+     * Implements the [ProofOfPossessionBuilder] contract. Kept at its original arity for binary
+     * compatibility; the `iss` claim is offered through the additional [clientId] overload, so this
+     * form omits `iss`.
      */
     @Deprecated("Use the Crypto2Key overload")
-    suspend fun buildProof(
+    override suspend fun buildProof(
         key: Key,
         audience: String,
         nonce: String?,
         binding: ProofKeyBinding,
     ): Proofs = buildProof(key, audience, nonce, binding, clientId = null)
 
-    suspend fun buildProof(
+    /**
+     * Implements the [Crypto2ProofOfPossessionBuilder] contract. Kept at its original arity for
+     * binary compatibility; the `iss` claim is offered through the additional [clientId] overload,
+     * so this form omits `iss`.
+     */
+    override suspend fun buildProof(
         key: Crypto2Key,
         algorithm: JwsAlgorithm,
         audience: String,

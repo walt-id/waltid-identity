@@ -41,8 +41,6 @@ interface ProofOfPossessionBuilder {
      * @param audience The credential issuer URL (aud claim)
      * @param nonce The optional c_nonce obtained from the issuer's Nonce Endpoint
      * @param binding How the proof header identifies [key]
-     * @param clientId OAuth `client_id` for the proof `iss` claim. Set for client-bound
-     * token requests and omit for anonymous pre-authorized access (OpenID4VCI 1.0 Appendix F.1).
      * @return Proofs object containing the proof
      */
     @Deprecated("Use Crypto2ProofOfPossessionBuilder.buildProof")
@@ -51,7 +49,6 @@ interface ProofOfPossessionBuilder {
         audience: String,
         nonce: String?,
         binding: ProofKeyBinding,
-        clientId: String? = null,
     ): Proofs
 
     /**
@@ -77,8 +74,6 @@ interface Crypto2ProofOfPossessionBuilder {
      * @param audience The credential issuer URL (aud claim)
      * @param nonce The c_nonce obtained from the issuer's Nonce Endpoint, or null when the issuer has none
      * @param binding How the proof header identifies [key]
-     * @param clientId OAuth `client_id` for the proof `iss` claim. Set for client-bound
-     * token requests and omit for anonymous pre-authorized access (OpenID4VCI 1.0 Appendix F.1).
      */
     suspend fun buildProof(
         key: Crypto2Key,
@@ -86,7 +81,6 @@ interface Crypto2ProofOfPossessionBuilder {
         audience: String,
         nonce: String?,
         binding: ProofKeyBinding,
-        clientId: String? = null,
     ): Proofs
 
     /** Gets the proof type identifier */
@@ -111,10 +105,21 @@ object ProofBuilderUtils {
     fun validateProofParameters(
         audience: String,
         nonce: String?,
-        clientId: String? = null,
     ) {
         require(audience.isNotBlank()) { "Audience (issuer URL) cannot be blank" }
         require(nonce == null || nonce.isNotBlank()) { "Nonce (c_nonce) cannot be blank" }
+    }
+
+    /**
+     * Validates required parameters for proof generation, including the optional `iss` [clientId].
+     * Kept as a separate overload so the original two-argument entry point stays binary compatible.
+     */
+    fun validateProofParameters(
+        audience: String,
+        nonce: String?,
+        clientId: String?,
+    ) {
+        validateProofParameters(audience, nonce)
         require(clientId == null || clientId.isNotBlank()) { "Client id (iss) cannot be blank" }
     }
 }
