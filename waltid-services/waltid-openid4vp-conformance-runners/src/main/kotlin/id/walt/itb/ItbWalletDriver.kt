@@ -109,7 +109,7 @@ class ItbWalletDriver private constructor(
             wallet, PreviewPresentationRequest(interaction.url),
             transactionDataTypeRegistry = paymentTypes, clientIdTrustConfiguration = clientIdTrust,
         )
-        try {
+        usePreview(discard = { WalletPresentationHandler.discardPreview(wallet, preview.handle) }) {
             if (preview is PreviewPresentationResult.Invalid) throw ItbWalletRejection(preview.error.code.code)
             check(preview is PreviewPresentationResult.Ready)
             val selection = select(preview.credentialOptions, preview.credentialRequirements)
@@ -118,13 +118,6 @@ class ItbWalletDriver private constructor(
                 transactionDataTypeRegistry = paymentTypes,
             )
             check(result.transmissionSuccess == true) { "The wallet did not transmit the presentation successfully" }
-        } finally {
-            try {
-                WalletPresentationHandler.discardPreview(wallet, preview.handle)
-            } catch (error: PreviewSessionException) {
-                // submitPresentation consumes its handle before transmission, including transmission failures.
-                if (error.reason != PreviewSessionFailureReason.CONSUMED) throw error
-            }
         }
     }
 
@@ -188,6 +181,20 @@ class ItbWalletDriver private constructor(
     }
 
     companion object {
+        /** Preserve the presentation failure if releasing its preview also fails. */
+        internal suspend fun usePreview(discard: suspend () -> Unit, present: suspend () -> Unit) {
+            val execution = runCatching { present() }
+            val cleanupFailure = runCatching { discard() }.exceptionOrNull()?.takeUnless {
+                // Submission consumes the handle even when transmission fails.
+                it is PreviewSessionException && it.reason == PreviewSessionFailureReason.CONSUMED
+            }
+            execution.exceptionOrNull()?.let { failure ->
+                cleanupFailure?.let(failure::addSuppressed)
+                throw failure
+            }
+            cleanupFailure?.let { throw it }
+        }
+
         internal fun descriptorExpiry(value: JsonElement): Instant {
             val primitive = value.jsonPrimitive
             require(!primitive.isString && primitive.longOrNull != null) { "The ITB descriptor expiry must be Unix seconds" }

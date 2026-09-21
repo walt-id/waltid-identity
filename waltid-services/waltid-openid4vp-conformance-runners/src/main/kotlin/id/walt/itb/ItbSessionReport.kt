@@ -23,7 +23,10 @@ class ItbSessionReport private constructor(
     val passed: Boolean get() = isComplete && verdict == Verdict.SUCCESS
 
     companion object {
+        // GITB XML namespace identifiers, never network destinations. Changing their scheme breaks report parsing.
+        @Suppress("kotlin:S5332")
         private const val REPORT_NAMESPACE = "http://www.gitb.com/tr/v1/"
+        @Suppress("kotlin:S5332")
         private const val CORE_NAMESPACE = "http://www.gitb.com/core/v1/"
 
         fun parse(xml: String, expectedCaseId: String, expectedSessionId: String): ItbSessionReport {
