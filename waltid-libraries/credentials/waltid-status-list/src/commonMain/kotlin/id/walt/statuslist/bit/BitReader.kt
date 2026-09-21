@@ -7,14 +7,28 @@ object BitReader {
         bitSize: Int,
         bitOrder: BitOrder,
     ): List<Boolean> {
+        require(index >= 0) { "Status index must be non-negative" }
+        require(bitSize > 0) { "bitSize must be positive" }
         val bitStartPosition = index.toULong() * bitSize.toUInt()
+        val bitEndPosition = bitStartPosition + bitSize.toUInt()
+        val totalBits = input.size.toULong() * 8u
+        if (bitEndPosition > totalBits) {
+            throw IndexOutOfBoundsException(
+                "Status index $index with bitSize $bitSize is outside a ${input.size}-byte list",
+            )
+        }
         val byteStart = (bitStartPosition / 8u).toInt()
-        val bytesToRead = (bitSize - 1) / 8 + 1
-        val endIndex = minOf(byteStart + bytesToRead, input.size)
-        val bytesToProcess = input.sliceArray(byteStart until endIndex)
-        val bits = bytesToProcess.toBitSequence(bitOrder)
         val bitStartInSlice = (bitStartPosition % 8u).toInt()
-        return bits.drop(bitStartInSlice).take(bitSize).toList()
+        val bytesToRead = (bitStartInSlice + bitSize + 7) / 8
+        val bytesToProcess = input.sliceArray(byteStart until byteStart + bytesToRead)
+        val bits = bytesToProcess.toBitSequence(bitOrder)
+            .drop(bitStartInSlice)
+            .take(bitSize)
+            .toList()
+        require(bits.size == bitSize) {
+            "Expected $bitSize status bits at index $index, got ${bits.size}"
+        }
+        return bits
     }
 
     fun readStatus(
@@ -26,7 +40,6 @@ object BitReader {
     ): UInt {
         val bits = readBits(input, index, bitSize, bitOrder)
         val ordered = if (reverseBits) bits.reversed() else bits
-        if (ordered.isEmpty()) return 0u
         return ordered.joinToString("") { if (it) "1" else "0" }.toUInt(2)
     }
 
