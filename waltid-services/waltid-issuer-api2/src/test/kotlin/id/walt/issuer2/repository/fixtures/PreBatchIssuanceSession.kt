@@ -1,0 +1,49 @@
+// Serialization fixture copied from OSS commit 7f82850a848e3ba6fe914c150fb63766e5426963.
+package id.walt.issuer2.repository.fixtures
+
+import id.walt.issuer2.domain.IssuanceSessionStatus
+import id.walt.issuer2.domain.IssuanceSessionFailure
+
+import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
+import id.walt.issuer2.notifications.IssuanceNotifications
+import id.walt.openid4vci.offers.AuthenticationMethod
+import id.walt.openid4vci.offers.CredentialOffer
+import id.walt.sdjwt.SDMap
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlin.time.Instant
+
+@Serializable
+data class PreBatchIssuanceSession(
+    val sessionId: String,
+    val profileId: String,
+    val authenticationMethod: AuthenticationMethod,
+    val credentialConfigurationId: String,
+    val issuerKey: JsonObject,
+    val expectedCredentialProofKeyJwk: JsonObject? = null,
+    val credentialData: JsonObject,
+    val mapping: JsonObject? = null,
+    val selectiveDisclosure: SDMap? = null,
+    val idTokenClaimsMapping: Map<String, String>? = null,
+    val mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
+    /** OpenID4VP transaction_data types the issued key may sign, embedded in the mdoc MSO. */
+    val authorizedTransactionDataTypes: List<String>? = null,
+    val x5Chain: List<String>? = null,
+    val issuerDid: String? = null,
+    val credentialOffer: CredentialOffer? = null,
+    val authorizationRequest: Map<String, List<String>>? = null,
+    val externalAuthorizationState: String? = null,
+    val authorizationClaims: JsonObject? = null,
+    val expiresAt: Instant,
+    val status: IssuanceSessionStatus = IssuanceSessionStatus.ACTIVE,
+    val statusReason: String? = null,
+    val issuedCredentialFormat: String? = null,
+    val notifications: IssuanceNotifications? = null,
+    val isClosed: Boolean = false,
+    val credentialStatus: JsonElement? = null,
+    val failure: IssuanceSessionFailure? = null,
+    @Transient
+    val crypto2IssuerStoredKey: String? = null,
+)
