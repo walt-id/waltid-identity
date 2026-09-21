@@ -35,8 +35,9 @@ force those specific lanes.
 | `macos-predicate-tests` | Code changes (skipped for docs/asset-only PRs and pushes) | Fixture coverage of the A3 path predicates | Runtime job success |
 
 Main and release keep a cacheless Gradle rebuild (`clean cleanAllTests --rerun-tasks --no-daemon`).
-PR Gradle keeps `clean cleanAllTests --no-daemon` and omits `--rerun-tasks` until that
-experiment is compared on identical SHAs.
+PR Gradle runs `build allTests` with the setup-gradle daemon and cached outputs.
+The Linux Gradle job times out after 90 minutes. Library JVM tests default to a
+10-minute per-test timeout; live conformance / e2e / integration suites are excluded.
 
 ## Measurements
 

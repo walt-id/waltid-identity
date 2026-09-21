@@ -42,7 +42,7 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
         builder: X509CertificateDataBuilder
     ): X509Certificate {
         val issuerPublicKeyInfo = BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(issuerKey)
-        val subject = X500Name(builder.subjectDn)
+        val subject = builder.bouncySubject
         var issuer: X500Name? = null
 
         val subjectPublicKeyInfo =
@@ -75,7 +75,7 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
         builder: X509CertificateDataBuilder
     ): X509Certificate {
         val issuerPublicKeyInfo = BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(issuerKey)
-        val subject = X500Name(builder.subjectDn)
+        val subject = builder.bouncySubject
         var issuer: X500Name? = null
 
         val subjectPublicKeyInfo =
@@ -87,9 +87,12 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
                     val issuerDnRaw = builder.issuerDnRaw
                     require(issuerDnRaw.isNotEmpty()) { "Issuer DN must be set for non-self-signed certificates" }
                     issuer = X500Name.getInstance(issuerDnRaw.toByteArray())
-
-                    checkNotNull(subjectKeyBuilder.crypto1key) { "Certificate subject public key missing" }
-                    BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(subjectKeyBuilder.crypto1key)
+                    if (subjectKeyBuilder.spki != null) {
+                        subjectKeyBuilder.spki
+                    } else {
+                        checkNotNull(subjectKeyBuilder.crypto1key) { "Certificate subject public key missing" }
+                        BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(subjectKeyBuilder.crypto1key)
+                    }
                 }
             }
 
@@ -192,4 +195,12 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
 
         return bouncyBuilder
     }
+
+    private val X509CertificateDataBuilder.bouncySubject: X500Name
+        get() = if (subjectDnRaw.isNotEmpty()) {
+            check(subjectDn.isEmpty()) { "Subject DN can be either set as string or raw, not both: '$subjectDn', '$subjectDnRaw'"}
+            X500Name.getInstance(subjectDnRaw.toByteArray())
+        } else {
+            X500Name(subjectDn)
+        }
 }

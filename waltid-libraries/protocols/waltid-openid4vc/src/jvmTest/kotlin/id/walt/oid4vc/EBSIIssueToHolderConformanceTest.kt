@@ -12,6 +12,9 @@ import id.walt.oid4vc.responses.AuthorizationCodeResponse
 import id.walt.oid4vc.responses.TokenResponse
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.network.sockets.ConnectTimeoutException
+import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -24,9 +27,15 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
+import org.junit.jupiter.api.Assumptions
+import org.junit.jupiter.api.condition.EnabledIf
 import org.kotlincrypto.hash.sha2.SHA256
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.security.cert.X509Certificate
 import javax.net.ssl.X509TrustManager
 import kotlin.io.encoding.Base64
@@ -71,8 +80,18 @@ class EBSIIssueToHolderConformanceTest {
         install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
         }
+        install(HttpTimeout) {
+            connectTimeoutMillis = 10_000
+            requestTimeoutMillis = 30_000
+            socketTimeoutMillis = 15_000
+        }
+        followRedirects = false
 
         engine {
+            endpoint {
+                connectTimeout = 10_000
+                connectAttempts = 1
+            }
             https {
                 https {
                     //disable https certificate verification
@@ -96,10 +115,54 @@ class EBSIIssueToHolderConformanceTest {
         }
     }
 
+    companion object {
+        private const val EBSI_CONFORMANCE_HOST = "api-conformance.ebsi.eu"
+
+        @JvmStatic
+        fun isEbsiConformanceAvailable(): Boolean = runBlocking {
+            HttpClient(CIO) {
+                install(HttpTimeout) {
+                    connectTimeoutMillis = 5_000
+                    requestTimeoutMillis = 8_000
+                }
+                engine {
+                    endpoint {
+                        connectTimeout = 5_000
+                        connectAttempts = 1
+                    }
+                }
+            }.use { client ->
+                runCatching { client.get("https://$EBSI_CONFORMANCE_HOST/conformance/v3/auth-mock") }
+                    .onFailure { ex -> if (!isEbsiUnavailable(ex)) throw ex }
+                    .isSuccess
+            }
+        }
+
+        fun isEbsiUnavailable(ex: Throwable): Boolean =
+            generateSequence(ex) { it.cause }.any { throwable ->
+                throwable is ConnectTimeoutException ||
+                    throwable is HttpRequestTimeoutException ||
+                    throwable is ConnectException ||
+                    throwable is SocketTimeoutException ||
+                    throwable is UnknownHostException
+            }
+    }
+
 
     @Test
+    @EnabledIf("isEbsiConformanceAvailable")
     fun getCTIssueQualificationCredential() = runTest {
+        try {
+            getCTIssueQualificationCredentialAgainstEbsi()
+        } catch (ex: Throwable) {
+            if (isEbsiUnavailable(ex)) {
+                Assumptions.abort<Unit>("Skipping: EBSI conformance API is unavailable")
+            }
+            throw ex
+        }
+    }
 
+    private suspend fun getCTIssueQualificationCredentialAgainstEbsi() {
         startEBSIIssuerMockServer()
         // val taoIssuerServer = "http://localhost:3000/conformance/v3/issuer-mock"
         // val taoAuthServer = "http://localhost:3000/conformance/v3/auth-mock"

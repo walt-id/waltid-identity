@@ -130,21 +130,21 @@ interface WalletResolver {
     // ---------------------------------------------------------------------------
 
     suspend fun resolveKeyStore(storeId: String): WalletKeyStore? = null
-    suspend fun storeKeyStore(storeId: String, store: WalletKeyStore) {}
+    suspend fun storeKeyStore(storeId: String, store: WalletKeyStore) { /* no-op: default has no persistent store registry */ }
     suspend fun createKeyStore(storeId: String): WalletKeyStore =
         InMemoryKeyStore().also { storeKeyStore(storeId, it) }
 
     fun listKeyStoreIds(): Flow<String> = emptyFlow()
 
     suspend fun resolveCredentialStore(storeId: String): WalletCredentialStore? = null
-    suspend fun storeCredentialStore(storeId: String, store: WalletCredentialStore) {}
+    suspend fun storeCredentialStore(storeId: String, store: WalletCredentialStore) { /* no-op: default has no persistent store registry */ }
     suspend fun createCredentialStore(storeId: String): WalletCredentialStore =
         InMemoryCredentialStore().also { storeCredentialStore(storeId, it) }
 
     fun listCredentialStoreIds(): Flow<String> = emptyFlow()
 
     suspend fun resolveDidStore(storeId: String): WalletDidStore? = null
-    suspend fun storeDidStore(storeId: String, store: WalletDidStore) {}
+    suspend fun storeDidStore(storeId: String, store: WalletDidStore) { /* no-op: default has no persistent store registry */ }
     suspend fun createDidStore(storeId: String): WalletDidStore =
         InMemoryDidStore().also { storeDidStore(storeId, it) }
 
