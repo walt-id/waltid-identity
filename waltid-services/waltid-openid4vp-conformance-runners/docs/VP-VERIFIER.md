@@ -76,85 +76,16 @@ wallet and verifier-api2 answers over HTTP.
    `Cannot reach verifier` (ngrok URL wrong, or verifier-api2/ngrok not actually running).
 
 6. **Read the results**:
-   - `build/reports/openid-conformance/vp-verifier/summary.md` and `results.json`
+   - `build/reports/openid-conformance/vp-verifier/summary.md` and `results.json` (this run only, gitignored)
+   - `./export-verifier-results.py` turns that into a committable snapshot at
+     [docs/VP-VERIFIER-RESULTS.md](VP-VERIFIER-RESULTS.md) — run it after every suite run and commit
+     the result to keep a tracked history
    - Per-module suite logs: `https://localhost.emobix.co.uk:8443/log-detail.html?log=<test_id>`
 
-## Test Profiles (last run: 2026-09-21, suite v5.3.1, verifier2 built from `main`)
+## Test Results
 
-14 variants × up to 8 test modules each = 106 total: **49 passed, 56 failed, 1 skipped**.
-
-**Comparison with `feature/wal-896-final-conformance`:** identical, module-for-module. That
-branch is 24 commits ahead of `main` on verifier2/wallet functionality (redirect_uri binding,
-client_id handling, authenticated request objects, cert profiles, etc.), but none of those
-commits changed the outcome of this matrix — same 49 passed / 56 failed / 1 skipped, same variants
-passing, same modules failing. Preserved results from that branch:
-[docs/VP-VERIFIER-wal-896.md](VP-VERIFIER-wal-896.md).
-
-Every variant follows the same pattern: all positive (ACCEPT) modules pass, every negative
-(REJECT) module comes back `WARNING` from the suite instead of the expected `PASSED` — see
-[Open Issues](#open-issues) below.
-
-| Variant (format-clientIdScheme-requestMethod-responseMode-profile) | Positive modules | Negative modules |
-|---|---|---|
-| sdjwt-redirecturi-urlquery-directpost-plainvp | 4/4 ✅ | 0/7 ❌ |
-| sdjwt-redirecturi-urlquery-directpostjwt-plainvp | 4/4 ✅ | 0/7 ❌ |
-| sdjwt-x509sandns-requrisigned-directpost-plainvp | 4/4 ✅ | 0/7 ❌ |
-| sdjwt-x509sandns-requrisigned-directpostjwt-plainvp | 4/4 ✅ | 0/7 ❌ |
-| sdjwt-x509hash-requrisigned-directpost-plainvp | 4/4 ✅ | 0/7 ❌ |
-| sdjwt-x509hash-requrisigned-directpostjwt-plainvp | 4/4 ✅ | 0/7 ❌ |
-| sdjwt-x509hash-requrisigned-directpostjwt-haip | 4/4 ✅ | 0/7 ❌ |
-| mdl-redirecturi-urlquery-directpost-plainvp | 3/3 ✅ | 0/1 ❌ |
-| mdl-redirecturi-urlquery-directpostjwt-plainvp | 3/3 ✅ | 0/1 ❌ |
-| mdl-x509sandns-requrisigned-directpost-plainvp | 3/3 ✅ | 0/1 ❌ |
-| mdl-x509sandns-requrisigned-directpostjwt-plainvp | 3/3 ✅ | 0/1 ❌ |
-| mdl-x509hash-requrisigned-directpost-plainvp | 3/3 ✅ | 0/1 ❌ |
-| mdl-x509hash-requrisigned-directpostjwt-plainvp | 3/3 ✅ | 0/1 ❌ |
-| mdl-x509hash-requrisigned-directpostjwt-haip | 3/3 ✅ | 0/1 ❌ |
-
-Positive modules (all pass, every variant): `happy-flow`, `minimal-cnf-jwk`,
-`request-uri-method-post`, `request-uri-fetched-twice`.
-
-Negative modules (all `WARNING`, every SD-JWT variant): `invalid-kb-jwt-signature`,
-`invalid-credential-signature`, `invalid-sd-hash`, `invalid-kb-jwt-nonce`, `invalid-kb-jwt-aud`,
-`kb-jwt-iat-in-past`, `kb-jwt-iat-in-future`. mDL variants only run `invalid-session-transcript`.
-
-Good news: the two HAIP variants (`x509_hash` client-id scheme + encrypted response) now pass
-their `happy-flow` module, meaning the KB-JWT/DeviceAuth audience is accepted correctly under
-`x509_hash`. The `AUDIENCE_MISMATCH` bug this doc used to describe here (as of 2026-07-08) is no
-longer reproducing — worth a deliberate re-check before closing it out, since nothing yet directly
-tests the encrypted-response `aud` path in isolation.
-
-## Open Issues
-
-1. **Negative/REJECT modules return `WARNING`, not `PASSED`, everywhere.** `ExpectedModuleOutcome`
-   ([src/main/kotlin/.../runner/req/ExpectedModuleOutcome.kt](../src/main/kotlin/id/walt/openid4vp/conformance/testplans/runner/req/ExpectedModuleOutcome.kt))
-   expects a `REJECT` module to reach suite result `PASSED` because "the verifier's 4xx is itself
-   the pass criterion." Getting `WARNING` instead on *every single one* of these modules, across
-   every variant, needs isolating: is verifier-api2 actually failing to reject the bad KB-JWT
-   signature / credential signature / SD-hash / nonce / audience / iat / mdoc session transcript
-   presentations, or has the suite's module behavior changed (e.g. it now always parks on
-   `WARNING` for manual review instead of resolving straight to `PASSED`)? Check one log via the
-   suite UI and correlate with the verifier's own session status first.
-2. **Upstream `~/dev/openid/conformance-suite/nginx/Dockerfile` has no SAN on its self-signed
-   cert.** Fixed locally per checkout (see Quick Start step 1); not something walt.id can fix by
-   editing this repo. Worth a merge request upstream, or at minimum re-applying after every
-   `git pull` there.
-3. **`config/web.conf` for verifier-api2 now defaults to port 7004, was 7003.** Docs and env-var
-   guidance (`VERIFIER_NGROK_URL`, `ngrok http <port>`) updated to match; confirm this is the
-   intended stable port before anyone automates around it.
-
-### Fixed this pass (for context, not follow-up)
-
-- `nginx/Dockerfile`, `-static`, `-nodocker` in this repo: added the same SAN fix as the upstream
-  one above, so `docker-compose-walt.yml` works without the manual patch.
-- `VerifierConformanceTests.kt` used `kotlinx.coroutines.test.runTest` instead of `runBlocking` +
-  `withTimeout` (every sibling test class — issuer, VCI wallet, VP wallet — already used the
-  latter). `runTest`'s virtual-time dispatcher does not reliably wait for real async I/O completions
-  arriving off its dispatcher: every second real HTTP call in a run hung for the full 60s timeout
-  even though the server had already answered. Now matches the sibling pattern.
-- `ConformanceInterface.kt` pins the CIO engine explicitly instead of relying on Ktor's classpath-order
-  auto-selection between `ktor-client-cio` and `ktor-client-java` (both are on the classpath). This
-  turned out not to be the cause of the hang above, but is a reasonable pin to keep regardless.
+Current per-profile, per-module breakdown: [docs/VP-VERIFIER-RESULTS.md](VP-VERIFIER-RESULTS.md)
+(regenerate with `./export-verifier-results.py` after a run — see Quick Start step 6).
 
 ## Prerequisites
 
