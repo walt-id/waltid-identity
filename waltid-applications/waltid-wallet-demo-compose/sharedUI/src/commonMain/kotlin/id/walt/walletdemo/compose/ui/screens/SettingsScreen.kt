@@ -185,14 +185,14 @@ internal fun SettingsScreen(
                     )
                 }
                 sharingSettingsContent?.invoke()
-            }
-            OutlinedButton(
-                onClick = onLock,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(WalletUiTestTags.SettingsLock),
-            ) {
-                Text("Lock")
+                OutlinedButton(
+                    onClick = onLock,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(WalletUiTestTags.SettingsLock),
+                ) {
+                    Text("Lock")
+                }
             }
             Button(
                 onClick = { confirmReset = true },
