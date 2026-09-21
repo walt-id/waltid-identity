@@ -140,7 +140,7 @@ class ProviderCredentialProofVerificationTest {
     }
 
     @Test
-    fun `rejects multiple proofs when batch issuance is disabled`() = runTest {
+    fun `rejects multiple proofs when batch issuance is disabled before requesting issuance inputs`() = runTest {
         val provider = buildOAuth2Provider(
             createTestConfig(credentialProofVerifier = DefaultCredentialProofVerifier(now = { NOW })),
         )
@@ -151,20 +151,23 @@ class ProviderCredentialProofVerificationTest {
                 createProof(JWKKey.generate(KeyType.secp256r1)),
             ),
         )
+        var inputProviderInvoked = false
 
         val responseResult = provider.createCredentialResponse(
             request = request,
             configuration = credentialConfiguration(),
             issuerKey = JWKKey.generate(KeyType.secp256r1),
             issuerId = "did:example:issuer",
-            issuanceInputData = issuanceInputs(
-                buildJsonObject { put("given_name", "Alice") },
-            ),
+            issuanceInputData = {
+                inputProviderInvoked = true
+                emptyList()
+            },
             proofValidationContext = proofContext(),
         )
 
         assertTrue(responseResult is CredentialResponseResult.Failure)
-        assertEquals(CredentialErrorCodes.INVALID_PROOF, responseResult.error.error)
+        assertEquals(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, responseResult.error.error)
+        assertEquals(false, inputProviderInvoked)
     }
 
     @Test
@@ -191,7 +194,7 @@ class ProviderCredentialProofVerificationTest {
         )
 
         assertTrue(responseResult is CredentialResponseResult.Failure)
-        assertEquals(CredentialErrorCodes.INVALID_PROOF, responseResult.error.error)
+        assertEquals(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, responseResult.error.error)
         assertEquals(false, inputProviderInvoked)
     }
 

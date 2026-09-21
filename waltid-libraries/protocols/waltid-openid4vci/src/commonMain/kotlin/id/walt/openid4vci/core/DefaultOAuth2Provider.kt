@@ -818,12 +818,12 @@ class DefaultOAuth2Provider(
         if (proofCount <= 1) return null
         val batch = context?.batchCredentialIssuance
             ?: return CredentialError(
-                CredentialErrorCodes.INVALID_PROOF,
+                CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
                 "Batch credential issuance is not enabled",
             )
         return if (proofCount > batch.batchSize) {
             CredentialError(
-                CredentialErrorCodes.INVALID_PROOF,
+                CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
                 "Credential proof count $proofCount exceeds the maximum batch size ${batch.batchSize}",
             )
         } else {
