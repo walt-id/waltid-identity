@@ -59,12 +59,6 @@ struct SettingsView: View {
                 }
             }
             if viewModel.identityScreen == nil { signingProtectionSection }
-            else {
-                Section {
-                    Text("Reset this wallet to choose different key storage or signing approval. This removes local credentials; key recovery does not restore them.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
-            }
             Section {
                 Toggle(
                     "Show Walt Wallet preview for DC API Presentation",

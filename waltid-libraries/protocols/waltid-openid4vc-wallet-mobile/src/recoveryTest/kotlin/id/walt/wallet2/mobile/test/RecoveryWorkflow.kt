@@ -9,6 +9,9 @@ import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
+import id.walt.mdoc.proximity.mobile.BleMdocRoleSelection
+import id.walt.mdoc.proximity.mobile.BleProximityTransportConfiguration
+import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
@@ -138,6 +141,12 @@ internal class RecoveryTestWallet private constructor(
                 recoveryProviders = listOf(provider), authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)))
             lateinit var driver: SqlDriver
             val wallet = createEncryptedSqlDelightMobileWallet(config, ClientIdTrustConfiguration(), databaseKeys, nativeKeys,
+                proximityTransportFactory = object : BleProximityTransportFactory {
+                    override suspend fun capability(roles: BleMdocRoleSelection): Nothing =
+                        error("Recovery must not query radio capabilities")
+                    override fun create(configuration: BleProximityTransportConfiguration): Nothing =
+                        error("Recovery must not start a radio transport")
+                },
                 openEncryptedDriver = { name, key, local, walletId -> openDriver(name, key, local, walletId).also { driver = it } },
                 deleteDatabase = deleteDatabase)
             return RecoveryTestWallet(wallet, SqlDelightKeyStore(nativeKeys, WalletPersistenceDatabase(driver).walletPersistenceQueries,

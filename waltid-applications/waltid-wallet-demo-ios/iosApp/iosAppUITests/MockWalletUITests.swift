@@ -31,15 +31,15 @@ final class MockWalletUITests: XCTestCase {
         ui.tapElement(identifier: "wallet.settingsReaderAuthentication")
 
         let allowUntrusted = app.descendants(matching: .any)[
-            "wallet.readerTrustAllowUntrusted"
+            "wallet.settingsReaderPolicyAllowUntrusted"
         ]
         let requireTrusted = app.descendants(matching: .any)[
-            "wallet.readerTrustRequireTrusted"
+            "wallet.settingsReaderPolicyRequireTrusted"
         ]
         XCTAssertTrue(allowUntrusted.waitForExistence(timeout: 10))
         XCTAssertTrue(requireTrusted.waitForExistence(timeout: 10))
         XCTAssertTrue(
-            app.buttons["wallet.readerTrustImport"].waitForExistence(timeout: 10)
+            app.buttons["wallet.settingsReaderTrustImport"].waitForExistence(timeout: 10)
         )
 
         allowUntrusted.tap()
@@ -51,7 +51,7 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertEqual(allowUntrusted.value as? String, "Not selected")
 
         ui.tapButton(
-            identifier: "wallet.readerTrustReset",
+            identifier: "wallet.settingsReaderTrustReset",
             fallbackLabel: "Reset Reader Authentication settings"
         )
         let resetConfirmation = app.buttons["wallet.readerTrustResetConfirm"].firstMatch
@@ -61,8 +61,13 @@ final class MockWalletUITests: XCTestCase {
         )
         XCTAssertEqual(XCTWaiter.wait(for: [resetReady], timeout: 10), .completed)
         resetConfirmation.tap()
+        let resetApplied = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", "Selected"),
+            object: allowUntrusted
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [resetApplied], timeout: 10), .completed)
         XCTAssertEqual(allowUntrusted.value as? String, "Selected")
-        XCTAssertFalse(app.buttons["wallet.readerTrustReset"].exists)
+        XCTAssertFalse(app.buttons["wallet.settingsReaderTrustReset"].exists)
     }
 
     func testSettingsExposeAllProximityTransportProfiles() {

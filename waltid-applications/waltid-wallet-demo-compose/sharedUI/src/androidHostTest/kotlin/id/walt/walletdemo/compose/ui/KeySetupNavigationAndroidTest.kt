@@ -33,7 +33,19 @@ class KeySetupNavigationAndroidTest {
     fun settingsDoNotOfferLegacySigningControlsWhileDetailsLoadOrFail() = runAndroidComposeUiTest<ComponentActivity> {
         val state = mutableStateOf(WalletDemoUiState())
         setContent {
-            SettingsScreen(state.value, {}, {}, {}, {}, {}, {}, {}, {}, {})
+            SettingsScreen(
+                state = state.value,
+                onShowDcApiPresentationPreviewChange = {},
+                onProximityTransportProfileChange = null,
+                onBack = {},
+                onIdentityAction = {},
+                onRefreshIdentityDetails = {},
+                onLock = {},
+                onResetWallet = {},
+                onRequestSigningProtectionChange = {},
+                onConfirmSigningProtectionChange = {},
+                onCancelSigningProtectionChange = {},
+            )
         }
         onNodeWithText("Protection and recovery").performClick()
         onAllNodesWithText("Signing protection").assertCountEquals(0)
@@ -74,7 +86,19 @@ class KeySetupNavigationAndroidTest {
         val state = WalletDemoUiState(identityDetails = WalletDemoIdentityDetailsState.Available(
             WalletDemoIdentityDetails("Android Keystore", "Imported", "No signing prompt", "Saved locally", emptyList(),
                 protection = "StrongBox", providerFailures = listOf("Backup provider requires sign-in."))))
-        setContent { SettingsScreen(state, {}, {}, {}, { refreshed = true }, {}, {}, {}, {}, {}) }
+        setContent { SettingsScreen(
+                state = state,
+                onShowDcApiPresentationPreviewChange = {},
+                onProximityTransportProfileChange = null,
+                onBack = {},
+                onIdentityAction = {},
+                onRefreshIdentityDetails = { refreshed = true },
+                onLock = {},
+                onResetWallet = {},
+                onRequestSigningProtectionChange = {},
+                onConfirmSigningProtectionChange = {},
+                onCancelSigningProtectionChange = {},
+            ) }
         onNodeWithText("Protection and recovery").performClick()
         onNodeWithText("StrongBox").performScrollTo().assertIsDisplayed()
         onNodeWithText("Backup provider requires sign-in.").performScrollTo().assertIsDisplayed()

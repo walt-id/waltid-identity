@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -240,17 +241,17 @@ internal fun SettingsScreen(
                             modifier = Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview),
                         )
                     }
+                    if (onProximityTransportProfileChange != null) {
+                        HorizontalDivider()
+                        ProximityPresentationSettings(
+                            selected = state.proximityTransportProfile,
+                            onSelect = onProximityTransportProfileChange,
+                            approvalMode = state.proximityApprovalMode,
+                            onSelectApprovalMode = onProximityApprovalModeChange,
+                        )
+                    }
+                    sharingSettingsContent?.invoke()
                 }
-                if (onProximityTransportProfileChange != null) {
-                    HorizontalDivider()
-                    ProximityPresentationSettings(
-                        selected = state.proximityTransportProfile,
-                        onSelect = onProximityTransportProfileChange,
-                        approvalMode = state.proximityApprovalMode,
-                        onSelectApprovalMode = onProximityApprovalModeChange,
-                    )
-                }
-                sharingSettingsContent?.invoke()
                 OutlinedButton(
                     onClick = onLock,
                     modifier = Modifier

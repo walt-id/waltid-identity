@@ -291,7 +291,10 @@ struct WalletIdentityView: View {
                         detailRow("Key origin", identity.origin.displayName)
                         detailRow("Signing approval", WalletIdentityScreenModel.authorization(identity.authorization))
                         detailRow("Recovery", recoveryDescription(identity.recovery))
-
+                    }
+                    Section {
+                        Text("Reset this wallet to choose different key storage or signing approval. This removes local credentials; key recovery does not restore them.")
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
                 } else if let selected = model.selected {
                     Section {

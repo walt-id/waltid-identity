@@ -750,7 +750,14 @@ class SigningIdentityManagerTest {
             recoveryProviders = listOf(provider), authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)))
         init { WalletPersistenceDatabase.Schema.create(driver) }
         val wallet = reopen()
-        fun reopen(signingIdentity: SigningIdentityConfiguration = config.signingIdentity) = createSqlDelightMobileWallet(config.copy(signingIdentity = signingIdentity), ClientIdTrustConfiguration(), db, native, Crypto2DidService, {})
+        fun reopen(signingIdentity: SigningIdentityConfiguration = config.signingIdentity) = createSqlDelightMobileWallet(
+            config = config.copy(signingIdentity = signingIdentity),
+            clientIdTrustConfiguration = ClientIdTrustConfiguration(),
+            db = db,
+            keyProvider = native,
+            didService = Crypto2DidService,
+            deleteLocalPersistence = {},
+        )
         override fun close() { driver.close() }
     }
 
