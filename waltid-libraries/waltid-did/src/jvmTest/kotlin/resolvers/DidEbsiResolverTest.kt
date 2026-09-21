@@ -5,6 +5,9 @@ import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.resolver.local.DidEbsiResolver
 import id.walt.did.dids.resolver.local.LocalResolverMethod
 import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.TimeoutConfiguration
+import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.plugins.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
@@ -19,7 +22,12 @@ import java.util.stream.Stream
 
 class DidEbsiResolverTest : DidResolverTestBase() {
     override val resolver: LocalResolverMethod =
-        DidEbsiResolver(WebDataFetcher("did-ebsi-resolver-test"))
+        DidEbsiResolver(
+            WebDataFetcher(
+                "did-ebsi-resolver-test",
+                WebDataFetchingConfiguration(timeouts = TimeoutConfiguration.Example),
+            )
+        )
 
 
     // TODO: Include test in the scope of WAL-842
@@ -85,6 +93,8 @@ class DidEbsiResolverTest : DidResolverTestBase() {
                 is java.net.ConnectException -> true
                 is java.net.SocketTimeoutException -> true
                 is javax.net.ssl.SSLException -> true
+                is ConnectTimeoutException -> true
+                is HttpRequestTimeoutException -> true
                 else -> false
             }
         }
