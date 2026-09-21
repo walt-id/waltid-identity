@@ -1306,16 +1306,32 @@ class WalletDemoAppTestScenarios(
         }
         setWalletContent {
             CompositionLocalProvider(LocalClipboardManager provides clipboard) {
-                SettingsCopyRow("Public key (JWK)", original, "jwk-value", "jwk-copy", "Copy public key as JWK", "Public key copied",
-                    disclosureLabels = "Show public key" to "Hide public key", formatJson = true)
+                Column {
+                    SettingsCopyRow("Wallet DID", "did:jwk:example", "did-value", "did-copy", "Copy wallet DID", "Wallet DID copied")
+                    SettingsCopyRow("Public key (JWK)", original, "jwk-value", "jwk-copy", "Copy public key as JWK", "Public key copied",
+                        disclosureLabels = "Show public key" to "Hide public key", formatJson = true)
+                }
             }
         }
+        mainClock.autoAdvance = false
+        val disclosure = onNodeWithContentDescription("Show public key")
+        val originalBounds = disclosure.getUnclippedBoundsInRoot()
+        onNodeWithTag("did-copy").performClick()
+        mainClock.advanceTimeByFrame()
+        waitForIdle()
+        assertEquals(originalBounds, disclosure.getUnclippedBoundsInRoot(), "Copy feedback must not move the next control")
+        assertEquals("Wallet DID copied", onNodeWithTag("did-copy").fetchSemanticsNode().config[SemanticsProperties.StateDescription])
+        mainClock.advanceTimeBy(2_100)
+        waitForIdle()
+        assertEquals(originalBounds, disclosure.getUnclippedBoundsInRoot(), "Expiring copy feedback must not move the next control")
+        assertTrue(!onNodeWithTag("did-copy").fetchSemanticsNode().config.contains(SemanticsProperties.StateDescription))
+        mainClock.autoAdvance = true
         onAllNodesWithTag("jwk-value").assertCountEquals(0)
         onNodeWithTag("jwk-copy").assertHasClickAction().assertIsEnabled()
         assertTrue(!onNodeWithTag("jwk-copy").fetchSemanticsNode().config.contains(SemanticsProperties.HideFromAccessibility))
         onNodeWithTag("jwk-copy").performClick()
         runOnIdle { assertEquals(original, clipboard.getText()?.text) }
-        onNodeWithText("Copied").assertIsDisplayed()
+        assertEquals("Public key copied", onNodeWithTag("jwk-copy").fetchSemanticsNode().config[SemanticsProperties.StateDescription])
         onAllNodesWithTag("jwk-value").assertCountEquals(0)
         onNodeWithContentDescription("Show public key").performClick()
         onNodeWithTag("jwk-value").assertTextContains("complete-public-key-coordinate", substring = true)

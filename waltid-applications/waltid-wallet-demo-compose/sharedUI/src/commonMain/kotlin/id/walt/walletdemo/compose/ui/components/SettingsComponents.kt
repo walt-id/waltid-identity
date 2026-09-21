@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
@@ -225,8 +226,12 @@ internal fun SettingsCopyRow(
                     }
                     SettingsIconButton(copyLabel, enabled = !value.isNullOrBlank(), onClick = {
                         value?.let { clipboard.setText(AnnotatedString(it)); copied = true }
-                    }, modifier = Modifier.testTag(copyTag)) {
-                        Icon(painterResource(Res.drawable.settings_copy), contentDescription = null)
+                    }, modifier = Modifier.testTag(copyTag).semantics {
+                        liveRegion = LiveRegionMode.Polite
+                        if (copied) stateDescription = copyAnnouncement
+                    }) {
+                        if (copied) Icon(Icons.Default.Check, contentDescription = null)
+                        else Icon(painterResource(Res.drawable.settings_copy), contentDescription = null)
                     }
                 }
             },
@@ -236,8 +241,5 @@ internal fun SettingsCopyRow(
                 Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp).testTag(valueTag),
                 style = MaterialTheme.typography.bodySmall)
         }
-        if (copied) Text(stringResource(Res.string.settings_copied),
-            Modifier.padding(horizontal = 16.dp, vertical = 8.dp).semantics { liveRegion = LiveRegionMode.Polite; contentDescription = copyAnnouncement },
-            style = MaterialTheme.typography.labelMedium)
     }
 }

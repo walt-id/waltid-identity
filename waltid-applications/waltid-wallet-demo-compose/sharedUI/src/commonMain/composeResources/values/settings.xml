@@ -38,7 +38,6 @@
     <string name="settings_copy_did">Copy wallet DID</string>
     <string name="settings_copy_key_id">Copy key ID</string>
     <string name="settings_copy_public_key">Copy public key as JWK</string>
-    <string name="settings_copied">Copied</string>
     <string name="settings_unavailable">Unavailable</string>
     <string name="settings_show_public_key">Show public key</string>
     <string name="settings_hide_public_key">Hide public key</string>

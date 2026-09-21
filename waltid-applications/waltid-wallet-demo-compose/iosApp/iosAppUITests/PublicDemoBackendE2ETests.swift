@@ -27,7 +27,9 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         // Auditing the native tree also catches unlabeled tooltip wrappers beside labeled buttons.
         try app.performAccessibilityAudit(for: [.elementDetection, .hitRegion, .sufficientElementDescription, .trait])
         copy.tap()
-        XCTAssertTrue(app.otherElements["Wallet DID copied"].waitForExistence(timeout: 5))
+        let copied = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "Wallet DID copied"), object: copy)
+        XCTAssertEqual(XCTWaiter.wait(for: [copied], timeout: 5), .completed)
+        XCTAssertEqual(copy.label, "Copy wallet DID")
     }
 
     private let backend = DemoBackend.shared
@@ -493,11 +495,19 @@ final class WalletIdentitySetupUITests: XCTestCase {
         let did = app.staticTexts["wallet.settingsDid"]
         XCTAssertTrue(did.waitForExistence(timeout: 10))
         XCTAssertTrue(did.label.hasPrefix("did:jwk:"))
+        let disclosure = app.buttons["Show public key"]
+        let disclosureFrame = disclosure.frame
+        let copy = app.buttons["wallet.settingsDidCopy"]
         ui.tapButton(identifier: "wallet.settingsDidCopy", fallbackLabel: "Copy wallet DID")
-        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Wallet DID copied")).firstMatch.waitForExistence(timeout: 3))
+        let copied = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "Wallet DID copied"), object: copy)
+        XCTAssertEqual(XCTWaiter.wait(for: [copied], timeout: 3), .completed)
+        XCTAssertEqual(disclosure.frame, disclosureFrame, "Copy feedback must not move the disclosure button")
         XCTAssertFalse(app.staticTexts["wallet.settingsPublicJwk"].exists)
         capture("technical-copy", app: app)
-        app.buttons["Show public key"].tap()
+        let feedbackExpired = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value != %@", "Wallet DID copied"), object: copy)
+        XCTAssertEqual(XCTWaiter.wait(for: [feedbackExpired], timeout: 3), .completed)
+        XCTAssertEqual(disclosure.frame, disclosureFrame, "Expiring feedback must not move the disclosure button")
+        disclosure.tap()
         XCTAssertTrue(app.staticTexts["wallet.settingsPublicJwk"].waitForExistence(timeout: 3))
         capture("technical-expanded", app: app)
         ui.tapButton(identifier: "wallet.settingsBack", fallbackLabel: "Back")
