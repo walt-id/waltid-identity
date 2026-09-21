@@ -34,13 +34,9 @@ wallet and verifier-api2 answers over HTTP.
    docker compose -f docker-compose-prebuilt.yml up -d --force-recreate nginx
    ```
 
-2. **Trust that cert for the Gradle JVM** (self-signed, not in any public CA bundle):
-
-   ```bash
-   echo | openssl s_client -connect localhost.emobix.co.uk:8443 -servername localhost.emobix.co.uk 2>/dev/null \
-     | openssl x509 > /tmp/conformance-suite-cert.pem
-   export CONFORMANCE_EXTRA_CA_PEM=/tmp/conformance-suite-cert.pem
-   ```
+2. **Trust that cert for the Gradle JVM** (self-signed, not in any public CA bundle) - the
+   `openssl`/`export CONFORMANCE_EXTRA_CA_PEM` lines in step 5 below do this; no separate action
+   needed here, this step just explains why they're there.
 
 3. **Start verifier-api2** — check the log for the port it actually binds
    ([config/web.conf](../../waltid-verifier-api2/config/web.conf) currently says `7004`, older docs said `7003`):
@@ -56,24 +52,43 @@ wallet and verifier-api2 answers over HTTP.
    ngrok http 7004
    ```
 
-5. **Run the whole suite** (~9 minutes for all 14 variants):
+5. **Run the whole suite** (~9 minutes for all 14 variants). This block is self-contained - it
+   re-does the cert trust step, so it works even in a fresh terminal that never ran step 2:
 
    ```bash
    cd ~/dev/walt-id/waltid-unified-build
-   export VERIFIER_NGROK_URL="https://<your-ngrok-url>.ngrok-free.app"
+
+   echo | openssl s_client -connect localhost.emobix.co.uk:8443 -servername localhost.emobix.co.uk 2>/dev/null \
+     | openssl x509 > /tmp/conformance-suite-cert.pem
+   export CONFORMANCE_EXTRA_CA_PEM=/tmp/conformance-suite-cert.pem
+
+   export VERIFIER_NGROK_URL="https://<your-ngrok-url>.ngrok-free.app"  # from step 4's output
+
    ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VerifierConformanceTests" --rerun
    ```
 
    `--rerun` matters: Gradle doesn't see `VERIFIER_NGROK_URL`/`CONFORMANCE_EXTRA_CA_PEM` as task
    inputs, so a cached `test` task silently no-ops without it.
 
+   If this still gets skipped instead of running, check `build/reports/openid-conformance/vp-verifier/summary.md`'s
+   "not available" error, or just rerun with `--info` and look for `PKIX path building failed`
+   (cert not trusted - re-run the `openssl`/`export CONFORMANCE_EXTRA_CA_PEM` lines above) versus
+   `Cannot reach verifier` (ngrok URL wrong, or verifier-api2/ngrok not actually running).
+
 6. **Read the results**:
    - `build/reports/openid-conformance/vp-verifier/summary.md` and `results.json`
    - Per-module suite logs: `https://localhost.emobix.co.uk:8443/log-detail.html?log=<test_id>`
 
-## Test Profiles (last run: 2026-09-21, suite v5.3.1)
+## Test Profiles (last run: 2026-09-21, suite v5.3.1, verifier2 built from `main`)
 
 14 variants × up to 8 test modules each = 106 total: **49 passed, 56 failed, 1 skipped**.
+
+**Comparison with `feature/wal-896-final-conformance`:** identical, module-for-module. That
+branch is 24 commits ahead of `main` on verifier2/wallet functionality (redirect_uri binding,
+client_id handling, authenticated request objects, cert profiles, etc.), but none of those
+commits changed the outcome of this matrix — same 49 passed / 56 failed / 1 skipped, same variants
+passing, same modules failing. Preserved results from that branch:
+[docs/VP-VERIFIER-wal-896.md](VP-VERIFIER-wal-896.md).
 
 Every variant follows the same pattern: all positive (ACCEPT) modules pass, every negative
 (REJECT) module comes back `WARNING` from the suite instead of the expected `PASSED` — see
