@@ -36,6 +36,10 @@ inputs:
     required: false
     type: string
     default: 'false'
+  wallet-core-artifact:
+    description: 'Restored release artifact directory to verify and reuse for WalletSDK bridge tests'
+    required: false
+    default: ''
   run-native-demo-tests:
     description: 'Run native iOS WalletSDK demo tests'
     required: false
@@ -219,8 +223,10 @@ runs:
       continue-on-error: true
       shell: bash
       run: |
-        "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-wallet-sdk-tests.sh" \
-          "${{ steps.resolve-simulator.outputs.destination }}"
+        exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
+          --output-dir "${{ github.workspace }}/ios-ci-logs" wallet-sdk-bridge \
+          "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-wallet-sdk-tests.sh" \
+          "${{ steps.resolve-simulator.outputs.destination }}" "${{ inputs.wallet-core-artifact }}"
 
     - name: Upload WalletSDK bridge discovery evidence
       if: ${{ always() && inputs.run-wallet-sdk-tests == 'true' && steps.wallet_sdk_tests.outcome != 'skipped' }}

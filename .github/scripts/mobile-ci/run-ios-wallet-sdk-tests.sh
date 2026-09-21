@@ -15,14 +15,30 @@ mkdir -p "$root"
 run_dir="$(mktemp -d "$root/swift-bridge.XXXXXX")"
 echo "Swift bridge evidence: $run_dir"
 
+# CI supplies an already restored release artifact. Verify it instead of linking it again.
+# Local runs without an artifact retain the full release-build fallback.
+release_artifact="${2:-}"
+verify_release() {
+  (cd "$identity_dir" && python3 "$script_dir/wallet-core-artifact.py" verify --artifact-dir "$release_artifact")
+}
+framework_tasks=(assembleWalletCoreBridgeFixturesReleaseXCFramework)
+if [[ -n "$release_artifact" ]]; then
+  verify_release
+else
+  framework_tasks=(assembleWalletCoreReleaseXCFramework "${framework_tasks[@]}")
+fi
+
 phase_start=$SECONDS
-# Separate compiler lifetimes keep four native links from retaining their heaps together.
-for framework_task in assembleWalletCoreReleaseXCFramework assembleWalletCoreBridgeFixturesReleaseXCFramework; do
+# Separate compiler lifetimes and one worker avoid overlapping native-link heaps.
+for framework_task in "${framework_tasks[@]}"; do
   "$identity_dir/gradlew" -p "$identity_dir" \
     ":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:$framework_task" \
-    -PenableIosBuild=true -PenableWalletSdkBridgeFixtures=true --no-daemon --console=plain \
+    -PenableIosBuild=true -PenableWalletSdkBridgeFixtures=true --no-daemon --console=plain --max-workers=1 \
     2>&1 | tee "$run_dir/$framework_task.log"
 done
+if [[ -n "$release_artifact" ]]; then
+  verify_release
+fi
 echo "WalletCore assembly finished in $((SECONDS - phase_start))s"
 
 # A workspace containing the local package exposes WalletSDKTests as its own target. Merely

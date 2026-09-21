@@ -162,7 +162,7 @@ jobs:
     needs: wallet-core-framework
     if: ${{ inputs.run-native || inputs.run-compose }}
     runs-on: macos-26
-    timeout-minutes: 70
+    timeout-minutes: 110
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@6cf69001d859d67687353466f1ad2fb006f574e0
@@ -185,7 +185,8 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
 
       - name: Run selected WalletCore consumer tests
-        timeout-minutes: 60
+        # Main budgets 60 minutes for demos/providers; allow 40 more for the isolated bridge fixture and tests.
+        timeout-minutes: 100
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
@@ -195,6 +196,7 @@ jobs:
           run-ios-simulator-tests: 'false'
           run-wallet-core-xcframework: 'false'
           run-wallet-sdk-tests: 'true'
+          wallet-core-artifact: ${{ runner.temp }}/wallet-core-artifact
           run-native-demo-tests: ${{ (inputs.run-native) && 'true' || 'false' }}
           run-native-identity-document-provider-checks: ${{ (inputs.run-native) && 'true' || 'false' }}
           run-compose-demo-tests: ${{ (inputs.run-compose) && 'true' || 'false' }}

@@ -36,8 +36,9 @@ tests. The iOS Kotlin and consumer lanes invoke the action from their checked-ou
 revision, so editing that action changes the code actually executed by those lanes.
 Path eligibility includes the guard scripts and native simulator test sources.
 
-`run-ios-wallet-sdk-tests.sh` assembles the release and test-fixture XCFrameworks
-from the selected checkout, checks their headers, records source and binary hashes,
+`run-ios-wallet-sdk-tests.sh` reuses the verified shared release framework in CI and
+assembles the isolated test-fixture XCFramework from the selected checkout. Local runs
+without a release artifact build both frameworks. The runner checks their headers, records source and binary hashes,
 and explicitly runs `KMPProximityProjectionTests`, `ProximityBridgeContractTests` and
 `ProximityInputValidationTests` in `WalletSDKTests` on a simulator. The discovery guard
 requires every named test to pass; missing or skipped tests fail the lane.
