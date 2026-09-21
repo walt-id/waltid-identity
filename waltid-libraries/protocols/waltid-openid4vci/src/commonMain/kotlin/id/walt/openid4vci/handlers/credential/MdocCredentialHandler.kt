@@ -240,5 +240,5 @@ class MdocCredentialHandler(
     }
 
     private fun resolveValidUntil(configuredValidUntil: Instant?): Instant =
-        configuredValidUntil ?: Clock.System.now().plus(365.days)
+        configuredValidUntil ?: now().plus(365.days)
 }
