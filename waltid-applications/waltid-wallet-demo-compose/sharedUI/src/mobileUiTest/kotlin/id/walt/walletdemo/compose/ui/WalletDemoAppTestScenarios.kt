@@ -913,8 +913,8 @@ class WalletDemoAppTestScenarios(
 
         previewGate.complete(Unit)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
-        onAllNodesWithTag("wallet.presentationInput").assertCountEquals(0)
         awaitTaggedNode(WalletUiTestTags.PresentationActions)
+        onAllNodesWithTag("wallet.presentationInput").assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.PresentationActions).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton, useUnmergedTree = true)
             .assertIsDisplayed()
