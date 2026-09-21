@@ -5,7 +5,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
-import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.repository.IssuanceSessionStorageCodec
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferCreateRequest
@@ -126,10 +126,7 @@ class IssuanceNotificationRouteTest {
                     .session
             )
             assertEquals(createdOffer.offerId, tokenRequest["sessionId"]?.jsonPrimitive?.contentOrNull)
-            val tokenIssuanceRequest = assertNotNull(tokenRequest["issuanceRequests"])
-                .jsonArray
-                .single()
-                .jsonObject
+            val tokenIssuanceRequest = tokenRequest
             assertEquals(
                 "OpenBadgeCredential_jwt_vc_json",
                 tokenIssuanceRequest["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull,
@@ -140,10 +137,7 @@ class IssuanceNotificationRouteTest {
             }
             assertEquals(createdOffer.offerId, credentialSuccess.session["sessionId"]?.jsonPrimitive?.contentOrNull)
             assertEquals("SUCCESSFUL", credentialSuccess.session["status"]?.jsonPrimitive?.contentOrNull)
-            val credentialSuccessIssuanceRequest = assertNotNull(credentialSuccess.session["issuanceRequests"])
-                .jsonArray
-                .single()
-                .jsonObject
+            val credentialSuccessIssuanceRequest = credentialSuccess.session
             assertEquals(
                 "redacted",
                 credentialSuccessIssuanceRequest["issuerKey"]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull,
@@ -468,7 +462,7 @@ class IssuanceNotificationRouteTest {
                 },
             )
 
-            val storedSession = client.get("/issuer2/sessions/${createdOffer.offerId}").body<IssuanceSession>()
+            val storedSession = client.get("/issuer2/sessions/${createdOffer.offerId}").bodyAsText().let(IssuanceSessionStorageCodec::decode)
             assertEquals(IssuanceSessionStatus.ACTIVE, storedSession.status)
             assertEquals(false, storedSession.isClosed)
             assertNull(storedSession.failure)
@@ -650,10 +644,7 @@ class IssuanceNotificationRouteTest {
         assertEquals(createdOffer.offerId, update.target)
         assertEquals(IssuanceSessionEvent.CREDENTIAL_OFFER_RETRIEVED.value, update.event)
         assertEquals(createdOffer.offerId, update.session["sessionId"]?.jsonPrimitive?.contentOrNull)
-        val issuanceRequest = assertNotNull(update.session["issuanceRequests"])
-            .jsonArray
-            .single()
-            .jsonObject
+        val issuanceRequest = update.session
         assertEquals(
             "OpenBadgeCredential_jwt_vc_json",
             issuanceRequest["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull,

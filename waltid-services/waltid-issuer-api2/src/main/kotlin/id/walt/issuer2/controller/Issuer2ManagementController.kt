@@ -63,12 +63,12 @@ class Issuer2ManagementController(
             }
 
             get("sessions", Issuer2ManagementRoutesDocs.listSessions()) {
-                call.respond(sessionService.listSessions())
+                call.respond(sessionService.listSessions().map(::PublicIssuanceSession))
             }
 
             get("sessions/{sessionId}", Issuer2ManagementRoutesDocs.getSession()) {
                 val sessionId = requireNotNull(call.parameters["sessionId"]) { "Missing sessionId" }
-                call.respond(sessionService.getSession(sessionId))
+                call.respond(PublicIssuanceSession(sessionService.getSession(sessionId)))
             }
 
             route(Issuer2ManagementRoutesDocs.issuerEvents()) {

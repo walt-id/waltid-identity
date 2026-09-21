@@ -205,7 +205,7 @@ object Issuer2ManagementRoutesDocs {
         response {
             HttpStatusCode.OK to {
                 description = "Issuance sessions"
-                body<List<IssuanceSession>>()
+                body(array(anyOf(SerialTypeDescriptor(singleIssuanceSessionDescriptor), type<IssuanceSession>())))
             }
         }
     }
@@ -219,7 +219,7 @@ object Issuer2ManagementRoutesDocs {
         response {
             HttpStatusCode.OK to {
                 description = "Issuance session"
-                body<IssuanceSession>()
+                body(anyOf(SerialTypeDescriptor(singleIssuanceSessionDescriptor), type<IssuanceSession>()))
             }
         }
     }

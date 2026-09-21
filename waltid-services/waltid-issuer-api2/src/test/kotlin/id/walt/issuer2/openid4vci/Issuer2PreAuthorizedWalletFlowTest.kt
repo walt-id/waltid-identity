@@ -407,9 +407,16 @@ class Issuer2PreAuthorizedWalletFlowTest {
             txCodeMode = Issuer2TxCodeMode.NONE,
         )
         val initialSession = client.getSession(createdOffer.offerId)
-        val credentialIdentifier = initialSession.issuanceRequests.single().credentialIdentifier
         val resolvedOffer = walletFlow.resolve(createdOffer)
-        val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
+        val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null,
+            additionalParameters = mapOf("authorization_details" to buildJsonArray {
+                add(buildJsonObject {
+                    put("type", OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE)
+                    put("credential_configuration_id", scenario.credentialConfigurationId)
+                })
+            }.toString()),
+        )
+        val credentialIdentifier = assertNotNull(tokenResponse.authorization_details).single().credentialIdentifiers!!.single()
 
         // Each request gets a fresh proof; both configuration and identifier selection remain usable.
         repeat(3) { index ->
@@ -428,7 +435,7 @@ class Issuer2PreAuthorizedWalletFlowTest {
             val session = client.getSession(createdOffer.offerId)
             assertEquals(IssuanceSessionStatus.SUCCESSFUL, session.status)
             assertFalse(session.isClosed)
-            assertEquals(setOf(credentialIdentifier), session.issuanceResults.keys)
+            assertEquals(setOf(scenario.credentialConfigurationId), session.issuanceResults.keys)
             assertEquals(initialSession.expiresAt, session.expiresAt)
         }
     }

@@ -48,10 +48,7 @@ class IssuanceNotificationServiceTest {
         assertEquals("token_request_pre_authorized_code_succeeded", payload.event)
         assertEquals("session-123", payload.session["sessionId"]?.jsonPrimitive?.contentOrNull)
         assertEquals("PRE_AUTHORIZED", payload.session["authenticationMethod"]?.jsonPrimitive?.contentOrNull)
-        val issuanceRequest = assertNotNull(payload.session["issuanceRequests"])
-            .jsonArray
-            .single()
-            .jsonObject
+        val issuanceRequest = payload.session
         assertEquals("identity_credential", issuanceRequest["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull)
         assertEquals("redacted", issuanceRequest["issuerKey"]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull)
     }
