@@ -7,7 +7,7 @@ import XCTest
 final class WalletViewModelReceiveTests: XCTestCase {
     func testRequiredTransactionCodeIsPromptedAndForwardedOnce() async throws {
         let client = TransactionCodeWalletClient()
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -46,7 +46,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
     func testChangingOfferClearsTransactionCodeState() async throws {
         let client = TransactionCodeWalletClient()
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -65,7 +65,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let client = TransactionCodeWalletClient(
             transactionCode: IssuanceTransactionCode(inputMode: "numeric", length: 6, descriptionText: nil)
         )
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -85,7 +85,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
     func testAuthorizationCodeOfferOpensIssuerSignInContinuation() async throws {
         let client = TransactionCodeWalletClient(transactionCode: nil, issuanceGrant: .authorizationCode)
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -103,7 +103,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
     func testStaleIssuanceStartCannotOverwriteIncomingDeepLink() async throws {
         let client = TransactionCodeWalletClient(issuanceStartDelayNanoseconds: 100_000_000)
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -122,7 +122,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let client = TransactionCodeWalletClient()
         let pinStore = InMemoryDemoPinStore()
         try await pinStore.setPin("1234")
-        let viewModel = WalletViewModel(walletClient: client, pinStore: pinStore)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {}, pinStore: pinStore)
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
         let bootstrapCallsAfterUnlock = await client.bootstrapCalls
@@ -168,7 +168,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
     func testPresentationDeepLinkCancelsActiveIssuanceSession() async throws {
         let client = TransactionCodeWalletClient(startsWithCredential: true)
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -195,7 +195,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             startsWithCredential: true,
             presentationPreviewDelayNanoseconds: 100_000_000
         )
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -215,7 +215,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             startsWithCredential: true,
             presentationPreviewDelayNanoseconds: 100_000_000
         )
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -238,7 +238,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             startsWithCredential: true,
             presentationActionDelayNanoseconds: 100_000_000
         )
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -269,7 +269,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: store,
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
 
         viewModel.selectSigningProtection(.none)
@@ -288,7 +289,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .required,
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(),
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
 
         try await waitUntil { viewModel.biometricSigningAvailability == .biometricNotEnrolled }
@@ -303,7 +305,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(),
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         try await waitUntil { viewModel.biometricSigningAvailability == .biometricNotEnrolled }
 
@@ -318,7 +321,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(.biometric),
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -347,7 +351,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(
                 WalletDemoSigningProtection.none
             ),
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -365,7 +370,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .required,
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(.biometric),
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -383,7 +389,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(.biometric),
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -407,7 +414,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: store,
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -428,7 +436,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: store,
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -453,7 +462,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: store,
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -482,7 +492,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(.biometric),
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }

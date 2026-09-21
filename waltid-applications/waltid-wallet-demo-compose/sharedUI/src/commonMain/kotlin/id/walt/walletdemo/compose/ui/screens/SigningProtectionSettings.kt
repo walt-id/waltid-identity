@@ -34,7 +34,7 @@ internal fun SigningProtectionSettings(
         state.biometricSigningAvailability == WalletDemoSigningProtectionAvailability.Available
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Signing protection", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Text("Current: ${current?.title() ?: "Not available"}", style = MaterialTheme.typography.bodyLarge)
+        Text("Current: ${current?.title() ?: "Unavailable"}", style = MaterialTheme.typography.bodyLarge)
         Text(
             "Changing signing protection creates a new wallet key and DID.",
             style = MaterialTheme.typography.bodySmall,
@@ -125,4 +125,3 @@ internal fun SigningProtectionSettings(
         }
     }
 }
-

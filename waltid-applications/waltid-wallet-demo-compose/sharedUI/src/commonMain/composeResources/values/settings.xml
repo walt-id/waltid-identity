@@ -27,7 +27,7 @@
     <string name="settings_signing_approval">Signing approval</string>
     <string name="settings_key_backup">Key backup</string>
     <string name="settings_backup_status">Backup status</string>
-    <string name="settings_change_key_notice">Reset the wallet to change key storage or signing approval. This removes local credentials. Restoring a key does not restore them.</string>
+    <string name="settings_change_key_notice">Reset the wallet to change key storage or signing approval. This removes local credentials. Restoring a signing key does not restore credentials.</string>
     <string name="settings_delete_backup">Delete key backup</string>
     <string name="settings_delete_backup_question">Delete key backup?</string>
     <string name="settings_delete_backup_notice">This asks %1$s to delete the key backup. You may lose the ability to recover the key. Keys already restored on other devices are not deleted.</string>
@@ -39,7 +39,7 @@
     <string name="settings_copy_key_id">Copy key ID</string>
     <string name="settings_copy_public_key">Copy public key as JWK</string>
     <string name="settings_copied">Copied</string>
-    <string name="settings_unavailable">Not available</string>
+    <string name="settings_unavailable">Unavailable</string>
     <string name="settings_show_public_key">Show public key</string>
     <string name="settings_hide_public_key">Hide public key</string>
     <string name="settings_did_copied">Wallet DID copied</string>
@@ -48,7 +48,7 @@
     <string name="reader_trust_fingerprint_copied">Fingerprint for %1$s copied</string>
     <string name="settings_approval">Sharing approval</string>
     <string name="settings_provisional">Provisional NFC profiles</string>
-    <string name="settings_connection_footer">Use Automatic unless the reader requires a specific connection method. Changes update sharing before connection or approval. Otherwise, they apply to your next presentation.</string>
+    <string name="settings_connection_footer">Use Automatic unless the reader requires a specific connection method. Changes apply to the current presentation before connection or approval. After that, they apply to the next presentation.</string>
     <string name="settings_automatic">Automatic</string>
     <string name="settings_bluetooth">Bluetooth transfer</string>
     <string name="settings_wifi_aware">Wi-Fi Aware transfer</string>
@@ -67,7 +67,7 @@
     <string name="setup_recovery">Recovery</string>
     <string name="setup_storage">Key storage</string>
     <string name="setup_approval">Signing approval</string>
-    <string name="setup_recovery_description">Create a new signing key, with or without a backup, or restore an existing key.</string>
+    <string name="setup_recovery_description">Create a new signing key or restore an existing one. New keys can be created with or without a backup.</string>
     <string name="setup_storage_description">Choose how to store and protect your signing key. Only options compatible with your recovery choice are shown.</string>
     <string name="setup_approval_description">Choose how to approve signing. This is separate from unlocking the app.</string>
     <string name="setup_create_group">Create a new key</string>
@@ -89,7 +89,7 @@
     <string name="setup_no_backup">No key backup</string>
     <string name="reader_trust_policy">Reader policy</string>
     <string name="reader_trust_allow_description">Anonymous or untrusted readers may request credentials. Their authentication status is shown during review.</string>
-    <string name="reader_trust_require_description">Only readers trusted by the configured reader CAs or RICAL providers can proceed to review.</string>
+    <string name="reader_trust_require_description">Only trusted readers can proceed to review. Evidence-only RICAL providers do not establish trust.</string>
     <string name="reader_trust_no_cas">No reader CAs configured</string>
     <string name="reader_trust_no_providers">No RICAL providers configured</string>
     <string name="reader_trust_provider_trusted">RICAL provider · Establishes reader trust</string>

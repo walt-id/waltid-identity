@@ -72,7 +72,7 @@ private struct ConnectionSettingsView: View {
             Section { profiles([.provisionalNfcV2Hybrid, .provisionalNfcV2Direct, .provisionalNfcV2WifiAware]) } header: {
                 Text("Provisional NFC profiles")
             } footer: {
-                Text("Use Automatic unless the reader requires a specific connection method. Changes update sharing before connection or approval. Otherwise, they apply to your next presentation.")
+                Text("Use Automatic unless the reader requires a specific connection method. Changes apply to the current presentation before connection or approval. After that, they apply to the next presentation.")
             }
         }
         .frame(maxWidth: 640)

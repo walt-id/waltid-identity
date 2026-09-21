@@ -88,7 +88,7 @@ struct SettingsView: View {
             HStack {
                 Text("Current")
                 Spacer()
-                Text(viewModel.appliedSigningProtection?.title ?? "Not available")
+                Text(viewModel.appliedSigningProtection?.title ?? "Unavailable")
             }
             Text("Changing signing protection creates a new wallet key and DID.")
                 .font(.footnote)

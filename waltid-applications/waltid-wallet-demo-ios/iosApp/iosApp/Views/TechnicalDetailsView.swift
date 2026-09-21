@@ -68,7 +68,7 @@ struct SettingsCopyContent: View {
                 .accessibilityIdentifier(copyID)
             }
             if disclosureLabels == nil || expanded {
-                Text(value.isEmpty ? String(localized: "Not available") : displayValue)
+                Text(value.isEmpty ? String(localized: "Unavailable") : displayValue)
                     .font(.footnote.monospaced())
                     .textSelection(.enabled)
                     .accessibilityIdentifier(valueID)

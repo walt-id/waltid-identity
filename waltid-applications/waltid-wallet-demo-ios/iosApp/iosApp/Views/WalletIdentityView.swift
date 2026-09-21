@@ -184,7 +184,7 @@ final class WalletIdentityScreenModel: ObservableObject {
             recoveryUnavailableReasons = previousUnavailableReasons
             if error is CancellationError { return }
             loadFailed = true
-            message = previousIdentity == nil ? "Could not load signing key options. Try again." : "Could not load signing key details. Try again."
+            message = previousIdentity == nil ? "Could not load the signing key options. Try again." : "Could not load the signing key details. Try again."
         }
     }
 
@@ -293,7 +293,7 @@ struct WalletIdentityView: View {
                         detailRow("Key origin", identity.origin.displayName)
                         detailRow("Signing approval", WalletIdentityScreenModel.authorization(identity.authorization))
                     } header: { Text("Key protection") } footer: {
-                        Text("Reset the wallet to change key storage or signing approval. This removes local credentials. Restoring a key does not restore them.")
+                        Text("Reset the wallet to change key storage or signing approval. This removes local credentials. Restoring a signing key does not restore credentials.")
                     }
                     Section("Key backup") {
                         detailRow("Backup status", recoveryDescription(identity.recovery))
@@ -402,7 +402,7 @@ struct WalletIdentityView: View {
 
     private var stepDescription: String {
         switch model.step {
-        case .recovery: "Create a new signing key, with or without a backup, or restore an existing key."
+        case .recovery: "Create a new signing key or restore an existing one. New keys can be created with or without a backup."
         case .storage: "Choose how to store and protect your signing key. Only options compatible with your recovery choice are shown."
         case .approval: "Choose how to approve signing. This is separate from unlocking the app."
         }

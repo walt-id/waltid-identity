@@ -30,7 +30,7 @@ struct ReaderTrustSettingsView: View {
                 policyChoice(
                     .requireTrusted,
                     title: "Require trusted readers",
-                    detail: "Only readers trusted by the configured reader CAs or RICAL providers can proceed to review."
+                    detail: "Only trusted readers can proceed to review. Evidence-only RICAL providers do not establish trust."
                 )
                 .accessibilityIdentifier(WalletAccessibilityID.readerTrustRequireTrusted)
                 if controller.settings.readerPolicy == .requireTrusted,
@@ -130,7 +130,7 @@ struct ReaderTrustSettingsView: View {
                 : "This RICAL provider will no longer be used by new nearby-sharing sessions. An active session keeps its existing trust settings.")
         }
         .alert("Could not update reader trust", isPresented: errorPresented) {
-            Button("OK", action: controller.dismissError)
+            Button("Close", action: controller.dismissError)
         } message: {
             Text(controller.errorMessage ?? "Could not import the trust material. Choose another file or try again.")
                 .accessibilityIdentifier(WalletAccessibilityID.readerTrustError)

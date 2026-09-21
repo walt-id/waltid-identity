@@ -1532,7 +1532,7 @@ class WalletDemoController(
             catch (cause: Exception) {
                 if (isCurrentWallet()) _state.update {
                     it.copy(identityDetails = WalletDemoIdentityDetailsState.Failed(
-                        "Could not load signing key details. Try again."))
+                        "Could not load the signing key details. Try again."))
                 }
             } finally { _state.update { it.copy(identityProgress = null) } }
         }

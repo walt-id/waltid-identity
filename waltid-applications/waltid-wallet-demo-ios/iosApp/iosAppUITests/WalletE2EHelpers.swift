@@ -210,6 +210,11 @@ final class WalletE2EUI {
 
     func replaceText(in element: XCUIElement, value: String) {
         XCTAssertTrue(element.waitForExistence(timeout: 20), "Input element not found")
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: element)
+        guard XCTWaiter.wait(for: [enabled], timeout: 20) == .completed else {
+            XCTFail("Input did not become enabled: \(element.identifier)")
+            return
+        }
         makeHittable(element)
         XCTAssertTrue(element.isHittable, "Input element is not hittable")
         element.tap()

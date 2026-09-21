@@ -126,7 +126,7 @@ Terminal recovery creates a new single-use session.
 
 ## Signing key setup
 
-PIN setup controls access to the app, with optional biometric unlock. Key setup then asks three separate questions: whether to create a signing key with or without a backup, or restore one, where to store it, and when to request system approval for signing. Each screen groups the SDK's supported options into choice rows; a single supported option is shown as read-only.  Continue keeps the selection local until Create signing key or Restore signing key is pressed. The SDK revalidates the selected option before executing it.
+PIN setup controls access to the app, with optional biometric unlock. Signing-key setup has three steps: choose whether to create or restore a key, choose its storage, and choose when signing requires system approval. New keys can be created with or without a backup. Each screen groups the SDK's supported options into choice rows; a single supported option is shown as read-only. Continue keeps the selection local until Create signing key or Restore signing key is pressed. The SDK revalidates the selected option before executing it.
 
 Key recovery restores the original key and DID, not credentials. A local save does not prove delivery to another device. Unavailable providers show their reported reason and can be checked again; returning to the app also refreshes the choices.
 
@@ -134,7 +134,7 @@ Android offers encrypted-cloud backup and device transfer separately. Cloud back
 
 On iOS, choose Without a backup under Create a new key to use Secure Enclave. Recoverable keys use Keychain or the encrypted wallet database because existing keys cannot be imported into Secure Enclave.
 
-Settings → Signing key shows the storage policy, observed key protection, key origin, signing approval, and key backup status. Technical details contains the Wallet DID, Key ID, and public JWK, with copy controls. Nearby sharing groups sharing approval, connection methods, and reader authentication. Reader-trust imports are reviewed before saving; resets and removals require confirmation. The Digital Credentials API page controls the additional wallet review, while Lock wallet and Reset wallet remain on the Settings root. To replace a key or its signing policy, use Reset wallet and repeat setup; this removes local credentials, which must be issued again.
+Settings → Signing key shows the storage policy, observed key protection, key origin, signing approval, and key backup status. The Technical details page shows the wallet DID, key ID, and public key (JWK), with copy controls. Nearby sharing groups sharing approval, connection methods, and reader authentication. Reader-trust imports are reviewed before saving; resets and removals require confirmation. The Digital Credentials API page controls the additional wallet review, while Lock wallet and Reset wallet remain on the Settings root. To replace a key or its signing policy, use Reset wallet and repeat setup; this removes local credentials, which must be issued again.
 
 
 ## Local wallet data
