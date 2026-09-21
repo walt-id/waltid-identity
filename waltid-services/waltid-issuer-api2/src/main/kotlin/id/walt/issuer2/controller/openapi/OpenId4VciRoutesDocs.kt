@@ -184,6 +184,10 @@ object OpenId4VciRoutesDocs {
             binding data for one issued credential. Use separate Credential Endpoint requests for different
             formats or datasets. The maximum accepted batch size is advertised as
             `batch_credential_issuance.batch_size` in Credential Issuer metadata.
+
+            A selection with a preconfigured `credentialStatus` accepts only one proof per request:
+            OSS cannot allocate a separate status entry per copy, so multiple proof copies return
+            `invalid_credential_request` even when batch issuance is enabled.
         """.trimIndent()
         request {
             headerParameter<String>("Authorization") {
