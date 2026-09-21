@@ -64,7 +64,7 @@ inputs:
     type: string
     default: 'iOS Test Report'
   test-report-require-tests:
-    description: 'Fail test report publishing if matching reports contain no tests'
+    description: 'Require reports containing tests for selected test suites'
     required: false
     type: string
     default: 'true'
@@ -305,8 +305,12 @@ runs:
         } >> "$GITHUB_STEP_SUMMARY"
 
         if (( xcode_report_count == 0 && gradle_report_count == 0 )); then
-          echo "::warning::No iOS test reports found under $WALTID_DIR"
           echo "has_report=false" >> "$GITHUB_OUTPUT"
+          if [[ "${{ inputs.test-report-require-tests }}" == "true" ]]; then
+            echo "::error::Required iOS test reports are missing under $WALTID_DIR"
+            exit 1
+          fi
+          echo "::warning::No iOS test reports found under $WALTID_DIR"
           exit 0
         fi
 
