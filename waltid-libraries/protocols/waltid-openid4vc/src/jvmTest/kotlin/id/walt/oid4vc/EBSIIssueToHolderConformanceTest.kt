@@ -132,7 +132,9 @@ class EBSIIssueToHolderConformanceTest {
                     }
                 }
             }.use { client ->
-                runCatching { client.get("https://$EBSI_CONFORMANCE_HOST/conformance/v3/auth-mock") }.isSuccess
+                runCatching { client.get("https://$EBSI_CONFORMANCE_HOST/conformance/v3/auth-mock") }
+                    .onFailure { ex -> if (!isEbsiUnavailable(ex)) throw ex }
+                    .isSuccess
             }
         }
 
