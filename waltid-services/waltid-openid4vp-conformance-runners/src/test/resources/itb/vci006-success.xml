@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TestCaseOverviewReport xmlns="http://www.gitb.com/tr/v1/"
+                        xmlns:ns2="http://www.gitb.com/core/v1/"
+                        xmlns:ns3="http://www.gitb.com/tbs/v1/"
+                        id="tc_vci_006">
+   <metadata>
+      <ns2:name>Test Case VCI-006: WE BUILD - Pre-authorized code flow - sdjwt - X509</ns2:name>
+      <ns2:version>1.0</ns2:version>
+      <ns2:description>Test integration of Wallet with WE BUILD reference implementation.
+            Pre-authorized code flow (no transaction code) with x509 signing of the sd-jwt issued
+            urn:eu.europa.ec.eudi:pid:1 credential"
+            Key differences from authorization code flow:
+            Pre-authorized flow: No user authorization step; wallet directly exchanges pre-authorized code for access
+            token
+            No transaction code this endpoint doesn't require a PIN/transaction code
+            Issuer signs the SD-JWT with an x509 certificate and includes x5c in the header
+        </ns2:description>
+   </metadata>
+   <sessionId>00000000-0000-0000-0000-000000000001</sessionId>
+   <startTime>2026-09-21T14:48:14.000Z</startTime>
+   <endTime>2026-09-21T14:49:58.000Z</endTime>
+   <result>SUCCESS</result>
+   <message>Test case completed successfully.</message>
+   <steps>
+      <step id="1.2.1">
+         <description>Step 1: Request Issuance</description>
+         <report xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:type="SR"
+                 id="1.2.1">
+            <date>2026-09-21T14:49:56.857Z</date>
+            <result>SUCCESS</result>
+         </report>
+      </step>
+      <step id="1.2.1.1">
+         <description>Step 2: Request credential issuance</description>
+         <report xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:type="TAR"
+                 id="1.2.1.1">
+            <date>2026-09-21T14:48:14.537Z</date>
+            <result>SUCCESS</result>
+            <counters>
+               <nrOfAssertions>0</nrOfAssertions>
+               <nrOfErrors>0</nrOfErrors>
+               <nrOfWarnings>0</nrOfWarnings>
+            </counters>
+         </report>
+      </step>
+      <step id="1.2.1.2">
+         <description>Step 3: Check status code</description>
+         <report xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:type="TAR"
+                 name="String Validation"
+                 id="1.2.1.2">
+            <date>2026-09-21T14:48:14.599Z</date>
+            <result>SUCCESS</result>
+            <counters>
+               <nrOfAssertions>0</nrOfAssertions>
+               <nrOfErrors>0</nrOfErrors>
+               <nrOfWarnings>0</nrOfWarnings>
+            </counters>
+         </report>
+      </step>
+      <step id="1.2.1.3">
+         <description>Step 4: Check non-empty QR code</description>
+         <report xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:type="TAR"
+                 id="1.2.1.3">
+            <date>2026-09-21T14:48:14.602Z</date>
+            <result>SUCCESS</result>
+            <counters>
+               <nrOfAssertions>0</nrOfAssertions>
+               <nrOfErrors>0</nrOfErrors>
+               <nrOfWarnings>0</nrOfWarnings>
+            </counters>
+         </report>
+      </step>
+      <step id="1.2.2">
+         <description>Step 5: Check response</description>
+         <report xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:type="SR"
+                 id="1.2.2">
+            <date>2026-09-21T14:49:56.922Z</date>
+            <result>SUCCESS</result>
+         </report>
+      </step>
+      <step id="1.2.2.1">
+         <description>Step 6: Get the validation response</description>
+         <report xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:type="TAR"
+                 id="1.2.2.1">
+            <date>2026-09-21T14:49:56.901Z</date>
+            <result>SUCCESS</result>
+            <counters>
+               <nrOfAssertions>0</nrOfAssertions>
+               <nrOfErrors>0</nrOfErrors>
+               <nrOfWarnings>0</nrOfWarnings>
+            </counters>
+         </report>
+      </step>
+      <step id="1.2.2.2">
+         <description>Step 7: Check status code</description>
+         <report xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:type="TAR"
+                 name="String Validation"
+                 id="1.2.2.2">
+            <date>2026-09-21T14:49:56.914Z</date>
+            <result>SUCCESS</result>
+            <counters>
+               <nrOfAssertions>0</nrOfAssertions>
+               <nrOfErrors>0</nrOfErrors>
+               <nrOfWarnings>0</nrOfWarnings>
+            </counters>
+         </report>
+      </step>
+      <step id="1.2.2.4">
+         <description>Step 8: Check validation status</description>
+         <report xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:type="TAR"
+                 name="String Validation"
+                 id="1.2.2.4">
+            <date>2026-09-21T14:49:56.922Z</date>
+            <result>SUCCESS</result>
+            <counters>
+               <nrOfAssertions>0</nrOfAssertions>
+               <nrOfErrors>0</nrOfErrors>
+               <nrOfWarnings>0</nrOfWarnings>
+            </counters>
+         </report>
+      </step>
+      <step id="1.3">
+         <description>Step 9: Get Logs...</description>
+         <report xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:type="SR"
+                 id="1.3">
+            <date>2026-09-21T14:49:56.996Z</date>
+            <result>SUCCESS</result>
+         </report>
+      </step>
+      <step id="1.3.1">
+         <description>Step 10: Get the service logs</description>
+         <report xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:type="TAR"
+                 id="1.3.1">
+            <date>2026-09-21T14:49:56.959Z</date>
+            <result>SUCCESS</result>
+            <counters>
+               <nrOfAssertions>0</nrOfAssertions>
+               <nrOfErrors>0</nrOfErrors>
+               <nrOfWarnings>0</nrOfWarnings>
+            </counters>
+         </report>
+      </step>
+   </steps>
+</TestCaseOverviewReport>
