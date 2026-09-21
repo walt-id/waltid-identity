@@ -1,5 +1,7 @@
 package id.walt.issuer2.testsupport
 
+import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
+import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
@@ -48,6 +50,17 @@ suspend fun HttpClient.listSessions(): List<IssuanceSession> =
 suspend fun HttpClient.createCredentialOffer(
     request: CredentialOfferCreateRequest,
 ): CredentialOfferCreateResponse {
+    val response = post("/issuer2/credential-offers") {
+        contentType(ContentType.Application.Json)
+        setBody(request)
+    }
+    assertEquals(HttpStatusCode.Created, response.status, response.bodyAsText())
+    return response.body()
+}
+
+suspend fun HttpClient.createCredentialOffer(
+    request: MultiCredentialOfferCreateRequest,
+): MultiCredentialOfferCreateResponse {
     val response = post("/issuer2/credential-offers") {
         contentType(ContentType.Application.Json)
         setBody(request)

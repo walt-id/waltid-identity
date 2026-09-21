@@ -2,9 +2,16 @@ package id.walt.issuer2.controller.openapi
 
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
+import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
+import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
 import io.github.smiley4.ktoropenapi.config.RouteConfig
+import id.walt.issuer2.models.singleIssuanceSessionDescriptor
+import io.github.smiley4.ktoropenapi.config.descriptors.array
+import io.github.smiley4.ktoropenapi.config.descriptors.SerialTypeDescriptor
+import io.github.smiley4.ktoropenapi.config.descriptors.anyOf
+import io.github.smiley4.ktoropenapi.config.descriptors.type
 import io.ktor.http.HttpStatusCode
 
 object Issuer2ManagementRoutesDocs {
@@ -66,8 +73,23 @@ object Issuer2ManagementRoutesDocs {
         description = """
             Create a profile-derived OpenID4VCI credential offer URL and the backing issuance session.
 
-            Supports pre-authorized and authorization-code issuance flows. The offer can contain one
-            or more credential profiles and can be returned by reference or by value. Runtime overrides can
+            Choose one of the following request formats:
+
+            - Single-profile offer: send `profileId` with optional `runtimeOverrides`.
+            - Multi-credential offer: send a non-empty `credentials` array. Each entry contains a
+              `profileId` and optional `runtimeOverrides`. Select different profiles to offer different
+              credential formats, or repeat a profile with different `credentialData` overrides to offer
+              different datasets.
+
+            The batch limit is advertised as `batch_credential_issuance.batch_size` in issuer metadata.
+
+            When using `credentials`, put overrides inside each entry and omit top-level `profileId`
+            and `runtimeOverrides` entirely, rather than setting them to null. A `profileId` request
+            returns a response containing `profileId`. A `credentials` request returns the offer response
+            without profile fields or a `credentials` array, even when only one entry was supplied.
+
+            Both request formats support pre-authorized and authorization-code issuance flows, with offers
+            returned by reference or by value. Runtime overrides can
             be applied per credential for one offer only. Supported
             override fields are: issuerDid, credentialData, mapping, selectiveDisclosure,
             idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, authorizedTransactionDataTypes,
@@ -81,7 +103,7 @@ object Issuer2ManagementRoutesDocs {
             Use -1 for no expiry.
         """.trimIndent()
         request {
-            body<CredentialOfferCreateRequest> {
+            body(anyOf(type<CredentialOfferCreateRequest>(), type<MultiCredentialOfferCreateRequest>())) {
                 example("[authorized][single][by-reference]") {
                     value = Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE
                 }
@@ -150,7 +172,7 @@ object Issuer2ManagementRoutesDocs {
         response {
             HttpStatusCode.Created to {
                 description = "Credential offer created"
-                body<CredentialOfferCreateResponse> {
+                body(anyOf(type<CredentialOfferCreateResponse>(), type<MultiCredentialOfferCreateResponse>())) {
                     example("Offer response by reference") {
                         value = Issuer2RequestExamples.CREDENTIAL_OFFER_RESPONSE_BY_REFERENCE
                     }

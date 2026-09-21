@@ -3,7 +3,9 @@ package id.walt.issuer2.service
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
-import id.walt.issuer2.models.CredentialOfferCredentialResponse
+import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
+import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
+import id.walt.issuer2.models.asMultiCredentialOfferRequest
 import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.notifications.IssuanceNotificationService
@@ -36,6 +38,22 @@ class CredentialOfferService(
         request: CredentialOfferCreateRequest,
         requestId: String,
     ): CredentialOfferCreateResponse {
+        val receipt = createCredentialOffer(request.asMultiCredentialOfferRequest(), requestId)
+        return CredentialOfferCreateResponse(
+            offerId = receipt.offerId,
+            profileId = request.profileId,
+            authMethod = receipt.authMethod,
+            issuerStateMode = receipt.issuerStateMode,
+            expiresAt = receipt.expiresAt,
+            txCodeValue = receipt.txCodeValue,
+            credentialOffer = receipt.credentialOffer,
+        )
+    }
+
+    suspend fun createCredentialOffer(
+        request: MultiCredentialOfferCreateRequest,
+        requestId: String,
+    ): MultiCredentialOfferCreateResponse {
         val resolvedCredentials = request.credentials.map { credential ->
             val profile = profileService.resolveProfile(credential.profileId)
             val overrides = credential.runtimeOverrides
@@ -139,14 +157,8 @@ class CredentialOfferService(
             )
         }
 
-        return CredentialOfferCreateResponse(
+        return MultiCredentialOfferCreateResponse(
             offerId = sessionId,
-            credentials = resolvedCredentials.map { (profile, issuanceRequest) ->
-                CredentialOfferCredentialResponse(
-                    profileId = profile.profileId,
-                    credentialConfigurationId = issuanceRequest.credentialConfigurationId,
-                )
-            },
             authMethod = request.authMethod,
             issuerStateMode = issuerStateMode,
             expiresAt = expiresAt.toEpochMilliseconds(),

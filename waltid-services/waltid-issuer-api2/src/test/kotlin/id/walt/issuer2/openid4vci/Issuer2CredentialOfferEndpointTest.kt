@@ -93,6 +93,64 @@ class Issuer2CredentialOfferEndpointTest {
     }
 
     @Test
+    fun shouldAcceptLegacyJsonAndReturnTheLegacyReceipt() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val response = client.post("/issuer2/credential-offers") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"profileId":"$OPEN_BADGE_PROFILE_ID","authMethod":"PRE_AUTHORIZED"}""")
+        }
+        assertEquals(HttpStatusCode.Created, response.status, response.bodyAsText())
+        val receipt = json.parseToJsonElement(response.bodyAsText()).jsonObject
+        assertEquals(OPEN_BADGE_PROFILE_ID, receipt["profileId"]?.jsonPrimitive?.content)
+        assertEquals(setOf("offerId", "profileId", "authMethod", "expiresAt", "credentialOffer"), receipt.keys)
+        assertTrue(receipt.getValue("expiresAt").jsonPrimitive.content.toLong() > Clock.System.now().toEpochMilliseconds())
+        assertNotNull(CredentialOfferParser.parseCredentialOfferUrl(receipt.getValue("credentialOffer").jsonPrimitive.content).credentialOfferUri)
+    }
+
+    @Test
+    fun shouldReturnTheArrayReceiptForOneOrMoreEntries() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        for (profileIds in listOf(listOf(OPEN_BADGE_PROFILE_ID), listOf(OPEN_BADGE_PROFILE_ID, IDENTITY_SD_JWT_PROFILE_ID))) {
+            val entries = profileIds.joinToString(",") { """{"profileId":"$it"}""" }
+            val response = client.post("/issuer2/credential-offers") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"credentials":[$entries],"authMethod":"PRE_AUTHORIZED","valueMode":"BY_VALUE"}""")
+            }
+            assertEquals(HttpStatusCode.Created, response.status, response.bodyAsText())
+            val receipt = json.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(setOf("offerId", "authMethod", "expiresAt", "credentialOffer"), receipt.keys)
+            val offer = assertNotNull(CredentialOfferParser.parseCredentialOfferUrl(receipt.getValue("credentialOffer").jsonPrimitive.content).credentialOffer)
+            assertEquals(profileIds.size, offer.credentialConfigurationIds.size)
+        }
+    }
+
+    @Test
+    fun shouldRejectInvalidOrConflictingContractSelectors() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val entry = """{"profileId":"$OPEN_BADGE_PROFILE_ID"}"""
+        val invalidFields = listOf(
+            "", "\"profileId\":null,", "\"profileId\":42,", "\"profileId\":\"\",",
+            "\"credentials\":null,", "\"credentials\":{},", "\"credentials\":[],",
+            """"profileId":"$OPEN_BADGE_PROFILE_ID","credentials":null,""",
+            """"profileId":null,"credentials":[$entry],""",
+            """"profileId":"$OPEN_BADGE_PROFILE_ID","credentials":[$entry],""",
+            """"credentials":[$entry],"runtimeOverrides":null,""",
+            """"credentials":[$entry],"runtimeOverrides":{},""",
+        )
+        for (fields in invalidFields) {
+            val body = """{$fields"authMethod":"PRE_AUTHORIZED"}"""
+            val response = client.post("/issuer2/credential-offers") {
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status, "$body: ${response.bodyAsText()}")
+        }
+    }
+
+    @Test
     fun bundledPortraitProfilesProduceTaggedCaptureTimestamps() {
         val serviceConfig = issuer2ConfigDir()
         val dockerConfig = serviceConfig.parent.parent.parent.resolve("docker-compose/issuer-api2/config/issuer2-profiles.conf")

@@ -2,7 +2,7 @@ package id.walt.issuer2.openid4vci
 
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.domain.IssuanceSessionStatus
-import id.walt.issuer2.models.CredentialOfferCreateRequest
+import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCredential
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
@@ -190,7 +190,7 @@ class Issuer2PreAuthorizedWalletFlowTest {
         val client = apiClient()
         val walletFlow = Issuer2WalletFlowDriver(client)
         val createdOffer = client.createCredentialOffer(
-            CredentialOfferCreateRequest(
+            MultiCredentialOfferCreateRequest(
                 credentials = listOf(
                     CredentialOfferCredential(sdJwtScenario.profileId),
                     CredentialOfferCredential(mdocScenario.profileId),
@@ -248,7 +248,7 @@ class Issuer2PreAuthorizedWalletFlowTest {
         val client = apiClient()
         val walletFlow = Issuer2WalletFlowDriver(client)
         val createdOffer = client.createCredentialOffer(
-            CredentialOfferCreateRequest(
+            MultiCredentialOfferCreateRequest(
                 credentials = listOf(
                     CredentialOfferCredential(
                         profileId = scenario.profileId,

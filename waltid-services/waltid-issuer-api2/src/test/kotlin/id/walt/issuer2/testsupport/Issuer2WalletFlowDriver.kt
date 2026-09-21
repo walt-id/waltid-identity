@@ -7,6 +7,7 @@ import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.issuer2.models.CredentialOfferCreateResponse
+import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
@@ -55,8 +56,12 @@ class Issuer2WalletFlowDriver(
 ) {
     private var walletInstanceKey: Crypto2Key? = null
 
-    suspend fun resolve(createdOffer: CredentialOfferCreateResponse): ResolvedCredentialOffer {
-        val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(createdOffer.credentialOffer)
+    suspend fun resolve(createdOffer: CredentialOfferCreateResponse): ResolvedCredentialOffer = resolve(createdOffer.credentialOffer)
+
+    suspend fun resolve(createdOffer: MultiCredentialOfferCreateResponse): ResolvedCredentialOffer = resolve(createdOffer.credentialOffer)
+
+    private suspend fun resolve(credentialOffer: String): ResolvedCredentialOffer {
+        val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(credentialOffer)
         val offer = CredentialOfferResolver(client).resolveCredentialOffer(
             credentialOffer = offerRequest.credentialOffer,
             credentialOfferUri = offerRequest.credentialOfferUri,

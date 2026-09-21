@@ -76,7 +76,7 @@ class IssuanceNotificationRouteTest {
     private fun CredentialOfferCreateRequest.withRuntimeOverrides(
         runtimeOverrides: CredentialOfferRuntimeOverrides,
     ): CredentialOfferCreateRequest = copy(
-        credentials = credentials.map { it.copy(runtimeOverrides = runtimeOverrides) }
+        runtimeOverrides = runtimeOverrides
     )
 
 
