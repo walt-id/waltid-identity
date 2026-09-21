@@ -24,7 +24,7 @@ on:
       enforce:
         description: Fail the job when profile assertions fail
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read
@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   wallet-profile:
-    name: Wallet profile checks (${{ inputs.enforce && 'enforcing' || 'report-only' }})
+    name: Wallet profile checks
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     env:
@@ -50,10 +50,15 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
       - name: Verify report collection safeguards
         run: python3 -m unittest discover -s scripts/itb -p 'test_*.py'
+      - name: Check runner orchestration and report handling
+        run: >-
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test
+          --tests 'id.walt.itb.*' -PskipLiveConformance=true
+          --max-workers=2 --console=plain
       - name: Run the real wallet profile assertions
         run: >-
           ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbTest
-          -PitbAllowFailures=${{ inputs.enforce && 'false' || 'true' }}
+          -PitbAllowFailures=${{ github.event_name == 'workflow_dispatch' && !inputs.enforce && 'true' || 'false' }}
           --max-workers=2 --console=plain
       - name: Report every result, including failures
         if: always()

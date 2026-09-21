@@ -1,0 +1,62 @@
+{
+  "observedOn": "2026-09-21",
+  "testBed": "https://dev-i4mlab.aegean.gr/itb",
+  "testBedVersion": "1.29.5",
+  "suites": [
+    {
+      "profile": "CS-01",
+      "specification": "Base Protocols",
+      "id": "cs01v1",
+      "name": "WE BUILD CTS - CS-01 Issuance",
+      "publishedVersion": "1.0 (December 2025)",
+      "cases": [
+        { "id": "tc_vci_001", "name": "Authorization code, SD-JWT, x509" },
+        { "id": "tc_vci_002", "name": "Authorization code, SD-JWT, jwk" },
+        { "id": "tc_vci_003", "name": "Authorization code, SD-JWT, kid" },
+        { "id": "tc_vci_005", "name": "Authorization code, mdoc, x509" },
+        { "id": "tc_vci_006", "name": "Pre-authorized code, SD-JWT, x509" },
+        { "id": "tc_vci_007", "name": "Pre-authorized code with transaction code, SD-JWT, x509" },
+        { "id": "tc_vci_008", "name": "Pre-authorized code, mdoc, x509" }
+      ]
+    },
+    {
+      "profile": "CS-02",
+      "specification": "Base Protocols",
+      "id": "cs02v1",
+      "name": "WE BUILD CTS - CS-02 Presentation",
+      "publishedVersion": "1.0 (December 2025)",
+      "cases": [
+        { "id": "tc_vp_001", "name": "VP-001: DCQL PID family_name" },
+        { "id": "tc_vp_002", "name": "VP-002: DCQL PID family_name" },
+        { "id": "tc_vp_003", "name": "VP-003: DCQL PID family_name" },
+        { "id": "tc_vp_007", "name": "VP-007: DCQL PID mdoc, x509, direct_post, GET request_uri" }
+      ]
+    },
+    {
+      "profile": "CS-07",
+      "specification": "domain specific",
+      "id": "cts07",
+      "name": "WE BUILD DC APIs Test Suite",
+      "cases": [
+        { "id": "tc15", "name": "DC API - CS-07 VP Request" }
+      ]
+    },
+    {
+      "profile": "TS12",
+      "specification": "Payment use cases",
+      "id": "ts12",
+      "name": "WE BUILD TS12 Test Suite",
+      "cases": [
+        { "id": "ts12_issue_01", "name": "Issue SCA-IBAN Credential" },
+        { "id": "ts12_issue_02", "name": "Issue SCA-User Credential" },
+        { "id": "ts12_issue_03", "name": "Issue SCA-Card DPC Credential" },
+        { "id": "ts12_pay_01", "name": "Authorize Payment with SCA-IBAN" },
+        { "id": "ts12_pay_02", "name": "Authorize Payment with SCA-User" },
+        { "id": "ts12_pay_03", "name": "Authorize Payment with SCA-Card DPC" },
+        { "id": "ts12_pay_dc_api_01", "name": "Authorize Payment over DC API with SCA-IBAN" },
+        { "id": "ts12_pay_dc_api_02", "name": "Authorize Payment over DC API with SCA-User" },
+        { "id": "ts12_pay_dc_api_03", "name": "Authorize Payment over DC API with SCA-Card DPC" }
+      ]
+    }
+  ]
+}
