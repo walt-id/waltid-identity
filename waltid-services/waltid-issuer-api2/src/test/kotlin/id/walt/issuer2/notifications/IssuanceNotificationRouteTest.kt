@@ -669,6 +669,7 @@ class IssuanceNotificationRouteTest {
             audience = issuerMetadata.credentialIssuer,
             nonce = nonce,
             binding = ProofKeyBinding.KeyId("$holderDid#0"),
+            clientId = null,
         )
         val proofs = if (tamperProof) {
             validProofs.copy(jwt = validProofs.jwt?.map(::tamperSignature))

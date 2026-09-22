@@ -801,6 +801,7 @@ class WalletIssuanceSessionService(
         val attestationJwt = obtainAttestationJwt(active)
         val anonymous = metadata.preAuthorizedGrantAnonymousAccessSupported == true &&
             active.request.tokenRequestHeaders.isEmpty() && attestationJwt == null
+        active.tokenRequestAnonymous = anonymous
         val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthorizedCode,
@@ -829,6 +830,7 @@ class WalletIssuanceSessionService(
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
         val attestationJwt = obtainAttestationJwt(active)
+        active.tokenRequestAnonymous = false
         val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangeAuthorizationCode(
             tokenEndpoint = tokenEndpoint,
             code = code,
@@ -1141,6 +1143,7 @@ class WalletIssuanceSessionService(
             audience = active.resolved.offer.credentialIssuer,
             nonce = nonce,
             binding = binding,
+            clientId = active.request.clientId.takeUnless { active.tokenRequestAnonymous },
         )
         return proofs.jwt?.singleOrNull() ?: error("Credential proof builder returned no JWT")
     }
@@ -1781,6 +1784,14 @@ class WalletIssuanceSessionService(
         var state: SessionState,
         var expiresAtEpochMilliseconds: Long,
         var attestationChallenge: String? = null,
+        /**
+         * Whether the token request for this session used anonymous pre-authorized access.
+         * Both token-exchange paths assign this before any proof is built, and token exchange and
+         * proof building run in the same `complete()` call (no persist/restore in between), so the
+         * default only applies before a token has been obtained. Recording it here lets credential
+         * proofs omit `iss` without re-running attestation (which has side effects).
+         */
+        var tokenRequestAnonymous: Boolean = false,
     ) {
         val persistable: Boolean get() = request.key == null
     }

@@ -245,11 +245,13 @@ class Issuer2WalletFlowDriver(
         accessToken: String,
         credentialConfigurationId: String = resolvedOffer.offer.credentialConfigurationIds.single(),
         includeDidInProof: Boolean? = null,
+        clientId: String? = null,
     ): JsonObject {
         val proofs = buildJwtProofs(
             issuerMetadata = resolvedOffer.issuerMetadata,
             credentialConfigurationId = credentialConfigurationId,
             includeDidInProof = includeDidInProof,
+            clientId = clientId ?: proofClientId(resolvedOffer),
         )
         val response = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(accessToken)
@@ -284,6 +286,19 @@ class Issuer2WalletFlowDriver(
         val authorizationResponse = client.get(authorizationUrl)
         assertEquals(HttpStatusCode.Found, authorizationResponse.status, authorizationResponse.bodyAsText())
         return assertNotNull(authorizationResponse.headers[HttpHeaders.Location])
+    }
+
+    /**
+     * Client-bound grants send the wallet `client_id` as proof `iss`. Anonymous pre-authorized
+     * access must omit it (OpenID4VCI 1.0 Appendix F.1), matching [exchangePreAuthorizedCode].
+     */
+    private suspend fun proofClientId(resolvedOffer: ResolvedCredentialOffer): String? {
+        val preAuthorizedOnly = resolvedOffer.offer.grants?.preAuthorizedCode != null &&
+            resolvedOffer.offer.grants?.authorizationCode == null
+        val anonymous = preAuthorizedOnly &&
+            buildAttestationHeaders(resolvedOffer) == null &&
+            resolvedOffer.authorizationServerMetadata.preAuthorizedGrantAnonymousAccessSupported == true
+        return walletClientConfig.clientId.takeUnless { anonymous }
     }
 
     private suspend fun buildAttestationHeaders(
@@ -362,6 +377,7 @@ class Issuer2WalletFlowDriver(
         issuerMetadata: CredentialIssuerMetadata,
         credentialConfigurationId: String,
         includeDidInProof: Boolean? = null,
+        clientId: String? = null,
     ): Proofs {
         val nonceResponse = client.post(requireNotNull(issuerMetadata.nonceEndpoint)).body<JsonObject>()
         val proofKey = JWKKey.generate(KeyType.secp256r1)
@@ -380,6 +396,7 @@ class Issuer2WalletFlowDriver(
             audience = issuerMetadata.credentialIssuer,
             nonce = requireNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull),
             binding = holderDid?.let { ProofKeyBinding.KeyId("$it#0") } ?: ProofKeyBinding.Jwk,
+            clientId = clientId,
         )
     }
 

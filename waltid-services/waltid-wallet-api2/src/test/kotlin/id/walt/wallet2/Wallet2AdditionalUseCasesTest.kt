@@ -466,7 +466,7 @@ class Wallet2AdditionalUseCasesTest {
                         ); put("issuing_country", "AT")
                         },
                         selectiveDisclosure = null,
-                        proofValidationContext = proofSupport.validationContext(request)
+                        proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization])
                     )
                     if (credResp !is CredentialResponseResult.Success) {
                         val failure = credResp as CredentialResponseResult.Failure
@@ -812,7 +812,7 @@ class Wallet2AdditionalUseCasesTest {
                         ); put("issuing_country", "AT")
                         },
                         selectiveDisclosure = null,
-                        proofValidationContext = proofSupport.validationContext(request)
+                        proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization])
                     )
                     if (credResp !is CredentialResponseResult.Success) {
                         val failure = credResp as CredentialResponseResult.Failure
