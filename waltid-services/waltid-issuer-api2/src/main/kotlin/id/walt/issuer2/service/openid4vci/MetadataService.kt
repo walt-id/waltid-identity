@@ -68,6 +68,7 @@ class MetadataService @JvmOverloads constructor(
             metadataSigningCertificateResolver
         )
     }
+    private val notificationEndpointPath = "/notification".takeIf { serviceConfig.notificationEndpointEnabled }
 
     private val issuerDisplay: List<IssuerDisplay>? =
         metadataConfig.issuerDisplay
@@ -97,6 +98,7 @@ class MetadataService @JvmOverloads constructor(
                 credentialRequestEncryption = credentialRequestEncryption,
                 batchCredentialIssuance = batchCredentialIssuance,
                 display = issuerDisplay,
+                notificationEndpointPath = notificationEndpointPath,
             )
         }
 
@@ -156,6 +158,8 @@ class MetadataService @JvmOverloads constructor(
             .keys
 
     fun issuerBaseUrl(): String = baseUrl
+
+    fun notificationEndpointEnabled(): Boolean = notificationEndpointPath != null
 
     /**
      * Publishes token and credential signing public keys, per RFC 8414 `jwks_uri`.
