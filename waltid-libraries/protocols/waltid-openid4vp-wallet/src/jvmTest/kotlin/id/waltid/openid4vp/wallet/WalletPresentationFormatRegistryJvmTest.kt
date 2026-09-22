@@ -16,8 +16,13 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.Signer
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class WalletPresentationFormatRegistryJvmTest {
@@ -106,6 +111,44 @@ class WalletPresentationFormatRegistryJvmTest {
         assertTrue(capabilities.supportedFormats.isEmpty())
         assertTrue(capabilities.supportedJwsAlgorithms.isEmpty())
         assertTrue(capabilities.supportedMdocCoseAlgorithms.isEmpty())
+    }
+
+    @Test
+    fun `supportsFormat rejects an incompatible alternative that supportsAny still accepts`() {
+        val capabilities = WalletPresentationFormatRegistry.capabilitiesFromKeyTypes(setOf(KeyType.Ed25519))
+        val verifierFormats = mapOf(
+            "jwt_vc_json" to buildJsonObject {
+                put("alg_values", JsonArray(listOf(JsonPrimitive("ES256"))))
+            },
+            "dc+sd-jwt" to buildJsonObject {
+                put("kb-jwt_alg_values", JsonArray(listOf(JsonPrimitive("Ed25519"))))
+            },
+        )
+
+        assertTrue(
+            WalletPresentationFormatRegistry.supportsAny(
+                verifierFormats = verifierFormats,
+                capabilities = capabilities,
+                requestedFormats = setOf(
+                    WalletPresentationFormatRegistry.SupportedFormat.JWT_VC_JSON,
+                    WalletPresentationFormatRegistry.SupportedFormat.DC_SD_JWT,
+                ),
+            ),
+        )
+        assertFalse(
+            WalletPresentationFormatRegistry.supportsFormat(
+                WalletPresentationFormatRegistry.SupportedFormat.JWT_VC_JSON,
+                verifierFormats,
+                capabilities,
+            ),
+        )
+        assertTrue(
+            WalletPresentationFormatRegistry.supportsFormat(
+                WalletPresentationFormatRegistry.SupportedFormat.DC_SD_JWT,
+                verifierFormats,
+                capabilities,
+            ),
+        )
     }
 
     private fun crypto2Key(

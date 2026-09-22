@@ -175,6 +175,47 @@ class VerificationSessionCreatorMetadataTest {
     }
 
     @Test
+    fun `pre-registered url client omits in-band metadata from unsigned and signed requests`() = runTest {
+        DidService.minimalInit()
+        val clientId = "https://verifier.example"
+        val verifierKey = JWKKey.generate(KeyType.secp256r1)
+        val query = DcqlQuery(
+            credentials = listOf(CredentialQuery("pid", CredentialFormat.DC_SD_JWT, meta = NoMeta))
+        )
+        val unsigned = VerificationSessionCreator.createVerificationSession(
+            setup = CrossDeviceFlowSetup(core = GeneralFlowConfig(clientId = clientId, dcqlQuery = query)),
+            clientId = clientId,
+            clientMetadata = ClientMetadata(clientName = "URL Verifier"),
+            urlPrefix = "https://verifier.example.com/verification-session",
+            urlHost = "openid4vp://authorize",
+        )
+        assertNull(assertNotNull(unsigned.authorizationRequestUrl).parameters["client_metadata"])
+
+        val signed = VerificationSessionCreator.createVerificationSession(
+            setup = CrossDeviceFlowSetup(
+                core = GeneralFlowConfig(
+                    signedRequest = true,
+                    clientId = clientId,
+                    key = DirectSerializedKey(verifierKey),
+                    dcqlQuery = query,
+                )
+            ),
+            clientId = clientId,
+            clientMetadata = ClientMetadata(clientName = "URL Verifier"),
+            urlPrefix = "https://verifier.example.com/verification-session",
+            urlHost = "openid4vp://authorize",
+            key = verifierKey,
+        )
+        val payload = Json.parseToJsonElement(
+            java.util.Base64.getUrlDecoder().decode(
+                assertNotNull(signed.signedAuthorizationRequestJwt).split('.')[1]
+            ).decodeToString()
+        ).jsonObject
+        assertFalse(payload.containsKey("client_metadata"))
+        assertEquals(clientId, payload["client_id"]?.jsonPrimitive?.content)
+    }
+
+    @Test
     fun `pre-registered encrypted session decrypts with the registered encryption key`() = runTest {
         DidService.minimalInit()
         val verifierKey = JWKKey.generate(KeyType.secp256r1)

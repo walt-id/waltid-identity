@@ -427,6 +427,58 @@ class MobileWalletDigitalCredentialPresentationTest {
         assertEquals("pid-1", preview.credentialOptions.single().credentialId)
     }
 
+    @Test
+    fun mixedFormatPreviewDoesNotOfferACredentialOutsideItsRegisteredAlgorithms() = runTest {
+        val verifierKey = JWKKey.generate(KeyType.Ed25519)
+        val trust = ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(
+                "verifier2" to ClientMetadata(
+                    jwks = ClientMetadata.Jwks(
+                        listOf(jwkWithKid(verifierKey.getPublicKey().exportJWKObject(), verifierKey.getKeyId())),
+                    ),
+                    vpFormatsSupported = mapOf(
+                        "jwt_vc_json" to buildJsonObject {
+                            put("alg_values", buildJsonArray { add(JsonPrimitive("ES256")) })
+                        },
+                        "dc+sd-jwt" to buildJsonObject {
+                            put("sd-jwt_alg_values", buildJsonArray { add(JsonPrimitive("EdDSA")) })
+                            put("kb-jwt_alg_values", buildJsonArray { add(JsonPrimitive("EdDSA")) })
+                        },
+                    ),
+                ),
+            ),
+        )
+        val fixture = walletFixture(sdJwtCredential(), clientIdTrustConfiguration = trust)
+        val error = assertFailsWith<IllegalArgumentException> {
+            fixture.wallet.previewDigitalCredentialPresentation(
+                dcApiRequest(
+                    protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
+                    data = signedRequestObject(
+                        key = verifierKey,
+                        unsignedPayload = Json.parseToJsonElement(
+                            """
+                            {
+                              "response_type": "vp_token",
+                              "response_mode": "dc_api",
+                              "nonce": "nonce-123",
+                              "dcql_query": {
+                                "credentials": [
+                                  {"id": "pid", "format": "jwt_vc_json", "meta": {}, "claims": [{"path": ["type"]}]},
+                                  {"id": "sd", "format": "dc+sd-jwt", "meta": {"vct_values": ["$SD_JWT_VCT"]}, "claims": [{"path": ["family_name"]}]}
+                                ],
+                                "credential_sets": [{"required": true, "options": [["pid"], ["sd"]]}]
+                              }
+                            }
+                            """.trimIndent(),
+                        ).jsonObject,
+                    ),
+                    selectedRegistryEntryIds = listOf(fixture.registryEntryId("pid-1")),
+                ),
+            )
+        }
+        assertTrue(error.message.orEmpty().contains("satisfy", ignoreCase = true))
+    }
+
     /**
      * `dc_api.jwt` without usable verifier encryption keys must fail rather than degrade to a
      * cleartext response, which the verifier would still accept as an answer to its encrypted request.

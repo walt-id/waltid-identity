@@ -928,7 +928,11 @@ object WalletPresentationHandler {
             }
         }.filter { option ->
             request.eligibleCredentialIds?.let { option.credentialId in it } ?: true
-        }
+        }.compatibleWithVerifierFormats(
+            verifierFormats = resolvedRequest.effectiveClientMetadata?.vpFormatsSupported,
+            capabilities = keyMaterial?.presentationCapabilities()
+                ?: WalletPresentationFormatRegistry.defaultCapabilities(),
+        )
         val credentialRequirements = query.requiredCredentialRequirements()
         val offeredQueryIds = credentialOptions.mapTo(mutableSetOf()) { it.queryId }
         val transactionAvailabilityError = PresentationRequestValidator.validateTransactionDataCredentialAvailability(
@@ -2152,6 +2156,14 @@ internal fun WalletKeyStoreEntry.presentationCapabilities(): WalletPresentationF
         keys = listOfNotNull(crypto2Key),
         fallbackKeyTypes = setOfNotNull(legacyKey?.keyType?.takeIf { crypto2Key == null }),
     )
+
+private fun List<PresentationCredentialOption>.compatibleWithVerifierFormats(
+    verifierFormats: Map<String, JsonObject>?,
+    capabilities: WalletPresentationFormatRegistry.RuntimeCapabilities,
+): List<PresentationCredentialOption> = filter { option ->
+    val format = WalletPresentationFormatRegistry.resolve(option.format) ?: return@filter false
+    WalletPresentationFormatRegistry.supportsFormat(format, verifierFormats, capabilities)
+}
 // ---------------------------------------------------------------------------
 // Isolated-step request / response types for the manual presentation flow
 // ---------------------------------------------------------------------------

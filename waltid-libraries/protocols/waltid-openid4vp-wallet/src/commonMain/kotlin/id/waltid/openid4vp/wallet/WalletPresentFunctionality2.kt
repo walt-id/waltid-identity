@@ -477,9 +477,10 @@ object WalletPresentFunctionality2 {
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
         clientMetadata: ClientMetadata? = authorizationRequest.clientMetadata,
     ): String {
-        val verifierJwkThumbprint = ResponseEncryption.resolveCrypto2(authorizationRequest, clientMetadata)?.thumbprint()
+        val presentationRequest = authorizationRequest.presentingWith(clientMetadata)
+        val verifierJwkThumbprint = ResponseEncryption.resolveCrypto2(presentationRequest, clientMetadata)?.thumbprint()
         return generateVpTokenForRequest(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = presentationRequest,
             matchedData = matchedCredentials,
             holderKey = holderKey,
             holderDid = holderDid,
@@ -501,9 +502,10 @@ object WalletPresentFunctionality2 {
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
         clientMetadata: ClientMetadata? = authorizationRequest.clientMetadata,
     ): String {
-        val verifierJwkThumbprint = ResponseEncryption.resolveCrypto2(authorizationRequest, clientMetadata)?.thumbprint()
+        val presentationRequest = authorizationRequest.presentingWith(clientMetadata)
+        val verifierJwkThumbprint = ResponseEncryption.resolveCrypto2(presentationRequest, clientMetadata)?.thumbprint()
         return generateVpTokenForRequest(
-            authorizationRequest = authorizationRequest,
+            authorizationRequest = presentationRequest,
             matchedData = matchedCredentials,
             holderKey = null,
             holderDid = holderDid,
@@ -1255,3 +1257,10 @@ object WalletPresentFunctionality2 {
         ResponseEncryption.isSupportedVerifierEncryptionJwk(jwk)
 
 }
+
+/**
+ * Presenters read algorithm restrictions from [AuthorizationRequest.clientMetadata].
+ * Registered metadata is not on the wire, so signing uses this local copy and does not re-emit it.
+ */
+private fun AuthorizationRequest.presentingWith(metadata: ClientMetadata?): AuthorizationRequest =
+    if (metadata == null || metadata == clientMetadata) this else copy(clientMetadata = metadata)
