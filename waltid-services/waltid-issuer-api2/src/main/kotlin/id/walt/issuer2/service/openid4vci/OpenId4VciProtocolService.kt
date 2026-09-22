@@ -95,10 +95,6 @@ private const val TOKEN_ENDPOINT_PATH = "token"
 private const val CREDENTIAL_ENDPOINT_PATH = "credential"
 private val AUTHORIZATION_CODE_SESSION_LIFETIME = 5.minutes
 
-private class UnsupportedBatchCredentialStatusException : IllegalArgumentException(
-    "Batch issuance with a preconfigured credential status is not supported; each credential requires a unique status entry",
-)
-
 internal suspend fun restoreSessionIssuerCrypto2Key(
     issuanceRequest: IssuanceRequest,
     runtime: CryptoRuntime,
@@ -1182,9 +1178,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
             )
             val issuanceInputData = CredentialIssuanceInputProvider { issuanceCount ->
-                if (issuanceCount > 1 && issuanceRequest.credentialStatus != null) {
-                    throw UnsupportedBatchCredentialStatusException()
-                }
+                // OSS embeds caller-supplied status: every copy of this selected item shares it.
+                // Status allocation and updates remain the caller's responsibility.
                 List(issuanceCount) {
                     CredentialIssuanceInput(
                         credentialData = credentialDataWithStatus,
@@ -1192,42 +1187,33 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     )
                 }
             }
-            val credentialResponseResult = try {
-                if (crypto2IssuerKey != null) {
-                    oauth2Provider.createCredentialResponse(
-                        request = requestWithSession,
-                        configuration = configuration,
-                        issuerKey = Crypto2CredentialSigningKey.select(crypto2IssuerKey, configuration),
-                        issuerId = issuerId,
-                        issuanceInputData = issuanceInputData,
-                        dataMapping = issuanceRequest.mapping,
-                        selectiveDisclosure = issuanceRequest.selectiveDisclosure,
-                        x5Chain = x5Chain,
-                        mDocNameSpacesDataMappingConfig = issuanceRequest.mDocNameSpacesDataMappingConfig,
-                        authorizedTransactionDataTypes = issuanceRequest.authorizedTransactionDataTypes,
-                        proofValidationContext = proofValidationContext,
-                    )
-                } else {
-                    oauth2Provider.createCredentialResponse(
-                        request = requestWithSession,
-                        configuration = configuration,
-                        issuerKey = issuerKey,
-                        issuerId = issuerId,
-                        issuanceInputData = issuanceInputData,
-                        dataMapping = issuanceRequest.mapping,
-                        selectiveDisclosure = issuanceRequest.selectiveDisclosure,
-                        x5Chain = x5Chain,
-                        mDocNameSpacesDataMappingConfig = issuanceRequest.mDocNameSpacesDataMappingConfig,
-                        authorizedTransactionDataTypes = issuanceRequest.authorizedTransactionDataTypes,
-                        proofValidationContext = proofValidationContext,
-                    )
-                }
-            } catch (e: UnsupportedBatchCredentialStatusException) {
-                CredentialResponseResult.Failure(
-                    CredentialError(
-                        CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
-                        e.message,
-                    )
+            val credentialResponseResult = if (crypto2IssuerKey != null) {
+                oauth2Provider.createCredentialResponse(
+                    request = requestWithSession,
+                    configuration = configuration,
+                    issuerKey = Crypto2CredentialSigningKey.select(crypto2IssuerKey, configuration),
+                    issuerId = issuerId,
+                    issuanceInputData = issuanceInputData,
+                    dataMapping = issuanceRequest.mapping,
+                    selectiveDisclosure = issuanceRequest.selectiveDisclosure,
+                    x5Chain = x5Chain,
+                    mDocNameSpacesDataMappingConfig = issuanceRequest.mDocNameSpacesDataMappingConfig,
+                    authorizedTransactionDataTypes = issuanceRequest.authorizedTransactionDataTypes,
+                    proofValidationContext = proofValidationContext,
+                )
+            } else {
+                oauth2Provider.createCredentialResponse(
+                    request = requestWithSession,
+                    configuration = configuration,
+                    issuerKey = issuerKey,
+                    issuerId = issuerId,
+                    issuanceInputData = issuanceInputData,
+                    dataMapping = issuanceRequest.mapping,
+                    selectiveDisclosure = issuanceRequest.selectiveDisclosure,
+                    x5Chain = x5Chain,
+                    mDocNameSpacesDataMappingConfig = issuanceRequest.mDocNameSpacesDataMappingConfig,
+                    authorizedTransactionDataTypes = issuanceRequest.authorizedTransactionDataTypes,
+                    proofValidationContext = proofValidationContext,
                 )
             }
             val credentialResponse = when (val result = credentialResponseResult) {

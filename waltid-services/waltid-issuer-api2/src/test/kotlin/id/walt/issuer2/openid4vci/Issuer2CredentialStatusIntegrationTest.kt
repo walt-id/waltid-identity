@@ -11,7 +11,6 @@ import id.walt.issuer2.testsupport.createCredentialOffer
 import id.walt.issuer2.testsupport.credentialRequest
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.openid4vci.handlers.credential.JwtUtils
-import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOfferValueMode
@@ -117,7 +116,7 @@ class Issuer2CredentialStatusIntegrationTest {
     }
 
     @Test
-    fun batchIssuanceRejectsReusingOneConfiguredCredentialStatus() = testApplication {
+    fun batchIssuanceSharesOneConfiguredCredentialStatus() = testApplication {
         installIssuer2WithConfigFiles {
             it.copy(batchCredentialIssuance = BatchCredentialIssuance(batchSize = 2))
         }
@@ -162,11 +161,14 @@ class Issuer2CredentialStatusIntegrationTest {
             )
         }
 
-        assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
-        val body = response.body<JsonObject>()
-        assertEquals(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, body["error"]?.jsonPrimitive?.content)
-        assertNull(body["credentials"])
-        assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
+        assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+        val credentials = response.body<JsonObject>().getValue("credentials").jsonArray
+        assertEquals(2, credentials.size)
+        credentials.forEach { issued ->
+            val payload = decodeJwtPayload(issued.jsonObject.getValue("credential").jsonPrimitive.content)
+            assertEquals(offerRequest.runtimeOverrides!!.credentialStatus, jwtVcPayload(payload)["credentialStatus"])
+        }
+        assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
     }
 
     @Test
