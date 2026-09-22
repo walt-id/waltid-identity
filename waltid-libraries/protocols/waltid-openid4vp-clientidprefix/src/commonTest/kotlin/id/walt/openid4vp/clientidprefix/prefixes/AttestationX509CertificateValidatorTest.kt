@@ -55,16 +55,39 @@ class AttestationX509CertificateValidatorTest {
     }
 
     @Test
-    fun leafWithExtendedKeyUsageLackingClientAuthIsRejected() = runTest {
+    fun leafWithExtendedKeyUsageLackingAVerifierPurposeIsRejected() = runTest {
         val context = leafContext()
-        AttestationX509CertificateValidator().validate(context, certificateWithExtendedKeyUsage())
+        AttestationX509CertificateValidator().validate(
+            context,
+            certificateWithExtendedKeyUsage(ExtendedKeyUsageExtension.KeyUsage.serverAuth.id),
+        )
         assertFalse(context.valid)
         assertTrue(
             context.log.any {
                 it.severity == ValidationResult.Severity.ERROR &&
-                    it.message.contains("client auth")
+                    it.message.contains("verifier purpose")
             }
         )
+    }
+
+    @Test
+    fun leafWithClientAuthExtendedKeyUsageIsAccepted() = runTest {
+        val context = leafContext()
+        AttestationX509CertificateValidator().validate(
+            context,
+            certificateWithExtendedKeyUsage(ExtendedKeyUsageExtension.KeyUsage.clientAuth.id),
+        )
+        assertTrue(context.valid)
+    }
+
+    @Test
+    fun leafWithMdocReaderAuthenticationExtendedKeyUsageIsAccepted() = runTest {
+        val context = leafContext()
+        AttestationX509CertificateValidator().validate(
+            context,
+            certificateWithExtendedKeyUsage(AttestationX509CertificateValidator.mdocReaderAuthenticationEkuOid),
+        )
+        assertTrue(context.valid)
     }
 
     private fun leafContext(): ValidationContext {
@@ -105,7 +128,7 @@ class AttestationX509CertificateValidatorTest {
             override val encodedDer = ByteString()
         }
 
-    private fun certificateWithExtendedKeyUsage(): X509Certificate =
+    private fun certificateWithExtendedKeyUsage(oid: String): X509Certificate =
         object : X509Certificate {
             inner class Data : X509Certificate.CertificateData {
                 override val version = 3
@@ -122,7 +145,7 @@ class AttestationX509CertificateValidatorTest {
                     get() = error("unused")
                 override val extensions: Map<String, Extension> = mapOf(
                     ExtendedKeyUsageExtension.OID to ExtendedKeyUsageExtension.Builder().apply {
-                        addKeyUsage(ExtendedKeyUsageExtension.KeyUsage.serverAuth)
+                        addKeyUsage(oid)
                     },
                 )
             }

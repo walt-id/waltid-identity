@@ -32,20 +32,37 @@ class AttestationX509CertificateValidator : X509CertificateValidator {
             )
         }
 
-        // RFC 5280 §4.2.1.12: ExtendedKeyUsage is unrestricted when absent. When present it must
-        // include clientAuth for this Request Object signing profile.
+        // RFC 5280 §4.2.1.12: ExtendedKeyUsage is unrestricted when absent. When present, the
+        // listed purposes must include one this wallet uses for a verifier: TLS clientAuth, or
+        // ISO mdoc reader authentication. OpenID4VP authenticates the chain and client id; it
+        // does not require the TLS clientAuth purpose.
         val extendedKeyUsage = x509Certificate.data.extensionExtendedKeyUsage
         if (extendedKeyUsage != null &&
-            ExtendedKeyUsageExtension.KeyUsage.clientAuth !in extendedKeyUsage.keyPurposeList
+            extendedKeyUsage.keyPurposeIdList.none { it in acceptedVerifierExtendedKeyUsageOids }
         ) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
-                "Certificate does not contain client auth Extended Key Usage (OID: '${ExtendedKeyUsageExtension.KeyUsage.clientAuth.id}')"
+                "Certificate Extended Key Usage does not include a verifier purpose " +
+                    "(clientAuth ${ExtendedKeyUsageExtension.KeyUsage.clientAuth.id} or " +
+                    "mdoc reader authentication $mdocReaderAuthenticationEkuOid)"
             )
         }
     }
 
     companion object {
         const val id = "attestation-leaf"
+
+        /** ISO/IEC 18013-5 reader-authentication EKU. */
+        const val mdocReaderAuthenticationEkuOid = "1.0.18013.5.1.6"
+
+        /** ISO/IEC 23220-4 reader-authentication EKU. */
+        const val mdocReaderAuthentication23220EkuOid = "1.0.23220.4.1.6"
+
+        private val acceptedVerifierExtendedKeyUsageOids = setOf(
+            ExtendedKeyUsageExtension.KeyUsage.anyExtendedKeyUsage.id,
+            ExtendedKeyUsageExtension.KeyUsage.clientAuth.id,
+            mdocReaderAuthenticationEkuOid,
+            mdocReaderAuthentication23220EkuOid,
+        )
     }
 }
