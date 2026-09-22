@@ -5,6 +5,7 @@ import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.mdoc.MsoData
 import io.ktor.server.plugins.NotFoundException
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -51,14 +52,17 @@ class CredentialProfileService(
             "Credential profile ${profile.profileId} references unsupported credential configuration " +
                     profile.credentialConfigurationId
         }
-        if (profile.msoData != null && !profile.msoData.isEmpty()) {
-            val format = metadataConfig.credentialConfigurations[profile.credentialConfigurationId]
-                ?.jsonObject?.get("format")?.jsonPrimitive?.content
-            require(format == CredentialFormat.MSO_MDOC.value) {
-                "msoData is only supported for mso_mdoc credential profiles"
-            }
-        }
+        requireMsoDataOnlyForMdoc(profile.credentialConfigurationId, profile.msoData)
         return profile
+    }
+
+    fun requireMsoDataOnlyForMdoc(credentialConfigurationId: String, msoData: MsoData?) {
+        if (msoData == null || msoData.isEmpty()) return
+        val format = metadataConfig.credentialConfigurations[credentialConfigurationId]
+            ?.jsonObject?.get("format")?.jsonPrimitive?.content
+        require(format == CredentialFormat.MSO_MDOC.value) {
+            "msoData is only supported for mso_mdoc credential profiles"
+        }
     }
 
     private fun CredentialProfileConfig.toDomain(profileId: String): CredentialProfile =
