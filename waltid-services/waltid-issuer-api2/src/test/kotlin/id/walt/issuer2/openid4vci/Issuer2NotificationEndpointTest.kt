@@ -352,35 +352,6 @@ class Issuer2NotificationEndpointTest {
         )
     }
 
-    @Test
-    fun disabledNotificationEndpointIsNotAdvertisedOrRouted() = testApplication {
-        installIssuer2WithConfigFiles(
-            configureServiceConfig = { it.copy(notificationEndpointEnabled = false) }
-        )
-        val client = apiClient()
-        val walletFlow = Issuer2WalletFlowDriver(client)
-        val createdOffer = client.createWalletFlowCredentialOffer(
-            scenario = Issuer2CredentialScenarios.openBadgeCredential,
-            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
-            txCodeMode = Issuer2TxCodeMode.NONE,
-        )
-        val resolvedOffer = walletFlow.resolve(createdOffer)
-        assertNull(resolvedOffer.issuerMetadata.notificationEndpoint)
-        val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
-        val credentialResponse = walletFlow.requestCredential(
-            resolvedOffer = resolvedOffer,
-            accessToken = tokenResponse.access_token,
-        )
-
-        assertFalse("notification_id" in credentialResponse)
-        val routeResponse = client.post("/openid4vci/notification") {
-            bearerAuth(tokenResponse.access_token)
-            contentType(ContentType.Application.Json)
-            setBody(notificationBody("unused", "credential_accepted"))
-        }
-        assertEquals(HttpStatusCode.NotFound, routeResponse.status)
-    }
-
     private suspend fun HttpClient.issueCredential(webhookUrl: String? = null): IssuedNotificationContext {
         val walletFlow = Issuer2WalletFlowDriver(this)
         val createdOffer = createWalletFlowCredentialOffer(

@@ -1172,7 +1172,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     authorizedTransactionDataTypes = session.authorizedTransactionDataTypes,
                     credentialStatus = mDocStatus,
                     proofValidationContext = proofValidationContext,
-                    issueNotificationId = metadataService.notificationEndpointEnabled(),
+                    issueNotificationId = true,
                 )
             } else {
                 oauth2Provider.createCredentialResponse(
@@ -1188,7 +1188,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     authorizedTransactionDataTypes = session.authorizedTransactionDataTypes,
                     credentialStatus = mDocStatus,
                     proofValidationContext = proofValidationContext,
-                    issueNotificationId = metadataService.notificationEndpointEnabled(),
+                    issueNotificationId = true,
                 )
             }
             val credentialResponse = when (val result = credentialResponseResult) {

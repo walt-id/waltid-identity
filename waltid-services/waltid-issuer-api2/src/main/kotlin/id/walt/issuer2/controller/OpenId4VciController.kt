@@ -278,18 +278,16 @@ class OpenId4VciController(
                     call.respondCredentialResponse(response)
                 }
 
-                if (metadataService.notificationEndpointEnabled()) {
-                    post("notification", OpenId4VciRoutesDocs.notification()) {
-                        val authorizationHeaders = call.request.headers.getAll(HttpHeaders.Authorization).orEmpty()
-                        val dpopProofHeaderValues = call.request.headers.getAll(DPoPConstants.HEADER_NAME).orEmpty()
-                        val response = protocolService.processNotificationRequest(
-                            authorizationHeaders = authorizationHeaders,
-                            dpopProofHeaderValues = dpopProofHeaderValues,
-                            requestBody = call.receiveText(),
-                            requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE },
-                        )
-                        call.respondNotificationResponse(response)
-                    }
+                post("notification", OpenId4VciRoutesDocs.notification()) {
+                    val authorizationHeaders = call.request.headers.getAll(HttpHeaders.Authorization).orEmpty()
+                    val dpopProofHeaderValues = call.request.headers.getAll(DPoPConstants.HEADER_NAME).orEmpty()
+                    val response = protocolService.processNotificationRequest(
+                        authorizationHeaders = authorizationHeaders,
+                        dpopProofHeaderValues = dpopProofHeaderValues,
+                        requestBody = call.receiveText(),
+                        requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE },
+                    )
+                    call.respondNotificationResponse(response)
                 }
             }
         }
