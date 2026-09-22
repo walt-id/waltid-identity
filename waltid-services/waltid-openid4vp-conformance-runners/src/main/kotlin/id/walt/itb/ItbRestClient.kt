@@ -12,7 +12,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.time.Instant
 
-/** GITB 1.29.5 session API. Starting a session never implies that its wallet interaction ran. */
+/** GITB 1.29.5 status, report and cleanup API for sessions created by the portal bridge. */
 class ItbRestClient(
     private val httpClient: HttpClient,
     private val apiUrl: Url,
@@ -28,13 +28,6 @@ class ItbRestClient(
         }
         require(apiUrl.user == null && apiUrl.password == null && apiUrl.parameters.isEmpty()) {
             "ITB API URL must not contain credentials or query parameters"
-        }
-    }
-
-    @Serializable
-    data class CreatedSession(val testSuite: String, val testCase: String, val session: String) {
-        init {
-            require(testSuite.isNotBlank() && testCase.isNotBlank() && session.isNotBlank()) { "Missing ITB session identity" }
         }
     }
 
@@ -59,19 +52,6 @@ class ItbRestClient(
     }
 
     @Serializable
-    private data class StartRequest(
-        val system: String,
-        val actor: String,
-        val testSuite: List<String>,
-        val testCase: List<String>,
-        val forceSequentialExecution: Boolean = true,
-        val waitForCompletion: Boolean = false,
-    )
-
-    @Serializable
-    private data class StartResponse(val createdSessions: List<CreatedSession>)
-
-    @Serializable
     private data class StatusRequest(val session: List<String>, val withReports: Boolean)
 
     @Serializable
@@ -79,17 +59,6 @@ class ItbRestClient(
 
     @Serializable
     private data class StopRequest(val session: List<String>)
-
-    /** No retry: repeating a start request after an uncertain response could create duplicate runs. */
-    suspend fun start(systemKey: String, actorKey: String, suiteId: String, caseIds: List<String>): List<CreatedSession> {
-        require(systemKey.isNotBlank() && actorKey.isNotBlank()) { "ITB system and actor keys are required" }
-        require(suiteId.isNotBlank() && caseIds.isNotEmpty() && caseIds.all { it.isNotBlank() }) {
-            "An explicit ITB suite and nonempty case selection are required"
-        }
-        require(caseIds.distinct().size == caseIds.size) { "Duplicate ITB case selection" }
-        val body = json.encodeToString(StartRequest(systemKey, actorKey, listOf(suiteId), caseIds))
-        return decode<StartResponse>("start", request("start", HttpMethod.Post, body)).createdSessions
-    }
 
     suspend fun status(sessionIds: List<String>, withReports: Boolean = false): List<SessionStatus> {
         validateSessions(sessionIds)
