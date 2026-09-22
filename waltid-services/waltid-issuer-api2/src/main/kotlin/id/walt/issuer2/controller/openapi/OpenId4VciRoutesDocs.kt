@@ -187,9 +187,12 @@ object OpenId4VciRoutesDocs {
 
             Multiple proofs when batch issuance is disabled, or more proofs than the advertised limit,
             return `invalid_credential_request`. Invalid proof signatures return `invalid_proof`.
-            A selection with a preconfigured `credentialStatus` accepts only one proof per request:
-            OSS cannot allocate a separate status entry per copy, so multiple proof copies return
-            `invalid_credential_request` even when batch issuance is enabled.
+            Each offered credential uses its configured `credentialStatus` for all copies issued from it.
+            When multiple proofs are supplied, those copies share the same status entry. Revoking that
+            entry revokes every credential referencing it, including copies issued by later requests.
+            Shared status references also make the copies linkable.
+            Different `credentials[]` items can supply different statuses, each used for its corresponding item.
+            These rules apply to both single-profile and multi-credential offers.
 
             When several authorized datasets share a configuration, selecting it by
             `credential_configuration_id` is ambiguous and returns `invalid_credential_request`.

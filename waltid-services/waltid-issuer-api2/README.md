@@ -75,7 +75,49 @@ batchCredentialIssuance {
 Change `batchSize` to adjust the limit, or remove the `batchCredentialIssuance` block
 to disable multiple-proof requests. Single-credential issuance remains available.
 
-Each Credential Request selects one configuration and dataset and issues one copy for each holder proof. A multi-selection offer is redeemed through separate Credential Requests. Holder keys may repeat; using distinct cryptographic data is recommended by OpenID4VCI, not required. Selections containing one preconfigured credential-status entry remain single-issuance only because every batched credential requires its own status entry.
+Each Credential Request selects one configuration and dataset and issues one copy for each holder proof. A multi-selection offer is redeemed through separate Credential Requests. Holder keys may repeat; using distinct cryptographic data is recommended by OpenID4VCI, not required.
+
+Supply status through the existing `runtimeOverrides.credentialStatus` field, either on a
+single-profile offer or inside each `credentials[]` item. A runtime value takes precedence
+over the profile's configured status. Issuer2 embeds this supplied value in every copy of the
+selected item. The caller is responsible for allocating status entries, publishing their
+lists, and updating their values. Issuer2 does not allocate a new entry for each proof.
+
+All credentials referencing the same status entry share its status: revoking it revokes
+every such credential, including copies issued by later requests. The shared reference
+also makes those copies linkable. Different offered items can supply different entries,
+so revoking one item's entry does not revoke items using another entry.
+
+For example, this offer uses the same SD-JWT profile twice with two different status entries:
+
+```json
+{
+  "authMethod": "PRE_AUTHORIZED",
+  "credentials": [
+    {
+      "profileId": "identityCredentialSdJwt",
+      "runtimeOverrides": {
+        "credentialStatus": {
+          "status_list": { "idx": 94567, "uri": "https://status.example.com/list/1" }
+        }
+      }
+    },
+    {
+      "profileId": "identityCredentialSdJwt",
+      "runtimeOverrides": {
+        "credentialStatus": {
+          "status_list": { "idx": 12345, "uri": "https://status.example.com/list/1" }
+        }
+      }
+    }
+  ]
+}
+```
+
+The status-list URL and indexes above are illustrative; replace them with entries managed
+by your application. Request `authorization_details` to obtain each item's
+`credential_identifier`, then redeem the items separately. With one proof per request,
+the first item's credential references index 94567 and the second item's credential references index 12345.
 
 ## API Endpoints
 

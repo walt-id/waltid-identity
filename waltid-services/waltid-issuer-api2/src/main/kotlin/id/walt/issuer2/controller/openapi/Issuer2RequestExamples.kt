@@ -57,6 +57,51 @@ object Issuer2RequestExamples {
         valueMode = CredentialOfferValueMode.BY_VALUE,
     )
 
+    val PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS = PROFILE_PRE_AUTHORIZED_OFFER.copy(
+        runtimeOverrides = CredentialOfferRuntimeOverrides(
+            credentialStatus = buildJsonObject {
+                put("id", "https://status.example.com/list/1#94567")
+                put("type", "BitstringStatusListEntry")
+                put("statusPurpose", "revocation")
+                put("statusListIndex", "94567")
+                put("statusListCredential", "https://status.example.com/list/1")
+            },
+        ),
+    )
+
+    val PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_SD_JWT_STATUS = PROFILE_PRE_AUTHORIZED_OFFER.copy(
+        profileId = IDENTITY_SD_JWT_PROFILE_ID,
+        runtimeOverrides = CredentialOfferRuntimeOverrides(credentialStatus = tokenStatusEntry(94567)),
+    )
+
+    val PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_MDOC_STATUS = PROFILE_PRE_AUTHORIZED_OFFER.copy(
+        profileId = MDOC_MDL_PROFILE_ID,
+        runtimeOverrides = CredentialOfferRuntimeOverrides(credentialStatus = tokenStatusEntry(94567)),
+    )
+
+    val PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES = MultiCredentialOfferCreateRequest(
+        credentials = listOf(94567, 12345).map { index ->
+            CredentialOfferCredential(
+                profileId = IDENTITY_SD_JWT_PROFILE_ID,
+                runtimeOverrides = CredentialOfferRuntimeOverrides(credentialStatus = tokenStatusEntry(index)),
+            )
+        },
+        authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+    )
+
+    val PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES =
+        PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES.copy(
+            authMethod = AuthenticationMethod.AUTHORIZED,
+            issuerStateMode = IssuerStateMode.INCLUDE,
+        )
+
+    private fun tokenStatusEntry(index: Int) = buildJsonObject {
+        putJsonObject("status_list") {
+            put("idx", index)
+            put("uri", "https://status.example.com/list/1")
+        }
+    }
+
     val PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER = MultiCredentialOfferCreateRequest(
         credentials = listOf(
             CredentialOfferCredential(W3C_PROFILE_ID),

@@ -1,8 +1,11 @@
 package id.walt.issuer2.openid4vci
 
 import id.walt.commons.web.modules.OpenApiModule
+import id.walt.issuer2.models.CredentialOfferCreateRequest
+import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
 import id.walt.issuer2.testsupport.*
 import io.github.smiley4.ktoropenapi.OpenApi
+import io.github.smiley4.ktoropenapi.config.ExampleEncoder
 import io.github.smiley4.ktoropenapi.openApi
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -22,7 +25,11 @@ class Issuer2OpenApiCompatibilityTest {
     @Test
     fun `generated OpenAPI describes both offer contracts and both public session shapes without a discriminator`() = testApplication {
         application {
-            install(OpenApi) { schemas { generator = OpenApiModule.createGenerator() } }
+            install(OpenApi) {
+                schemas { generator = OpenApiModule.createGenerator() }
+                // Match the typed example serializer used by OpenApiModule in the running service.
+                examples { exampleEncoder = ExampleEncoder.kotlinx() }
+            }
             routing { route("api.json") { openApi() } }
         }
         installIssuer2WithConfigFiles()
@@ -42,6 +49,21 @@ class Issuer2OpenApiCompatibilityTest {
         requests.forEach {
             assertFalse(it.containsKey("discriminator"), it.toString())
             assertFalse(it.getValue("properties").jsonObject.containsKey("type"), it.toString())
+        }
+        val examples = offer.getValue("requestBody").jsonObject.getValue("content").jsonObject
+            .getValue("application/json").jsonObject.getValue("examples").jsonObject
+        val statusExamples = examples.filterKeys { "status" in it }
+        assertEquals(5, statusExamples.size)
+        statusExamples.values.forEach { example ->
+            val value = example.jsonObject.getValue("value").jsonObject
+            val statuses = if ("profileId" in value) {
+                val request = Json.decodeFromJsonElement<CredentialOfferCreateRequest>(value)
+                listOf(assertNotNull(request.runtimeOverrides?.credentialStatus))
+            } else {
+                val request = Json.decodeFromJsonElement<MultiCredentialOfferCreateRequest>(value)
+                request.credentials.map { assertNotNull(it.runtimeOverrides?.credentialStatus) }
+            }
+            assertEquals(statuses.size, statuses.distinct().size)
         }
         val responses = resolve(body(offer.getValue("responses").jsonObject.getValue("201").jsonObject))
             .getValue("anyOf").jsonArray.map(::resolve)
