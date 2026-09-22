@@ -34,6 +34,7 @@ import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestTargetResolution
 import id.walt.openid4vci.requests.credential.resolveCredentialConfigurationId
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.openid4vci.requests.notification.NotificationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
@@ -87,6 +88,12 @@ private const val INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER = "_issuer2_sessio
 private const val TOKEN_ENDPOINT_PATH = "token"
 private const val CREDENTIAL_ENDPOINT_PATH = "credential"
 private const val NOTIFICATION_ENDPOINT_PATH = "notification"
+
+private fun NotificationEvent.toIssuanceSessionEvent(): IssuanceSessionEvent = when (this) {
+    NotificationEvent.CREDENTIAL_ACCEPTED -> IssuanceSessionEvent.WALLET_CREDENTIAL_ACCEPTED
+    NotificationEvent.CREDENTIAL_FAILURE -> IssuanceSessionEvent.WALLET_CREDENTIAL_FAILURE
+    NotificationEvent.CREDENTIAL_DELETED -> IssuanceSessionEvent.WALLET_CREDENTIAL_DELETED
+}
 private val AUTHORIZATION_CODE_SESSION_LIFETIME = 5.minutes
 
 internal suspend fun restoreSessionIssuerCrypto2Key(
@@ -721,6 +728,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         authorizationHeaders: List<String>,
         dpopProofHeaderValues: List<String>,
         requestBody: String,
+        requestId: String,
     ): NotificationResponseHttp {
         val authorization = parseCredentialAuthorization(authorizationHeaders)
             ?: return oauth2Provider.writeNotificationError(
@@ -750,7 +758,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         OAuthError(OAuthErrorCodes.INVALID_TOKEN, "Access token has no session id"),
                         authorization.scheme,
                     )
-                sessionService.updateWalletNotificationEvent(
+                val update = sessionService.updateWalletNotificationEvent(
                     sessionId = sessionId,
                     notificationId = result.request.notificationId,
                     event = result.request.event,
@@ -758,6 +766,13 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 ) ?: return oauth2Provider.writeNotificationError(
                     NotificationError(NotificationErrorCodes.INVALID_NOTIFICATION_ID),
                 )
+                if (update.changed) {
+                    notificationService.notify(
+                        requestId = requestId,
+                        session = update.session,
+                        event = result.request.event.toIssuanceSessionEvent(),
+                    )
+                }
                 return oauth2Provider.writeNotificationResponse(oauth2Provider.createNotificationResponse())
             }
         }

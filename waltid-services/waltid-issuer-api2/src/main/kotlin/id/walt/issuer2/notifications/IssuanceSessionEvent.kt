@@ -77,4 +77,13 @@ enum class IssuanceSessionEvent(val value: String) {
 
     @SerialName("issuance_status_changed")
     ISSUANCE_STATUS_CHANGED("issuance_status_changed"),
+
+    @SerialName("wallet_credential_accepted")
+    WALLET_CREDENTIAL_ACCEPTED("wallet_credential_accepted"),
+
+    @SerialName("wallet_credential_failure")
+    WALLET_CREDENTIAL_FAILURE("wallet_credential_failure"),
+
+    @SerialName("wallet_credential_deleted")
+    WALLET_CREDENTIAL_DELETED("wallet_credential_deleted"),
 }

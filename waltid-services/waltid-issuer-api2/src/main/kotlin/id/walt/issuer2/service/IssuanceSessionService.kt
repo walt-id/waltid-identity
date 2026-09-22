@@ -57,20 +57,26 @@ class IssuanceSessionService(
         notificationId: String,
         event: NotificationEvent,
         eventDescription: String? = null,
-    ): IssuanceSession? {
+    ): WalletNotificationUpdate? {
         val existing = getSessionOrNull(sessionId) ?: return null
         if (existing.walletNotificationId != notificationId) return null
         if (
             existing.walletNotificationEvent == event &&
             existing.walletNotificationEventDescription == eventDescription
         ) {
-            return existing
+            return WalletNotificationUpdate(existing, changed = false)
         }
-        return repository.save(
+        val saved = repository.save(
             existing.copy(
                 walletNotificationEvent = event,
                 walletNotificationEventDescription = eventDescription,
             )
         )
+        return WalletNotificationUpdate(saved, changed = true)
     }
 }
+
+data class WalletNotificationUpdate(
+    val session: IssuanceSession,
+    val changed: Boolean,
+)

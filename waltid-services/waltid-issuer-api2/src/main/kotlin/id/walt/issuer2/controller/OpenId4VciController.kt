@@ -286,6 +286,7 @@ class OpenId4VciController(
                             authorizationHeaders = authorizationHeaders,
                             dpopProofHeaderValues = dpopProofHeaderValues,
                             requestBody = call.receiveText(),
+                            requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE },
                         )
                         call.respondNotificationResponse(response)
                     }

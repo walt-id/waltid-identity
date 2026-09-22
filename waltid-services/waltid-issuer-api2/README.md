@@ -112,6 +112,9 @@ Issuer sessions publish the same `KtorSessionUpdate` envelope to SSE and to an o
 | W3C VC credential request | `credential_request_w3c_vc_succeeded`, `credential_request_w3c_vc_failed` |
 | mdoc credential request | `credential_request_mso_mdoc_succeeded`, `credential_request_mso_mdoc_failed` |
 | Session lifecycle | `issuance_status_changed` |
+| Wallet result | `wallet_credential_accepted`, `wallet_credential_failure`, `wallet_credential_deleted` |
+
+A wallet notification is published on the offer webhook and the issuer SSE stream only when the stored event or description changes. It does not change the issuance status. `credential_request_*_succeeded` still means the issuer issued the credential.
 
 Kotlin enum constants are `SCREAMING_SNAKE_CASE`; webhook and SSE payloads use the lowercase `value` strings above.
 
