@@ -17,6 +17,8 @@ data class Issuer2ServiceConfig(
     val clientAuthenticationConfig: ClientAuthenticationConfig? = null,
     /** Preferred encoded crypto2 StoredKey. Invalid or mismatched values fail startup. */
     val ciTokenStoredKey: String? = null,
+    /** Advertises and serves the OpenID4VCI notification endpoint. This is issuer metadata, not a wallet setting. */
+    val notificationEndpointEnabled: Boolean = true,
 ) : WaltConfig() {
     /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
     constructor(
