@@ -147,17 +147,34 @@ object WalletPresentationFormatRegistry {
             }
         }
 
+    /**
+     * Whether this wallet can sign [format] under the verifier's advertised algorithms.
+     * A null [verifierFormats] map means the verifier published no restriction.
+     */
+    fun supportsFormat(
+        format: SupportedFormat,
+        verifierFormats: Map<String, JsonObject>?,
+        capabilities: RuntimeCapabilities = defaultCapabilities(),
+    ): Boolean {
+        if (format !in capabilities.supportedFormats) return false
+        if (verifierFormats == null) return true
+        val verifierMetadata = verifierFormats.entries
+            .firstOrNull { (formatId, _) -> resolve(formatId) == format }
+            ?.value
+            ?: return false
+        return verifierMetadata.algorithmsMatch(
+            walletMetadata = buildVpFormatMetadata(format, capabilities),
+            fields = format.holderAlgorithmFields,
+        )
+    }
+
     /** Returns whether the wallet and verifier share at least one compatible presentation format. */
     fun supportsAny(
         verifierFormats: Map<String, JsonObject>,
         capabilities: RuntimeCapabilities = defaultCapabilities(),
         requestedFormats: Set<SupportedFormat> = capabilities.supportedFormats,
-    ): Boolean = verifierFormats.any { (formatId, verifierMetadata) ->
-        val format = resolve(formatId) ?: return@any false
-        format in requestedFormats && format in capabilities.supportedFormats && verifierMetadata.algorithmsMatch(
-            walletMetadata = buildVpFormatMetadata(format, capabilities),
-            fields = format.holderAlgorithmFields,
-        )
+    ): Boolean = requestedFormats.any { format ->
+        supportsFormat(format, verifierFormats, capabilities)
     }
 
     private fun buildVpFormatMetadata(
