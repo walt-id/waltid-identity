@@ -96,24 +96,35 @@ internal suspend fun executeCredentialTargets(
                 onEvent.emitSafely(WalletSessionEvent.issuance_deferred)
             } else {
                 onEvent.emitSafely(WalletSessionEvent.issuance_credential_received)
-                val prepared = wallet.prepareIssuedCredentials(rawCredentials.map {
-                    val value = it.credential
-                    if (value is JsonPrimitive) value.content else value.toString()
-                }, selected.bindings, label, metadata, proofRequired = algorithms != null,
-                    expectedConfiguration = configuration)
-                stage = CredentialIssuanceStage.STORAGE
-                ensureOwned()
-                val outcome = sessions.storeReceivedCredentials(
-                    prepared, target.credentialConfigurationId, target.credentialIdentifier,
-                    persistable = access.persistable, sessionId = sessionId,
-                    beforeCredentialsStored = beforeCredentialsStored,
-                    onCredentialStored = { entry ->
-                        stage = CredentialIssuanceStage.OBSERVER
-                        onCredentialStored(entry)
-                        stage = CredentialIssuanceStage.STORAGE
+                withIssuedCredentialNotification(
+                    httpClient = httpClient,
+                    notificationEndpoint = issuerMetadata.notificationEndpoint,
+                    notificationId = response.notificationId,
+                    accessToken = access.accessToken,
+                    tokenType = access.tokenType,
+                    dpopProofFactory = access.dpop?.let {
+                        dpopProofFactoryFor(access.tokenType, it.algorithms, access.senderKey, access.accessToken)
                     },
-                )
-                if (outcome is WalletIssuanceOutcome.Failed) throw CredentialStorageException(outcome)
+                ) {
+                    val prepared = wallet.prepareIssuedCredentials(rawCredentials.map {
+                        val value = it.credential
+                        if (value is JsonPrimitive) value.content else value.toString()
+                    }, selected.bindings, label, metadata, proofRequired = algorithms != null,
+                        expectedConfiguration = configuration)
+                    stage = CredentialIssuanceStage.STORAGE
+                    ensureOwned()
+                    val outcome = sessions.storeReceivedCredentials(
+                        prepared, target.credentialConfigurationId, target.credentialIdentifier,
+                        persistable = access.persistable, sessionId = sessionId,
+                        beforeCredentialsStored = beforeCredentialsStored,
+                        onCredentialStored = { entry ->
+                            stage = CredentialIssuanceStage.OBSERVER
+                            onCredentialStored(entry)
+                            stage = CredentialIssuanceStage.STORAGE
+                        },
+                    )
+                    if (outcome is WalletIssuanceOutcome.Failed) throw CredentialStorageException(outcome)
+                }
             }
         } catch (error: CancellationException) {
             throw error

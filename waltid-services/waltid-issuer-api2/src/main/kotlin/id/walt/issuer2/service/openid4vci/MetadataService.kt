@@ -50,6 +50,7 @@ class MetadataService(
     private val batchCredentialIssuance = serviceConfig.batchCredentialIssuance
     private val enforcePushedAuthorizationRequests = serviceConfig.enforcePushedAuthorizationRequests
     private val supportsClientAttestation = serviceConfig.clientAttestationConfig() != null
+    private val notificationEndpointPath = "/notification".takeIf { serviceConfig.notificationEndpointEnabled }
 
     private val issuerDisplay: List<IssuerDisplay>? =
         metadataConfig.issuerDisplay
@@ -98,6 +99,7 @@ class MetadataService(
                 credentialRequestEncryption = credentialRequestEncryption,
                 batchCredentialIssuance = batchCredentialIssuance,
                 display = issuerDisplay,
+                notificationEndpointPath = notificationEndpointPath,
             )
         }
 
@@ -166,6 +168,8 @@ class MetadataService(
     }
 
     fun issuerBaseUrl(): String = baseUrl
+
+    fun notificationEndpointEnabled(): Boolean = notificationEndpointPath != null
 
     /**
      * Publishes the public halves of every key this issuer signs with, per RFC 8414 `jwks_uri`.
