@@ -6,11 +6,13 @@ This document covers setup, execution, and status of OpenID4VCI Wallet conforman
 
 | Profile | Test Plan | Format | Grant Type | Client Auth | Status |
 |---------|-----------|--------|------------|-------------|--------|
-| SD-JWT VC + DPoP | `oid4vci-1_0-wallet-test-plan` | SD-JWT VC | authorization_code | private_key_jwt | 🔄 Not yet tested |
-| ISO mdoc + DPoP | `oid4vci-1_0-wallet-test-plan` | mso_mdoc | authorization_code | private_key_jwt | 🔄 Not yet tested |
-| SD-JWT VC HAIP | `oid4vci-1_0-wallet-haip-test-plan` | SD-JWT VC | authorization_code | client_attestation | 🔄 Not yet tested |
+| SD-JWT VC + DPoP (pre-authorized code) | `oid4vci-1_0-wallet-test-plan` | SD-JWT VC | pre_authorization_code | - | ✅ Passing |
+| SD-JWT VC + DPoP | `oid4vci-1_0-wallet-test-plan` | SD-JWT VC | authorization_code | private_key_jwt | ✅ Passing |
+| ISO mdoc + DPoP | `oid4vci-1_0-wallet-test-plan` | mso_mdoc | authorization_code | private_key_jwt | ✅ Passing |
+| SD-JWT VC HAIP | `oid4vci-1_0-wallet-haip-test-plan` | SD-JWT VC | authorization_code | client_attestation | ✅ Passing (partial coverage - see below) |
 
-**Last tested:** Not yet run
+**Last tested:** 2026-09-22, suite v5.3.1. Full breakdown: [docs/VCI-WALLET-RESULTS.md](VCI-WALLET-RESULTS.md)
+(regenerate with `./export-verifier-results.py --results build/reports/openid-conformance/vci-wallet/results.json --output docs/VCI-WALLET-RESULTS.md --title "VCI-Wallet Conformance Results"` after a run).
 
 ---
 
@@ -18,16 +20,23 @@ This document covers setup, execution, and status of OpenID4VCI Wallet conforman
 
 ### Test Results
 
-_Tests have not been run yet. This section will be updated with actual results._
+First-ever run of this flow (previously untested): **8 passed, 0 failed**, 26 skipped. All skips
+are the suite or harness honestly reporting inapplicable/not-yet-implemented paths (e.g. "Deferred
+credential issuance is not supported", "needs wallet-initiated issuance, which the harness cannot
+yet trigger"), not silent failures - see [docs/VCI-WALLET-RESULTS.md](VCI-WALLET-RESULTS.md) for
+which modules and why.
 
 ### Architecture
 
-The VCI Wallet conformance tests use an **adapter pattern**:
+The VCI Wallet conformance tests use an **adapter pattern**, and unlike the doc below used to say,
+**both the adapter and the wallet run fully in-process inside the JUnit test** - there is nothing
+to start manually beyond the conformance suite itself:
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Conformance     │    │ Wallet Adapter  │    │ Wallet API      │
-│ Suite (Issuer)  │───▶│ (port 7007)     │───▶│ (port 7005)     │
+│ Conformance     │    │ Wallet Adapter  │    │ Wallet2         │
+│ Suite (Issuer)  │───▶│ (port 7007,     │───▶│ (port 7016,     │
+│                 │    │  in-process)    │    │  in-process)    │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
         │                      │
         │                      ▼
@@ -41,48 +50,38 @@ The VCI Wallet conformance tests use an **adapter pattern**:
         6. Store issued credential
 ```
 
-The **VciWalletConformanceAdapter** bridges the conformance suite with the walt.id wallet API.
+The **VciWalletConformanceAdapter** bridges the conformance suite with an in-process Wallet2
+instance (`VciWalletConformanceTests.kt` starts both via `E2ETest` and `VciWalletConformanceAdapter(...).start()`
+- see that file for the exact ports). Only port 7007 (the adapter) needs to be reachable *by the
+suite*; port 7016 (Wallet2) is only ever called by the adapter itself, on the same host.
 
 ---
 
 ## Prerequisites
 
-1. **Conformance Suite** running at `https://localhost.emobix.co.uk:8443`
+1. **Conformance Suite** running at `https://localhost.emobix.co.uk:8443` - any variant works,
+   this flow doesn't depend on the walt.id-specific nginx routes:
    ```bash
    cd ~/dev/openid/conformance-suite
-   docker compose -f docker-compose-walt.yml up -d
+   docker compose -f docker-compose-prebuilt.yml up -d   # latest suite, recommended
    ```
-
-2. **Wallet API** running (wallet-api2):
+2. **/etc/hosts entry:** `127.0.0.1 localhost.emobix.co.uk`
+3. **Trust the suite's self-signed cert for the Gradle JVM** (see
+   [docs/VP-VERIFIER.md](VP-VERIFIER.md#quick-start) Quick Start step 5 for the exact commands -
+   same mechanism, `CONFORMANCE_EXTRA_CA_PEM`).
+4. **Expose the adapter's port 7007 to the suite.** In this sandboxed environment
+   `host.docker.internal` doesn't route from the suite's Docker container back to the host (see
+   [docs/VCI-ISSUER.md](VCI-ISSUER.md#connect-timed-out-errors) for the full diagnosis) - unlike
+   the issuer flow, this one worked cleanly through the same ngrok workaround, no other issues
+   hit. On a normal (non-sandboxed) host this step may not be needed at all - try
+   `CONFORMANCE_ADAPTER_HOST=host.docker.internal` (the default) first.
    ```bash
-   cd ~/dev/walt-id/waltid-unified-build
-   ./gradlew :waltid-services:waltid-wallet-api2:run
+   ngrok http 7007 --config <(echo 'version: "2"
+   web_addr: localhost:4043') --config ~/.config/ngrok/ngrok.yml
    ```
 
-3. **/etc/hosts entry:**
-   ```
-   127.0.0.1 localhost.emobix.co.uk
-   ```
-
----
-
-## Setup
-
-### 1. Start Wallet API
-
-```bash
-cd ~/dev/walt-id/waltid-unified-build
-./gradlew :waltid-services:waltid-wallet-api2:run
-```
-
-Verify wallet is running:
-```bash
-curl -s http://127.0.0.1:7005/health | jq .
-```
-
-### 2. Configure Test Wallet
-
-Ensure a test wallet exists that can receive credentials. The adapter uses a default wallet for testing.
+There is no wallet-api2 to start separately, and no test wallet to pre-configure - both are
+created fresh, in-process, per test run.
 
 ---
 
@@ -90,18 +89,24 @@ Ensure a test wallet exists that can receive credentials. The adapter uses a def
 
 ```bash
 cd ~/dev/walt-id/waltid-unified-build
+export CONFORMANCE_EXTRA_CA_PEM=/tmp/conformance-suite-cert.pem   # see Prerequisites #3
+export CONFORMANCE_VCI_WALLET_ADAPTER_BASE_URL="<your-adapter-ngrok-url>"   # see Prerequisites #4
+export CONFORMANCE_ADAPTER_HOST="<your-adapter-ngrok-host-without-scheme>"
 
 # Run all VCI Wallet tests
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VciWalletConformanceTests"
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VciWalletConformanceTests" --rerun
 
 # Run specific test
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-  --tests "VciWalletConformanceTests.vciWalletSdJwtVcDpopAuthorizationCode"
+  --tests "VciWalletConformanceTests.vciWalletSdJwtVcDpopAuthorizationCode" --rerun
 
 # Run HAIP full target test
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-  --tests "VciWalletConformanceTests.vciWalletSdJwtVcAuthorizationCodeHaipFullTarget"
+  --tests "VciWalletConformanceTests.vciWalletSdJwtVcAuthorizationCodeHaipFullTarget" --rerun
 ```
+
+`--rerun` matters here too: Gradle doesn't see these env vars as task inputs, so a cached `test`
+task can silently no-op without it (same reasoning as the verifier flow).
 
 ### Test Execution Flow
 
