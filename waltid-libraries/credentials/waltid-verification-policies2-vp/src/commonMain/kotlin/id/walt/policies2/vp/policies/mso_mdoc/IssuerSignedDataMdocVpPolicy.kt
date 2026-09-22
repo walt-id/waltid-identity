@@ -38,14 +38,24 @@ class IssuerSignedDataMdocVpPolicy : MdocVPPolicy() {
 
         verifyIssuerSignedItemDigests(document, mso).forEach { verification ->
             val item = verification.item
+            // A reference to the element and the digest that proved it, not the element itself.
+            //
+            // This result used to carry `value` and `serialized_hex` for every disclosed element, so an mDL with a
+            // 250 KB portrait produced a megabyte of policy results - the portrait as base64, plus the same bytes
+            // again as hex, which is two characters per byte. A verification session then serialised to 6.7 copies
+            // of the portrait, and with the several policies an Enterprise profile runs it passed MongoDB's 16 MB
+            // document limit: every portrait presentation failed with BsonMaximumSizeExceededException.
+            //
+            // The values are not lost. The presentation is stored exactly as received and exactly as it was
+            // decoded, which is the audit record - a decoder changes between versions, so what this deployment
+            // understood at the time is the thing worth keeping. A policy result only has to say which element it
+            // checked and what it concluded.
             addHashListResult(
                 "namespace", verification.namespace, mapOf(
                     "id" to item.elementIdentifier,
                     "digest_id" to item.digestId,
-                    "value" to item.elementValue,
                     "value_type" to (item.elementValue::class.simpleName ?: "?"),
-                    "random_hex" to item.random.toHexString(),
-                    "serialized_hex" to verification.serialized.toHexString(),
+                    "digest_hex" to verification.calculatedDigest.toHexString(),
                 )
             )
             addHashListResult("matching_digest", verification.namespace, item.elementIdentifier)
