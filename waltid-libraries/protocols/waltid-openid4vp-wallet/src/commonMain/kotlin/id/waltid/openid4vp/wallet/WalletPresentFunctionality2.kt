@@ -6,6 +6,7 @@ import kotlin.time.TimeSource
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.UuidUtils
 import id.walt.crypto.utils.ShaUtils.calculateSha256Base64Url
 import id.walt.crypto2.jose.*
 import id.walt.crypto2.keys.EncodedKey
@@ -75,6 +76,7 @@ object WalletPresentFunctionality2 {
         dcApiOrigin: String? = null,
         /** Required for mdocs; resolves the exact credential-bound MSO DeviceKey. */
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        scaAuthorizer: ScaPresentationAuthorizer? = null,
     ): String {
         val vpTokenMapContents = mutableMapOf<String, JsonArray>()
         // OID4VP 1.0 Appendix A: DC API holder binding is to the platform-asserted origin.
@@ -108,22 +110,9 @@ object WalletPresentFunctionality2 {
                             )
 
                         resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.DC_SD_JWT ->
-                            holderCrypto2Key?.let {
-                                SdJwtVcPresenter.presentSdJwtVc(
-                                    digitalCredential,
-                                    matchResult,
-                                    authorizationRequest,
-                                    it,
-                                    holderDid,
-                                    holderBindingAudience,
-                                )
-                            } ?: SdJwtVcPresenter.presentSdJwtVc(
-                                digitalCredential,
-                                matchResult,
-                                authorizationRequest,
-                                requireNotNull(holderKey),
-                                holderDid,
-                                holderBindingAudience,
+                            SdJwtVcPresenter.presentSdJwtVcAuthorized(
+                                digitalCredential, matchResult, authorizationRequest, holderKey, holderDid,
+                                holderCrypto2Key, holderBindingAudience, scaAuthorizer,
                             )
 
                         resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.MSO_MDOC -> {
@@ -476,6 +465,31 @@ object WalletPresentFunctionality2 {
         dcApiOrigin: String? = null,
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
         clientMetadata: ClientMetadata? = authorizationRequest.clientMetadata,
+    ): String = buildVpToken(
+        authorizationRequest = authorizationRequest,
+        matchedCredentials = matchedCredentials,
+        holderKey = holderKey,
+        holderDid = holderDid,
+        transactionDataTypeRegistry = transactionDataTypeRegistry,
+        holderCrypto2Key = holderCrypto2Key,
+        dcApiOrigin = dcApiOrigin,
+        mdocHolderKeyResolver = mdocHolderKeyResolver,
+        clientMetadata = clientMetadata,
+        scaAuthorizer = null,
+    )
+
+    @Deprecated("Use the Crypto2Key overload")
+    suspend fun buildVpToken(
+        authorizationRequest: AuthorizationRequest,
+        matchedCredentials: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        holderKey: Key,
+        holderDid: String?,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        holderCrypto2Key: Crypto2Key?,
+        dcApiOrigin: String? = null,
+        mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        clientMetadata: ClientMetadata? = authorizationRequest.clientMetadata,
+        scaAuthorizer: ScaPresentationAuthorizer?,
     ): String {
         val presentationRequest = authorizationRequest.presentingWith(clientMetadata)
         val verifierJwkThumbprint = ResponseEncryption.resolveCrypto2(presentationRequest, clientMetadata)?.thumbprint()
@@ -489,6 +503,7 @@ object WalletPresentFunctionality2 {
             holderCrypto2Key = holderCrypto2Key,
             dcApiOrigin = dcApiOrigin,
             mdocHolderKeyResolver = mdocHolderKeyResolver,
+            scaAuthorizer = scaAuthorizer,
         )
     }
 
@@ -501,6 +516,35 @@ object WalletPresentFunctionality2 {
         dcApiOrigin: String? = null,
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
         clientMetadata: ClientMetadata? = authorizationRequest.clientMetadata,
+    ): String = buildVpToken(
+        authorizationRequest = authorizationRequest,
+        matchedCredentials = matchedCredentials,
+        holderKey = holderKey,
+        holderDid = holderDid,
+        transactionDataTypeRegistry = transactionDataTypeRegistry,
+        dcApiOrigin = dcApiOrigin,
+        mdocHolderKeyResolver = mdocHolderKeyResolver,
+        clientMetadata = clientMetadata,
+        scaAuthorizer = null,
+    )
+
+    /**
+     * Builds a presentation with application-supplied TS12 authentication.
+     * The request must already be authenticated and the credential/disclosure selection approved.
+     * Each bound TS12 payment invokes [scaAuthorizer] with its exact proof inputs. Missing or
+     * unsuccessful authentication aborts signing; ordinary presentations do not invoke the callback.
+     * This callback does not replace platform key-use authorization or establish SCA assurance.
+     */
+    suspend fun buildVpToken(
+        authorizationRequest: AuthorizationRequest,
+        matchedCredentials: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        holderKey: Crypto2Key,
+        holderDid: String?,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
+        dcApiOrigin: String? = null,
+        mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        clientMetadata: ClientMetadata? = authorizationRequest.clientMetadata,
+        scaAuthorizer: ScaPresentationAuthorizer?,
     ): String {
         val presentationRequest = authorizationRequest.presentingWith(clientMetadata)
         val verifierJwkThumbprint = ResponseEncryption.resolveCrypto2(presentationRequest, clientMetadata)?.thumbprint()
@@ -514,6 +558,7 @@ object WalletPresentFunctionality2 {
             holderCrypto2Key = holderKey,
             dcApiOrigin = dcApiOrigin,
             mdocHolderKeyResolver = mdocHolderKeyResolver,
+            scaAuthorizer = scaAuthorizer,
         )
     }
 
@@ -1114,6 +1159,7 @@ object WalletPresentFunctionality2 {
         transactionData: List<String>? = null,
         acceptedAlgorithms: Set<String>? = null,
         holderCrypto2Key: Crypto2Key? = null,
+        scaContext: ScaKeyBindingContext? = null,
     ): String = createKeyBindingJwtWithKey(
         disclosed,
         nonce,
@@ -1123,6 +1169,7 @@ object WalletPresentFunctionality2 {
         transactionData,
         acceptedAlgorithms,
         holderCrypto2Key,
+        scaContext,
     )
 
     internal suspend fun createKeyBindingJwt(
@@ -1133,6 +1180,7 @@ object WalletPresentFunctionality2 {
         holderKey: Crypto2Key,
         transactionData: List<String>? = null,
         acceptedAlgorithms: Set<String>? = null,
+        scaContext: ScaKeyBindingContext? = null,
     ): String = createKeyBindingJwtWithKey(
         disclosed,
         nonce,
@@ -1142,6 +1190,7 @@ object WalletPresentFunctionality2 {
         transactionData,
         acceptedAlgorithms,
         holderKey,
+        scaContext,
     )
 
     private suspend fun createKeyBindingJwtWithKey(
@@ -1153,6 +1202,7 @@ object WalletPresentFunctionality2 {
         transactionData: List<String>?,
         acceptedAlgorithms: Set<String>?,
         holderCrypto2Key: Crypto2Key?,
+        scaContext: ScaKeyBindingContext?,
     ): String {
         selectedDisclosures.map { it.asEncoded() }
         log.trace { "Creating KB+JWT for disclosures: $selectedDisclosures" }
@@ -1196,7 +1246,24 @@ object WalletPresentFunctionality2 {
             put("typ", JsonPrimitive("kb+jwt"))
         }
 
+        val authentication = scaContext?.let { context ->
+            val presentation = ScaPresentation(
+                credentialId = context.credentialId,
+                holderKeyId = crypto2Key?.id?.value ?: requireNotNull(holderKey).getKeyId(),
+                audience = requireNotNull(audience),
+                nonce = nonce,
+                responseMode = context.responseMode,
+                sdHash = sdHash,
+                transactionData = transactionData.orEmpty().toList(),
+            )
+            context.authorizer.authorize(presentation)
+        }
         val kbJwtPayload = buildJsonObject {
+            if (scaContext != null) {
+                put("jti", UuidUtils.randomUUIDString())
+                put("response_mode", Json.encodeToJsonElement(scaContext.responseMode))
+                put("amr", requireNotNull(authentication).toJson())
+            }
             put("aud", JsonPrimitive(audience))
             put("nonce", JsonPrimitive(nonce))
             put("iat", JsonPrimitive(Clock.System.now().epochSeconds))
