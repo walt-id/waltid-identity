@@ -26,8 +26,6 @@ data class Issuer2ServiceConfig(
     val keyAttestationConfig: KeyAttestationConfig? = null,
     /** Optional dedicated metadata signer, separate from token and credential signing. */
     val signedMetadata: SignedMetadataConfig? = null,
-    /** Advertises and serves the OpenID4VCI notification endpoint. This is issuer metadata, not a wallet setting. */
-    val notificationEndpointEnabled: Boolean = true,
 ) : WaltConfig() {
     /** Preserves the full JVM constructor from before metadata signing configuration. */
     constructor(
