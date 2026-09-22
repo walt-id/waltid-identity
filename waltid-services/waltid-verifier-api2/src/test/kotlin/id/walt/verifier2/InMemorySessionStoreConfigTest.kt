@@ -142,6 +142,11 @@ class InMemorySessionStoreConfigTest {
             """.trimIndent() + "\n" + extraLines + "\n"
         )
         System.setProperty("config.file.verifier-service", configFile.toString())
+        // Cleared first, because ConfigManager is process-wide and rejects a second registration of the same name
+        // with "A configuration with the name ... already exists". Another test class in the same JVM registers
+        // verifier-service too, so this passed when run alone and failed in the suite - the registration order is
+        // not this test's business, and depending on it would make the failure reappear at random.
+        ConfigManager.preclear()
         ConfigManager.registerConfig("verifier-service", OSSVerifier2ServiceConfig::class)
         ConfigManager.loadConfigs()
     }
