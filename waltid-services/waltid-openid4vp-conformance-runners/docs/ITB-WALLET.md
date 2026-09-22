@@ -196,11 +196,12 @@ Consequently, the deployed workflow needs a browser interaction bridge or a
 test-suite interaction handler in addition to REST orchestration. Do not create
 a separate issuer offer and report it as the ITB session's wallet interaction.
 
-The complete development baseline and remaining blockers are documented in
-[ITB-BASELINE.md](ITB-BASELINE.md). Those runs exercised the production adapter
-with a Cua-driven portal bridge; they do not qualify the standalone Playwright
-CLI or hosted workflow. The combined CLI/CI entry points must still be exercised
-on the final build before this draft is considered ready.
+The standalone CLI results and remaining blockers are documented in
+[ITB-BASELINE.md](ITB-BASELINE.md). The CLI now runs against the authenticated
+tenant and records terminal reports. Four REST-started DC API cases terminate
+before a wallet interaction is available; they remain failures, not wallet
+qualification. The hosted live workflow still needs its first execution after
+default-branch registration. Keep the PR draft while these gaps remain.
 
 The reference issuer's [credential metadata](https://dss.aegean.gr/rfc-issuer/.well-known/openid-credential-issuer)
 and [authorization-server metadata](https://dss.aegean.gr/rfc-issuer/.well-known/oauth-authorization-server)
