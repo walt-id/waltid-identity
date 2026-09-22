@@ -139,6 +139,49 @@ class SanDnsTests {
         assertEquals(ClientIdError.MissingX509TrustAnchors, result.error)
     }
 
+    @Test
+    fun `x509_san_dns reports a chain that does not reach a configured anchor`() = runTest {
+        val sigAlg = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
+        val issuerKey = genKey("issuer")
+        val issuer = X509CertificateUtil.createSelfSignedCertificate(issuerKey, sigAlg) {
+            subjectDn = "cn=Unpinned Issuer"
+            extensionBasicConstraints { cA = true }
+        }
+        val leafKey = genKey("unpinned-leaf")
+        val leaf = X509CertificateUtil.createCertificate(issuerKey, issuer, sigAlg) {
+            subjectDn = "cn=verifier.example.com"
+            subjectPublicKey(leafKey)
+            extensionKeyUsage { addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature) }
+            extensionExtendedKeyUsage { addKeyUsage("1.3.6.1.5.5.7.3.2") }
+            extensionSan { addDnsName("verifier.example.com") }
+        }
+        val otherAnchorKey = genKey("other-anchor")
+        val otherAnchor = X509CertificateUtil.createSelfSignedCertificate(otherAnchorKey, sigAlg) {
+            subjectDn = "cn=Other Anchor"
+            extensionBasicConstraints { cA = true }
+        }
+        val requestObject = CompactJws.sign(
+            "{}".encodeToByteArray(),
+            leafKey,
+            JwsAlgorithm.ES256,
+            buildJsonObject {
+                put("x5c", JsonArray(listOf(JsonPrimitive(Base64.Default.encode(leaf.encodedDer.toByteArray())))))
+            },
+        )
+        val context = RequestContext(
+            clientId = "x509_san_dns:verifier.example.com",
+            clientMetadataString = validMetadataJson,
+            requestObjectJws = requestObject,
+        )
+        val clientId = X509SanDns("verifier.example.com", context.clientId)
+        val trust = ClientIdTrustConfiguration(x509TrustAnchors = InMemoryTrustStore(listOf(otherAnchor)))
+
+        val failure = assertIs<ClientValidationResult.Failure>(
+            clientId.authenticateX509SanDns(clientId, context, trust)
+        )
+        assertEquals(ClientIdError.X509TrustAnchorMismatch, failure.error)
+    }
+
     /**
      * Builds a leaf certificate for [dnsName] plus the root that signed it, and a request object
      * signed with the leaf key - the shape an `x509_san_dns` verifier sends.
