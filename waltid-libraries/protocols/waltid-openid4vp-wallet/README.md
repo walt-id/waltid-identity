@@ -268,6 +268,30 @@ class WalletService(
 | mdoc | `mso_mdoc` | ✅ Supported | Builds SessionTranscript and DeviceAuth |
 | LDP VC | `ldp_vc` | ❌ Not Supported | Placeholder for future implementation |
 
+### TS12 payment authentication
+
+SD-JWT presentations bound to `urn:eudi:sca:payment:1` require an explicit
+`ScaPresentationAuthorizer` through the `buildVpToken` overload. After the application
+has authenticated the request and approved the selected credentials, this callback
+must authenticate the exact presentation and return the methods actually used.
+It receives the credential and key identifiers, audience, nonce, response mode,
+SD-JWT hash and exact encoded transaction data. Throw on denial, cancellation or
+insufficient evidence; do not derive methods merely from a configured key policy
+or accept them from the verifier/request body.
+
+The presenter adds a fresh cryptographically random `jti`, the request's
+`response_mode`, and typed `amr` containing at least two distinct categories.
+Existing transaction hash and algorithm binding is preserved. The profile is defined by
+[TS12 sections 3.6 and 4.2](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/9090fe29d715d9818b0189fd60cee7f14fc5bb68/docs/technical-specifications/ts12-electronic-payments-SCA-implementation-with-wallet.md#36-presentation-response).
+Ordinary SD-JWT presentations retain their existing behavior.
+
+**Integration boundary:** no default authentication provider is supplied. Existing
+entry points without an authorizer reject TS12 payment presentation before signing.
+The higher-level wallet/mobile adapters and headless ITB runner do not yet supply
+this evidence. A successful protocol test with simulated methods does not establish
+real user authentication, factor independence, WSCD qualification, or native SCA
+conformance. Platform key-use enforcement remains mandatory and separate.
+
 ### Holder Policies (Optional)
 
 You can integrate holder policies to control credential presentation:
