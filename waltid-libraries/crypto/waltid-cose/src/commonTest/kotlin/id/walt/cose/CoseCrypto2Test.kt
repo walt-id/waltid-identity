@@ -50,6 +50,47 @@ class CoseCrypto2Test {
     }
 
     @Test
+    fun `fully specified ESP256 signs and verifies without weakening the algorithm allowlist`() = runTest {
+        val key = generate(KeySpec.Ec(EcCurve.P256))
+        val signed = CoseSign1.createAndSignDetached(
+            protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ESP256),
+            detachedPayload = "reader-authentication".encodeToByteArray(),
+            key = key,
+        )
+
+        assertTrue(
+            signed.verifyDetached(
+                key,
+                "reader-authentication".encodeToByteArray(),
+                Cose.Algorithm.ESP256,
+            )
+        )
+        assertFails {
+            signed.verifyDetached(
+                key,
+                "reader-authentication".encodeToByteArray(),
+                Cose.Algorithm.ES256,
+            )
+        }
+        assertFails {
+            CoseSign1.createAndSignDetached(
+                protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ESP384),
+                detachedPayload = byteArrayOf(),
+                key = key,
+            )
+        }
+    }
+
+    @Test
+    fun `fully specified algorithm identifiers match RFC 9864`() {
+        assertEquals(-9, Cose.Algorithm.ESP256)
+        assertEquals(-51, Cose.Algorithm.ESP384)
+        assertEquals(-52, Cose.Algorithm.ESP512)
+        assertEquals(-19, Cose.Algorithm.Ed25519)
+        assertEquals(-53, Cose.Algorithm.Ed448)
+    }
+
+    @Test
     fun `EdDSA and RSA-PSS use protected algorithms`() = runTest {
         val ed = generate(KeySpec.Edwards(EdwardsCurve.ED25519))
         val rsa = generate(KeySpec.Rsa(2048))

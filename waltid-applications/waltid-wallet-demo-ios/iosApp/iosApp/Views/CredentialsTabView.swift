@@ -13,12 +13,11 @@ struct CredentialsTabView: View {
     @State private var motionGeneration = 0
     @State private var confirmDelete = false
 
-    private var details: [CredentialDetails] {
-        viewModel.credentials.map(CredentialDisplayNormalizer.details(for:))
-    }
+    @State private var cards: [CredentialCardItem] = []
+    @State private var expanded: CredentialDetails?
 
-    private var expanded: CredentialDetails? {
-        details.first { $0.id == selectedDetailsID }
+    private var selectedCredential: Credential? {
+        viewModel.credentials.first { $0.id == selectedDetailsID }
     }
 
     private var expandedRawCredential: String {
@@ -38,11 +37,19 @@ struct CredentialsTabView: View {
                         }
                     }
 
-                    if details.isEmpty {
+                    if !viewModel.isReady {
+                        if viewModel.isLoading {
+                            ProgressView("Loading credentials…")
+                                .accessibilityIdentifier(WalletAccessibilityID.credentialsLoading)
+                        }
+                    } else if viewModel.credentials.isEmpty {
                         EmptyCredentialsView()
+                    } else if cards.isEmpty {
+                        ProgressView("Loading credentials…")
+                            .accessibilityIdentifier(WalletAccessibilityID.credentialsLoading)
                     } else {
                         CredentialCardStackView(
-                            details: details,
+                            cards: cards,
                             expandedID: selectedDetailsID,
                             othersHidden: othersHidden,
                             selectedAtTop: selectedAtTop
@@ -57,6 +64,8 @@ struct CredentialsTabView: View {
                         if showDetailsBody, let expanded {
                             CredentialDetailsView(details: expanded)
                             .transition(.opacity)
+                        } else if showDetailsBody, selectedCredential != nil {
+                            ProgressView("Loading details…")
                         }
                     }
                 }
@@ -136,6 +145,19 @@ struct CredentialsTabView: View {
             }
         }
         .navigationViewStyle(.stack)
+        .task(id: viewModel.credentials) {
+            cards = []
+            let snapshot = await CredentialDisplayNormalizer.cards(for: viewModel.credentials)
+            guard !Task.isCancelled else { return }
+            cards = snapshot
+        }
+        .task(id: selectedCredential) {
+            expanded = nil
+            guard let selectedCredential else { return }
+            let snapshot = await CredentialDisplayNormalizer.details(for: [selectedCredential])
+            guard !Task.isCancelled else { return }
+            expanded = snapshot.first
+        }
     }
 
     private func openDetails(_ id: String) {

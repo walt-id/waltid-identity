@@ -693,6 +693,7 @@ class WalletDemoControllerTest {
         runCurrent()
         assertTrue(pinStore.hasPin())
         controller.setShowDcApiPresentationPreview(false)
+        controller.setProximityTransportProfile(WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct)
 
         controller.resetWallet()
         runCurrent()
@@ -703,6 +704,14 @@ class WalletDemoControllerTest {
         assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
         assertFalse(controller.state.value.showDcApiPresentationPreview)
         assertFalse(sharingSettings.showDcApiPresentationPreview())
+        assertEquals(
+            WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct,
+            controller.state.value.proximityTransportProfile,
+        )
+        assertEquals(
+            WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct,
+            sharingSettings.proximityTransportProfile(),
+        )
     }
 
     @Test
@@ -717,6 +726,26 @@ class WalletDemoControllerTest {
 
         val recreatedController = controllerWith(FakeDemoWallet(), this, sharingSettings = sharingSettings)
         assertFalse(recreatedController.state.value.showDcApiPresentationPreview)
+    }
+
+    @Test
+    fun proximityTransportProfilePersistsAcrossControllerRecreation() = runTest {
+        val sharingSettings = InMemoryDemoSharingSettingsStore()
+        val firstController = controllerWith(FakeDemoWallet(), this, sharingSettings = sharingSettings)
+        assertEquals(
+            WalletDemoProximityTransportProfile.Default,
+            firstController.state.value.proximityTransportProfile,
+        )
+
+        firstController.setProximityTransportProfile(
+            WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid,
+        )
+
+        val recreatedController = controllerWith(FakeDemoWallet(), this, sharingSettings = sharingSettings)
+        assertEquals(
+            WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid,
+            recreatedController.state.value.proximityTransportProfile,
+        )
     }
 
     @Test
@@ -742,6 +771,29 @@ class WalletDemoControllerTest {
             setup.error,
         )
         assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
+    }
+
+    @Test
+    fun resetWalletKeepsSessionWhenDeleteFails() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        wallet.deleteWalletError = IllegalStateException("HTTP 500")
+        val controller = unlockedControllerWith(wallet, this)
+        assertTrue(controller.state.value.session is WalletSessionState.Ready)
+
+        controller.resetWallet()
+        runCurrent()
+
+        assertEquals(1, wallet.deleteWalletCalls)
+        assertEquals(listOf(sampleCredential), wallet.credentials)
+        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+        assertTrue(controller.state.value.session is WalletSessionState.Ready)
+        assertEquals(
+            WalletOperationState.Failed(
+                WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, "HTTP 500"),
+                WalletDemoTab.Credentials,
+            ),
+            controller.state.value.operation,
+        )
     }
 
     @Test
@@ -968,6 +1020,63 @@ class WalletDemoControllerTest {
         assertFalse(controller.state.value.receiveCompleted)
         assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
         assertEquals(null, controller.state.value.offerPreview)
+    }
+
+    @Test
+    fun httpErrorAuthorizationCallbackIsDispatched() = runTest {
+        val wallet = FakeDemoWallet(
+            issuanceGrant = WalletDemoIssuanceGrant.AuthorizationCode,
+            authorizationOutcome = WalletDemoIssuanceOutcome.Cancelled,
+        )
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://authorization-code")
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
+        runCurrent()
+        controller.authorizationRequestOpened()
+        controller.handleDeepLink("http://localhost:7106/?error=access_denied&state=state-1")
+        runCurrent()
+
+        assertEquals(
+            listOf("http://localhost:7106/?error=access_denied&state=state-1"),
+            wallet.authorizationCallbackUris,
+        )
+        assertEquals(null, controller.state.value.offerPreview)
+        assertEquals("", controller.state.value.requestDrafts.offerUrl)
+        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
+        assertTrue(controller.state.value.receiveUrlEntryEnabled)
+        assertEquals(
+            WalletOperationState.Succeeded(
+                WalletDisplayText.CredentialOfferDeclined,
+                WalletDemoTab.Receive,
+            ),
+            controller.state.value.operation,
+        )
+        assertEquals(WalletDisplayText.CredentialOfferDeclined, controller.state.value.statusText)
+    }
+
+    @Test
+    fun preAuthorizedCancellationDeclinesOfferInsteadOfReceiveFailed() = runTest {
+        val wallet = FakeDemoWallet(preAuthorizedOutcome = WalletDemoIssuanceOutcome.Cancelled)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
+        runCurrent()
+
+        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
+        assertEquals(
+            WalletOperationState.Succeeded(
+                WalletDisplayText.CredentialOfferDeclined,
+                WalletDemoTab.Receive,
+            ),
+            controller.state.value.operation,
+        )
+        assertEquals(WalletDisplayText.CredentialOfferDeclined, controller.state.value.statusText)
     }
 
     @Test
@@ -2288,6 +2397,7 @@ private class FakeDemoWallet(
     val rejectedPresentationPreviewHandles = mutableListOf<WalletDemoPresentationPreviewHandle>()
     val deletedCredentialIds = mutableListOf<String>()
     var deleteWalletCalls = 0
+    var deleteWalletError: Throwable? = null
 
     override suspend fun bootstrap(
         signingProtection: WalletDemoSigningProtection,
@@ -2424,6 +2534,7 @@ private class FakeDemoWallet(
 
     override suspend fun deleteWallet() {
         deleteWalletCalls += 1
+        deleteWalletError?.let { throw it }
         credentials = emptyList()
     }
 }

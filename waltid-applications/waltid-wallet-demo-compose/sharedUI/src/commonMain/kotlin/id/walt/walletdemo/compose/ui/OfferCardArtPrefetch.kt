@@ -4,6 +4,7 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
+import id.walt.walletdemo.compose.ui.components.RasterImageSupport
 
 /**
  * Downloads offered-credential background images into the Coil cache before Review is shown.
@@ -18,9 +19,9 @@ suspend fun prefetchOfferCardArt(
     val loader = SingletonImageLoader.get(context)
     preview.offeredCredentials
         .mapNotNull { credential ->
-            credential.display?.backgroundImageUri?.takeIf { uri ->
-                uri.trim().startsWith("https://", ignoreCase = true)
-            }
+            credential.display?.backgroundImageUri?.takeIf(
+                RasterImageSupport::isHttpsDisplayImageUrl,
+            )
         }
         .distinct()
         .forEach { uri ->

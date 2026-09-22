@@ -35,6 +35,12 @@ class WalletDemoAppAndroidTest {
         scenarios.credentialsTabShowsCompactCardsAndNavigatesToDetails()
 
     @Test
+    fun credentialsTabWaitsForCredentialRead() = scenarios.credentialsTabWaitsForCredentialRead()
+
+    @Test
+    fun credentialsTabDoesNotShowEmptyOnLoadFailure() = scenarios.credentialsTabDoesNotShowEmptyOnLoadFailure()
+
+    @Test
     fun credentialsTabShowsEmptyStateAndUpdatesAfterReceive() =
         scenarios.credentialsTabShowsEmptyStateAndUpdatesAfterReceive()
 
@@ -65,6 +71,10 @@ class WalletDemoAppAndroidTest {
     @Test
     fun receiveAndPresentTabsExposeQrScanActions() =
         scenarios.receiveAndPresentTabsExposeQrScanActions()
+
+    @Test
+    fun embeddedPresentationJourneyKeepsWalletChrome() =
+        scenarios.embeddedPresentationJourneyKeepsWalletChrome()
 
     @Test
     fun presentTabAllowsPreviewAndDeclineWithoutCredentials() =
@@ -123,8 +133,16 @@ class WalletDemoAppAndroidTest {
         scenarios.customBrandingTitleAppearsInTheHeader()
 
     @Test
+    fun sharingApprovalPreferenceIsConsistentAndPersistsAcrossJourneys() =
+        scenarios.sharingApprovalPreferenceIsConsistentAndPersistsAcrossJourneys()
+
+    @Test
     fun settingsReplacesHeaderLockAndShowsDidAndKey() =
         scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
+
+    @Test
+    fun readerTrustSettingsReviewAndPersistPublicCa() =
+        scenarios.readerTrustSettingsReviewAndPersistPublicCa()
 
     @Test
     fun lockDoesNotAutoPromptBiometrics() =

@@ -50,6 +50,11 @@ dependencies:
     repository: "file://../common"
 
   - name: common
+    alias: wallet2
+    version: 0.1.0
+    repository: "file://../common"
+
+  - name: common
     alias: portal
     version: 0.1.0
     repository: "file://../common"

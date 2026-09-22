@@ -155,7 +155,7 @@ class Issuer2CredentialOfferEndpointTest {
     fun bundledPortraitProfilesProduceTaggedCaptureTimestamps() {
         val serviceConfig = issuer2ConfigDir()
         val dockerConfig = serviceConfig.parent.parent.parent.resolve("docker-compose/issuer-api2/config/issuer2-profiles.conf")
-        for ((profileFile, expectedCount) in listOf(serviceConfig.resolve("issuer2-profiles.conf") to 4, dockerConfig to 3)) {
+        for ((profileFile, expectedCount) in listOf(serviceConfig.resolve("issuer2-profiles.conf") to 2, dockerConfig to 2)) {
             loadIssuer2ConfigFiles(profileFile)
             var checked = 0
             for ((profileId, profile) in ConfigManager.getConfig<Issuer2ProfilesConfig>().profiles) {
@@ -193,7 +193,7 @@ class Issuer2CredentialOfferEndpointTest {
             client.getProfile(ISO_MDL_PROFILE_ID),
             client.getProfile(ISO_PHOTO_ID_PROFILE_ID),
             client.getProfile(IDENTITY_SD_JWT_PROFILE_ID),
-            client.getProfile(TAX_ID_SD_JWT_PROFILE_ID),
+            client.getProfile(EHIC_SD_JWT_PROFILE_ID),
         )
 
         representativeProfiles.forEach { profile ->
@@ -1024,7 +1024,7 @@ class Issuer2CredentialOfferEndpointTest {
         const val ISO_PHOTO_ID_COMMON_NAMESPACE_ID = "org.iso.23220.1"
         const val ISO_PHOTO_ID_CONFIGURATION_ID = "org.iso.23220.photoid.1"
         const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
-        const val TAX_ID_SD_JWT_PROFILE_ID = "taxIdCredentialSdJwt"
+        const val EHIC_SD_JWT_PROFILE_ID = "ehicSdJwt"
         const val EU_AGE_VERIFICATION_PROFILE_ID = "euAgeVerificationMdoc"
         const val SCA_PAYMENT_TRANSACTION_DATA_TYPE = "urn:eudi:sca:payment:1"
         const val TX_CODE_VALUE = "123456"

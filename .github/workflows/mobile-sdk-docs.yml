@@ -29,25 +29,33 @@ on:
         required: false
         type: boolean
         default: true
-      restore-wallet-core-artifact:
-        description: "Download the WalletCore XCFramework produced by the consumer job"
+      wallet-core-artifact:
+        description: "Same-run full release WalletCore artifact from the framework producer"
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: ''
+      checkout-refs:
+        description: "Exact coordinated revisions resolved by the framework producer"
+        required: false
+        type: string
+        default: ''
 
 jobs:
   linux-sdk-docs:
     if: ${{ inputs.generate-linux-docs }}
     runs-on: ubuntu-22.04
+    timeout-minutes: 55
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
+          identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
+          resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Check mobile SDK documentation snippets
         working-directory: waltid-identity
@@ -67,39 +75,32 @@ jobs:
   mobile-sdk-docs:
     if: ${{ github.event_name == 'workflow_dispatch' || inputs.generate-macos-docs }}
     runs-on: macos-26
+    timeout-minutes: 80
     env:
-      XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
+          identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
+          resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
-      - name: Restore WalletCore XCFramework
-        if: ${{ inputs.restore-wallet-core-artifact }}
-        uses: actions/download-artifact@v4
+      - name: Restore the shared release framework
+        if: ${{ inputs.wallet-core-artifact != '' }}
+        uses: actions/download-artifact@v8
         with:
-          name: wallet-core-release-xcframework
-          # upload-artifact v4 stores the *contents* of WalletCore.xcframework at the
-          # artifact root. Download into that directory so Info.plist and slices land
-          # under WalletCore.xcframework/, not beside it.
-          path: waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework
+          name: ${{ inputs.wallet-core-artifact }}
+          path: ${{ runner.temp }}/wallet-core-artifact
 
-      - name: Detect restored WalletCore XCFramework
-        id: restore-wallet-core
-        run: |
-          xcframework="waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework"
-          if [[ -d "$xcframework" ]]; then
-            echo "skip_assemble=true" >> "$GITHUB_OUTPUT"
-            echo "Reusing WalletCore XCFramework from the consumer job artifact."
-          else
-            echo "skip_assemble=false" >> "$GITHUB_OUTPUT"
-            echo "No WalletCore artifact present; this job will assemble it."
-          fi
+      - name: Verify the shared release framework
+        if: ${{ inputs.wallet-core-artifact != '' }}
+        working-directory: waltid-identity
+        run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
 
       - name: Check mobile SDK API contract
         timeout-minutes: 20
@@ -125,10 +126,10 @@ jobs:
         uses: ./waltid-identity/.github/actions/gradle-mobile-sdk-docs
         with:
           waltid-directory: 'waltid-identity'
-          xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
+          xcode-developer-dir: ${{ env.DEVELOPER_DIR }}
           generate-dokka: true
           check-snippets: ${{ inputs.generate-linux-docs && 'false' || 'true' }}
-          skip-wallet-core-assemble: ${{ steps.restore-wallet-core.outputs.skip_assemble }}
+          skip-wallet-core-assemble: ${{ inputs.wallet-core-artifact != '' && 'true' || 'false' }}
 
       - name: Collect generated HTML
         if: ${{ inputs.deploy }}
@@ -172,7 +173,7 @@ jobs:
             WalletSDK.doccarchive
 
       - name: Upload Swift WalletSDK DocC archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: walletsdk-doccarchive
           path: waltid-identity/waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc/WalletSDK.doccarchive.tar.gz
@@ -184,14 +185,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout waltid-identity
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: waltid-identity
           sparse-checkout: docs/mobile-sdk-api
 
       - name: Download SDK docs HTML artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: sdk-docs-html
           path: waltid-identity/docs/mobile-sdk-api/html
@@ -208,11 +209,11 @@ jobs:
       - name: Generate Docker tags
         id: tags
         run: |
-          TAGS="waltid/waltid-sdk-docs:${{ inputs.version }}, waltid/waltid-sdk-docs:latest"
+          TAGS="waltid/waltid-sdk-docs:${{ inputs.version }}"
           for tag in $(echo '${{ inputs.tags }}' | jq -r '.[]'); do
             TAGS="$TAGS, waltid/waltid-sdk-docs:$tag"
           done
-          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
 
       - name: Build and push sdk-docs image
         uses: docker/build-push-action@v7

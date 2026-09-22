@@ -60,12 +60,16 @@ val modules = listOfNotNull(
         "waltid-mdoc-credentials",
         "waltid-dif-definitions-parser",
         "waltid-dcql",
+        "waltid-status-list",
         "waltid-verification-policies",
         "waltid-verification-policies2",
         "waltid-verification-policies2-vp",
         "waltid-holder-policies",
         "waltid-vical",
         "waltid-mdoc-credentials2",
+        "waltid-mdoc-proximity",
+        "waltid-mdoc-proximity-mobile" whenEnabled enableAndroidBuild,
+        "waltid-mdoc-proximity-mobile" whenEnabled enableIosBuild,
         "waltid-trust-registry"
     ),
 

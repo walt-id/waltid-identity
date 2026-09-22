@@ -346,7 +346,7 @@ private suspend fun awaitCompletion(stage: CompletionStage<*>?, operation: Strin
     requireNotNull(stage) { "$operation returned a null CompletionStage" }.await()
 }
 
-private fun SignatureAlgorithm.toJava(): JavaSignatureAlgorithm = when (this) {
+internal fun SignatureAlgorithm.toJava(): JavaSignatureAlgorithm = when (this) {
     is SignatureAlgorithm.Ecdsa -> JavaSignatureAlgorithm.ecdsa(
         JavaDigestAlgorithm(digest.name),
         encoding.name,
@@ -361,7 +361,7 @@ private fun SignatureAlgorithm.toJava(): JavaSignatureAlgorithm = when (this) {
     is SignatureAlgorithm.Custom -> JavaSignatureAlgorithm.custom(id, parameters)
 }
 
-private fun JavaSignatureAlgorithm.toKotlin(): SignatureAlgorithm = when (type) {
+internal fun JavaSignatureAlgorithm.toKotlin(): SignatureAlgorithm = when (type) {
     JavaSignatureAlgorithm.Type.ECDSA -> SignatureAlgorithm.Ecdsa(
         DigestAlgorithm(requireNotNull(digest).name),
         EcdsaSignatureEncoding.valueOf(requireNotNull(encoding)),
@@ -424,7 +424,7 @@ private fun JavaNamedAlgorithm.toKeyWrapping(): KeyWrappingAlgorithm = when (typ
     JavaNamedAlgorithm.Type.CUSTOM -> KeyWrappingAlgorithm.Custom(id, parameters)
 }
 
-private fun KeySpec.toJava(): JavaKeySpec = when (this) {
+internal fun KeySpec.toJava(): JavaKeySpec = when (this) {
     is KeySpec.Ec -> JavaKeySpec.ec(curve.name)
     is KeySpec.Edwards -> JavaKeySpec.edwards(curve.name)
     is KeySpec.Montgomery -> JavaKeySpec.montgomery(curve.name)
@@ -433,7 +433,7 @@ private fun KeySpec.toJava(): JavaKeySpec = when (this) {
     is KeySpec.Custom -> JavaKeySpec.custom(family, parameters)
 }
 
-private fun JavaKeySpec.toKotlin(): KeySpec = when (type) {
+internal fun JavaKeySpec.toKotlin(): KeySpec = when (type) {
     JavaKeySpec.Type.EC -> KeySpec.Ec(EcCurve(requireNotNull(name)))
     JavaKeySpec.Type.EDWARDS -> KeySpec.Edwards(EdwardsCurve(requireNotNull(name)))
     JavaKeySpec.Type.MONTGOMERY -> KeySpec.Montgomery(MontgomeryCurve(requireNotNull(name)))

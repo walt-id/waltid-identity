@@ -129,6 +129,8 @@ portal2:
     NUXT_PUBLIC_ISSUER_BASE: "https://issuer2.portal.test.waltid.cloud"
     NUXT_PUBLIC_VERIFIER_BASE: "https://verifier2.portal.test.waltid.cloud"
     NUXT_PUBLIC_WALLET_URL: "https://wallet.test.waltid.cloud"
+  envFromSecrets:
+    - portal2-pid-secret
   ingress:
     ingressClassName: "traefik"
     clusterIssuer: letsencrypt-prod
@@ -197,6 +199,17 @@ wallet-api2:
       imagePullPolicy: Always
   configMountPath: /waltid-wallet-api2/config
   configFiles:
+    _features.conf: |-
+      enabledFeatures = [
+          auth
+          wallet2-persistence
+      ]
+    auth.conf: |-
+      signingKey = {"type":"jwk","jwk":{"kty":"EC","crv":"P-256","d":"G9s272WjWjiX0KhIc1qaDAQnUqfN5VXlkw3Os5Y9sJk","x":"zVLtcoaSJrUhZptr2BY4TuRs-IAROGeePcWCbKB0PyI","y":"TPKVrmDZdDsDj1kdqQD_sCEqVfjSC4sRcCUTPvAClGs"}}
+      tokenExpiry = "PT24H"
+    wallet2-persistence.conf: |
+      jdbcUrl = "jdbc:sqlite:/waltid-wallet-api2/data/wallet2.db"
+      driverClassName = "org.sqlite.JDBC"
     wallet-service.conf: |-
       publicBaseUrl = "https://{{ .Values.ingress.host }}"
       attestationConfig {
@@ -212,10 +225,43 @@ wallet-api2:
     storageClass: gp3-retain
     storageRequest: 1Gi
   ingress:
+    enabled: false
+    host: wallet2.test.waltid.cloud
+
+wallet2:
+  api:
+    containerPort: 8080
+    image:
+      repository: waltid/wallet-demo-compose-web
+      tag: latest
+      imagePullPolicy: Always
+  env:
+    WALLET_API2_PUBLIC_URL: "https://wallet2.test.waltid.cloud"
+  ingress:
     ingressClassName: "traefik"
     clusterIssuer: letsencrypt-prod
     tls:
       - hosts:
-          - wallet-api2.portal.test.waltid.cloud
-        secretName: wallet-api2-tls-secret
-    host: wallet-api2.portal.test.waltid.cloud
+          - wallet2.test.waltid.cloud
+        secretName: wallet2-tls-secret
+    host: wallet2.test.waltid.cloud
+    # wallet-api2's own route prefixes. No trailing slash on /wallet: the SPA calls the bare
+    # `GET /wallet` and `POST /wallet` as well as /wallet/<id>/...
+    extraPaths:
+      - path: /wallet
+        service: wallet-api2
+      - path: /auth
+        service: wallet-api2
+      - path: /transaction-data-profiles
+        service: wallet-api2
+      - path: /swagger
+        service: wallet-api2
+      - path: /api.json
+        pathType: ImplementationSpecific
+        service: wallet-api2
+      - path: /livez
+        service: wallet-api2
+      - path: /features
+        service: wallet-api2
+      - path: /debug
+        service: wallet-api2

@@ -21,6 +21,9 @@ import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 import id.walt.wallet2.persistence.stores.SqlDelightIssuanceSessionStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
+import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
+import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -154,6 +157,9 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
     clientIdTrustConfiguration: ClientIdTrustConfiguration,
     managedDatabaseKeyProvider: DatabaseEncryptionKeyProvider,
     platformKeyProvider: PlatformManagedKeyProvider,
+    proximityTransportFactory: BleProximityTransportFactory,
+    proximityNfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
+    proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     openEncryptedDriver: (
         databaseName: String,
         encryptionKey: DatabaseEncryptionKey,
@@ -161,6 +167,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
         walletId: String,
     ) -> SqlDriver,
     deleteDatabase: (databaseName: String) -> Unit,
+    registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
 ): MobileWallet {
     val databaseName = "wallet_${config.walletId}"
     val databaseKeyProvider = when (val databaseKey = config.persistence.databaseKey) {
@@ -180,6 +187,10 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
         clientIdTrustConfiguration = clientIdTrustConfiguration,
         db = db,
         keyProvider = platformKeyProvider,
+        registrationProjection = registrationProjection,
+        proximityTransportFactory = proximityTransportFactory,
+        proximityNfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
+        proximityWifiAwareTransportFactory = proximityWifiAwareTransportFactory,
         deleteLocalPersistence = {
             runCatching { driver.close() }
             deleteDatabase(databaseName)
@@ -193,8 +204,12 @@ internal fun createSqlDelightMobileWallet(
     clientIdTrustConfiguration: ClientIdTrustConfiguration,
     db: WalletPersistenceDatabase,
     keyProvider: PlatformManagedKeyProvider,
+    proximityTransportFactory: BleProximityTransportFactory? = null,
+    proximityNfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
+    proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     didService: Crypto2DidService = Crypto2DidService,
     deleteLocalPersistence: suspend () -> Unit,
+    registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
 ): MobileWallet {
     val queries = db.walletPersistenceQueries
     val keyStore = SqlDelightKeyStore(keyProvider, queries)
@@ -239,8 +254,12 @@ internal fun createSqlDelightMobileWallet(
         credentialIssuerMetadataTrustResolver = config.credentialIssuerMetadataTrustResolver,
         onEvent = config.onEvent,
         credentialRegistry = config.credentialRegistry,
+        registrationProjection = registrationProjection,
         onDigitalCredentialRegistryChanged = config.onDigitalCredentialRegistryChanged,
         readerTrustEvaluator = config.readerTrustEvaluator,
+        proximityTransportFactory = proximityTransportFactory,
+        proximityNfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
+        proximityWifiAwareTransportFactory = proximityWifiAwareTransportFactory,
         deleteLocalPersistence = deleteLocalPersistence,
     )
 }

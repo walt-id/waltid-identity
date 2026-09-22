@@ -17,6 +17,14 @@ inputs:
     description: 'If set to "yes", checkout waltid-unified-build to its repo name instead of "."'
     required: false
     default: "false"
+  identity-sha:
+    description: 'Optional exact Identity commit; companion repositories still use ref fallback'
+    required: false
+    default: ''
+  resolved-refs:
+    description: 'Optional JSON object of exact unified, identity, enterprise and enterprise_license commit SHAs'
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -35,9 +43,28 @@ runs:
       env:
         REF: ${{ inputs.ref }}
         TOKEN: ${{ inputs.token }}
+        IDENTITY_SHA: ${{ inputs.identity-sha }}
+        RESOLVED_REFS: ${{ inputs.resolved-refs }}
       run: |
         resolve_ref() {
           local repo="$1" needs_token="$2" key="$3"
+          if [ -n "$RESOLVED_REFS" ]; then
+            local sha
+            sha=$(jq -er --arg key "$key" '.[$key] | select(type == "string") | select(test("^[0-9a-f]{40}$"))' <<< "$RESOLVED_REFS") || {
+              echo "::error::Missing or invalid resolved commit for $key"
+              return 1
+            }
+            echo "${key}=$sha" >> "$GITHUB_OUTPUT"
+            return
+          fi
+          if [ "$key" = "identity" ] && [ -n "$IDENTITY_SHA" ]; then
+            if [[ ! "$IDENTITY_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Invalid Identity commit"
+              return 1
+            fi
+            echo "identity=$IDENTITY_SHA" >> "$GITHUB_OUTPUT"
+            return
+          fi
           local url="https://github.com/${repo}.git"
           [ "$needs_token" = "true" ] && url="https://${TOKEN}@github.com/${repo}.git"
           if [ -n "$REF" ] && git ls-remote --exit-code "$url" "$REF"; then
@@ -52,7 +79,7 @@ runs:
         resolve_ref "walt-id/waltid-identity-enterprise-license" true enterprise_license
 
     - name: Checkout waltid-unified-build
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         repository: walt-id/waltid-unified-build
         ref: ${{ steps.refs.outputs.unified }}
@@ -60,7 +87,7 @@ runs:
         path: ${{ inputs.checkoutUnifiedToRepoDir == 'true' && 'waltid-unified-build' || '.' }}
 
     - name: Checkout waltid-identity
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         repository: walt-id/waltid-identity
         ref: ${{ steps.refs.outputs.identity }}
@@ -68,7 +95,7 @@ runs:
         path: waltid-identity
 
     - name: Checkout waltid-identity-enterprise
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         repository: walt-id/waltid-identity-enterprise
         ref: ${{ steps.refs.outputs.enterprise }}
@@ -76,7 +103,7 @@ runs:
         path: waltid-identity-enterprise
 
     - name: Checkout waltid-identity-enterprise-license
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         repository: walt-id/waltid-identity-enterprise-license
         ref: ${{ steps.refs.outputs.enterprise_license }}

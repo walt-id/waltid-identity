@@ -21,7 +21,6 @@ kotlin {
     if (enableWalletDemoComposeWeb) {
         wasmJs {
             browser()
-            binaries.executable()
         }
     }
 
@@ -37,7 +36,6 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedLogic"))
-            implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             implementation(identityLibs.compose.runtime)
             implementation(identityLibs.compose.foundation)
             implementation(identityLibs.compose.ui)
@@ -46,14 +44,18 @@ kotlin {
             implementation(identityLibs.compose.navigation3.ui)
             implementation(identityLibs.coil.compose)
             implementation(identityLibs.coil.network.ktor3)
+            implementation(identityLibs.coil.svg)
             implementation(compose.components.resources)
+            implementation(identityLibs.kotlinx.serialization.json)
         }
 
         if (enableAndroidBuild || enableIosBuild) {
             val mobileMain by creating {
                 dependsOn(commonMain.get())
                 dependencies {
+                    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
                     implementation(identityLibs.easyqrscan)
+                    implementation(identityLibs.kotlinx.datetime)
                 }
             }
 
@@ -63,11 +65,27 @@ kotlin {
                     // The system back gesture is registered against the host Activity's own
                     // dispatcher, so a provider surface can turn it into an Activity result.
                     implementation(identityLibs.androidx.activity.compose)
+                    implementation(identityLibs.zxing.core)
+                    implementation(identityLibs.androidx.core.ktx)
+                    implementation(identityLibs.androidx.lifecycle.runtime.ktx)
+                    implementation(identityLibs.androidx.lifecycle.runtime.compose)
                 }
             }
 
             if (enableIosBuild) {
-                iosMain.get().dependsOn(mobileMain)
+                iosMain.get().apply {
+                    dependsOn(mobileMain)
+                    dependencies {
+                        implementation(identityLibs.zxing.cpp.kotlin.native)
+                    }
+                }
+            }
+        }
+
+        if (enableWalletDemoComposeWeb) {
+            getByName("wasmJsMain").dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-browser:0.3")
+                implementation(identityLibs.kotlinx.coroutines.core)
             }
         }
 

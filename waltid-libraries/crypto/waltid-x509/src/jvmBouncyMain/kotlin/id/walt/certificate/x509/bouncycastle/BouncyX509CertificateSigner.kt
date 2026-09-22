@@ -18,6 +18,7 @@ import org.bouncycastle.asn1.x509.AlgorithmIdentifier
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
 import org.bouncycastle.cert.X509CertificateHolder
 import org.bouncycastle.cert.X509v3CertificateBuilder
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.ContentVerifierProvider
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder
 import org.bouncycastle.pkcs.PKCS10CertificationRequest
@@ -29,6 +30,9 @@ import id.walt.crypto.keys.Key as Crypto1Key
 class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
 
     override val name: String = "BouncyCastle"
+
+    // Certificate validation must work before any process-global provider registration.
+    private val verificationProvider = BouncyCastleProvider()
 
     override suspend fun convertKeyToPublicKeyInfo(key: Key): PublicKeyInfo =
         BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(key)
@@ -42,7 +46,7 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
         builder: X509CertificateDataBuilder
     ): X509Certificate {
         val issuerPublicKeyInfo = BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(issuerKey)
-        val subject = X500Name(builder.subjectDn)
+        val subject = builder.bouncySubject
         var issuer: X500Name? = null
 
         val subjectPublicKeyInfo =
@@ -75,7 +79,7 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
         builder: X509CertificateDataBuilder
     ): X509Certificate {
         val issuerPublicKeyInfo = BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(issuerKey)
-        val subject = X500Name(builder.subjectDn)
+        val subject = builder.bouncySubject
         var issuer: X500Name? = null
 
         val subjectPublicKeyInfo =
@@ -87,9 +91,12 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
                     val issuerDnRaw = builder.issuerDnRaw
                     require(issuerDnRaw.isNotEmpty()) { "Issuer DN must be set for non-self-signed certificates" }
                     issuer = X500Name.getInstance(issuerDnRaw.toByteArray())
-
-                    checkNotNull(subjectKeyBuilder.crypto1key) { "Certificate subject public key missing" }
-                    BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(subjectKeyBuilder.crypto1key)
+                    if (subjectKeyBuilder.spki != null) {
+                        subjectKeyBuilder.spki
+                    } else {
+                        checkNotNull(subjectKeyBuilder.crypto1key) { "Certificate subject public key missing" }
+                        BouncyPublicKeyInfoUtil.publicKeyInfoOfKey(subjectKeyBuilder.crypto1key)
+                    }
                 }
             }
 
@@ -124,7 +131,7 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
 
         // Build the verifier provider using the issuer's public key
         val verifierProvider: ContentVerifierProvider? = JcaContentVerifierProviderBuilder()
-            .setProvider("BC")
+            .setProvider(verificationProvider)
             .build(publicKey)
 
         return bouncyCertificate.isSignatureValid(verifierProvider)
@@ -142,7 +149,7 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
 
         // Build the provider-backed verifier using the public key embedded inside the CSR
         val verifierProvider: ContentVerifierProvider? = JcaContentVerifierProviderBuilder()
-            .setProvider("BC")
+            .setProvider(verificationProvider)
             .build(bouncyCsr.getSubjectPublicKeyInfo())
 
         // Cryptographically validate the signature
@@ -192,4 +199,12 @@ class BouncyX509CertificateSigner : X509CertificateSigner, SignatureValidator {
 
         return bouncyBuilder
     }
+
+    private val X509CertificateDataBuilder.bouncySubject: X500Name
+        get() = if (subjectDnRaw.isNotEmpty()) {
+            check(subjectDn.isEmpty()) { "Subject DN can be either set as string or raw, not both: '$subjectDn', '$subjectDnRaw'"}
+            X500Name.getInstance(subjectDnRaw.toByteArray())
+        } else {
+            X500Name(subjectDn)
+        }
 }

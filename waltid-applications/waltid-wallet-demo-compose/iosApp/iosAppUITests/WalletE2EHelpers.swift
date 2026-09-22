@@ -113,26 +113,32 @@ final class WalletE2EUI {
     }
 
     func latestStatus(prefixes: [String]) -> String? {
-        let tagged = app.descendants(matching: .any)["wallet.status"]
-        if tagged.exists {
-            let candidates = [tagged.label, tagged.value as? String]
-                .compactMap { $0 }
-                .filter { !$0.isEmpty }
+        // Read one snapshot: the status banner can disappear between live element queries.
+        let snapshot: any XCUIElementSnapshot
+        do {
+            snapshot = try app.snapshot()
+        } catch {
+            XCTFail("Could not capture wallet status: \(error)")
+            return nil
+        }
+
+        var pending = [snapshot]
+        var taggedValues: [String] = []
+        var labels: [String] = []
+        while let element = pending.popLast() {
+            if element.identifier == "wallet.status" {
+                taggedValues += [element.label, element.value as? String].compactMap { $0 }.filter { !$0.isEmpty }
+            }
+            if element.elementType == .staticText {
+                labels.append(element.label)
+            }
+            pending.append(contentsOf: element.children.reversed())
+        }
+        for candidates in [taggedValues, labels] {
             for prefix in prefixes {
                 if let match = candidates.first(where: { $0.hasPrefix(prefix) }) {
                     return match
                 }
-            }
-        }
-        for prefix in prefixes {
-            let predicate = NSPredicate(format: "label BEGINSWITH %@", prefix)
-            let query = app.staticTexts.matching(predicate)
-            // Avoid firstMatch.exists: on Xcode 26 a missing snapshot can fail the test
-            // instead of returning false, which aborted waitForStatus on a hidden banner.
-            guard query.count > 0 else { continue }
-            let match = query.element(boundBy: 0)
-            if match.exists {
-                return match.label
             }
         }
         return nil

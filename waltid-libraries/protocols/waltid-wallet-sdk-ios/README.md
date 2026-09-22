@@ -52,6 +52,20 @@ Then build or test the Swift facade:
 swift test --package-path waltid-libraries/protocols/waltid-wallet-sdk-ios -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
 ```
 
+Host Swift tests do not exercise the conditional WalletCore bridge. Run its package target on an
+explicit simulator from the Identity root:
+
+```bash
+.github/scripts/mobile-ci/run-ios-wallet-sdk-tests.sh 'platform=iOS Simulator,id=<simulator-UDID>'
+```
+
+The runner builds WalletCore from the selected checkout and separately compiles the same SDK sources
+with native flow/receipt fixtures under `build/bridge-fixtures`. These fixtures never enter the default
+framework or published API. The runner selects that test binary with `WALLET_SDK_BRIDGE_FIXTURES=1`,
+checks both framework headers, and requires the named review, approval, receipt, cancellation and
+error tests in JUnit results. Missing frameworks, undiscovered tests and unexpected skips fail the run.
+Source revision, binary hashes and results are recorded under `build/proximity-tests/swift-bridge.*`.
+
 Generate and validate the Swift DocC archive:
 
 ```bash
@@ -104,6 +118,210 @@ for the app's review UI. `WalletConfiguration` uses
 Issuance uses DPoP consistently for authorization binding, token exchange, and
 protected credential requests whenever the authorization server advertises
 supported DPoP signing algorithms.
+
+## In-person proximity presentation
+
+Use the Swift-native proximity API for ISO/IEC 18013-5 device engagement and
+retrieval. It is separate from the URL-based OpenID4VP methods:
+
+<!-- doc-snippet:start swift-proximity-session -->
+```swift
+let configuration = ProximityConfiguration()
+let capabilities = try await wallet.proximityPresentationCapabilities(
+    configuration: configuration
+)
+showUnavailableMethods(capabilities)
+let session = try await wallet.startProximityPresentation(
+    configuration: configuration
+)
+
+for await state in session.states {
+    switch state {
+    case .checkingPrerequisites(let current):
+        showUnavailableMethods(current)
+    case .engagementReady(let engagements):
+        showEngagements(engagements)
+    case .reviewRequired(let review, _):
+        showReview(review)
+    case .preparationRequired(let plan, let reason):
+        showPreparationReview(plan, reason: reason)
+    case .completed(let exchanges, _, _):
+        showCompletion(exchanges: exchanges)
+    case .noData(let exchange):
+        showNoData(exchange: exchange)
+    case .failed(let error):
+        showFailure(error)
+    default:
+        showProgress(state)
+    }
+}
+await session.close()
+```
+<!-- doc-snippet:end swift-proximity-session -->
+
+The default selects QR engagement and BLE retrieval. The Swift facade installs
+the iOS BLE and NFC platform adapters automatically. NFC runtime reporting is
+limited to the public device, support, eligibility, session, and callback facts
+Core NFC exposes; entitlement and provisioning are verified separately in the
+approved signed build environment. Wi-Fi Aware remains unavailable until its
+platform adapter is installed. Use `ProximityConfiguration.session` to select `.qr`, conventional
+`.nfc`, or `.provisionalNFCV2` with its compatible retrieval plan. An optional
+`qrFallback` is a separate nonempty conventional plan. Shared BLE policy and
+conventional NFC length limits must match across routes. The SDK prepares only
+viable selected routes. Perform a suggested permission or settings effect in app
+UI and report its privacy-safe
+outcome with `.reportRemediation`. The SDK alone advances protocol state.
+
+`ProximityConfiguration.approval` selects `.askEachTime` (default) or
+`.prepareBeforeSharing`. Preparation first authenticates the reader and declines
+its request without credential disclosure. After the connection closes,
+`.preparationRequired(plan, reason)` supplies a recent request for an explicit
+review. Display `plan.review`, let the holder choose credentials/fields, and honour
+`requiredElements`. Call `try plan.approve(submission)` only from the approval action;
+on `.prepared(sharing)`, start a new session with
+`configuration.withApproval(.prepared(sharing))`. The old connection is finished.
+
+The shared SDK binds that approval to the exact authenticated reader, request,
+selected credentials, retention/purpose and application requirements. It lasts 60
+seconds, uses a monotonic deadline, and permits one connection attempt. A plan
+expires after ten minutes and is not permission to disclose. Keep both objects
+in memory within the journey; persist only the mode. `sharing.remainingSeconds`
+supports a countdown, and `await sharing.revoke()` cancels future use. Close and
+revoke on dismissal/backgrounding, preserving only actual Core NFC system presentation.
+Retries require a fresh review; changed requests never inherit a broader approval.
+
+The bundled iOS adapter cannot host interactive review during NFC-only retrieval.
+It first declines and collects an eligible reader request even in `.askEachTime`,
+then lets the holder review and reconnect. NFC-to-Bluetooth handover can still
+review while connected. Preparation needs one named authenticated trusted reader;
+other readers need an interactive route. Normal trust, credential and holder-key
+checks remain mandatory, and protected-key prompts still depend on OS availability.
+`.completed` may include a display-only receipt; this records local response
+completion, not the reader's verification result.
+
+When the user chooses a prepared NFC engagement, call `await session.presentNfc()` to open Core NFC's
+system sheet. The request preserves the current engagement and keys, waits for the NFC resource to be
+ready, and is idempotent while emulation is starting or active. The optional presentment assertion may
+expire or be unavailable during its cooldown; explicit presentation does not require it. Calls outside
+NFC engagement readiness are ignored. Failures and cancellation still arrive through `session.states`.
+
+After an NFC-only response is submitted, keep the devices together until the reader shows its result,
+then separate them. The adapter drains pending response fragments and keeps the NFC session active
+until reader deselection, cancellation, or a platform timeout. Bluetooth handover closes NFC after
+its response drains. Response submission alone does not confirm the reader's verification result.
+
+NFC card presentation requires Apple's managed HCE capability and a matching
+provisioning profile. [`HCE.entitlements.example`](HCE.entitlements.example) is
+an unreferenced host-app template containing the Type 4/NDEF, conventional mdoc
+retrieval, and provisional NFCv2 AIDs. Do not select or copy it into a target
+until Apple has enabled the capability for that app identifier; the file alone
+cannot make an HCE build eligible or validly signed. See the proximity DocC page
+for the complete setup boundary.
+
+Device signature is the default holder-authentication policy. Select
+`.macOnly`, `.preferSignature`, or `.preferMAC` explicitly when the integration
+profile permits it. The chosen method is frozen per credential option before
+review; `.authorizingHolderKey` reports the exact method and credential for
+each document request. The pinned EUDI profile currently requires
+`.signatureOnly`.
+
+Approval uses `.approve(reviewID: review.reviewID, submission: submission)`;
+decline uses `.decline(reviewID: review.reviewID)`. Accepted decisions consume the
+review once; delayed or duplicate UI actions cannot act on a later review.
+`ProximityError.recovery` distinguishes prerequisite retry from a
+fresh session after terminal failure. Runtime capability observations distinguish
+`.notChecked`, `.available`, and `.unavailable` independently of selection.
+Reader scopes use `.document(index:)` or `.wholeRequest`; only the valid
+authentication outcome carries an evaluated trust decision.
+
+`session.connectedRoute` retains the actual engagement and bearer through review and completion,
+even if a consumer skips the brief connecting state. Terminal errors also expose `remediationActions`;
+after Settings, wait for the application to become active and close the failed session before starting
+a fresh one. Do not send prerequisite retry actions to a terminal session.
+
+`ProximitySession` is an actor over the KMP source of truth. Its
+state stream, typed actions, immutable review, trust facts, disclosure choices,
+application-profile result, and terminal states contain no generated Kotlin,
+Bluetooth, COSE, or platform objects. Call `close()` when the journey ends;
+closing is idempotent and every new session rotates engagement identifiers and
+ephemeral key material.
+
+Reader authentication validity does not establish reader trust. Provision
+Reader CA certificates out of band and inject the shared evaluator when the
+integration requires a trusted reader:
+
+```swift
+let readerTrust = ProximityConfiguredReaderTrustEvaluator(
+    configuration: ProximityReaderTrustConfiguration(
+        trustAnchors: [
+            ProximityReaderTrustAnchor(
+                certificateDER: readerCA,
+                displayName: "Example reader authority"
+            )
+        ],
+        revocationPolicy: .check(applicationRevocationEvaluator)
+    )
+)
+let configuration = ProximityConfiguration(
+    readerPolicy: .requireTrusted,
+    readerTrustEvaluator: readerTrust
+)
+```
+
+The SDK validates the certificate profile, time, and path only against explicit
+application anchors. It performs no hidden network lookup and ships no reader
+trust list. Certificates sent by the reader are path inputs, never implicit
+anchors. Optional RICAL providers have separate explicit provider roots, signer
+policy, revocation, and constraint boundaries. Demo apps can inject a named
+test anchor through the same configuration initializer without making it a
+production default.
+
+Use `ProximityCRLRevocationEvaluator` when the application supplies a complete-CRL transport:
+
+```swift
+let crlStatus = try ProximityCRLRevocationEvaluator(
+    issuerCertificatesDER: [readerCA],
+    scope: .validatedPath,
+    fetcher: applicationCRLFetcher
+)
+// Supply crlStatus to ProximityReaderTrustConfiguration(revocationPolicy: .check(crlStatus)).
+```
+
+The `.validatedPath` scope checks certificates below the selected configured anchor on the
+actual direct or RICAL-validated path. Install it through the configured trust evaluator;
+standalone raw evidence returns indeterminate for this scope. The separately explicit
+`.readerCertificateAndIssuingAuthorities` scope retains terminal-authority status checking.
+
+Set `requiredIACAIssuerCertificateDER` when the application identifies a required IACA direct
+issuer. That exact issuer must be on the validated path and the reader must include the
+conditional non-critical email/URI issuer contact extension. Generic imported CAs do not
+supply that role. Without this context, conditional IACA validation is outside the checked scope.
+
+`ProximityCRLFetcher` receives a Foundation `URL` and byte limit and returns
+`ProximityCRLFetchResult.available(der:)` or `.unavailable`. The application owns timeouts,
+redirects, destination restrictions and caching. The shared verifier authenticates direct complete
+v2 CRLs and checks their scope and freshness; unsupported forms or unavailable status stay
+indeterminate. Issuer lookup certificates do not establish trust. Demo trust imports do not install
+a CRL client, and this CRL path does not implement OCSP.
+
+For holder-managed configuration, use `ProximityReaderTrustSettingsCodec` to
+validate and preview public Reader CA or versioned walt.id trust-bundle files
+before persisting the returned `ProximityReaderTrustSettings`. The importer
+accepts DER and certificate-only PEM Reader CAs plus static signed RICAL bundle
+entries. It rejects private keys, PKCS#12/PFX, unknown bundle semantics,
+duplicates, invalid or expired trust material, and files larger than 1 MiB.
+Apply one immutable snapshot to a new session with `settings.applying(to:)`;
+changes made while a session is active apply only to the next session. Applying settings
+replaces the trust evaluator; install application CRL/IACA/custom policy afterward. Decoding
+stored data checks structure, not current trust. Service references remain live in a snapshot;
+collection data is detached. Demo imports do not install a CRL network client.
+
+A final request with no returnable data ends in `ProximityState.noData(exchange:)`. No credential
+data was sent for that request; earlier exchanges in the same session may have
+shared approved data. Render `ProximityReview.readerAuthenticationSummary` for
+the request summary: it accounts for whole-request authentication coverage while
+preserving malformed, invalid, and revoked authentication warnings. Individual
+`readerAuthentication` entries remain available for detailed inspection.
 
 ## Protected keys
 

@@ -10,23 +10,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
-import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.ui.rememberAuthorizationRequestOpener
 
 @Composable
-internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {
-    val ready = state.session as? WalletSessionState.Ready
-    val credentials = ready?.credentials.orEmpty()
-    val uriHandler = LocalUriHandler.current
+internal fun WalletScreen(
+    controller: WalletDemoController,
+    state: WalletDemoUiState,
+    onStartProximityPresentation: (() -> Unit)? = null,
+    presentationContent: (@Composable () -> Unit)? = null,
+    sharingSettingsContent: (@Composable () -> Unit)? = null,
+    onOpenSettings: () -> Unit = {},
+    onResetWallet: () -> Unit = { controller.resetWallet() },
+    onSignOut: (() -> Unit)? = null,
+) {
+    val openAuthorizationRequest = rememberAuthorizationRequestOpener()
     var showingSettings by remember { mutableStateOf(false) }
     var detailsChrome by remember { mutableStateOf<CredentialDetailsChrome?>(null) }
 
     LaunchedEffect(state.authorizationRequestUrl) {
         state.authorizationRequestUrl?.let { authorizationUrl ->
-            uriHandler.openUri(authorizationUrl)
+            openAuthorizationRequest(authorizationUrl)
             controller.authorizationRequestOpened()
         }
     }
@@ -35,12 +41,18 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
         SettingsScreen(
             state = state,
             onShowDcApiPresentationPreviewChange = controller::setShowDcApiPresentationPreview,
+            onProximityTransportProfileChange = onStartProximityPresentation?.let {
+                controller::setProximityTransportProfile
+            },
             onBack = { showingSettings = false },
             onLock = controller::lock,
-            onResetWallet = controller::resetWallet,
+            onResetWallet = onResetWallet,
+            onSignOut = onSignOut,
             onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
             onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
             onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,
+            sharingSettingsContent = sharingSettingsContent,
+            onProximityApprovalModeChange = onStartProximityPresentation?.let { controller::setProximityApprovalMode },
         )
         return
     }
@@ -53,7 +65,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
             } else {
                 WalletHeader(
                     state = state,
-                    onSettings = { showingSettings = true },
+                    onSettings = { onOpenSettings(); showingSettings = true },
                     onDismissStatus = controller::dismissStatus,
                     onToggleStatusExpanded = controller::toggleStatusExpanded,
                 )
@@ -72,7 +84,7 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
 
         when (state.selectedTab) {
             WalletDemoTab.Credentials -> CredentialsTab(
-                credentials = credentials,
+                session = state.session,
                 onDeleteCredential = controller::deleteCredential,
                 onDetailsChromeChange = { detailsChrome = it },
                 modifier = modifier,
@@ -101,6 +113,8 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
                     onSubmit = controller::submitPresentation,
                     onReject = controller::rejectPresentation,
                     onCancel = controller::cancelPresentationReview,
+                    onStartProximityPresentation = onStartProximityPresentation,
+                    presentationContent = presentationContent,
                     modifier = modifier,
                 )
             }

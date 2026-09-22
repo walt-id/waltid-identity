@@ -19,6 +19,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -34,11 +35,17 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelectio
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.resolvedCardTitle
+import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.logic.toRequestedDisclosureGroup
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.exportTestTagsForPlatformAutomation
+import id.walt.walletdemo.compose.ui.resources.Res
+import id.walt.walletdemo.compose.ui.resources.proximity_approve
+import id.walt.walletdemo.compose.ui.resources.proximity_cancel
+import id.walt.walletdemo.compose.ui.resources.proximity_decline
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The wallet's single presentation-review surface, shared by every transport that can ask for a
@@ -81,7 +88,9 @@ internal fun SharingReviewSection(
                 claimsOptionId = null
             }
             CredentialCardStack(
-                details = review.credentialOptions.map { it.toCredentialDetails() },
+                cards = remember(review.credentialOptions) {
+                    review.credentialOptions.map { it.toCredentialDetails().toCardDisplayData() }
+                },
                 onOpenDetails = { detailsId ->
                     claimsOptionId = detailsId
                 },
@@ -89,10 +98,10 @@ internal fun SharingReviewSection(
             claimsOption?.let { option ->
                 SharingClaimsDialog(
                     option = option,
-                    details = option.toCredentialDetails(),
+                    details = remember(option) { option.toCredentialDetails() },
                     credentialSelected = option.selection in selectedCredentialOptions,
                     selectedDisclosureOptions = selectedDisclosureOptions,
-                    requestedDisclosureItems = option.toRequestedDisclosureGroup()?.items.orEmpty(),
+                    requestedDisclosureItems = remember(option) { option.toRequestedDisclosureGroup()?.items.orEmpty() },
                     enabled = enabled,
                     readOnly = readOnly,
                     onToggleDisclosure = onToggleDisclosure,
@@ -148,8 +157,8 @@ private fun SelectableCredentialRow(
     onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
 ) {
-    val details = option.toCredentialDetails()
-    val requestedDisclosureItems = option.toRequestedDisclosureGroup()?.items.orEmpty()
+    val details = remember(option) { option.toCredentialDetails() }
+    val requestedDisclosureItems = remember(option) { option.toRequestedDisclosureGroup()?.items.orEmpty() }
     var claimsOpen by rememberSaveable(option.selection.id) { mutableStateOf(false) }
 
     Row(
@@ -345,7 +354,20 @@ internal fun SharingActionsRow(
     onSubmit: () -> Unit,
     onCancel: () -> Unit,
     onReject: (() -> Unit)?,
+    presentation: ReviewActionPresentation = ReviewActionPresentation.Sharing,
 ) {
+    val submitLabel = when (presentation) {
+        ReviewActionPresentation.Sharing -> "Share"
+        ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_approve)
+    }
+    val rejectLabel = when (presentation) {
+        ReviewActionPresentation.Sharing -> "Reject"
+        ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_decline)
+    }
+    val cancelLabel = when (presentation) {
+        ReviewActionPresentation.Sharing -> if (onReject == null) "Cancel" else "Cancel review"
+        ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_cancel)
+    }
     Row(
         modifier = Modifier.testTag(WalletUiTestTags.PresentationActions),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -353,25 +375,48 @@ internal fun SharingActionsRow(
         Button(
             onClick = onSubmit,
             enabled = enabled && selectionComplete,
-            modifier = Modifier.testTag(WalletUiTestTags.PresentationSubmitButton),
+            modifier = Modifier.testTag(presentation.submitTestTag),
         ) {
-            Text("Share")
+            Text(submitLabel)
+        }
+        TextButton(
+            onClick = onCancel,
+            enabled = enabled || presentation == ReviewActionPresentation.Proximity,
+            modifier = Modifier.testTag(presentation.cancelTestTag),
+        ) {
+            Text(cancelLabel)
         }
         onReject?.let { reject ->
             TextButton(
                 onClick = reject,
                 enabled = enabled,
-                modifier = Modifier.testTag(WalletUiTestTags.PresentationRejectButton),
+                modifier = Modifier.testTag(presentation.rejectTestTag),
             ) {
-                Text("Reject")
+                Text(rejectLabel)
             }
         }
-        TextButton(
-            onClick = onCancel,
-            enabled = enabled,
-            modifier = Modifier.testTag(WalletUiTestTags.PresentationCancelButton),
-        ) {
-            Text(if (onReject == null) "Cancel" else "Cancel review")
-        }
     }
+}
+
+internal enum class ReviewActionPresentation {
+    Sharing,
+    Proximity;
+
+    val submitTestTag: String
+        get() = when (this) {
+            Sharing -> WalletUiTestTags.PresentationSubmitButton
+            Proximity -> WalletUiTestTags.ProximityApprove
+        }
+
+    val rejectTestTag: String
+        get() = when (this) {
+            Sharing -> WalletUiTestTags.PresentationRejectButton
+            Proximity -> WalletUiTestTags.ProximityDecline
+        }
+
+    val cancelTestTag: String
+        get() = when (this) {
+            Sharing -> WalletUiTestTags.PresentationCancelButton
+            Proximity -> WalletUiTestTags.ProximityCancel
+        }
 }
