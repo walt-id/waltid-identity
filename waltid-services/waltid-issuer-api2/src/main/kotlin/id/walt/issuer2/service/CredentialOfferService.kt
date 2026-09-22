@@ -58,6 +58,7 @@ class CredentialOfferService(
         val resolvedCredentials = request.credentials.map { credential ->
             val profile = profileService.resolveProfile(credential.profileId)
             val overrides = credential.runtimeOverrides
+            profileService.requireMsoDataOnlyForMdoc(profile.credentialConfigurationId, overrides?.msoData)
             val issuerKey = overrides?.issuerKey ?: profile.issuerKey
             require(issuerKey.isNotEmpty()) { "issuerKey must not be empty" }
             require(issuerKey["type"] != null) { "issuerKey must contain a key type" }

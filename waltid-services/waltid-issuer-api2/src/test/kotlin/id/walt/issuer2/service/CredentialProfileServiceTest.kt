@@ -148,6 +148,18 @@ class CredentialProfileServiceTest {
     }
 
     @Test
+    fun `rejects msoData for non-mdoc credential configurations`() {
+        val service = serviceWithProfiles(profiles = mapOf(PROFILE_ID to profileConfig()))
+
+        assertFailsWith<IllegalArgumentException> {
+            service.requireMsoDataOnlyForMdoc(
+                CREDENTIAL_CONFIGURATION_ID,
+                MsoData(validUntil = "<timestamp-in:30d>"),
+            )
+        }
+    }
+
+    @Test
     fun `rejects invalid profile values`() {
         val service = serviceWithProfiles(
             profiles = mapOf(

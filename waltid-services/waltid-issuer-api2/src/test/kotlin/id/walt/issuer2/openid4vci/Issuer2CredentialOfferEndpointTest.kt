@@ -4,6 +4,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.WaltConfig
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
+import id.walt.commons.web.plugins.configureStatusPages
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -32,6 +33,7 @@ import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.CredentialOfferValueMode
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.offers.TxCode
+import id.walt.openid4vci.mdoc.MsoData
 import id.walt.sdjwt.SDMap
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import io.ktor.client.HttpClient
@@ -508,6 +510,27 @@ class Issuer2CredentialOfferEndpointTest {
     }
 
     @Test
+    fun shouldRejectMsoDataRuntimeOverrideOnNonMdocProfile() = testApplication {
+        installIssuer2()
+
+        val response = apiClient().post("/issuer2/credential-offers") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                CredentialOfferCreateRequest(
+                    profileId = OPEN_BADGE_PROFILE_ID,
+                    authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+                    runtimeOverrides = CredentialOfferRuntimeOverrides(
+                        msoData = MsoData(validUntil = "<timestamp-in:30d>"),
+                    ),
+                ),
+            )
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertTrue(response.bodyAsText().contains("msoData is only supported for mso_mdoc credential profiles"))
+    }
+
+    @Test
     fun shouldCreateCredentialOffersForDocumentedModes() = testApplication {
         installIssuer2()
         val client = apiClient()
@@ -851,6 +874,7 @@ class Issuer2CredentialOfferEndpointTest {
             install(ServerContentNegotiation) {
                 json(json)
             }
+            configureStatusPages()
             issuer2AuthenticationPluginAmendment()
             AuthenticationServiceModule.run { enable() }
             issuer2Module(withPlugins = true)
