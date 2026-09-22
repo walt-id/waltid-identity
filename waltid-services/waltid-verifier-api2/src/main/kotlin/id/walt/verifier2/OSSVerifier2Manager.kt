@@ -53,6 +53,7 @@ object OSSVerifier2Manager {
             is DcApiAnnexCFlowSetup -> setup.origin
         }
         val x5c = setup.core.x5c ?: config.x5c
+        requireX5cForX509ClientId(clientId, x5c)
         return configuredKey?.let {
             VerificationSessionCreator.createVerificationSession(
                 setup = setup,
@@ -164,4 +165,14 @@ object OSSVerifier2Manager {
     )
 
     private val requestSigningUsages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
+}
+
+private fun requireX5cForX509ClientId(clientId: String?, x5c: List<String>?) {
+    val prefix = clientId?.substringBefore(':', missingDelimiterValue = "")
+    if (prefix != "x509_san_dns" && prefix != "x509_hash") return
+    if (!x5c.isNullOrEmpty()) return
+    throw IllegalArgumentException(
+        "An x5c certificate chain is required when clientId uses the 'x509_san_dns:' or 'x509_hash:' prefix, " +
+            "but none was provided. Provide it via 'core.x5c', or configure a default x5c on the verifier service."
+    )
 }
