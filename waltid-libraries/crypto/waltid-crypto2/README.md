@@ -54,8 +54,7 @@ This library is being developed to:
 - **Multiplatform**: Common implementation for JVM, JavaScript, Android, iOS, Linux, Windows, and macOS targets
 
 Encoding support is provider and target specific. Private JWK import derives and validates the public component before
-exposing capabilities. Android supports this validation for RSA, but fails closed for EC, Ed25519, and X25519 private
-JWK import because its cryptography backend cannot derive those public keys from private-only material. Public JWK and
+exposing capabilities. Android supports RSA validation and P-256 private-JWK import with a pairwise sign/verify check of the supplied public component. It fails closed for other EC curves, Ed25519, and X25519 private JWK import where the backend cannot validate the private/public binding. Public JWK and
 SPKI paths remain available. Android also does not advertise PKCS8 generation, import, or private export.
 
 ## secp256k1 target support

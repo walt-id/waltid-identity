@@ -2,6 +2,8 @@ package id.walt.walletdemo.compose.ui
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -71,13 +73,40 @@ fun WalletDemoTheme(
 ) {
     CompositionLocalProvider(LocalWalletDemoBranding provides branding) {
         MaterialTheme(
-            colorScheme = lightColorScheme(
+            colorScheme = if (isSystemInDarkTheme()) darkColorScheme(
+                primary = branding.secondary,
+                onPrimary = branding.onSecondary,
+                secondary = branding.secondary,
+                onSecondary = branding.onSecondary,
+                primaryContainer = branding.onSecondary,
+                onPrimaryContainer = branding.primaryContainer,
+                secondaryContainer = branding.onSecondary,
+                onSecondaryContainer = branding.primaryContainer,
+                background = Color(0xFF111318),
+                surface = Color(0xFF111318),
+                surfaceContainerLow = Color(0xFF1B1D22),
+                surfaceContainer = Color(0xFF202228),
+                surfaceContainerHigh = Color(0xFF2B2D33),
+                onSurface = Color(0xFFE2E2E9),
+                onSurfaceVariant = Color(0xFFC4C6D0),
+                outlineVariant = Color(0xFF44464F),
+            ) else lightColorScheme(
                 primary = branding.primary,
                 onPrimary = branding.onPrimary,
                 secondary = branding.secondary,
                 onSecondary = branding.onSecondary,
                 primaryContainer = branding.primaryContainer,
                 onPrimaryContainer = branding.onPrimaryContainer,
+                secondaryContainer = branding.primaryContainer,
+                onSecondaryContainer = branding.onPrimaryContainer,
+                background = Color(0xFFF2F3F7),
+                surface = Color(0xFFF2F3F7),
+                surfaceContainerLow = Color.White,
+                surfaceContainer = Color(0xFFECEEF3),
+                surfaceContainerHigh = Color(0xFFE5E7ED),
+                onSurface = Color(0xFF191C20),
+                onSurfaceVariant = Color(0xFF44474F),
+                outlineVariant = Color(0xFFD9DCE3),
             ),
             content = content,
         )

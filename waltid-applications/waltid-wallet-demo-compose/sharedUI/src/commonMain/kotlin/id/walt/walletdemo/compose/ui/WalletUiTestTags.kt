@@ -1,6 +1,9 @@
 package id.walt.walletdemo.compose.ui
 
 internal object WalletUiTestTags {
+    val IdentitySetup = tag("identitySetup")
+    val KeySetupContinue = tag("keySetupContinue")
+    fun keySetupChoice(step: String, index: Int) = tag("keySetupChoice", step, index.toString())
     val Status = tag("status")
     val StatusDismiss = tag("statusDismiss")
     val StatusExpand = tag("statusExpand")
@@ -15,6 +18,10 @@ internal object WalletUiTestTags {
     val AppTitle = tag("appTitle")
     val SettingsButton = tag("settingsButton")
     val SettingsScreen = tag("settingsScreen")
+    val SettingsSigningKey = tag("settingsSigningKey")
+    val SettingsTechnicalDetails = tag("settingsTechnicalDetails")
+    val SettingsConnectionMethod = tag("settingsConnectionMethod")
+    val SettingsDigitalCredentialsApi = tag("settingsDigitalCredentialsApi")
     val SettingsBack = tag("settingsBack")
     val SettingsDid = tag("settingsDid")
     val SettingsDidCopy = tag("settingsDidCopy")

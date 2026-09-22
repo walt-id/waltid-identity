@@ -15,7 +15,13 @@ import kotlinx.serialization.json.JsonObject
  */
 public class SqlDelightDidStore(
     private val queries: WalletPersistenceQueries,
+    private val identityWalletId: String = "default",
 ) : WalletDidStore {
+
+    /** Returns only the explicitly activated DID once identity lifecycle state exists. */
+    override suspend fun getDefaultDid(): String? {
+        return queries.selectActiveIdentity(identityWalletId).executeAsOneOrNull()?.did
+    }
 
     /**
      * Loads a DID document by DID.

@@ -32,11 +32,13 @@ fun WalletDemoApp(
     branding: WalletDemoBranding = WalletDemoBranding(),
     onStartProximityPresentation: (() -> Unit)? = null,
     onSignOut: (() -> Unit)? = null,
+    resetWalletDescription: String? = null,
 ) = WalletDemoAppHost(
     controller = controller,
     branding = branding,
     onStartProximityPresentation = onStartProximityPresentation,
     onSignOut = onSignOut,
+    resetWalletDescription = resetWalletDescription,
 )
 
 /** Wallet shell with an internal slot for transport-specific presentation journey content. */
@@ -46,10 +48,12 @@ internal fun WalletDemoAppHost(
     branding: WalletDemoBranding = WalletDemoBranding(),
     onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
-    sharingSettingsContent: (@Composable () -> Unit)? = null,
+    readerTrustSettingsContent: (@Composable () -> Unit)? = null,
+    readerTrustPolicySummary: String? = null,
     onOpenSettings: () -> Unit = {},
     onResetWallet: () -> Unit = { controller.resetWallet() },
     onSignOut: (() -> Unit)? = null,
+    resetWalletDescription: String? = null,
 ) {
     val state by controller.state.collectAsState()
     PresentationContinuationEffect(
@@ -83,9 +87,6 @@ internal fun WalletDemoAppHost(
                             auth = auth,
                             isBusy = state.isBusy,
                             biometricAvailable = state.biometricUnlockAvailable,
-                            signingProtectionMode = state.signingProtectionMode,
-                            selectedSigningProtection = state.selectedSigningProtection,
-                            biometricSigningAvailability = state.biometricSigningAvailability,
                         )
                     }
                     is WalletAuthState.StorageUnavailable -> Box(
@@ -103,10 +104,12 @@ internal fun WalletDemoAppHost(
                         state = state,
                         onStartProximityPresentation = onStartProximityPresentation,
                         presentationContent = presentationContent,
-                        sharingSettingsContent = sharingSettingsContent,
+                        readerTrustSettingsContent = readerTrustSettingsContent,
+                        readerTrustPolicySummary = readerTrustPolicySummary,
                         onOpenSettings = onOpenSettings,
                         onResetWallet = onResetWallet,
                         onSignOut = onSignOut,
+                        resetWalletDescription = resetWalletDescription,
                     )
                 }
             }
