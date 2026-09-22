@@ -94,6 +94,8 @@ object Issuer2ManagementRoutesDocs {
             override fields are: issuerDid, credentialData, mapping, selectiveDisclosure,
             idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, authorizedTransactionDataTypes,
             msoData, x5Chain, notifications, and credentialStatus.
+            runtimeOverrides.msoData is rejected unless the profile credential configuration
+            format is mso_mdoc.
             credentialData is applied as a partial object patch over the configured profile data:
             nested objects are merged, while primitive, array, and null values replace the configured value.
             Each offered credential uses its configured `credentialStatus` for all copies issued from it.
