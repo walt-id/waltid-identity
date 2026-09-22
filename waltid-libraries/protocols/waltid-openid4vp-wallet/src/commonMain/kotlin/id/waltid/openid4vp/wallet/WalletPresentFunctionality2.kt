@@ -42,6 +42,8 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.filter
@@ -531,8 +533,9 @@ object WalletPresentFunctionality2 {
     /**
      * Builds a presentation with application-supplied TS12 authentication.
      * The request must already be authenticated and the credential/disclosure selection approved.
-     * Each bound TS12 payment invokes [scaAuthorizer] with its exact proof inputs. Missing or
-     * unsuccessful authentication aborts signing; ordinary presentations do not invoke the callback.
+     * Each bound TS12 payment invokes [scaAuthorizer] with its exact proof inputs. It declares
+     * factors already applied or guaranteed by successful signing with this key. Missing evidence,
+     * failed signing or cancellation releases no proof. Ordinary presentations skip the callback.
      * This callback does not replace platform key-use authorization or establish SCA assurance.
      */
     suspend fun buildVpToken(
@@ -1246,21 +1249,25 @@ object WalletPresentFunctionality2 {
             put("typ", JsonPrimitive("kb+jwt"))
         }
 
+        val proofId = scaContext?.let { UuidUtils.randomUUIDString() }
         val authentication = scaContext?.let { context ->
+            currentCoroutineContext().ensureActive()
             val presentation = ScaPresentation(
+                proofId = requireNotNull(proofId),
                 credentialId = context.credentialId,
                 holderKeyId = crypto2Key?.id?.value ?: requireNotNull(holderKey).getKeyId(),
+                signingAlgorithm = signingAlgorithm,
                 audience = requireNotNull(audience),
                 nonce = nonce,
                 responseMode = context.responseMode,
                 sdHash = sdHash,
                 transactionData = transactionData.orEmpty().toList(),
             )
-            context.authorizer.authorize(presentation)
+            context.authorizer.authorize(presentation).also { currentCoroutineContext().ensureActive() }
         }
         val kbJwtPayload = buildJsonObject {
             if (scaContext != null) {
-                put("jti", UuidUtils.randomUUIDString())
+                put("jti", requireNotNull(proofId))
                 put("response_mode", Json.encodeToJsonElement(scaContext.responseMode))
                 put("amr", requireNotNull(authentication).toJson())
             }
@@ -1281,7 +1288,7 @@ object WalletPresentFunctionality2 {
                 }
             }
         }
-        return if (crypto2Key != null) {
+        val proof = if (crypto2Key != null) {
             CompactJws.sign(
                 payload = Json.encodeToString(kbJwtPayload).encodeToByteArray(),
                 key = crypto2Key,
@@ -1292,6 +1299,9 @@ object WalletPresentFunctionality2 {
             plaintext = kbJwtPayload.toString().encodeToByteArray(),
             headers = jwsHeaders,
         )
+        // A native signer may finish after cancellation without observing the coroutine's Job.
+        if (scaContext != null) currentCoroutineContext().ensureActive()
+        return proof
     }
 
     internal suspend fun encryptDirectPostResponse(

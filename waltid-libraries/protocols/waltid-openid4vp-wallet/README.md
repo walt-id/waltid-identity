@@ -273,11 +273,19 @@ class WalletService(
 SD-JWT presentations bound to `urn:eudi:sca:payment:1` require an explicit
 `ScaPresentationAuthorizer` through the `buildVpToken` overload. After the application
 has authenticated the request and approved the selected credentials, this callback
-must authenticate the exact presentation and return the methods actually used.
-It receives the credential and key identifiers, audience, nonce, response mode,
-SD-JWT hash and exact encoded transaction data. Throw on denial, cancellation or
-insufficient evidence; do not derive methods merely from a configured key policy
-or accept them from the verifier/request body.
+authorizes the exact proof intent. Its methods must already have been applied to
+this operation or be guaranteed by the enforced policy of the exact signing key.
+This permits native authentication during signing without a separate prompt.
+Returning methods alone does not establish authentication; failed signing or
+coroutine cancellation releases no proof.
+
+The callback receives the fresh proof ID (`jti`), credential and key identifiers,
+signing algorithm, audience, nonce, response mode, SD-JWT hash and exact encoded
+transaction data. Bind it to the reviewed action and actual key instance; identifier
+strings alone do not establish that binding. Throw on denial, expiry, cancellation
+or insufficient evidence. A merely requested key policy or one permitting unknown
+alternative authentication routes is insufficient. Never accept factors from the
+verifier/request body. The caller owns action lifetime and the final delivery gate.
 
 The presenter adds a fresh cryptographically random `jti`, the request's
 `response_mode`, and typed `amr` containing at least two distinct categories.

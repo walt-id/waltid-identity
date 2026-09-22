@@ -24,6 +24,9 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.waltid.openid4vp.wallet.presentation.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import java.io.File
@@ -72,6 +75,8 @@ class ScaPresentationInteropTest {
             assertEquals("sha-256", payload["transaction_data_hashes_alg"]?.jsonPrimitive?.content)
             assertEquals(listOf(hash(fixture.transaction)), payload.getValue("transaction_data_hashes").jsonArray.map { it.jsonPrimitive.content })
             assertEquals(fixture.transaction, assertNotNull(observed).transactionData.single())
+            assertEquals(proofId, observed!!.proofId)
+            assertEquals("ES256", observed!!.signingAlgorithm)
             assertEquals(payload["sd_hash"]?.jsonPrimitive?.content, observed!!.sdHash)
             assertEquals("stored-$type", observed!!.credentialId)
             assertEquals(fixture.keyId, observed!!.holderKeyId)
@@ -117,6 +122,59 @@ class ScaPresentationInteropTest {
     fun `successful authentication cannot bypass a failed key operation`() = runTest {
         val fixture = fixture().also { it.rejectSigning = true }
         assertFailsWith<IllegalStateException> { present(fixture, simulatedAuthentication) }
+        assertEquals(1, fixture.signatures)
+    }
+
+    @Test
+    fun `signing can establish the declared factors without a separate authentication operation`() = runTest {
+        val fixture = fixture()
+        val events = mutableListOf<String>()
+        val signingEnforcedFactors = ScaAuthenticationMethods.PossessionAndInherence(
+            ScaAuthenticationMethods.Possession.OTHER,
+            ScaAuthenticationMethods.Inherence.OTHER,
+        )
+        // Models the ordering contract only, not a real platform policy or authentication result.
+        fixture.beforeSigning = { events += "native authentication and signing" }
+        val vp = present(fixture, ScaPresentationAuthorizer {
+            events += "authorize proof intent"
+            assertEquals(0, fixture.signatures)
+            signingEnforcedFactors
+        })
+        events += "proof released"
+        assertEquals(signingEnforcedFactors.toJson(), verify(fixture, vp)["amr"])
+        assertEquals(listOf("authorize proof intent", "native authentication and signing", "proof released"), events)
+        assertEquals(1, fixture.signatures)
+    }
+
+    @Test
+    fun `cancellation during authorization prevents the signing operation`() = runTest {
+        val fixture = fixture()
+        var released = false
+        val attempt = launch {
+            present(fixture, ScaPresentationAuthorizer {
+                currentCoroutineContext().cancel()
+                factors // A callback may return normally after the operation was cancelled.
+            })
+            released = true
+        }
+        attempt.join()
+        assertTrue(attempt.isCancelled)
+        assertFalse(released)
+        assertEquals(0, fixture.signatures)
+    }
+
+    @Test
+    fun `late native success cannot release a proof after cancellation`() = runTest {
+        val fixture = fixture()
+        fixture.afterSigning = { currentCoroutineContext().cancel() }
+        var released = false
+        val attempt = launch {
+            present(fixture, simulatedAuthentication)
+            released = true
+        }
+        attempt.join()
+        assertTrue(attempt.isCancelled)
+        assertFalse(released)
         assertEquals(1, fixture.signatures)
     }
 
@@ -301,11 +359,14 @@ class ScaPresentationInteropTest {
     ) {
         var signatures = 0
         var rejectSigning = false
+        var beforeSigning: suspend () -> Unit = {}
+        var afterSigning: suspend () -> Unit = {}
         val key = object : id.walt.crypto2.keys.Key by originalKey {
             override val capabilities = originalKey.capabilities.copy(signer = Signer { data, algorithm ->
                 signatures++
                 check(!rejectSigning) { "Signing failed" }
-                requireNotNull(originalKey.capabilities.signer).sign(data, algorithm)
+                beforeSigning()
+                requireNotNull(originalKey.capabilities.signer).sign(data, algorithm).also { afterSigning() }
             })
         }
         val keyId = key.id.value
