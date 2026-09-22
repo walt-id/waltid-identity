@@ -6,7 +6,9 @@ import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.web.WebService
+import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.did.dids.DidService
+import id.walt.ktorauthnz.auth.ktorAuthnz
 import id.walt.wallet2.auth.configureWallet2Auth
 import id.walt.wallet2.auth.registerWallet2AuthRoutes
 import id.walt.wallet2.config.registerWallet2ConfigDecoders
@@ -25,6 +27,12 @@ import org.slf4j.event.Level
 
 suspend fun main(args: Array<String>) {
     registerWallet2ConfigDecoders()
+
+    // WebService installs Authentication before the service module runs. Register the
+    // ktor-authnz provider first so /auth and wallet routes can call authenticate().
+    AuthenticationServiceModule.AuthenticationServiceConfig.customAuthentication = {
+        ktorAuthnz("ktor-authnz") { }
+    }
 
     ServiceMain(
         ServiceConfiguration("wallet", version = BuildConfig.VERSION),
@@ -70,6 +78,12 @@ fun Application.configureHTTP() {
     install(CORS) {
         allowHeaders { true }
         allowMethod(HttpMethod.Options)
+        allowMethod(HttpMethod.Get)
+        allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Delete)
+        allowMethod(HttpMethod.Patch)
+        allowMethod(HttpMethod.Head)
         allowNonSimpleContentTypes = true
         allowCredentials = true
         allowOrigins { true }

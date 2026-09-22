@@ -33,5 +33,10 @@ persistence:
   storageRequest: 1Gi
 
 ingress:
+  enabled: true
   ingressClassName: traefik
   host: issuer.portal.waltid.cloud
+  # Extra path -> sibling-release routes on this host, matched before the release's own '/'.
+  # Each entry: { path, pathType (default Prefix), service (sibling alias) | serviceName,
+  # portName (default http) }.
+  extraPaths: []
