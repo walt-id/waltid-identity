@@ -50,11 +50,20 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
       - name: Verify report collection safeguards
         run: python3 -m unittest discover -s scripts/itb -p 'test_*.py'
+      - name: Prepare browser for offline portal contracts
+        run: >-
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers
+          -Pplaywright.browser=chromium -Pplaywright.installWithDeps=true
+          --max-workers=2 --console=plain
       - name: Check runner orchestration and report handling
         run: >-
           ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test
           --tests 'id.walt.itb.*' -PskipLiveConformance=true
           --max-workers=2 --console=plain
+      - name: Check offline portal contracts
+        run: >-
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbPortalTest
+          -PskipLiveConformance=true --max-workers=2 --console=plain
       - name: Run the real wallet profile assertions
         run: >-
           ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbTest
@@ -73,5 +82,8 @@ jobs:
           name: itb-wallet-profile-${{ github.sha }}
           if-no-files-found: error
           path: |
+            waltid-services/waltid-openid4vp-conformance-runners/build/test-results/test/TEST-id.walt.itb.*.xml
+            waltid-services/waltid-openid4vp-conformance-runners/build/test-results/itbPortalTest/*.xml
+            waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/itbPortalTest/
             waltid-services/waltid-openid4vp-conformance-runners/build/test-results/itbTest/*.xml
             waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/itbTest/

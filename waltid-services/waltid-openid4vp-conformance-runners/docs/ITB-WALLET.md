@@ -19,17 +19,14 @@ logging for these runs.
 | Environment variable | Value |
 | --- | --- |
 | `ITB_ORGANISATION_KEY` | Existing organisation API key |
-| `ITB_SYSTEM_KEY` | System API key from the portal's REST configuration |
-| `ITB_BASE_ACTOR_KEY` | Base Protocols actor API key |
-| `ITB_DOMAIN_ACTOR_KEY` | Domain Specific actor API key |
-| `ITB_PAYMENT_ACTOR_KEY` | Payment use cases actor API key |
 | `ITB_USERNAME`, `ITB_PASSWORD` | Existing portal account |
 | `ITB_ORGANISATION_ID` | Portal organisation ID (`20` for the inspected Walt.id tenant) |
 | `ITB_BUILD_REVISION` | Tested 40-character commit SHA; append `+dirty` for an uncommitted tree |
 
-Portal UI IDs are not API keys. Actor keys are required only for the selected
-specifications. The deployment is pinned by the case manifest to
-`https://dev-i4mlab.aegean.gr/itb`.
+Portal UI IDs are not API keys. The manifest pins the deployment to
+`https://dev-i4mlab.aegean.gr/itb`, the system name to `walt.id`, and the exact
+statement, suite and case labels. A different selected system or missing/ambiguous
+label fails before wallet execution. System and actor API keys are not needed.
 
 ```bash
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers -Pplaywright.browser=chromium
@@ -52,13 +49,17 @@ expected failures or skips. `adapterInvoked` records entry into the adapter,
 not proof that every wallet protocol stage ran.
 
 The runner starts one session at a time, never retries an uncertain start, and
-stops only sessions returned by its own start call. A stopped ITB session can
+records each prepared session ID before starting its test steps. Cleanup stops
+only that owned session. A stopped ITB session can
 have `UNDEFINED` rather than `FAILURE`; the separate wallet outcome is preserved.
 Reports contain identities, timestamps and error types/codes, not credentials,
 raw protocol messages, browser state or ITB service logs.
 
-The bridge authenticates to the portal, filters by the exact REST session ID,
-and downloads that session's offer/request/script input. It reads declarative
+The bridge authenticates to the portal and selects the exact statement, suite
+and case in **Interactive execution** mode. Each case starts from a fresh portal
+document, so prior dialogs and asynchronously updated session lists cannot
+select another interaction. It downloads the owned session's offer/request/script
+input directly from its execution page. It reads declarative
 DC API inputs without executing supplied JavaScript. Downloads are removed
 immediately after reading. The deployed authorization-code issuer returns a
 direct redirect; the adapter validates its destination, state and code before
@@ -71,7 +72,8 @@ recorded in [the fixture provenance](../src/main/resources/itb/README.md).
 file. Request `x5c` chains are never automatically trusted.
 
 The **WeBuild ITB live wallet cases** workflow is manually dispatched and strict.
-Configure matching repository Actions secrets for the seven key/account variables
+Configure repository Actions secrets `ITB_ORGANISATION_KEY`, `ITB_USERNAME` and
+`ITB_PASSWORD`
 and repository variable `ITB_ORGANISATION_ID=20`, following the existing conformance
 workflows. A dedicated GitHub environment is not required. Tenant credentials are
 injected only into the manually dispatched live test step, never into the ITB PR
@@ -181,27 +183,33 @@ identify this branch's build and must not be reported as its results. Case title
 and linked documentation are insufficient to infer interaction contracts: the
 VCI-006 documentation popup still describes an unrelated AcademicID flow.
 
-### Verified REST and interaction boundary
+### Verified portal and REST boundary
 
-An authenticated check against the deployment on 2026-09-21 confirmed that
-`ITB-API-KEY` works for starting sessions and retrieving their status and reports.
-The deployment's Swagger UI instead sends `ITB_API_KEY`, which returned HTTP 401
-with "Needs API key header." Use the documented hyphenated header.
+Interactive portal startup is required by the deployed DC API cases: REST
+background startup completes their instruction steps before the wallet can act.
+The runner therefore uses one interactive execution path for all 21 cases and
+uses REST only for authenticated status, terminal XML reports and cleanup. The
+hyphenated `ITB-API-KEY` header is required by the deployment. XML report requests
+send only `Accept: application/xml`; a combined JSON/XML header is rejected.
 
-For a REST-started VCI-006 session, `withReports` and `withLogs` exposed execution
-steps and the supporting service's session ID, but omitted the credential offer
-and interaction context. The authenticated portal's **My test sessions → View
-pending interaction → VCI request** exposed the offer for that same session.
-Consequently, the deployed workflow needs a browser interaction bridge or a
-test-suite interaction handler in addition to REST orchestration. Do not create
-a separate issuer offer and report it as the ITB session's wallet interaction.
+The REST reports omit the offers and request context. The bridge downloads these
+from the owned session's pending interaction. It never substitutes a separate
+issuer offer or verifier request and attributes that to an ITB case. Full results
+and the remaining external dependencies are in [ITB-BASELINE.md](ITB-BASELINE.md).
 
-The standalone CLI results and remaining blockers are documented in
-[ITB-BASELINE.md](ITB-BASELINE.md). The CLI now runs against the authenticated
-tenant and records terminal reports. Four REST-started DC API cases terminate
-before a wallet interaction is available; they remain failures, not wallet
-qualification. The hosted live workflow still needs its first execution after
-default-branch registration. Keep the PR draft while these gaps remain.
+### Offline runner checks
+
+```bash
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests 'id.walt.itb.*' -PskipLiveConformance=true
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbPortalTest -PskipLiveConformance=true
+python3 -m unittest discover -s scripts/itb -p 'test_*.py'
+```
+
+The explicit `itbPortalTest` task requires the Chromium installation shown above;
+ordinary JVM tests do not. It intercepts all browser traffic and verifies suite
+selection, interactive mode, download labels, session identity and stale-dialog
+cleanup against local DOM fixtures. PR checks run these without tenant secrets.
+These tests protect the runner; they do not establish live wallet conformance.
 
 The reference issuer's [credential metadata](https://dss.aegean.gr/rfc-issuer/.well-known/openid-credential-issuer)
 and [authorization-server metadata](https://dss.aegean.gr/rfc-issuer/.well-known/oauth-authorization-server)
