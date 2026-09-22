@@ -46,7 +46,7 @@ jobs:
       DC_API_AVD_NAME: 'dc-api-api37-pixel7-google-apis'
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
