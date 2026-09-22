@@ -861,6 +861,9 @@ object WalletPresentationHandler {
         )
         val authorizationRequest = resolvedRequest.authorizationRequest
         val keyMaterial = wallet.resolveKeyMaterial(keyId = null, crypto2Usages = setOf(KeyUsage.SIGN))
+        val defaultCapabilities = keyMaterial?.presentationCapabilities()
+            ?: WalletPresentationFormatRegistry.defaultCapabilities()
+        val resolveMdocHolderKey = wallet.mdocHolderKeyResolver()
         val validation = PresentationRequestValidator.validate(
             resolvedRequest = ResolvedAuthorizationRequest.Plain(
                 authorizationRequest = authorizationRequest,
@@ -930,9 +933,19 @@ object WalletPresentationHandler {
             request.eligibleCredentialIds?.let { option.credentialId in it } ?: true
         }.compatibleWithVerifierFormats(
             verifierFormats = resolvedRequest.effectiveClientMetadata?.vpFormatsSupported,
-            capabilities = keyMaterial?.presentationCapabilities()
-                ?: WalletPresentationFormatRegistry.defaultCapabilities(),
-        )
+        ) { option ->
+            val format = WalletPresentationFormatRegistry.resolve(option.format)
+            if (format != WalletPresentationFormatRegistry.SupportedFormat.MSO_MDOC) {
+                defaultCapabilities
+            } else {
+                val stored = storedById[option.credentialId] ?: return@compatibleWithVerifierFormats null
+                runCatching {
+                    WalletPresentationFormatRegistry.capabilitiesFromKeys(
+                        listOf(resolveMdocHolderKey(option.credentialId, stored.credential)),
+                    )
+                }.getOrNull()
+            }
+        }
         val credentialRequirements = query.requiredCredentialRequirements()
         val offeredQueryIds = credentialOptions.mapTo(mutableSetOf()) { it.queryId }
         val transactionAvailabilityError = PresentationRequestValidator.validateTransactionDataCredentialAvailability(
@@ -2157,12 +2170,17 @@ internal fun WalletKeyStoreEntry.presentationCapabilities(): WalletPresentationF
         fallbackKeyTypes = setOfNotNull(legacyKey?.keyType?.takeIf { crypto2Key == null }),
     )
 
-private fun List<PresentationCredentialOption>.compatibleWithVerifierFormats(
+private suspend fun List<PresentationCredentialOption>.compatibleWithVerifierFormats(
     verifierFormats: Map<String, JsonObject>?,
-    capabilities: WalletPresentationFormatRegistry.RuntimeCapabilities,
-): List<PresentationCredentialOption> = filter { option ->
-    val format = WalletPresentationFormatRegistry.resolve(option.format) ?: return@filter false
-    WalletPresentationFormatRegistry.supportsFormat(format, verifierFormats, capabilities)
+    capabilitiesFor: suspend (PresentationCredentialOption) -> WalletPresentationFormatRegistry.RuntimeCapabilities?,
+): List<PresentationCredentialOption> = buildList {
+    for (option in this@compatibleWithVerifierFormats) {
+        val format = WalletPresentationFormatRegistry.resolve(option.format) ?: continue
+        val capabilities = capabilitiesFor(option) ?: continue
+        if (WalletPresentationFormatRegistry.supportsFormat(format, verifierFormats, capabilities)) {
+            add(option)
+        }
+    }
 }
 // ---------------------------------------------------------------------------
 // Isolated-step request / response types for the manual presentation flow
