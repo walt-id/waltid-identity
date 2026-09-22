@@ -342,3 +342,6 @@ registerWalletProfileTestTask(
     testFilter = "id.walt.itb.ItbPortalBridgeBrowserTest",
     descriptionText = "Check ITB portal orchestration against an isolated local DOM fixture."
 )
+
+// The opt-in Android fixture compiles the same wallet driver, without the JVM software-key factory.
+kotlin.sourceSets.named("main") { kotlin.srcDir("src/deviceShared/kotlin") }

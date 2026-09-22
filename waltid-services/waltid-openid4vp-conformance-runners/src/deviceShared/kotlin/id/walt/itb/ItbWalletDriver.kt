@@ -3,19 +3,15 @@
 package id.walt.itb
 
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
-import id.walt.openid4vp.conformance.wallet.WalletCredentialIssuer
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.handlers.*
-import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
-import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import io.ktor.client.HttpClient
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 import kotlinx.serialization.json.*
 import java.time.Instant
-import java.util.UUID
 
 /** Session-correlated inputs supplied by the test bed, never replacement reference-service requests. */
 sealed interface ItbWalletInteraction {
@@ -38,16 +34,17 @@ sealed interface ItbWalletInteraction {
 class ItbWalletRejection(val code: String) : IllegalStateException("The wallet rejected the presentation request ($code)")
 
 /**
- * Exercises shared JVM wallet behavior with a fresh holder and an in-memory credential store.
+ * Exercises the shared wallet with an explicitly supplied holder and credential store.
  * The portal supplies offers/requests; a reference-issuer callback completes authorization without implementing wallet cryptography.
  * Digital Credentials execution is a protocol bridge, not evidence of native platform delivery or consent.
  */
-class ItbWalletDriver private constructor(
+class ItbWalletDriver internal constructor(
     private val wallet: Wallet,
     private val client: HttpClient,
     private val trustedOrigin: Url,
     private val clientIdTrust: ClientIdTrustConfiguration,
     private val authorize: suspend (Url, Url) -> Url,
+    private val scaAuthorizer: WalletScaPresentationAuthorizer? = null,
 ) {
     private val paymentTypes = TransactionDataTypeRegistry("urn:eudi:sca:payment:1")
     private val redirectUri = Url("openid://")
@@ -116,6 +113,7 @@ class ItbWalletDriver private constructor(
             val result = WalletPresentationHandler.submitPresentation(
                 wallet, SubmitPresentationRequest(preview.handle, selection),
                 transactionDataTypeRegistry = paymentTypes,
+                scaAuthorizer = scaAuthorizer,
             )
             check(result.transmissionSuccess == true) { "The wallet did not transmit the presentation successfully" }
         }
@@ -166,6 +164,7 @@ class ItbWalletDriver private constructor(
                 preview.requestId, select(preview.credentialOptions, preview.credentialRequirements),
             ),
             transactionDataTypeRegistry = paymentTypes,
+            scaAuthorizer = scaAuthorizer,
         )
         val submitted = client.post(responseEndpoint) {
             header(HttpHeaders.Origin, trustedOrigin.toString().trimEnd('/'))
@@ -199,21 +198,6 @@ class ItbWalletDriver private constructor(
             val primitive = value.jsonPrimitive
             require(!primitive.isString && primitive.longOrNull != null) { "The ITB descriptor expiry must be Unix seconds" }
             return Instant.ofEpochSecond(primitive.long)
-        }
-
-        suspend fun create(
-            client: HttpClient,
-            trustedOrigin: Url,
-            clientIdTrust: ClientIdTrustConfiguration,
-            authorize: suspend (Url, Url) -> Url,
-        ): ItbWalletDriver {
-            val holder = WalletCredentialIssuer().holderCrypto2Key()
-            val wallet = Wallet(
-                id = "itb-${UUID.randomUUID()}",
-                keyStores = listOf(InMemoryKeyStore().apply { addCrypto2Key(holder) }),
-                credentialStores = listOf(InMemoryCredentialStore()),
-            )
-            return ItbWalletDriver(wallet, client, trustedOrigin, clientIdTrust, authorize)
         }
 
         /** Pick a complete advertised alternative for each required credential set, preserving wallet matching. */

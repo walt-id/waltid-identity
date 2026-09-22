@@ -81,6 +81,29 @@ internal class WalletFixtures {
         return json.parseToJsonElement(verified.payload.decodeToString()).jsonObject
     }
 
+    /** Reviewed submission with explicitly simulated factors; never used by the live runner. */
+    suspend fun presentPayment(authorizer: WalletScaPresentationAuthorizer?): JsonObject {
+        val wallet = wallet()
+        WalletCredentialHandler.importCredential(wallet, ImportCredentialRequest(credential()))
+        val data = JsonObject(json.encodeToJsonElement(request(transactionData = listOf(payment()))).jsonObject
+            .minus("client_id").minus("response_uri") + ("response_mode" to JsonPrimitive("dc_api")))
+        val preview = WalletPresentationHandler.previewDcApiPresentation(
+            wallet, PreviewDcApiPresentationRequest("openid4vp-v1-unsigned", data, VERIFIER),
+            transactionDataTypeRegistry = TransactionDataTypeRegistry(PAYMENT_TYPE),
+        )
+        val result = WalletPresentationHandler.submitDcApiPresentation(
+            wallet, SubmitDcApiPresentationRequest(preview.requestId, preview.credentialOptions.map {
+                PresentationCredentialSelection(it.queryId, it.credentialId)
+            }),
+            transactionDataTypeRegistry = TransactionDataTypeRegistry(PAYMENT_TYPE),
+            scaAuthorizer = authorizer,
+        )
+        val presentation = result.data.getValue("vp_token").jsonObject
+            .getValue("credential").jsonArray.single().jsonPrimitive.content
+        val verified = CompactJws.verify(presentation.substringAfterLast('~'), issuer.holderCrypto2Key(), JwsAlgorithm.ES256)
+        return json.parseToJsonElement(verified.payload.decodeToString()).jsonObject
+    }
+
     companion object {
         const val ISSUER = "https://credentials.example.com"
         const val VERIFIER = "https://verifier.example.com"
