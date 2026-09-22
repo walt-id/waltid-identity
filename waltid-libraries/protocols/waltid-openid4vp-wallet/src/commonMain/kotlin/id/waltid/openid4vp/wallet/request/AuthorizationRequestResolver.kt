@@ -180,6 +180,10 @@ object AuthorizationRequestResolver {
 
     /**
      * Shared transport mapping for retrieving Authorization Requests via `request_uri`.
+     * POST metadata includes a fresh public encryption key. The private key lives only for
+     * this exchange; a JWE response is unwrapped before the resolver authenticates its signed JWT.
+     * Caller-supplied encryption keys and request-encryption algorithms are replaced by this
+     * exchange's capabilities; other wallet metadata is retained.
      * Keeps GET/POST behavior and response conversion centralized for all wallet callers.
      */
     suspend fun fetchRequestUriWithWebDataFetcher(
@@ -193,6 +197,13 @@ object AuthorizationRequestResolver {
             .takeIf { it == RequestUriHttpMethod.POST }
             ?.let { UuidUtils.randomUUIDString().replace("-", "") }
 
+        val encryption = if (requestUriMethod == RequestUriHttpMethod.POST && sendWalletMetadata) {
+            RequestObjectEncryption.create()
+        } else null
+        val walletMetadata = encryption?.walletMetadata(
+            requestUriPostWalletMetadata ?: defaultRequestUriPostWalletMetadata,
+        )
+
         val response = when (requestUriMethod) {
             null, RequestUriHttpMethod.GET -> webResolveAuthReq.rawFetch(requestUri)
             RequestUriHttpMethod.POST -> webResolveAuthReq.rawFetch(Url(requestUri)) {
@@ -202,17 +213,23 @@ object AuthorizationRequestResolver {
                 setBody(
                     buildRequestUriPostBody(
                         walletNonce = requireNotNull(walletNonce),
-                        walletMetadata = requestUriPostWalletMetadata ?: defaultRequestUriPostWalletMetadata,
+                        walletMetadata = walletMetadata ?: requestUriPostWalletMetadata ?: defaultRequestUriPostWalletMetadata,
                         sendWalletMetadata = sendWalletMetadata,
                     )
                 )
             }
         }
 
+        val body = response.bodyAsText()
+        val requestObject = if (response.status.isSuccess() &&
+            response.contentType()?.match("application/oauth-authz-req+jwt") == true && body.count { it == '.' } == 4
+        ) {
+            requireNotNull(encryption) { "No request-encryption key was advertised for this exchange" }.decrypt(body)
+        } else body
         return RequestUriFetchResponse(
             status = response.status,
             contentType = response.contentType(),
-            body = response.bodyAsText(),
+            body = requestObject,
             walletNonce = walletNonce,
         )
     }
