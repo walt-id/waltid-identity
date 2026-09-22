@@ -11,6 +11,7 @@ import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import io.ktor.http.Url
+import io.klogging.config.loggingConfiguration
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import java.nio.file.Path
@@ -20,6 +21,8 @@ import kotlin.system.exitProcess
 
 /** Explicit opt-in entry point. Ordinary unit tests never sign in to or start sessions on the remote tenant. */
 fun main(): Unit = runBlocking {
+    // Protocol libraries can log headers and bearer URLs. This CLI emits only sanitized outcomes.
+    loggingConfiguration {}
     val exit = try { runItb() } catch (error: Exception) {
         // Configuration errors and browser exceptions may carry authentication values.
         System.err.println("ITB runner setup failed (${error::class.simpleName}); no passing result is implied.")
@@ -72,7 +75,7 @@ private suspend fun runItb(): Int {
                 page.getByRole(AriaRole.TEXTBOX, Page.GetByRoleOptions().setName("Username:")).fill(username)
                 page.getByRole(AriaRole.TEXTBOX, Page.GetByRoleOptions().setName("Password:")).fill(password)
                 page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(Pattern.compile("Log in"))).click()
-                page.waitForURL("**/#/home")
+                page.waitForURL("${catalogue.testBed}/app#/home")
                 itbHttpClient().use { client ->
                     val wallet = ItbWalletDriver.create(client, origin, trust) { url, callback ->
                         ItbReferenceAuthorization.resolve(client, origin, url, callback)

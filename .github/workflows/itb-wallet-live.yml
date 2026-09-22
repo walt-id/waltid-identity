@@ -25,11 +25,15 @@ jobs:
       KLOGGING_CONFIG_PATH: ${{ github.workspace }}/.github/ci/klogging.conf
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-read-only: true
       - name: Prepare runner browser
         run: >-
           ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers
@@ -65,6 +69,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: itb-wallet-live-${{ github.sha }}
+          retention-days: 14
           if-no-files-found: error
           path: |
             build/reports/itb-wallet/results.json
