@@ -546,6 +546,61 @@ class MobileWalletDigitalCredentialPresentationTest {
         assertEquals("mdl-1", preview.credentialOptions.single().credentialId)
     }
 
+    @Test
+    fun signedDcApiPreviewKeepsASoleMdocSignedByItsBoundKeyWhenTheDefaultKeyCannot() = runTest {
+        val defaultKey = ed25519SigningKey("default-ed25519")
+        val mdocKey = signingKey("mdoc-p256")
+        val verifierKey = JWKKey.generate(KeyType.Ed25519)
+        val trust = ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(
+                "verifier2" to ClientMetadata(
+                    jwks = ClientMetadata.Jwks(
+                        listOf(jwkWithKid(verifierKey.getPublicKey().exportJWKObject(), verifierKey.getKeyId())),
+                    ),
+                    vpFormatsSupported = mapOf(
+                        "mso_mdoc" to buildJsonObject {
+                            put("deviceauth_alg_values", buildJsonArray { add(JsonPrimitive(-7)) })
+                        },
+                    ),
+                ),
+            ),
+        )
+        val fixture = walletFixtureWithKeys(
+            keys = listOf(defaultKey, mdocKey),
+            credentials = arrayOf(mdocCredential(holderKey = mdocKey)),
+            clientIdTrustConfiguration = trust,
+        )
+        val preview = fixture.wallet.previewDigitalCredentialPresentation(
+            dcApiRequest(
+                protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
+                data = signedRequestObject(
+                    key = verifierKey,
+                    unsignedPayload = Json.parseToJsonElement(
+                        """
+                        {
+                          "response_type": "vp_token",
+                          "response_mode": "dc_api",
+                          "nonce": "nonce-123",
+                          "dcql_query": {
+                            "credentials": [
+                              {
+                                "id": "mdl",
+                                "format": "mso_mdoc",
+                                "meta": {"doctype_value": "$MDOC_DOCTYPE"},
+                                "claims": [{"path": ["$MDOC_NAMESPACE", "given_name"]}]
+                              }
+                            ]
+                          }
+                        }
+                        """.trimIndent(),
+                    ).jsonObject,
+                ),
+                selectedRegistryEntryIds = listOf(fixture.registryEntryId("mdl-1")),
+            ),
+        )
+        assertEquals("mdl-1", preview.credentialOptions.single().credentialId)
+    }
+
     /**
      * `dc_api.jwt` without usable verifier encryption keys must fail rather than degrade to a
      * cleartext response, which the verifier would still accept as an answer to its encrypted request.
