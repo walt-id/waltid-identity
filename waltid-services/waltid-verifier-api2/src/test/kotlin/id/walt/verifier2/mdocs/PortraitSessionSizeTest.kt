@@ -47,6 +47,9 @@ import io.ktor.client.call.body
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.server.application.Application
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -183,10 +186,128 @@ class PortraitSessionSizeTest {
         }
     }
 
-    private data class PortraitHolder(val credential: MdocsCredential, val key: id.walt.crypto2.keys.Key)
+    /**
+     * What a portrait costs in time, beside what it costs in bytes.
+     *
+     * Reported rather than asserted: a wall-clock number on a shared machine is not a threshold anybody should
+     * gate a build on, but the ratio between the two credential shapes is what sizing a deployment needs, and
+     * measuring it here takes seconds where a remote arm takes forty minutes.
+     */
+    @Test
+    fun `measure the cost of a portrait against a minimal credential`() {
+        val host = "127.0.0.1"
+        val port = 17032
+        val minimal = runBlocking { portraitHolder(portraitBytes = 0) }
+        val portrait = runBlocking { portraitHolder(portraitBytes = portraitBytes) }
+
+        E2ETest(host, port, true).testBlock(
+            features = listOf(OSSVerifier2FeatureCatalog),
+            preload = {
+                ConfigManager.preloadConfig(
+                    "verifier-service", OSSVerifier2ServiceConfig(
+                        clientId = "verifier2",
+                        urlPrefix = "http://$host:$port/verification-session",
+                        urlHost = "openid4vp://authorize",
+                    )
+                )
+            },
+            init = {
+                DidService.apply {
+                    registerResolver(LocalResolver())
+                    updateResolversForMethods()
+                }
+            },
+            module = Application::verifierModule,
+        ) {
+            val http = testHttpClient()
+            val rounds = 20
+
+            suspend fun timeFor(holder: PortraitHolder, label: String): Double {
+                // One untimed round first, so class loading and JIT land on the warm-up rather than the result.
+                repeat(1 + rounds) { index ->
+                    val created = http.post("/verification-session/create") {
+                        setBody(portraitSessionSetup(requestPortrait = holder.hasPortrait))
+                    }.body<VerificationSessionCreationResponse>()
+                    val started = kotlin.time.TimeSource.Monotonic.markNow()
+                    WalletPresentFunctionality2.walletPresentHandling(
+                        holderKey = holder.key,
+                        holderDid = null,
+                        presentationRequestUrl = created.bootstrapAuthorizationRequestUrl!!,
+                        selectCredentialsForQuery = { query -> matchFor(query, holder) },
+                        holderPoliciesToRun = null,
+                        runPolicies = null,
+                        transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                        mdocHolderKeyResolver = { _, _ -> holder.key },
+                    )
+                    if (index > 0) elapsed[label] = (elapsed[label] ?: 0.0) + started.elapsedNow().inWholeMicroseconds
+                }
+                return (elapsed[label] ?: 0.0) / rounds / 1000.0
+            }
+
+            /**
+             * Concurrent, because the inverse of a latency is not a throughput.
+             *
+             * Sequentially this reports about 40 sessions/s at 24.5ms each, which invites the conclusion that the
+             * verifier does 40 sessions/s - it does not. A local reference run measured 533 to 715 sessions/s at
+             * concurrency 25 to 400, and those are the same system: one in flight is a latency measurement.
+             */
+            suspend fun throughputFor(holder: PortraitHolder, concurrency: Int, total: Int): Double = coroutineScope {
+                val started = kotlin.time.TimeSource.Monotonic.markNow()
+                val next = java.util.concurrent.atomic.AtomicInteger(0)
+                List(concurrency) {
+                    launch {
+                        while (next.getAndIncrement() < total) {
+                            val created = http.post("/verification-session/create") {
+                                setBody(portraitSessionSetup(requestPortrait = holder.hasPortrait))
+                            }.body<VerificationSessionCreationResponse>()
+                            WalletPresentFunctionality2.walletPresentHandling(
+                                holderKey = holder.key,
+                                holderDid = null,
+                                presentationRequestUrl = created.bootstrapAuthorizationRequestUrl!!,
+                                selectCredentialsForQuery = { query -> matchFor(query, holder) },
+                                holderPoliciesToRun = null,
+                                runPolicies = null,
+                                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                                mdocHolderKeyResolver = { _, _ -> holder.key },
+                            )
+                        }
+                    }
+                }.joinAll()
+                total / (started.elapsedNow().inWholeMilliseconds / 1000.0)
+            }
+
+            test("Compare a minimal credential with a portrait one") {
+                val minimalMs = timeFor(minimal, "minimal")
+                val portraitMs = timeFor(portrait, "portrait")
+                println(
+                    "LATENCY minimalMs=${"%.1f".format(minimalMs)} portraitMs=${"%.1f".format(portraitMs)} " +
+                            "ratio=${"%.2f".format(portraitMs / minimalMs)}"
+                )
+
+                // Both credential shapes at the same concurrency, which is the comparison a deployment needs.
+                val concurrency = 32
+                val minimalRate = throughputFor(minimal, concurrency, total = 200)
+                val portraitRate = throughputFor(portrait, concurrency, total = 100)
+                println(
+                    "THROUGHPUT concurrency=$concurrency " +
+                            "minimalPerSecond=${"%.1f".format(minimalRate)} " +
+                            "portraitPerSecond=${"%.1f".format(portraitRate)} " +
+                            "ratio=${"%.2f".format(minimalRate / portraitRate)}"
+                )
+            }
+        }
+    }
+
+    private val elapsed = mutableMapOf<String, Double>()
+
+    private data class PortraitHolder(
+        val credential: MdocsCredential,
+        val key: id.walt.crypto2.keys.Key,
+        val hasPortrait: Boolean,
+    )
 
     /** Issues an mDL whose portrait is the size a real one is, with a self-signed document signer. */
-    private suspend fun portraitHolder(): PortraitHolder {
+    private suspend fun portraitHolder(portraitBytes: Int = this.portraitBytes): PortraitHolder {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         suspend fun key(id: String) = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
@@ -227,7 +348,11 @@ class PortraitSessionSizeTest {
             Document(docType = DOC_TYPE, issuerSigned = issuerSigned),
         ).encodeToBase64Url()
 
-        return PortraitHolder(CredentialParser.detectAndParse(raw).second as MdocsCredential, holderKey)
+        return PortraitHolder(
+            CredentialParser.detectAndParse(raw).second as MdocsCredential,
+            holderKey,
+            hasPortrait = portraitBytes > 0,
+        )
     }
 
     private fun matchFor(query: DcqlQuery, holder: PortraitHolder) = DcqlMatcher.match(
@@ -243,7 +368,7 @@ class PortraitSessionSizeTest {
         ),
     ).getOrThrow()
 
-    private fun portraitSessionSetup(): VerificationSessionSetup = CrossDeviceFlowSetup(
+    private fun portraitSessionSetup(requestPortrait: Boolean = true): VerificationSessionSetup = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
             dcqlQuery = DcqlQuery(
                 credentials = listOf(
@@ -252,7 +377,10 @@ class PortraitSessionSizeTest {
                         format = CredentialFormat.MSO_MDOC,
                         meta = MsoMdocMeta(doctypeValue = DOC_TYPE),
                         claims = listOf(
-                            ClaimsQuery(path = listOf(NAMESPACE, "portrait").map { Json.parseToJsonElement("\"$it\"") }),
+                            ClaimsQuery(
+                                path = listOf(NAMESPACE, if (requestPortrait) "portrait" else "family_name")
+                                    .map { Json.parseToJsonElement("\"$it\"") }
+                            ),
                         ),
                     )
                 )
