@@ -2,14 +2,15 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.crypto2.keys.Key as ManagedKeyMaterial
+import id.walt.wallet2.mobile.identity.*
+import id.walt.crypto2.keys.PlatformKeyFacts
+import id.walt.wallet2.persistence.keys.WalletKeyProtection
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.KeyCapabilities
 import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.ProviderId
 import id.walt.crypto2.keys.SoftwareKey
@@ -26,15 +27,15 @@ import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseEnforcement
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationReuseTimeoutValidation
+import id.walt.crypto2.keys.KeyUseAuthorizationException
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationReuseEnforcement
+import id.walt.crypto2.keys.KeyUseAuthorizationReuseTimeoutValidation
 import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
 import id.walt.wallet2.persistence.keys.WalletKeyRequirements
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
@@ -54,238 +55,60 @@ import kotlin.test.assertTrue
 
 class MobileWalletFactoryTest {
     @Test
-    fun `default bootstrap persists restarts and signs with public-only DIDs`() = runTest {
-        val cases = listOf(
-            BootstrapCase(
-                keyType = MobileWalletKeyType.secp256r1,
-                didMethod = "key",
-                signatureAlgorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256),
-            ),
-            BootstrapCase(
-                keyType = MobileWalletKeyType.secp384r1,
-                didMethod = "jwk",
-                signatureAlgorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_384),
-            ),
-        )
-
-        cases.forEach { case ->
-            database().use { database ->
-                val provider = FakePlatformManagedKeyProvider()
-                val config = MobileWalletConfig(defaultKeyType = case.keyType)
-                val wallet = wallet(config, database, provider)
-
-                val bootstrap = wallet.bootstrap(didMethod = case.didMethod)
-                assertEquals(config.defaultKeyUseAuthorizationPolicy, bootstrap.keyUseAuthorizationPolicy)
-                val row = database.queries.selectByKeyId(bootstrap.keyId).executeAsOne()
-                val stored = assertIs<StoredKey.Managed>(
-                    StoredKeyCodec.decodeFromString(assertNotNull(row.stored_key))
-                )
-                assertEquals(stored.id.value, bootstrap.keyId)
-                assertTrue(bootstrap.did.startsWith("did:${case.didMethod}:"))
-                assertStoredDidContainsPublicMaterialOnly(database, bootstrap.did)
-                assertTrue(DidService.resolverMethods.containsKey(case.didMethod))
-
-                val recreatedWallet = wallet(config, database, provider)
-                assertEquals(bootstrap, recreatedWallet.bootstrap(didMethod = case.didMethod))
-                assertTrue(DidService.resolverMethods.containsKey(case.didMethod))
-                assertEquals(1, provider.generateCount)
-
-                val restored = assertNotNull(
-                    SqlDelightKeyStore(provider, database.queries)
-                        .getCrypto2Key(bootstrap.keyId, setOf(KeyUsage.SIGN))
-                )
-                val message = "mobile-key-bootstrap".encodeToByteArray()
-                val signature = assertNotNull(restored.capabilities.signer)
-                    .sign(message, case.signatureAlgorithm)
-                assertTrue(
-                    assertNotNull(restored.capabilities.verifier)
-                        .verify(message, signature, case.signatureAlgorithm)
-                )
-                assertDidMatchesPublicKey(bootstrap.did, restored)
-            }
+    fun `identity initialization persists one matched P256 DID and signs after restart`() = runTest {
+        database().use { database ->
+            val provider = FakePlatformManagedKeyProvider()
+            val config = MobileWalletConfig()
+            val original = wallet(config, database, provider)
+            val identity = assertIs<SigningIdentityOperationResult.Active>(original.signingIdentity.initialize()).identity
+            assertEquals(KeyUseAuthorizationPolicy.BiometricCurrentSet, identity.authorization)
+            assertTrue(identity.did.startsWith("did:jwk:"))
+            assertStoredDidContainsPublicMaterialOnly(database, identity.did)
+            val reopened = wallet(config, database, provider)
+            assertEquals(identity, assertIs<SigningIdentityOperationResult.Active>(reopened.signingIdentity.initialize()).identity)
+            assertEquals(1, provider.generateCount)
+            val key = assertNotNull(SqlDelightKeyStore(provider, database.queries).getCrypto2Key(identity.keyId))
+            val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)
+            val message = "identity-restart".encodeToByteArray()
+            val signature = assertNotNull(key.capabilities.signer).sign(message, algorithm)
+            assertTrue(assertNotNull(key.capabilities.verifier).verify(message, signature, algorithm))
+            assertDidMatchesPublicKey(identity.did, key)
         }
     }
 
     @Test
-    fun `unsupported DID method fails before key generation`() = runTest {
+    fun `identity creation uses the configured DID service`() = runTest {
         database().use { database ->
-            val provider = FakePlatformManagedKeyProvider()
-
-            val failure = assertFailsWith<IllegalArgumentException> {
-                wallet(MobileWalletConfig(), database, provider).bootstrap(didMethod = "web")
-            }
-
-            assertTrue(failure.message.orEmpty().contains("supports only did:key and did:jwk"))
-            assertEquals(0, provider.generateCount)
-            assertTrue(database.queries.selectAll().executeAsList().isEmpty())
-        }
-    }
-
-    @Test
-    fun `configured DID service registers the requested method`() = runTest {
-        database().use { database ->
-            val provider = FakePlatformManagedKeyProvider()
             val didService = RecordingDidService()
-
-            val bootstrap = wallet(
-                database = database,
-                provider = provider,
-                config = MobileWalletConfig(),
-                didService = didService,
-            ).bootstrap(didMethod = "jwk")
-
-            assertTrue(bootstrap.did.startsWith("did:jwk:"))
+            val result = wallet(MobileWalletConfig(), database, FakePlatformManagedKeyProvider(), didService).signingIdentity.initialize()
+            assertIs<SigningIdentityOperationResult.Active>(result)
             assertEquals(listOf("jwk"), didService.registeredMethods)
         }
     }
 
     @Test
-    fun `DID registration failure removes the persisted key`() = runTest {
-        database().use { database ->
-            val provider = FakePlatformManagedKeyProvider()
-            val failure = assertFailsWith<IllegalStateException> {
-                wallet(
-                    config = MobileWalletConfig(),
-                    database = database,
-                    provider = provider,
-                    didService = object : Crypto2DidService by Crypto2DidService {
-                        override suspend fun registerByKey(
-                            method: String,
-                            key: ManagedKeyMaterial,
-                            options: DidCreateOptions,
-                        ): DidResult = error("DID registration failed")
-                    },
-                ).bootstrap()
-            }
-
-            assertTrue(failure.message.orEmpty().contains("DID registration failed"))
-            assertTrue(database.queries.selectAll().executeAsList().isEmpty())
-            assertEquals(1, provider.deleteCount)
-        }
-    }
-
-    @Test
-    fun `preflight and bootstrap resolve configured and per-call authorization policies`() = runTest {
-        val cases = listOf(
-            PolicyCase(
-                configured = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-                requested = null,
-                expected = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-            ),
-            PolicyCase(
-                configured = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-                requested = KeyUseAuthorizationPolicy.None,
-                expected = KeyUseAuthorizationPolicy.None,
-            ),
-            PolicyCase(
-                configured = KeyUseAuthorizationPolicy.None,
-                requested = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-                expected = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-            ),
-            PolicyCase(
-                configured = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-                requested = KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10),
-                expected = KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10),
-            ),
-        )
-
-        cases.forEach { case ->
-            database().use { database ->
-                val provider = FakePlatformManagedKeyProvider()
-                val mobileWallet = wallet(
-                    config = MobileWalletConfig(defaultKeyUseAuthorizationPolicy = case.configured),
-                    database = database,
-                    provider = provider,
-                )
-
-                val preflight = if (case.requested == null) {
-                    mobileWallet.keyUseAuthorizationPreflight()
-                } else {
-                    mobileWallet.keyUseAuthorizationPreflight(
-                        keyUseAuthorizationPolicy = case.requested,
-                    )
-                }
-                assertEquals(case.expected.toSupportedPreflight(), preflight)
-                assertEquals(listOf(case.expected), provider.preflightPolicies)
-            }
-
-            database().use { database ->
-                val provider = FakePlatformManagedKeyProvider()
-                val bootstrap = wallet(
-                    config = MobileWalletConfig(defaultKeyUseAuthorizationPolicy = case.configured),
-                    database = database,
-                    provider = provider,
-                ).bootstrap(keyUseAuthorizationPolicy = case.requested)
-
-                val expectedManagedCalls = listOf(case.expected)
-                assertEquals(case.expected, bootstrap.keyUseAuthorizationPolicy)
-                assertEquals(expectedManagedCalls, provider.generatedPolicies)
-                assertEquals(listOf(case.expected), provider.preflightPolicies)
-
-                val reopened = wallet(
-                    config = MobileWalletConfig(defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None),
-                    database = database,
-                    provider = provider,
-                ).bootstrap(keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None)
-                assertEquals(case.expected, reopened.keyUseAuthorizationPolicy)
-                assertEquals(1, provider.generateCount)
-            }
-        }
-    }
-
-    @Test
-    fun `protected bootstrap fails closed when preflight is unsupported`() = runTest {
+    fun `unsupported native authorization never silently selects software`() = runTest {
         database().use { database ->
             val provider = FakePlatformManagedKeyProvider().apply {
-                preflightResult = KeyUseAuthorizationSupport.Unsupported(
-                    KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled,
-                )
+                preflightResult = KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled)
             }
-
-            val failure = assertFailsWith<KeyUseAuthorizationException> {
-                wallet(
-                    config = MobileWalletConfig(
-                        defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-                    ),
-                    database = database,
-                    provider = provider,
-                ).bootstrap()
-            }
-
-            assertEquals(
-                KeyUseAuthorizationFailure.BiometricNotEnrolled,
-                failure.failure,
-            )
+            val result = wallet(MobileWalletConfig(), database, provider).signingIdentity.initialize()
+            assertEquals(SigningIdentityFailure.UnsupportedPolicy, assertIs<SigningIdentityOperationResult.Failed>(result).reason)
             assertEquals(0, provider.generateCount)
             assertTrue(database.queries.selectAll().executeAsList().isEmpty())
         }
     }
 
     @Test
-    fun `protected bootstrap propagates provider generation authorization failure`() = runTest {
+    fun `authorization cancellation cleans owned operation without choosing a weaker key`() = runTest {
         database().use { database ->
             val provider = FakePlatformManagedKeyProvider().apply {
-                generateFailure = KeyUseAuthorizationException(
-                    failure = KeyUseAuthorizationFailure.UnsupportedCombination,
-                    message = "The platform could not enforce the requested key policy",
-                    cause = SignumKeyPolicyMismatchException("wallet-key", "hardware policy mismatch"),
-                )
+                generateFailure = KeyUseAuthorizationException(KeyUseAuthorizationFailure.AuthorizationNotCompleted, "Test cancellation")
             }
-
-            val failure = assertFailsWith<KeyUseAuthorizationException> {
-                wallet(
-                    config = MobileWalletConfig(
-                        defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
-                    ),
-                    database = database,
-                    provider = provider,
-                ).bootstrap()
-            }
-
-            assertEquals(KeyUseAuthorizationFailure.UnsupportedCombination, failure.failure)
+            val result = wallet(MobileWalletConfig(), database, provider).signingIdentity.initialize()
+            assertEquals(SigningIdentityFailure.AuthorizationNotCompleted, assertIs<SigningIdentityOperationResult.Failed>(result).reason)
             assertEquals(1, provider.generateCount)
             assertTrue(database.queries.selectAll().executeAsList().isEmpty())
-            assertTrue(database.queries.selectAllDids().executeAsList().isEmpty())
         }
     }
 
@@ -369,7 +192,9 @@ class MobileWalletFactoryTest {
 
         override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport {
             preflightPolicies += requirements.authorizationPolicy
-            return preflightResult ?: requirements.authorizationPolicy.toSupportedPreflight()
+            return preflightResult ?: if (requirements.protection == WalletKeyProtection.HardwareRequired)
+                KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
+            else requirements.authorizationPolicy.toSupportedPreflight()
         }
 
         override suspend fun generateManagedKey(request: WalletKeyCreationRequest): ManagedKey {
@@ -411,6 +236,13 @@ class MobileWalletFactoryTest {
             } ?: PlatformManagedKeyRestoration.Missing(keyUseAuthorizationPolicy(stored))
         }
 
+        override suspend fun keyFacts(stored: StoredKey.Managed): PlatformKeyFacts = PlatformKeyFacts(
+            origin = id.walt.crypto2.keys.KeyOrigin.GENERATED,
+            protection = id.walt.crypto2.keys.KeyProtectionLevel.SOFTWARE,
+            securityLevel = id.walt.crypto2.keys.KeySecurityLevel.SOFTWARE,
+        )
+        override suspend fun deleteUncommittedKey(request: WalletKeyCreationRequest, imported: Boolean) = Unit
+
         override suspend fun deleteManagedKey(stored: StoredKey.Managed) {
             deleteCount++
             keys.remove(stored.id)
@@ -423,7 +255,7 @@ class MobileWalletFactoryTest {
         }
 
         private companion object {
-            val PROVIDER_ID = ProviderId("mobile-bootstrap-test")
+            val PROVIDER_ID = ProviderId("mobile-identity-test")
         }
     }
 

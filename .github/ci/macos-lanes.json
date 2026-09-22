@@ -36,7 +36,13 @@
         "*/src/iosSimulatorArm64Test/*",
         ".github/scripts/mobile-ci/verify_proximity_suites.py",
         ".github/scripts/mobile-ci/verify_test_results.py",
-        ".github/scripts/mobile-ci/proximity-test-suites.json"
+        ".github/scripts/mobile-ci/proximity-test-suites.json",
+        "scripts/*recovery*",
+        "scripts/ios_simulator_test.py",
+        "scripts/tests/test_*recovery*",
+        ".github/scripts/mobile-ci/run-ios-wallet-recovery-tests.sh",
+        "*/src/recoveryTest/*",
+        "*/src/iosRecoveryTest/*"
       ]
     },
     "native": {

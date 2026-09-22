@@ -19,6 +19,9 @@ class WalletDemoAppIosTest {
     fun proximityQrFitsWalletChromeWithoutScrolling() = scenarios.proximityQrFitsWalletChromeWithoutScrolling()
 
     @Test
+    fun keySetupGroupsChoicesAndConfirmsSelectedConfiguration() = scenarios.keySetupGroupsChoicesAndConfirmsSelectedConfiguration()
+
+    @Test
     fun pinStorageFailureStaysLockedUntilRetrySucceeds() =
         scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
 
@@ -35,8 +38,8 @@ class WalletDemoAppIosTest {
         scenarios.pinSetupKeepsSubmitReachableWhenScrolled()
 
     @Test
-    fun unavailableBiometricSigningIsDisabledButNoneRemainsAvailable() =
-        scenarios.unavailableBiometricSigningIsDisabledButNoneRemainsAvailable()
+    fun pinSetupDoesNotAskForSigningApproval() =
+        scenarios.pinSetupDoesNotAskForSigningApproval()
 
     @Test
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() =
@@ -147,6 +150,10 @@ class WalletDemoAppIosTest {
     @Test
     fun settingsReplacesHeaderLockAndShowsDidAndKey() =
         scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
+
+    @Test
+    fun technicalCopyPreservesFullValueWithoutChangingExpansion() =
+        scenarios.technicalCopyPreservesFullValueWithoutChangingExpansion()
 
     @Test
     fun readerTrustSettingsReviewAndPersistPublicCa() =

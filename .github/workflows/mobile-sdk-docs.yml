@@ -47,7 +47,7 @@ jobs:
     timeout-minutes: 55
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6cf69001d859d67687353466f1ad2fb006f574e0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
@@ -55,7 +55,7 @@ jobs:
           resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Check mobile SDK documentation snippets
         working-directory: waltid-identity
@@ -80,7 +80,7 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6cf69001d859d67687353466f1ad2fb006f574e0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
@@ -88,11 +88,11 @@ jobs:
           resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Restore the shared release framework
         if: ${{ inputs.wallet-core-artifact != '' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.wallet-core-artifact }}
           path: ${{ runner.temp }}/wallet-core-artifact
@@ -113,8 +113,15 @@ jobs:
           fi
           git fetch --prune origin main
           ./gradlew \
+            :build-logic:test \
+            :waltid-libraries:crypto:waltid-crypto2:checkKotlinAbi \
+            :waltid-libraries:crypto:waltid-crypto2-signum:checkKotlinAbi \
             :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:checkKotlinAbi \
             :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:checkKotlinAbi \
+            :waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-blockstore:checkKotlinAbi \
+            :waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-keychain:checkKotlinAbi \
+            :waltid-libraries:protocols:waltid-openid4vc-wallet-custody-enterprise:checkKotlinAbi \
+            :waltid-libraries:protocols:waltid-openid4vc-wallet-custody-enterprise:testAndroidHostTest \
             -PenableAndroidBuild=true \
             -PenableIosBuild=true \
             --no-daemon \
@@ -173,7 +180,7 @@ jobs:
             WalletSDK.doccarchive
 
       - name: Upload Swift WalletSDK DocC archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: walletsdk-doccarchive
           path: waltid-identity/waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc/WalletSDK.doccarchive.tar.gz
@@ -185,14 +192,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout waltid-identity
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: waltid-identity
           sparse-checkout: docs/mobile-sdk-api
 
       - name: Download SDK docs HTML artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: sdk-docs-html
           path: waltid-identity/docs/mobile-sdk-api/html

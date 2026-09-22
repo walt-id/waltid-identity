@@ -11,6 +11,9 @@ class WalletDemoAppAndroidTest {
     private val scenarios = WalletDemoAppTestScenarios()
 
     @Test
+    fun keySetupGroupsChoicesAndConfirmsSelectedConfiguration() = scenarios.keySetupGroupsChoicesAndConfirmsSelectedConfiguration()
+
+    @Test
     fun pinStorageFailureStaysLockedUntilRetrySucceeds() =
         scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
 
@@ -27,8 +30,8 @@ class WalletDemoAppAndroidTest {
         scenarios.pinSetupKeepsSubmitReachableWhenScrolled()
 
     @Test
-    fun unavailableBiometricSigningIsDisabledButNoneRemainsAvailable() =
-        scenarios.unavailableBiometricSigningIsDisabledButNoneRemainsAvailable()
+    fun pinSetupDoesNotAskForSigningApproval() =
+        scenarios.pinSetupDoesNotAskForSigningApproval()
 
     @Test
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() =
@@ -139,6 +142,10 @@ class WalletDemoAppAndroidTest {
     @Test
     fun settingsReplacesHeaderLockAndShowsDidAndKey() =
         scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
+
+    @Test
+    fun technicalCopyPreservesFullValueWithoutChangingExpansion() =
+        scenarios.technicalCopyPreservesFullValueWithoutChangingExpansion()
 
     @Test
     fun readerTrustSettingsReviewAndPersistPublicCa() =

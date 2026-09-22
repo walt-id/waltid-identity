@@ -28,10 +28,10 @@ internal actual fun rememberReaderTrustImportPicker(
             onResult(ReaderTrustImportPickerResult.Cancelled)
         } else {
             scope.launch {
-            withContext(Dispatchers.IO) { runCatching { resolver.readReaderTrustFile(uri) } }.fold(
-                onSuccess = { currentResult.value(ReaderTrustImportPickerResult.Selected(it)) },
-                onFailure = { currentResult.value(ReaderTrustImportPickerResult.Failed(it)) },
-            )
+                withContext(Dispatchers.IO) { runCatching { resolver.readReaderTrustFile(uri) } }.fold(
+                    onSuccess = { currentResult.value(ReaderTrustImportPickerResult.Selected(it)) },
+                    onFailure = { currentResult.value(ReaderTrustImportPickerResult.Failed(it)) },
+                )
             }
         }
     }
@@ -42,6 +42,7 @@ internal actual fun rememberReaderTrustImportPicker(
                     "application/json",
                     "application/x-x509-ca-cert",
                     "application/pkix-cert",
+                    "application/x-pem-file",
                     "application/pem-certificate-chain",
                     "application/octet-stream",
                     "text/plain",

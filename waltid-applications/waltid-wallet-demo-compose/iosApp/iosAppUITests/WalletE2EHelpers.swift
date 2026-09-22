@@ -10,7 +10,16 @@ final class WalletE2EUI {
         self.app = app
     }
 
-    func launch(environment: [String: String] = [:]) {
+    func completeKeySetupIfNeeded() {
+        let button = app.buttons["wallet.keySetupContinue"]
+        guard button.waitForExistence(timeout: 10) else { return }
+        for heading in ["1 of 3 · Recovery", "2 of 3 · Key storage", "3 of 3 · Signing approval"] {
+            XCTAssertTrue(app.staticTexts[heading].waitForExistence(timeout: 10), "Missing setup step: \(heading)")
+            button.tap()
+        }
+    }
+
+    func launch(environment: [String: String] = [:], initializeSigningIdentity: Bool = true) {
         app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] =
             app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] ?? "disabled"
         for (key, value) in environment {
@@ -18,6 +27,7 @@ final class WalletE2EUI {
         }
         app.launch()
         unlockWallet()
+        if initializeSigningIdentity { completeKeySetupIfNeeded() }
     }
 
     func launch(attestation: [String: String]) {

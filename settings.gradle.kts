@@ -60,6 +60,7 @@ val modules = listOfNotNull(
         "waltid-mdoc-credentials",
         "waltid-dif-definitions-parser",
         "waltid-dcql",
+        "waltid-status-list",
         "waltid-verification-policies",
         "waltid-verification-policies2",
         "waltid-verification-policies2-vp",
@@ -67,7 +68,8 @@ val modules = listOfNotNull(
         "waltid-vical",
         "waltid-mdoc-credentials2",
         "waltid-mdoc-proximity",
-        "waltid-mdoc-proximity-mobile",
+        "waltid-mdoc-proximity-mobile" whenEnabled enableAndroidBuild,
+        "waltid-mdoc-proximity-mobile" whenEnabled enableIosBuild,
         "waltid-trust-registry"
     ),
 
@@ -87,6 +89,10 @@ val modules = listOfNotNull(
         "waltid-openid4vc-wallet-persistence-server",
         "waltid-openid4vc-wallet-mobile" whenEnabled enableAndroidBuild,
         "waltid-openid4vc-wallet-mobile" whenEnabled enableIosBuild,
+        "waltid-openid4vc-wallet-recovery-blockstore" whenEnabled enableAndroidBuild,
+        "waltid-openid4vc-wallet-recovery-keychain" whenEnabled enableIosBuild,
+        "waltid-openid4vc-wallet-custody-enterprise" whenEnabled enableAndroidBuild,
+        "waltid-openid4vc-wallet-custody-enterprise" whenEnabled enableIosBuild,
         "waltid-openid4vc-wallet-server",
         "waltid-mobile-test-utils" whenEnabled enableAndroidBuild,
     ),

@@ -56,7 +56,9 @@ on:
         required: false
         default: false
 
-# Keep both gradle-ios metadata pins in sync with action changes; scripts use the selected checkout.
+# In-repo composites are referenced by path (./waltid-identity/.github/actions/...) so a PR editing
+# them is validated by its own copy; only checkout-repos stays pinned, since nothing is checked out
+# yet when it runs. Scripts use the selected checkout.
 env:
   XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
   IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=latest
@@ -69,18 +71,18 @@ jobs:
     timeout-minutes: 50
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6cf69001d859d67687353466f1ad2fb006f574e0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
           identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Compile iOS targets and run Kotlin iOS simulator tests
         timeout-minutes: 40
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@23c6890329c1e9ddfc9448d047ea31d267933646
+        uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -94,6 +96,38 @@ jobs:
           test-report-check-name: iOS Simulator Test Report
           test-result-artifact-name: ios-simulator-test-results
 
+      - name: Run Keychain contracts and wallet recovery workflows
+        id: wallet_recovery
+        if: ${{ !cancelled() }}
+        timeout-minutes: 35
+        env:
+          DEVELOPER_DIR: ${{ env.XCODE_DEVELOPER_DIR }}
+        run: ./waltid-identity/.github/scripts/mobile-ci/run-ios-wallet-recovery-tests.sh
+
+      - name: Publish iOS wallet recovery report
+        if: always() && steps.wallet_recovery.outcome != 'skipped'
+        uses: mikepenz/action-junit-report@v6
+        with:
+          update_check: true
+          job_name: ${{ env.JOB_NAME_PREFIX }}ios-simulator-tests
+          check_name: iOS Wallet Recovery Test Report
+          report_paths: waltid-identity/build/reports/ios-wallet-recovery/**/results.xml
+          require_tests: true
+          include_passed: false
+          include_skipped: false
+
+      - name: Upload iOS wallet recovery reports
+        if: always() && steps.wallet_recovery.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-wallet-recovery-reports
+          path: |
+            waltid-identity/build/reports/ios-wallet-recovery/**/*.xml
+            waltid-identity/build/reports/ios-wallet-recovery/**/*.json
+            waltid-identity/build/reports/ios-wallet-recovery/**/*.log
+            waltid-identity/waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/iosSimulatorArm64Test/*.xml
+          retention-days: 30
+
   wallet-core-framework:
     if: ${{ inputs.run-native || inputs.run-compose || inputs.run-enterprise || inputs.run-sdk-docs }}
     runs-on: macos-26
@@ -103,7 +137,7 @@ jobs:
       artifact-name: wallet-core-release-${{ github.run_attempt }}
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6cf69001d859d67687353466f1ad2fb006f574e0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
@@ -120,13 +154,13 @@ jobs:
               output.write("refs=" + json.dumps(refs) + "\n")
           PYTHON
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
       - name: Select Xcode toolchain
         run: |
           test -d "$XCODE_DEVELOPER_DIR"
           echo "DEVELOPER_DIR=$XCODE_DEVELOPER_DIR" >> "$GITHUB_ENV"
       - name: Cache Kotlin Native dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.konan
           key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.gradle*', '**/gradle.properties', '**/gradle-wrapper.properties') }}
@@ -144,7 +178,7 @@ jobs:
         working-directory: waltid-identity
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py pack --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
       - name: Publish the full release framework
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wallet-core-release-${{ github.run_attempt }}
           path: ${{ runner.temp }}/wallet-core-artifact/
@@ -152,7 +186,7 @@ jobs:
           retention-days: 1
       - name: Retain failed framework build logs
         if: failure() || cancelled()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wallet-core-framework-failure-logs
           path: |
@@ -166,13 +200,13 @@ jobs:
     timeout-minutes: 110
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6cf69001d859d67687353466f1ad2fb006f574e0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           resolved-refs: ${{ needs.wallet-core-framework.outputs.checkout-refs }}
 
       - name: Restore the shared release framework
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ needs.wallet-core-framework.outputs.artifact-name }}
           path: ${{ runner.temp }}/wallet-core-artifact
@@ -183,12 +217,12 @@ jobs:
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Run selected WalletCore consumer tests
         # Main budgets 60 minutes for demos/providers; allow 40 more for the isolated bridge fixture and tests.
         timeout-minutes: 100
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@23c6890329c1e9ddfc9448d047ea31d267933646
+        uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
@@ -210,7 +244,7 @@ jobs:
       # Outside the timed composite action so logs survive its deadline.
       - name: Retain failed WalletCore consumer logs
         if: failure() || cancelled()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wallet-core-consumer-failure-logs
           path: |
@@ -219,7 +253,7 @@ jobs:
 
       - name: Retain incomplete WalletCore test results
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wallet-core-incomplete-test-results
           path: |
@@ -234,13 +268,13 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@6cf69001d859d67687353466f1ad2fb006f574e0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           resolved-refs: ${{ needs.wallet-core-framework.outputs.checkout-refs }}
 
       - name: Restore the shared release framework
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ needs.wallet-core-framework.outputs.artifact-name }}
           path: ${{ runner.temp }}/wallet-core-artifact
@@ -251,7 +285,7 @@ jobs:
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Select Enterprise Xcode toolchain
         run: |
@@ -289,6 +323,9 @@ jobs:
           xcode_report_count=0
           while IFS= read -r -d '' bundle; do
             if ! command -v xcresultparser >/dev/null 2>&1; then
+              # See install-and-run-kdoctor: the runner image's untrusted aws/tap makes every
+              # `brew install` emit a tap-trust warning. Drop it first.
+              brew untap aws/tap 2>/dev/null || true
               brew install xcresultparser
             fi
 
@@ -333,7 +370,7 @@ jobs:
 
       - name: Upload Enterprise iOS mobile test results
         if: always() && steps.enterprise_ios_mobile_tests.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: enterprise-ios-mobile-test-results
           path: |
@@ -343,7 +380,7 @@ jobs:
 
       - name: Retain failed Enterprise iOS logs
         if: failure() || cancelled() || steps.enterprise_ios_mobile_tests.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: enterprise-ios-failure-logs
           path: |

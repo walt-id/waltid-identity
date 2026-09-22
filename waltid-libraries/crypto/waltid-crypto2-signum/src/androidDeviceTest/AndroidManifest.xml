@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <application>
+        <activity android:name="id.walt.crypto2.signum.KeyAuthorizationTestActivity"
+            android:exported="false" android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+    </application>
+</manifest>

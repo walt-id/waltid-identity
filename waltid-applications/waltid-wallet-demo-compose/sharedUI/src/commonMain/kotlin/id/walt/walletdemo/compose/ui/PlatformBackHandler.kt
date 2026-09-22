@@ -15,3 +15,6 @@ import androidx.compose.runtime.Composable
  */
 @Composable
 internal expect fun SystemBackHandler(enabled: Boolean, onBack: () -> Unit)
+
+/** Whether the host provides a system Back action instead of an on-screen control. */
+internal expect val hasSystemBackNavigation: Boolean

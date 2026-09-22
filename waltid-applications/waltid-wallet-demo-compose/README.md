@@ -51,7 +51,7 @@ setup only when the SDK reports another complete route that can start. Returning
 availability; declined permissions are not requested again automatically. QR visibility alone controls
 temporary screen brightness, and the QR is hidden once connecting begins.
 
-**Settings → Credential Sharing → Nearby sharing** stores the connection profile. Changing it
+**Settings → Nearby sharing → Connection method** stores the connection profile. Changing it
 before connection or approval replaces the open engagement and rechecks availability. The previous
 QR and choices remain hidden until the new profile is ready. Connected exchanges and approved shares
 keep their configuration. New presentations use the latest preference.
@@ -105,7 +105,7 @@ This demo proves the wallet-side SDK integration. Wi-Fi Aware physical discovery
 interoperability, external reader interoperability, prolonged
 reliability, and release qualification are tracked separately and must not be inferred from the demo.
 
-The mobile settings screen exposes **Credential Sharing → Reader Authentication** on Compose Android
+The mobile settings screen exposes **Settings → Nearby sharing → Reader authentication** on Compose Android
 and Compose iOS. It supports a permissive or trusted-reader-only policy, lists and removes configured
 Reader CAs/RICAL providers, and imports DER, certificate-only PEM, or versioned walt.id JSON trust
 bundles through the platform document picker. Every import is validated and previewed before an atomic
@@ -123,6 +123,21 @@ Review actions carry the identity of the displayed review. Each new review reset
 holder choices and continuation. Selected permissions are offered explicitly; an optional
 permission can be skipped only when the SDK reports a complete viable alternative route.
 Terminal recovery creates a new single-use session.
+
+## Signing key setup
+
+PIN setup controls access to the app, with optional biometric unlock. Signing-key setup has three steps: choose whether to create or restore a key, choose its storage, and choose when signing requires system approval. New keys can be created with or without a backup. Each screen groups the SDK's supported options into choice rows; a single supported option is shown as read-only. Continue keeps the selection local until Create signing key or Restore signing key is pressed. The SDK revalidates the selected option before executing it.
+
+Key recovery restores the original key and DID, not credentials. A local save does not prove delivery to another device. Unavailable providers show their reported reason and can be checked again; returning to the app also refreshes the choices.
+
+Android offers encrypted-cloud backup and device transfer separately. Cloud backup requires Google to report end-to-end encryption available. Device transfer is performed by a supported Android phone setup or migration flow, requires the source device and does not request a cloud copy. Hardware-required storage must pass the hardware check; Android Keystore without that requirement leaves the protection level to the platform.
+
+On iOS, choose Without a backup under Create a new key to use Secure Enclave. Recoverable keys use Keychain or the encrypted wallet database because existing keys cannot be imported into Secure Enclave.
+
+Settings → Signing key shows the storage policy, observed key protection, key origin, signing approval, and key backup status. The Technical details page shows the wallet DID, key ID, and public key (JWK), with copy controls. Nearby sharing groups sharing approval, connection methods, and reader authentication. Reader-trust imports are reviewed before saving; resets and removals require confirmation. The Digital Credentials API page controls the additional wallet review, while Lock wallet and Reset wallet remain on the Settings root. To replace a key or its signing policy, use Reset wallet and repeat setup; this removes local credentials, which must be issued again.
+
+
+The web demo uses account sign-in instead of a local PIN. Its Settings root retains Technical details, Sign out, and Reset wallet; device-only signing and sharing controls are hidden.
 
 ## Local wallet data
 

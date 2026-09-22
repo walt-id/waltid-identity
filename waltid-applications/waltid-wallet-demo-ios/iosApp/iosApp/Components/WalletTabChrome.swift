@@ -34,14 +34,13 @@ struct WalletTabStatusBanner: View {
 }
 
 extension View {
-    func walletSettingsToolbar(viewModel: WalletViewModel) -> some View {
+    func walletSettingsToolbar(onOpenSettings: @escaping () -> Void) -> some View {
         toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                NavigationLink {
-                    SettingsView(viewModel: viewModel)
-                } label: {
+                Button(action: onOpenSettings) {
                     Image(systemName: "gearshape")
                 }
+                .accessibilityLabel("Settings")
                 .accessibilityIdentifier(WalletAccessibilityID.settingsButton)
             }
         }

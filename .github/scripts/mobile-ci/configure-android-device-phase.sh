@@ -10,9 +10,23 @@ case "$phase" in
   wallet-mobile)
     script="./waltid-identity/.github/scripts/mobile-ci/run-android-wallet-mobile-tests.sh"
     emulator_options="-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
-    report_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**/*.xml\nwaltid-identity/waltid-libraries/crypto/waltid-crypto2-signum/build/outputs/androidTest-results/**/*.xml'
+    # This phase runs connectedAndroidDeviceTest for two modules
+    # (protocols/waltid-openid4vc-wallet-mobile and crypto/waltid-crypto2-signum), but
+    # mikepenz/action-junit-report splits report_paths on newlines *and* commas and then expects
+    # check_name to have either 1 or exactly that many entries. Two paths against one check name
+    # warns once per path, so keep this a single glob: `*` does not cross a path separator, so
+    # `*/*` covers both modules and nothing outside waltid-libraries/<group>/<module>.
+    report_paths='waltid-identity/waltid-libraries/*/*/build/outputs/androidTest-results/**/*.xml'
     artifact_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**\nwaltid-identity/waltid-libraries/crypto/waltid-crypto2-signum/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/crypto/waltid-crypto2-signum/build/outputs/androidTest-results/**'
     emulator_target="default"
+    ;;
+  wallet-recovery)
+    script="./waltid-identity/.github/scripts/mobile-ci/run-android-wallet-recovery-tests.sh"
+    emulator_api_level="35"
+    emulator_target="google_apis"
+    emulator_options="-no-snapshot -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
+    report_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/build/outputs/androidTest-results/**/*.xml\nwaltid-identity/build/reports/wallet-recovery/**/results.xml'
+    artifact_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/build/outputs/androidTest-results/**\nwaltid-identity/build/reports/wallet-recovery/**'
     ;;
   compose-demo)
     # The default image has no Google Play services. Keep GMS-only classes out of

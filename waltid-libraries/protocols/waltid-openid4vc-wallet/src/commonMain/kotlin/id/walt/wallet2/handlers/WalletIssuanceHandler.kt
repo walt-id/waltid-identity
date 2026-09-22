@@ -357,11 +357,17 @@ data class SignProofRequest(
     val key: DirectSerializedKey? = null,
     val keyId: String? = null,
     val did: String? = null,
+    /**
+     * OAuth `client_id` written as the proof `iss` claim for client-bound token requests.
+     * Leave unset for anonymous pre-authorized access (OpenID4VCI 1.0 Appendix F.1).
+     */
+    val clientId: String? = null,
 ) {
     init {
         require(credentialConfigurationId.isNotBlank()) {
             "credentialConfigurationId must not be blank"
         }
+        require(clientId == null || clientId.isNotBlank()) { "clientId cannot be blank" }
     }
 }
 
@@ -810,6 +816,7 @@ object WalletIssuanceHandler {
                             nonce = nonce,
                             did = did?.takeUnless { preferJwkBinding },
                             acceptedAlgorithms = jwtProofAlgorithms,
+                            clientId = request.clientId.takeUnless { anonymousPreAuthorizedCode },
                         ).jwt?.firstOrNull()
                     }
                 } else null
@@ -1166,6 +1173,7 @@ object WalletIssuanceHandler {
             nonce = request.nonce,
             did = request.did?.takeUnless { preferJwkBinding },
             acceptedAlgorithms = acceptedAlgorithms,
+            clientId = request.clientId,
         )
         return SignProofResult(proofJwt = proofs.jwt?.firstOrNull() ?: error("Proof signing produced no JWT"))
     }
@@ -2158,6 +2166,7 @@ object WalletIssuanceHandler {
                     nonce = nonce,
                     did = holderDid?.takeUnless { preferJwkBinding },
                     acceptedAlgorithms = jwtProofAlgorithms,
+                    clientId = clientId,
                 ).jwt?.firstOrNull()
             },
             onProofGenerated = { onEvent(WalletSessionEvent.issuance_proof_signed) },
@@ -2257,6 +2266,7 @@ object WalletIssuanceHandler {
         nonce: String?,
         did: String?,
         acceptedAlgorithms: Set<String>? = null,
+        clientId: String? = null,
     ): Proofs {
         val binding = did
             ?.let { ProofKeyBinding.KeyId(DidService.resolveAuthenticationMethodId(it, keyMaterial.keyId)) }
@@ -2270,6 +2280,7 @@ object WalletIssuanceHandler {
                 audience = audience,
                 nonce = nonce,
                 binding = binding,
+                clientId = clientId,
             )
         } ?: run {
             val legacyKey = requireNotNull(keyMaterial.legacyKey) {
@@ -2285,6 +2296,7 @@ object WalletIssuanceHandler {
                 audience = audience,
                 nonce = nonce,
                 binding = binding,
+                clientId = clientId,
             )
         }
     }
@@ -2292,7 +2304,11 @@ object WalletIssuanceHandler {
 
 internal fun supportedJwtProofAlgorithms(proofTypes: Map<String, ProofType>?): Set<String>? {
     if (proofTypes.isNullOrEmpty()) return null
-    return requireNotNull(proofTypes["jwt"]) {
+    val jwt = requireNotNull(proofTypes["jwt"]) {
         "Issuer requires an unsupported proof type: ${proofTypes.keys}"
-    }.proofSigningAlgValuesSupported
+    }
+    require(jwt.keyAttestationsRequired == null) {
+        "Issuer requires a key-attestation JWT; the configured proof path cannot supply one"
+    }
+    return jwt.proofSigningAlgValuesSupported
 }

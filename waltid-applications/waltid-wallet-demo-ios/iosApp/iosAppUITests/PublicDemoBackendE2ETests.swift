@@ -40,17 +40,14 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertEqual(offerReadyStatus, "Review credential offer", "Offer preview did not appear, status: \(offerReadyStatus ?? "nil")")
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
-        let receiveStatus = ui.waitForStatus(
-            prefixes: ["Received", "Receive failed", "Bootstrap failed"],
-            timeout: credentialOperationTimeout
-        )
-        XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
+        // Successful issuance returns to the credential list, which does not display a status banner.
+        ui.assertExists(identifierPrefix: "wallet.credentialCard.", timeout: credentialOperationTimeout)
 
         ui.tapTab(label: "Credentials")
         ui.assertExists(identifierPrefix: "wallet.credentialCard.")
         ui.tapElement(identifierPrefix: "wallet.credentialCard.")
         ui.assertExists(identifierPrefix: "wallet.credentialOverview.")
-        XCTAssertTrue(app.otherElements["wallet.credentialDetailsScreen"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "wallet.credentialDetailsScreen").firstMatch.waitForExistence(timeout: 20))
         ui.tapNavigationBack()
 
         let session = try await backend.createVerifierSession(scenario: scenario)
@@ -67,7 +64,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ui.assertExists(identifierPrefix: "wallet.credentialCard.")
         ui.tapElement(identifierPrefix: "wallet.credentialCard.")
         ui.assertExists(identifierPrefix: "wallet.credentialOverview.")
-        XCTAssertTrue(app.otherElements["wallet.credentialDetailsScreen"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "wallet.credentialDetailsScreen").firstMatch.waitForExistence(timeout: 20))
         ui.tapNavigationBack()
 
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")

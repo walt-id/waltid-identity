@@ -34,6 +34,9 @@ pathlib.Path(sys.argv[1]).write_text(
 PY
 
 if ! command -v fastlane >/dev/null 2>&1; then
+  # See install-and-run-kdoctor: the runner image's untrusted aws/tap makes every
+  # `brew install` emit a tap-trust warning. Drop it first.
+  brew untap aws/tap 2>/dev/null || true
   brew install fastlane
 fi
 

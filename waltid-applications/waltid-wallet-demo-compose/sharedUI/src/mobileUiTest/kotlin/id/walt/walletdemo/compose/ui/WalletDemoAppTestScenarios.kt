@@ -2,7 +2,16 @@
 
 package id.walt.walletdemo.compose.ui
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipboardManager
+import androidx.compose.ui.platform.LocalClipboardManager
+import id.walt.walletdemo.compose.ui.components.SettingsCopyRow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,12 +26,15 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -56,6 +68,12 @@ import id.walt.walletdemo.compose.logic.WalletDemoProximityApprovalMode
 import id.walt.walletdemo.compose.logic.WalletDemoProximityController
 import id.walt.walletdemo.compose.logic.DemoPinStore
 import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
+
+import id.walt.walletdemo.compose.logic.WalletDemoKeyChoice
+import id.walt.walletdemo.compose.logic.WalletDemoKeySetupOption
+import id.walt.walletdemo.compose.logic.WalletDemoIdentitySetup
+import id.walt.walletdemo.compose.logic.WalletDemoIdentityDetails
+import id.walt.walletdemo.compose.ui.screens.IdentitySetupScreen
 import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.InMemoryDemoPinStore
 import id.walt.walletdemo.compose.logic.InMemoryDemoReaderTrustSettingsStore
@@ -156,7 +174,7 @@ class WalletDemoAppTestScenarios(
         controller.refreshBiometricUnlockAvailability()
         waitForIdle()
 
-        onNodeWithText("Use Face ID or fingerprint instead of typing the PIN. The PIN remains a fallback.")
+        onNodeWithText("Use biometrics to open the app instead of typing the PIN. Signing approval is set up next.")
             .performScrollTo()
             .assertIsDisplayed()
     }
@@ -171,7 +189,41 @@ class WalletDemoAppTestScenarios(
             .assertIsDisplayed()
     }
 
-    fun unavailableBiometricSigningIsDisabledButNoneRemainsAvailable() = runComposeUiTest {
+    fun keySetupGroupsChoicesAndConfirmsSelectedConfiguration() = runComposeUiTest {
+        fun value(name: String) = WalletDemoKeyChoice(name, name, "Details for $name")
+        fun option(recovery: String, storage: String, approval: String) = WalletDemoKeySetupOption(
+            "$recovery-$storage-$approval", value(recovery), value(storage), value(approval),
+        )
+        val options = listOf(option("new", "hardware", "biometric"), option("new", "native", "biometric"),
+            option("new", "native", "none"), option("backup", "native", "biometric"), option("backup", "database", "none"))
+        var submitted: String? = null
+        setWalletContent {
+            IdentitySetupScreen(
+                WalletDemoIdentitySetup.Choose(options), null,
+                onChoose = { submitted = it }, onResume = {}, onCancel = {}, onRefresh = {},
+            )
+        }
+        onAllNodesWithText("new").assertCountEquals(1)
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Recovery", 1)).performScrollTo().performClick().assertIsSelected()
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        onAllNodesWithText("hardware").assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        onAllNodesWithText("biometric").assertCountEquals(0)
+        onAllNodesWithText("Refresh available options").assertCountEquals(0)
+        if (hasSystemBackNavigation) {
+            onNodeWithText("Back").assertIsDisplayed()
+        } else {
+            onNodeWithText("Back").performClick()
+            onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).assertIsSelected()
+            onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        }
+        assertEquals(null, submitted)
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        assertEquals("backup-database-none", submitted)
+    }
+
+    fun pinSetupDoesNotAskForSigningApproval() = runComposeUiTest {
         val wallet = FakeDemoWallet(
             signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled,
         )
@@ -184,13 +236,8 @@ class WalletDemoAppTestScenarios(
                 WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
         }
 
-        onNodeWithTag(WalletUiTestTags.SigningProtectionBiometric)
-            .performScrollTo()
-            .assertIsNotEnabled()
-        onNodeWithTag(WalletUiTestTags.SigningProtectionNone)
-            .performScrollTo()
-            .assertIsEnabled()
-            .performClick()
+        onAllNodesWithTag(WalletUiTestTags.SigningProtectionBiometric).assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.SigningProtectionNone).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.PinSubmitButton)
             .performScrollTo()
             .assertIsEnabled()
@@ -1117,18 +1164,19 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.ProximityStartButton).performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
         waitUntil(timeoutMillis = 5_000) { proximity.state.value.sessionState is ProximityState.EngagementReady }
         onNodeWithTag("proximity-show-Qr").performScrollTo().assertIsDisplayed().performClick()
-        val switch = onNodeWithTag("proximity-approval-mode")
-        switch.performScrollTo().assertIsOff()
-        val before = switch.getUnclippedBoundsInRoot()
-        switch.performClick()
+        val prepared = onNodeWithTag("proximity-approval-prepare")
+        val ask = onNodeWithTag("proximity-approval-ask")
+        prepared.performScrollTo().assertIsNotSelected()
+        val before = prepared.getUnclippedBoundsInRoot()
+        prepared.performClick()
         waitUntil(timeoutMillis = 5_000) { proximity.state.value.refreshingEngagement }
-        switch.assertIsOn().assertIsNotEnabled()
-        assertEquals(before, switch.getUnclippedBoundsInRoot(), "Mode refresh must retain the switch position")
+        prepared.assertIsSelected().assertIsNotEnabled()
+        assertEquals(before, prepared.getUnclippedBoundsInRoot(), "Mode refresh must retain the prepared position")
         onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
         assertEquals(WalletDemoProximityApprovalMode.PrepareSharing, settings.proximityApprovalMode())
         backend.firstClose.complete(Unit)
         waitUntil(timeoutMillis = 5_000) { !proximity.state.value.refreshingEngagement }
-        switch.assertIsOn().assertIsEnabled()
+        prepared.assertIsSelected().assertIsEnabled()
         onNodeWithTag(WalletUiTestTags.ProximityQr).performScrollTo().assertIsDisplayed()
 
         // Opening Settings ends the journey; changed preferences apply to an explicit fresh start.
@@ -1139,9 +1187,9 @@ class WalletDemoAppTestScenarios(
         onAllNodesWithTag(WalletUiTestTags.ProximityScreen).assertCountEquals(0)
         onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation).performScrollTo().performClick()
-        switch.performScrollTo().assertIsOn().performClick()
-        switch.assertIsOff()
-        onNodeWithText("Done").assertIsDisplayed().performClick()
+        ask.performScrollTo().performClick().assertIsSelected()
+        prepared.assertIsNotSelected()
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
         onAllNodesWithTag(WalletUiTestTags.ProximityScreen).assertCountEquals(0)
         assertEquals(WalletDemoProximityApprovalMode.AskEachTime, settings.proximityApprovalMode())
@@ -1149,7 +1197,7 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { proximity.state.value.sessionState is ProximityState.EngagementReady }
         onNodeWithTag(WalletUiTestTags.ProximityScreen).assertIsDisplayed()
         waitUntil(timeoutMillis = 5_000) { proximity.state.value.approvalMode == WalletDemoProximityApprovalMode.AskEachTime && !proximity.state.value.refreshingEngagement }
-        switch.performScrollTo().assertIsOff().performClick()
+        prepared.performScrollTo().assertIsNotSelected().performClick()
         waitUntil(timeoutMillis = 5_000) { proximity.state.value.approvalMode == WalletDemoProximityApprovalMode.PrepareSharing && !proximity.state.value.refreshingEngagement }
         // Transport changes in Settings also require a fresh journey, retaining the saved approval mode.
         val closesBeforeTransportSettings = backend.closedSessions
@@ -1157,7 +1205,10 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { backend.closedSessions == closesBeforeTransportSettings + 1 }
         assertTrue(!proximity.state.value.active)
         onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation).performScrollTo().performClick()
+        onNodeWithText("Connection method").performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.SettingsProximityNfcV2Direct).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
         onAllNodesWithTag(WalletUiTestTags.ProximityScreen).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.ProximityStartButton).performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
@@ -1167,12 +1218,12 @@ class WalletDemoAppTestScenarios(
         }
         onAllNodesWithTag("proximity-show-Qr").assertCountEquals(0)
         onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
-        switch.assertIsOn()
+        prepared.assertIsSelected()
         runOnIdle { backend.latestState.value = ProximityState.Completed(1, false) }
         onNodeWithTag(WalletUiTestTags.ProximityDone).performClick()
         onNodeWithTag(WalletUiTestTags.ProximityStartButton).performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
         waitUntil(timeoutMillis = 5_000) { proximity.state.value.sessionState is ProximityState.EngagementReady }
-        switch.performScrollTo().assertIsOn()
+        prepared.performScrollTo().assertIsSelected()
         assertEquals(WalletDemoProximityApprovalMode.PrepareSharing,
             WalletDemoController(FakeDemoWallet(), InMemoryDemoPinStore(), sharingSettings = settings).state.value.proximityApprovalMode)
         runOnIdle { proximity.dismiss() }
@@ -1190,17 +1241,21 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsButton).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsScreen).assertIsDisplayed()
+        onNodeWithText("Technical details").performClick()
         onNodeWithTag(WalletUiTestTags.SettingsDid).assertTextContains("did:key:test")
         onNodeWithTag(WalletUiTestTags.SettingsKeyId).assertTextContains("key-1")
         val session = controller.state.value.session as WalletSessionState.Ready
         assertTrue(session.publicJwk.contains("OKP"), session.publicJwk)
+        onNodeWithContentDescription("Show public key").performScrollTo().performClick()
         // iOS Compose text matching does not treat JSON fragments as substrings.
         onNodeWithTag(WalletUiTestTags.SettingsPublicJwk)
             .performScrollTo()
             .assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsCredentialSharing)
             .performScrollTo()
             .assertIsDisplayed()
+        onNodeWithText("Digital Credentials API").performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview)
             .performScrollTo()
             .assertIsDisplayed()
@@ -1208,10 +1263,19 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview).assertIsOff()
         assertEquals(false, controller.state.value.showDcApiPresentationPreview)
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
+        onNodeWithText("Signing key").performScrollTo().performClick()
+        onAllNodesWithTag(WalletUiTestTags.SettingsCredentialSharing).assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.SettingsReset).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
+        onNodeWithText("Digital Credentials API").performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview).performScrollTo().assertIsOff()
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation)
             .performScrollTo()
             .assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation).performClick()
+        onNodeWithText("Connection method").performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.SettingsProximityNfcV2Direct)
             .performScrollTo()
             .performClick()
@@ -1219,6 +1283,8 @@ class WalletDemoAppTestScenarios(
             WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct,
             controller.state.value.proximityTransportProfile,
         )
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsLock)
             .performScrollTo()
             .assertIsDisplayed()
@@ -1230,6 +1296,54 @@ class WalletDemoAppTestScenarios(
         onNodeWithText("Enter your PIN").assertIsDisplayed()
     }
 
+    fun technicalCopyPreservesFullValueWithoutChangingExpansion() = runComposeUiTest {
+        val original = """{"kty":"EC","crv":"P-256","x":"complete-public-key-coordinate","y":"another-complete-coordinate"}"""
+        // The headless iOS Compose test owner supplies a no-op clipboard.
+        val clipboard = object : ClipboardManager {
+            var copied: AnnotatedString? = null
+            override fun getText(): AnnotatedString? = copied
+            override fun setText(annotatedString: AnnotatedString) { copied = annotatedString }
+        }
+        setWalletContent {
+            CompositionLocalProvider(LocalClipboardManager provides clipboard) {
+                Column {
+                    SettingsCopyRow("Wallet DID", "did:jwk:example", "did-value", "did-copy", "Copy wallet DID", "Wallet DID copied")
+                    SettingsCopyRow("Public key (JWK)", original, "jwk-value", "jwk-copy", "Copy public key as JWK", "Public key copied",
+                        disclosureLabels = "Show public key" to "Hide public key", formatJson = true)
+                }
+            }
+        }
+        mainClock.autoAdvance = false
+        val disclosure = onNodeWithContentDescription("Show public key")
+        val originalBounds = disclosure.getUnclippedBoundsInRoot()
+        onNodeWithTag("did-copy").performClick()
+        mainClock.advanceTimeByFrame()
+        waitForIdle()
+        assertEquals(originalBounds, disclosure.getUnclippedBoundsInRoot(), "Copy feedback must not move the next control")
+        assertEquals("Wallet DID copied", onNodeWithTag("did-copy").fetchSemanticsNode().config[SemanticsProperties.StateDescription])
+        mainClock.advanceTimeBy(2_100)
+        waitForIdle()
+        assertEquals(originalBounds, disclosure.getUnclippedBoundsInRoot(), "Expiring copy feedback must not move the next control")
+        assertTrue(!onNodeWithTag("did-copy").fetchSemanticsNode().config.contains(SemanticsProperties.StateDescription))
+        mainClock.autoAdvance = true
+        onAllNodesWithTag("jwk-value").assertCountEquals(0)
+        onNodeWithTag("jwk-copy").assertHasClickAction().assertIsEnabled()
+        assertTrue(!onNodeWithTag("jwk-copy").fetchSemanticsNode().config.contains(SemanticsProperties.HideFromAccessibility))
+        onNodeWithTag("jwk-copy").performClick()
+        runOnIdle { assertEquals(original, clipboard.getText()?.text) }
+        assertEquals("Public key copied", onNodeWithTag("jwk-copy").fetchSemanticsNode().config[SemanticsProperties.StateDescription])
+        onAllNodesWithTag("jwk-value").assertCountEquals(0)
+        onNodeWithContentDescription("Show public key").performClick()
+        onNodeWithTag("jwk-value").assertTextContains("complete-public-key-coordinate", substring = true)
+        onNodeWithTag("jwk-copy").performClick()
+        runOnIdle { assertEquals(original, clipboard.getText()?.text) }
+        onNodeWithTag("jwk-value").assertIsDisplayed()
+        onNodeWithContentDescription("Hide public key").performClick()
+        onAllNodesWithTag("jwk-value").assertCountEquals(0)
+        onNodeWithTag("jwk-copy").performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        onNodeWithText("Copy public key as JWK").assertIsDisplayed()
+    }
+
     fun readerTrustSettingsReviewAndPersistPublicCa() = runComposeUiTest {
         val store = InMemoryDemoReaderTrustSettingsStore()
         val controller = DemoReaderTrustSettingsController(
@@ -1238,7 +1352,7 @@ class WalletDemoAppTestScenarios(
             dispatcher = Dispatchers.Unconfined,
         )
 
-        setWalletContent { DemoReaderTrustSettings(controller) }
+        setWalletContent { Column(Modifier.verticalScroll(rememberScrollState())) { DemoReaderTrustSettings(controller) } }
 
         val allowUntrusted = onNodeWithTag(
             WalletUiTestTags.SettingsReaderPolicyAllowUntrusted
@@ -1291,9 +1405,9 @@ class WalletDemoAppTestScenarios(
         assertEquals(TestReaderCaSha256, preview.readerAuthorities.single().sha256Fingerprint)
         assertTrue(store.load().trustAnchors.isEmpty())
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportReview).assertIsDisplayed()
-        onNodeWithText("Review reader trust import").assertIsDisplayed()
+        onNodeWithText("Review import").assertIsDisplayed()
         onNodeWithText("wal-1349-local-reader-ca.der").assertIsDisplayed()
-        onNodeWithText("WAL-1349 Local Reader Test CA", substring = true).assertIsDisplayed()
+        onAllNodesWithText("CN=WAL-1349 Local Reader Test CA", useUnmergedTree = true)[0].performScrollTo().assertIsDisplayed()
 
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportCancel).performClick()
         waitForIdle()
@@ -1347,6 +1461,22 @@ class WalletDemoAppTestScenarios(
             ProximityReaderPolicy.RequireTrusted,
             store.load().readerPolicy,
         )
+        onNodeWithTag(WalletUiTestTags.SettingsReaderTrustReset).performScrollTo().performClick()
+        onNodeWithText("Cancel").performClick()
+        assertEquals(1, store.load().trustAnchors.size)
+        onNodeWithContentDescription("Remove CN=WAL-1349 Local Reader Test CA").performScrollTo().performClick()
+        onNodeWithText("Cancel").performClick()
+        assertEquals(1, store.load().trustAnchors.size)
+        onNodeWithContentDescription("Remove CN=WAL-1349 Local Reader Test CA").performScrollTo().performClick()
+        onNodeWithTag("reader-trust-remove-confirm").performClick()
+        waitUntil(timeoutMillis = 5_000) { !controller.state.value.importInProgress }
+        assertTrue(store.load().trustAnchors.isEmpty())
+        assertEquals(ProximityReaderPolicy.RequireTrusted, store.load().readerPolicy)
+        onNodeWithTag(WalletUiTestTags.SettingsReaderTrustReset).performScrollTo().performClick()
+        onNodeWithTag("reader-trust-reset-confirm").performClick()
+        waitUntil(timeoutMillis = 5_000) { !controller.state.value.importInProgress }
+        assertTrue(store.load().trustAnchors.isEmpty())
+        assertEquals(ProximityReaderPolicy.AllowAnonymousOrUntrusted, store.load().readerPolicy)
     }
 
     fun lockDoesNotAutoPromptBiometrics() = runComposeUiTest {
@@ -1384,14 +1514,33 @@ class WalletDemoAppTestScenarios(
 
     fun settingsConfirmsAndAppliesSigningProtectionChange() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val identityDetailsRequested = CompletableDeferred<Unit>()
+        val identityDetailsResponse = CompletableDeferred<WalletDemoIdentityDetails?>()
+        val delayedWallet = object : DemoWallet by wallet {
+            override suspend fun identityDetails(): WalletDemoIdentityDetails? {
+                identityDetailsRequested.complete(Unit)
+                return identityDetailsResponse.await()
+            }
+        }
         val pinStore = InMemoryDemoPinStore()
-        val controller = WalletDemoController(wallet, pinStore)
+        val controller = WalletDemoController(delayedWallet, pinStore)
 
         setWalletContent { WalletDemoApp(controller) }
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { identityDetailsRequested.isCompleted }
+        onNodeWithTag(WalletUiTestTags.SettingsScreen).assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.SigningProtectionNone).assertCountEquals(0)
+
+        onNodeWithText("Signing key").performClick()
+        identityDetailsResponse.complete(null)
+        // Identity details load on the controller's dispatcher, outside Compose's idle tracking.
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodes(hasTestTag(WalletUiTestTags.SigningProtectionNone) and isEnabled())
+                .fetchSemanticsNodes().size == 1
+        }
         onNodeWithTag(WalletUiTestTags.SigningProtectionNone)
             .performScrollTo()
             .performClick()
@@ -1535,9 +1684,9 @@ class WalletDemoAppTestScenarios(
             assertTrue(qr.right - qr.left >= Dp(if (landscape) 100f else 200f))
         }
         assertWholeQrVisible()
-        onNodeWithTag("proximity-approval-mode").assertIsOff().assertIsDisplayed()
+        onNodeWithTag("proximity-approval-prepare").assertIsNotSelected().assertIsDisplayed()
         capture("qr-ask")
-        onNodeWithTag("proximity-approval-mode").performClick().assertIsOn()
+        onNodeWithTag("proximity-approval-prepare").performClick().assertIsSelected()
         assertEquals(WalletDemoProximityApprovalMode.PrepareSharing, proximity.value.approvalMode)
         assertWholeQrVisible()
         capture("qr-prepare")

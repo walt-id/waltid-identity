@@ -29,6 +29,8 @@ dependencies {
 
     // Kotlin
     implementation(identityLibs.kotlin.gradle.plugin)
+    // Public KLib dump parser only; ABI checks remain owned by the Kotlin Gradle plugin.
+    implementation(identityLibs.binary.compatibility.validator)
 
     // Serialization
     implementation(identityLibs.kotlin.plugin.serialization)
@@ -70,4 +72,5 @@ dependencies {
 
     // Tests
     implementation(identityLibs.mokkery.gradle.plugin)
+    testImplementation(kotlin("test-junit"))
 }

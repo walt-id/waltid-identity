@@ -43,6 +43,7 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-vical"))
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
+            implementation(project(":waltid-libraries:credentials:waltid-status-list"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto")) // for Base64Utils
             implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
 

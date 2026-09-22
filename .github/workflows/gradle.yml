@@ -69,7 +69,7 @@ jobs:
           sudo swapon /swapfile
 
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
@@ -77,7 +77,20 @@ jobs:
         run: test -f "$KLOGGING_CONFIG_PATH"
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
+        with:
+          # Restricted to pushes to main because Dependabot only consumes the default-branch
+          # snapshot; submitting per PR just adds annotations and dependency-graph_*.json artifacts.
+          dependency-graph: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'generate-and-submit' || 'disabled' }}
+
+      - name: Check default Kotlin configuration
+        run: |
+          # Mobile-enabled builds can hide modules included without any Kotlin targets.
+          for project_dir in . waltid-identity; do
+            ./gradlew -p "$project_dir" checkKotlinGradlePluginConfigurationErrors \
+              -PenableAndroidBuild=false -PenableIosBuild=false -PenableWalletDemoComposeWeb=false \
+              --no-configuration-cache --console=plain
+          done
 
       - name: Install SoftHSM for PKCS11 tests
         run: |
@@ -86,14 +99,14 @@ jobs:
 
       - name: Enable Android build
         if: ${{ inputs.enable-android-build }}
-        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        uses: ./waltid-identity/.github/actions/set-properties
         with:
           file: 'waltid-identity/gradle.properties'
           properties: 'enableAndroidBuild=true'
 
       - name: Enable Android build in unified-build root
         if: ${{ inputs.enable-android-build }}
-        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        uses: ./waltid-identity/.github/actions/set-properties
         with:
           file: 'gradle.properties'
           properties: 'enableAndroidBuild=true'
@@ -213,7 +226,7 @@ jobs:
           sudo swapon /swapfile
 
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
@@ -221,7 +234,7 @@ jobs:
         run: test -f "$KLOGGING_CONFIG_PATH"
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Start tunnels and get URLs
         id: tunnel
@@ -425,23 +438,23 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Enable Android build
         if: ${{ inputs.enable-android-build }}
-        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        uses: ./waltid-identity/.github/actions/set-properties
         with:
           file: 'waltid-identity/gradle.properties'
           properties: 'enableAndroidBuild=true'
 
       - name: Enable Android build in unified-build root
         if: ${{ inputs.enable-android-build }}
-        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        uses: ./waltid-identity/.github/actions/set-properties
         with:
           file: 'gradle.properties'
           properties: 'enableAndroidBuild=true'
@@ -477,12 +490,12 @@ jobs:
   #         sudo swapon /swapfile
 
   #     - name: Checkout all repos with ref fallback
-  #       uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
+  #       uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
   #       with:
   #         token: ${{ secrets.GH_ACCESS_TOKEN }}
 
   #     - name: Configure gradle
-  #       uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+  #       uses: ./waltid-identity/.github/actions/gradle-setup-action
 
   #     - name: Prepare Issuer2 conformance runtime
   #       id: issuer-tunnel
@@ -591,7 +604,7 @@ jobs:
 
   #     - name: Upload OpenID4VCI 1.0 conformance results and logs
   #       if: always()
-  #       uses: actions/upload-artifact@v4
+  #       uses: actions/upload-artifact@v7
   #       with:
   #         name: openid4vci1.0-conformance-test-results
   #         if-no-files-found: warn
@@ -680,12 +693,12 @@ jobs:
   #         sudo swapon /swapfile
 
   #     - name: Checkout all repos with ref fallback
-  #       uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
+  #       uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
   #       with:
   #         token: ${{ secrets.GH_ACCESS_TOKEN }}
 
   #     - name: Configure gradle
-  #       uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+  #       uses: ./waltid-identity/.github/actions/gradle-setup-action
 
   #     - name: Prepare Issuer2 HAIP conformance runtime
   #       id: issuer-tunnel
@@ -796,7 +809,7 @@ jobs:
 
   #     - name: Upload OpenID4VC HAIP 1.0 conformance results and logs
   #       if: always()
-  #       uses: actions/upload-artifact@v4
+  #       uses: actions/upload-artifact@v7
   #       with:
   #         name: openid4vc-haip1.0-conformance-test-results
   #         if-no-files-found: warn
