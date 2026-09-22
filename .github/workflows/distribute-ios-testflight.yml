@@ -61,7 +61,7 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
@@ -72,10 +72,10 @@ jobs:
           xcodebuild -version
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Configure iOS build environment
-        uses: walt-id/waltid-identity/.github/actions/ios-build-setup@e7889e25f7e3f7c98db9d0c8e5bf905e6dd538ec
+        uses: ./waltid-identity/.github/actions/ios-build-setup
         with:
           gradle-properties-path: waltid-identity/gradle.properties
 
@@ -88,7 +88,7 @@ jobs:
         run: ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework --no-daemon --console=plain --warning-mode=summary
 
       - name: Upload WalletCore XCFramework
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wallet-core-xcframework
           path: waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework
@@ -104,7 +104,7 @@ jobs:
         app: ${{ fromJSON(inputs.app == 'both' && '["compose","native"]' || format('["{0}"]', inputs.app)) }}
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.head_ref || github.ref_name }}
@@ -115,7 +115,7 @@ jobs:
           xcodebuild -version
 
       - name: Download WalletCore XCFramework
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: wallet-core-xcframework
           path: waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework

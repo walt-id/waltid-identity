@@ -120,6 +120,9 @@ if [[ ! -d "$run_dir/Tests.xcresult" ]]; then
   exit 1
 fi
 if ! command -v xcresultparser >/dev/null 2>&1; then
+  # See install-and-run-kdoctor: the runner image's untrusted aws/tap makes every
+  # `brew install` emit a tap-trust warning. Drop it first.
+  brew untap aws/tap 2>/dev/null || true
   brew install xcresultparser
 fi
 xcresultparser "$run_dir/Tests.xcresult" --output-format=junit > "$run_dir/results.xml"

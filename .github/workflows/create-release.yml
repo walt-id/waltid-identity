@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
@@ -45,18 +45,18 @@ jobs:
 
       - name: Configure gradle
         if: ${{ steps.detect.outputs.exists == 'true' }}
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Enable Android build in identity repo
         if: ${{ steps.detect.outputs.exists == 'true' }}
-        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        uses: ./waltid-identity/.github/actions/set-properties
         with:
           file: 'waltid-identity/gradle.properties'
           properties: 'enableAndroidBuild=true'
 
       - name: Enable Android build in unified-build root
         if: ${{ steps.detect.outputs.exists == 'true' }}
-        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        uses: ./waltid-identity/.github/actions/set-properties
         with:
           file: 'gradle.properties'
           properties: 'enableAndroidBuild=true'

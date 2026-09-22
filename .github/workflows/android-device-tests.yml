@@ -46,22 +46,22 @@ jobs:
       DC_API_AVD_NAME: 'dc-api-api37-pixel7-google-apis'
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Enable Android build in identity repo
-        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        uses: ./waltid-identity/.github/actions/set-properties
         with:
           file: 'waltid-identity/gradle.properties'
           properties: 'enableAndroidBuild=true'
 
       - name: Enable Android build in unified-build root
-        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        uses: ./waltid-identity/.github/actions/set-properties
         with:
           file: 'gradle.properties'
           properties: 'enableAndroidBuild=true'
@@ -81,7 +81,7 @@ jobs:
       - name: Restore configured DC API AVD
         if: matrix.phase == 'dc-api-compose'
         id: dc-api-avd-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           # Cache the configured AVD disk plus the host ADB key pair that authorizes it. The restored
           # userdata contains that key in its adbd authorization list; omitting the matching host key
@@ -153,7 +153,7 @@ jobs:
 
       - name: Save configured DC API AVD baseline
         if: matrix.phase == 'dc-api-compose' && steps.dc-api-avd-cache.outputs.cache-hit != 'true' && steps.dc-api-avd-preparation.outcome == 'success'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: |
             ~/.android/avd/dc-api-api37-pixel7-google-apis.ini
@@ -164,7 +164,7 @@ jobs:
 
       - name: Run Android device tests
         if: matrix.phase != 'dc-api-compose'
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
           api-level: ${{ steps.android-device-phase.outputs.emulator_api_level }}
           arch: x86_64
@@ -205,7 +205,7 @@ jobs:
 
       - name: Upload Android device test reports
         if: always() && steps.android-device-phase.outputs.artifact_paths != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-device-test-reports-${{ matrix.phase }}
           path: ${{ steps.android-device-phase.outputs.artifact_paths }}
