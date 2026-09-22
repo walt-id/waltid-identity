@@ -140,6 +140,7 @@ kotlin {
         }
         if (enableAndroidBuild) {
             val androidDeviceTest by getting {
+                kotlin.srcDir(rootProject.file("waltid-services/waltid-openid4vp-conformance-runners/src/deviceShared/kotlin"))
                 kotlin.srcDir("src/scaTestFixtures/kotlin")
                 if (enableProximityPhysicalTests) {
                     kotlin.srcDir("src/physicalDeviceTest/kotlin")
@@ -156,6 +157,9 @@ kotlin {
                     implementation(identityLibs.androidx.test.runner)
                     implementation(identityLibs.androidx.test.ext.junit)
                     implementation(identityLibs.ktor.client.android)
+                    implementation(identityLibs.ktor.client.content.negotiation)
+                    implementation(identityLibs.ktor.serialization.kotlinx.json)
+                    implementation(identityLibs.oshai.kotlinlogging)
                 }
             }
         }
