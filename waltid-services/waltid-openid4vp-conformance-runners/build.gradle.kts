@@ -332,3 +332,13 @@ tasks.register<JavaExec>("itbWallet") {
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass.set("id.walt.itb.ItbMainKt")
 }
+
+// Offline browser contracts are explicit so ordinary JVM tests need no installed browser.
+tasks.test {
+    useJUnitPlatform { excludeTags("itb-portal") }
+}
+registerWalletProfileTestTask(
+    taskName = "itbPortalTest",
+    testFilter = "id.walt.itb.ItbPortalBridgeBrowserTest",
+    descriptionText = "Check ITB portal orchestration against an isolated local DOM fixture."
+)
