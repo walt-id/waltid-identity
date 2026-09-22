@@ -17,11 +17,12 @@ class ItbPortalBridge(
         // A fresh document discards old dialogs and pending session-list updates while retaining login cookies.
         page.navigate("about:blank")
         page.navigate(statementsUrl)
-        page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(
-            Pattern.compile(Pattern.quote(systemName) + "$"),
-        )).waitFor()
+        val system = page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(systemName))
+        check(system.innerText().trim() == systemName) { "The portal selected a different ITB system" }
         page.getByText(suite.statement, Page.GetByTextOptions().setExact(true)).click()
-        page.locator("#button-executionType").click()
+        page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(
+            Pattern.compile("(?:Interactive|Parallel background|Sequential background) execution$"),
+        )).click()
         page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName("Interactive execution").setExact(true)).click()
         val suiteRow = page.locator(".testSuite").filter(Locator.FilterOptions().setHas(
             page.getByText(suite.name, Page.GetByTextOptions().setExact(true)),
