@@ -8,6 +8,10 @@ import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.issuer2.domain.IssuanceSessionStatus
+import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
+import id.walt.issuer2.notifications.IssuanceNotifications
+import id.walt.issuer2.notifications.IssuanceSessionEvent
+import id.walt.issuer2.testsupport.Issuer2TestNotificationServer
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
 import id.walt.issuer2.testsupport.Issuer2TxCodeMode
 import id.walt.issuer2.testsupport.Issuer2WalletFlowDriver
@@ -52,6 +56,55 @@ class Issuer2NotificationEndpointTest {
     @AfterEach
     fun clearConfig() {
         clearIssuer2TestEnvironment()
+    }
+
+    @Test
+    fun changedWalletEventIsPublishedToTheOfferWebhookOnce() = testApplication {
+        val notificationServer = Issuer2TestNotificationServer()
+        notificationServer.startServer()
+        try {
+            installIssuer2WithConfigFiles()
+            val client = apiClient()
+            val issuance = client.issueCredential(notificationServer.webhookUrl())
+
+            val accepted = client.post(issuance.notificationEndpoint) {
+                bearerAuth(issuance.accessToken)
+                contentType(ContentType.Application.Json)
+                setBody(notificationBody(issuance.notificationId, "credential_accepted", "Stored"))
+            }
+            assertEquals(HttpStatusCode.NoContent, accepted.status, accepted.bodyAsText())
+            val repeated = client.post(issuance.notificationEndpoint) {
+                bearerAuth(issuance.accessToken)
+                contentType(ContentType.Application.Json)
+                setBody(notificationBody(issuance.notificationId, "credential_accepted", "Stored"))
+            }
+            assertEquals(HttpStatusCode.NoContent, repeated.status, repeated.bodyAsText())
+            notificationServer.awaitEvent(issuance.sessionId, IssuanceSessionEvent.WALLET_CREDENTIAL_ACCEPTED)
+            assertEquals(
+                1,
+                notificationServer.getReceivedUpdates().count {
+                    it.target == issuance.sessionId && it.event == IssuanceSessionEvent.WALLET_CREDENTIAL_ACCEPTED.value
+                },
+            )
+
+            val failure = client.post(issuance.notificationEndpoint) {
+                bearerAuth(issuance.accessToken)
+                contentType(ContentType.Application.Json)
+                setBody(notificationBody(issuance.notificationId, "credential_failure", "Could not store"))
+            }
+            assertEquals(HttpStatusCode.NoContent, failure.status, failure.bodyAsText())
+            val failureEvent = notificationServer.awaitEvent(
+                issuance.sessionId,
+                IssuanceSessionEvent.WALLET_CREDENTIAL_FAILURE,
+            )
+            assertEquals("SUCCESSFUL", failureEvent.session["status"]?.jsonPrimitive?.content)
+            assertEquals(
+                "credential_failure",
+                failureEvent.session["walletNotificationEvent"]?.jsonPrimitive?.content,
+            )
+        } finally {
+            notificationServer.stopServer()
+        }
     }
 
     @Test
@@ -328,12 +381,19 @@ class Issuer2NotificationEndpointTest {
         assertEquals(HttpStatusCode.NotFound, routeResponse.status)
     }
 
-    private suspend fun HttpClient.issueCredential(): IssuedNotificationContext {
+    private suspend fun HttpClient.issueCredential(webhookUrl: String? = null): IssuedNotificationContext {
         val walletFlow = Issuer2WalletFlowDriver(this)
         val createdOffer = createWalletFlowCredentialOffer(
             scenario = Issuer2CredentialScenarios.openBadgeCredential,
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
             txCodeMode = Issuer2TxCodeMode.NONE,
+            runtimeOverrides = webhookUrl?.let {
+                CredentialOfferRuntimeOverrides(
+                    notifications = IssuanceNotifications(
+                        webhook = IssuanceNotifications.WebhookNotification(it),
+                    ),
+                )
+            },
         )
         val resolvedOffer = walletFlow.resolve(createdOffer)
         val notificationEndpoint = assertNotNull(resolvedOffer.issuerMetadata.notificationEndpoint)
