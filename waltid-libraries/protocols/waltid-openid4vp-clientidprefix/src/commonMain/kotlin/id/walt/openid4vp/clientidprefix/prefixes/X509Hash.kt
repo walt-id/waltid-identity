@@ -6,6 +6,7 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.jose.CompactJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
+import id.walt.openid4vp.clientidprefix.isMissing
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
@@ -52,7 +53,7 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
     ): ClientValidationResult {
         val jws = context.requestObjectJws
             ?: return ClientValidationResult.Failure(ClientIdError.MissingRequestObject)
-        if (trustConfiguration.x509TrustAnchors == null) {
+        if (trustConfiguration.x509TrustAnchors.isMissing()) {
             return ClientValidationResult.Failure(ClientIdError.MissingX509TrustAnchors)
         }
 

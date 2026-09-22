@@ -40,6 +40,9 @@ data class ClientIdTrustConfiguration(
         get() = x509TrustAnchors ?: InMemoryTrustStore()
 }
 
+internal fun X509CertificateTrustStore?.isMissing(): Boolean =
+    this == null || (this is InMemoryTrustStore && isEmpty())
+
 /**
  * A sealed class representing all possible validation errors for clear, type-safe error handling.
  *
@@ -82,6 +85,14 @@ sealed class ClientIdError(val message: String) {
 
     @Serializable
     data object MissingX509TrustAnchors : ClientIdError("No X.509 trust anchors are configured.")
+
+    /**
+     * Anchors are configured, but the presented chain does not reach one of them.
+     * Distinct from [MissingX509TrustAnchors], which means the wallet has none.
+     */
+    @Serializable
+    data object X509TrustAnchorMismatch :
+        ClientIdError("The certificate chain does not reach a configured X.509 trust anchor.")
 
     /**
      * The `redirect_uri`'s FQDN did not match an `x509_san_dns` Client Identifier.
