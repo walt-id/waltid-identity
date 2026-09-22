@@ -7,9 +7,11 @@ that one). Reads a results.json written by ConformanceReportWriter and writes a 
 so results are tracked in git instead of only living in the gitignored build/ directory.
 
 Entries whose name follows the verifier convention ("<variant> / <module>") are grouped by
-variant/profile; entries with a flat name (e.g. the wallet roles' "<description>#<n>") get a single
-flat table instead. Originally written for VerifierConformanceTests hence the filename and the
-VP-Verifier defaults - pass --results/--output/--title to point it at a different role.
+variant/profile; entries whose name is "<producer>/<module>" (the VP-Wallet matrix convention,
+where `producer` is itself a report field) are grouped by producer instead; entries with a flat
+name (e.g. the other wallet roles' "<description>#<n>") get a single flat table. Originally written
+for VerifierConformanceTests hence the filename and the VP-Verifier defaults - pass
+--results/--output/--title to point it at a different role.
 
 Usage:
     ./export-verifier-results.py [--results PATH] [--output PATH] [--title TITLE] [--note "context"]
@@ -48,25 +50,45 @@ def load_results(path: Path) -> list[dict]:
     return json.loads(path.read_text())
 
 
+def profile_label(producer: str) -> str:
+    """Turn a VP-Wallet matrix producer id into a short, readable profile heading.
+
+    `producer` looks like "oid4vp-1final-wallet-test-plan/client_id_prefix=redirect_uri,
+    credential_format=sd_jwt_vc,...". The plan name only distinguishes HAIP from plain VP, and the
+    param names are implied by their position, so keep just those two things.
+    """
+    plan, _, params = producer.partition("/")
+    kind = "HAIP" if "haip" in plan else "plain VP"
+    values = [kv.partition("=")[2] for kv in params.split(",") if "=" in kv]
+    return f"{kind}: " + " · ".join(values) if values else producer
+
+
 def group_by_profile(entries: list[dict]) -> tuple[dict[str, list[dict]], list[dict], list[dict]]:
     """Split into (variant/module groups, flat-named test cases, pure housekeeping entries).
 
-    The verifier convention "<variant> / <module>" groups by variant. Wallet roles use a flat
-    "<description>#<n>" name instead - those get their own table rather than being grouped, since
-    there's no separate profile axis to split on. The single "conformance-suite" availability
-    entry ConformanceReportWriter always emits is kept out of both (see writeSkippedIfEmpty) -
-    it's a fixed housekeeping marker, not a real test result.
+    Three name conventions in use across roles:
+    - Verifier: "<variant> / <module>" (space-slash-space) - group by variant.
+    - VP-Wallet: "<producer>/<module>" where `producer` is itself an entry field identifying the
+      matrix point - group by producer, using [profile_label] for a readable heading.
+    - Other wallet roles: flat "<description>#<n>" - no separate profile axis, single flat table.
+    The single "conformance-suite" availability entry ConformanceReportWriter always emits is kept
+    out of all three (see writeSkippedIfEmpty) - it's a fixed housekeeping marker, not a real
+    result.
     """
     profiles: dict[str, list[dict]] = {}
     flat: list[dict] = []
     housekeeping: list[dict] = []
     for entry in entries:
         name = entry.get("name", "")
-        if name == "conformance-suite" and entry.get("producer") == "suite-availability":
+        producer = entry.get("producer", "")
+        if name == "conformance-suite" and producer == "suite-availability":
             housekeeping.append(entry)
         elif " / " in name:
             profile, case = name.split(" / ", 1)
             profiles.setdefault(profile, []).append({**entry, "case": case})
+        elif producer and name.startswith(producer + "/"):
+            case = name[len(producer) + 1:]
+            profiles.setdefault(profile_label(producer), []).append({**entry, "case": case})
         else:
             flat.append(entry)
     return profiles, flat, housekeeping
