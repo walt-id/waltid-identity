@@ -20,8 +20,6 @@ data class Issuer2ServiceConfig(
     val ciTokenStoredKey: String? = null,
     /** Enables batch credential issuance and defines the maximum accepted batch size. */
     val batchCredentialIssuance: BatchCredentialIssuance? = null,
-    /** Advertises and serves the OpenID4VCI notification endpoint. This is issuer metadata, not a wallet setting. */
-    val notificationEndpointEnabled: Boolean = true,
 ) : WaltConfig() {
     /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
     constructor(
