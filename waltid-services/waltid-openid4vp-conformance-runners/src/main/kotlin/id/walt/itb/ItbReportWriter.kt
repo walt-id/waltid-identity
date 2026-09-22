@@ -12,7 +12,11 @@ data class ItbRunReport(
     val buildRevision: String,
     val catalogueObservedOn: String,
     val cases: List<ItbCaseResult>,
-)
+    val walletExecution: WalletExecution = WalletExecution.JVM_SOFTWARE,
+    val androidApkSha256: String? = null,
+) {
+    enum class WalletExecution { JVM_SOFTWARE, ANDROID_NATIVE }
+}
 
 /** Only bounded outcome metadata is published; raw reports, browser state and protocol payloads stay private. */
 object ItbReportWriter {
@@ -24,6 +28,8 @@ object ItbReportWriter {
             appendLine("# WeBuild ITB wallet sessions")
             appendLine()
             appendLine("Build: `${report.buildRevision}`. Catalogue: ${report.catalogueObservedOn}.")
+            appendLine("Wallet execution: ${report.walletExecution}.")
+            report.androidApkSha256?.let { appendLine("Android test APK SHA-256: `$it`.") }
             appendLine("${report.cases.size - failures}/${report.cases.size} passed; $failures non-passing.")
             appendLine()
             appendLine("| Suite | Case | Runner result | Wallet | ITB verdict | Session |")
@@ -33,7 +39,7 @@ object ItbReportWriter {
                 appendLine("| ${result.suite} | ${result.case} | ${result.outcome} | $wallet | ${result.testBedVerdict ?: "unavailable"} | ${result.session ?: "not started"} |")
             }
             appendLine()
-            appendLine("JVM wallet protocol execution with a portal interaction bridge. This does not qualify native consent or platform delivery.")
+            appendLine("Wallet protocol execution with a portal interaction bridge. Native mode uses operator authentication on Android; neither mode qualifies transaction-consent UI, browser/OS DC API delivery or formal SCA assurance.")
         })
         writeAtomically(directory.resolve("junit.xml"), buildString {
             appendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")

@@ -39,11 +39,19 @@ private suspend fun runItb(): Int {
     val directory = Path.of(System.getenv("ITB_REPORT_DIR") ?: "build/reports/itb-wallet")
     val selected = ItbRunSelection.select(catalogue, System.getenv("ITB_CASES"))
     val started = Instant.now().toString()
+    val androidPort = System.getenv("ITB_ANDROID_PORT")?.toInt()?.also { require(it in 1024..65535) }
+    val androidApkSha256 = androidPort?.let {
+        required("ITB_ANDROID_APK_SHA256").also { require(it.matches(Regex("[0-9a-f]{64}"))) }
+    }
     val results = selected.map { (suite, case) ->
         ItbCaseResult(suite.id, case.id, null, ItbCaseResult.Outcome.NOT_RUN, ItbCaseResult.Phase.START,
             false, false, null, false, null, started, started)
     }.toMutableList()
-    fun writeReport() = ItbReportWriter.write(directory, ItbRunReport(revision, catalogue.observedOn, results.toList()))
+    fun writeReport() = ItbReportWriter.write(directory, ItbRunReport(
+        revision, catalogue.observedOn, results.toList(),
+        walletExecution = if (androidPort == null) ItbRunReport.WalletExecution.JVM_SOFTWARE else ItbRunReport.WalletExecution.ANDROID_NATIVE,
+        androidApkSha256 = androidApkSha256,
+    ))
     writeReport()
 
     val organisationKey = required("ITB_ORGANISATION_KEY")
@@ -70,19 +78,25 @@ private suspend fun runItb(): Int {
                 page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(Pattern.compile("Log in"))).click()
                 page.waitForURL("${catalogue.testBed}/app#/home")
                 itbHttpClient().use { client ->
-                    val wallet = ItbWalletDriver.create(client, origin, trust) { url, callback ->
-                        ItbReferenceAuthorization.resolve(client, origin, url, callback)
+                    val native = androidPort?.let {
+                        ItbAndroidWalletDriver.connect(it, required("ITB_ANDROID_TOKEN"), origin, pem)
                     }
-                    client.config { followRedirects = false }.use { restClient ->
-                        val api = ItbRestClient(restClient, Url("${catalogue.testBed}/api/rest"), organisationKey)
-                        val bridge = ItbPortalBridge(page, "${catalogue.testBed}/app#/organisation/conformance/$organisationId", catalogue.systemName)
-                        val runner = ItbCaseRunner(api, bridge, wallet::execute)
-                        selected.forEachIndexed { index, (suite, case) ->
-                            results[index] = runner.run(suite, case)
-                            writeReport()
-                            println("${suite.id}/${case.id}: ${results[index].outcome}")
+                    try {
+                        val executeWallet: suspend (ItbWalletInteraction) -> Unit = native?.let { it::execute }
+                            ?: ItbWalletDriver.create(client, origin, trust) { url, callback ->
+                                ItbReferenceAuthorization.resolve(client, origin, url, callback)
+                            }.let { it::execute }
+                        client.config { followRedirects = false }.use { restClient ->
+                            val api = ItbRestClient(restClient, Url("${catalogue.testBed}/api/rest"), organisationKey)
+                            val bridge = ItbPortalBridge(page, "${catalogue.testBed}/app#/organisation/conformance/$organisationId", catalogue.systemName)
+                            val runner = ItbCaseRunner(api, bridge, executeWallet)
+                            selected.forEachIndexed { index, (suite, case) ->
+                                results[index] = runner.run(suite, case)
+                                writeReport()
+                                println("${suite.id}/${case.id}: ${results[index].outcome}")
+                            }
                         }
-                    }
+                    } finally { native?.close() }
                 }
             }
         }
