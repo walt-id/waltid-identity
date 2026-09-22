@@ -9,9 +9,19 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
 import java.time.Instant
 
-/** The UI transport owns only the interaction belonging to the supplied REST session. */
+/** An owned session is recorded before its first execution attempt, so failed starts can be cleaned up. */
+data class ItbSession(val testSuite: String, val testCase: String, val session: String) {
+    init {
+        require(testSuite.isNotBlank() && testCase.isNotBlank()) { "Missing ITB case identity" }
+        require(Regex("[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}").matches(session)) { "Invalid ITB session ID" }
+    }
+}
+
 interface ItbInteractionBridge {
-    suspend fun read(session: ItbRestClient.CreatedSession): ItbWalletInteraction
+    /** Prepare one interactive session without starting its test steps. Never retry an uncertain creation. */
+    suspend fun prepare(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case): ItbSession
+    /** Start the prepared session and read its pending wallet interaction. */
+    suspend fun read(session: ItbSession): ItbWalletInteraction
     suspend fun complete()
 }
 
@@ -49,10 +59,9 @@ class ItbCaseRunner(
         require(caseTimeoutMillis > 0 && pollMillis > 0) { "ITB timeouts must be positive" }
     }
 
-    suspend fun run(system: String, actor: String, suite: String, case: String): ItbCaseResult {
+    suspend fun run(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case): ItbCaseResult {
         val start = Instant.now().toString()
-        var sessions = emptyList<ItbRestClient.CreatedSession>()
-        var session: ItbRestClient.CreatedSession? = null
+        var session: ItbSession? = null
         var report: ItbSessionReport? = null
         var phase = ItbCaseResult.Phase.START
         var adapterInvoked = false
@@ -63,12 +72,11 @@ class ItbCaseRunner(
         var outcome = ItbCaseResult.Outcome.ERROR
         try {
             withTimeout(caseTimeoutMillis) {
-                sessions = api.start(system, actor, suite, listOf(case))
-                check(sessions.size == 1 && sessions.single().testSuite == suite && sessions.single().testCase == case) {
-                    "ITB started an unexpected case inventory"
-                }
-                val createdSession = sessions.single()
+                val createdSession = bridge.prepare(suite, case)
                 session = createdSession
+                check(createdSession.testSuite == suite.id && createdSession.testCase == case.id) {
+                    "ITB prepared an unexpected case"
+                }
                 phase = ItbCaseResult.Phase.INTERACTION
                 val interaction = bridge.read(createdSession)
                 phase = ItbCaseResult.Phase.WALLET
@@ -82,7 +90,7 @@ class ItbCaseRunner(
                     if (status.isComplete) break
                     delay(pollMillis)
                 }
-                val finalReport = api.report(case, createdSession.session)
+                val finalReport = api.report(case.id, createdSession.session)
                 report = finalReport
                 outcome = when {
                     finalReport.passed -> ItbCaseResult.Outcome.PASSED
@@ -102,12 +110,11 @@ class ItbCaseRunner(
             outcome = if (adapterInvoked && !walletSucceeded) ItbCaseResult.Outcome.WALLET_FAILED else ItbCaseResult.Outcome.ERROR
         } finally {
             withContext(NonCancellable) {
-                // Never stop other tenant sessions; only IDs returned by this invocation's start call.
-                if (sessions.isNotEmpty() && report?.isComplete != true) {
+                // Only the session created by this invocation is eligible for cleanup.
+                session?.takeIf { report?.isComplete != true }?.let { owned ->
                     try {
-                        val active = api.status(sessions.map { it.session }).filterNot { it.isComplete }
-                        if (active.isNotEmpty()) api.stop(active.map { it.session })
-                        session?.let { report = api.report(case, it.session) }
+                        if (!api.status(listOf(owned.session)).single().isComplete) api.stop(listOf(owned.session))
+                        report = api.report(case.id, owned.session)
                     } catch (_: Exception) {
                         cleanupFailed = true
                     }
@@ -115,7 +122,7 @@ class ItbCaseRunner(
             }
         }
         return ItbCaseResult(
-            suite, case, session?.session, outcome, phase, adapterInvoked, walletSucceeded,
+            suite.id, case.id, session?.session, outcome, phase, adapterInvoked, walletSucceeded,
             report?.verdict, report?.isComplete == true, report?.caseVersion,
             start, Instant.now().toString(), failure, cleanupFailed, errorCode,
         )

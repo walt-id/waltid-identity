@@ -4,32 +4,45 @@ import com.microsoft.playwright.Page
 import com.microsoft.playwright.Locator
 import com.microsoft.playwright.options.AriaRole
 import io.ktor.http.Url
-import io.ktor.http.parseQueryString
 import java.util.regex.Pattern
 import java.nio.file.Files
 
-/** DOM-only bridge for the deployed GITB 1.29.5 portal. No browser storage, traces or screenshots are exported. */
+/** Interactive GITB 1.29.5 execution. Browser storage, traces and screenshots are never exported. */
 class ItbPortalBridge(
     private val page: Page,
-    private val sessionsUrl: String,
+    private val statementsUrl: String,
+    private val systemName: String,
 ) : ItbInteractionBridge {
-    override suspend fun read(session: ItbRestClient.CreatedSession): ItbWalletInteraction {
-        // A fresh page also dismisses any interaction belonging to a preceding failed session.
-        if (page.url() == sessionsUrl) page.reload() else page.navigate(sessionsUrl)
-        val filter = page.locator("input[name=filterValue]")
-        if (!filter.isVisible) page.getByText("Filters", Page.GetByTextOptions().setExact(true)).click()
-        filter.click()
-        filter.fill(session.session)
-        // Expanding before the filtered response renders can click a loading row or lose the expansion.
-        val response = page.waitForResponse({ response ->
-            Url(response.url()).encodedPath.endsWith("/api/reports/active") &&
-                parseQueryString(response.request().postData().orEmpty())["session_id"] == session.session
-        }) { filter.press("Enter") }
-        check(response.ok() && response.finished() == null) { "ITB session search failed" }
-        val active = page.locator("#active-tests")
-        active.locator("tr[table-row-directive]").click()
-        active.getByText(session.session, Locator.GetByTextOptions().setExact(true)).waitFor()
-        active.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName(Pattern.compile("View pending interaction"))).click()
+    override suspend fun prepare(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case): ItbSession {
+        // A fresh document discards old dialogs and pending session-list updates while retaining login cookies.
+        page.navigate("about:blank")
+        page.navigate(statementsUrl)
+        page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(
+            Pattern.compile(Pattern.quote(systemName) + "$"),
+        )).waitFor()
+        page.getByText(suite.statement, Page.GetByTextOptions().setExact(true)).click()
+        page.locator("#button-executionType").click()
+        page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName("Interactive execution").setExact(true)).click()
+        val suiteRow = page.locator(".testSuite").filter(Locator.FilterOptions().setHas(
+            page.getByText(suite.name, Page.GetByTextOptions().setExact(true)),
+        ))
+        suiteRow.locator(".mainLine").filter(Locator.FilterOptions().setHas(
+            page.getByText(case.name, Page.GetByTextOptions().setExact(true)),
+        )).locator("button[ngbtooltip=Run]").click()
+        page.waitForCondition { startButton().isEnabled }
+        return ItbSession(suite.id, case.id, sessionId())
+    }
+
+    private fun startButton(): Locator = page.getByRole(
+        AriaRole.BUTTON, Page.GetByRoleOptions().setName(Pattern.compile("Start$")),
+    )
+
+    private fun sessionId(): String = page.locator(".session-table-title-value .value").innerText().trim()
+
+    override suspend fun read(session: ItbSession): ItbWalletInteraction {
+        check(sessionId() == session.session) { "The portal is not showing the owned ITB session" }
+        // Interactive execution keeps DC API instructions pending; REST background starts skip those steps.
+        startButton().click()
         val dialog = page.locator("ngb-modal-window:not([aria-hidden=true])")
         dialog.getByText(Pattern.compile(
             "^\\s*(VCI request|VP request|(?:TS12 payment )?Digital Credentials API presentation request)\\s*$",

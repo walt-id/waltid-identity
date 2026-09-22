@@ -6,12 +6,13 @@ import io.ktor.http.encodedPath
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/** Deployed case identifiers, independent of organisation/system/actor API credentials. */
+/** Deployed case identifiers, and exact portal labels, without account credentials. */
 @Serializable
 data class ItbCatalogue(
     val observedOn: String,
     val testBed: String,
     val testBedVersion: String,
+    val systemName: String,
     val suites: List<Suite>,
 ) {
     internal val origin: Url get() = URLBuilder(testBed).apply { encodedPath = "" }.build()
@@ -19,7 +20,7 @@ data class ItbCatalogue(
     @Serializable
     data class Suite(
         val profile: String,
-        val specification: String,
+        val statement: String,
         val id: String,
         val name: String,
         val publishedVersion: String? = null,
@@ -30,10 +31,11 @@ data class ItbCatalogue(
     data class Case(val id: String, val name: String)
 
     init {
+        require(systemName.isNotBlank()) { "Missing ITB system name" }
         require(suites.isNotEmpty()) { "The ITB catalogue must contain suites" }
         require(suites.map { it.id }.distinct().size == suites.size) { "Duplicate ITB suite IDs" }
         suites.forEach { suite ->
-            require(suite.id.isNotBlank() && suite.cases.isNotEmpty()) { "Empty ITB suite" }
+            require(suite.id.isNotBlank() && suite.name.isNotBlank() && suite.statement.isNotBlank() && suite.cases.isNotEmpty()) { "Empty ITB suite" }
             require(suite.cases.all { it.id.isNotBlank() && it.name.isNotBlank() }) { "Empty ITB case identity" }
             require(suite.cases.map { it.id }.distinct().size == suite.cases.size) {
                 "Duplicate ITB case IDs in ${suite.id}"

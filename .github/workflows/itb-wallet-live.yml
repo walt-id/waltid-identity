@@ -42,10 +42,6 @@ jobs:
       - name: Run selected deployed cases
         env:
           ITB_ORGANISATION_KEY: ${{ secrets.ITB_ORGANISATION_KEY }}
-          ITB_SYSTEM_KEY: ${{ secrets.ITB_SYSTEM_KEY }}
-          ITB_BASE_ACTOR_KEY: ${{ secrets.ITB_BASE_ACTOR_KEY }}
-          ITB_DOMAIN_ACTOR_KEY: ${{ secrets.ITB_DOMAIN_ACTOR_KEY }}
-          ITB_PAYMENT_ACTOR_KEY: ${{ secrets.ITB_PAYMENT_ACTOR_KEY }}
           ITB_USERNAME: ${{ secrets.ITB_USERNAME }}
           ITB_PASSWORD: ${{ secrets.ITB_PASSWORD }}
           ITB_ORGANISATION_ID: ${{ vars.ITB_ORGANISATION_ID }}
