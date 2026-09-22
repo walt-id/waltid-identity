@@ -64,7 +64,6 @@ waltid-openid4vp-conformance-runners/
 | [docs/VP-VERIFIER.md](docs/VP-VERIFIER.md) | VP verifier setup, status, and troubleshooting |
 | [docs/VCI-WALLET.md](docs/VCI-WALLET.md) | VCI wallet conformance documentation |
 | [docs/VP-WALLET.md](docs/VP-WALLET.md) | VP wallet conformance documentation |
-| [TEST-PLANS-AND-PROFILES.md](TEST-PLANS-AND-PROFILES.md) | Test-plan inventory and profile reference |
 
 `./gradlew test` only executes the test task. It does not universally provision
 remote services or local conformance infrastructure. Follow the relevant
