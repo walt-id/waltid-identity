@@ -1,93 +1,66 @@
 # Deployed ITB runner baseline — 2026-09-22
 
 The standalone `itbWallet` CLI completed all **21 deployed cases** on clean commit
-`c4ed00f788fcbc5e4eba51c2ab80361c144df9b0`: **9 passed, 6 failed at wallet
-execution and 6 failed during interaction acquisition**. Every case has a
-correlated terminal ITB XML report; no cleanup failed. The process exited 1.
-A pass requires both wallet success and terminal ITB `SUCCESS`.
+`7d5eb3b3d79cee35d445627cb6edd65e4943a3c1`: **11 passed and 10 failed in
+production wallet execution**. Every case reached the wallet and has a correlated
+terminal ITB XML report. There were **no orchestration errors, skipped cases or
+cleanup failures**. The process exited 1 because the wallet failures remain real
+failures. A pass requires both wallet success and terminal ITB `SUCCESS`.
 
-The run used the production JVM wallet adapter, its authenticated Playwright
-bridge and synthetic wallet data. Production code includes the main merge of
-[#2168](https://github.com/walt-id/waltid-identity/pull/2168); outstanding production
-fixes remain external. The hosted live workflow has not run. JVM protocol results
-do not qualify native delivery, consent UX or full normative EUDI/SCA assurance.
+The run used authenticated, interactive portal sessions and synthetic wallet
+data. Each session ID was captured before starting its test steps. Offers and
+requests came from that session's dialog; REST supplied status, terminal reports
+and owned-session cleanup. This avoids the deployed DC API background-interaction
+skip and the session-list navigation races found during qualification.
+
+Production code includes the main merge of
+[#2168](https://github.com/walt-id/waltid-identity/pull/2168). Outstanding production
+fixes remain external. JVM protocol results do not qualify native delivery,
+consent UX or full normative EUDI/SCA assurance.
 
 ## Standalone case results
 
-`UNDEFINED` records a session stopped after failure; it is not a pass. Interaction
-errors have `adapterInvoked=false` and must not be described as wallet failures.
-This is one complete run, without replacing failures with successful retries.
+`UNDEFINED` records a session stopped after wallet failure; it is not an ITB
+assertion failure or a pass. This table contains one complete run, without
+replacing failures with successful retries.
 
-| Case | Outcome / phase | Terminal ITB | Runtime version | Session |
+| Case | Wallet outcome | Terminal ITB | Runtime version | Session |
 | --- | --- | --- | --- | --- |
-| `tc_vci_001` | `PASSED` / `VERDICT` | `SUCCESS` | 1.0 | `0ba786b0-1ece-4e7d-9a04-b5b68a4dfd64` |
-| `tc_vci_002` | `PASSED` / `VERDICT` | `SUCCESS` | 1.0 | `bd75f45b-250a-4c6b-a1ee-194af7c50d93` |
-| `tc_vci_003` | `PASSED` / `VERDICT` | `SUCCESS` | 1.0 | `f745adb3-980b-4c0f-a3bd-4678cbf906a8` |
-| `tc_vci_005` | `WALLET_FAILED` / `WALLET` | `UNDEFINED` | 1.0 | `f4bb4f94-88ef-48f5-83c6-48b65997c689` |
-| `tc_vci_006` | `PASSED` / `VERDICT` | `SUCCESS` | 1.0 | `700ebcfc-181f-4a12-9fa8-03f1d87e8e88` |
-| `tc_vci_007` | `PASSED` / `VERDICT` | `SUCCESS` | 1.0 | `4a4323af-c928-4fb1-92b5-5673044bb35f` |
-| `tc_vci_008` | `WALLET_FAILED` / `WALLET` | `UNDEFINED` | 1.0 | `b99c91ef-4be5-494b-b6da-f36dc360acab` |
-| `tc_vp_001` | `ERROR` / `INTERACTION` | `UNDEFINED` | 1.0 | `356d99b8-d835-4f9b-9b1b-b65f6914fc48` |
-| `tc_vp_002` | `PASSED` / `VERDICT` | `SUCCESS` | 1.0 | `f5316e3c-58b1-4d68-9fa0-051ba29ec7d5` |
-| `tc_vp_003` | `PASSED` / `VERDICT` | `SUCCESS` | 1.0 | `21d13278-90d0-4fc0-b5c5-b446ead511a6` |
-| `tc_vp_007` | `WALLET_FAILED` / `WALLET` | `UNDEFINED` | 1.0 | `409c8bae-b223-41bc-9bf1-ece6b676ab6a` |
-| `tc15` | `ERROR` / `INTERACTION` | `FAILURE` | 1.6 | `b3b2e9b6-1cae-4c59-bf7a-465a61227229` |
-| `ts12_issue_01` | `PASSED` / `VERDICT` | `SUCCESS` | 1.0 | `eb039b41-1c4b-40d8-ab51-1f47756d25c3` |
-| `ts12_issue_02` | `ERROR` / `INTERACTION` | `UNDEFINED` | 1.0 | `69f1c249-ed98-4ff2-807d-a92b923b8b9d` |
-| `ts12_issue_03` | `PASSED` / `VERDICT` | `SUCCESS` | 1.0 | `0f13d26d-2040-49fa-805d-86ddda64cf2c` |
-| `ts12_pay_01` | `WALLET_FAILED` / `WALLET` | `UNDEFINED` | 1.0 | `7c9eea10-338f-412e-92b9-c9cb1de60404` |
-| `ts12_pay_02` | `WALLET_FAILED` / `WALLET` | `UNDEFINED` | 1.0 | `9f40d6bb-6eb2-43c7-9ab0-441d70f294c2` |
-| `ts12_pay_03` | `WALLET_FAILED` / `WALLET` | `UNDEFINED` | 1.0 | `109382cc-e6c9-4d8d-8127-c04317a41ea1` |
-| `ts12_pay_dc_api_01` | `ERROR` / `INTERACTION` | `FAILURE` | 1.0 | `d5e23424-6858-4481-bf5c-4fb3f309f895` |
-| `ts12_pay_dc_api_02` | `ERROR` / `INTERACTION` | `FAILURE` | 1.0 | `8880d6a8-f4a1-4466-9bb1-f442c57e75cc` |
-| `ts12_pay_dc_api_03` | `ERROR` / `INTERACTION` | `FAILURE` | 1.0 | `19da1bc5-f837-46f3-a2df-79cfc69bca3b` |
-
-## Automation gaps
-
-- **Four DC API cases:** REST-started CS-07 and all three TS12 DC API sessions
-  finish with ITB `FAILURE` before a pending wallet interaction is available.
-  The wallet adapter is never invoked. For CS-07, a controlled portal-started
-  comparison (`032a6a0c-b7a8-428f-ab20-e032be0b19b1`) exposes the expected DC API
-  script and waits; that diagnostic session was then stopped. This establishes
-  a REST-versus-interactive execution difference. GITB documents automatic
-  completion of background interactions without a suitable timeout or handler
-  ([interaction semantics](https://www.itb.ec.europa.eu/docs/tdl/latest/constructs/index.html#background-execution-and-timeouts)).
-  The deployed test definition was not available to confirm the exact setting.
-  Resolve the test-bed interaction contract or implement and qualify interactive
-  session startup before claiming automated wallet coverage for these four cases.
-- **Portal reliability:** VP001 and TS12 issuance 02 timed out during interaction
-  acquisition in this run, despite passing earlier. Targeted diagnostic retries
-  passed, but do not erase these failures. The intermittent cause remains open.
-- **Hosted execution:** seven repository Actions secrets and organisation variable
-  are configured, consistent with the existing conformance jobs; no dedicated
-  environment is used. GitHub rejects dispatch while the workflow is absent from
-  the default branch. Its first hosted smoke and full matrix remain pending.
-
-## Targeted portal retry
-
-Two diagnostic retries passed VCI006, VP001 and TS12 issuance 02 (3/3 each).
-They used `c4ed00f788fcbc5e4eba51c2ab80361c144df9b0+dirty` with temporary,
-message-free exception-location logging; no wallet or browser logic changed.
-The last retry's sessions are below. The diagnostic logging was then removed.
-Neither retry establishes the intermittent timeout's cause or replaces the
-complete-run results.
-
-| Case | Wallet / terminal ITB | Session |
-| --- | --- | --- |
-| `tc_vci_006` | Passed / `SUCCESS` | `7b7dee46-db63-408e-ac50-e8210879c24d` |
-| `tc_vp_001` | Passed / `SUCCESS` | `bc0d9e7f-ba4e-4e57-8bcc-d1474b0ca7bf` |
-| `ts12_issue_02` | Passed / `SUCCESS` | `500182aa-f65e-4b70-9dc8-045147682aa2` |
+| `tc_vci_001` | `PASSED` | `SUCCESS` | 1.0 | `c7bfa6ee-b3e2-4c70-b572-32cd31b01842` |
+| `tc_vci_002` | `PASSED` | `SUCCESS` | 1.0 | `6d526f02-533b-4a70-874a-99f24ea86a69` |
+| `tc_vci_003` | `PASSED` | `SUCCESS` | 1.0 | `34f7d5d1-32ad-42b8-8e83-11c0b8e54cf2` |
+| `tc_vci_005` | `WALLET_FAILED` | `UNDEFINED` | 1.0 | `360d4eb2-b00a-4ec0-b3eb-20ad37abe126` |
+| `tc_vci_006` | `PASSED` | `SUCCESS` | 1.0 | `50808266-3df4-454d-b6fb-d0cb535fd340` |
+| `tc_vci_007` | `PASSED` | `SUCCESS` | 1.0 | `6c94df99-b430-40a5-90df-bbbd2533380a` |
+| `tc_vci_008` | `WALLET_FAILED` | `UNDEFINED` | 1.0 | `d73be736-89c5-438b-a68b-cd3bbc99e196` |
+| `tc_vp_001` | `PASSED` | `SUCCESS` | 1.0 | `f006551c-e085-4b1d-9662-dd430cb0575f` |
+| `tc_vp_002` | `PASSED` | `SUCCESS` | 1.0 | `d94613ab-21de-4e22-b672-7f93931fecff` |
+| `tc_vp_003` | `PASSED` | `SUCCESS` | 1.0 | `7869c1f8-9979-4162-865d-5ec5c99ea1e0` |
+| `tc_vp_007` | `WALLET_FAILED` | `UNDEFINED` | 1.0 | `8ca6f171-5e1d-456c-87e6-8ce4dfa76eed` |
+| `tc15` | `WALLET_FAILED` | `UNDEFINED` | 1.6 | `f98caa55-533a-459b-a995-32260e9e648f` |
+| `ts12_issue_01` | `PASSED` | `SUCCESS` | 1.0 | `e15141d0-63ff-42f8-984c-d45b219b9ea9` |
+| `ts12_issue_02` | `PASSED` | `SUCCESS` | 1.0 | `715f6a30-e802-46ad-8695-b8574b68c02c` |
+| `ts12_issue_03` | `PASSED` | `SUCCESS` | 1.0 | `6aaef32b-8119-4077-b718-5aab706fb4aa` |
+| `ts12_pay_01` | `WALLET_FAILED` | `UNDEFINED` | 1.0 | `ef3e420f-93ca-40fc-9392-2a123e1200a1` |
+| `ts12_pay_02` | `WALLET_FAILED` | `UNDEFINED` | 1.0 | `a5f19b66-c89f-4b34-95a2-63a370e6baa5` |
+| `ts12_pay_03` | `WALLET_FAILED` | `UNDEFINED` | 1.0 | `95c939d9-8dae-4dfd-ad0a-88e8b795ae7c` |
+| `ts12_pay_dc_api_01` | `WALLET_FAILED` | `UNDEFINED` | 1.0 | `912fbf16-7e92-4685-9caa-cad9c3d54345` |
+| `ts12_pay_dc_api_02` | `WALLET_FAILED` | `UNDEFINED` | 1.0 | `28a6f651-ba07-4215-b812-600fffe1c987` |
+| `ts12_pay_dc_api_03` | `WALLET_FAILED` | `UNDEFINED` | 1.0 | `836888dd-6500-46aa-b4a6-167360377cfc` |
 
 ## Confirmed dependencies and open gaps
 
 - **WAL-896 / [#2141](https://github.com/walt-id/waltid-identity/pull/2141):**
-  Earlier interactive development runs of CS-07 and all three TS12 DC API cases
-  reached production signed-protocol dispatch
-  and failed with `UnsupportedDcApiProtocolException` for `openid4vp-v1-signed`.
+  CS-07 and all three TS12 DC API cases reach production signed-protocol dispatch
+  and fail with `UnsupportedDcApiProtocolException` for `openid4vp-v1-signed`.
   VP007 separately rejects verifier mdoc `deviceauth_alg_values` `[-7, -35]`:
   the baseline P-256 wallet advertises ESP256 (`-9`). The inspected #2141 head
-  `511e0b779f236396f0019dcf12493b5754c08dee` adds ES256 (`-7`) support alongside
+  `04802383782ce3cf76a5d224519ad529ae290bc1` adds ES256 (`-7`) support alongside
   ESP256. This confirms the dependency, not that its complete live matrix passes.
+  That PR also adds a `clientIdTrustConfiguration` parameter to the DC API preview
+  handler. After it merges, pass the runner's existing pinned reference CA through
+  that parameter before rerunning signed X.509 DC API cases. The current baseline
+  has no such parameter; this runner does not copy or reflectively invoke future APIs.
 - **Reference-issuer mdoc encoding:** VCI005 and VCI008 fail parsing the issued
   `DeviceKeyInfo.CoseKey`. Fresh captures confirmed that the issuer encodes COSE
   label `2` (`kid`) as a CBOR text string. [RFC 9052 section 7.1](https://www.rfc-editor.org/rfc/rfc9052.html#section-7.1)
@@ -123,17 +96,25 @@ The runner correctly retains `WALLET_FAILED` alongside that ITB verdict; a
 regression test covers this observed combination. These development results
 are separate from the standalone matrix above.
 
-## Remaining acceptance
+## Execution and remaining acceptance
 
-Keep the PR draft. Resolve the DC API startup contract and portal reliability,
-qualify the hosted workflow after default-branch registration, and rerun all 21
-cases after the external wallet and issuer fixes. Failures, timeouts and
-unexecuted cases remain non-passing; WAL-1423 stays open until the matrix passes.
+All five SD-JWT issuance cases, VP001/002/003 and all three TS12 issuance cases
+passed. These cover the reference authorization-code/PAR flow, transaction-code
+issuance and **VP002 response encryption**. The independently sourced verifier
+trust anchor is documented in [CA provenance](../src/main/resources/itb/README.md).
 
-The earlier [interactive development evidence](https://github.com/walt-id/waltid-identity/blob/cd2aab80ac701789853d41f517f300a01f3080ac/waltid-services/waltid-openid4vp-conformance-runners/docs/ITB-BASELINE.md)
-records 11 passes and 10 wallet failures through a temporary JVM probe with
-separate portal control. It establishes the signed DC API and issuer findings,
-but is not interchangeable with the standalone results above. Authorization-code
-and PAR handling, pre-authorized PIN issuance and VP002 response encryption have
-also passed in standalone execution. The explicit verifier trust anchor remains
-independently sourced; see [CA provenance](../src/main/resources/itb/README.md).
+The interactive bridge also passed a targeted six-case run before the full
+matrix: four passes and the two expected signed DC API wallet failures. Offline
+browser contracts cover exact suite selection, interactive mode, request-versus-QR
+labels, stale dialogs and session ownership. They do not replace live evidence.
+
+The live workflow uses three repository secrets (organisation API key and portal
+login) and the organisation ID variable, with no dedicated environment. Its first
+hosted run remains pending: GitHub requires the workflow on the default branch
+before manual dispatch. After it lands, run the issuance/presentation smoke and
+then the complete matrix, as described in the [operator guide](ITB-WALLET.md).
+
+Keep the PR draft as requested. Resolve the external wallet and issuer blockers,
+apply the DC API trust wiring once its API becomes available, and rerun against
+the actual merged revisions. Failures, timeouts and unexecuted cases must remain
+non-passing; WAL-1423 stays open until the required matrix passes.
