@@ -71,11 +71,26 @@ recorded in [the fixture provenance](../src/main/resources/itb/README.md).
 file. Request `x5c` chains are never automatically trusted.
 
 The **WeBuild ITB live wallet cases** workflow is manually dispatched and strict.
-Configure matching repository secrets for the seven key/account variables and
-repository variable `ITB_ORGANISATION_ID`. It runs selected cases and uploads
-only sanitized reports. It does not expose tenant credentials to pull-request
-jobs. Hosted execution still needs CI credentials and workflow qualification;
-the checked-in workflow alone is not a successful hosted run.
+Configure matching repository Actions secrets for the seven key/account variables
+and repository variable `ITB_ORGANISATION_ID=20`, following the existing conformance
+workflows. A dedicated GitHub environment is not required. Tenant credentials are
+injected only into the manually dispatched live test step, never into the ITB PR
+checks. As with other repository secrets, maintainers must review workflow changes
+that could access them; this does not create a branch-specific secret boundary.
+
+The JVM version and JSON/JUnit/Markdown reporting follow the existing conformance
+setup. ITB uses an outbound portal bridge, so it does not need the other suites'
+inbound tunnels or coordinated enterprise checkout. Its strict results follow
+WAL-1423's explicit requirement; the older suites' `CONFORMANCE_ALLOW_FAILURE`
+switch does not change ITB outcomes.
+
+The live workflow uses a read-only GitHub token, does not persist checkout
+credentials or write Gradle caches, and retains only sanitized reports for 14 days.
+The workflow must exist on the default branch before its first manual dispatch.
+After it lands, dispatch `itb-wallet-live.yml` on the intended commit with
+`cases=tc_vp_002` for a small issuance-plus-encrypted-presentation run, then leave
+`cases` empty for all 21 cases. The checked-in workflow alone is not a successful
+hosted run.
 
 ## Local profile checks
 

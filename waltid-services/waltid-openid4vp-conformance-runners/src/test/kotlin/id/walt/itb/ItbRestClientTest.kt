@@ -3,8 +3,10 @@ package id.walt.itb
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.*
 import io.ktor.http.content.TextContent
+import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
@@ -12,6 +14,20 @@ import kotlin.test.*
 
 class ItbRestClientTest {
     private val apiUrl = Url("https://testbed.example/itb/api/rest")
+
+    @Test
+    fun `XML reports request exactly one media type even with wallet JSON negotiation installed`() = runBlocking<Unit> {
+        val session = "00000000-0000-0000-0000-000000000001"
+        val xml = javaClass.getResource("/itb/vci006-success.xml")!!.readText()
+        HttpClient(MockEngine { request ->
+            assertEquals(listOf("application/xml"), request.headers.getAll(HttpHeaders.Accept))
+            respond(xml, headers = headersOf(HttpHeaders.ContentType, "application/xml"))
+        }) {
+            install(ContentNegotiation) { json() }
+        }.use { client ->
+            assertTrue(ItbRestClient(client, apiUrl, "secret").report("tc_vci_006", session).passed)
+        }
+    }
 
     @Test
     fun `starts explicit cases with sequential execution and no implicit wait`() = runBlocking<Unit> {

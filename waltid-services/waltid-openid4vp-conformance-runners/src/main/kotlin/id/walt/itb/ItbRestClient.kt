@@ -1,6 +1,7 @@
 package id.walt.itb
 
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.contentnegotiation.exclude
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
@@ -120,6 +121,8 @@ class ItbRestClient(
                 }.build()) {
                     this.method = method
                     header("ITB-API-KEY", organisationKey)
+                    // ITB treats Accept as one report format and rejects the wallet plugin's added JSON type.
+                    if (operation == "report") exclude(ContentType.Application.Json)
                     accept(if (operation == "report") ContentType.Application.Xml else ContentType.Application.Json)
                     if (body != null) {
                         contentType(ContentType.Application.Json)

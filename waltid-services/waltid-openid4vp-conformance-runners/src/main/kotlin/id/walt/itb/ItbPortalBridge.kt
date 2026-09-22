@@ -4,6 +4,7 @@ import com.microsoft.playwright.Page
 import com.microsoft.playwright.Locator
 import com.microsoft.playwright.options.AriaRole
 import io.ktor.http.Url
+import io.ktor.http.parseQueryString
 import java.util.regex.Pattern
 import java.nio.file.Files
 
@@ -19,12 +20,18 @@ class ItbPortalBridge(
         if (!filter.isVisible) page.getByText("Filters", Page.GetByTextOptions().setExact(true)).click()
         filter.click()
         filter.fill(session.session)
-        filter.press("Enter")
-        val active = page.getByRole(AriaRole.TABLE).first()
-        active.getByRole(AriaRole.ROW).nth(1).click()
+        // Expanding before the filtered response renders can click a loading row or lose the expansion.
+        val response = page.waitForResponse({ response ->
+            Url(response.url()).encodedPath.endsWith("/api/reports/active") &&
+                parseQueryString(response.request().postData().orEmpty())["session_id"] == session.session
+        }) { filter.press("Enter") }
+        check(response.ok() && response.finished() == null) { "ITB session search failed" }
+        val active = page.locator("#active-tests")
+        active.locator("tr[table-row-directive]").click()
         active.getByText(session.session, Locator.GetByTextOptions().setExact(true)).waitFor()
         active.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName(Pattern.compile("View pending interaction"))).click()
         val dialog = page.locator("ngb-modal-window:not([aria-hidden=true])")
+        dialog.getByText(Pattern.compile("VCI request|VP request|Digital Credentials API presentation request")).waitFor()
         val text = dialog.innerText()
         return when {
             text.contains("VCI request") -> {
