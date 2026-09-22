@@ -8,6 +8,7 @@ import id.walt.issuer2.application.Issuer2Module
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.configurePlugins
 import id.walt.issuer2.models.CredentialOfferCredential
+import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
 import id.walt.issuer2.repository.ConfiguredIssuanceSessionRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
@@ -17,6 +18,7 @@ import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
+import id.walt.sdjwt.SDJwt
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.forms.submitForm
@@ -73,8 +75,16 @@ class Issuer2RefreshAuthorizationTest {
         val a = Issuer2CredentialScenarios.identitySdJwt
         val b = Issuer2CredentialScenarios.isoMdl
         val selected = if (initialSubset) listOf(a) else listOf(a, b)
+        val statuses = listOf(94567, 12345).map { index -> buildJsonObject {
+            putJsonObject("status_list") {
+                put("idx", index)
+                put("uri", "https://status.example.com/list/1")
+            }
+        } }
         val offer = client.createCredentialOffer(MultiCredentialOfferCreateRequest(
-            credentials = listOf(CredentialOfferCredential(a.profileId), CredentialOfferCredential(b.profileId)),
+            credentials = listOf(a, b).mapIndexed { index, scenario ->
+                CredentialOfferCredential(scenario.profileId, CredentialOfferRuntimeOverrides(credentialStatus = statuses[index]))
+            },
             authMethod = AuthenticationMethod.AUTHORIZED,
         ))
         val session = assertNotNull(repository.get(offer.offerId))
@@ -144,7 +154,20 @@ class Issuer2RefreshAuthorizationTest {
         }
         assertEquals(HttpStatusCode.BadRequest, deniedCredential.status, deniedCredential.bodyAsText())
         assertTrue(assertNotNull(repository.get(offer.offerId)).issuanceResults.isEmpty())
-        wallet.requestCredential(resolved, accessToken, a.credentialConfigurationId, includeDidInProof = false)
+        val first = wallet.buildJwtProofs(resolved.issuerMetadata, a.credentialConfigurationId, includeDidInProof = false)
+        val second = wallet.buildJwtProofs(resolved.issuerMetadata, a.credentialConfigurationId, includeDidInProof = false)
+        val issued = client.post(resolved.issuerMetadata.credentialEndpoint) {
+            bearerAuth(accessToken)
+            contentType(ContentType.Application.Json)
+            setBody(credentialRequest(a.credentialConfigurationId, first.copy(jwt = first.jwt!! + second.jwt!!)))
+        }
+        assertEquals(HttpStatusCode.OK, issued.status, issued.bodyAsText())
+        val copies = issued.body<JsonObject>().getValue("credentials").jsonArray
+        assertEquals(2, copies.size)
+        copies.forEach { copy ->
+            val credential = copy.jsonObject.getValue("credential").jsonPrimitive.content
+            assertEquals(statuses[0], SDJwt.parse(credential).fullPayload["status"])
+        }
         val after = assertNotNull(repository.get(offer.offerId))
         assertEquals(session.issuanceRequests, after.issuanceRequests)
         assertEquals(session.issuanceRequests.take(selected.size).map { it.credentialIdentifier }, after.authorizedCredentialIdentifiers)
