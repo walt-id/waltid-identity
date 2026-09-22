@@ -4,11 +4,18 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import kotlinx.serialization.json.*
 
 /**
- * Authenticates and authorizes this exact TS12 presentation before its proof is signed.
+ * Authorizes this exact TS12 proof and declares the factors its successful signing will establish.
  *
- * Implementations must return only factors successfully applied to this operation, or throw
- * on denial/cancellation. A configured key policy, app unlock, or a test fixture is not evidence
- * of authentication. This is a trusted application callback, never verifier-supplied metadata.
+ * Factors must either have been applied to this operation already, or be guaranteed by the
+ * enforced policy of the exact key that will sign it. The latter allows native authentication
+ * during signing, without a separate prompt. A merely requested policy or one allowing several
+ * alternative authentication routes is insufficient. The presenter releases no proof if signing
+ * fails or its coroutine is cancelled; returning methods here alone proves no authentication.
+ *
+ * This is a trusted application callback, never verifier-supplied metadata. Implementations bind
+ * it to their wallet, reviewed action and actual key object; identifiers alone are not authority.
+ * They must reject denial, expiry, changed selection and insufficient factor evidence. Action
+ * lifetime and delivery remain the caller's responsibility. No authorization is cached here.
  */
 fun interface ScaPresentationAuthorizer {
     suspend fun authorize(presentation: ScaPresentation): ScaAuthenticationMethods
@@ -16,8 +23,11 @@ fun interface ScaPresentationAuthorizer {
 
 /** Values are derived by the presenter from the selected credential and resolved request. */
 class ScaPresentation internal constructor(
+    /** Fresh identifier for this proof attempt; becomes the signed jti claim. */
+    val proofId: String,
     val credentialId: String,
     val holderKeyId: String,
+    val signingAlgorithm: String,
     val audience: String,
     val nonce: String,
     val responseMode: OpenID4VPResponseMode,
