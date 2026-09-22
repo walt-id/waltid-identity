@@ -68,7 +68,8 @@ val modules = listOfNotNull(
         "waltid-vical",
         "waltid-mdoc-credentials2",
         "waltid-mdoc-proximity",
-        "waltid-mdoc-proximity-mobile",
+        "waltid-mdoc-proximity-mobile" whenEnabled enableAndroidBuild,
+        "waltid-mdoc-proximity-mobile" whenEnabled enableIosBuild,
         "waltid-trust-registry"
     ),
 
