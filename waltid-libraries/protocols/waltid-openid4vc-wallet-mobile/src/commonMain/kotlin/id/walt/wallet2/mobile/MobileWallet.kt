@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.handlers.WalletScaPresentationAuthorizer
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
@@ -214,6 +215,7 @@ public class MobileWallet internal constructor(
     private val proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     /** Issuance transport override. Only tests set this; production uses the configured engine. */
     issuanceHttpClient: HttpClient? = null,
+    private val scaAuthorizer: WalletScaPresentationAuthorizer? = null,
     createSigningIdentityManager: ((suspend () -> Unit) -> id.walt.wallet2.mobile.identity.SigningIdentityManager)? = null,
 ) {
     private val eventStream = MobileWalletEventStream()
@@ -617,6 +619,7 @@ public class MobileWallet internal constructor(
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
+            scaAuthorizer = scaAuthorizer,
         )
         return response.toMobileDigitalCredentialResponse()
     }
@@ -777,6 +780,7 @@ public class MobileWallet internal constructor(
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
+            scaAuthorizer = scaAuthorizer,
         ).toMobilePresentationResult()
 
     /** Discards a reviewed presentation after local dismissal. */

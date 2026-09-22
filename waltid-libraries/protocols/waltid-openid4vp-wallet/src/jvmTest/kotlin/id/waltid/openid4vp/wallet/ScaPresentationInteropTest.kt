@@ -119,6 +119,19 @@ class ScaPresentationInteropTest {
     }
 
     @Test
+    fun `SCA refuses missing or different credential holder keys before authentication`() = runTest {
+        for (binding in listOf("missing", "different")) {
+            val fixture = fixture(holderBinding = binding)
+            var authorizations = 0
+            assertFailsWith<IllegalArgumentException> {
+                present(fixture, ScaPresentationAuthorizer { authorizations++; factors })
+            }
+            assertEquals(0, authorizations)
+            assertEquals(0, fixture.signatures)
+        }
+    }
+
+    @Test
     fun `successful authentication cannot bypass a failed key operation`() = runTest {
         val fixture = fixture().also { it.rejectSigning = true }
         assertFailsWith<IllegalStateException> { present(fixture, simulatedAuthentication) }
@@ -305,6 +318,7 @@ class ScaPresentationInteropTest {
     private suspend fun fixture(
         type: String = "sca-iban", mode: OpenID4VPResponseMode = OpenID4VPResponseMode.DIRECT_POST,
         transactionType: String = TS12_PAYMENT_TYPE, transactionQueryId: String = "payment",
+        holderBinding: String = "valid",
     ): Fixture {
         val issuer = ECKeyGenerator(Curve.P_256).generate()
         val holder = JWKKey.generate(KeyType.secp256r1)
@@ -317,7 +331,10 @@ class ScaPresentationInteropTest {
         val claims = buildJsonObject {
             put("iss", "https://issuer.example"); put("vct", vct); put("_sd_alg", "sha-256")
             put("iat", 1789990000); put("exp", 4102444800L)
-            put("cnf", buildJsonObject { put("jwk", publicKey) })
+            if (holderBinding != "missing") put("cnf", buildJsonObject {
+                put("jwk", if (holderBinding == "different")
+                    Json.parseToJsonElement(issuer.toPublicJWK().toJSONString()) else publicKey)
+            })
             if (type == "sca-user") put("aud", "x509_san_dns:rp.example")
             put("_sd", JsonArray(disclosures.map { JsonPrimitive(hash(it.encoded)) }))
         }

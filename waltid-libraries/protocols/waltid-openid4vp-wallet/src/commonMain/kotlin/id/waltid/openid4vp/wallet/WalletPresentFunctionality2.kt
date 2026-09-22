@@ -10,6 +10,8 @@ import id.walt.crypto.utils.UuidUtils
 import id.walt.crypto.utils.ShaUtils.calculateSha256Base64Url
 import id.walt.crypto2.jose.*
 import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.toPublicJwk
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.CredentialFormat
@@ -619,6 +621,24 @@ object WalletPresentFunctionality2 {
         selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>>,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+    ): Result<DcApiCredentialResponse> = walletPresentDcApiHandling(
+        holderKey = holderKey,
+        holderDid = holderDid,
+        request = request,
+        selectCredentialsForQuery = selectCredentialsForQuery,
+        transactionDataTypeRegistry = transactionDataTypeRegistry,
+        mdocHolderKeyResolver = mdocHolderKeyResolver,
+        scaAuthorizer = null,
+    )
+
+    suspend fun walletPresentDcApiHandling(
+        holderKey: Crypto2Key,
+        holderDid: String?,
+        request: ResolvedDcApiRequest,
+        selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        scaAuthorizer: ScaPresentationAuthorizer?,
     ): Result<DcApiCredentialResponse> = runCatching {
         val authorizationRequest = request.authorizationRequest
         validateRequestTransactionData(
@@ -638,6 +658,7 @@ object WalletPresentFunctionality2 {
             dcApiOrigin = request.origin,
             mdocHolderKeyResolver = mdocHolderKeyResolver,
             clientMetadata = request.encryptionMetadata,
+            scaAuthorizer = scaAuthorizer,
         )
         val idToken = buildIdToken(
             authorizationRequest = authorizationRequest,
@@ -645,7 +666,10 @@ object WalletPresentFunctionality2 {
             holderDid = holderDid,
             holderBindingAudience = request.holderBindingAudience,
         )
-        DcApiWallet.buildResponse(request, vpToken, idToken)
+        if (scaAuthorizer != null) currentCoroutineContext().ensureActive()
+        DcApiWallet.buildResponse(request, vpToken, idToken).also {
+            if (scaAuthorizer != null) currentCoroutineContext().ensureActive()
+        }
     }
 
     /**
@@ -914,6 +938,43 @@ object WalletPresentFunctionality2 {
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
         expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+    ): Result<WalletPresentResult> = walletPresentHandling(
+        holderKey = holderKey,
+        holderDid = holderDid,
+        presentationRequestUrl = presentationRequestUrl,
+        selectCredentialsForQuery = selectCredentialsForQuery,
+        holderPoliciesToRun = holderPoliciesToRun,
+        runPolicies = runPolicies,
+        transactionDataTypeRegistry = transactionDataTypeRegistry,
+        legacyFallbackCallback = legacyFallbackCallback,
+        unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+        resolvedAuthorizationRequest = resolvedAuthorizationRequest,
+        holderCrypto2Key = holderCrypto2Key,
+        clientIdTrustConfiguration = clientIdTrustConfiguration,
+        beforeCredentialsUsed = beforeCredentialsUsed,
+        mdocHolderKeyResolver = mdocHolderKeyResolver,
+        expectedRequestObjectAudience = expectedRequestObjectAudience,
+        scaAuthorizer = null,
+    )
+
+    suspend fun walletPresentHandling(
+        holderKey: Key,
+        holderDid: String?,
+        presentationRequestUrl: Url,
+        selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        holderPoliciesToRun: Flow<HolderPolicy>?,
+        runPolicies: Boolean?,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
+        holderCrypto2Key: Crypto2Key?,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
+        mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+        scaAuthorizer: ScaPresentationAuthorizer?,
     ): Result<WalletPresentResult> = walletPresentHandlingWithKey(
         holderKey,
         holderDid,
@@ -930,6 +991,7 @@ object WalletPresentFunctionality2 {
         beforeCredentialsUsed,
         mdocHolderKeyResolver,
         expectedRequestObjectAudience,
+        scaAuthorizer,
     )
 
     suspend fun walletPresentHandling(
@@ -948,6 +1010,41 @@ object WalletPresentFunctionality2 {
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
         expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+    ): Result<WalletPresentResult> = walletPresentHandling(
+        holderKey = holderKey,
+        holderDid = holderDid,
+        presentationRequestUrl = presentationRequestUrl,
+        selectCredentialsForQuery = selectCredentialsForQuery,
+        holderPoliciesToRun = holderPoliciesToRun,
+        runPolicies = runPolicies,
+        transactionDataTypeRegistry = transactionDataTypeRegistry,
+        legacyFallbackCallback = legacyFallbackCallback,
+        unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+        resolvedAuthorizationRequest = resolvedAuthorizationRequest,
+        clientIdTrustConfiguration = clientIdTrustConfiguration,
+        beforeCredentialsUsed = beforeCredentialsUsed,
+        mdocHolderKeyResolver = mdocHolderKeyResolver,
+        expectedRequestObjectAudience = expectedRequestObjectAudience,
+        scaAuthorizer = null,
+    )
+
+    suspend fun walletPresentHandling(
+        holderKey: Crypto2Key,
+        holderDid: String?,
+        presentationRequestUrl: Url,
+        selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        holderPoliciesToRun: Flow<HolderPolicy>?,
+        runPolicies: Boolean?,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
+        mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+        scaAuthorizer: ScaPresentationAuthorizer?,
     ): Result<WalletPresentResult> = walletPresentHandlingWithKey(
         null,
         holderDid,
@@ -964,6 +1061,7 @@ object WalletPresentFunctionality2 {
         beforeCredentialsUsed,
         mdocHolderKeyResolver,
         expectedRequestObjectAudience,
+        scaAuthorizer,
     )
 
     private suspend fun walletPresentHandlingWithKey(
@@ -990,6 +1088,7 @@ object WalletPresentFunctionality2 {
         beforeCredentialsUsed: suspend (Int) -> Unit,
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)?,
         expectedRequestObjectAudience: String,
+        scaAuthorizer: ScaPresentationAuthorizer?,
     ): Result<WalletPresentResult> {
         log.trace { "- Start of Wallet Present Handling -" }
         log.trace { "Wallet presentation will use key $holderKey, and did $holderDid" }
@@ -1107,6 +1206,7 @@ object WalletPresentFunctionality2 {
                 transactionDataTypeRegistry,
                 mdocHolderKeyResolver = mdocHolderKeyResolver,
                 clientMetadata = resolvedRequest.effectiveClientMetadata,
+                scaAuthorizer = scaAuthorizer,
             )
         } ?: buildVpToken(
             authorizationRequest,
@@ -1117,6 +1217,7 @@ object WalletPresentFunctionality2 {
             holderCrypto2Key = null,
             mdocHolderKeyResolver = mdocHolderKeyResolver,
             clientMetadata = resolvedRequest.effectiveClientMetadata,
+            scaAuthorizer = scaAuthorizer,
         )
         val idToken = if (holderCrypto2Key != null) {
             buildIdToken(authorizationRequest, holderCrypto2Key, holderDid)
@@ -1125,6 +1226,7 @@ object WalletPresentFunctionality2 {
         }
 
         // Step 4: Send response.
+        if (scaAuthorizer != null) currentCoroutineContext().ensureActive()
         val afterVpToken = walletPhaseStart.elapsedNow()
         return sendAuthorizationResponse(
             authorizationRequest,
@@ -1221,7 +1323,8 @@ object WalletPresentFunctionality2 {
         }
 
         log.trace { "Wallet presentation: Calculating hash for SD-JWT kb from: $stringToHash" }
-        val sdAlgorithm = SDJwt.parse(disclosed).undisclosedPayload["_sd_alg"]?.jsonPrimitive?.contentOrNull
+        val issuerClaims = SDJwt.parse(disclosed).undisclosedPayload
+        val sdAlgorithm = issuerClaims["_sd_alg"]?.jsonPrimitive?.contentOrNull
             ?: "sha-256"
         require(sdAlgorithm.equals("sha-256", ignoreCase = true)) {
             "Unsupported SD-JWT disclosure hash algorithm: $sdAlgorithm"
@@ -1252,6 +1355,15 @@ object WalletPresentFunctionality2 {
         val proofId = scaContext?.let { UuidUtils.randomUUIDString() }
         val authentication = scaContext?.let { context ->
             currentCoroutineContext().ensureActive()
+            val confirmationKey = (issuerClaims["cnf"] as? JsonObject)?.get("jwk") as? JsonObject
+            requireNotNull(confirmationKey) { "TS12 requires the credential's cnf.jwk holder key" }
+            val expected = EncodedKey.Jwk(BinaryData(confirmationKey.toString().encodeToByteArray()), privateMaterial = false)
+            val actual = crypto2Key?.let { key ->
+                requireNotNull(key.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(key.spec)
+            } ?: EncodedKey.Jwk(BinaryData(requireNotNull(holderKey).getPublicKey().exportJWK().encodeToByteArray()), privateMaterial = false)
+            require(Jwk.sha256Thumbprint(expected) == Jwk.sha256Thumbprint(actual)) {
+                "TS12 signing key does not match the credential's holder key"
+            }
             val presentation = ScaPresentation(
                 proofId = requireNotNull(proofId),
                 credentialId = context.credentialId,

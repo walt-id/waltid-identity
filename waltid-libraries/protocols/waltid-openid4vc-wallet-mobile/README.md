@@ -490,6 +490,20 @@ Managed signing keys are device-local by default. They protect data at rest on t
 
 `MobileWalletConfig()` does not accept any OpenID4VP `transaction_data` profiles by default. Wallet apps must pass the profile types they understand through `transactionDataProfiles`; requests containing unknown transaction data types are rejected before the user can submit a presentation. Profile fields are preserved for app UI and display metadata.
 
+When an app enables `urn:eudi:sca:payment:1`, reviewed ordinary and Digital
+Credentials API submissions require a generated, non-exportable hardware signing
+key with the per-use `BiometricCurrentSet` policy. The SDK checks the restored
+native key's protection and policy provenance before signing. A successful native
+signature establishes possession and inherence; the proof reports both methods as
+`other`, without claiming a specific biometric modality or certified WSCD category.
+Cancellation, missing native evidence, and unsupported key policies produce no
+payment proof. This does not upgrade an existing key's policy.
+
+The application remains responsible for transaction display, informed consent and
+action lifetime. This adapter does not supply transaction UI, authentication
+batching, timed reuse, or full SCA assurance. The native provenance contract depends
+on the provider changes in [PR #2222](https://github.com/walt-id/waltid-identity/pull/2222).
+
 The examples below build `MobileWalletConfig` values. Pass the selected config
 to `MobileWalletFactory(...).create(config)` from a coroutine to create the
 wallet.
