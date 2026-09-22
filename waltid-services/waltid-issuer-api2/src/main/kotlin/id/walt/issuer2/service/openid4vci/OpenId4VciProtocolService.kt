@@ -1295,7 +1295,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         validUntil = resolvedMsoValidity?.validUntil,
                         expectedUpdate = resolvedMsoValidity?.expectedUpdate,
                         proofValidationContext = proofValidationContext,
-                        issueNotificationId = metadataService.notificationEndpointEnabled(),
+                        issueNotificationId = true,
                     )
                 } else {
                     oauth2Provider.createCredentialResponse(
@@ -1313,7 +1313,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         validUntil = resolvedMsoValidity?.validUntil,
                         expectedUpdate = resolvedMsoValidity?.expectedUpdate,
                         proofValidationContext = proofValidationContext,
-                        issueNotificationId = metadataService.notificationEndpointEnabled(),
+                        issueNotificationId = true,
                     )
                 }
             }
