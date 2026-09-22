@@ -327,6 +327,17 @@ object PresentationVerificationEngine {
         //      an unprocessable credential should not be a 500)
         try {
 
+            // Refuse a presentation the store cannot hold, before the session grows around it.
+            //
+            // A session retains the presentation about four times over: as received, as decoded, as validated
+            // credentials, and in policy results. A persistent store has a hard document limit - 16 MB in MongoDB
+            // and DocumentDB - so beyond roughly a quarter of that the session becomes unwritable. That used to
+            // surface as HTTP 500 carrying BsonMaximumSizeExceededException, and not because the guard below was
+            // missing: the guard stores the reason on the session, and for an oversized session that write fails
+            // too, so the failure could not even be recorded. Checked here, the wallet gets a 400 naming the
+            // sizes, the session records why, and none of the verification work is done first.
+            checkPresentationIsStorable(vpTokenContents)
+
             // Phase timings for the verifier's real work. The enclosing call is ~13ms of a 40ms
             // presentation while an isolated mdoc verification is 1.4ms, so most of it is elsewhere in
             // these phases and this is what says where.
@@ -557,5 +568,44 @@ object PresentationVerificationEngine {
             )
         }
 
+    }
+}
+
+/**
+ * Hard document limit of the stores Verifier2 is deployed against: MongoDB, and DocumentDB which inherits it.
+ */
+internal const val STORE_DOCUMENT_LIMIT_BYTES = 16_793_600
+
+/**
+ * Times a presentation is retained in a session, measured rather than assumed.
+ *
+ * An mDL with a 250 KB portrait produced a 1.24 MB session: the raw device response as received, the decoded
+ * presentation, and the policy results - each kept deliberately, because a decoder changes between versions and
+ * what a deployment understood at the time is the record worth keeping. Four leaves a little room above the
+ * measured 3.7.
+ */
+internal const val PRESENTATION_RETENTION_FACTOR = 4
+
+/** Largest presentation whose session still fits, with a tenth of the limit left for everything else. */
+internal val maxStorablePresentationBytes =
+    (STORE_DOCUMENT_LIMIT_BYTES * 9 / 10) / PRESENTATION_RETENTION_FACTOR
+
+/**
+ * Fails fast when a `vp_token` is too large for a session to be stored.
+ *
+ * Deliberately a rejection of the presentation rather than a storage error: the wallet sent something this
+ * deployment cannot process, which is a 400, and the message has to carry the numbers because the alternative is
+ * an operator reading a driver exception about a document size with no idea which credential caused it.
+ */
+internal fun checkPresentationIsStorable(vpTokenContents: ParsedVpToken) {
+    val presentedBytes = vpTokenContents.values.sumOf { presentations -> presentations.sumOf { it.length.toLong() } }
+    if (presentedBytes > maxStorablePresentationBytes) {
+        error(
+            "Presentation of $presentedBytes bytes is too large to store: a session retains it about " +
+                    "${PRESENTATION_RETENTION_FACTOR}x and the store's document limit is " +
+                    "$STORE_DOCUMENT_LIMIT_BYTES bytes, so at most $maxStorablePresentationBytes bytes can be " +
+                    "presented. A large binary claim such as a portrait is the usual cause; request fewer claims, " +
+                    "or a smaller image."
+        )
     }
 }
