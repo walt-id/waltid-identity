@@ -20,31 +20,13 @@ class ItbRestClientTest {
         val session = "00000000-0000-0000-0000-000000000001"
         val xml = javaClass.getResource("/itb/vci006-success.xml")!!.readText()
         HttpClient(MockEngine { request ->
+            assertEquals("secret", request.headers["ITB-API-KEY"])
             assertEquals(listOf("application/xml"), request.headers.getAll(HttpHeaders.Accept))
             respond(xml, headers = headersOf(HttpHeaders.ContentType, "application/xml"))
         }) {
             install(ContentNegotiation) { json() }
         }.use { client ->
             assertTrue(ItbRestClient(client, apiUrl, "secret").report("tc_vci_006", session).passed)
-        }
-    }
-
-    @Test
-    fun `starts explicit cases with sequential execution and no implicit wait`() = runBlocking<Unit> {
-        val engine = MockEngine { request ->
-            assertEquals("/itb/api/rest/tests/start", request.url.encodedPath)
-            assertEquals("organisation-secret", request.headers["ITB-API-KEY"])
-            val body = Json.parseToJsonElement((request.body as TextContent).text).jsonObject
-            assertEquals(JsonPrimitive(true), body["forceSequentialExecution"])
-            assertEquals(JsonPrimitive(false), body["waitForCompletion"])
-            assertEquals(JsonArray(listOf(JsonPrimitive("cs01v1"))), body["testSuite"])
-            assertEquals(JsonArray(listOf(JsonPrimitive("tc_vci_006"))), body["testCase"])
-            respond("""{"createdSessions":[{"testSuite":"cs01v1","testCase":"tc_vci_006","session":"run-1"}]}""")
-        }
-        HttpClient(engine).use {
-            val created = ItbRestClient(it, apiUrl, "organisation-secret")
-                .start("system-secret", "actor-secret", "cs01v1", listOf("tc_vci_006"))
-            assertEquals("run-1", created.single().session)
         }
     }
 
@@ -78,11 +60,11 @@ class ItbRestClientTest {
     }
 
     @Test
-    fun `HTTP errors preserve status without leaking response bodies or retrying start`() = runBlocking<Unit> {
+    fun `HTTP errors preserve status without leaking response bodies or retrying`() = runBlocking<Unit> {
         var calls = 0
         HttpClient(MockEngine { calls++; respond("sensitive-server-response", HttpStatusCode.TooManyRequests) }).use {
             val error = assertFailsWith<ItbRestClient.HttpFailure> {
-                ItbRestClient(it, apiUrl, "secret").start("system", "actor", "suite", listOf("case"))
+                ItbRestClient(it, apiUrl, "secret").status(listOf("run-1"))
             }
             assertEquals(429, error.statusCode)
             assertFalse(error.toString().contains("sensitive-server-response"))

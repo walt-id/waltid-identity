@@ -38,10 +38,6 @@ private suspend fun runItb(): Int {
     val origin = catalogue.origin
     val directory = Path.of(System.getenv("ITB_REPORT_DIR") ?: "build/reports/itb-wallet")
     val selected = ItbRunSelection.select(catalogue, System.getenv("ITB_CASES"))
-    val actorVariables = mapOf(
-        "Base Protocols" to "ITB_BASE_ACTOR_KEY", "domain specific" to "ITB_DOMAIN_ACTOR_KEY",
-        "Payment use cases" to "ITB_PAYMENT_ACTOR_KEY",
-    )
     val started = Instant.now().toString()
     val results = selected.map { (suite, case) ->
         ItbCaseResult(suite.id, case.id, null, ItbCaseResult.Outcome.NOT_RUN, ItbCaseResult.Phase.START,
@@ -51,12 +47,9 @@ private suspend fun runItb(): Int {
     writeReport()
 
     val organisationKey = required("ITB_ORGANISATION_KEY")
-    val systemKey = required("ITB_SYSTEM_KEY")
     val username = required("ITB_USERNAME")
     val password = required("ITB_PASSWORD")
     val organisationId = required("ITB_ORGANISATION_ID").also { require(it.matches(Regex("[0-9]+"))) }
-    val actorKeys = selected.map { it.first.specification }.distinct()
-        .associateWith { required(actorVariables.getValue(it)) }
 
     // This test-only CA is pinned from the official EUDI reference wallet, independently of request x5c.
     val pem = System.getenv("ITB_X509_TRUST_ANCHORS")?.let { Files.readString(Path.of(it)) }
@@ -82,10 +75,10 @@ private suspend fun runItb(): Int {
                     }
                     client.config { followRedirects = false }.use { restClient ->
                         val api = ItbRestClient(restClient, Url("${catalogue.testBed}/api/rest"), organisationKey)
-                        val bridge = ItbPortalBridge(page, "${catalogue.testBed}/app#/organisation/tests/$organisationId")
+                        val bridge = ItbPortalBridge(page, "${catalogue.testBed}/app#/organisation/conformance/$organisationId", catalogue.systemName)
                         val runner = ItbCaseRunner(api, bridge, wallet::execute)
                         selected.forEachIndexed { index, (suite, case) ->
-                            results[index] = runner.run(systemKey, actorKeys.getValue(suite.specification), suite.id, case.id)
+                            results[index] = runner.run(suite, case)
                             writeReport()
                             println("${suite.id}/${case.id}: ${results[index].outcome}")
                         }
