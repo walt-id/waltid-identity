@@ -118,7 +118,7 @@ jobs:
 
       - name: Upload iOS wallet recovery reports
         if: always() && steps.wallet_recovery.outcome != 'skipped'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-wallet-recovery-reports
           path: |
