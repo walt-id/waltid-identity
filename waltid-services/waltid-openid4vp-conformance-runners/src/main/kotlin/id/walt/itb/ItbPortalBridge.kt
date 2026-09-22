@@ -31,7 +31,9 @@ class ItbPortalBridge(
         active.getByText(session.session, Locator.GetByTextOptions().setExact(true)).waitFor()
         active.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName(Pattern.compile("View pending interaction"))).click()
         val dialog = page.locator("ngb-modal-window:not([aria-hidden=true])")
-        dialog.getByText(Pattern.compile("VCI request|VP request|Digital Credentials API presentation request")).waitFor()
+        dialog.getByText(Pattern.compile(
+            "^\\s*(VCI request|VP request|(?:TS12 payment )?Digital Credentials API presentation request)\\s*$",
+        )).waitFor()
         val text = dialog.innerText()
         return when {
             text.contains("VCI request") -> {
