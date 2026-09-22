@@ -11,9 +11,10 @@ keychain_path="${workdir}/app-signing.keychain-db"
 keychain_password="${IOS_KEYCHAIN_PASSWORD:-$(openssl rand -base64 24)}"
 p12_path="${workdir}/distribution.p12"
 profiles_dir="${HOME}/Library/MobileDevice/Provisioning Profiles"
+xcode_profiles_dir="${HOME}/Library/Developer/Xcode/UserData/Provisioning Profiles"
 names_file="${workdir}/profile-names.env"
 
-mkdir -p "$profiles_dir"
+mkdir -p "$profiles_dir" "$xcode_profiles_dir"
 umask 077
 
 python3 - "$p12_path" <<'PY'
@@ -132,6 +133,7 @@ install_profile() {
   uuid="$(security cms -D -i "$path" | plutil -extract UUID raw -)"
   name="$(security cms -D -i "$path" | plutil -extract Name raw -)"
   cp "$path" "${profiles_dir}/${uuid}.mobileprovision"
+  cp "$path" "${xcode_profiles_dir}/${uuid}.mobileprovision"
   echo "${env_name}=${name}" >> "$names_file"
   echo "Installed provisioning profile ${name}"
 }
