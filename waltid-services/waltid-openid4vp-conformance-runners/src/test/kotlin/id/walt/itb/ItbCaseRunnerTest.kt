@@ -158,4 +158,61 @@ class ItbCaseRunnerTest {
             assertFalse(result.cleanupFailed)
         }
     }
+    @Test
+    fun failedPreparationIsNotRetriedAndCannotStopUnownedSessions() = runBlocking<Unit> {
+        var preparations = 0
+        val bridge = object : ItbInteractionBridge {
+            override suspend fun prepare(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case): ItbSession {
+                preparations++
+                throw IllegalStateException("private portal details")
+            }
+            override suspend fun read(session: ItbSession): ItbWalletInteraction = error("Must not start")
+            override suspend fun complete() = error("Must not complete")
+        }
+        HttpClient(MockEngine { error("No owned session exists; do not query or stop tenant sessions") }).use { client ->
+            val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), bridge, {
+                error("Wallet must not run")
+            }).run(suite, case)
+            assertEquals(1, preparations)
+            assertEquals(ItbCaseResult.Outcome.ERROR, result.outcome)
+            assertEquals(ItbCaseResult.Phase.START, result.phase)
+            assertNull(result.session)
+            assertFalse(result.adapterInvoked || result.cleanupFailed)
+            assertFalse(result.toString().contains("private portal details"))
+        }
+    }
+
+    @Test
+    fun failedInteractiveStartRetainsAndCleansItsPreparedSession() = runBlocking<Unit> {
+        val stopped = mutableListOf<String>()
+        val bridge = object : ItbInteractionBridge {
+            override suspend fun prepare(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case) =
+                ItbSession(suite.id, case.id, session)
+            override suspend fun read(session: ItbSession): ItbWalletInteraction = error("Browser failed after starting")
+            override suspend fun complete() = error("Must not complete")
+        }
+        HttpClient(MockEngine { request ->
+            respond(when (request.url.encodedPath.substringAfterLast('/')) {
+                "status" -> status(false, "UNDEFINED")
+                "stop" -> {
+                    stopped += (request.body as io.ktor.http.content.TextContent).text
+                    ""
+                }
+                session -> report.replace("<result>SUCCESS</result>", "<result>UNDEFINED</result>")
+                else -> error("Unexpected request")
+            })
+        }).use { client ->
+            val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), bridge, {
+                error("Wallet must not run")
+            }).run(suite, case)
+            assertEquals(listOf("""{"session":["$session"]}"""), stopped)
+            assertEquals(session, result.session)
+            assertEquals(ItbCaseResult.Outcome.ERROR, result.outcome)
+            assertEquals(ItbCaseResult.Phase.INTERACTION, result.phase)
+            assertFalse(result.adapterInvoked || result.cleanupFailed)
+            assertTrue(result.testBedCompleted)
+            assertEquals(ItbSessionReport.Verdict.UNDEFINED, result.testBedVerdict)
+        }
+    }
+
 }
