@@ -864,20 +864,22 @@ object WalletPresentationHandler {
         val defaultCapabilities = keyMaterial?.presentationCapabilities()
             ?: WalletPresentationFormatRegistry.defaultCapabilities()
         val resolveMdocHolderKey = wallet.mdocHolderKeyResolver()
-        val validation = PresentationRequestValidator.validate(
-            resolvedRequest = ResolvedAuthorizationRequest.Plain(
-                authorizationRequest = authorizationRequest,
-                client = AuthenticatedClientFacts(
-                    effectiveClientMetadata = resolvedRequest.effectiveClientMetadata,
-                    responseDestinationAuthenticated = true,
-                    boundResponseDestination = resolvedRequest.origin,
-                ),
+        // Structure and authentication are checked before any credential is read. Format
+        // compatibility waits until the snapshot below: an mdoc is signed by its bound device
+        // key, which can differ from the wallet default, so the default key alone must not
+        // reject an mdoc-only request.
+        val requestForValidation = ResolvedAuthorizationRequest.Plain(
+            authorizationRequest = authorizationRequest,
+            client = AuthenticatedClientFacts(
+                effectiveClientMetadata = resolvedRequest.effectiveClientMetadata,
+                responseDestinationAuthenticated = true,
+                boundResponseDestination = resolvedRequest.origin,
             ),
+        )
+        val validation = PresentationRequestValidator.validate(
+            resolvedRequest = requestForValidation,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
-            formatCapabilities = {
-                keyMaterial?.presentationCapabilities()
-                    ?: WalletPresentationFormatRegistry.defaultCapabilities()
-            },
+            formatCapabilities = null,
             transport = PresentationValidationTransport.DigitalCredentialsApi,
         )
         if (validation is PresentationRequestValidationResult.Invalid) {
@@ -902,7 +904,21 @@ object WalletPresentationHandler {
             // well-formed enough to be selected but cannot actually be encrypted to.
             encryption.thumbprint()
         }
-        val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
+        val storedCredentials = wallet.streamAllCredentials().toList()
+        val formatCapabilities = defaultCapabilities.withBoundMdocDeviceAuthentication(
+            stored = storedCredentials,
+            resolveMdocHolderKey = resolveMdocHolderKey,
+        )
+        val formatValidation = PresentationRequestValidator.validate(
+            resolvedRequest = requestForValidation,
+            transactionDataTypeRegistry = transactionDataTypeRegistry,
+            formatCapabilities = { formatCapabilities },
+            transport = PresentationValidationTransport.DigitalCredentialsApi,
+        )
+        if (formatValidation is PresentationRequestValidationResult.Invalid) {
+            throw IllegalArgumentException(formatValidation.error.message)
+        }
+        val storedById = storedCredentials.associateBy { it.id }
         val holderKeyEligibility = selectHolderKeyEligibleFromSnapshot(
             wallet = wallet,
             query = query,
@@ -2169,6 +2185,39 @@ internal fun WalletKeyStoreEntry.presentationCapabilities(): WalletPresentationF
         keys = listOfNotNull(crypto2Key),
         fallbackKeyTypes = setOfNotNull(legacyKey?.keyType?.takeIf { crypto2Key == null }),
     )
+
+/**
+ * Request-level format checks see the wallet default key. mdoc device authentication uses the
+ * key bound to each credential, so those COSE algorithms are added before
+ * [PresentationRequestValidator] decides whether any requested format is possible.
+ */
+private suspend fun WalletPresentationFormatRegistry.RuntimeCapabilities.withBoundMdocDeviceAuthentication(
+    stored: List<StoredCredential>,
+    resolveMdocHolderKey: suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key,
+): WalletPresentationFormatRegistry.RuntimeCapabilities {
+    val boundMdocAlgorithms = stored.flatMap { storedCredential ->
+        if (
+            WalletPresentationFormatRegistry.resolve(storedCredential.credential.format) !=
+            WalletPresentationFormatRegistry.SupportedFormat.MSO_MDOC
+        ) {
+            return@flatMap emptyList()
+        }
+        runCatching {
+            WalletPresentationFormatRegistry.capabilitiesFromKeys(
+                listOf(resolveMdocHolderKey(storedCredential.id, storedCredential.credential)),
+            ).supportedMdocCoseAlgorithms
+        }.getOrDefault(emptyList())
+    }
+    val mdocAlgorithms = (supportedMdocCoseAlgorithms + boundMdocAlgorithms).distinct().sorted()
+    return copy(
+        supportedFormats = if (mdocAlgorithms.isEmpty()) {
+            supportedFormats
+        } else {
+            supportedFormats + WalletPresentationFormatRegistry.SupportedFormat.MSO_MDOC
+        },
+        supportedMdocCoseAlgorithms = mdocAlgorithms,
+    )
+}
 
 private suspend fun List<PresentationCredentialOption>.compatibleWithVerifierFormats(
     verifierFormats: Map<String, JsonObject>?,
