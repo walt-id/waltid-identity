@@ -80,8 +80,24 @@ object Verifier2Service {
     /**
      * Safe default for OSS startup and tests. Deployments inject a repository into [registerRoute]
      * rather than replacing global process state at runtime.
+     *
+     * Its limits come from [OSSVerifier2ServiceConfig], because the right ceiling depends on the deployment:
+     * how large the presented credentials are and how much heap the pod was given. They were hard-coded when the
+     * bounds were introduced, which left the one number an operator needs to raise after an out-of-memory
+     * incident reachable only by rebuilding. Lazy so that the configuration is read when the service is wired
+     * rather than when this class initialises, and absent configuration falls back to the documented defaults so
+     * that tests and embedded use need no config file.
      */
-    val defaultSessionRepository: VerificationSessionRepository = InMemoryVerificationSessionRepository()
+    val defaultSessionRepository: VerificationSessionRepository by lazy {
+        // Absent configuration is normal for tests and embedded use, and means the documented defaults.
+        inMemorySessionRepositoryFor(
+            try {
+                ConfigManager.getConfig<OSSVerifier2ServiceConfig>()
+            } catch (_: IllegalArgumentException) {
+                null
+            }
+        )
+    }
 
     /**
      * Update data for this session and send session update notifications
