@@ -70,7 +70,6 @@ class MetadataService @JvmOverloads constructor(
             metadataSigningCertificateResolver
         )
     }
-    private val notificationEndpointPath = "/notification".takeIf { serviceConfig.notificationEndpointEnabled }
 
     private val issuerDisplay: List<IssuerDisplay>? =
         metadataConfig.issuerDisplay
@@ -125,7 +124,7 @@ class MetadataService @JvmOverloads constructor(
                 credentialRequestEncryption = credentialRequestEncryption,
                 batchCredentialIssuance = batchCredentialIssuance,
                 display = issuerDisplay,
-                notificationEndpointPath = notificationEndpointPath,
+                notificationEndpointPath = NOTIFICATION_ENDPOINT_PATH,
             )
         }
 
@@ -202,8 +201,6 @@ class MetadataService @JvmOverloads constructor(
     }
 
     fun issuerBaseUrl(): String = baseUrl
-
-    fun notificationEndpointEnabled(): Boolean = notificationEndpointPath != null
 
     /**
      * Publishes token and credential signing public keys, per RFC 8414 `jwks_uri`.
@@ -373,5 +370,6 @@ class MetadataService @JvmOverloads constructor(
         private const val INTERNAL_VCT_BASE_URL = "vctBaseUrl"
         // NID may contain dots, as in urn:eu.europa.ec.eudi:cor:1. The first colon separates it from a non-empty NSS.
         private val URN_WITH_NAMESPACE = Regex("^[^:\\s]+:\\S+$")
+        private const val NOTIFICATION_ENDPOINT_PATH = "/notification"
     }
 }

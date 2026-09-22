@@ -30,8 +30,6 @@ data class Issuer2ServiceConfig(
     val deferredIssuance: id.walt.openid4vci.deferred.DeferredIssuanceConfig = id.walt.openid4vci.deferred.DeferredIssuanceConfig(),
     /** Requires PKCE for authorization-code requests; supplied PKCE is always verified. */
     val requirePkce: Boolean = false,
-    /** Advertises and serves the OpenID4VCI notification endpoint. This is issuer metadata, not a wallet setting. */
-    val notificationEndpointEnabled: Boolean = true,
 ) : WaltConfig() {
     /** Preserves the full JVM constructor from before metadata signing configuration. */
     constructor(
