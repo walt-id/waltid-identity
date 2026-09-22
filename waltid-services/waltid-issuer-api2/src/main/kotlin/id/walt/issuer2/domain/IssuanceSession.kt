@@ -5,6 +5,7 @@ import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.openid4vci.mdoc.MsoData
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -67,6 +68,14 @@ data class IssuanceSession(
     val failure: IssuanceSessionFailure? = null,
     /** Established issuance selection; independent of any later token narrowing. */
     val authorizedCredentialIdentifiers: List<String>? = null,
+    /**
+     * One notification id for the credential response stored on this session.
+     * A later credential response on the same session replaces it.
+     * [walletNotificationEvent] keeps only the latest event for that id.
+     */
+    val walletNotificationId: String? = null,
+    val walletNotificationEvent: NotificationEvent? = null,
+    val walletNotificationEventDescription: String? = null,
 ) {
     init {
         require(issuanceRequests.isNotEmpty()) { "issuanceRequests must not be empty" }

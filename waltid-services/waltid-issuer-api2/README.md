@@ -26,7 +26,7 @@ Use this service for new issuer integrations that need OpenID4VCI 1.0 support. T
 
 ## Features
 
-- **OpenID4VCI 1.0** — Credential offer, authorization, token, nonce, and credential endpoints
+- **OpenID4VCI 1.0** — Credential offer, authorization, token, nonce, credential, and notification endpoints
 - **Credential profiles** — Configurable issuance profiles in `issuer2-profiles.conf`
 - **Metadata endpoints** — Credential issuer, authorization server, JWT VC issuer, JWKS, and VCT metadata
 - **Grant types** — Pre-authorized code and authorization code flows
@@ -60,6 +60,8 @@ Configuration files live in `config/`:
 | `authentication-service.conf` | Optional external OAuth authentication configuration |
 
 The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Update this value when deploying behind a public host or reverse proxy so generated metadata and credential offers contain externally reachable URLs.
+
+`notificationEndpointEnabled` defaults to true. When enabled, issuer metadata advertises `notification_endpoint` and successful credential responses that contain credentials include `notification_id`. `POST /openid4vci/notification` accepts `credential_accepted`, `credential_failure`, and `credential_deleted` with the same access token. Set the flag to false to omit the endpoint from metadata and routing. The session stores one notification id and the latest event for that id.
 
 `ciTokenStoredKey` optionally carries an encoded crypto2 `StoredKey` sidecar for `ciTokenKey` and takes precedence at startup. The service validates that both values identify the same signing and verification key. If the sidecar is absent, a legacy JWK is migrated only in memory; the configuration file is never rewritten. A malformed or mismatched sidecar fails startup without falling back to `ciTokenKey`.
 
