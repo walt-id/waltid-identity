@@ -152,6 +152,27 @@ class PortraitSessionSizeTest {
                     .take(8)
                     .forEach { (key, size) -> println("PORTRAIT field=$key chars=$size") }
 
+                // Which policy result holds the copies, and under which key: that is what has to become a
+                // reference, and naming it saves the next reader the measurement.
+                session.presentationValidationResults?.forEach { (queryId, byPolicy) ->
+                    byPolicy.forEach { (policyName, run) ->
+                        run.results.forEach { (key, value) ->
+                            println("PORTRAIT policyResult query=$queryId policy=$policyName key=$key chars=${value.toString().length}")
+                        }
+                    }
+                }
+
+                // The regression that matters is not the absolute size but what scales with policy count. Policy
+                // results must describe what was checked, not repeat it: one policy echoing the disclosed elements
+                // cost a megabyte here, and an Enterprise profile runs several.
+                val validationResultChars =
+                    encoded["presentation_validation_results"]?.toString()?.length ?: 0
+                assertTrue(
+                    validationResultChars < encodedPortraitChars / 10,
+                    "policy results hold $validationResultChars chars for a $encodedPortraitChars char portrait, " +
+                            "so they are carrying the presented values rather than a reference to them",
+                )
+
                 assertTrue(
                     encoded.toString().length < bsonDocumentLimit,
                     "a session with a ${portraitBytes / 1000} KB portrait serialises to " +
