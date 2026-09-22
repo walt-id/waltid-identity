@@ -83,6 +83,15 @@ jobs:
           # snapshot; submitting per PR just adds annotations and dependency-graph_*.json artifacts.
           dependency-graph: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'generate-and-submit' || 'disabled' }}
 
+      - name: Check default Kotlin configuration
+        run: |
+          # Mobile-enabled builds can hide modules included without any Kotlin targets.
+          for project_dir in . waltid-identity; do
+            ./gradlew -p "$project_dir" checkKotlinGradlePluginConfigurationErrors \
+              -PenableAndroidBuild=false -PenableIosBuild=false -PenableWalletDemoComposeWeb=false \
+              --no-configuration-cache --console=plain
+          done
+
       - name: Install SoftHSM for PKCS11 tests
         run: |
           sudo apt-get update
