@@ -26,6 +26,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class DeviceKeyInfo(
     @SerialName("deviceKey")
+    @Serializable(with = ItbDiagnosticMsoDeviceKeySerializer::class)
     val deviceKey: CoseKey,
 
     @SerialName("keyAuthorizations")
