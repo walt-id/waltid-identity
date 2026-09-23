@@ -66,7 +66,7 @@ class IssuerSignedElementTruncationTest {
 
     /** The serialised item carries the same bytes, so bounding the value alone would not bound the result. */
     @Test
-    fun `a serialised item is hex until it grows, then a marked prefix`() {
+    fun `a serialised item is hex until it grows and then a marked prefix`() {
         val small = ByteArray(MAX_INLINE_SERIALIZED_BYTES) { 1 }
         assertIs<String>(small.truncatedHex(MAX_INLINE_SERIALIZED_BYTES))
 
