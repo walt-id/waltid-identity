@@ -77,6 +77,26 @@ class ItbCaseRunnerTest {
     }
 
     @Test
+    fun unavailableAuthenticationIsNotReportedAsWalletInteroperabilityFailure() = runBlocking<Unit> {
+        HttpClient(MockEngine { request ->
+            respond(when (request.url.encodedPath.substringAfterLast('/')) {
+                "status" -> status(false, "UNDEFINED")
+                "stop" -> ""
+                session -> report.replace("<result>SUCCESS</result>", "<result>UNDEFINED</result>")
+                else -> error("Unexpected request")
+            })
+        }).use { client ->
+            val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), Bridge(), {
+                throw ItbAuthenticationUnavailable()
+            }).run(suite, case)
+            assertEquals(ItbCaseResult.Outcome.AUTH_UNAVAILABLE, result.outcome)
+            assertEquals(ItbCaseResult.Phase.WALLET, result.phase)
+            assertFalse(result.walletSucceeded)
+            assertEquals(ItbSessionReport.Verdict.UNDEFINED, result.testBedVerdict)
+        }
+    }
+
+    @Test
     fun reportForAnotherCaseCannotProduceAPass() = runBlocking<Unit> {
         HttpClient(MockEngine { request ->
             respond(when (request.url.encodedPath.substringAfterLast('/')) {

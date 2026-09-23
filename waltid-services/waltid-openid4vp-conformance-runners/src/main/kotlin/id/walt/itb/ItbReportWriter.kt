@@ -32,11 +32,17 @@ object ItbReportWriter {
             report.androidApkSha256?.let { appendLine("Android test APK SHA-256: `$it`.") }
             appendLine("${report.cases.size - failures}/${report.cases.size} passed; $failures non-passing.")
             appendLine()
-            appendLine("| Suite | Case | Runner result | Wallet | ITB verdict | Session |")
-            appendLine("| --- | --- | --- | --- | --- | --- |")
+            appendLine("| Suite | Case | Runner result | Reason | Wallet | ITB verdict | Session |")
+            appendLine("| --- | --- | --- | --- | --- | --- | --- |")
             report.cases.forEach { result ->
-                val wallet = if (result.walletSucceeded) "succeeded" else if (result.adapterInvoked) "failed" else "not run"
-                appendLine("| ${result.suite} | ${result.case} | ${result.outcome} | $wallet | ${result.testBedVerdict ?: "unavailable"} | ${result.session ?: "not started"} |")
+                val wallet = when {
+                    result.walletSucceeded -> "succeeded"
+                    result.outcome == ItbCaseResult.Outcome.AUTH_UNAVAILABLE -> "not authorized"
+                    result.adapterInvoked -> "failed"
+                    else -> "not run"
+                }
+                val reason = result.errorCode ?: result.errorType ?: "—"
+                appendLine("| ${result.suite} | ${result.case} | ${result.outcome} | $reason | $wallet | ${result.testBedVerdict ?: "unavailable"} | ${result.session ?: "not started"} |")
             }
             appendLine()
             appendLine("Wallet protocol execution with a portal interaction bridge. Native mode uses operator authentication on Android; neither mode qualifies transaction-consent UI, browser/OS DC API delivery or formal SCA assurance.")
