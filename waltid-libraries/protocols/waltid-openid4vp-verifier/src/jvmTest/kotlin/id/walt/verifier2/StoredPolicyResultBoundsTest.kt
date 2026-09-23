@@ -2,8 +2,9 @@ package id.walt.verifier2
 
 import id.walt.policies2.vc.CredentialPolicyResult
 import id.walt.policies2.vc.policies.RevocationPolicy
-import id.walt.verifier2.verification2.MAX_STORED_POLICY_ARRAY
-import id.walt.verifier2.verification2.MAX_STORED_POLICY_TEXT
+import id.walt.crypto.utils.MAX_STORED_JSON_ARRAY
+import id.walt.crypto.utils.MAX_STORED_JSON_TEXT
+import id.walt.crypto.utils.withoutBulkValues
 import id.walt.verifier2.verification2.boundedForStorage
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -29,10 +30,10 @@ class StoredPolicyResultBoundsTest {
 
     @Test
     fun aBulkStringBecomesADescriptor() {
-        val bounded = JsonPrimitive(portrait).boundedForStorage().jsonObject
+        val bounded = JsonPrimitive(portrait).withoutBulkValues().jsonObject
         assertEquals(333_334, bounded["length"]!!.jsonPrimitive.content.toInt())
         assertEquals(true, bounded["truncated"]!!.jsonPrimitive.content.toBoolean())
-        assertEquals(MAX_STORED_POLICY_TEXT, bounded["prefix"]!!.jsonPrimitive.content.length)
+        assertEquals(MAX_STORED_JSON_TEXT, bounded["prefix"]!!.jsonPrimitive.content.length)
         assertTrue(bounded.toString().length < 2_000, "descriptor must not carry the payload")
     }
 
@@ -45,7 +46,7 @@ class StoredPolicyResultBoundsTest {
             put("birth_date", "1985-03-15")
             put("issue_count", 7)
         }
-        assertEquals(kept, kept.boundedForStorage())
+        assertEquals(kept, kept.withoutBulkValues())
     }
 
     @Test
@@ -57,7 +58,7 @@ class StoredPolicyResultBoundsTest {
                 put("portrait", portrait)
             })
         }
-        val bounded = nested.boundedForStorage().jsonObject
+        val bounded = nested.withoutBulkValues().jsonObject
         val ns = bounded["org.iso.18013.5.1"]!!.jsonObject
         assertEquals("Test", ns["given_name"]!!.jsonPrimitive.content)
         assertEquals(333_334, ns["portrait"]!!.jsonObject["length"]!!.jsonPrimitive.content.toInt())
@@ -67,15 +68,15 @@ class StoredPolicyResultBoundsTest {
     fun aLongNumberArrayIsBounded() {
         // A decoded CBOR byte string arrives as an array of numbers.
         val bytes = buildJsonArray { repeat(5_000) { add(JsonPrimitive(it % 256)) } }
-        val bounded = bytes.boundedForStorage().jsonObject
+        val bounded = bytes.withoutBulkValues().jsonObject
         assertEquals(5_000, bounded["length"]!!.jsonPrimitive.content.toInt())
-        assertEquals(MAX_STORED_POLICY_ARRAY, (bounded["prefix"] as JsonArray).size)
+        assertEquals(MAX_STORED_JSON_ARRAY, (bounded["prefix"] as JsonArray).size)
     }
 
     @Test
     fun aShortArraySurvivesWhole() {
         val short = buildJsonArray { repeat(10) { add(JsonPrimitive(it)) } }
-        assertEquals(short, short.boundedForStorage())
+        assertEquals(short, short.withoutBulkValues())
     }
 
     @Test
