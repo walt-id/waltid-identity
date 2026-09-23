@@ -9,6 +9,7 @@ import id.walt.crypto2.migration.v1.v1PublicKeyReference
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.issuer2.config.CredentialEncryptionKeyConfig
+import id.walt.issuer2.config.Issuer2EndpointPaths
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.service.CredentialProfileService
@@ -21,7 +22,9 @@ import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionPro
 import id.walt.openid4vci.tokens.jwt.Crypto2JwtSigningKey
 import id.walt.sdjwt.metadata.issuer.JWTVCIssuerMetadata
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
+import io.ktor.server.plugins.NotFoundException
 import kotlinx.serialization.json.*
+import java.net.URI
 
 class MetadataService(
     serviceConfig: Issuer2ServiceConfig,
@@ -57,7 +60,9 @@ class MetadataService(
             json.decodeFromJsonElement(
                 CredentialConfiguration.serializer(),
                 DisplayUriResolver.resolve(value, issuerHttpBaseUrl),
-            ).withResolvedVct(configurationId)
+            ).withResolvedVct(configurationId).also { configuration ->
+                configuration.vct?.let { validateSelfHostedVct(configurationId, it) }
+            }
         }
 
     fun getCredentialIssuerMetadata(): CredentialIssuerMetadata =
@@ -119,11 +124,14 @@ class MetadataService(
             .keys
 
     fun getVctTypeMetadata(credentialType: String): SdJwtVcTypeMetadataDraft04 {
+        if (credentialType in Issuer2EndpointPaths.reservedVctNames) {
+            throw NotFoundException("Credential type metadata not found: $credentialType")
+        }
         val expectedVct = selfHostedVct(credentialType)
         credentialConfigurations.entries.firstOrNull { (_, configuration) ->
             configuration.vct == expectedVct
         }
-            ?: throw IllegalArgumentException("Invalid type value: $credentialType. The $credentialType type is not supported")
+            ?: throw NotFoundException("Credential type metadata not found: $credentialType")
 
         return SdJwtVcTypeMetadataDraft04(
             vct = expectedVct,
@@ -220,6 +228,28 @@ class MetadataService(
 
     private fun selfHostedVct(credentialType: String): String =
         "$baseUrl/$credentialType"
+
+    private fun validateSelfHostedVct(configurationId: String, vct: String) {
+        // VCTs may be external URLs or non-HTTP identifiers. Only our own protocol paths collide.
+        val vctUri = runCatching { URI(vct) }.getOrNull() ?: return
+        val issuerUri = URI(baseUrl)
+        if (!vctUri.scheme.equals(issuerUri.scheme, ignoreCase = true) ||
+            !vctUri.host.equals(issuerUri.host, ignoreCase = true) ||
+            vctUri.effectivePort() != issuerUri.effectivePort()
+        ) return
+
+        val prefix = issuerUri.normalize().path.trimEnd('/') + "/"
+        val path = vctUri.normalize().path ?: return
+        if (!path.startsWith(prefix)) return
+        val name = path.removePrefix(prefix).substringBefore('/')
+        require(name !in Issuer2EndpointPaths.reservedVctNames) {
+            "Credential configuration '$configurationId' has self-hosted VCT '$vct' under reserved " +
+                    "OpenID4VCI path '$name'. Choose a different VCT path or an externally hosted VCT URL."
+        }
+    }
+
+    private fun URI.effectivePort(): Int =
+        if (port >= 0) port else if (scheme.equals("https", ignoreCase = true)) 443 else 80
 
     private fun resolveCredentialRequestEncryptionMetadata(): CredentialRequestEncryption? {
         val serializedKey = credentialEncryptionKeyConfig ?: return null

@@ -64,7 +64,9 @@ object OpenId4VciRoutesDocs {
     fun vctTypeMetadata(): RouteConfig.() -> Unit = {
         tags = listOf(OPENID4VCI_TAG)
         summary = "Get SD-JWT VC type metadata"
-        description = "Resolve self-hosted SD-JWT VC type metadata from a VCT URL path."
+        description = "Resolve configured self-hosted SD-JWT VC type metadata through " +
+                "`/.well-known/vct/{type}` or `/openid4vci/{type}`. Unknown types return 404. " +
+                "OpenID4VCI protocol path names are reserved and cannot be used for self-hosted VCT URLs."
         request {
             pathParameter<String>("type")
         }
@@ -72,6 +74,9 @@ object OpenId4VciRoutesDocs {
             HttpStatusCode.OK to {
                 description = "SD-JWT VC type metadata"
                 body<JsonObject>()
+            }
+            HttpStatusCode.NotFound to {
+                description = "The type has no self-hosted metadata or uses a reserved protocol path name."
             }
         }
     }
