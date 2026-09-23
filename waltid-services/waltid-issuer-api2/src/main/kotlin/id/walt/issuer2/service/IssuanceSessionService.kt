@@ -4,6 +4,7 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionFailure
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.repository.IssuanceSessionRepository
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import io.ktor.server.plugins.NotFoundException
 
 class IssuanceSessionService(
@@ -45,4 +46,37 @@ class IssuanceSessionService(
         )
         return repository.save(updated)
     }
+
+    /**
+     * Records the latest wallet notification for [notificationId].
+     * An identical event and description is left unchanged. A different event replaces the previous one.
+     * Returns null when this session was not issued with that notification id.
+     */
+    suspend fun updateWalletNotificationEvent(
+        sessionId: String,
+        notificationId: String,
+        event: NotificationEvent,
+        eventDescription: String? = null,
+    ): WalletNotificationUpdate? {
+        val existing = getSessionOrNull(sessionId) ?: return null
+        if (existing.walletNotificationId != notificationId) return null
+        if (
+            existing.walletNotificationEvent == event &&
+            existing.walletNotificationEventDescription == eventDescription
+        ) {
+            return WalletNotificationUpdate(existing, changed = false)
+        }
+        val saved = repository.save(
+            existing.copy(
+                walletNotificationEvent = event,
+                walletNotificationEventDescription = eventDescription,
+            )
+        )
+        return WalletNotificationUpdate(saved, changed = true)
+    }
 }
+
+data class WalletNotificationUpdate(
+    val session: IssuanceSession,
+    val changed: Boolean,
+)

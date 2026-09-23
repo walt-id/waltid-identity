@@ -41,6 +41,9 @@ import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.toJsonObject
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
+import id.walt.openid4vci.requests.notification.NotificationRequestResult
+import id.walt.openid4vci.requests.notification.invalidNotificationRequest
+import id.walt.openid4vci.requests.notification.parseNotificationRequest
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
@@ -586,6 +589,7 @@ class DefaultOAuth2Provider(
         validFrom: Instant?,
         validUntil: Instant?,
         proofValidationContext: CredentialProofValidationContext?,
+        issueNotificationId: Boolean,
     ): CredentialResponseResult {
         val verifiedProofs = when (
             val proofResult = verifyCredentialProofs(
@@ -622,7 +626,7 @@ class DefaultOAuth2Provider(
             validFrom = validFrom,
             validUntil = validUntil,
             verifiedProofs = verifiedProofs,
-        )
+        ).withNotificationId(issueNotificationId)
     }
 
     override suspend fun createCredentialResponse(
@@ -642,6 +646,7 @@ class DefaultOAuth2Provider(
         validFrom: Instant?,
         validUntil: Instant?,
         proofValidationContext: CredentialProofValidationContext?,
+        issueNotificationId: Boolean,
     ): CredentialResponseResult {
         val verifiedProofs = when (
             val proofResult = verifyCredentialProofs(
@@ -686,7 +691,7 @@ class DefaultOAuth2Provider(
             validFrom = validFrom,
             validUntil = validUntil,
             verifiedProofs = verifiedProofs,
-        )
+        ).withNotificationId(issueNotificationId)
     }
 
     override fun writeCredentialError(error: CredentialError): CredentialResponseHttp =
@@ -736,6 +741,58 @@ class DefaultOAuth2Provider(
             status = 200,
             body = CredentialResponseBody.EncryptedJwt(encrypted),
         )
+    }
+
+    override suspend fun createNotificationRequest(
+        body: String,
+        accessTokenContext: CredentialAccessTokenContext,
+    ): NotificationRequestResult {
+        val claims = when (val tokenResult = verifyNotificationAccessToken(accessTokenContext)) {
+            is NotificationAccessTokenVerification.Success -> tokenResult.claims
+            is NotificationAccessTokenVerification.Failure -> return NotificationRequestResult.OAuthFailure(tokenResult.error)
+        }
+        val request = parseNotificationRequest(body) ?: return invalidNotificationRequest()
+        return NotificationRequestResult.Success(request = request, tokenClaims = claims)
+    }
+
+    private fun CredentialResponseResult.withNotificationId(issueNotificationId: Boolean): CredentialResponseResult {
+        if (!issueNotificationId) return this
+        val success = this as? CredentialResponseResult.Success ?: return this
+        if (success.response.credentials.isNullOrEmpty()) return this
+        return CredentialResponseResult.Success(
+            success.response.copy(notificationId = config.notificationIdGenerator()),
+        )
+    }
+
+    private suspend fun verifyNotificationAccessToken(
+        accessTokenContext: CredentialAccessTokenContext,
+    ): NotificationAccessTokenVerification {
+        val verifier = config.accessTokenVerifier
+            ?: return NotificationAccessTokenVerification.Failure(
+                OAuthError(OAuthErrorCodes.SERVER_ERROR, "access token verifier not configured"),
+            )
+        val claims = try {
+            verifier.verify(
+                token = accessTokenContext.authorization.token,
+                expectedIssuer = accessTokenContext.expectedIssuer,
+                expectedAudience = accessTokenContext.expectedAudience,
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return NotificationAccessTokenVerification.Failure(
+                OAuthError(OAuthErrorCodes.INVALID_TOKEN, e.message ?: "Access token is invalid"),
+            )
+        }
+        verifyCredentialAccessTokenBinding(accessTokenContext, claims)?.let { failure ->
+            return NotificationAccessTokenVerification.Failure(failure.error)
+        }
+        return NotificationAccessTokenVerification.Success(claims)
+    }
+
+    private sealed class NotificationAccessTokenVerification {
+        data class Success(val claims: JsonObject) : NotificationAccessTokenVerification()
+        data class Failure(val error: OAuthError) : NotificationAccessTokenVerification()
     }
 
     private suspend fun verifyCredentialAccessToken(

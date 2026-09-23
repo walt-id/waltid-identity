@@ -19,6 +19,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.wallet2.data.*
@@ -551,21 +552,30 @@ class WalletIssuanceSessionService(
         }
 
         return try {
-            val credentials = response.response.body<CredentialResponse>().credentials
+            val credentialResponse = response.response.body<CredentialResponse>()
+            val credentials = credentialResponse.credentials
                 ?.takeIf { it.isNotEmpty() }
                 ?: run {
                     restoreDeferred(record.copy(dpopNonce = response.dpopNonce))
                     return failed(record.sessionId, WalletIssuanceErrorCode.PROTOCOL)
                 }
-            val stored = credentials.map {
-                wallet.parseAndStore(
-                    issued = it,
-                    label = record.label,
-                    metadata = record.metadata,
-                    keyMaterial = record.keyMaterial,
-                )
+            val stored = try {
+                credentials.map {
+                    wallet.parseAndStore(
+                        issued = it,
+                        label = record.label,
+                        metadata = record.metadata,
+                        keyMaterial = record.keyMaterial,
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                notifyDeferredIssuer(record, credentialResponse.notificationId, NotificationEvent.CREDENTIAL_FAILURE)
+                throw error
             }
             stored.forEach { emitEvent(WalletSessionEvent.issuance_credential_stored) }
+            notifyDeferredIssuer(record, credentialResponse.notificationId, NotificationEvent.CREDENTIAL_ACCEPTED)
             emitEvent(WalletSessionEvent.issuance_completed)
             WalletIssuanceOutcome.Stored(record.sessionId, stored.map { it.id })
         } catch (error: CancellationException) {
@@ -713,21 +723,39 @@ class WalletIssuanceSessionService(
                         issuerMetadata = active.resolved.issuerMetadata.metadata,
                         credentialConfigurationId = offered.credentialConfigurationId,
                     )
-                    credentials.forEach { issued ->
-                        val stored = try {
-                            wallet.parseAndStore(
+                    try {
+                        credentials.forEach { issued ->
+                            val stored = wallet.parseAndStore(
                                 issued = issued,
                                 label = label,
                                 metadata = metadata,
                                 keyMaterial = active.keyMaterial,
                             )
-                        } catch (error: CancellationException) {
-                            throw error
-                        } catch (error: Exception) {
-                            throw IssuanceStageException(WalletIssuanceErrorCode.STORAGE, error)
+                            storedIds += stored.id
+                            emitEvent(WalletSessionEvent.issuance_credential_stored)
                         }
-                        storedIds += stored.id
-                        emitEvent(WalletSessionEvent.issuance_credential_stored)
+                        notifyIssuer(
+                            endpoint = active.resolved.issuerMetadata.metadata.notificationEndpoint,
+                            notificationId = response.notificationId,
+                            accessToken = token.access_token,
+                            tokenType = token.token_type,
+                            dpopAlgorithms = dpopAlgorithms,
+                            keyMaterial = active.keyMaterial,
+                            event = NotificationEvent.CREDENTIAL_ACCEPTED,
+                        )
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        notifyIssuer(
+                            endpoint = active.resolved.issuerMetadata.metadata.notificationEndpoint,
+                            notificationId = response.notificationId,
+                            accessToken = token.access_token,
+                            tokenType = token.token_type,
+                            dpopAlgorithms = dpopAlgorithms,
+                            keyMaterial = active.keyMaterial,
+                            event = NotificationEvent.CREDENTIAL_FAILURE,
+                        )
+                        throw IssuanceStageException(WalletIssuanceErrorCode.STORAGE, error)
                     }
                 }
 
@@ -773,6 +801,7 @@ class WalletIssuanceSessionService(
                             persistable = active.persistable,
                             label = label,
                             metadata = metadata,
+                            notificationEndpoint = active.resolved.issuerMetadata.metadata.notificationEndpoint,
                         ),
                     )
                 }
@@ -1201,6 +1230,47 @@ class WalletIssuanceSessionService(
         }
     }
 
+    private suspend fun notifyIssuer(
+        endpoint: String?,
+        notificationId: String?,
+        accessToken: String,
+        tokenType: String,
+        dpopAlgorithms: Set<String>?,
+        keyMaterial: WalletKeyStoreEntry,
+        event: NotificationEvent,
+    ) {
+        deliverCredentialNotification(
+            httpClient = httpClient,
+            notificationEndpoint = endpoint,
+            notificationId = notificationId,
+            accessToken = accessToken,
+            tokenType = tokenType,
+            event = event,
+            dpopProofFactory = dpopProofFactoryFor(
+                tokenType = tokenType,
+                dpopAlgorithms = dpopAlgorithms,
+                keyMaterial = keyMaterial,
+                accessToken = accessToken,
+            ),
+        )
+    }
+
+    private suspend fun notifyDeferredIssuer(
+        record: DeferredRecord,
+        notificationId: String?,
+        event: NotificationEvent,
+    ) {
+        notifyIssuer(
+            endpoint = record.notificationEndpoint,
+            notificationId = notificationId,
+            accessToken = record.accessToken,
+            tokenType = record.tokenType,
+            dpopAlgorithms = record.dpop,
+            keyMaterial = record.keyMaterial,
+            event = event,
+        )
+    }
+
     private suspend fun postProtected(
         endpoint: String,
         accessToken: String,
@@ -1584,6 +1654,7 @@ class WalletIssuanceSessionService(
                     selectedPublicJwk = record.selectedPublicJwk,
                     label = record.label,
                     metadata = record.metadata,
+                    notificationEndpoint = record.notificationEndpoint,
                 )
                 store.put(
                     WalletIssuanceSessionRecord(
@@ -1635,6 +1706,7 @@ class WalletIssuanceSessionService(
             persistable = true,
             label = persisted.label,
             metadata = persisted.metadata,
+            notificationEndpoint = persisted.notificationEndpoint,
         )
     }
 
@@ -1811,6 +1883,7 @@ class WalletIssuanceSessionService(
         val persistable: Boolean,
         val label: String?,
         val metadata: JsonObject? = null,
+        val notificationEndpoint: String? = null,
     )
 
     private data class PendingDeferred(
@@ -1862,6 +1935,7 @@ class WalletIssuanceSessionService(
         val selectedPublicJwk: String,
         val label: String?,
         val metadata: JsonObject? = null,
+        val notificationEndpoint: String? = null,
     )
 
     private suspend fun resolveIssuanceKeyMaterial(

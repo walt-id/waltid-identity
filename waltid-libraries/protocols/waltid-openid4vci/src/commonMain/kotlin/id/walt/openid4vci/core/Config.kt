@@ -27,6 +27,7 @@ import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.CredentialRequestValidator
 import id.walt.openid4vci.validation.IssuerStateValidator
+import kotlin.uuid.Uuid
 
 /**
  * Configuration holds handler registries and injectable objects used by the provider.
@@ -76,6 +77,8 @@ data class OAuth2ProviderConfig(
     val credentialProofVerifier: CredentialProofVerifier? = DefaultCredentialProofVerifier(),
     val credentialEndpointHandlers: CredentialEndpointHandlers,
     val credentialResponseEncryptor: CredentialResponseEncryptor = Crypto2JweCredentialResponseEncryptor,
+    /** Generates `notification_id` values while a Credential Response that contains credentials is created. */
+    val notificationIdGenerator: () -> String = { Uuid.random().toString() },
 )
 
 data class PushedAuthorizationConfig(

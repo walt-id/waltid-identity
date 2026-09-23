@@ -1,6 +1,7 @@
 package id.walt.issuer2.controller.openapi
 
 import id.walt.openid4vci.errors.CredentialError
+import id.walt.openid4vci.errors.NotificationError
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
@@ -219,6 +220,38 @@ object OpenId4VciRoutesDocs {
             }
             HttpStatusCode.InternalServerError to {
                 description = "Credential processing failed"
+                body<OAuthError>()
+            }
+        }
+    }
+
+    fun notification(): RouteConfig.() -> Unit = {
+        summary = "Notification endpoint"
+        description = "OpenID4VCI 1.0 notification endpoint. The wallet reports credential_accepted, credential_failure, or credential_deleted."
+        request {
+            headerParameter<String>("Authorization") {
+                required = true
+                description = "Bearer or DPoP access token from the token endpoint"
+            }
+            headerParameter<String>("DPoP") {
+                required = false
+                description = "Required when presenting a DPoP-bound access token"
+            }
+            body<JsonObject> {
+                description = "Notification request"
+                mediaTypes(ContentType.Application.Json)
+            }
+        }
+        response {
+            HttpStatusCode.NoContent to {
+                description = "Notification accepted"
+            }
+            HttpStatusCode.BadRequest to {
+                description = "Invalid notification request or notification id"
+                body<NotificationError>()
+            }
+            HttpStatusCode.Unauthorized to {
+                description = "Access token is missing or invalid. The response body is an OAuth error and WWW-Authenticate challenges with the presented scheme, Bearer or DPoP."
                 body<OAuthError>()
             }
         }

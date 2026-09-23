@@ -3,7 +3,9 @@ package id.walt.openid4vci.core
 import id.walt.certificate.x509.X509Certificate
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.errors.CredentialError
+import id.walt.openid4vci.errors.NotificationError
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
@@ -12,6 +14,7 @@ import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
+import id.walt.openid4vci.requests.notification.NotificationRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponse
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
@@ -25,11 +28,17 @@ import id.walt.openid4vci.responses.token.TokenResponseOptions
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
+import id.walt.openid4vci.responses.notification.NotificationResponseHttp
+import id.walt.openid4vci.responses.notification.NotificationResponseResult
+import id.walt.openid4vci.responses.notification.notificationErrorHttp
+import id.walt.openid4vci.responses.notification.notificationOAuthErrorHttp
+import id.walt.openid4vci.responses.notification.notificationSuccessHttp
+import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
+import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
-import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.json.JsonObject
@@ -151,6 +160,7 @@ interface OAuth2Provider {
         validFrom: Instant? = null,
         validUntil: Instant? = null,
         proofValidationContext: CredentialProofValidationContext? = null,
+        issueNotificationId: Boolean = false,
     ): CredentialResponseResult
 
     suspend fun createCredentialResponse(
@@ -170,6 +180,7 @@ interface OAuth2Provider {
         validFrom: Instant? = null,
         validUntil: Instant? = null,
         proofValidationContext: CredentialProofValidationContext? = null,
+        issueNotificationId: Boolean = false,
     ): CredentialResponseResult
 
     fun writeCredentialError(error: CredentialError): CredentialResponseHttp
@@ -182,4 +193,30 @@ interface OAuth2Provider {
 
     /** Suspending because response encryption performs key agreement, which is asynchronous on every crypto2 target. */
     suspend fun writeCredentialResponse(request: CredentialRequest, response: CredentialResponse): CredentialResponseHttp
+
+    /**
+     * Verifies the access token before parsing [body].
+     * A missing verifier or invalid token is an OAuth failure and does not inspect the body.
+     */
+    suspend fun createNotificationRequest(
+        body: String,
+        accessTokenContext: CredentialAccessTokenContext,
+    ): NotificationRequestResult = NotificationRequestResult.OAuthFailure(
+        OAuthError(OAuthErrorCodes.SERVER_ERROR, "Notification endpoint is not supported"),
+    )
+
+    /** Protocol acknowledgement for a notification the issuer has already accepted. */
+    fun createNotificationResponse(): NotificationResponseResult = NotificationResponseResult.Success()
+
+    fun writeNotificationError(error: NotificationError): NotificationResponseHttp = notificationErrorHttp(error)
+
+    fun writeNotificationError(
+        error: OAuthError,
+        scheme: AccessTokenAuthorizationScheme,
+    ): NotificationResponseHttp = notificationOAuthErrorHttp(error, scheme)
+
+    fun writeNotificationResponse(result: NotificationResponseResult): NotificationResponseHttp {
+        check(result is NotificationResponseResult.Success)
+        return notificationSuccessHttp()
+    }
 }

@@ -66,6 +66,7 @@ class MetadataService(
                 credentialConfigurationsSupported = credentialConfigurations,
                 credentialRequestEncryption = credentialRequestEncryption,
                 display = issuerDisplay,
+                notificationEndpointPath = NOTIFICATION_ENDPOINT_PATH,
             )
         }
 
@@ -232,5 +233,6 @@ class MetadataService(
 
     companion object {
         private const val INTERNAL_VCT_BASE_URL = "vctBaseUrl"
+        private const val NOTIFICATION_ENDPOINT_PATH = "/notification"
     }
 }
