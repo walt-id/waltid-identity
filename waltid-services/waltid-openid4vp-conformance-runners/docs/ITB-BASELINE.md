@@ -109,10 +109,10 @@ browser contracts cover exact suite selection, interactive mode, request-versus-
 labels, stale dialogs and session ownership. They do not replace live evidence.
 
 The live workflow uses three repository secrets (organisation API key and portal
-login) and the organisation ID variable, with no dedicated environment. Its first
-hosted run remains pending: GitHub requires the workflow on the default branch
-before manual dispatch. After it lands, run the issuance/presentation smoke and
-then the complete matrix, as described in the [operator guide](ITB-WALLET.md).
+login) and the organisation ID variable, with no dedicated environment. It runs
+all 21 cases on pushes to the WAL-1423 investigation branches; the report for
+each run is the evidence for that revision. Manual dispatch becomes available
+once the workflow reaches the default branch. See the [operator guide](ITB-WALLET.md).
 
 Keep the PR draft as requested. Resolve the external wallet and issuer blockers,
 apply the DC API trust wiring once its API becomes available, and rerun against
