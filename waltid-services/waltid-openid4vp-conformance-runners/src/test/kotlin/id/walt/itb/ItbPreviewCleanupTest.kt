@@ -4,9 +4,26 @@ import id.walt.wallet2.handlers.PreviewSessionException
 import id.walt.wallet2.handlers.PreviewSessionFailureReason
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 import kotlin.test.*
 
 class ItbPreviewCleanupTest {
+    @Test
+    fun verifierErrorCategoryRetainsOnlySafeProtocolIdentifiers() {
+        assertEquals("missing_sca_credential", ItbWalletDriver.verifierErrorCategory(
+            Json.parseToJsonElement("""{"error":"missing_sca_credential","details":"private response"}"""),
+        ))
+        for (body in listOf(
+            """{"error":"token.value.with.dots"}""",
+            """{"error":"secret with spaces"}""",
+            """{"error":"some_secret"}""",
+            """{"error":{"code":"missing_sca_credential"}}""",
+            """{"details":"private response"}""",
+        )) {
+            assertNull(ItbWalletDriver.verifierErrorCategory(Json.parseToJsonElement(body)))
+        }
+    }
+
     @Test
     fun successfulSubmissionCanAlreadyHaveConsumedItsPreview() = runBlocking<Unit> {
         var presented = false

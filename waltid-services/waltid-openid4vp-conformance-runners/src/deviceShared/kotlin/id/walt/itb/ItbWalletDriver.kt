@@ -115,7 +115,11 @@ class ItbWalletDriver internal constructor(
                 transactionDataTypeRegistry = paymentTypes,
                 scaAuthorizer = scaAuthorizer,
             )
-            check(result.transmissionSuccess == true) { "The wallet did not transmit the presentation successfully" }
+            check(result.transmissionSuccess == true) {
+                val category = verifierErrorCategory(result.verifierResponse)
+                "The wallet did not transmit the presentation successfully" +
+                    (category?.let { " (verifier error: $it)" } ?: "")
+            }
         }
     }
 
@@ -158,6 +162,7 @@ class ItbWalletDriver internal constructor(
                 trustedOrigin.toString().trimEnd('/'),
             ),
             transactionDataTypeRegistry = paymentTypes,
+            clientIdTrustConfiguration = clientIdTrust,
         )
         val credential = WalletPresentationHandler.submitDcApiPresentation(
             wallet, SubmitDcApiPresentationRequest(
@@ -180,6 +185,12 @@ class ItbWalletDriver internal constructor(
     }
 
     companion object {
+        /** Retain only a bounded protocol error identifier, never the verifier's response body. */
+        internal fun verifierErrorCategory(response: JsonElement?): String? =
+            ((response as? JsonObject)?.get("error") as? JsonPrimitive)
+                ?.takeIf { it.isString && it.content == "missing_sca_credential" }
+                ?.content
+
         /** Preserve the presentation failure if releasing its preview also fails. */
         internal suspend fun usePreview(discard: suspend () -> Unit, present: suspend () -> Unit) {
             val execution = runCatching { present() }
