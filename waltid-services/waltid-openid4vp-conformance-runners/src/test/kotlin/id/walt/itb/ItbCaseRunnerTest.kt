@@ -18,10 +18,12 @@ class ItbCaseRunnerTest {
     private inner class Bridge : ItbInteractionBridge {
         var reads = 0
         var completed = false
+        var readFailure: Exception? = null
         override suspend fun prepare(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case) =
             ItbSession(suite.id, case.id, session)
         override suspend fun read(session: ItbSession): ItbWalletInteraction {
             reads++
+            readFailure?.let { throw it }
             return ItbWalletInteraction.Offer(Url("openid-credential-offer://?credential_offer=%7B%7D"))
         }
         override suspend fun complete() { completed = true }
@@ -93,6 +95,29 @@ class ItbCaseRunnerTest {
             assertEquals(ItbCaseResult.Phase.WALLET, result.phase)
             assertFalse(result.walletSucceeded)
             assertEquals(ItbSessionReport.Verdict.UNDEFINED, result.testBedVerdict)
+        }
+    }
+
+    @Test
+    fun portalStepTimeoutNamesOnlyItsStepAndNeverInvokesTheWallet() = runBlocking<Unit> {
+        HttpClient(MockEngine { request ->
+            respond(when (request.url.encodedPath.substringAfterLast('/')) {
+                "status" -> status(false, "UNDEFINED")
+                "stop" -> ""
+                session -> report.replace("<result>SUCCESS</result>", "<result>UNDEFINED</result>")
+                else -> error("Unexpected request")
+            })
+        }).use { client ->
+            val bridge = Bridge().apply {
+                readFailure = ItbPortalStepTimeout(ItbPortalStepTimeout.Step.DOWNLOAD)
+            }
+            val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), bridge, {
+                error("The wallet must not run")
+            }).run(suite, case)
+            assertEquals(ItbCaseResult.Outcome.TIMED_OUT, result.outcome)
+            assertEquals("download", result.errorCode)
+            assertEquals(ItbCaseResult.Phase.INTERACTION, result.phase)
+            assertFalse(result.adapterInvoked)
         }
     }
 
