@@ -13,7 +13,7 @@ internal class ItbPortalExecutionError : IllegalStateException("The ITB portal c
 
 /** A bounded portal step timed out; the step name is safe to include in sanitized reports. */
 internal class ItbPortalStepTimeout(val step: Step) : IllegalStateException("The ITB portal timed out at $step") {
-    enum class Step { SESSION, START, INTERACTION, DIALOG, DOWNLOAD }
+    enum class Step { SESSION, START, INTERACTION, DIALOG, DOWNLOAD_CONTROL, DOWNLOAD_EVENT }
 }
 
 /** Interactive GITB 1.29.5 execution. Browser storage, traces and screenshots are never exported. */
@@ -99,8 +99,14 @@ class ItbPortalBridge(
             Locator.FilterOptions().setHas(page.getByText(label, Page.GetByTextOptions().setExact(true))),
         )
         // CodeMirror virtualizes long scripts, so rendered lines can omit payment inputs.
-        val download = step(ItbPortalStepTimeout.Step.DOWNLOAD) {
-            page.waitForDownload { row.locator("button[ngbtooltip=Download]").click() }
+        val download = step(ItbPortalStepTimeout.Step.DOWNLOAD_EVENT) {
+            // The portal may prepare this one file after its interaction dialog appears.
+            // Wait for the same click's download; never click again after an uncertain result.
+            page.waitForDownload(Page.WaitForDownloadOptions().setTimeout(45_000.0)) {
+                step(ItbPortalStepTimeout.Step.DOWNLOAD_CONTROL) {
+                    row.locator("button[ngbtooltip=Download]").click(Locator.ClickOptions().setTimeout(45_000.0))
+                }
+            }
         }
         return try {
             val path = download.path()

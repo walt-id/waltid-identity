@@ -109,13 +109,13 @@ class ItbCaseRunnerTest {
             })
         }).use { client ->
             val bridge = Bridge().apply {
-                readFailure = ItbPortalStepTimeout(ItbPortalStepTimeout.Step.DOWNLOAD)
+                readFailure = ItbPortalStepTimeout(ItbPortalStepTimeout.Step.DOWNLOAD_EVENT)
             }
             val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), bridge, {
                 error("The wallet must not run")
             }).run(suite, case)
             assertEquals(ItbCaseResult.Outcome.TIMED_OUT, result.outcome)
-            assertEquals("download", result.errorCode)
+            assertEquals("download_event", result.errorCode)
             assertEquals(ItbCaseResult.Phase.INTERACTION, result.phase)
             assertFalse(result.adapterInvoked)
         }
