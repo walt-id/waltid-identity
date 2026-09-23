@@ -222,6 +222,22 @@ class PortraitSessionSizeTest {
             val http = testHttpClient()
             val rounds = 20
 
+            suspend fun presentOnce(holder: PortraitHolder) {
+                val created = http.post("/verification-session/create") {
+                    setBody(portraitSessionSetup(requestPortrait = holder.hasPortrait))
+                }.body<VerificationSessionCreationResponse>()
+                WalletPresentFunctionality2.walletPresentHandling(
+                    holderKey = holder.key,
+                    holderDid = null,
+                    presentationRequestUrl = created.bootstrapAuthorizationRequestUrl!!,
+                    selectCredentialsForQuery = { query -> matchFor(query, holder) },
+                    holderPoliciesToRun = null,
+                    runPolicies = null,
+                    transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                    mdocHolderKeyResolver = { _, _ -> holder.key },
+                )
+            }
+
             suspend fun timeFor(holder: PortraitHolder, label: String): Double {
                 // One untimed round first, so class loading and JIT land on the warm-up rather than the result.
                 repeat(1 + rounds) { index ->
@@ -251,29 +267,32 @@ class PortraitSessionSizeTest {
              * verifier does 40 sessions/s - it does not. A local reference run measured 533 to 715 sessions/s at
              * concurrency 25 to 400, and those are the same system: one in flight is a latency measurement.
              */
-            suspend fun throughputFor(holder: PortraitHolder, concurrency: Int, total: Int): Double = coroutineScope {
+            suspend fun throughputFor(
+                holder: PortraitHolder,
+                concurrency: Int,
+                total: Int,
+                label: String,
+            ): Double = coroutineScope {
+                // Warm up before timing anything. 200 sessions at 150/s is 1.3 seconds, which measures class
+                // loading and JIT rather than the verifier - the same error as the 8-second remote arms that made
+                // a plateau look real this morning, at a smaller scale.
+                val warmup = java.util.concurrent.atomic.AtomicInteger(0)
+                List(concurrency) {
+                    launch {
+                        while (warmup.getAndIncrement() < concurrency * 4) presentOnce(holder)
+                    }
+                }.joinAll()
+
                 val started = kotlin.time.TimeSource.Monotonic.markNow()
                 val next = java.util.concurrent.atomic.AtomicInteger(0)
                 List(concurrency) {
                     launch {
-                        while (next.getAndIncrement() < total) {
-                            val created = http.post("/verification-session/create") {
-                                setBody(portraitSessionSetup(requestPortrait = holder.hasPortrait))
-                            }.body<VerificationSessionCreationResponse>()
-                            WalletPresentFunctionality2.walletPresentHandling(
-                                holderKey = holder.key,
-                                holderDid = null,
-                                presentationRequestUrl = created.bootstrapAuthorizationRequestUrl!!,
-                                selectCredentialsForQuery = { query -> matchFor(query, holder) },
-                                holderPoliciesToRun = null,
-                                runPolicies = null,
-                                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
-                                mdocHolderKeyResolver = { _, _ -> holder.key },
-                            )
-                        }
+                        while (next.getAndIncrement() < total) presentOnce(holder)
                     }
                 }.joinAll()
-                total / (started.elapsedNow().inWholeMilliseconds / 1000.0)
+                val seconds = started.elapsedNow().inWholeMilliseconds / 1000.0
+                println("THROUGHPUT_RUN $label sessions=$total seconds=${"%.1f".format(seconds)}")
+                total / seconds
             }
 
             test("Compare a minimal credential with a portrait one") {
@@ -285,9 +304,10 @@ class PortraitSessionSizeTest {
                 )
 
                 // Both credential shapes at the same concurrency, which is the comparison a deployment needs.
+                // Sized so each phase runs for tens of seconds rather than one, at the ratio their costs imply.
                 val concurrency = 32
-                val minimalRate = throughputFor(minimal, concurrency, total = 200)
-                val portraitRate = throughputFor(portrait, concurrency, total = 100)
+                val minimalRate = throughputFor(minimal, concurrency, total = 6_000, label = "minimal")
+                val portraitRate = throughputFor(portrait, concurrency, total = 600, label = "portrait")
                 println(
                     "THROUGHPUT concurrency=$concurrency " +
                             "minimalPerSecond=${"%.1f".format(minimalRate)} " +
