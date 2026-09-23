@@ -1,6 +1,11 @@
 name: WeBuild ITB live wallet cases
 
 on:
+  # WAL-1423 investigation: review these branch-specific runs before merging #2255.
+  push:
+    branches:
+      - feature/wal-1423-itb-initial-tests
+      - fix/wal-1423-itb-compat-diagnostics
   workflow_dispatch:
     inputs:
       cases:
