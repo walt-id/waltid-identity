@@ -13,7 +13,7 @@ REQUIRED_COUNTS = {
     "id.walt.itb.PresentationProfileTest": 5,
     "id.walt.itb.DigitalCredentialsProfileTest": 1,
     "id.walt.itb.ResponseEncryptionProfileTest": 2,
-    "id.walt.itb.PaymentProfileTest": 1,
+    "id.walt.itb.PaymentProfileTest": 2,
 }
 
 
