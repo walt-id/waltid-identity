@@ -2,6 +2,7 @@ package id.walt.itb
 
 import com.microsoft.playwright.Page
 import com.microsoft.playwright.Locator
+import com.microsoft.playwright.TimeoutError
 import com.microsoft.playwright.options.AriaRole
 import io.ktor.http.Url
 import java.util.regex.Pattern
@@ -9,6 +10,11 @@ import java.nio.file.Files
 
 /** The owned session started, but the portal displayed its generic execution error. */
 internal class ItbPortalExecutionError : IllegalStateException("The ITB portal could not start the wallet interaction")
+
+/** A bounded portal step timed out; the step name is safe to include in sanitized reports. */
+internal class ItbPortalStepTimeout(val step: Step) : IllegalStateException("The ITB portal timed out at $step") {
+    enum class Step { SESSION, START, INTERACTION, DIALOG, DOWNLOAD }
+}
 
 /** Interactive GITB 1.29.5 execution. Browser storage, traces and screenshots are never exported. */
 class ItbPortalBridge(
@@ -43,10 +49,18 @@ class ItbPortalBridge(
 
     private fun sessionId(): String = page.locator(".session-table-title-value .value").innerText().trim()
 
+    private inline fun <T> step(name: ItbPortalStepTimeout.Step, action: () -> T): T = try {
+        action()
+    } catch (_: TimeoutError) {
+        throw ItbPortalStepTimeout(name)
+    }
+
     override suspend fun read(session: ItbSession): ItbWalletInteraction {
-        check(sessionId() == session.session) { "The portal is not showing the owned ITB session" }
+        check(step(ItbPortalStepTimeout.Step.SESSION, ::sessionId) == session.session) {
+            "The portal is not showing the owned ITB session"
+        }
         // Interactive execution keeps DC API instructions pending; REST background starts skip those steps.
-        startButton().click()
+        step(ItbPortalStepTimeout.Step.START) { startButton().click() }
         val dialog = page.locator("ngb-modal-window:not([aria-hidden=true])")
         val interaction = dialog.getByText(Pattern.compile(
             "^\\s*(VCI request|VP request|(?:TS12 payment )?Digital Credentials API presentation request)\\s*$",
@@ -54,12 +68,14 @@ class ItbPortalBridge(
         val portalError = page.getByText("Unexpected Error", Page.GetByTextOptions().setExact(true))
         // Some reference-service starts take longer than the ordinary 15-second DOM timeout.
         // Wait for this owned session's interaction, without clicking Start or creating a session again.
-        page.waitForCondition(
-            { interaction.count() > 0 || portalError.count() > 0 },
-            Page.WaitForConditionOptions().setTimeout(45_000.0),
-        )
+        step(ItbPortalStepTimeout.Step.INTERACTION) {
+            page.waitForCondition(
+                { interaction.count() > 0 || portalError.count() > 0 },
+                Page.WaitForConditionOptions().setTimeout(45_000.0),
+            )
+        }
         if (portalError.count() > 0 && interaction.count() == 0) throw ItbPortalExecutionError()
-        val text = dialog.innerText()
+        val text = step(ItbPortalStepTimeout.Step.DIALOG) { dialog.innerText() }
         return when {
             text.contains("VCI request") -> {
                 val pin = Regex("\\bPIN\\s+([0-9]+)\\b").find(text)?.groupValues?.get(1)
@@ -83,7 +99,9 @@ class ItbPortalBridge(
             Locator.FilterOptions().setHas(page.getByText(label, Page.GetByTextOptions().setExact(true))),
         )
         // CodeMirror virtualizes long scripts, so rendered lines can omit payment inputs.
-        val download = page.waitForDownload { row.locator("button[ngbtooltip=Download]").click() }
+        val download = step(ItbPortalStepTimeout.Step.DOWNLOAD) {
+            page.waitForDownload { row.locator("button[ngbtooltip=Download]").click() }
+        }
         return try {
             val path = download.path()
             require(Files.size(path) <= 1024 * 1024) { "The ITB interaction exceeds the size limit" }
