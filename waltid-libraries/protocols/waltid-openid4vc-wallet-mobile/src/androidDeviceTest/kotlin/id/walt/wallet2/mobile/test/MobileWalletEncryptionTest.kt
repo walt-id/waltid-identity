@@ -1,5 +1,7 @@
 package id.walt.wallet2.mobile.test
 
+import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
+import id.walt.wallet2.mobile.identity.SigningIdentity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
@@ -10,6 +12,7 @@ import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletPersistence
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
@@ -152,7 +155,10 @@ class MobileWalletEncryptionTest {
 
         val firstKey = provider.getOrCreateKey(walletId, databaseName)
         val wallet = MobileWalletFactory(context).create(
-            MobileWalletConfig(walletId = walletId)
+            MobileWalletConfig(
+                walletId = walletId,
+                defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+            )
         )
         assertTrue(databaseFiles(databaseFileName).any { it.exists() }, "Encrypted wallet DB should exist before deletion")
 
@@ -185,11 +191,12 @@ class MobileWalletEncryptionTest {
             persistence = MobileWalletPersistence(
                 databaseKey = MobileWalletDatabaseKey.Provided(provider),
             ),
+            defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
         )
         val wallet = factory.create(config)
 
-        val bootstrap = wallet.bootstrap()
-        val reopenedBootstrap = factory.create(config).bootstrap()
+        val bootstrap = wallet.signingIdentity.initialize().activeIdentity()
+        val reopenedBootstrap = factory.create(config).signingIdentity.initialize().activeIdentity()
 
         assertEquals(bootstrap, reopenedBootstrap)
         assertEquals(listOf("$walletId:$databaseName", "$walletId:$databaseName"), provider.requestedKeys)
@@ -211,16 +218,17 @@ class MobileWalletEncryptionTest {
             persistence = MobileWalletPersistence(
                 credentialStore = credentialStore,
             ),
+            defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
         )
         val factory = MobileWalletFactory(context)
         deleteDatabaseFiles(databaseFileName)
 
         val wallet = factory.create(config)
 
-        val bootstrap = wallet.bootstrap()
+        val bootstrap = wallet.signingIdentity.initialize().activeIdentity()
         val credentials = wallet.credentials()
         val reopenedWallet = factory.create(config)
-        val reopenedBootstrap = reopenedWallet.bootstrap()
+        val reopenedBootstrap = reopenedWallet.signingIdentity.initialize().activeIdentity()
         val reopenedCredentials = reopenedWallet.credentials()
 
         assertTrue(bootstrap.did.startsWith("did:"), "Custom credential stores should keep Android platform signing keys")
@@ -228,8 +236,7 @@ class MobileWalletEncryptionTest {
         assertEquals(bootstrap.did, reopenedBootstrap.did, "Default DID store should survive wallet recreation")
         assertEquals(bootstrap.keyId, reopenedBootstrap.keyId, "Platform signing-key reference should survive wallet recreation")
         assertEquals(emptyList(), reopenedCredentials)
-        // Each bootstrap refreshes the platform credential registry, in addition to the two
-        // explicit credentials() reads above.
+        // Both initializations refresh credential registration, in addition to the two explicit reads.
         assertEquals(4, credentialStore.listCredentialsCalls)
 
         wallet.deleteWallet()
@@ -329,3 +336,6 @@ class MobileWalletEncryptionTest {
         override fun apply() = Unit
     }
 }
+
+private fun SigningIdentityOperationResult.activeIdentity(): SigningIdentity =
+    kotlin.test.assertIs<SigningIdentityOperationResult.Active>(this).identity

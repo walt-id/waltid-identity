@@ -26,10 +26,13 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
+import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
+import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
+import id.walt.verifier2.events.Verifier2WebhookRecorder
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import id.walt.verifier2.verifierModule
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
@@ -42,6 +45,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -92,12 +96,14 @@ class MsoMdocsVerifier2IntegrationTest {
         )
     )
 
-    private val verificationSessionSetup: VerificationSessionSetup = CrossDeviceFlowSetup(
-        core = GeneralFlowConfig(
-            dcqlQuery = mdocsDcqlQuery,
-            policies = mdocsPolicies
+    private fun verificationSessionSetup(notifications: KtorSessionNotifications): VerificationSessionSetup =
+        CrossDeviceFlowSetup(
+            core = GeneralFlowConfig(
+                dcqlQuery = mdocsDcqlQuery,
+                policies = mdocsPolicies,
+                notifications = notifications,
+            )
         )
-    )
 
     private val walletCredentials = listOf(
         MdocsCredential(
@@ -182,8 +188,6 @@ class MsoMdocsVerifier2IntegrationTest {
         )
     )
 
-    private val holderKeyFun = suspend { KeyManager.resolveSerializedKey(HOLDER_SERIALIZED_KEY) }
-
     private suspend fun selectCredentialsForQuery(
         query: DcqlQuery,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
@@ -209,16 +213,21 @@ class MsoMdocsVerifier2IntegrationTest {
     }
 
     @Test
-    fun test() {
-        val host = "127.0.0.1"
-        val port = 17011
+    fun test() = runVerifierWalletFlow(port = 17011, clientId = "verifier2")
 
+    @Test
+    fun `omitted clientId generates redirect_uri and wallet presents`() =
+        runVerifierWalletFlow(port = 17012, clientId = null)
+
+    private fun runVerifierWalletFlow(port: Int, clientId: String?) {
+        val host = "127.0.0.1"
+        Verifier2WebhookRecorder().start().use { webhook ->
         E2ETest(host, port, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(
-                        clientId = "verifier2",
+                        clientId = clientId,
                         clientMetadata = ClientMetadata(
                             clientName = "Verifier2",
                             logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
@@ -241,7 +250,7 @@ class MsoMdocsVerifier2IntegrationTest {
             // Create the verification session
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
-                    setBody(verificationSessionSetup)
+                    setBody(verificationSessionSetup(webhook.notifications()))
                 }.body<VerificationSessionCreationResponse>()
             }
             println("Verification Session Response: $verificationSessionResponse")
@@ -268,10 +277,19 @@ class MsoMdocsVerifier2IntegrationTest {
                 }
             }
 
+            if (clientId == null) {
+                val responseUri = "http://$host:$port/verification-session/$sessionId/response"
+                test("Omitted clientId is generated as redirect_uri bound to response_uri") {
+                    assertEquals(responseUri, info1.authorizationRequest.responseUri)
+                    assertEquals("redirect_uri:$responseUri", info1.authorizationRequest.clientId)
+                    assertEquals("redirect_uri:$responseUri", info1.bootstrapAuthorizationRequest?.clientId)
+                }
+            }
+
             // Present with wallet
             val bootstrapUrl = verificationSessionResponse.bootstrapAuthorizationRequestUrl
 
-            val holderKey = holderKeyFun()
+            val holderKey = restoreMdlHolderCrypto2Key("cross-device-mdoc-holder")
 
             val selectCallback: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>> = { query ->
                 selectCredentialsForQuery(
@@ -288,6 +306,7 @@ class MsoMdocsVerifier2IntegrationTest {
                     holderPoliciesToRun = null,
                     runPolicies = null,
                     transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+                    mdocHolderKeyResolver = { _, _ -> holderKey },
                 )
             }
 
@@ -321,6 +340,17 @@ class MsoMdocsVerifier2IntegrationTest {
                 assertTrue { info2.policyResults!!.overallSuccess }
                 assertTrue { info2.policyResults!!.vcPolicies.size == 2 }
             }
+
+            test("Emit successful verification callback events") {
+                webhook.assertReceivedInOrder(
+                    sessionId,
+                    Verifier2WebhookRecorder.successfulPresentationEvents,
+                )
+                webhook.assertDoesNotContain(sessionId, SessionEvent.presentation_validation_failed)
+                webhook.assertDoesNotContain(sessionId, SessionEvent.dcql_fulfillment_check_failed)
+                webhook.assertDoesNotContain(sessionId, SessionEvent.wallet_error_response_received)
+            }
+        }
         }
     }
 

@@ -1,5 +1,6 @@
 package id.walt.credentials.formats
 
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.credentials.CredentialDetectorTypes
 import id.walt.credentials.presentations.formats.DcSdJwtPresentation
 import id.walt.credentials.signatures.JwtCredentialSignature
@@ -20,9 +21,6 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
 import id.walt.did.utils.JsonCanonicalization
 import id.walt.w3c.vc.vcs.W3CVC
-import id.walt.x509.GenericX509CertificateBuilder
-import id.walt.x509.GenericX509CertificateProfileData
-import id.walt.x509.X509DistinguishedName
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
@@ -50,17 +48,13 @@ class Crypto2DigitalCredentialTest {
                 usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
             )
         )
-        val certificate = GenericX509CertificateBuilder().buildDer(
-            profileData = GenericX509CertificateProfileData(
-                subjectName = X509DistinguishedName(commonName = "Credential issuer"),
-            ),
-            subjectPublicKey = key,
-            signingKey = key,
-            signatureAlgorithm = SignatureAlgorithm.Ecdsa(
-                DigestAlgorithm.SHA_256,
-                EcdsaSignatureEncoding.DER,
-            ),
+        val sigAlg =SignatureAlgorithm.Ecdsa(
+            DigestAlgorithm.SHA_256,
+            EcdsaSignatureEncoding.DER,
         )
+        val certificate = X509CertificateUtil.createSelfSignedCertificate(key, sigAlg) {
+            subjectDn = "CN=Credential issuer"
+        }
         val credential = W3CVC.build(
             context = listOf("https://www.w3.org/2018/credentials/v1"),
             type = listOf("VerifiableCredential", "ExampleCredential"),
@@ -73,7 +67,7 @@ class Crypto2DigitalCredentialTest {
             subjectDid = "did:example:holder",
             additionalJwtHeader = mapOf(
                 "x5c" to JsonArray(
-                    listOf(JsonPrimitive(Base64.encode(certificate.bytes.toByteArray())))
+                    listOf(JsonPrimitive(Base64.encode(certificate.encodedDer.toByteArray())))
                 )
             ),
         )

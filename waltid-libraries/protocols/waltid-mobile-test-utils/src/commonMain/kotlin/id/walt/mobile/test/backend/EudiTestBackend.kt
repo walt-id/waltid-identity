@@ -167,14 +167,8 @@ object EudiTestBackend {
     }
 
     suspend fun createVerifierTransaction(credentialId: String = "eu.europa.ec.eudi.pid_vc_sd_jwt"): VerifierTransaction {
-        val dcqlQuery = buildDcqlQuery(credentialId)
-        val payload = buildJsonObject {
-            put("dcql_query", dcqlQuery)
-            put("nonce", JsonPrimitive(Uuid.random().toString()))
-            put("request_uri_method", JsonPrimitive("post"))
-            put("profile", JsonPrimitive("openid4vp"))
-            put("authorization_request_uri", JsonPrimitive("openid4vp://"))
-        }
+        val intendedUseId = resolveVerifierIntendedUseId()
+        val payload = buildVerifierTransactionPayload(credentialId, intendedUseId)
 
         val response = requestText(
             url = "$VERIFIER_BACKEND/ui/presentations/v2",
@@ -190,6 +184,38 @@ object EudiTestBackend {
 
         return VerifierTransaction(transactionId, authRequestUri)
     }
+
+    private suspend fun resolveVerifierIntendedUseId(): String {
+        val response = requestText("$VERIFIER_BACKEND/ui/intended-uses")
+        val responseJson = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        return intendedUseIdFromResponse(responseJson)
+    }
+
+    internal fun intendedUseIdFromResponse(response: JsonObject): String {
+        val intendedUses = response["intended_uses"] as? JsonArray
+            ?: error("EUDI verifier response did not contain an intended_uses array")
+
+        return intendedUses.asSequence()
+            .mapNotNull { intendedUse ->
+                (intendedUse as? JsonObject)
+                    ?.get("intended_use_id")
+                    ?.let { it as? JsonPrimitive }
+                    ?.contentOrNull
+                    ?.takeIf { it.isNotBlank() }
+            }
+            .firstOrNull()
+            ?: error("EUDI verifier exposes no configured intended use")
+    }
+
+    internal fun buildVerifierTransactionPayload(credentialId: String, intendedUseId: String): JsonObject =
+        buildJsonObject {
+            put("dcql_query", buildDcqlQuery(credentialId))
+            put("nonce", JsonPrimitive(Uuid.random().toString()))
+            put("request_uri_method", JsonPrimitive("post"))
+            put("profile", JsonPrimitive("openid4vp"))
+            put("authorization_request_uri", JsonPrimitive("openid4vp://"))
+            put("intended_use_id", JsonPrimitive(intendedUseId))
+        }
 
     suspend fun waitForVerifierSuccess(transactionId: String, timeoutMs: Long = 90_000) {
         val mark = TimeSource.Monotonic.markNow()

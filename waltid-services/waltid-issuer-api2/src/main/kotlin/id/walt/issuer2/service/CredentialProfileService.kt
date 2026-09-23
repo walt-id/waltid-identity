@@ -63,6 +63,7 @@ class CredentialProfileService(
             selectiveDisclosure = selectiveDisclosure,
             idTokenClaimsMapping = idTokenClaimsMapping,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+            authorizedTransactionDataTypes = authorizedTransactionDataTypes,
             x5Chain = x5Chain,
             notifications = notifications,
             credentialStatus = credentialStatus,

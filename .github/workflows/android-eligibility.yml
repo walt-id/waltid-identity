@@ -53,6 +53,7 @@ jobs:
       pr-head-repo: ${{ inputs.pr-head-repo }}
       pr-labels: ${{ inputs.pr-labels }}
       pr-draft: ${{ inputs.pr-draft }}
+      additional-labels: '["ci:mobile"]'
       platform-name: Android
       platform-label: ci:android
       path-patterns: |
@@ -65,6 +66,9 @@ jobs:
           ".github/actions/gradle-setup-action/*",
           ".github/actions/set-properties/*",
           ".github/scripts/mobile-ci/*android*",
+          "scripts/qualify-wallet-recovery.py",
+          "scripts/tests/test_qualify_wallet_recovery.py",
+          "*/src/recoveryTest/*",
           "build-logic/*",
           "build.gradle.kts",
           "gradle/*",

@@ -103,7 +103,6 @@ class Wallet2IssuerVerifier2IntegrationTest {
     // Each test gets its own pair of ports to avoid Address-already-in-use when
     // the previous test's embedded server hasn't fully stopped yet.
     companion object {
-        private val nextPortBase = java.util.concurrent.atomic.AtomicInteger(17060)
     }
 
     // Issuer signing key (ES256) — generated once at class load time
@@ -236,8 +235,8 @@ class Wallet2IssuerVerifier2IntegrationTest {
         dcqlQuery: DcqlQuery
     ) {
         // Allocate a fresh port pair for this test run to avoid BindException
-        val issuerPort = nextPortBase.getAndAdd(2)
-        val walletPort = issuerPort + 1
+        val issuerPort = freePort()
+        val walletPort = freePort()
         val issuerBase = "http://127.0.0.1:$issuerPort"
         val walletBase = "http://127.0.0.1:$walletPort"
 
@@ -438,7 +437,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
                         issuerId = issuerBase,
                         credentialData = credentialData,
                         selectiveDisclosure = selectiveDisclosure,
-                        proofValidationContext = proofSupport.validationContext(request)
+                        proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization])
                     )
                     if (credentialResponse !is CredentialResponseResult.Success) {
                         val failure = credentialResponse as CredentialResponseResult.Failure

@@ -1,13 +1,15 @@
 @file:OptIn(ExperimentalSerializationApi::class)
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.profile.IsoDocumentSignerX509CertificateProfile.profileDocumentSignerCertificate
+import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profileIaCaRootCertificate
 import id.walt.cose.*
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.presentations.formats.MsoMdocPresentation
-import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.mdoc.credsdata.DrivingPrivilege
 import id.walt.mdoc.credsdata.Mdl
 import id.walt.mdoc.credsdata.isoshared.IsoSexEnum
@@ -41,43 +43,39 @@ class MdocIssuanceTest {
 
     companion object {
 
-        val issuerKeyInit = suspend {
-            KeyManager.resolveSerializedKey(
-                """
-           {
-            "type": "jwk",
-            "jwk": {
-              "kty": "EC",
-              "d": "-wSIL_tMH7-mO2NAfHn03I8ZWUHNXVzckTTb96Wsc1s",
-              "crv": "P-256",
-              "kid": "sW5yv0UmZ3S0dQuUrwlR9I3foREBHHFwXhGJGqGEVf0",
-              "x": "Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U",
-              "y": "6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"
-            }
-          }""".trimIndent()
-            ) as JWKKey
-        }
+        internal data class TestKeyMaterial(
+            val issuerKey: JWKKey,
+            val holderKey: CoseKey,
+            val issuerCertificateChain: List<CoseCertificate>,
+        )
 
-        val holderKeyInit = suspend {
-            KeyManager.resolveSerializedKey(
-                """
-           {
-            "type": "jwk",
-            "jwk": {
-              "kty": "EC",
-              "d": "2STd0J5vD68K5FdxvK4SvgkumTr7shP0abiAmbRdgNk",
-              "crv": "P-256",
-              "kid": "holder",
-              "x": "lcaMxDbsqZsDc-REGbONOCz7ghxVuk38wZ__8BNuF4c",
-              "y": "rWK-j7daO07d1AwyhD2It6a1evaTwmoSs1p70PGu99M"
+        internal suspend fun createTestKeyMaterial(): TestKeyMaterial {
+            val iacaKey = JWKKey.generate(KeyType.secp256r1)
+            val issuerKey = JWKKey.generate(KeyType.secp256r1)
+            val holderKey = JWKKey.generate(KeyType.secp256r1).getPublicKey().getCosePublicKey()
+            val iacaCertificate = X509CertificateUtil.createSelfSignedCertificate(iacaKey) {
+                profileIaCaRootCertificate(
+                    issuerDnCountryCode = "AT",
+                    issuerDnCommonName = "walt.id Test IACA",
+                    issuerUri = "https://iaca.example",
+                )
             }
-          }""".trimIndent()
-            ) as JWKKey
-        }
+            val issuerCertificate = X509CertificateUtil.createCertificate(iacaKey, iacaCertificate) {
+                profileDocumentSignerCertificate(
+                    crlDistributionPointUri = "https://issuer.example/crl",
+                    issuerUri = "https://issuer.example",
+                    subjectKey = issuerKey,
+                    subjectDnCountryCode = "AT",
+                    subjectDnCommonName = "walt.id Test Document Signer",
+                )
+            }
 
-        val issuerCert =
-            listOf("MIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61/473UAVi2/UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR/SQ0jt/jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH/BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66M")
-        val issuerCertCose = issuerCert.map { CoseCertificate(it.decodeFromBase64()) }
+            return TestKeyMaterial(
+                issuerKey = issuerKey,
+                holderKey = holderKey,
+                issuerCertificateChain = listOf(CoseCertificate(issuerCertificate.encodedDer.toByteArray())),
+            )
+        }
 
 
         /** Verification process: Simulate what a verifier would do */
@@ -184,8 +182,7 @@ class MdocIssuanceTest {
 
     @Test
     fun testUniversalIssuance() = runTest {
-        val issuerKey = issuerKeyInit()
-        val holderKey = holderKeyInit().getPublicKey().getCosePublicKey()
+        val (issuerKey, holderKey, issuerCertificateChain) = createTestKeyMaterial()
         val issuerPublicKey = issuerKey.getPublicKey()
         val issuerPublicCoseVerifier = issuerPublicKey.toCoseVerifier()
 
@@ -238,7 +235,7 @@ class MdocIssuanceTest {
 
         val issuerSigned = MdocIssuer.issueUniversal(
             issuerKey = issuerKey,
-            issuerCertificate = issuerCertCose,
+            issuerCertificate = issuerCertificateChain,
             holderKey = holderKey,
             docType = docType,
             data = data,
@@ -258,7 +255,7 @@ class MdocIssuanceTest {
 
         val qualifiedIssuerSigned = MdocIssuer.issueUniversal(
             issuerKey = issuerKey,
-            issuerCertificate = issuerCertCose,
+            issuerCertificate = issuerCertificateChain,
             holderKey = holderKey,
             docType = docType,
             data = data,
@@ -266,13 +263,13 @@ class MdocIssuanceTest {
             protectedHeaderX5u = "https://issuer.example/document-signer.cer",
             protectedHeaderX5t = CoseCertHash(
                 CoseCertHash.SHA_256,
-                issuerCertCose.first().rawBytes.sha256(),
+                issuerCertificateChain.first().rawBytes.sha256(),
             ),
         )
         val qualifiedProtectedHeaders = coseCompliantCbor.decodeFromByteArray<CoseHeaders>(
             qualifiedIssuerSigned.issuerAuth.protected
         )
-        check(qualifiedProtectedHeaders.x5chain == issuerCertCose)
+        check(qualifiedProtectedHeaders.x5chain == issuerCertificateChain)
         check(qualifiedIssuerSigned.issuerAuth.unprotected.x5chain == null)
         verifyIssued(
             document = makeDocument(docType, qualifiedIssuerSigned),
@@ -287,8 +284,7 @@ class MdocIssuanceTest {
 
     @Test
     fun testTypesafeIssuance() = runTest {
-        val issuerKey = issuerKeyInit()
-        val holderKey = holderKeyInit().getPublicKey().getCosePublicKey()
+        val (issuerKey, holderKey, issuerCertificateChain) = createTestKeyMaterial()
         val issuerPublicKey = issuerKey.getPublicKey()
         val issuerPublicCoseVerifier = issuerPublicKey.toCoseVerifier()
 
@@ -314,7 +310,7 @@ class MdocIssuanceTest {
 
         val issuerSigned = MdocIssuer.issueTypesafe(
             issuerKey = issuerKey,
-            issuerCertificate = issuerCertCose,
+            issuerCertificate = issuerCertificateChain,
             holderKey = holderKey,
             typesafeData = data
         )
@@ -333,4 +329,3 @@ class MdocIssuanceTest {
         )
     }
 }
-

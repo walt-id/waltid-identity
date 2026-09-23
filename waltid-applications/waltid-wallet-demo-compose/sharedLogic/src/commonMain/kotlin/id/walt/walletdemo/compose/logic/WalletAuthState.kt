@@ -6,12 +6,14 @@ sealed interface WalletAuthState {
     data class Setup(
         val pin: String = "",
         val confirmation: String = "",
+        val useBiometrics: Boolean = false,
         val error: String? = null,
     ) : PinEntry
 
     data class Login(
         val pin: String = "",
         val error: String? = null,
+        val biometricPromptConsumed: Boolean = false,
     ) : PinEntry
 
     data class StorageUnavailable(

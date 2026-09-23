@@ -3,13 +3,13 @@ package id.walt.walletdemo.compose.android
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.credentials.provider.ProviderGetCredentialRequest
+import androidx.fragment.app.FragmentActivity
 import id.walt.wallet2.mobile.AndroidDigitalCredentialProvider
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
@@ -22,8 +22,10 @@ import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
+import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
+import id.walt.walletdemo.compose.logic.defaultCredentialSelection
 import id.walt.walletdemo.compose.logic.toSharingReview
-import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewScreen
+import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewSheet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,7 +38,7 @@ import kotlinx.coroutines.launch
  * Separate from [MainActivity]: Credential Manager owns this task's lifecycle and expects exactly one
  * result from it, which the wallet's own navigation must not be able to influence.
  */
-class DigitalCredentialProviderActivity : ComponentActivity() {
+class DigitalCredentialProviderActivity : FragmentActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val resultIntent = Intent()
 
@@ -51,25 +53,32 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
                 // The same construction MainActivity uses: Credential Manager launches this activity
                 // without the wallet UI having run, and a wallet configured independently here would
                 // open a different database.
-                val wallet = createAndroidDemoMobileWallet(
+                val config = demoWalletConfig()
+                val created = createAndroidDemoMobileWallet(
                     context = applicationContext,
-                    config = demoWalletConfig(),
-                ).wallet
-                wallet.bootstrap()
+                    config = config,
+                    interactionContextProvider = { this@DigitalCredentialProviderActivity },
+                )
+                val wallet = created.wallet
+                created.bootstrap(config.selectedSigningProtection(applicationContext))
+                val showPreview = createAndroidDemoSharingSettingsStore(applicationContext)
+                    .showDcApiPresentationPreview()
                 if (input.request.protocol == MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C) {
                     val annexCRequest = wallet.annexCRequest(input.request)
                     val preview = wallet.previewAnnexCPresentation(annexCRequest)
-                    showReview(
+                    presentOrSubmit(
                         review = preview.toSharingReview(),
                         title = "Share mobile document?",
+                        showPreview = showPreview,
                     ) { selection ->
                         submitAnnexC(wallet, preview, annexCRequest, selection, input.providerRequest)
                     }
                 } else {
                     val preview = wallet.previewDigitalCredentialPresentation(input.request)
-                    showReview(
+                    presentOrSubmit(
                         review = preview.toSharingReview(),
                         title = "Share digital credential?",
+                        showPreview = showPreview,
                     ) { selection ->
                         submitDigitalCredential(wallet, preview, selection, input.providerRequest)
                     }
@@ -78,6 +87,26 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
                 reportFailure(it)
             }
         }
+    }
+
+    /**
+     * Shows the shared review, or submits the default selection when the Settings toggle is off.
+     *
+     * Cancel and back resolve to different Credential Manager outcomes: Cancel ends the caller's whole
+     * operation, while backing out of this provider's review returns [RESULT_CANCELED] so Credential
+     * Manager can put its selector back up and another provider can still answer.
+     */
+    private fun presentOrSubmit(
+        review: WalletDemoSharingReview,
+        title: String,
+        showPreview: Boolean,
+        onSubmit: (WalletDemoSharingSelection) -> Unit,
+    ) {
+        if (showPreview) {
+            showReview(review, title, onSubmit)
+            return
+        }
+        onSubmit(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
     }
 
     /**
@@ -94,7 +123,7 @@ class DigitalCredentialProviderActivity : ComponentActivity() {
     ) {
         setContent {
             var submitting by remember { mutableStateOf(false) }
-            WalletDemoSharingReviewScreen(
+            WalletDemoSharingReviewSheet(
                 review = review,
                 title = title,
                 enabled = !submitting,

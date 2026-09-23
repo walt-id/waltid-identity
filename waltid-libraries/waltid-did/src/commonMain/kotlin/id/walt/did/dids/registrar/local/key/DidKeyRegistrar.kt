@@ -2,6 +2,7 @@ package id.walt.did.dids.registrar.local.key
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.PublicKeyIds.publicJwkForPublish
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonCanonicalizationUtils
 import id.walt.crypto.utils.MultiBaseUtils.convertRawKeyToMultiBase58Btc
@@ -40,7 +41,7 @@ class DidKeyRegistrar : LocalRegistrarMethod("key") {
         val pubKey = key.getPublicKey()
         val identifierComponents = getIdentifierComponents(pubKey, it)
         val identifier = convertRawKeyToMultiBase58Btc(identifierComponents.pubKeyBytes, identifierComponents.multiCodecKeyCode)
-        createDid(identifier, pubKey.exportJWKObject())
+        createDid(identifier, pubKey.publicJwkForPublish())
     }
 
     private suspend fun getIdentifierComponents(key: Key, options: DidCreateOptions): IdentifierComponents =

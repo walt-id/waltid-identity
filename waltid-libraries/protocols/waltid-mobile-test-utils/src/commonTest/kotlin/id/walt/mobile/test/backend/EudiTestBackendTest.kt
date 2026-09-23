@@ -2,16 +2,64 @@ package id.walt.mobile.test.backend
 
 import io.ktor.http.encodeURLParameter
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 
 class EudiTestBackendTest {
+    @Test
+    fun selectsFirstNonBlankConfiguredIntendedUse() {
+        val response = buildJsonObject {
+            putJsonArray("intended_uses") {
+                addJsonObject {
+                    put("intended_use_id", JsonPrimitive("  "))
+                }
+                addJsonObject {
+                    put("intended_use_id", JsonPrimitive("configured-use"))
+                }
+                addJsonObject {
+                    put("intended_use_id", JsonPrimitive("later-use"))
+                }
+            }
+        }
+
+        assertEquals("configured-use", EudiTestBackend.intendedUseIdFromResponse(response))
+    }
+
+    @Test
+    fun rejectsVerifierResponseWithoutConfiguredIntendedUse() {
+        val response = buildJsonObject {
+            putJsonArray("intended_uses") {
+                addJsonObject {
+                    put("description", JsonPrimitive("missing id"))
+                }
+            }
+        }
+
+        assertFailsWith<IllegalStateException> {
+            EudiTestBackend.intendedUseIdFromResponse(response)
+        }
+    }
+
+    @Test
+    fun addsIntendedUseIdWithoutSendingRegistrationCertificate() {
+        val payload = EudiTestBackend.buildVerifierTransactionPayload(
+            credentialId = "eu.europa.ec.eudi.ehic_sd_jwt_vc",
+            intendedUseId = "configured-use",
+        )
+
+        assertEquals("configured-use", payload["intended_use_id"]?.jsonPrimitive?.content)
+        assertFalse(payload.containsKey("registration_certificate"))
+    }
+
     @Test
     fun buildsEhicSdJwtVerifierQuery() {
         val query = EudiTestBackend.buildDcqlQuery("eu.europa.ec.eudi.ehic_sd_jwt_vc").jsonObject

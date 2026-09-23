@@ -20,6 +20,10 @@ configFiles: {}
 # configure via env vars instead of mounted config files (e.g. the portals).
 env: {}
 
+# Names of pre-existing Kubernetes secrets whose keys are injected as env vars.
+# Mounted as optional, so a namespace without the secret still rolls out.
+envFromSecrets: []
+
 # Optional persistent data volume (used by wallet-api).
 persistence:
   enabled: false
@@ -29,5 +33,10 @@ persistence:
   storageRequest: 1Gi
 
 ingress:
+  enabled: true
   ingressClassName: traefik
   host: issuer.portal.waltid.cloud
+  # Extra path -> sibling-release routes on this host, matched before the release's own '/'.
+  # Each entry: { path, pathType (default Prefix), service (sibling alias) | serviceName,
+  # portName (default http) }.
+  extraPaths: []

@@ -5,6 +5,8 @@ data class CredentialDetails(
     val groups: List<ClaimGroup>,
     /** Issuer display from stored sidecar metadata (`issuerDisplay`), when available. */
     val issuerDisplay: WalletDemoMetadataDisplay? = null,
+    /** Credential configuration display from stored sidecar metadata (`credentialDisplay`), when available. */
+    val credentialDisplay: WalletDemoMetadataDisplay? = null,
 )
 
 data class ClaimGroup(
@@ -94,6 +96,11 @@ sealed interface DisplayValue {
     data class BooleanValue(val value: Boolean) : DisplayValue
     data class ObjectValue(val entries: List<ClaimItem>) : DisplayValue
     data class ListValue(val values: List<DisplayValue>) : DisplayValue
+    /** Encoded media stays unresolved until a visible claim requests it. */
+    class DeferredImage internal constructor(val byteCount: Int? = null, private val decode: () -> DisplayValue) : DisplayValue {
+        fun resolve(): DisplayValue = decode()
+    }
+
     data class Image(
         val encoded: String,
         val bytes: ByteArray,

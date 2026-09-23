@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Registers a proprietary AID under the payment category so Android lists this app as a Wallet
+  role candidate (Default wallet app). AID is walt.id-specific and must not collide with EMV RIDs.
+-->
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/wallet_hce_service_description"
+    android:requireDeviceUnlock="false"
+    android:apduServiceBanner="@drawable/apdu_service_banner">
+    <aid-group
+        android:description="@string/wallet_hce_aid_group_description"
+        android:category="payment">
+        <aid-filter android:name="F057414C54494401" />
+    </aid-group>
+</host-apdu-service>

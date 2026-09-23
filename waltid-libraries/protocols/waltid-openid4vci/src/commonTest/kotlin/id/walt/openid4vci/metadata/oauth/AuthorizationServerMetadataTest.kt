@@ -3,6 +3,7 @@ package id.walt.openid4vci.metadata.oauth
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.ResponseType
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,6 +27,19 @@ class AuthorizationServerMetadataTest {
                 authorizationEndpoint = "https://issuer.example/authorize",
                 tokenEndpoint = "https://issuer.example/token",
                 responseTypesSupported = setOf(ResponseType.CODE.value),
+            )
+        }
+    }
+
+    @Test
+    fun `challenge endpoint must be a host-bearing URL without a fragment`() {
+        assertFailsWith<IllegalArgumentException> {
+            AuthorizationServerMetadata(
+                issuer = "https://issuer.example",
+                authorizationEndpoint = "https://issuer.example/authorize",
+                tokenEndpoint = "https://issuer.example/token",
+                responseTypesSupported = setOf(ResponseType.CODE.value),
+                challengeEndpoint = "https://issuer.example/challenge#fragment",
             )
         }
     }
@@ -119,6 +133,7 @@ class AuthorizationServerMetadataTest {
             dpopSigningAlgValuesSupported = setOf("ES384"),
             codeChallengeMethodsSupported = listOf("S256"),
             pushedAuthorizationRequestEndpointPath = "/oauth2/par",
+            challengeEndpointPath = "/oauth2/challenge",
             requirePushedAuthorizationRequests = true,
             statusListAggregationEndpointPath = "/oauth2/status-list-aggregation",
             authorizationResponseIssParameterSupported = true,
@@ -138,6 +153,7 @@ class AuthorizationServerMetadataTest {
         assertEquals(setOf("ES384"), metadata.dpopSigningAlgValuesSupported)
         assertEquals(listOf("S256"), metadata.codeChallengeMethodsSupported)
         assertEquals("https://issuer.example/oauth2/par", metadata.pushedAuthorizationRequestEndpoint)
+        assertEquals("https://issuer.example/oauth2/challenge", metadata.challengeEndpoint)
         assertEquals(
             "https://issuer.example/oauth2/status-list-aggregation",
             metadata.statusListAggregationEndpoint
@@ -179,6 +195,34 @@ class AuthorizationServerMetadataTest {
                 responseTypesSupported = setOf(ResponseType.CODE.value),
                 tokenEndpointAuthMethodsSupported = setOf("private_key_jwt"),
                 tokenEndpointAuthSigningAlgValuesSupported = setOf("none"),
+            )
+        }
+    }
+
+    @Test
+    fun `attest jwt client auth requires attestation signing algs`() {
+        assertFailsWith<IllegalArgumentException> {
+            AuthorizationServerMetadata(
+                issuer = "https://issuer.example",
+                authorizationEndpoint = "https://issuer.example/authorize",
+                tokenEndpoint = "https://issuer.example/token",
+                responseTypesSupported = setOf(ResponseType.CODE.value),
+                tokenEndpointAuthMethodsSupported = setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH),
+                clientAttestationPopSigningAlgValuesSupported = setOf("ES256"),
+            )
+        }
+    }
+
+    @Test
+    fun `attest jwt client auth requires attestation pop signing algs`() {
+        assertFailsWith<IllegalArgumentException> {
+            AuthorizationServerMetadata(
+                issuer = "https://issuer.example",
+                authorizationEndpoint = "https://issuer.example/authorize",
+                tokenEndpoint = "https://issuer.example/token",
+                responseTypesSupported = setOf(ResponseType.CODE.value),
+                tokenEndpointAuthMethodsSupported = setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH),
+                clientAttestationSigningAlgValuesSupported = setOf("ES256"),
             )
         }
     }

@@ -137,7 +137,7 @@ object Issuer2RequestExamples {
                     put("family_name", "Doe")
                     put("birth_date", "2003-12-21")
                     put("issue_date", "2025-12-13")
-                    put("issuing_authority_unicode", "Walt.id Issuer")
+                    put("issuing_authority_unicode", "walt.id Issuer")
                     put("expiry_date", "2026-12-13")
                 }
                 putJsonObject("org.iso.23220.photoid.1") {
@@ -147,6 +147,16 @@ object Issuer2RequestExamples {
             },
         ),
     )
+
+    val PROFILE_PRE_AUTHORIZED_OFFER_WITH_AUTHORIZED_TRANSACTION_DATA_TYPES_OVERRIDE =
+        CredentialOfferCreateRequest(
+            profileId = EU_AGE_VERIFICATION_PROFILE_ID,
+            authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            valueMode = CredentialOfferValueMode.BY_REFERENCE,
+            runtimeOverrides = CredentialOfferRuntimeOverrides(
+                authorizedTransactionDataTypes = listOf(SCA_PAYMENT_TRANSACTION_DATA_TYPE),
+            ),
+        )
 
     val AUTHORIZED_MDOC_MDL_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE = CredentialOfferCreateRequest(
         profileId = MDOC_MDL_PROFILE_ID,
@@ -249,6 +259,8 @@ object Issuer2RequestExamples {
     private const val W3C_PROFILE_ID = "openBadgeCredential"
     private const val MDOC_PHOTO_ID_PROFILE_ID = "isoPhotoId"
     private const val MDOC_MDL_PROFILE_ID = "isoMdl"
+    private const val EU_AGE_VERIFICATION_PROFILE_ID = "euAgeVerificationMdoc"
+    private const val SCA_PAYMENT_TRANSACTION_DATA_TYPE = "urn:eudi:sca:payment:1"
     private const val W3C_CREDENTIAL_CONFIGURATION_ID = "OpenBadgeCredential_jwt_vc_json"
     private const val EXAMPLE_CREDENTIAL_ISSUER = "http://localhost:7002/openid4vci"
     private const val EXAMPLE_OFFER_ID = "018f8d6e-8df4-7b73-9f3d-f3df21a4374a"

@@ -79,6 +79,7 @@ class ProviderRefreshTokenFlowTest {
         val reuse = refresh(provider, initial.refreshToken)
         assertTrue(reuse is AccessTokenResponseResult.Failure)
         assertEquals("invalid_grant", reuse.error.error)
+        assertEquals("demo-subject", assertNotNull(reuse.request.session).subject)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -91,6 +92,7 @@ class ProviderRefreshTokenFlowTest {
 
         assertTrue(result is AccessTokenResponseResult.Failure)
         assertEquals("invalid_grant", result.error.error)
+        assertNull(result.request.session)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -206,6 +208,7 @@ class ProviderRefreshTokenFlowTest {
 
         assertTrue(result is AccessTokenResponseResult.Failure)
         assertEquals("invalid_grant", result.error.error)
+        assertNull(result.request.session)
     }
 
     private fun buildTestProvider(

@@ -125,6 +125,8 @@ cd ~/dev/walt-id/waltid-unified-build
 | `WALLET_API_URL` | Wallet API base URL | `http://127.0.0.1:7005` |
 | `CONFORMANCE_HOST` | Conformance suite host | `localhost.emobix.co.uk` |
 | `CONFORMANCE_PORT` | Conformance suite port | `8443` |
+| `CONFORMANCE_ADAPTER_HOST` | Host the suite uses to reach the adapter | `host.docker.internal` or `127.0.0.1` |
+| `CONFORMANCE_VCI_WALLET_ADAPTER_BASE_URL` | Public HTTPS base for the adapter when the suite cannot reach `host:port` | unset (uses `http://$CONFORMANCE_ADAPTER_HOST:7007/credential-offer`) |
 
 ---
 

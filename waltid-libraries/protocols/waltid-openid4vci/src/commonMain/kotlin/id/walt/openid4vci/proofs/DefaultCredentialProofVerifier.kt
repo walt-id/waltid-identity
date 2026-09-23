@@ -286,8 +286,11 @@ class DefaultCredentialProofVerifier(
             }
             return
         }
-        issuer?.let {
-            requireCredentialProof(context.clientId != null && it == context.clientId) {
+        // OpenID4VCI 1.0 Appendix F.1: the proof `iss` claim is OPTIONAL, but when present its
+        // value MUST be the access token `client_id`. A client-bound proof may still omit `iss`,
+        // so its absence is accepted here.
+        if (issuer != null) {
+            requireCredentialProof(context.clientId != null && issuer == context.clientId) {
                 "Credential proof issuer claim must match the access token client_id"
             }
         }

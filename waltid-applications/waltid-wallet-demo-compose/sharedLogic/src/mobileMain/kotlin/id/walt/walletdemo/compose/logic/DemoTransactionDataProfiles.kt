@@ -7,6 +7,7 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -15,18 +16,21 @@ internal data class DemoTransactionDataProfilesResult(
     val warning: String? = null,
 )
 
-internal suspend fun DemoWalletConfig.resolveDemoTransactionDataProfiles(): DemoTransactionDataProfilesResult {
+internal suspend fun DemoWalletConfig.resolveDemoTransactionDataProfiles(
+    loadProfiles: suspend (String) -> List<MobileWalletTransactionDataProfile> = ::fetchTransactionDataProfiles,
+): DemoTransactionDataProfilesResult {
     val url = transactionDataProfilesUrl.trim()
     if (url.isEmpty()) {
         return transactionDataProfilesUnavailable("transactionDataProfiles.url is not configured")
     }
 
-    return runCatching {
-        fetchTransactionDataProfiles(url)
-    }.fold(
-        onSuccess = { profiles -> DemoTransactionDataProfilesResult(profiles = profiles) },
-        onFailure = { error -> transactionDataProfilesUnavailable(error.message ?: error::class.simpleName.orEmpty()) },
-    )
+    return try {
+        DemoTransactionDataProfilesResult(profiles = loadProfiles(url))
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (error: Throwable) {
+        transactionDataProfilesUnavailable(error.message ?: error::class.simpleName.orEmpty())
+    }
 }
 
 private suspend fun fetchTransactionDataProfiles(url: String) =

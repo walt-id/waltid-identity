@@ -1,5 +1,8 @@
 package id.walt.credentials.trustedauthorities
 
+import id.walt.certificate.x509.X509Certificate
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.representations.X5CCertificateString
 import id.walt.credentials.signatures.CoseCredentialSignature
@@ -11,9 +14,8 @@ import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.TrustedAuthoritiesQuery
 import id.walt.dcql.models.TrustedAuthorityType
-import id.walt.x509.CertificateDer
-import id.walt.x509.authorityKeyIdentifier
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -76,13 +78,13 @@ object DcqlTrustedAuthoritiesChecker {
         }
 
         return certChain.any { cert ->
-            val aki = runCatching { cert.authorityKeyIdentifier }
+            val aki = runCatching { cert.data.extensionAuthorityKeyIdentifier?.keyIdentifier }
                 .getOrElse { e ->
                     log.debug { "Failed to read certificate AKI: ${e.message}" }
                     null
                 }
                 ?: return@any false
-            val akiBase64Url = aki.encodeToBase64Url()
+            val akiBase64Url = aki.toByteArray().encodeToBase64Url()
             akiValues.any { queryValue -> queryValue == akiBase64Url }.also { matched ->
                 if (matched) log.debug { "AKI match for credential ${credential.id}: $akiBase64Url" }
             }
@@ -96,7 +98,7 @@ object DcqlTrustedAuthoritiesChecker {
      * 1. [CoseCredentialSignature.x5cList] - mdoc / COSE-signed credentials
      * 2. JWS `x5c` header - JWT / SD-JWT credentials
      */
-    private fun extractCertChain(credential: DcqlCredential): List<CertificateDer> {
+    private fun extractCertChain(credential: DcqlCredential): List<X509Certificate> {
         val originalCredential = (credential as? RawDcqlCredential)?.originalCredential as? DigitalCredential
             ?: return emptyList()
 
@@ -112,8 +114,8 @@ object DcqlTrustedAuthoritiesChecker {
         }
     }
 
-    private fun parseCert(certString: X5CCertificateString): CertificateDer? = runCatching {
-        CertificateDer(certString.base64Der.decodeFromBase64())
+    private fun parseCert(certString: X5CCertificateString): X509Certificate? = runCatching {
+        X509CertificateUtil.parseCertificateDerEncoded(ByteString(certString.base64Der.decodeFromBase64()))
     }.getOrElse { e ->
         log.debug { "Failed to parse certificate: ${e.message}" }
         null

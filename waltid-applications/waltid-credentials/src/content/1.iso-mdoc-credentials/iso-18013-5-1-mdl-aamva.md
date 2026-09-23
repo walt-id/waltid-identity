@@ -33,7 +33,7 @@
     "hair_colour": "blond",
     "birth_place": "Sample City",
     "resident_address": "Sample Street 123, 12345 Sample City, Sample State, Utopia",
-    "portrait_capture_date": "2020-03-14",
+    "portrait_capture_date": "2020-03-14T12:00:00Z",
     "age_in_years": 54,
     "age_birth_year": 1971,
     "age_over_13": true,

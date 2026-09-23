@@ -13,6 +13,7 @@ object FeatureManager {
     val enabledFeatures = HashSet<String>()
     val disabledFeatures = HashSet<String>()
     val registeredFeatures = HashMap<String, AbstractFeature>()
+    val deprecatedFeatures = HashSet<String>()
 
     private val failed = ArrayList<Pair<AbstractFeature, Throwable>>()
 
@@ -22,6 +23,7 @@ object FeatureManager {
         enabledFeatures.clear()
         disabledFeatures.clear()
         registeredFeatures.clear()
+        deprecatedFeatures.clear()
         failed.clear()
         featureAmendments.clear()
     }
@@ -133,6 +135,7 @@ object FeatureManager {
     suspend fun registerCatalog(catalog: ServiceFeatureCatalog) {
         registerBaseFeatures(catalog.baseFeatures)
         registerOptionalFeatures(catalog.optionalFeatures)
+        registerDeprecatedFeatures(catalog.deprecatedFeatures)
     }
 
     suspend fun registerCatalogs(catalogs: List<ServiceFeatureCatalog>) {
@@ -142,10 +145,25 @@ object FeatureManager {
         catalogs.forEach { catalog ->
             registerOptionalFeatures(catalog.optionalFeatures)
         }
+        catalogs.forEach { catalog ->
+            registerDeprecatedFeatures(catalog.deprecatedFeatures)
+        }
     }
 
     fun registerFeature(feature: AbstractFeature) {
         registeredFeatures[feature.name] = feature
+    }
+
+    fun registerDeprecatedFeatures(names: Collection<String>) {
+        deprecatedFeatures.addAll(names)
+    }
+
+    fun configuredFeature(name: String, action: String): AbstractFeature? {
+        registeredFeatures[name]?.let { return it }
+        check(name in deprecatedFeatures) {
+            "Could not $action feature \"$name\" as it's not loaded/registered by any catalog. Registered features are: ${registeredFeatures.keys}"
+        }
+        return null
     }
 
     fun getDefaultedFeatures() =
@@ -175,8 +193,12 @@ object FeatureManager {
         val config = ConfigManager.getConfig<FeatureConfig>()
 
         config.disabledFeatures.forEach { name ->
-            registeredFeatures[name]?.let { disableFeature(it) }
-                ?: error("Could not disable feature \"$name\" as it's not loaded/registered by any catalog. Registered features are: ${registeredFeatures.keys}")
+            val feature = configuredFeature(name, "disable")
+            if (feature == null) {
+                log.warn { "Ignoring deprecated feature flag \"$name\" listed in disabledFeatures. This flag no longer has any effect and can be removed from the configuration." }
+            } else {
+                disableFeature(feature)
+            }
         }
         log.info { "Disabled features (${disabledFeatures.size}): ${disabledFeatures.joinToString()}" }
 
@@ -190,11 +212,13 @@ object FeatureManager {
         }
 
         config.enabledFeatures.forEach { name ->
-            registeredFeatures[name]?.let { feature ->
+            val feature = configuredFeature(name, "enable")
+            if (feature == null) {
+                log.warn { "Ignoring deprecated feature flag \"$name\" listed in enabledFeatures. This flag no longer has any effect and can be removed from the configuration." }
+            } else {
                 log.info { "Enabling feature \"${feature.name}\"..." }
                 enableFeatureAndIfNotSucceededRun(feature) { _, ex -> failed += feature to ex }
             }
-                ?: error("Could not enable feature \"$name\" as it's not loaded/registered by any catalog. Registered features are: ${registeredFeatures.keys}")
         }
         log.info { "Enabled features (${enabledFeatures.size}): ${enabledFeatures.joinToString()}" }
 

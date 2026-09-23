@@ -18,7 +18,6 @@ kotlin {
     if (enableWalletDemoComposeWeb) {
         wasmJs {
             browser()
-            binaries.executable()
         }
     }
 
@@ -28,6 +27,9 @@ kotlin {
             implementation(identityLibs.kotlinx.datetime)
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.ktor.http)
+            implementation(identityLibs.ktor.client.core)
+            implementation(identityLibs.ktor.client.content.negotiation)
+            implementation(identityLibs.ktor.serialization.kotlinx.json)
         }
 
         if (enableMobileWallet) {
@@ -35,6 +37,7 @@ kotlin {
                 dependsOn(commonMain.get())
                 dependencies {
                     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
+                    implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
                     implementation(identityLibs.ktor.client.core)
                     implementation(identityLibs.ktor.client.content.negotiation)
                     implementation(identityLibs.ktor.serialization.kotlinx.json)
@@ -49,7 +52,17 @@ kotlin {
                 }
 
                 androidMain.dependencies {
+                    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-blockstore"))
                     implementation(identityLibs.ktor.client.android)
+                    implementation(identityLibs.androidx.fragment)
+                    implementation(identityLibs.androidx.biometric)
+                }
+
+                getByName("androidHostTest").dependencies {
+                    implementation(kotlin("test"))
+                    implementation(identityLibs.junit)
+                    implementation(identityLibs.robolectric)
+                    implementation(identityLibs.kotlinx.coroutines.test)
                 }
 
                 getByName("androidDeviceTest").dependencies {
@@ -66,8 +79,16 @@ kotlin {
                 }
 
                 iosMain.dependencies {
+                    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-keychain"))
                     implementation(identityLibs.ktor.client.darwin)
                 }
+            }
+        }
+
+        if (enableWalletDemoComposeWeb) {
+            getByName("wasmJsMain").dependencies {
+                implementation(identityLibs.ktor.client.js)
+                implementation("org.jetbrains.kotlinx:kotlinx-browser:0.3")
             }
         }
 
@@ -75,6 +96,16 @@ kotlin {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }
+    }
+}
+
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    if (name == "testAndroidHostTest") {
+        useJUnit()
+        systemProperty(
+            "walletDemoImageFixturesDir",
+            layout.projectDirectory.dir("../../waltid-wallet-demo-test-fixtures/resources/files").asFile.absolutePath,
+        )
     }
 }
 

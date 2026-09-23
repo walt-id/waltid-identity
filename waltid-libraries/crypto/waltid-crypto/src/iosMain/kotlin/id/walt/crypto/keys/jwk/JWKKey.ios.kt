@@ -4,10 +4,10 @@ import at.asitplus.signum.indispensable.CryptoPublicKey
 import at.asitplus.signum.indispensable.ECCurve
 import at.asitplus.signum.indispensable.josef.JsonWebKey
 import at.asitplus.signum.indispensable.josef.JweAlgorithm
-import at.asitplus.signum.indispensable.pki.X509Certificate
 import at.asitplus.signum.indispensable.josef.JweEncrypted.Companion.deserialize
 import at.asitplus.signum.indispensable.josef.io.joseCompliantSerializer
 import at.asitplus.signum.indispensable.josef.toJsonWebKey
+import at.asitplus.signum.indispensable.pki.X509Certificate
 import at.asitplus.signum.supreme.SignatureResult
 import at.asitplus.signum.supreme.os.IosKeychainProvider
 import at.asitplus.signum.supreme.sign.Signer
@@ -17,25 +17,16 @@ import dev.whyoleg.cryptography.CryptographyProviderApi
 import dev.whyoleg.cryptography.algorithms.EC
 import dev.whyoleg.cryptography.algorithms.ECDSA
 import dev.whyoleg.cryptography.algorithms.EdDSA
-import id.walt.crypto.MobileSoftwareKey
+import id.walt.crypto.*
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.signJwsWithPlatformSigner
-import id.walt.crypto.toPlatformKeyStoreCurve
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.crypto.utils.JweEncryptionHelper
 import id.walt.crypto.utils.keyFromIntermediate
-import id.walt.crypto.verifyJwsWithPlatformSigner
-import id.walt.crypto.verifyRawWithPlatformSigner
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.uuid.Uuid
 
@@ -249,19 +240,31 @@ actual class JWKKey actual constructor(
         }
 
         actual override suspend fun importPEM(pem: String): Result<JWKKey> = runCatching {
-            val derBytes = pem.lines()
-                .filter { !it.startsWith("-----") }
-                .joinToString("")
-                .let { Base64.decode(it) }
+            val pemRegex = "^-----\\s*BEGIN\\s([^-]*)-----\\s*$([^-]+)^-----\\s*END\\s+([^-]+)-----".toRegex(
+                setOf(
+                    RegexOption.DOT_MATCHES_ALL,
+                    RegexOption.MULTILINE
+                )
+            )
+            val match = pemRegex.matchEntire(pem)
+            requireNotNull(match) { "Invalid PEM format" }
+            val headerType = match.groupValues[1].trim()
+            val footerType = match.groupValues[3].trim()
+            require(headerType == footerType) { "PEM header and footer do not match" }
+            when (headerType) {
+                "CERTIFICATE" -> X509Certificate.decodeFromPem(pem).getOrThrow()
+                    .decodedPublicKey.getOrThrow()
 
-            val cryptoPubKey = if (pem.contains("BEGIN CERTIFICATE")) {
-                X509Certificate.decodeFromDer(derBytes).decodedPublicKey.getOrThrow()
-            } else {
-                CryptoPublicKey.decodeFromDer(derBytes)
+                "PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY" ->
+                    throw UnsupportedOperationException("Importing private PEM keys is not supported on iOS")
+
+                else -> CryptoPublicKey.decodeFromPem(pem).getOrThrow()
+            }.let { cryptoPubKey ->
+                val jwkJson = joseCompliantSerializer.encodeToString(cryptoPubKey.toJsonWebKey())
+                JWKKey(jwkJson)
             }
-            val jwkJson = joseCompliantSerializer.encodeToString(cryptoPubKey.toJsonWebKey())
-            JWKKey(jwkJson)
         }
+
     }
 
     override fun hashCode(): Int {

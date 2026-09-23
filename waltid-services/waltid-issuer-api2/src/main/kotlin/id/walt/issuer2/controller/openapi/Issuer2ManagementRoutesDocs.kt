@@ -18,8 +18,8 @@ object Issuer2ManagementRoutesDocs {
             Profiles are deployment templates used by credential-offer creation. Use the
             returned profileId in POST /issuer2/credential-offers. Runtime overrides may
             provide credential data, mappings, selective disclosure, mDoc namespace data
-            mappings, ID token claim mappings, x5 chains, and webhook URLs for a single
-            issuance session.
+            mappings, authorized transaction data types, ID token claim mappings, x5 chains,
+            and webhook URLs for a single issuance session.
         """.trimIndent()
         response {
             HttpStatusCode.OK to {
@@ -69,7 +69,8 @@ object Issuer2ManagementRoutesDocs {
             Supports pre-authorized and authorization-code issuance flows. The offer can be returned
             by reference or by value. Runtime overrides can be applied for one offer only. Supported
             override fields are: issuerDid, credentialData, mapping, selectiveDisclosure,
-            idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, x5Chain, and notifications.
+            idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, authorizedTransactionDataTypes,
+            x5Chain, and notifications.
             credentialData is applied as a partial object patch over the configured profile data:
             nested objects are merged, while primitive, array, and null values replace the configured value.
             Authorization-code offers include issuer_state by default. Set issuerStateMode to OMIT only
@@ -118,6 +119,9 @@ object Issuer2ManagementRoutesDocs {
                 }
                 example("[pre-authorized][by-reference][override mDoc photo ID credentialData]") {
                     value = Issuer2RequestExamples.PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE
+                }
+                example("[pre-authorized][by-reference][override authorizedTransactionDataTypes]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_AUTHORIZED_TRANSACTION_DATA_TYPES_OVERRIDE
                 }
                 example("[authorized][by-reference][override mDoc mDL credentialData]") {
                     value = Issuer2RequestExamples.AUTHORIZED_MDOC_MDL_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE
@@ -179,12 +183,20 @@ object Issuer2ManagementRoutesDocs {
             Establishes an SSE connection to receive real-time updates about an issuance session.
 
             Events:
-            - `resolved_credential_offer` - Wallet has resolved the credential offer
-            - `requested_token` - Wallet has requested an access token
-            - `sdjwt_issue` - SD-JWT VC credential has been issued
-            - `jwt_issue` - JWT VC credential has been issued
-            - `generated_mdoc` - mDoc credential has been generated
-            - `issuance_status` - Session status has changed
+            - `credential_offer_created`, `credential_offer_retrieved`
+            - `pushed_authorization_request_succeeded`, `pushed_authorization_request_failed`
+            - `authorization_request_succeeded`, `authorization_request_failed`
+            - `token_request_<grant>_succeeded`, `token_request_<grant>_failed`
+            - `credential_request_failed`
+            - `credential_request_<format>_succeeded`, `credential_request_<format>_failed`
+            - `issuance_status_changed`
+
+            Token grants are `authorization_code`, `pre_authorized_code`, and `refresh_token`.
+            A token request whose `grant_type` is missing, malformed, or unsupported emits
+            `token_request_failed` because no supported grant can be identified.
+            Credential formats are grouped as `sd_jwt_vc`, `w3c_vc`, and `mso_mdoc`. Once the
+            trusted session configuration is resolved, failures use the format-specific event;
+            earlier failures use `credential_request_failed`.
 
             Events use the same KtorSessionUpdate envelope as webhook notifications.
         """.trimIndent()
@@ -205,6 +217,24 @@ object Issuer2ManagementRoutesDocs {
             }
             HttpStatusCode.NotFound to {
                 description = "Issuance session not found"
+            }
+        }
+    }
+
+    fun issuerEvents(): RouteConfig.() -> Unit = {
+        summary = "Receive issuer protocol events via Server-Sent Events (SSE)"
+        description = """
+            Streams protocol outcomes across the issuer. Each event contains a requestId and may contain
+            a correlated issuance session. Failed events expose error and error_description directly.
+
+            Events without session correlation are available only on this issuer-level stream. Correlated
+            events are also sent to the corresponding session stream and configured session webhook.
+            Nonce request events are always uncorrelated and are available only on this issuer-level stream.
+        """.trimIndent()
+        response {
+            HttpStatusCode.OK to {
+                description = "SSE connection established. Events are streamed as text/event-stream."
+                body<String>()
             }
         }
     }

@@ -20,9 +20,13 @@ object DidKeyResolver : BaseKeyResolver {
 
         if (keys.isEmpty()) throw Exception("No valid key found in DID document for $issuerId")
 
+        if (issuerId.startsWith("did:jwk:")) {
+            return selectDidJwkKey(keys, issuerId, kid)
+        }
+
         if (!kid.isNullOrBlank()) {
             val selfIdentifyingKid = kid == selfIdentifyingVerificationMethod(issuerId) ||
-                kid == issuerId && (issuerId.startsWith("did:key:") || issuerId.startsWith("did:jwk:"))
+                kid == issuerId && issuerId.startsWith("did:key:")
             if (keys.size == 1 && selfIdentifyingKid) {
                 return keys.first()
             }
@@ -34,6 +38,28 @@ object DidKeyResolver : BaseKeyResolver {
             throw NoSuchElementException("No key with kid '$kid' found in DID document for $issuerId")
         }
 
+        return keys.first()
+    }
+
+    /**
+     * did:jwk always publishes a single verification method `{did}#0`.
+     * Pre-2115 issuers wrote KMS-path or thumbprint fragments. Accept those as a
+     * compatibility fallback: the DID encodes exactly one key, so kid cannot select
+     * another key. Ignoring a non-`#0` kid is not spec-compliant DID URL matching;
+     * new issuance must still emit `{did}#0`.
+     */
+    private fun selectDidJwkKey(keys: Set<Key>, did: String, kid: String?): Key {
+        if (keys.size != 1) {
+            throw Exception("did:jwk must resolve to exactly one verification key")
+        }
+        val methodKid = "$did#0"
+        if (!kid.isNullOrBlank() && kid != methodKid) {
+            log.warn {
+                "did:jwk verification is ignoring non-spec kid '$kid' for '$did'; " +
+                    "the method verification method is '$methodKid'. " +
+                    "did:jwk documents contain exactly one key."
+            }
+        }
         return keys.first()
     }
 
@@ -67,7 +93,6 @@ object DidKeyResolver : BaseKeyResolver {
 
     private fun selfIdentifyingVerificationMethod(did: String): String? = when {
         did.startsWith("did:key:") -> "$did#${did.removePrefix("did:key:")}"
-        did.startsWith("did:jwk:") -> "$did#0"
         else -> null
     }
 }

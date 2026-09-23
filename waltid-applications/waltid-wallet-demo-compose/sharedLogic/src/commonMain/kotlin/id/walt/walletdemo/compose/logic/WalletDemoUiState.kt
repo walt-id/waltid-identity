@@ -3,7 +3,19 @@ package id.walt.walletdemo.compose.logic
 data class WalletDemoUiState(
     val auth: WalletAuthState = WalletAuthState.Setup(),
     val isAuthenticating: Boolean = false,
+    val biometricUnlockAvailable: Boolean = false,
+    val identityDetails: WalletDemoIdentityDetailsState = WalletDemoIdentityDetailsState.Loading,
+    val identityProgress: String? = null,
+    val identityError: String? = null,
     val session: WalletSessionState = WalletSessionState.NotBootstrapped,
+    val signingProtectionMode: WalletDemoSigningProtectionMode = WalletDemoSigningProtectionMode.Optional,
+    val selectedSigningProtection: WalletDemoSigningProtection = WalletDemoSigningProtection.Biometric,
+    val biometricSigningAvailability: WalletDemoSigningProtectionAvailability? = null,
+    val signingProtectionWarning: String? = null,
+    val pendingSigningProtectionChange: WalletDemoSigningProtection? = null,
+    val signingProtectionReprovisionTarget: WalletDemoSigningProtection? = null,
+    val isChangingSigningProtection: Boolean = false,
+    val signingProtectionError: String? = null,
     val operation: WalletOperationState = WalletOperationState.Idle,
     val selectedTab: WalletDemoTab = WalletDemoTab.Credentials,
     val requestDrafts: WalletRequestDrafts = WalletRequestDrafts(),
@@ -20,7 +32,18 @@ data class WalletDemoUiState(
     val presentationNavigationResetKey: Int = 0,
     val warning: String? = null,
     val pendingPresentationContinuation: WalletDemoPendingPresentationContinuation? = null,
+    val statusDismissedKey: String? = null,
+    val statusExpanded: Boolean = false,
+    val statusOccurrenceId: Long = 0,
+    val sharingSettingsError: String? = null,
+    val showDcApiPresentationPreview: Boolean = true,
+    val proximityTransportProfile: WalletDemoProximityTransportProfile =
+        WalletDemoProximityTransportProfile.Default,
+    val proximityApprovalMode: WalletDemoProximityApprovalMode = WalletDemoProximityApprovalMode.AskEachTime,
+    val pinLockEnabled: Boolean = true,
 ) {
+    val identityBusy: Boolean get() = identityProgress != null
+
     val presentationPreview: WalletDemoPresentationPreview?
         get() = (presentationReview as? WalletDemoPresentationPreviewResult.Ready)?.preview
 

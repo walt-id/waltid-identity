@@ -12,8 +12,10 @@ data class Issuer2ProfilesConfig(
     val defaultIssuerKey: JsonObject? = null,
     val defaultIssuerDid: String? = null,
     val defaultIssuerX5chain: List<String> = emptyList(),
+    val defaultMdocIssuerX5chain: List<String> = emptyList(),
     val defaultHaipIssuerKey: JsonObject? = null,
     val defaultHaipIssuerX5chain: List<String> = emptyList(),
+    val defaultHaipMdocIssuerX5chain: List<String> = emptyList(),
     val profiles: Map<String, CredentialProfileConfig> = emptyMap(),
 ) : WaltConfig()
 
@@ -28,6 +30,12 @@ data class CredentialProfileConfig(
     val selectiveDisclosure: SDMap? = null,
     val idTokenClaimsMapping: Map<String, String>? = null,
     val mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
+    /**
+     * OpenID4VP transaction_data types the issued key may sign. Each becomes a key in the mdoc MSO's
+     * `KeyAuthorizations.dataElements`, authorizing the hash elements our presenter device-signs for
+     * that type; presenting transaction data of an unlisted type is rejected.
+     */
+    val authorizedTransactionDataTypes: List<String>? = null,
     val x5Chain: List<String>? = null,
     val notifications: IssuanceNotifications? = null,
     val credentialStatus: JsonElement? = null,

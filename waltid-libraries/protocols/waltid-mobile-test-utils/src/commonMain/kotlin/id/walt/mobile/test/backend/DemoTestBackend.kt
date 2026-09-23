@@ -1,5 +1,19 @@
 package id.walt.mobile.test.backend
 
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.crypto2.serialization.BinaryData
+import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
+import id.waltid.openid4vci.wallet.metadata.MetadataSigner
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.*
@@ -10,7 +24,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -30,13 +43,33 @@ import kotlin.uuid.Uuid
 object DemoTestBackend {
 
     private const val ISSUER_BASE_URL = "https://issuer2.demo.walt.id"
+    private const val ISSUER_IDENTIFIER = "$ISSUER_BASE_URL/openid4vci"
+    // RFC 7638 thumbprint of the issuer2 metadata signing key published at
+    // https://issuer2.demo.walt.id/openid4vci/jwks (verified 2026-09-15). This is an independent trust anchor;
+    // it must not be learned from the signed metadata JWT itself.
+    private const val ISSUER_METADATA_SIGNING_KEY_THUMBPRINT =
+        "Tq0T3ytmPJnXFBBrP2-7c_5R_eSV5T0pMtPPuWcArac"
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
+    // The demo verifier only accepts signed requests for an explicitly configured client ID.
+    const val PUBLIC_DEMO_VERIFIER_CLIENT_ID = "verifier2"
+    // `kid`, `x`, and `y` of the ES256 request-object signing key served by verifier2's x5c header.
+    // This is a pre-registered trust anchor: it must not be learned from the request object itself.
+    private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_ID = "_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug"
+    private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_X = "G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0"
+    private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_Y = "VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"
 
     const val TRANSACTION_DATA_PROFILES_URL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
     private const val EUDI_PID_SD_JWT_VCT = "$ISSUER_BASE_URL/openid4vci/urn:eudi:pid:1"
     private const val PAYMENT_AUTHORIZATION_TYPE = "org.waltid.transaction-data.payment-authorization"
-    // The fields the currently deployed profile declares, not the ones #2062 configures.
-    private val requiredPaymentAuthorizationFields = setOf("amount", "currency", "payee")
+
+    /** EUDI TS-12 SCA payment, the type whose payload the Credential Manager matcher reads as a nested object. */
+    const val SCA_PAYMENT_TYPE = "urn:eudi:sca:payment:1"
+    const val SCA_PAYMENT_PAYEE_NAME = "Super Store"
+    const val SCA_PAYMENT_CURRENCY = "EUR"
+    const val SCA_PAYMENT_AMOUNT = 11.56
+    const val SCA_PAYMENT_TRANSACTION_ID = "8D8AC610-566D-4EF0-9C22-186B2A5ED793"
+    private val requiredPaymentAuthorizationFields = setOf("merchant_name", "amount", "currency")
+    private val metadataCryptoRuntime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
 
     val scenarios = listOf(
         CredentialScenario(
@@ -61,6 +94,32 @@ object DemoTestBackend {
                 doctype = "eu.europa.ec.eudi.pid.1",
                 namespace = "eu.europa.ec.eudi.pid.1",
                 claims = listOf("given_name", "family_name"),
+            ),
+        ),
+        CredentialScenario(
+            id = "sca-payment-card",
+            displayName = "SCA Payment Card",
+            profileId = "scaPaymentCardMdoc",
+            credentialConfigurationId = "sca_payment_card_mso_mdoc",
+            format = "mso_mdoc",
+            verifierCredentialQuery = mdocQuery(
+                id = "sca_payment_card",
+                doctype = "eu.europa.ec.eudi.sca.payment_card.1",
+                namespace = "eu.europa.ec.eudi.sca.payment_card.1",
+                claims = listOf("card_scheme", "card_last4", "card_holder_name"),
+            ),
+        ),
+        CredentialScenario(
+            id = "eu-age-verification",
+            displayName = "EU Age Verification",
+            profileId = "euAgeVerificationMdoc",
+            credentialConfigurationId = "eu.europa.ec.av.1",
+            format = "mso_mdoc",
+            verifierCredentialQuery = mdocQuery(
+                id = "proof_of_age",
+                doctype = "eu.europa.ec.av.1",
+                namespace = "eu.europa.ec.av.1",
+                claims = listOf("age_over_18"),
             ),
         ),
         CredentialScenario(
@@ -111,7 +170,11 @@ object DemoTestBackend {
         val verifierCredentialQuery: JsonObject,
     )
 
-    data class GeneratedOffer(val offerUrl: String, val txCode: String?)
+    /**
+     * @property offerId The issuer-side session id, so callers can poll `/issuer2/sessions/{id}`
+     *   to confirm the issuer actually completed issuance rather than trusting a wallet-side ack.
+     */
+    data class GeneratedOffer(val offerUrl: String, val txCode: String?, val offerId: String)
 
     data class VerifierSession(val sessionId: String, val authorizationRequestUri: String)
 
@@ -121,13 +184,26 @@ object DemoTestBackend {
      */
     data class DcApiVerifierSession(val sessionId: String, val requestJson: String)
 
+    /**
+     * Creates a pre-authorized credential offer on the public demo issuer2.
+     *
+     * [inlineOffer] requests `valueMode=BY_VALUE`, so the returned URL carries a `credential_offer`
+     * query parameter instead of a `credential_offer_uri`. The issuer defaults to `BY_REFERENCE`,
+     * which is what the QR and deep link flows consume; DC API issuance needs the offer object itself
+     * because it is passed to `navigator.credentials.create` / Credential Manager verbatim.
+     * [runtimeOverrides] supplies test-specific credential data without changing the shared issuer profile.
+     */
     suspend fun createOffer(
         scenario: CredentialScenario,
         withGeneratedTransactionCode: Boolean = false,
+        inlineOffer: Boolean = false,
+        runtimeOverrides: JsonObject? = null,
     ): GeneratedOffer {
         val payload = buildJsonObject {
+            runtimeOverrides?.let { put("runtimeOverrides", it) }
             put("profileId", scenario.profileId)
             put("authMethod", "PRE_AUTHORIZED")
+            if (inlineOffer) put("valueMode", "BY_VALUE")
             if (withGeneratedTransactionCode) {
                 putJsonObject("txCode") {
                     put("input_mode", "numeric")
@@ -148,12 +224,114 @@ object DemoTestBackend {
         check(!withGeneratedTransactionCode || txCode != null) {
             "Public demo issuer2 did not return the requested transaction code: $response"
         }
+        val offerId = response["offerId"]?.jsonPrimitive?.contentOrNull
+            ?: error("Missing offerId in public demo issuer2 response: $response")
 
-        return GeneratedOffer(offerUrl = offerUrl, txCode = txCode)
+        return GeneratedOffer(
+            offerUrl = offerUrl,
+            txCode = txCode,
+            offerId = offerId,
+        )
+    }
+
+    /**
+     * Lifecycle status of an offer session, e.g. `ACTIVE` or `SUCCESSFUL`.
+     *
+     * Deliberately narrow: this endpoint also returns the issuer signing key and the full credential
+     * payload, so nothing but the status is lifted out of the response and it is never logged whole.
+     */
+    suspend fun issuerSessionStatus(offerId: String): String? {
+        val response = client.get("$ISSUER_BASE_URL/issuer2/sessions/$offerId")
+        check(response.status.isSuccess()) {
+            "Public demo issuer2 session lookup failed: ${response.status}"
+        }
+        return json.parseToJsonElement(response.bodyAsText())
+            .jsonObject["status"]?.jsonPrimitive?.contentOrNull
+    }
+
+    /**
+     * Waits until issuer2 closes the offer session, i.e. the credential was actually issued.
+     *
+     * The DC API create flow gives the caller no trustworthy completion signal of its own: the
+     * provider acknowledgment is built from constants, so asserting on it proves nothing about
+     * issuance. This is the authoritative signal that the protocol ran to completion.
+     */
+    suspend fun waitForIssuerIssuanceSuccess(offerId: String, timeoutMs: Long = 60_000) {
+        val mark = TimeSource.Monotonic.markNow()
+        while (true) {
+            val status = runCatching { issuerSessionStatus(offerId) }.getOrNull()
+            when (status?.uppercase()) {
+                "SUCCESSFUL" -> return
+                "UNSUCCESSFUL", "REJECTED_BY_USER", "EXPIRED" ->
+                    error("public demo issuer2 reported $status for offer session $offerId")
+            }
+            if (mark.elapsedNow() > timeoutMs.milliseconds) {
+                error(
+                    "public demo issuer2 did not complete issuance within ${timeoutMs}ms for offer " +
+                        "session $offerId (last status ${status ?: "<unavailable>"})"
+                )
+            }
+            delay(2_000.milliseconds)
+        }
     }
 
     suspend fun createVerifierSession(scenario: CredentialScenario): VerifierSession {
         return createVerifierSession(scenario.verifierCredentialQuery)
+    }
+
+    suspend fun createVerifierSession(
+        scenario: CredentialScenario,
+        signedRequest: Boolean,
+    ): VerifierSession = createVerifierSession(
+        credentialQuery = scenario.verifierCredentialQuery,
+        transactionData = emptyList(),
+        signedRequest = signedRequest,
+    )
+
+    /** Public key that authenticates signed request objects served by the public verifier2 demo. */
+    val publicDemoVerifierRequestObjectSigningJwk = buildJsonObject {
+        put("kty", "EC")
+        put("crv", "P-256")
+        put("kid", VERIFIER_REQUEST_OBJECT_SIGNING_KEY_ID)
+        put("x", VERIFIER_REQUEST_OBJECT_SIGNING_KEY_X)
+        put("y", VERIFIER_REQUEST_OBJECT_SIGNING_KEY_Y)
+    }
+
+    /** Trust resolver for signed metadata served by the public issuer2 demo. */
+    val publicDemoIssuerMetadataTrustResolver = CredentialIssuerMetadataTrustResolver { compactJwt, expectedCredentialIssuer ->
+        require(expectedCredentialIssuer == ISSUER_IDENTIFIER) {
+            "Unexpected public demo Credential Issuer: $expectedCredentialIssuer"
+        }
+        val decoded = CompactJws.decodeUnverified(compactJwt)
+        val algorithm = decoded.protectedHeader[JwtHeaderParams.ALGORITHM]?.jsonPrimitive?.contentOrNull
+            ?: error("Public demo signed metadata is missing alg")
+        require(algorithm == "ES256") {
+            "Unsupported public demo signed metadata algorithm: $algorithm"
+        }
+        val jwk = decoded.protectedHeader[JwtHeaderParams.JSON_WEB_KEY]?.jsonObject
+            ?: error("Public demo signed metadata is missing jwk")
+        require(jwk["kty"]?.jsonPrimitive?.contentOrNull == "EC") {
+            "Public demo signed metadata jwk must use EC"
+        }
+        require(jwk["crv"]?.jsonPrimitive?.contentOrNull == "P-256") {
+            "Public demo signed metadata jwk must use P-256"
+        }
+        val encodedVerificationKey = EncodedKey.Jwk(
+            data = BinaryData(jwk.toString().encodeToByteArray()),
+            privateMaterial = false,
+        )
+        require(Jwk.sha256Thumbprint(encodedVerificationKey) == ISSUER_METADATA_SIGNING_KEY_THUMBPRINT) {
+            "Public demo signed metadata key is not the pinned issuer2 signing key"
+        }
+        val verificationKey = metadataCryptoRuntime.restore(
+            encodedVerificationKey.toStoredSoftwareKey(KeyId("issuer2-metadata"), setOf(KeyUsage.VERIFY))
+        )
+        CompactJws.verify(compactJwt, verificationKey, JwsAlgorithm.ES256)
+        MetadataSigner(
+            keyId = decoded.protectedHeader[JwtHeaderParams.KEY_ID]?.jsonPrimitive?.contentOrNull,
+            algorithm = algorithm,
+            trustType = MetadataSignerTrustType.TRUSTED_ISSUER,
+        )
     }
 
     suspend fun createResponseBoundVerifierSession(scenario: CredentialScenario): VerifierSession {
@@ -178,22 +356,66 @@ object DemoTestBackend {
         transactionData = listOf(paymentAuthorizationTransactionData("pid")),
     )
 
-    /**
-     * One `payment-authorization` transaction data item bound to [credentialId], with the fields the
-     * deployed profile declares.
-     *
-     * The profile is fetched rather than assumed, so a deployment that stops declaring `amount`,
-     * `currency` or `payee` fails here instead of producing an item whose fields a test cannot find on
-     * screen for a reason it would misattribute to the wallet. `payee` is required only for as long as
-     * the deployed profile is the pre-#2062 one.
-     */
+    /** One generic payment-authorization item using the current public-demo profile contract. */
     suspend fun paymentAuthorizationTransactionData(credentialId: String): JsonObject {
         val fields = transactionDataProfileFields(PAYMENT_AUTHORIZATION_TYPE)
         check(fields.containsAll(requiredPaymentAuthorizationFields)) {
             "Public demo transaction data profile '$PAYMENT_AUTHORIZATION_TYPE' is missing required fields: " +
                 (requiredPaymentAuthorizationFields - fields).joinToString()
         }
-        return paymentAuthorizationTransactionData(credentialId, fields)
+        return buildPaymentAuthorizationTransactionData(credentialId)
+    }
+
+    internal fun buildPaymentAuthorizationTransactionData(credentialId: String): JsonObject = buildJsonObject {
+        put("type", JsonPrimitive(PAYMENT_AUTHORIZATION_TYPE))
+        putJsonArray("credential_ids") {
+            add(JsonPrimitive(credentialId))
+        }
+        put("require_cryptographic_holder_binding", JsonPrimitive(true))
+        putJsonArray("transaction_data_hashes_alg") {
+            add(JsonPrimitive("sha-256"))
+        }
+        put("merchant_name", JsonPrimitive("ACME Corp"))
+        put("amount", JsonPrimitive("42.00"))
+        put("currency", JsonPrimitive("EUR"))
+    }
+
+    /**
+     * One `urn:eudi:sca:payment:1` item bound to [credentialId], shaped as the type requires: a nested
+     * `payload`, not the flat fields the walt.id payment-authorization type uses.
+     *
+     * The values are those of the SCA demo request in `Verifier2OpenApiExamples`, so a test can assert
+     * the same strings on the Credential Manager prompt and on the wallet's own review. `amount` is a
+     * JSON number because the Credential Manager matcher reads it as one for this type and skips the
+     * entry if it is a string.
+     *
+     * The profile is fetched rather than assumed so that a deployment which still declares the old
+     * `payment_details` type fails here, instead of producing an item the matcher silently drops.
+     */
+    suspend fun scaPaymentTransactionData(credentialId: String): JsonObject {
+        val fields = transactionDataProfileFields(SCA_PAYMENT_TYPE)
+        check(fields.contains("payload")) {
+            "Demo transaction data profile '$SCA_PAYMENT_TYPE' does not declare 'payload': $fields"
+        }
+        return buildJsonObject {
+            put("type", JsonPrimitive(SCA_PAYMENT_TYPE))
+            putJsonArray("credential_ids") {
+                add(JsonPrimitive(credentialId))
+            }
+            put("require_cryptographic_holder_binding", JsonPrimitive(true))
+            putJsonArray("transaction_data_hashes_alg") {
+                add(JsonPrimitive("sha-256"))
+            }
+            putJsonObject("payload") {
+                put("transaction_id", JsonPrimitive(SCA_PAYMENT_TRANSACTION_ID))
+                putJsonObject("payee") {
+                    put("name", JsonPrimitive(SCA_PAYMENT_PAYEE_NAME))
+                    put("id", JsonPrimitive("merchant-001"))
+                }
+                put("currency", JsonPrimitive(SCA_PAYMENT_CURRENCY))
+                put("amount", JsonPrimitive(SCA_PAYMENT_AMOUNT))
+            }
+        }
     }
 
     suspend fun transactionDataProfileFields(type: String): Set<String> {
@@ -219,11 +441,19 @@ object DemoTestBackend {
         credentialQuery: JsonObject,
         transactionData: List<JsonObject>,
         bindClientIdToResponseUri: Boolean = false,
+        signedRequest: Boolean = false,
     ): VerifierSession {
+        require(!(bindClientIdToResponseUri && signedRequest)) {
+            "A signed verifier request cannot use a response-bound redirect_uri client ID"
+        }
         val requestedSessionId = Uuid.random().toString().takeIf { bindClientIdToResponseUri }
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
+                if (signedRequest) {
+                    put("signed_request", true)
+                    put("clientId", PUBLIC_DEMO_VERIFIER_CLIENT_ID)
+                }
                 requestedSessionId?.let { sessionId ->
                     val responseUri = "$VERIFIER_BASE_URL/verification-session/$sessionId/response"
                     put("sessionId", sessionId)
@@ -297,31 +527,12 @@ object DemoTestBackend {
         require(expectedOrigins.isNotEmpty()) { "DC API sessions require at least one expected origin" }
         require(credentialQueries.isNotEmpty()) { "DC API sessions require at least one DCQL credential query" }
 
-        val payload = buildJsonObject {
-            // "dc_api" is the @SerialName of DcApiAnnexDFlowSetup; unlike cross_device this flow
-            // spells its core config "core", and it takes no url_config.
-            put("flow_type", "dc_api")
-            putJsonObject("core") {
-                putJsonObject("dcql_query") {
-                    putJsonArray("credentials") {
-                        credentialQueries.forEach { add(it) }
-                    }
-                }
-                if (encryptedResponse) put("encrypted_response", JsonPrimitive(true))
-            }
-            if (transactionData.isNotEmpty()) {
-                putJsonObject("openid") {
-                    putJsonArray("transactionData") {
-                        transactionData.forEach { add(it) }
-                    }
-                }
-            }
-            // No vp_policies override: the verifier applies its full default mdoc policy set, so a policy
-            // regression is visible here instead of silently skipped.
-            putJsonArray("expectedOrigins") {
-                expectedOrigins.forEach { add(JsonPrimitive(it)) }
-            }
-        }
+        val payload = buildDcApiVerifierSessionPayload(
+            credentialQueries = credentialQueries,
+            expectedOrigins = expectedOrigins,
+            encryptedResponse = encryptedResponse,
+            transactionData = transactionData,
+        )
 
         val response = requestJson(
             url = "$VERIFIER_BASE_URL/verification-session/create",
@@ -334,6 +545,35 @@ object DemoTestBackend {
             sessionId = sessionId,
             requestJson = dcApiRequestJson(sessionId),
         )
+    }
+
+    internal fun buildDcApiVerifierSessionPayload(
+        credentialQueries: List<JsonObject>,
+        expectedOrigins: List<String>,
+        encryptedResponse: Boolean = false,
+        transactionData: List<JsonObject> = emptyList(),
+    ): JsonObject = buildJsonObject {
+        put("flow_type", "dc_api_openid4vp")
+        putJsonObject("core_flow") {
+            putJsonObject("dcql_query") {
+                putJsonArray("credentials") {
+                    credentialQueries.forEach { add(it) }
+                }
+            }
+            if (encryptedResponse) put("encrypted_response", JsonPrimitive(true))
+        }
+        if (transactionData.isNotEmpty()) {
+            putJsonObject("openid") {
+                putJsonArray("transactionData") {
+                    transactionData.forEach { add(it) }
+                }
+            }
+        }
+        // No vp_policies override: the verifier applies its full default mdoc policy set, so a policy
+        // regression is visible here instead of silently skipped.
+        putJsonArray("expectedOrigins") {
+            expectedOrigins.forEach { add(JsonPrimitive(it)) }
+        }
     }
 
     /**
@@ -366,30 +606,6 @@ object DemoTestBackend {
             error("HTTP ${response.status.value} from verifier2 DC API response for $sessionId: $body")
         }
         return body
-    }
-
-    private fun paymentAuthorizationTransactionData(
-        credentialId: String,
-        fields: Set<String>,
-    ): JsonObject = buildJsonObject {
-        put("type", JsonPrimitive(PAYMENT_AUTHORIZATION_TYPE))
-        putJsonArray("credential_ids") {
-            add(JsonPrimitive(credentialId))
-        }
-        put("require_cryptographic_holder_binding", JsonPrimitive(true))
-        putJsonArray("transaction_data_hashes_alg") {
-            add(JsonPrimitive("sha-256"))
-        }
-        // Credential Manager consumes merchant_name/amount, so merchant_name is sent whether or not the
-        // deployed profile declares it yet.
-        put("merchant_name", JsonPrimitive("ACME Corp"))
-        putProfileField(fields, "amount", "42.00")
-        putProfileField(fields, "currency", "EUR")
-        // TODO: Remove `payee` once the transaction-data profile from #2062 is deployed to
-        //  wallet.demo.walt.id and verifier2.demo.walt.id. The repository config already declares
-        //  merchant_name/amount/currency; the deployed one still declares payee, and the fields are
-        //  resolved from it at run time.
-        putProfileField(fields, "payee", "ACME Corp")
     }
 
     suspend fun verifierSessionInfo(sessionId: String): JsonObject {
@@ -562,12 +778,6 @@ object DemoTestBackend {
 
     private fun claimSet(vararg claimIds: String) = kotlinx.serialization.json.buildJsonArray {
         claimIds.forEach { add(JsonPrimitive(it)) }
-    }
-
-    private fun JsonObjectBuilder.putProfileField(fields: Set<String>, key: String, value: String) {
-        if (key in fields) {
-            put(key, JsonPrimitive(value))
-        }
     }
 
     private val json = kotlinx.serialization.json.Json {

@@ -1,0 +1,47 @@
+# walt.id Identity
+
+> Open-source infrastructure for issuing, holding, and verifying digital identity credentials — standards-based (OpenID4VCI 1.0, OpenID4VP 1.0, HAIP, W3C Verifiable Credentials, SD-JWT VCs, mdoc/mDL) and self-hostable with no vendor lock-in. This is the **Community Stack**: the free, open-source edition of the walt.id product line.
+
+This repository is a Gradle monorepo. Module paths mirror the directory layout, e.g. `waltid-services/waltid-issuer-api2` builds via `:waltid-services:waltid-issuer-api2`. Services, apps, and libraries are tagged 🟢 actively maintained, 🟠 planned deprecation, 🟡 unmaintained, or 🔴 deprecated — prefer 🟢 unless you specifically need legacy compatibility.
+
+The closed-source **Enterprise Stack** (multi-tenant, org/tenant/service model) is a separate product and a separate repository — it is not part of this codebase. See https://walt.id/pricing.md.
+
+For protocol/concept explanations (DIDs, VCs, OID4VCI/VP flows, trust models) and OpenAPI references, prefer https://docs.walt.id over inferring behavior from source — see the Docs section below.
+
+## Get started
+
+- [Quickstart docker-compose](https://github.com/walt-id/waltid-identity/tree/main/docker-compose): `cd docker-compose && docker compose up` brings up issuer, verifier, and wallet APIs together. Follow with the [30-minute tutorial](https://docs.walt.id/community-stack/home/tutorial-30-min-v2.md).
+- [Top-level README](https://github.com/walt-id/waltid-identity/blob/main/README.md): product overview, architecture diagram, and links to hosted demo instances.
+
+## Services (waltid-services/) — current (v2, OID4VCI/OID4VP 1.0)
+
+- [waltid-issuer-api2](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-issuer-api2): issue W3C VCs, SD-JWT VCs, and mdocs/mDL via OID4VCI 1.0.
+- [waltid-verifier-api2](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-verifier-api2): verify credentials via OID4VP 1.0.
+- [waltid-wallet-api2](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-wallet-api2): wallet backend — credential storage, issuance/presentation flows.
+
+## Applications (waltid-applications/)
+
+- [waltid-web-wallet](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-web-wallet): reference web wallet (Vue/Nuxt). Only works with v1 servises a web wallet for v2 services is coming.
+- [waltid-web-portal2](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-web-portal2): interactive issuance/verification demo portal (Next.js), pairs with issuer-api2/verifier-api2.
+
+## Libraries (waltid-libraries/) — build your own tooling
+
+- [waltid-crypto2](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/crypto/waltid-crypto2): keys, signature algorithms, and KMS/HSM provider backends.
+- [waltid-did](https://github.com/walt-id/waltid-identity/blob/main/waltid-libraries/waltid-did/README.md): create, register, and resolve DIDs.
+- [waltid-digital-credentials](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/credentials/waltid-digital-credentials): unified parse/verify layer across W3C VC, SD-JWT, and mdoc.
+- [waltid-openid4vci](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vci): OpenID4VCI 1.0 issuer-side protocol implementation.
+- [waltid-openid4vp](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vp): OpenID4VP 1.0 core library with DCQL support.
+- [waltid-sdjwt](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/sdjwt/waltid-sdjwt): Selective Disclosure JWTs.
+
+## Docs
+
+- [docs.walt.id](https://docs.walt.id): concepts, protocol guides, and per-service getting-started pages.
+- [docs.walt.id/llms.txt](https://docs.walt.id/llms.txt): the docs site's own LLM index — start here for protocol/concept depth.
+- [Community Stack OpenAPI specs](https://docs.walt.id): machine-readable API references for issuer2/verifier2/wallet2.
+
+## Optional
+
+- [Legacy v1 services](https://github.com/walt-id/waltid-identity/tree/main/waltid-services) (`waltid-issuer-api`, `waltid-verifier-api`, `waltid-wallet-api`): draft-based OID4VCI/VP, planned for deprecation — only use for compatibility with existing draft integrations.
+- [CONTRIBUTING.md](https://github.com/walt-id/waltid-identity/blob/main/CONTRIBUTING.md): PR process and code of conduct.
+- [Mobile wallet development guide](https://github.com/walt-id/waltid-identity/blob/main/docs/mobile-wallet-development.md): setup for the native mobile SDK, demo apps, and mobile integration tests.
+- [waltid-services E2E/integration tests](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-e2e-tests): cross-service test suites.

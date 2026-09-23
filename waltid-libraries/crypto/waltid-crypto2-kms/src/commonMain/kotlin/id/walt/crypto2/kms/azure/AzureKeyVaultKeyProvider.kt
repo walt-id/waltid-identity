@@ -196,6 +196,8 @@ class AzureKeyVaultKeyProvider(
             } else {
                 signature
             }
+
+            
             return authorizedJson(
                 options = providerData.options,
                 endpoint = "${providerData.keyIdUrl}/verify?$API_VERSION",
@@ -203,7 +205,7 @@ class AzureKeyVaultKeyProvider(
                 body = buildJsonObject {
                     put("alg", algorithm.toAzureAlgorithm(storedKey.spec))
                     put("digest", base64Url.encode(digest.value.toByteArray()))
-                    put("signature", base64Url.encode(azureSignature))
+                    put("value", base64Url.encode(azureSignature))
                 },
             )["value"]?.jsonPrimitive?.content == "true"
         }

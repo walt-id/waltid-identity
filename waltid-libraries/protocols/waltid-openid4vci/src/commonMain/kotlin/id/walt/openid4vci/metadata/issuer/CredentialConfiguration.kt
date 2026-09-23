@@ -100,8 +100,8 @@ data class CredentialConfiguration(
                     }
 
                 CredentialFormat.MSO_MDOC ->
-                    require(algorithms.all { it is SigningAlgId.CoseValue || it is SigningAlgId.CoseName }) {
-                        "credential_signing_alg_values_supported must contain COSE identifiers for ${format.value}"
+                    require(algorithms.all { it is SigningAlgId.CoseValue }) {
+                        "credential_signing_alg_values_supported must contain numeric COSE identifiers for ${format.value}"
                     }
 
                 else ->

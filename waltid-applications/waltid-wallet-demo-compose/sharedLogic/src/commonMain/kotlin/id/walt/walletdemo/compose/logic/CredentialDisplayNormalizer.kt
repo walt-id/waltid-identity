@@ -20,13 +20,24 @@ object CredentialDisplayNormalizer {
         ignoreUnknownKeys = true
         isLenient = true
     }
-    private val valueDecoder = CredentialDisplayValueDecoder(json) { element, path -> element.toDisplayValue(path) }
+    private val valueDecoder = CredentialDisplayValueDecoder(json) { element, path, format ->
+        element.toDisplayValue(path, format)
+    }
 
-    fun toDetails(summary: CredentialSummary): CredentialDetails {
-        val issuerDisplay = StoredCredentialMetadataParser.issuerDisplay(summary.metadataJson)
+    fun toDetails(
+        summary: CredentialSummary,
+        preferredLocales: List<String> = emptyList(),
+    ): CredentialDetails {
+        val issuerDisplay = StoredCredentialMetadataParser.issuerDisplay(summary.metadataJson, preferredLocales)
+        val credentialDisplay = StoredCredentialMetadataParser.credentialDisplay(summary.metadataJson, preferredLocales)
         val rawJson = summary.credentialDataJson?.trim().orEmpty()
         if (rawJson.isBlank()) {
-            return CredentialDetails(summary = summary, groups = emptyList(), issuerDisplay = issuerDisplay)
+            return CredentialDetails(
+                summary = summary,
+                groups = emptyList(),
+                issuerDisplay = issuerDisplay,
+                credentialDisplay = credentialDisplay,
+            )
         }
 
         val parsed = runCatching { json.parseToJsonElement(rawJson).jsonObject }.getOrNull()
@@ -34,13 +45,18 @@ object CredentialDisplayNormalizer {
                 summary = summary,
                 groups = emptyList(),
                 issuerDisplay = issuerDisplay,
+                credentialDisplay = credentialDisplay,
             )
         val displayData = if (summary.format == MdocFormat) parsed.withoutNullObjectMembers() else parsed
 
         val groupedItems = displayData.entries
             .flatMap { (key, value) ->
                 val path = ClaimPath.topLevel(key)
-                value.toClaimRows(path = path, label = CredentialDisplayVocabulary.humanizedClaimLabel(key))
+                value.toClaimRows(
+                    path = path,
+                    label = CredentialDisplayVocabulary.humanizedClaimLabel(key),
+                    format = summary.format,
+                )
                     .map { row -> row.withMdocDisplaySemantics(summary.format) }
                     .map { row -> CredentialDisplayVocabulary.groupKind(row.path, summary.format) to row }
             }
@@ -63,13 +79,19 @@ object CredentialDisplayNormalizer {
             summary = summary,
             groups = groupedItems,
             issuerDisplay = issuerDisplay,
+            credentialDisplay = credentialDisplay,
         )
     }
 
-    internal fun toDisclosureValue(valueJson: String, displayValue: String?, path: ClaimPath): DisplayValue {
+    internal fun toDisclosureValue(
+        valueJson: String,
+        displayValue: String?,
+        path: ClaimPath,
+        format: String,
+    ): DisplayValue {
         val parsed = runCatching { json.parseToJsonElement(valueJson) }.getOrNull()
         if (parsed != null) {
-            val parsedValue = parsed.toDisplayValue(path)
+            val parsedValue = parsed.toDisplayValue(path, format)
             if (parsedValue is DisplayValue.Text && !displayValue.isNullOrBlank()) {
                 return DisplayValue.Text(displayValue)
             }
@@ -161,18 +183,19 @@ object CredentialDisplayNormalizer {
                 value.toClaimRows(
                     path = ClaimPath.child(path, key),
                     label = CredentialDisplayVocabulary.humanizedClaimLabel(key),
+                    format = null,
                 ).map { row -> row.item }
             }
-            else -> parsed.toClaimRows(path = path, label = fallbackLabel).map { row -> row.item }
+            else -> parsed.toClaimRows(path = path, label = fallbackLabel, format = null).map { row -> row.item }
         }
     }
 
-    private fun JsonElement.toClaimItem(path: ClaimPath, label: String): ClaimItem =
+    private fun JsonElement.toClaimItem(path: ClaimPath, label: String, format: String?): ClaimItem =
         ClaimItem(
             path = path.itemPath,
             pathComponents = path.components,
             label = label,
-            value = toProtocolDisplayValue(path) ?: toDisplayValue(path),
+            value = toProtocolDisplayValue(path) ?: toDisplayValue(path, format),
             rawValue = toString(),
             roles = CredentialDisplayVocabulary.roles(path),
         )
@@ -197,8 +220,8 @@ object CredentialDisplayNormalizer {
             else -> null
         }
 
-    private fun JsonElement.toClaimRows(path: ClaimPath, label: String): List<ClaimRow> {
-        val item = toClaimItem(path = path, label = label)
+    private fun JsonElement.toClaimRows(path: ClaimPath, label: String, format: String?): List<ClaimRow> {
+        val item = toClaimItem(path = path, label = label, format = format)
         return flattenObjectForClaimRows(path = path, item = item)
     }
 
@@ -225,6 +248,7 @@ object CredentialDisplayNormalizer {
     private fun DisplayValue.toBinaryAvailability(): DisplayValue.Text {
         val byteCount = when (this) {
             is DisplayValue.Image -> byteCount
+            is DisplayValue.DeferredImage -> byteCount
             is DisplayValue.ListValue -> values
                 .takeIf { it.isNotEmpty() && it.all { value -> value is DisplayValue.NumberValue } }
                 ?.size
@@ -252,27 +276,38 @@ object CredentialDisplayNormalizer {
             else -> this
         }
 
-    private fun JsonElement.flattenObjectForClaimRows(path: ClaimPath, item: ClaimItem): List<ClaimRow> =
+    private fun JsonElement.flattenObjectForClaimRows(
+        path: ClaimPath,
+        item: ClaimItem,
+    ): List<ClaimRow> =
         when {
             item.value !is DisplayValue.ObjectValue -> listOf(ClaimRow(path = path, item = item))
-            this is JsonObject -> entries.flatMap { (key, value) ->
+            this is JsonObject -> entries.flatMapIndexed { index, (key, value) ->
                 val childPath = ClaimPath.child(path, key)
-                val childItem = value.toClaimItem(
-                    path = childPath,
-                    label = CredentialDisplayVocabulary.humanizedClaimLabel(key),
-                )
+                val childItem = item.value.entries[index]
                 val rows = value.flattenObjectForClaimRows(path = childPath, item = childItem)
                 if (
                     rows.size == 1 &&
-                    rows.single().item.value is DisplayValue.Image &&
+                    (rows.single().item.value is DisplayValue.Image || rows.single().item.value is DisplayValue.DeferredImage) &&
                     rows.single().item.label == CredentialDisplayVocabulary.humanizedClaimLabel(imageWrapperClaimName)
                 ) {
                     listOf(rows.single().copy(item = rows.single().item.copy(label = item.label)))
                 } else {
-                    rows
+                    rows.map { row -> row.qualifiedWithParentLabel(parentPath = path, parentLabel = item.label) }
                 }
             }
             else -> item.flattenDisplayObjectForClaimRows()
+        }
+
+    /**
+     * Nested leaves such as `payee.name` say nothing on their own, so transaction data rows inherit
+     * the label of the object they came from.
+     */
+    private fun ClaimRow.qualifiedWithParentLabel(parentPath: ClaimPath, parentLabel: String): ClaimRow =
+        if (CredentialDisplayVocabulary.qualifiesNestedClaimLabels(parentPath)) {
+            copy(item = item.copy(label = CredentialDisplayVocabulary.qualifiedClaimLabel(parentLabel, item.label)))
+        } else {
+            this
         }
 
     private fun ClaimItem.flattenDisplayObjectForClaimRows(): List<ClaimRow> =
@@ -281,7 +316,7 @@ object CredentialDisplayNormalizer {
                 val rows = entry.flattenDisplayObjectForClaimRows()
                 if (
                     rows.size == 1 &&
-                    rows.single().item.value is DisplayValue.Image &&
+                    (rows.single().item.value is DisplayValue.Image || rows.single().item.value is DisplayValue.DeferredImage) &&
                     rows.single().item.label == CredentialDisplayVocabulary.humanizedClaimLabel(imageWrapperClaimName)
                 ) {
                     listOf(rows.single().copy(item = rows.single().item.copy(label = label)))
@@ -292,20 +327,31 @@ object CredentialDisplayNormalizer {
             else -> listOf(ClaimRow(path = ClaimPath(itemPath = path, components = pathComponents), item = this))
         }
 
-    private fun JsonElement.toDisplayValue(path: ClaimPath): DisplayValue =
+    private fun JsonElement.toDisplayValue(path: ClaimPath, format: String?): DisplayValue =
         when (this) {
             JsonNull -> DisplayValue.NullValue
             is JsonObject -> DisplayValue.ObjectValue(
                 entries = entries.map { (key, value) ->
-                    value.toClaimItem(path = ClaimPath.child(path, key), label = CredentialDisplayVocabulary.humanizedClaimLabel(key))
+                    value.toClaimItem(
+                        path = ClaimPath.child(path, key),
+                        label = CredentialDisplayVocabulary.humanizedClaimLabel(key),
+                        format = format,
+                    )
                 }
             )
-            is JsonArray -> valueDecoder.imageFromByteArray(this, CredentialDisplayVocabulary.roles(path))
-                ?: DisplayValue.ListValue(mapIndexed { index, value -> value.toDisplayValue(ClaimPath.indexed(path, index)) })
-            is JsonPrimitive -> toPrimitiveDisplayValue(path)
+            is JsonArray -> {
+                val renderList = {
+                    DisplayValue.ListValue(mapIndexed { index, value ->
+                        value.toDisplayValue(ClaimPath.indexed(path, index), format)
+                    })
+                }
+                valueDecoder.imageFromByteArray(this, CredentialDisplayVocabulary.roles(path), renderList)
+                    ?: renderList()
+            }
+            is JsonPrimitive -> toPrimitiveDisplayValue(path, format)
         }
 
-    private fun JsonPrimitive.toPrimitiveDisplayValue(path: ClaimPath): DisplayValue {
+    private fun JsonPrimitive.toPrimitiveDisplayValue(path: ClaimPath, format: String?): DisplayValue {
         booleanOrNull?.let { return DisplayValue.BooleanValue(it) }
         if (!isString) {
             content.formatEpochDateIfTemporal(path)?.let { return DisplayValue.Text(it) }
@@ -315,13 +361,26 @@ object CredentialDisplayNormalizer {
         val text = contentOrNull.orEmpty()
         text.formatEpochDateIfTemporal(path)?.let { return DisplayValue.Text(it) }
 
-        val decoded = valueDecoder.decodedString(text, path)
+        val decoded = valueDecoder.decodedString(
+            value = text,
+            path = path,
+            format = format,
+            imagePolicy = imageDecodingPolicy(path, format),
+        )
         if (decoded != null) {
             return decoded
         }
 
         return DisplayValue.Text(text)
     }
+
+    private fun imageDecodingPolicy(path: ClaimPath, format: String?): ImageDecodingPolicy =
+        when {
+            CredentialDisplayVocabulary.hasRole(path, ClaimRole.Image) -> ImageDecodingPolicy.SchemaImage
+            CredentialDisplayVocabulary.hasLeafDescriptor(path) -> ImageDecodingPolicy.Disabled
+            format?.lowercase()?.let(dataUrlFallbackFormats::contains) == true -> ImageDecodingPolicy.DataUrlFallback
+            else -> ImageDecodingPolicy.Disabled
+        }
 
     private fun String.formatEpochDateIfTemporal(path: ClaimPath): String? {
         if (!CredentialDisplayVocabulary.hasRole(path = path, role = ClaimRole.Temporal)) return null
@@ -340,6 +399,14 @@ object CredentialDisplayNormalizer {
     private const val epochMillisecondsThreshold = 10_000_000_000L
     private const val imageWrapperClaimName = "elementValue"
     private const val MdocFormat = "mso_mdoc"
+    private val dataUrlFallbackFormats = setOf(
+        "vc+sd-jwt",
+        "dc+sd-jwt",
+        "jwt_vc",
+        "jwt_vc_json",
+        "jwt_vc_json-ld",
+        "ldp_vc",
+    )
 }
 
 private data class ClaimRow(

@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -47,7 +49,9 @@ internal fun ReviewMetadataSection(
     content: @Composable () -> Unit,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(modifier),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
@@ -71,6 +75,46 @@ internal fun ReviewMetadataSection(
     }
 }
 
+/**
+ * Issuer or verifier identity. Tapping the box reveals technical details inline.
+ */
+@Composable
+internal fun ExpandableMetadataCard(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    toggleTestTag: String? = null,
+    summary: @Composable () -> Unit,
+    details: @Composable () -> Unit,
+) {
+    ReviewMetadataSection(title = title, modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (toggleTestTag != null) Modifier.testTag(toggleTestTag) else Modifier)
+                .clickable(role = Role.Button, onClick = onToggle)
+                .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
+                .padding(vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                summary()
+            }
+            Icon(
+                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = if (expanded) "Hide $title details" else "Show $title details",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (expanded) {
+            MetadataRowDivider()
+            details()
+        }
+    }
+}
+
 @Composable
 internal fun MetadataIdentityRow(
     display: WalletDemoMetadataDisplay?,
@@ -79,7 +123,7 @@ internal fun MetadataIdentityRow(
     modifier: Modifier = Modifier,
 ) {
     val name = display?.name?.takeIf { it.isNotBlank() } ?: fallbackName
-    val logoUri = display?.logoUri?.takeIf(::isHttpsUrl)
+    val logoUri = display?.logoUri?.takeIf(RasterImageSupport::isHttpsDisplayImageUrl)
 
     Row(
         modifier = modifier,
@@ -95,11 +139,19 @@ internal fun MetadataIdentityRow(
             if (logoUri != null) {
                 SubcomposeAsyncImage(
                     model = logoUri,
-                    contentDescription = display.logoAltText ?: "$name logo",
+                    contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit,
-                    loading = { MetadataLogoFallback(name) },
-                    error = { MetadataLogoFallback(name) },
+                    success = { state ->
+                        Image(
+                            painter = state.painter,
+                            contentDescription = display.logoAltText ?: "$name logo",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
+                        )
+                    },
+                    loading = {},
+                    error = {},
                 )
             } else {
                 MetadataLogoFallback(name)

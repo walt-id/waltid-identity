@@ -6,7 +6,7 @@ plugins {
 group = "id.walt.protocols"
 
 dependencies {
-    // Walt.id
+    // walt.id
     api(project(":waltid-services:waltid-service-commons"))
     implementation(project(":waltid-libraries:protocols:waltid-openid4vp-verifier"))
     implementation(project(":waltid-libraries:credentials:waltid-dcql"))

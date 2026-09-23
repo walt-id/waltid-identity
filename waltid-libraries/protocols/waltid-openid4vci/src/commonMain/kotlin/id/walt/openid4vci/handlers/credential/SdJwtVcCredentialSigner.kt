@@ -1,41 +1,31 @@
 package id.walt.openid4vci.handlers.credential
 
+import id.walt.certificate.x509.X509Certificate
+import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
-import id.walt.crypto2.jose.exportPublicJwkObject
 import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.Key as Crypto2Key
-import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
+import id.walt.crypto2.jose.exportPublicJwkObject
 import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDJwt.Companion.SEPARATOR_STR
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDJwtVC.Companion.defaultPayloadProperties
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
 import id.walt.w3c.issuance.Issuer.getKidHeader
-import id.walt.w3c.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonPrimitive
-import id.walt.crypto.utils.JsonUtils.toJsonObject
-import id.walt.sdjwt.SDJwt.Companion.SEPARATOR_STR
 import id.walt.w3c.issuance.dataFunctions
-import id.walt.x509.CertificateDer
-import kotlinx.serialization.json.jsonObject
+import id.walt.w3c.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
+import kotlinx.serialization.json.*
+import id.walt.crypto2.keys.Key as Crypto2Key
 
 object SdJwtVcCredentialSigner {
     @Deprecated("Use the Crypto2Key overload")
@@ -47,7 +37,7 @@ object SdJwtVcCredentialSigner {
         vct: String,
         selectiveDisclosure: SDMap? = null,
         dataMapping: JsonObject? = null,
-        x5Chain: List<CertificateDer>? = null,
+        x5Chain: List<X509Certificate>? = null,
         display: List<CredentialDisplay>? = null,
         sdJwtTypeHeader: String? = null,
         sdJwtCredentialClaims: JsonObject? = null,
@@ -76,7 +66,7 @@ object SdJwtVcCredentialSigner {
         vct: String,
         selectiveDisclosure: SDMap? = null,
         dataMapping: JsonObject? = null,
-        x5Chain: List<CertificateDer>? = null,
+        x5Chain: List<X509Certificate>? = null,
         display: List<CredentialDisplay>? = null,
         sdJwtTypeHeader: String? = null,
         sdJwtCredentialClaims: JsonObject? = null,
@@ -104,7 +94,7 @@ object SdJwtVcCredentialSigner {
         vct: String,
         selectiveDisclosure: SDMap?,
         dataMapping: JsonObject?,
-        x5Chain: List<CertificateDer>?,
+        x5Chain: List<X509Certificate>?,
         display: List<CredentialDisplay>?,
         sdJwtTypeHeader: String?,
         sdJwtCredentialClaims: JsonObject?,
@@ -174,7 +164,7 @@ object SdJwtVcCredentialSigner {
             JWT_HEADER_KID to JsonPrimitive(issuerKid),
             JWT_HEADER_TYPE to JsonPrimitive(sdJwtTypeHeader ?: SD_JWT_VC_TYPE_HEADER),
         ).plus(x5Chain?.let {
-            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert -> JsonPrimitive(cert.bytes.toByteArray().encodeToBase64()) }))
+            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert -> JsonPrimitive(cert.encodedDer.toByteArray().encodeToBase64()) }))
         } ?: mapOf())
 
         val finalSdPayload = SDPayload.createSDPayload(

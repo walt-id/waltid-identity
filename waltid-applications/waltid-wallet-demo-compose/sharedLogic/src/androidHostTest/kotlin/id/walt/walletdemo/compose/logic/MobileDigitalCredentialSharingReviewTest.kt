@@ -33,16 +33,16 @@ class MobileDigitalCredentialSharingReviewTest {
             transactionData = listOf(
                 transactionDataItem(
                     displayName = "Payment Authorization",
-                    detailsJson = """{"amount":"42.00","currency":"EUR","payee":"ACME Corp"}""",
+                    detailsJson = """{"merchant_name":"ACME Corp","amount":"42.00","currency":"EUR"}""",
                 ),
             ),
         ).toSharingReview()
 
         val payment = review.request.transactionData.single()
         assertEquals("Payment Authorization", payment.title)
+        assertEquals("ACME Corp", payment.textValue("Merchant name"))
         assertEquals("42.00", payment.textValue("Amount"))
         assertEquals("EUR", payment.textValue("Currency"))
-        assertEquals("ACME Corp", payment.textValue("Payee"))
     }
 
     /** Each item must survive the mapping: showing only the first authorizes the rest unseen. */
@@ -123,6 +123,34 @@ class MobileDigitalCredentialSharingReviewTest {
         assertEquals("https://verifier.example/about", requester.details.textValue("Client URI"))
         assertEquals("https://verifier.example/privacy", requester.details.textValue("Privacy policy"))
         assertEquals("https://verifier.example/terms", requester.details.textValue("Terms of service"))
+    }
+
+    /**
+     * Stored issuer card art is sidecar metadata, not credential data. Dropping it on the DC API
+     * present path leaves the review painting constructed fallback art.
+     */
+    @Test
+    fun reviewCarriesStoredCredentialDisplayMetadata() {
+        val metadataJson = """
+            {
+              "credentialDisplay": [
+                {
+                  "name": "Personal ID",
+                  "background_image": { "uri": "https://issuer.example/pid-bg.png" }
+                }
+              ]
+            }
+        """.trimIndent()
+        val review = digitalCredentialPreview(
+            credentialOptions = listOf(credentialOption(metadataJson = metadataJson)),
+        ).toSharingReview()
+
+        val option = review.credentialOptions.single()
+        assertEquals(metadataJson, option.metadataJson)
+        assertEquals(
+            "https://issuer.example/pid-bg.png",
+            option.toCredentialDetails().toCardDisplayData().backgroundImageUri,
+        )
     }
 
     /** The claims the request asks for are reviewed through the ordinary disclosure model. */
@@ -232,6 +260,7 @@ class MobileDigitalCredentialSharingReviewTest {
         transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
         verifierMetadata: MobileWalletVerifierMetadata? = null,
         responseMode: String? = "dc_api",
+        credentialOptions: List<MobileWalletPresentationCredentialOption> = listOf(credentialOption()),
     ): MobileWalletDigitalCredentialPreview = MobileWalletDigitalCredentialPreview(
         requestId = "request-1",
         protocol = "openid4vp-v1-unsigned",
@@ -243,7 +272,7 @@ class MobileDigitalCredentialSharingReviewTest {
             responseMode = responseMode,
             transactionData = transactionData,
         ),
-        credentialOptions = listOf(credentialOption()),
+        credentialOptions = credentialOptions,
         credentialRequirements = emptyList(),
         readerTrust = MobileWalletReaderTrust.NotApplicable,
     )
@@ -271,6 +300,7 @@ class MobileDigitalCredentialSharingReviewTest {
     private fun credentialOption(
         queryId: String = "pid",
         credentialId: String = "credential-1",
+        metadataJson: String? = null,
     ): MobileWalletPresentationCredentialOption = MobileWalletPresentationCredentialOption(
         queryId = queryId,
         credentialId = credentialId,
@@ -288,6 +318,7 @@ class MobileDigitalCredentialSharingReviewTest {
                 selectivelyDisclosable = false,
             ),
         ),
+        metadataJson = metadataJson,
     )
 
     private fun transactionDataItem(

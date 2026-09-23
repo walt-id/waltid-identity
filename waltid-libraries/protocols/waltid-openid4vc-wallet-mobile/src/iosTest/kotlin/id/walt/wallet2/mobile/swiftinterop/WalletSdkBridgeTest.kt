@@ -2,6 +2,7 @@ package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletDidEntry
@@ -10,8 +11,8 @@ import id.walt.wallet2.mobile.MobileWalletEventPhase
 import id.walt.wallet2.mobile.MobileWalletEventStatus
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
-import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletClientIdScheme
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
@@ -30,15 +31,20 @@ import id.walt.wallet2.mobile.MobileWalletResponseEncryption
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.MobileWalletVerifierMetadata
+import id.walt.wallet2.mobile.MobileWalletRequestAuthentication
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.mobile.WalletAttestationConfig
-import id.walt.x509.CertificateDer
+import id.waltid.openid4vci.wallet.metadata.MetadataSigner
+import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -48,6 +54,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class WalletSdkBridgeTest {
@@ -85,23 +92,6 @@ class WalletSdkBridgeTest {
     }
 
     @Test
-    fun bridgeBootstrapMapsKeyTypeAndResultDto() = runTest {
-        val operations = FakeWalletSdkBridgeOperations()
-        val bridge = WalletSdkBridge.forOperations(operations)
-
-        val result = bridge.bootstrap(
-            keyType = MobileWalletKeyType.secp256r1,
-            didMethod = "jwk",
-        )
-
-        assertIs<WalletBridgeResult.Success<MobileWalletBootstrapResult>>(result)
-        assertEquals("key-1", result.value.keyId)
-        assertEquals("did:jwk:issuer", result.value.did)
-        assertEquals(MobileWalletKeyType.secp256r1, operations.bootstrapKeyType)
-        assertEquals("jwk", operations.bootstrapDidMethod)
-    }
-
-    @Test
     fun bridgeCancelsIssuanceSessionsThroughTypedResults() = runTest {
         val operations = FakeWalletSdkBridgeOperations()
         val bridge = WalletSdkBridge.forOperations(operations)
@@ -135,6 +125,19 @@ class WalletSdkBridgeTest {
 
         assertIs<WalletBridgeResult.Success<Unit>>(result)
         assertEquals(1, operations.deleteWalletCalls)
+    }
+
+    @Test
+    fun bridgeDeletesCredentialAsSuccessResult() = runTest {
+        val operations = FakeWalletSdkBridgeOperations()
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        val result = bridge.deleteCredential("credential-1")
+
+        assertIs<WalletBridgeResult.Success<Boolean>>(result)
+        assertEquals(true, result.value)
+        assertEquals(1, operations.deleteCredentialCalls)
+        assertEquals(listOf("credential-1"), operations.deletedCredentialIds)
     }
 
     @Test
@@ -187,6 +190,68 @@ class WalletSdkBridgeTest {
     }
 
     @Test
+    fun bridgePresentationPreviewPreservesAuthenticatedRequestFacts() = runTest {
+        val operations = FakeWalletSdkBridgeOperations(
+            requestAuthentication = MobileWalletRequestAuthentication.Authenticated(
+                compactRequestObject = "signed-request-object",
+                algorithm = "ES256",
+                keyId = "verifier-kid",
+                clientIdScheme = MobileWalletClientIdScheme.PRE_REGISTERED,
+            ),
+        )
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        val result = bridge.previewPresentation("openid4vp://request")
+
+        val preview = assertIs<MobileWalletPresentationPreviewResult.Ready>(
+            assertIs<WalletBridgeResult.Success<MobileWalletPresentationPreviewResult>>(result).value,
+        ).preview
+        assertEquals(
+            MobileWalletRequestAuthentication.Authenticated(
+                compactRequestObject = "signed-request-object",
+                algorithm = "ES256",
+                keyId = "verifier-kid",
+                clientIdScheme = MobileWalletClientIdScheme.PRE_REGISTERED,
+            ),
+            preview.request.requestAuthentication,
+        )
+    }
+
+    @Test
+    fun bridgeIssuerMetadataTrustResolverPreservesSignerFacts() = runTest {
+        listOf(
+            WalletBridgeIssuerMetadataSignerTrustType.TrustedIssuer to MetadataSignerTrustType.TRUSTED_ISSUER,
+            WalletBridgeIssuerMetadataSignerTrustType.TrustedDelegate to MetadataSignerTrustType.TRUSTED_DELEGATE,
+        ).forEach { (bridgeTrustType, expectedTrustType) ->
+            val configured = WalletBridgeConfiguration(
+                issuerMetadataTrustResolver = object : WalletBridgeIssuerMetadataTrustResolver {
+                    override suspend fun verify(
+                        compactJwt: String,
+                        expectedCredentialIssuer: String,
+                    ) = WalletBridgeIssuerMetadataSigner(
+                        keyId = "issuer-key",
+                        algorithm = "ES256",
+                        trustType = bridgeTrustType,
+                    ).also {
+                        assertEquals("signed-metadata-jwt", compactJwt)
+                        assertEquals("https://issuer.example", expectedCredentialIssuer)
+                    }
+                },
+            ).toMobileWalletConfig()
+
+            val signer = requireNotNull(configured.credentialIssuerMetadataTrustResolver).verify(
+                "signed-metadata-jwt",
+                "https://issuer.example",
+            )
+
+            assertEquals(
+                MetadataSigner("issuer-key", "ES256", expectedTrustType),
+                signer,
+            )
+        }
+    }
+
+    @Test
     fun bridgePresentationPreviewPreservesDetectedProtocolError() = runTest {
         val expected = MobileWalletPresentationPreviewResult.Invalid(
             previewHandle = MobileWalletPresentationPreviewHandle("presentation-preview"),
@@ -203,6 +268,7 @@ class WalletSdkBridgeTest {
                     policyUri = null,
                     termsOfServiceUri = null,
                 ),
+                requestAuthentication = MobileWalletRequestAuthentication.Unauthenticated,
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
                 nonce = null,
@@ -274,6 +340,7 @@ class WalletSdkBridgeTest {
     }
 
     @Test
+    @OptIn(ExperimentalSerializationApi::class)
     fun factoryMapsSwiftFriendlyConfigurationToMobileWalletConfig() = runTest {
         var capturedConfig: MobileWalletConfig? = null
         var capturedTrustConfiguration: ClientIdTrustConfiguration? = null
@@ -282,12 +349,11 @@ class WalletSdkBridgeTest {
             capturedTrustConfiguration = trustConfiguration
             FakeWalletSdkBridgeOperations()
         }
-        val trustAnchor = CertificateDer(byteArrayOf(1, 2, 3)).toPEMEncodedString()
+        val expectedTrustAnchor = X509CertificateUtil.parseCertificatePem(validTrustAnchorPem)
 
         val result = factory.create(
             WalletBridgeConfiguration(
                 walletId = "consumer-wallet",
-                defaultKeyType = MobileWalletKeyType.Ed25519,
                 persistence = WalletBridgePersistence(
                     databaseKey = WalletBridgeDatabaseKeyConfiguration.Managed,
                 ),
@@ -298,7 +364,10 @@ class WalletSdkBridgeTest {
                     hostHeader = "attestation.example",
                 ),
                 clientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(
-                    x509TrustAnchorsPem = listOf(trustAnchor),
+                    x509TrustAnchorsPem = listOf(validTrustAnchorPem),
+                    preRegisteredClientMetadataJson = mapOf(
+                        "demo-verifier" to """{"jwks":{"keys":[{"kty":"EC","crv":"P-256","x":"x","y":"y"}]}}""",
+                    ),
                 ),
                 preferredLocales = listOf("de-AT", "en"),
                 transactionDataProfiles = listOf(
@@ -313,7 +382,6 @@ class WalletSdkBridgeTest {
 
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         assertEquals("consumer-wallet", capturedConfig?.walletId)
-        assertEquals(MobileWalletKeyType.Ed25519, capturedConfig?.defaultKeyType)
         assertEquals(
             MobileWalletPersistence(),
             capturedConfig?.persistence,
@@ -322,7 +390,12 @@ class WalletSdkBridgeTest {
         assertEquals("/wallet-attestation", capturedConfig?.attestationConfig?.attesterPath)
         assertEquals("token", capturedConfig?.attestationConfig?.bearerToken)
         assertEquals("attestation.example", capturedConfig?.attestationConfig?.hostHeader)
-        assertEquals(listOf(CertificateDer(byteArrayOf(1, 2, 3))), capturedTrustConfiguration?.x509TrustAnchors)
+        val capturedTrustStore = assertNotNull(capturedTrustConfiguration?.x509TrustAnchors)
+        val capturedTrustAnchor = capturedTrustStore
+            .findCertificateBySubjectDn(expectedTrustAnchor.data.subjectDn)
+            .single()
+        assertEquals(expectedTrustAnchor.encodedDer, capturedTrustAnchor.encodedDer)
+        assertEquals(setOf("demo-verifier"), capturedTrustConfiguration?.preRegisteredClients?.keys)
         assertEquals(listOf("de-AT", "en"), capturedConfig?.preferredLocales)
         assertEquals(
             listOf(
@@ -524,7 +597,6 @@ class WalletSdkBridgeTest {
         val config = WalletBridgeConfiguration().toMobileWalletConfig()
 
         assertEquals("default", config.walletId)
-        assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
         assertEquals(null, config.attestationConfig)
         assertEquals(MobileWalletPersistence(), config.persistence)
         assertEquals(emptyList(), config.preferredLocales)
@@ -564,11 +636,9 @@ class WalletSdkBridgeTest {
 
     private class FakeWalletSdkBridgeOperations(
         private val previewResult: MobileWalletPresentationPreviewResult? = null,
+        private val requestAuthentication: MobileWalletRequestAuthentication =
+            MobileWalletRequestAuthentication.Unauthenticated,
     ) : WalletSdkBridgeOperations {
-        var bootstrapKeyType: MobileWalletKeyType? = null
-            private set
-        var bootstrapDidMethod: String? = null
-            private set
         var presentationRequestUrl: String? = null
             private set
         var presentationDid: String? = null
@@ -577,6 +647,9 @@ class WalletSdkBridgeTest {
             private set
         var deleteWalletCalls = 0
             private set
+        var deleteCredentialCalls = 0
+            private set
+        val deletedCredentialIds = mutableListOf<String>()
         var previewRequestUrl: String? = null
             private set
         var submittedPreviewHandle: MobileWalletPresentationPreviewHandle? = null
@@ -597,17 +670,10 @@ class WalletSdkBridgeTest {
             private set
         var cancelledIssuanceSessionId: String? = null
             private set
-        override suspend fun bootstrap(
-            keyType: MobileWalletKeyType?,
-            didMethod: String,
-        ): MobileWalletBootstrapResult {
-            bootstrapKeyType = keyType
-            bootstrapDidMethod = didMethod
-            return MobileWalletBootstrapResult(
-                keyId = "key-1",
-                did = "did:jwk:issuer",
-            )
-        }
+        override suspend fun keyUseAuthorizationPreflight(
+            keyType: MobileWalletKeyType,
+            policy: KeyUseAuthorizationPolicy,
+        ): KeyUseAuthorizationSupport = error("Not used by this test fake")
 
         override suspend fun startIssuance(request: MobileWalletIssuanceRequest) =
             error("Not used by this test fake")
@@ -646,6 +712,12 @@ class WalletSdkBridgeTest {
                 )
             )
 
+        override suspend fun deleteCredential(credentialId: String): Boolean {
+            deleteCredentialCalls++
+            deletedCredentialIds += credentialId
+            return true
+        }
+
         override suspend fun deleteWallet() {
             deleteWalletCalls++
         }
@@ -681,6 +753,7 @@ class WalletSdkBridgeTest {
                         policyUri = null,
                         termsOfServiceUri = null,
                     ),
+                    requestAuthentication = requestAuthentication,
                     responseUri = "https://verifier.example/direct-post",
                     state = "state-1",
                     nonce = "nonce-1",
@@ -799,3 +872,19 @@ class WalletSdkBridgeTest {
     }
 
 }
+
+private val validTrustAnchorPem = """
+    -----BEGIN CERTIFICATE-----
+    MIICCTCCAY6gAwIBAgINAgPlwGjvYxqccpBQUjAKBggqhkjOPQQDAzBHMQswCQYD
+    VQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEUMBIG
+    A1UEAxMLR1RTIFJvb3QgUjQwHhcNMTYwNjIyMDAwMDAwWhcNMzYwNjIyMDAwMDAw
+    WjBHMQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2Vz
+    IExMQzEUMBIGA1UEAxMLR1RTIFJvb3QgUjQwdjAQBgcqhkjOPQIBBgUrgQQAIgNi
+    AATzdHOnaItgrkO4NcWBMHtLSZ37wWHO5t5GvWvVYRg1rkDdc/eJkTBa6zzuhXyi
+    QHY7qca4R9gq55KRanPpsXI5nymfopjTX15YhmUPoYRlBtHci8nHc8iMai/lxKvR
+    HYqjQjBAMA4GA1UdDwEB/wQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQW
+    BBSATNbrdP9JNqPV2Py1PsVq8JQdjDAKBggqhkjOPQQDAwNpADBmAjEA6ED/g94D
+    9J+uHXqnLrmvT/aDHQ4thQEd0dlq7A/Cr8deVl5c1RxYIigL9zC2L7F8AjEA8GE8
+    p/SgguMh1YQdc4acLa/KNJvxn7kjNuK8YAOdgLOaVsjh4rsUecrNIdSUtUlD
+    -----END CERTIFICATE-----
+""".trimIndent()

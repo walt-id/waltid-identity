@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
@@ -45,25 +45,39 @@ jobs:
 
       - name: Configure gradle
         if: ${{ steps.detect.outputs.exists == 'true' }}
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Enable Android build in identity repo
         if: ${{ steps.detect.outputs.exists == 'true' }}
-        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        uses: ./waltid-identity/.github/actions/set-properties
         with:
           file: 'waltid-identity/gradle.properties'
           properties: 'enableAndroidBuild=true'
 
       - name: Enable Android build in unified-build root
         if: ${{ steps.detect.outputs.exists == 'true' }}
-        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        uses: ./waltid-identity/.github/actions/set-properties
         with:
           file: 'gradle.properties'
           properties: 'enableAndroidBuild=true'
 
+      - name: Write Google services config
+        if: ${{ steps.detect.outputs.exists == 'true' }}
+        env:
+          GOOGLE_SERVICES_PREVIEW_JSON: ${{ secrets.GOOGLE_SERVICES_PREVIEW_JSON }}
+          GOOGLE_SERVICES_PRODUCTION_JSON: ${{ secrets.GOOGLE_SERVICES_PRODUCTION_JSON }}
+        run: |
+          set -euo pipefail
+          script="waltid-identity/.github/scripts/mobile-ci/write-google-services.sh"
+          if [ -f "$script" ]; then
+            bash "$script"
+          else
+            echo "::notice::Google services write script not present on this ref; skipping."
+          fi
+
       - name: Build debug APK
         if: ${{ steps.detect.outputs.exists == 'true' }}
-        run: ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug -PappVersionName=${{ inputs.version }} --no-daemon --console=plain --warning-mode=summary
+        run: ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleProductionDebug -PappVersionName=${{ inputs.version }} -PappVersionCode=${{ github.run_number }} --no-daemon --console=plain --warning-mode=summary
         env:
           CI: "true"
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
@@ -74,7 +88,7 @@ jobs:
         if: ${{ steps.detect.outputs.exists == 'true' }}
         run: |
           set -euo pipefail
-          apk=$(find waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/apk/debug -name '*.apk' | head -n 1)
+          apk=$(find waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/apk/production/debug -name '*.apk' | head -n 1)
           if [ -z "$apk" ]; then
             echo "::error::No APK found"
             exit 1
@@ -93,3 +107,38 @@ jobs:
           fail_on_unmatched_files: false
           prerelease: ${{ contains(inputs.tag, 'PRE-RELEASE') }}
           make_latest: ${{ inputs.make_latest }}
+
+      - name: Write Firebase release notes
+        if: ${{ steps.detect.outputs.exists == 'true' && steps.apk.outputs.path != '' }}
+        env:
+          VARIANT: production
+          COMMIT_SHA: ${{ github.sha }}
+          AUTHOR: ${{ github.actor }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          script="waltid-identity/.github/scripts/mobile-ci/write-mobile-release-notes.sh"
+          if [ -f "$script" ]; then
+            bash "$script" "$RUNNER_TEMP/firebase-release-notes.txt"
+          else
+            echo "::notice::Firebase release-notes script not present on this ref; skipping."
+          fi
+
+      - name: Upload production APK to Firebase App Distribution
+        if: ${{ steps.detect.outputs.exists == 'true' && steps.apk.outputs.path != '' }}
+        env:
+          APK_PATH: ${{ steps.apk.outputs.path }}
+          FIREBASE_APP_ID: 1:548517295104:android:cb044a978d7d49e7e154e5
+          FIREBASE_GROUPS: General
+          FIREBASE_PROJECT: waltid-compose-app
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          RELEASE_NOTES_FILE: ${{ runner.temp }}/firebase-release-notes.txt
+        run: |
+          set -euo pipefail
+          script="waltid-identity/.github/scripts/mobile-ci/distribute-firebase-android.sh"
+          if [ -f "$script" ]; then
+            bash "$script"
+          else
+            echo "::notice::Firebase distribute script not present on this ref; skipping."
+          fi

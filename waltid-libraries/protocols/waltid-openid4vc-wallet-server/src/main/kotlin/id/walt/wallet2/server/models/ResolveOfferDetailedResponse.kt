@@ -97,8 +97,8 @@ fun WalletOfferResolution.toDetailedResponse(
     tokenEndpoint = summary.tokenEndpoint,
     nonceEndpoint = summary.nonceEndpoint,
     issuer = OfferIssuerMetadata(
-        credentialIssuer = issuerMetadata.credentialIssuer,
-        display = issuerMetadata.display.selectPreferredByLocale(preferredLocales) { it.locale }?.toOfferDisplay(),
+        credentialIssuer = resolvedIssuerMetadata.metadata.credentialIssuer,
+        display = resolvedIssuerMetadata.metadata.display.selectPreferredByLocale(preferredLocales) { it.locale }?.toOfferDisplay(),
     ),
     offeredCredentials = offeredCredentials.map { offered ->
         val configuration = offered.configuration

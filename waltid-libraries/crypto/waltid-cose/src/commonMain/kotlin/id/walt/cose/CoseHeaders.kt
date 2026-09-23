@@ -166,10 +166,10 @@ object CoseCertificateSerializer : KSerializer<List<CoseCertificate>> {
         return when (element) {
             is CborArray -> element.map {
                 require(it is CborByteString) { "x5chain array elements must be byte strings" }
-                CoseCertificate(it.value)
+                CoseCertificate(it.toByteArray())
             }
 
-            is CborByteString -> listOf(CoseCertificate(element.value))
+            is CborByteString -> listOf(CoseCertificate(element.toByteArray()))
             else -> throw IllegalArgumentException("Expected array or bytestring for x5chain, got ${element::class.simpleName}")
         }
     }
@@ -222,7 +222,7 @@ object CoseCertHashSerializer : KSerializer<CoseCertHash> {
             is CborInteger -> alg.long.toInt()
             else -> throw IllegalArgumentException("x5t hashAlg must be an integer COSE algorithm identifier")
         }
-        return CoseCertHash(algInt, hash.value)
+        return CoseCertHash(algInt, hash.toByteArray())
     }
 }
 
@@ -245,7 +245,7 @@ object CoseKidSerializer : KSerializer<ByteArray?> {
     override fun deserialize(decoder: Decoder): ByteArray? {
         val element = decoder.decodeSerializableValue(CborElement.serializer())
         return when (element) {
-            is CborByteString -> element.value
+            is CborByteString -> element.toByteArray()
             is CborString -> element.value.encodeToByteArray()
             else -> null
         }

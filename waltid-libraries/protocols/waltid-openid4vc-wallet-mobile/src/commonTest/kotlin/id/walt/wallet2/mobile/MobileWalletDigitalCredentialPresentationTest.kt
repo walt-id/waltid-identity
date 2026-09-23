@@ -1,31 +1,65 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.wallet2.mobile
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.cose.Cose
+import id.walt.cose.CoseCertificate
+import id.walt.cose.coseCompliantCbor
+import id.walt.cose.toCoseKey
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.MdocsExamples
 import id.walt.credentials.examples.SdJwtExamples
 import id.walt.crypto.utils.Base64Utils.base64Url
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.algorithms.DigestAlgorithm
+import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
+import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.mdoc.issuance.MdocIssuer
+import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
+import id.walt.mdoc.objects.document.Document
+import id.walt.sdjwt.Crypto2AsyncJWTCryptoProvider
+import id.walt.sdjwt.Crypto2SdJwtKey
+import id.walt.sdjwt.SDField
+import id.walt.sdjwt.SDJwt
+import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.SDPayload
+import id.walt.wallet2.data.HolderKeyBindingErrorCode
+import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
+import id.walt.wallet2.data.withImportedHolderKeyBinding
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
-import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.cbor.CborByteString
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -78,7 +112,12 @@ class MobileWalletDigitalCredentialPresentationTest {
 
     @Test
     fun previewsAndSubmitsAnMdocRequestThroughTheDigitalCredentialsApi() = runTest {
-        val fixture = walletFixture(mdocCredential())
+        val holderKey = signingKey("mdoc-holder-key")
+        val unrelatedDefaultKey = signingKey("unrelated-wallet-default")
+        val fixture = walletFixtureWithKeys(
+            keys = listOf(unrelatedDefaultKey, holderKey),
+            credentials = arrayOf(mdocCredential(holderKey = holderKey)),
+        )
 
         val preview = fixture.wallet.previewDigitalCredentialPresentation(
             dcApiRequest(
@@ -100,6 +139,117 @@ class MobileWalletDigitalCredentialPresentationTest {
             fixture.presentationFor("mdl", data).isNotBlank(),
             "mdoc DeviceResponse missing from the vp_token: $data",
         )
+    }
+
+    @Test
+    fun requestedMdocImageBytesSurviveRegistrySelectionAndSubmission() = runTest {
+        val holderKey = signingKey("image-holder-key")
+        val fixture = walletFixtureWithKeys(
+            keys = listOf(holderKey),
+            credentials = arrayOf(mdocCredential(holderKey = holderKey, imageBytes = IMAGE_BYTES)),
+            registrationProjection = MobileWalletRegistryProjection.MdocIdentity,
+        )
+        val preview = fixture.wallet.previewDigitalCredentialPresentation(
+            dcApiRequest(
+                data = dcApiRequestData(
+                    credentialQuery = """{
+                      "id":"mdl", "format":"mso_mdoc",
+                      "meta":{"doctype_value":"$MDOC_DOCTYPE"},
+                      "claims":[{"path":["$MDOC_NAMESPACE","arbitrary_attachment"]}]
+                    }""",
+                ),
+                selectedRegistryEntryIds = listOf(fixture.registryEntryId("mdl-1")),
+            ),
+        )
+        val option = preview.credentialOptions.single()
+        val disclosure = option.disclosures.single()
+        assertTrue(disclosure.required)
+        val response = fixture.wallet.submitDigitalCredentialPresentation(
+            requestId = preview.requestId,
+            selectedCredentialOptions = preview.credentialOptions.selections(),
+            // Required mdoc claims are retained by the query and are not optional UI toggles.
+            selectedDisclosureOptions = emptyList(),
+        )
+        val data = Json.parseToJsonElement(response.dataJson).jsonObject
+        val deviceResponse = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(
+            fixture.presentationFor("mdl", data).decodeFromBase64Url(),
+        )
+        val items = assertNotNull(deviceResponse.documents).single().issuerSigned.namespaces
+            ?.get(MDOC_NAMESPACE)?.entries
+        val item = assertNotNull(items).single().value
+        assertEquals("arbitrary_attachment", item.elementIdentifier)
+        assertContentEquals(IMAGE_BYTES, (item.elementValue as CborByteString).toByteArray())
+    }
+
+    @Test
+    fun requestedSdJwtImageDataSurvivesRegistrySelectionAndExplicitDisclosure() = runTest {
+        val imageDataUrl = "data:image/png;base64,$IMAGE_BASE64"
+        val issuer = signingKey("image-issuer-key")
+        val payload = SDPayload.createSDPayload(
+            fullPayload = buildJsonObject {
+                put("iss", "https://issuer.example")
+                put("vct", SD_JWT_VCT)
+                put("arbitrary_attachment", imageDataUrl)
+                put("unrequested_attachment", imageDataUrl)
+            },
+            disclosureMap = SDMap(mapOf(
+                "arbitrary_attachment" to SDField(sd = true),
+                "unrequested_attachment" to SDField(sd = true),
+            )),
+        )
+        val provider = Crypto2AsyncJWTCryptoProvider(
+            mapOf("issuer" to Crypto2SdJwtKey(issuer, JwsAlgorithm.ES256)),
+        )
+        val signed = SDJwt.createFromSignedJwt(
+            signedJwt = provider.sign(payload.undisclosedPayload, "issuer", "dc+sd-jwt", emptyMap()),
+            sdPayload = payload,
+        )
+        val fixture = walletFixture(StoredCredential(
+            id = "pid-1",
+            credential = CredentialParser.detectAndParse(signed.toString()).second,
+        ))
+        val preview = fixture.wallet.previewDigitalCredentialPresentation(dcApiRequest(
+            data = dcApiRequestData(credentialQuery = """{
+              "id":"pid", "format":"dc+sd-jwt",
+              "meta":{"vct_values":["$SD_JWT_VCT"]},
+              "claims":[{"path":["arbitrary_attachment"]}]
+            }"""),
+            selectedRegistryEntryIds = listOf(fixture.registryEntryId("pid-1")),
+        ))
+        val option = preview.credentialOptions.single()
+        val response = fixture.wallet.submitDigitalCredentialPresentation(
+            requestId = preview.requestId,
+            selectedCredentialOptions = preview.credentialOptions.selections(),
+            selectedDisclosureOptions = listOf(MobileWalletPresentationDisclosureSelection(
+                option.queryId, option.credentialId, option.disclosures.single().path,
+            )),
+        )
+        val data = Json.parseToJsonElement(response.dataJson).jsonObject
+        val presented = SDJwt.parse(fixture.presentationFor("pid", data))
+        assertEquals(imageDataUrl, presented.fullPayload["arbitrary_attachment"]?.jsonPrimitive?.content)
+        assertFalse(presented.fullPayload.containsKey("unrequested_attachment"))
+        assertTrue(presented.sdPayload.verifyDisclosures())
+    }
+
+    @Test
+    fun anUnboundMdocIsRejectedDuringPreview() = runTest {
+        val holderKey = signingKey("mdoc-holder-key")
+        val fixture = walletFixtureWithKeys(
+            keys = listOf(holderKey),
+            credentials = arrayOf(mdocCredential(holderKey = holderKey)),
+            bindMdocs = false,
+        )
+
+        val failure = assertFailsWith<HolderKeyBindingException> {
+            fixture.wallet.previewDigitalCredentialPresentation(
+                dcApiRequest(
+                    data = mdocQuery(),
+                    selectedRegistryEntryIds = listOf(fixture.registryEntryId("mdl-1")),
+                )
+            )
+        }
+
+        assertEquals(HolderKeyBindingErrorCode.BINDING_MISSING, failure.code)
     }
 
     /**
@@ -374,7 +524,11 @@ class MobileWalletDigitalCredentialPresentationTest {
     /** Annex C requests use the dedicated facade, so the OpenID4VP entry point must turn them away. */
     @Test
     fun annexCRequestsAreNotAcceptedByTheOpenId4VpEntryPoint() = runTest {
-        val fixture = walletFixture(mdocCredential())
+        val holderKey = signingKey("annex-c-entrypoint-holder-key")
+        val fixture = walletFixtureWithKeys(
+            keys = listOf(holderKey),
+            credentials = arrayOf(mdocCredential(holderKey = holderKey)),
+        )
 
         assertFailsWith<IllegalArgumentException> {
             fixture.wallet.previewDigitalCredentialPresentation(
@@ -425,30 +579,55 @@ class MobileWalletDigitalCredentialPresentationTest {
         transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     ): Fixture {
         // The DC API is a crypto2-only surface, so the wallet holds nothing but a managed key.
-        val holderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
-            GenerateSoftwareKeyRequest(
-                id = KeyId("dc-api-holder-key"),
-                spec = KeySpec.Ec(EcCurve.P256),
-                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-            )
+        return walletFixtureWithKeys(
+            keys = listOf(signingKey("dc-api-holder-key")),
+            credentials = credentials,
+            transactionDataProfiles = transactionDataProfiles,
         )
+    }
+
+    private suspend fun walletFixtureWithKeys(
+        keys: List<Crypto2Key>,
+        credentials: Array<out StoredCredential>,
+        transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+        bindMdocs: Boolean = true,
+        registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
+    ): Fixture {
         val registry = CapturingRegistry()
+        val keyStore = InMemoryMobileWalletKeyStore().also { store ->
+            keys.forEach { store.addCrypto2Key(it) }
+        }
+        val bindingWallet = Wallet(id = "dc-api-presentation-wallet", keyStores = listOf(keyStore))
         val credentialStore = RecordingCredentialStore().also { store ->
-            credentials.forEach { store.addCredential(it) }
+            credentials.forEach { credential ->
+                store.addCredential(
+                    if (bindMdocs) bindingWallet.withImportedHolderKeyBinding(credential) else credential
+                )
+            }
         }
         val wallet = MobileWallet(
             walletId = "dc-api-presentation-wallet",
-            keyStore = InMemoryKeyStore().also { it.addCrypto2Key(holderKey) },
+            keyStore = keyStore,
             didStore = InMemoryDidStore().also {
                 it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
             },
             credentialStore = credentialStore,
-            generateAndPersistKey = { error("Digital Credentials presentation must not bootstrap a key") },
+
             transactionDataProfiles = transactionDataProfiles,
             credentialRegistry = registry,
+            registrationProjection = registrationProjection,
         )
         return Fixture(wallet, registry, credentialStore)
     }
+
+    private suspend fun signingKey(id: String): Crypto2Key =
+        CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId(id),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
 
     private fun dcApiRequest(
         data: String,
@@ -524,11 +703,57 @@ class MobileWalletDigitalCredentialPresentationTest {
      * the only key DCQL's `doctype_value` constraint reads. A fixture omitting it matches nothing, which
      * would be indistinguishable here from a routing bug.
      */
-    private suspend fun mdocCredential(id: String = "mdl-1"): StoredCredential = StoredCredential(
-        id = id,
-        credential = CredentialParser.detectAndParse(MdocsExamples.mdocsExampleBase64Url).second,
-        label = "mDL",
-    )
+    @OptIn(ExperimentalUnsignedTypes::class)
+    private suspend fun mdocCredential(
+        id: String = "mdl-1",
+        holderKey: Crypto2Key? = null,
+        imageBytes: ByteArray? = null,
+    ): StoredCredential {
+        if (holderKey == null) {
+            return StoredCredential(
+                id = id,
+                credential = CredentialParser.detectAndParse(MdocsExamples.mdocsExampleBase64Url).second,
+                label = "mDL",
+            )
+        }
+        val issuerKey = signingKey("mdoc-issuer-key")
+        val signatureAlgorithm = SignatureAlgorithm.Ecdsa(
+            DigestAlgorithm.SHA_256,
+            EcdsaSignatureEncoding.DER,
+        )
+        val certificate = X509CertificateUtil.createSelfSignedCertificate(issuerKey, signatureAlgorithm) {
+            subjectDn = "CN=Mobile wallet mdoc test issuer"
+        }
+        val holderPublicJwk = holderKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk
+        val issuerSigned = MdocIssuer.issueUniversal(
+            issuerKey = issuerKey,
+            signatureAlgorithm = Cose.Algorithm.ES256,
+            issuerCertificate = listOf(CoseCertificate(certificate.encodedDer.toByteArray())),
+            holderKey = holderPublicJwk.toCoseKey(),
+            docType = MDOC_DOCTYPE,
+            data = MdocIssuer.MdocUniversalIssuanceData(
+                namespaces = mapOf(
+                    MDOC_NAMESPACE to buildJsonObject {
+                        put("given_name", "Inga")
+                        if (imageBytes != null) put("arbitrary_attachment", JsonPrimitive("image"))
+                    }
+                )
+            ),
+            valueMappingFunction = { docType, namespace, name, value ->
+                if (name == "arbitrary_attachment" && imageBytes != null) CborByteString(imageBytes)
+                else MdocIssuer.defaultSchemalessMappingFunction(docType, namespace, name, value)
+            },
+        )
+        val raw = coseCompliantCbor.encodeToByteArray(
+            Document.serializer(),
+            Document(docType = MDOC_DOCTYPE, issuerSigned = issuerSigned),
+        ).encodeToBase64Url()
+        return StoredCredential(
+            id = id,
+            credential = CredentialParser.detectAndParse(raw).second,
+            label = "mDL",
+        )
+    }
 
     private fun List<MobileWalletPresentationCredentialOption>.selections() =
         map { MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId) }
@@ -574,6 +799,8 @@ class MobileWalletDigitalCredentialPresentationTest {
     }
 
     private companion object {
+        const val IMAGE_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
+        val IMAGE_BYTES = IMAGE_BASE64.decodeFromBase64()
         const val MDOC_DOCTYPE = "org.iso.18013.5.1.mDL"
         const val MDOC_NAMESPACE = "org.iso.18013.5.1"
         const val SD_JWT_VCT = "https://credentials.example.com/identity_credential"

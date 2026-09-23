@@ -26,12 +26,12 @@ async function copyToClipboard() {
 </script>
 
 <template>
-  <div class="flex flex-col items-center gap-4 py-4">
+  <div class="flex flex-col items-center gap-4 py-2 sm:py-4">
     <div class="p-3 bg-white rounded-lg border border-[--color-border]">
       <QrcodeVue :value="value" :size="200" level="M" />
     </div>
 
-    <div class="flex gap-2">
+    <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
       <a
         :href="webWalletHref"
         class="hidden btn btn-primary"
@@ -40,7 +40,7 @@ async function copyToClipboard() {
       >
         Open in Wallet
       </a>
-      <button class="btn btn-secondary" @click="copyToClipboard">
+      <button class="btn btn-secondary w-full sm:w-auto" @click="copyToClipboard">
         {{ copied ? "Copied!" : "Copy OpenID Link" }}
       </button>
     </div>

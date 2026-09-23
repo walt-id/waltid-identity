@@ -1,28 +1,29 @@
 package id.walt.x509
 
+import kotlinx.io.bytestring.ByteString
 import kotlin.io.encoding.Base64
 
 internal object X509TestCertificates {
-    val leafCertificate = CertificateDer(
+    val leafCertificate = ByteString(
         Base64.decode(
             "MIIBuTCCAV+gAwIBAgIULVajycAnSGTLObP+/Dp1Wmy9UjwwCgYIKoZIzj0EAwIwJjELMAkGA1UEBhMCVVMxFzAVBgNVBAMMDldhbHQgVGVzdCBJQUNBMB4XDTI2MDYyOTEzNTcyMFoXDTM2MDYyNjEzNTcyMFowMTELMAkGA1UEBhMCVVMxIjAgBgNVBAMMGVdhbHQgVGVzdCBEb2N1bWVudCBTaWduZXIwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQSHV7PBODYnk4FjIcPMTFjcIX+L0EM9zPH97cB0zIkvKXk7zu3RIW1bXM9DgBzsSRCOmRQzKMOhgFoAx2jabT6o2AwXjAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIHgDAdBgNVHQ4EFgQUoJB2sXVvq/2MhuS7cws0OL2o5xswHwYDVR0jBBgwFoAUsTrNBLUA5d4f/LE8POyPYLxiA3QwCgYIKoZIzj0EAwIDSAAwRQIgB1ikYok1QzN73w1yulCYIYCU0UqnbHrI3HFq8feJ4GMCIQDMYR+cvUX4nkFrNVOmlkyd1VW1Q3g5MSObOvYibekVcg=="
         )
     )
 
-    val issuerCertificate = CertificateDer(
+    val issuerCertificate = ByteString(
         Base64.decode(
             "MIIBtDCCAVqgAwIBAgIUXeZ8TU7ctMGSpHGjMLm3MFeMtYgwCgYIKoZIzj0EAwIwJjELMAkGA1UEBhMCVVMxFzAVBgNVBAMMDldhbHQgVGVzdCBJQUNBMB4XDTI2MDYyOTEzNTcyMFoXDTM2MDYyNjEzNTcyMFowJjELMAkGA1UEBhMCVVMxFzAVBgNVBAMMDldhbHQgVGVzdCBJQUNBMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPjayd0F/HXWABJ8+G5IRlmAKyJlC4xf4aj5/iVbkF32u60EHD3EbMw3v4PAhb8mfSdDkrx3p4ObFEYpXquGc66NmMGQwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFLE6zQS1AOXeH/yxPDzsj2C8YgN0MB8GA1UdIwQYMBaAFLE6zQS1AOXeH/yxPDzsj2C8YgN0MAoGCCqGSM49BAMCA0gAMEUCIQDCvxqC6szjFRNUalcGoxE/DR7S+pA07tb8/ZnQMuQ6NQIgUpCsr/4qDaQmsGHGlMR2OpTgdu0moGKXNQD6dpqhy10="
         )
     )
 
-    val sanDnsCertificate = CertificateDer(
+    val sanDnsCertificate = ByteString(
         Base64.decode(
             "MIIBVjCB/aADAgECAgg9JU9yqLTSlDAKBggqhkjOPQQDAjAfMR0wGwYDVQQDDBR2ZXJpZmllci5leGFtcGxlLmNvbTAeFw0yNTEwMTQwNTM2MTZaFw0yNjEwMTQwNTM2MTZaMB8xHTAbBgNVBAMMFHZlcmlmaWVyLmV4YW1wbGUuY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEy+ytwhEa31/os6dz9B5ZDLkJpnigeh2FEhpoRO/aPwB8WPKE6HkRQGlVq4Fuer7MA1WGgoZlsOYDQPw9vro61KMjMCEwHwYDVR0RBBgwFoIUdmVyaWZpZXIuZXhhbXBsZS5jb20wCgYIKoZIzj0EAwIDSAAwRQIhAJicm/egD5feJgUuca6FsbMIqUxP6baOALkrEKew1G34AiB0shCYfQtfSg1ks5SFo90669eACA6snm20HjRlHc2XPg=="
         )
     )
 
-    val tamperedLeafCertificate = CertificateDer(
-        leafCertificate.bytes.toByteArray().copyOf().also {
+    val tamperedLeafCertificate = ByteString(
+        leafCertificate.toByteArray().copyOf().also {
             it[it.lastIndex] = (it[it.lastIndex].toInt() xor 0x01).toByte()
         }
     )

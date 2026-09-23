@@ -66,6 +66,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.reflect.KClass
 import kotlin.test.assertEquals
+import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -92,6 +93,33 @@ class Issuer2CredentialOfferEndpointTest {
     }
 
     @Test
+    fun bundledPortraitProfilesProduceTaggedCaptureTimestamps() {
+        val serviceConfig = issuer2ConfigDir()
+        val dockerConfig = serviceConfig.parent.parent.parent.resolve("docker-compose/issuer-api2/config/issuer2-profiles.conf")
+        for ((profileFile, expectedCount) in listOf(serviceConfig.resolve("issuer2-profiles.conf") to 2, dockerConfig to 2)) {
+            loadIssuer2ConfigFiles(profileFile)
+            var checked = 0
+            for ((profileId, profile) in ConfigManager.getConfig<Issuer2ProfilesConfig>().profiles) {
+                for ((namespace, mapping) in profile.mDocNameSpacesDataMappingConfig.orEmpty()) {
+                    val captureMapping = mapping.entriesConfigMap["portrait_capture_date"] ?: continue
+                    val value = assertNotNull(profile.credentialData[namespace]?.jsonObject?.get("portrait_capture_date"), profileId)
+                    assertStringConversion(mapping.entriesConfigMap, "portrait_capture_date", StringToCborTypeConversion.STRING_TO_T_DATE)
+                    val timestamp = value.jsonPrimitive.content
+                    assertEquals(20, timestamp.length, profileId)
+                    assertEquals(timestamp, Instant.parse(timestamp).toString(), profileId)
+                    assertContentEquals(
+                        byteArrayOf(0xc0.toByte(), 0x74) + timestamp.encodeToByteArray(),
+                        captureMapping.executeMapping(value).toCBOR(),
+                        "$profileId / $namespace",
+                    )
+                    checked++
+                }
+            }
+            assertEquals(expectedCount, checked, profileFile.toString())
+        }
+    }
+
+    @Test
     fun shouldCreateCredentialOffersFromConfiguredProfiles() = testApplication {
         installIssuer2WithConfigFiles()
         val client = apiClient()
@@ -106,7 +134,7 @@ class Issuer2CredentialOfferEndpointTest {
             client.getProfile(ISO_MDL_PROFILE_ID),
             client.getProfile(ISO_PHOTO_ID_PROFILE_ID),
             client.getProfile(IDENTITY_SD_JWT_PROFILE_ID),
-            client.getProfile(TAX_ID_SD_JWT_PROFILE_ID),
+            client.getProfile(EHIC_SD_JWT_PROFILE_ID),
         )
 
         representativeProfiles.forEach { profile ->
@@ -283,6 +311,31 @@ class Issuer2CredentialOfferEndpointTest {
     }
 
     @Test
+    fun shouldApplyAuthorizedTransactionDataTypesRuntimeOverrideToOfferSession() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val profile = client.getProfile(EU_AGE_VERIFICATION_PROFILE_ID)
+        assertNull(
+            profile.authorizedTransactionDataTypes,
+            "euAgeVerificationMdoc must not authorize transaction data at the profile, so the offer override is the grant",
+        )
+
+        val response = client.createCredentialOffer(
+            CredentialOfferCreateRequest(
+                profileId = profile.profileId,
+                authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+                runtimeOverrides = CredentialOfferRuntimeOverrides(
+                    authorizedTransactionDataTypes = listOf(SCA_PAYMENT_TRANSACTION_DATA_TYPE),
+                ),
+            )
+        )
+
+        val session = client.getSession(response.offerId)
+        assertEquals(listOf(SCA_PAYMENT_TRANSACTION_DATA_TYPE), session.authorizedTransactionDataTypes)
+        assertNull(client.getProfile(profile.profileId).authorizedTransactionDataTypes)
+    }
+
+    @Test
     fun shouldMergeCredentialDataRuntimeOverridesWithConfiguredProfileData() = testApplication {
         installIssuer2WithConfigFiles()
         val client = apiClient()
@@ -403,6 +456,15 @@ class Issuer2CredentialOfferEndpointTest {
         assertCustomExpiry(client)
         assertNoExpiry(client)
         assertRuntimeOverrides(client)
+    }
+
+    @Test
+    fun shouldReturnNotFoundForUnknownCredentialOffer() = testApplication {
+        installIssuer2()
+
+        val response = apiClient().get("/openid4vci/credential-offer?id=unknown-offer")
+
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
 
     private suspend fun assertAuthorizedByReferenceOffer(client: HttpClient) {
@@ -736,7 +798,7 @@ class Issuer2CredentialOfferEndpointTest {
         }
     }
 
-    private fun loadIssuer2ConfigFiles() {
+    private fun loadIssuer2ConfigFiles(profilesFile: Path? = null) {
         ConfigManager.preclear()
         FeatureManager.preclear()
         registerIssuer2ConfigDecoders()
@@ -744,7 +806,8 @@ class Issuer2CredentialOfferEndpointTest {
 
         val configDir = issuer2ConfigDir()
         configFiles.forEach { (id, type) ->
-            System.setProperty("config.file.$id", configDir.resolve("$id.conf").toString())
+            val file = if (id == "issuer2-profiles" && profilesFile != null) profilesFile else configDir.resolve("$id.conf")
+            System.setProperty("config.file.$id", file.toString())
             ConfigManager.registerConfig(id, type)
         }
         ConfigManager.loadConfigs()
@@ -895,7 +958,9 @@ class Issuer2CredentialOfferEndpointTest {
         const val ISO_PHOTO_ID_COMMON_NAMESPACE_ID = "org.iso.23220.1"
         const val ISO_PHOTO_ID_CONFIGURATION_ID = "org.iso.23220.photoid.1"
         const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
-        const val TAX_ID_SD_JWT_PROFILE_ID = "taxIdCredentialSdJwt"
+        const val EHIC_SD_JWT_PROFILE_ID = "ehicSdJwt"
+        const val EU_AGE_VERIFICATION_PROFILE_ID = "euAgeVerificationMdoc"
+        const val SCA_PAYMENT_TRANSACTION_DATA_TYPE = "urn:eudi:sca:payment:1"
         const val TX_CODE_VALUE = "123456"
         const val TWO_MINUTES_SECONDS = 120L
 

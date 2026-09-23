@@ -4,12 +4,15 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
+import androidx.test.uiautomator.Until
 import org.junit.Assert.fail
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import java.io.ByteArrayOutputStream
 
 internal object WalletComposeE2EHelper {
     const val PIN = "1234"
@@ -66,31 +69,51 @@ internal object WalletComposeE2EHelper {
 
     private fun launch(context: Context) {
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            ?.apply { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
+            ?.apply {
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, "disabled")
+            }
             ?: error("Cannot resolve launch intent for ${context.packageName}")
         context.startActivity(launchIntent)
     }
 
     fun unlock(device: UiDevice) {
         val pinInput = waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT)
-        assertNotNull("PIN input not found", pinInput)
-        pinInput!!.setText(PIN)
+            ?: throw AssertionError("PIN input not found. ${foregroundWindowSnapshot(device)}")
+        pinInput.setText(PIN)
 
         waitForResource(device, "wallet.pinConfirmationInput", 2_000L)?.setText(PIN)
 
-        val submit = waitForResource(device, "wallet.pinSubmitButton", UI_ELEMENT_TIMEOUT)
-        assertNotNull("PIN submit button not found", submit)
-        submit!!.click()
+        clickByTag(device, "wallet.pinSubmitButton")
+        awaitWalletReady(device)
+    }
 
-        assertTrue(
-            "Wallet did not become ready after unlock. Latest status: ${latestStatus(device)}",
-            waitForStatus(
-                device = device,
-                timeoutMs = WALLET_READY_TIMEOUT,
-                matcher = { it == "Wallet ready" },
-                failurePrefixes = listOf("Bootstrap failed")
-            )
-        )
+    private fun awaitWalletReady(device: UiDevice) {
+        val deadline = System.currentTimeMillis() + WALLET_READY_TIMEOUT
+        var setupStep = 0
+        while (System.currentTimeMillis() < deadline) {
+            val status = latestStatus(device)
+            if (status == "Wallet ready") return
+            if (status.startsWith("Bootstrap failed")) break
+            if (setupStep < 3) {
+                try {
+                    val heading = listOf("1 of 3 · Recovery", "2 of 3 · Key storage", "3 of 3 · Signing approval")[setupStep]
+                    if (device.hasObject(By.text(heading))) {
+                        device.findObject(By.res("wallet.keySetupContinue"))?.let { button ->
+                            if (button.isEnabled) {
+                                button.click()
+                                setupStep++
+                            }
+                        }
+                    }
+                } catch (_: StaleObjectException) {
+                    // Re-query when Compose replaces the accessibility tree during setup.
+                }
+            }
+            Thread.sleep(500)
+        }
+        fail("Wallet did not become ready after unlock. Latest status: ${latestStatus(device)}. " +
+            foregroundWindowSnapshot(device))
     }
 
     fun sendDeepLink(context: Context, url: String) {
@@ -99,12 +122,13 @@ internal object WalletComposeE2EHelper {
             Uri.parse(url),
             context,
             MainActivity::class.java,
-        ).apply {
+            ).apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
                     Intent.FLAG_ACTIVITY_SINGLE_TOP
             )
+            putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, "disabled")
         }
         context.startActivity(intent)
     }
@@ -182,6 +206,20 @@ internal object WalletComposeE2EHelper {
     ) {
         if (findTextContainingAfterScrolling(device, substring) != null) return
         fail("$message. Expected a node containing '$substring'.\n${visibleUiSnapshot(device)}")
+    }
+
+    /**
+     * Asserts [substring] appears in the front-most window, whichever package owns it. Credential
+     * Manager draws its prompt from Google Play services, so the wallet-scoped lookups above cannot
+     * see it - and would report an empty screen rather than a missing value.
+     */
+    fun assertTextContainingVisibleInForegroundWindow(
+        device: UiDevice,
+        substring: String,
+        message: String,
+    ) {
+        if (device.wait(Until.findObject(By.textContains(substring)), UI_ELEMENT_TIMEOUT) != null) return
+        fail("$message. Expected a node containing '$substring'.\n${foregroundWindowSnapshot(device)}")
     }
 
     fun assertClaimValueVisibleAfterScrolling(
@@ -295,7 +333,7 @@ internal object WalletComposeE2EHelper {
                 node.isVisibleOn(device) && runCatching { node.resourceName == tag }.getOrDefault(false)
             }
 
-    private fun findResourceAfterScrolling(device: UiDevice, tag: String): UiObject2? {
+    fun findResourceAfterScrolling(device: UiDevice, tag: String): UiObject2? {
         findVisibleResource(device, tag)?.let { return it }
         repeat(6) {
             device.scrollDown()
@@ -321,7 +359,7 @@ internal object WalletComposeE2EHelper {
     private fun claimTag(path: String): String =
         "wallet.claim.${path.map { if (it.isLetterOrDigit()) it else '_' }.joinToString("")}"
 
-    private fun UiDevice.scrollDown() {
+    internal fun UiDevice.scrollDown() {
         swipe(
             displayWidth / 2,
             (displayHeight * 0.72).toInt(),
@@ -332,7 +370,7 @@ internal object WalletComposeE2EHelper {
         waitForIdle()
     }
 
-    private fun UiDevice.scrollUp() {
+    internal fun UiDevice.scrollUp() {
         swipe(
             displayWidth / 2,
             (displayHeight * 0.36).toInt(),
@@ -343,15 +381,15 @@ internal object WalletComposeE2EHelper {
         waitForIdle()
     }
 
-    fun latestStatus(device: UiDevice): String {
-        val tagged = device.findObject(By.res("wallet.status"))
-        if (tagged?.text != null) return tagged.text
-
-        for (prefix in statusPrefixes) {
-            val obj = device.findObject(By.textStartsWith(prefix))
-            if (obj != null) return obj.text
-        }
-        return "UNKNOWN"
+    fun latestStatus(device: UiDevice): String = try {
+        device.findObject(By.res("wallet.status"))?.text
+            ?: statusPrefixes.firstNotNullOfOrNull { prefix ->
+                device.findObject(By.textStartsWith(prefix))?.text
+            }
+            ?: "UNKNOWN"
+    } catch (_: StaleObjectException) {
+        // A screen transition invalidated the node; the next poll reads the new tree.
+        "UNKNOWN"
     }
 
     fun waitForStatus(
@@ -377,6 +415,29 @@ internal object WalletComposeE2EHelper {
             node = node.parent
         }
         return null
+    }
+
+    /**
+     * Every text and content description in the front-most window. Dumped rather than walked, because
+     * the node tree of a window owned by another package is not reachable through a package matcher.
+     */
+    fun foregroundWindowSnapshot(device: UiDevice): String {
+        val hierarchy = ByteArrayOutputStream().use { out ->
+            runCatching { device.dumpWindowHierarchy(out) }
+            out.toString("UTF-8")
+        }
+        val texts = Regex("""(?:text|content-desc)="([^"]*)"""").findAll(hierarchy)
+            .map { it.groupValues[1] }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(120)
+            .joinToString("\n")
+
+        return """
+            package=${device.currentPackageName}
+            foregroundWindowTexts:
+            ${texts.ifBlank { "<none>" }}
+        """.trimIndent()
     }
 
     private fun visibleUiSnapshot(device: UiDevice): String {

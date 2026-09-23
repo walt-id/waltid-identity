@@ -26,10 +26,29 @@ interface WalletTestPlan {
     val planName: String
 
     /**
+     * Identifies which plan owns a set of report entries.
+     *
+     * Must be unique per variant: [planName] is shared by every variant of the same suite plan, so
+     * using it would make one variant's results overwrite another's in the role report.
+     */
+    val producerId: String
+        get() = "$planName/${variant.entries.sortedBy { it.key }.joinToString(",") { "${it.key}=${it.value}" }}"
+
+    /**
      * Test plan variant parameters
      * Example: {"credential_format": "sd_jwt_vc", "client_id_prefix": "x509_san_dns"}
      */
     val variant: Map<String, String>
+
+    /**
+     * Every variant axis of this plan, under the suite's parameter names.
+     *
+     * Deliberately separate from [variant], which is only what gets sent when creating the plan: a
+     * suite plan may fix axes itself and then reject them being restated, so [variant] can describe
+     * the run incompletely. Anything reasoning about what actually runs - module applicability above
+     * all - has to use this instead.
+     */
+    val axisValues: Map<String, String>
 
     /**
      * Test plan configuration JSON for conformance suite

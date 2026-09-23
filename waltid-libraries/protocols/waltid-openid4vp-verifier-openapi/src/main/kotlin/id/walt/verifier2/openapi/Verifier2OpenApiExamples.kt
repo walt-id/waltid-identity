@@ -17,6 +17,7 @@ import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyAttribute
 import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyListArguments
 import id.walt.policies2.vp.policies.*
 import id.walt.verifier2.data.CrossDeviceFlowSetup
+import id.walt.verifier2.data.DcApiAnnexDFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.OpenId4VPConfig
 import id.walt.verifier2.data.UrlConfig
@@ -31,11 +32,15 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 
 object Verifier2OpenApiExamples {
 
     private const val IDENTITY_CREDENTIAL_VCT =
         "http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential"
+
+    private const val MDOC_NAMESPACE_ISO_18013_5_1 = "org.iso.18013.5.1"
+    private const val MDOC_DOCTYPE_ISO_23220_PHOTOID_1 = "org.iso.23220.photoid.1"
 
     val openid4vpHttpW3cVcDefault = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
@@ -100,8 +105,8 @@ object Verifier2OpenApiExamples {
                             doctypeValue = "org.iso.18013.5.1.mDL"
                         ),
                         claims = listOf(
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name"))
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "family_name")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "given_name"))
                         )
                     )
                 )
@@ -131,8 +136,8 @@ object Verifier2OpenApiExamples {
                             doctypeValue = "org.iso.18013.5.1.mDL"
                         ),
                         claims = listOf(
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name"))
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "family_name")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "given_name"))
                         )
                     )
                 )
@@ -275,7 +280,7 @@ object Verifier2OpenApiExamples {
             policies = DefinedVerificationPolicies(
                 vc_policies = VCPolicyList(
                     listOf(
-                        WebhookPolicy("http://your-backend.com")
+                        WebhookPolicy("https://your-backend.com")
                     )
                 )
             )
@@ -446,6 +451,82 @@ object Verifier2OpenApiExamples {
         )
     )
 
+    private const val SCA_PAYMENT_CARD_DOCTYPE = "eu.europa.ec.eudi.sca.payment_card.1"
+
+    /**
+     * SCA payment card + EU age verification over DC API, with one `urn:eudi:sca:payment:1` entry bound
+     * to the payment card credential. Combined presentation - payment attributes plus a second,
+     * non-payment credential in one request - is the reference use case. `credential_ids` names only the
+     * payment card, so the age credential is presented without device-signing the transaction data hash.
+     *
+     * The transaction data payload carries the nested `transaction_id`, `payee` (`name` and `id`),
+     * `currency` and numeric `amount` of the EUDI TS-12 payment data model; `amount` is a JSON number,
+     * which is how the type defines it. Transaction data on an mdoc also has to be authorized at
+     * issuance: the type must appear in the credential's MSO `KeyAuthorizations` for the holder to sign
+     * it, which issuer2's `scaPaymentCardMdoc` profile does. The payment card is a demo credential, not
+     * a normative TS-12 SCA Attestation.
+     *
+     * Presentable through Android Credential Manager, but only by a wallet whose OpenID4VP matcher
+     * handles it; see `OPENID4VP-MATCHER.md` in `waltid-openid4vc-wallet-mobile`.
+     */
+    val openid4vpDcApiScaPaymentCardAndAgeVerificationScaPayment = DcApiAnnexDFlowSetup(
+        core = GeneralFlowConfig(
+            dcqlQuery = DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "sca_payment_card",
+                        format = CredentialFormat.MSO_MDOC,
+                        meta = MsoMdocMeta(doctypeValue = SCA_PAYMENT_CARD_DOCTYPE),
+                        claims = listOf(
+                            ClaimsQuery(pathStrings = listOf(SCA_PAYMENT_CARD_DOCTYPE, "card_scheme")),
+                            ClaimsQuery(pathStrings = listOf(SCA_PAYMENT_CARD_DOCTYPE, "card_last4")),
+                            ClaimsQuery(pathStrings = listOf(SCA_PAYMENT_CARD_DOCTYPE, "pan_reference")),
+                            ClaimsQuery(pathStrings = listOf(SCA_PAYMENT_CARD_DOCTYPE, "card_holder_name")),
+                            ClaimsQuery(pathStrings = listOf(SCA_PAYMENT_CARD_DOCTYPE, "expiry_date")),
+                        )
+                    ),
+                    CredentialQuery(
+                        id = "proof_of_age",
+                        format = CredentialFormat.MSO_MDOC,
+                        meta = MsoMdocMeta(doctypeValue = "eu.europa.ec.av.1"),
+                        claims = listOf(
+                            ClaimsQuery(pathStrings = listOf("eu.europa.ec.av.1", "age_over_18")),
+                        )
+                    ),
+                )
+            ),
+            signedRequest = false,
+            encryptedResponse = false,
+        ),
+        expectedOrigins = listOf("https://digital-credentials.walt.id"),
+        haip = false,
+        openid = OpenId4VPConfig(
+            transactionData = listOf(
+                buildJsonObject {
+                    put("type", "urn:eudi:sca:payment:1")
+                    put("credential_ids", JsonArray(listOf(JsonPrimitive("sca_payment_card"))))
+                    put("require_cryptographic_holder_binding", true)
+                    put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
+                    put(
+                        "payload",
+                        buildJsonObject {
+                            put("transaction_id", "8D8AC610-566D-4EF0-9C22-186B2A5ED793")
+                            put(
+                                "payee",
+                                buildJsonObject {
+                                    put("name", "Super Store")
+                                    put("id", "merchant-001")
+                                }
+                            )
+                            put("currency", "EUR")
+                            put("amount", 11.56)
+                        }
+                    )
+                }
+            )
+        ),
+    )
+
     // ISO Examples
 
     val openid4vpHttpIsoPhotoIdMinimal = CrossDeviceFlowSetup(
@@ -456,17 +537,17 @@ object Verifier2OpenApiExamples {
                         id = "my_photoid",
                         format = CredentialFormat.MSO_MDOC,
                         meta = MsoMdocMeta(
-                            doctypeValue = "org.iso.23220.photoid.1"
+                            doctypeValue = MDOC_DOCTYPE_ISO_23220_PHOTOID_1
                         ),
                         claims = listOf(
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name_unicode")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name_unicode")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "issuing_authority_unicode")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "family_name_unicode")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "given_name_unicode")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "issuing_authority_unicode")),
                             ClaimsQuery(
-                                pathStrings = listOf("org.iso.18013.5.1", "issuing_country"),
+                                pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "issuing_country"),
                                 values = listOf("AT").map { JsonPrimitive(it) }
                             ),
-                            ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "travel_document_number"))
+                            ClaimsQuery(pathStrings = listOf(MDOC_DOCTYPE_ISO_23220_PHOTOID_1, "travel_document_number"))
                         )
                     )
                 )
@@ -483,24 +564,24 @@ object Verifier2OpenApiExamples {
                         id = "my_photoid",
                         format = CredentialFormat.MSO_MDOC,
                         meta = MsoMdocMeta(
-                            doctypeValue = "org.iso.23220.photoid.1"
+                            doctypeValue = MDOC_DOCTYPE_ISO_23220_PHOTOID_1
                         ),
                         claims = listOf(
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name_unicode")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name_unicode")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "issuing_authority_unicode")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "family_name_unicode")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "given_name_unicode")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "issuing_authority_unicode")),
                             ClaimsQuery(
-                                pathStrings = listOf("org.iso.18013.5.1", "resident_postal_code"),
+                                pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "resident_postal_code"),
                                 values = listOf(1180, 1190, 1200, 1210).map { JsonPrimitive(it) }
                             ),
                             ClaimsQuery(
-                                pathStrings = listOf("org.iso.18013.5.1", "issuing_country"),
+                                pathStrings = listOf(MDOC_NAMESPACE_ISO_18013_5_1, "issuing_country"),
                                 values = listOf("AT").map { JsonPrimitive(it) }
                             ),
-                            ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "person_id")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "resident_street")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "administrative_number")),
-                            ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "travel_document_number")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_DOCTYPE_ISO_23220_PHOTOID_1, "person_id")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_DOCTYPE_ISO_23220_PHOTOID_1, "resident_street")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_DOCTYPE_ISO_23220_PHOTOID_1, "administrative_number")),
+                            ClaimsQuery(pathStrings = listOf(MDOC_DOCTYPE_ISO_23220_PHOTOID_1, "travel_document_number")),
                             ClaimsQuery(pathStrings = listOf("org.iso.23220.dtc.1", "dtc_version")),
                             ClaimsQuery(pathStrings = listOf("org.iso.23220.dtc.1", "dtc_dg1"))
                         )
@@ -514,9 +595,7 @@ object Verifier2OpenApiExamples {
                         VicalPolicy(
                             vical = "<base64 encoded VICAL file>",
                             enableDocumentTypeValidation = true,
-                            enableTrustedChainRoot = true,
-                            enableSystemTrustAnchors = true,
-                            enableRevocation = true
+                            enableRevocation = false
                         )
                     )
                 )

@@ -3,22 +3,24 @@
 package id.walt.wallet2.mobile
 
 import id.walt.credentials.formats.MdocsCredential
+import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
+import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
+import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.utils.ShaUtils
-import id.walt.crypto2.keys.Key
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
-import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
-import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
 import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.PresentationCredentialOption
 import id.walt.wallet2.handlers.PresentationCredentialRequirement
@@ -43,6 +45,17 @@ import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.openid4vp.clientidprefix.prefixes.ClientId
+import id.walt.openid4vp.clientidprefix.prefixes.DecentralizedIdentifier
+import id.walt.openid4vp.clientidprefix.prefixes.OpenIdFederation
+import id.walt.openid4vp.clientidprefix.prefixes.PreRegistered
+import id.walt.openid4vp.clientidprefix.prefixes.RedirectUri
+import id.walt.openid4vp.clientidprefix.prefixes.Unsupported
+import id.walt.openid4vp.clientidprefix.prefixes.VerifierAttestation
+import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
+import id.walt.openid4vp.clientidprefix.prefixes.X509SanDns
+import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import id.waltid.openid4vp.wallet.DcApiCredentialResponse
 import id.waltid.openid4vp.wallet.DcApiWallet
@@ -56,6 +69,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -66,7 +81,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-private object MobileDidSupport {
+internal object MobileDidSupport {
     private val initializationMutex = Mutex()
     private var initialized = false
 
@@ -77,17 +92,6 @@ private object MobileDidSupport {
         }
     }
 }
-
-/**
- * Result returned after a mobile wallet has been initialized with signing material and a DID.
- *
- * @property keyId Identifier of the persisted signing key used by the wallet.
- * @property did Decentralized identifier registered for the persisted key.
- */
-public data class MobileWalletBootstrapResult(
-    public val keyId: String,
-    public val did: String,
-)
 
 /**
  * Credential entry suitable for mobile UI lists and detail display.
@@ -175,6 +179,9 @@ public data class WalletAttestationConfig(
     public val hostHeader: String = "",
 )
 
+/** Registration adapters select their projection at platform factory wiring; presentation uses full records. */
+internal enum class MobileWalletRegistryProjection { Full, MdocIdentity }
+
 /**
  * Android and iOS facade for the walt.id wallet SDK.
  *
@@ -184,24 +191,30 @@ public data class WalletAttestationConfig(
  */
 public class MobileWallet internal constructor(
     walletId: String,
-    private val keyStore: WalletKeyStore,
+    private val keyStore: MobileWalletKeyStore,
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
     private val issuanceSessionStore: WalletIssuanceSessionStore? = null,
-    private val generateAndPersistKey: suspend (MobileWalletKeyType) -> Key,
-    private val didService: Crypto2DidService = Crypto2DidService,
-    private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
+    private val runKeyUseAuthorizationPreflight: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> KeyUseAuthorizationSupport =
+        { _, _ -> error("This MobileWallet does not support key-use authorization preflight") },
+    private val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
     attestationConfig: WalletAttestationConfig? = null,
     private val preferredLocales: List<String> = emptyList(),
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     private val clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+    private val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     private val credentialRegistry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
+    private val registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
     private val readerTrustEvaluator: MobileWalletReaderTrustEvaluator = UnconfiguredMobileWalletReaderTrustEvaluator,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
+    private val proximityTransportFactory: BleProximityTransportFactory? = null,
+    private val proximityNfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
+    private val proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     /** Issuance transport override. Only tests set this; production uses the configured engine. */
     issuanceHttpClient: HttpClient? = null,
+    createSigningIdentityManager: ((suspend () -> Unit) -> id.walt.wallet2.mobile.identity.SigningIdentityManager)? = null,
 ) {
     private val eventStream = MobileWalletEventStream()
     /**
@@ -231,87 +244,55 @@ public class MobileWallet internal constructor(
     private val annexCEngine = MobileWalletAnnexCEngine(
         wallet = wallet,
         readerTrustEvaluator = readerTrustEvaluator,
-        registryRecords = ::registryRecords,
+        registryRecords = { registryRecords() },
     )
+    private val proximityCoordinator = ProximityCoordinator(
+        wallet = wallet,
+        bleTransportFactory = proximityTransportFactory,
+        nfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
+        wifiAwareTransportFactory = proximityWifiAwareTransportFactory,
+    )
+
+    /**
+     * Checks the exact BLE roles selected by [configuration] without creating keys, UUIDs, listeners,
+     * scanners, or advertisers.
+     */
+    public suspend fun proximityPresentationCapabilities(
+        configuration: ProximityConfiguration = ProximityConfiguration(),
+    ): ProximityCapabilities = proximityCoordinator.capabilities(configuration)
+
+    /**
+     * Starts one single-use in-person presentation session.
+     *
+     * Only one proximity session may be active for this wallet. A second start fails before any
+     * transaction material or radio resource is created.
+     */
+    public suspend fun startProximityPresentation(
+        configuration: ProximityConfiguration = ProximityConfiguration(),
+    ): ProximitySession = proximityCoordinator.start(configuration)
 
     private val issuanceSessions = WalletIssuanceSessionService(
         wallet = wallet,
         attestationAssembler = attestationAssembler,
+        metadataTrustResolver = credentialIssuerMetadataTrustResolver,
         onEvent = ::emitSessionEvent,
         sessionStore = issuanceSessionStore,
         httpClient = issuanceHttpClient,
     )
 
-    /**
-     * Initializes the wallet by creating or reusing platform-backed key material and a DID.
-     *
-     * If the wallet already contains persisted DIDs, the first persisted DID and key are reused.
-     *
-     * @param keyType Optional key type override. When omitted, [MobileWalletConfig.defaultKeyType] is used.
-     * @param didMethod DID method used for registering a new DID. The default `key` method is handled locally.
-     * @return The key identifier and DID used by this wallet.
-     * @throws IllegalArgumentException When persisted DID state exists without a persisted key.
-     */
-    public suspend fun bootstrap(
-        keyType: MobileWalletKeyType? = null,
-        didMethod: String = "key",
-    ): MobileWalletBootstrapResult {
-        MobileDidSupport.ensureInitialized()
-        val existingDids = didStore.listDids().toList()
-        if (existingDids.isNotEmpty()) {
-            val existingKeys = keyStore.listKeys().toList()
-            require(existingKeys.isNotEmpty()) {
-                "Wallet '${wallet.id}' has persisted DIDs but no persisted keys"
-            }
-            val existingKey = existingKeys.first()
-            // Force platform key resolution before a provider extension offers a credential.
-            val keyAvailable = keyStore.getCrypto2Key(existingKey.keyId) != null
-            require(keyAvailable) {
-                "Wallet '${wallet.id}' persisted key '${existingKey.keyId}' is unavailable"
-            }
-            syncDigitalCredentialRegistration()
-            return MobileWalletBootstrapResult(
-                keyId = existingKey.keyId,
-                did = existingDids.first().did,
-            )
-        }
+    private val signingIdentityManager = createSigningIdentityManager?.invoke(::syncDigitalCredentialRegistration)
 
-        val effectiveKeyType = keyType ?: defaultKeyType
-        return createKeyAndDid(effectiveKeyType, didMethod)
-            .also { syncDigitalCredentialRegistration() }
-    }
+    /** Signing identity creation, backup and restoration; recovery integrations are explicitly configured. */
+    public val signingIdentity: id.walt.wallet2.mobile.identity.SigningIdentityManager
+        get() = checkNotNull(signingIdentityManager) { "Identity lifecycle requires the persistent mobile wallet factory" }
 
-    private suspend fun createKeyAndDid(
-        keyType: MobileWalletKeyType,
-        didMethod: String,
-    ): MobileWalletBootstrapResult {
-        val normalizedMethod = didMethod.lowercase()
-        val options = when (normalizedMethod) {
-            "key" -> DidKeyCreateOptions()
-            "jwk" -> DidJwkCreateOptions()
-            else -> throw IllegalArgumentException("Mobile bootstrap supports only did:key and did:jwk")
-        }
-        val key = generateAndPersistKey(keyType)
-        try {
-            val didResult = didService.registerByKey(normalizedMethod, key, options)
-            didStore.addDid(
-                WalletDidEntry(
-                    did = didResult.did,
-                    document = didResult.didDocument.toJsonObject(),
-                )
-            )
-            return MobileWalletBootstrapResult(keyId = key.id.value, did = didResult.did)
-        } catch (cause: Throwable) {
-            try {
-                withContext(NonCancellable) {
-                    check(keyStore.removeKey(key.id.value)) { "Failed to remove signing key after DID bootstrap failure" }
-                }
-            } catch (cleanupFailure: Throwable) {
-                cause.addSuppressed(cleanupFailure)
-            }
-            throw cause
-        }
-    }
+
+    /** Checks whether a key-use authorization request is supported without creating or persisting a key. */
+    public suspend fun keyUseAuthorizationPreflight(
+        keyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
+        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy,
+    ): KeyUseAuthorizationSupport = runKeyUseAuthorizationPreflight(keyType, keyUseAuthorizationPolicy)
+
 
     /**
      * Resolves an offer and starts a bound OpenID4VCI 1.0 issuance session.
@@ -322,13 +303,15 @@ public class MobileWallet internal constructor(
     public suspend fun startIssuance(
         request: MobileWalletIssuanceRequest,
     ): WalletIssuanceSession = issuanceSessions.start(
-        newIssuanceRequest(
-            offerUrl = request.offerUrl.trim(),
+        request = newIssuanceRequest(
+            offer = request.offer,
             keyId = request.keyId,
+            keyPolicy = request.keyPolicy,
             did = request.did,
             clientId = request.clientId,
             redirectUri = request.redirectUri.trim(),
-        )
+        ),
+        preferredLocales = preferredLocales,
     )
 
     /**
@@ -399,22 +382,41 @@ public class MobileWallet internal constructor(
         }
 
     private suspend fun newIssuanceRequest(
-        offerUrl: String,
+        offer: MobileWalletCredentialOffer,
         clientId: String,
         redirectUri: String,
         keyId: String? = null,
         did: String? = null,
+        keyPolicy: id.walt.wallet2.mobile.identity.SigningIdentityKeyPolicy = id.walt.wallet2.mobile.identity.SigningIdentityKeyPolicy.GeneralPurpose,
     ): WalletIssuanceSessionRequest {
-        val selectedKeyId = keyId ?: keyStore.listKeys().toList().firstOrNull()?.keyId
+        val active = if (keyId == null || did == null) signingIdentityManager?.state() else null
+        val identity = (active as? id.walt.wallet2.mobile.identity.SigningIdentityState.Active)?.identity
+        check(signingIdentityManager == null || active == null || identity != null) { "The wallet requires an active signing identity" }
+        val selectedKeyId = keyId ?: identity?.keyId ?: keyStore.getDefaultKeyMaterial()?.keyId
             ?: error("No holder key is available for credential issuance")
-        val selectedDid = did ?: didStore.listDids().toList().firstOrNull()?.did
-        return WalletIssuanceSessionRequest(
-            offerUrl = Url(offerUrl),
-            keyId = selectedKeyId,
-            did = selectedDid,
-            clientId = clientId,
-            redirectUri = Url(redirectUri),
-        )
+        if (keyPolicy != id.walt.wallet2.mobile.identity.SigningIdentityKeyPolicy.GeneralPurpose) {
+            requireNotNull(signingIdentityManager) { "Restricted holder-key policy requires a managed signing identity" }
+                .requireKeyPolicy(selectedKeyId, keyPolicy)
+        }
+        val selectedDid = did ?: identity?.did ?: didStore.getDefaultDid()
+        return when (offer) {
+            is MobileWalletCredentialOffer.Uri -> WalletIssuanceSessionRequest(
+                offerUrl = Url(offer.value.trim()),
+                offerJson = null,
+                keyId = selectedKeyId,
+                did = selectedDid,
+                clientId = clientId,
+                redirectUri = Url(redirectUri),
+            )
+            is MobileWalletCredentialOffer.InlineJson -> WalletIssuanceSessionRequest(
+                offerUrl = null,
+                offerJson = Json.parseToJsonElement(offer.value).jsonObject,
+                keyId = selectedKeyId,
+                did = selectedDid,
+                clientId = clientId,
+                redirectUri = Url(redirectUri),
+            )
+        }
     }
 
     /**
@@ -423,7 +425,7 @@ public class MobileWallet internal constructor(
      * @return Credential entries, including display JSON, ordered by the underlying credential store.
      */
     public suspend fun credentials(): List<MobileWalletCredential> =
-        wallet.streamAllCredentials().toList().map { credential ->
+        wallet.streamAllCredentials().map { credential ->
             val meta = credential.toMetadata()
             MobileWalletCredential(
                 id = meta.id,
@@ -435,7 +437,7 @@ public class MobileWallet internal constructor(
                 credentialDataJson = credential.credential.credentialData.encodeJsonObject(),
                 metadataJson = credential.metadata?.let { Json.encodeToString(JsonObject.serializer(), it) },
             )
-        }
+        }.toList()
 
     /** Returns the native adapter's current runtime capability snapshot. */
     public fun digitalCredentialCapabilities(): MobileWalletDigitalCredentialCapabilities =
@@ -444,7 +446,7 @@ public class MobileWallet internal constructor(
     /**
      * Outcome of the most recent platform registry synchronization, or null before the first one.
      *
-     * A wallet operation that stores or removes a credential synchronizes the registry afterwards
+     * Signing-key activation/initialization and credential storage/removal synchronize the registry afterwards
      * and does not fail if that synchronization does not succeed, so this is where an application
      * learns that the platform projection is stale. Recover by calling
      * [refreshDigitalCredentialRegistration] again; the wallet store it projects is unaffected.
@@ -456,9 +458,12 @@ public class MobileWallet internal constructor(
      * Synchronizes platform credential metadata to a minimal view of the current wallet state.
      *
      * Raw credentials, issuer-signed payloads, and private keys are never registered, and neither
-     * are the SD-JWT VC infrastructure claims listed in [SD_JWT_INFRASTRUCTURE_CLAIMS]. Every
-     * remaining decoded claim value is registered, because the platform matcher runs out of process
-     * and cannot ask the wallet for a value it was not given.
+     * are the SD-JWT VC infrastructure claims listed in [SD_JWT_INFRASTRUCTURE_CLAIMS]. The adapter
+     * receives the remaining decoded claims and projects them into its platform index. The native
+     * iOS adapter receives only mdoc identifiers and document types, without processing claims or
+     * artwork. Custom adapters continue to receive full records. Android
+     * retains compound and embedded media fields for presence matching without registering their
+     * values; those fields cannot satisfy an exact-value constraint in the platform matcher.
      *
      * This is the retry entry point: it is safe to call at any time, and calling it again after a
      * failure re-publishes the current wallet state. It reports an adapter failure through the
@@ -466,8 +471,8 @@ public class MobileWallet internal constructor(
      * reading the wallet's own credentials failed.
      */
     public suspend fun refreshDigitalCredentialRegistration(): MobileWalletCredentialRegistrationResult {
-        val records = registryRecords()
-        val result = runCatching {
+        val records = registryRecords(registrationProjection)
+        val presentationResult = runCatching {
             credentialRegistry.replace(registryId = digitalCredentialRegistryId(), records = records)
         }.getOrElse { failure ->
             if (failure is CancellationException) throw failure
@@ -477,8 +482,15 @@ public class MobileWallet internal constructor(
                 reason = failure.message ?: failure::class.simpleName ?: "Credential registration failed",
             )
         }
-        lastRegistrationResult.value = result
-        return result
+        // Creation options advertise issuance capability and must not share the presentation
+        // replace lifecycle; failures here do not roll back a successful presentation projection.
+        runCatching {
+            credentialRegistry.registerCreationOptions()
+        }.onFailure { failure ->
+            if (failure is CancellationException) throw failure
+        }
+        lastRegistrationResult.value = presentationResult
+        return presentationResult
     }
 
     /**
@@ -690,7 +702,10 @@ public class MobileWallet internal constructor(
             is PreviewPresentationResult.Invalid ->
                 MobileWalletPresentationPreviewResult.Invalid(
                     previewHandle = MobileWalletPresentationPreviewHandle(result.handle.value),
-                    request = result.authorizationRequest.toMobileRequestContext(preferredLocales),
+                    request = result.authorizationRequest.toMobileRequestContext(
+                        preferredLocales = preferredLocales,
+                        resolvedAuthorizationRequest = result.resolvedAuthorizationRequest,
+                    ),
                     errorCode = result.error.code.toMobileErrorCode(),
                     message = result.error.message,
                 )
@@ -713,6 +728,7 @@ public class MobileWallet internal constructor(
                         previewHandle = MobileWalletPresentationPreviewHandle(result.handle.value),
                         request = result.authorizationRequest.toMobileRequestInfo(
                             preferredLocales = preferredLocales,
+                            resolvedAuthorizationRequest = result.resolvedAuthorizationRequest,
                             responseEncryption = result.responseEncryption,
                             transactionData = transactionData,
                         ),
@@ -784,11 +800,14 @@ public class MobileWallet internal constructor(
     /**
      * Deletes local wallet material owned by this mobile wallet instance.
      *
+     * Proximity admission is permanently closed and active proximity cleanup is awaited first.
+     * Use a newly opened wallet instance after deletion.
      * Active issuance continuations are invalidated before the key, credential, and DID stores receive
      * store-level remove calls. The wallet then closes and deletes the encrypted local database and deletes
      * the configured database key.
      */
     public suspend fun deleteWallet() {
+        proximityCoordinator.shutdown()
         WalletPresentationHandler.clearPreviews(wallet)
         issuanceSessions.clearSessions()
         keyStore.listKeys().toList().forEach { key ->
@@ -833,6 +852,7 @@ public class MobileWallet internal constructor(
                     selectable = disclosure.selectable,
                 )
             },
+            metadataJson = metadata?.encodeJsonObject(),
         )
 
     private fun PresentationCredentialRequirement.toMobileCredentialRequirement(): MobileWalletPresentationCredentialRequirement =
@@ -847,29 +867,63 @@ public class MobileWallet internal constructor(
     private fun digitalCredentialRegistryId(): String =
         "waltid-${ShaUtils.calculateSha256Base64Url(wallet.id).take(24)}"
 
-    private suspend fun registryRecords(): List<MobileWalletCredentialRegistryRecord> =
-        wallet.streamAllCredentials().toList().mapNotNull { stored ->
+    private suspend fun registryRecords(
+        projection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
+    ): List<MobileWalletCredentialRegistryRecord> =
+        wallet.streamAllCredentials().mapNotNull { stored ->
+            val credential = stored.credential
+            if (projection == MobileWalletRegistryProjection.MdocIdentity && credential !is MdocsCredential) {
+                return@mapNotNull null
+            }
             val registryEntryId = "dc-${ShaUtils.calculateSha256Base64Url("${wallet.id}\u0000${stored.id}").take(32)}"
-            val metadata = stored.toMetadata()
-            when (val credential = stored.credential) {
-                is MdocsCredential -> MobileWalletCredentialRegistryRecord(
+            if (projection == MobileWalletRegistryProjection.MdocIdentity) {
+                // IdentityDocumentServices indexes only identity and type. Do not read metadata,
+                // serialize claims, or decode images that the native adapter would discard.
+                return@mapNotNull MobileWalletCredentialRegistryRecord(
                     registryEntryId = registryEntryId,
                     credentialId = stored.id,
                     format = MobileWalletDigitalCredentialFormat.MDOC,
-                    type = credential.docType,
-                    fields = credential.credentialData
-                        .filterKeys { it != "docType" }
-                        .flatMap { (namespace, value) ->
-                            value.jsonObject.map { (element, elementValue) ->
-                                MobileWalletCredentialRegistryField(
-                                    path = listOf(namespace, element),
-                                    valueJson = Json.encodeToString(JsonElement.serializer(), elementValue),
-                                    selectivelyDisclosable = true,
-                                )
-                            }
-                        },
-                    displayName = metadata.label ?: credential.docType,
+                    type = (credential as MdocsCredential).docType,
+                    fields = emptyList(),
+                    displayName = "",
                 )
+            }
+            val metadata = stored.toMetadata()
+            when (credential) {
+                is MdocsCredential -> {
+                    val display = MobileWalletRegistryDisplay.resolve(
+                        format = MobileWalletDigitalCredentialFormat.MDOC,
+                        type = credential.docType,
+                        credentialData = credential.credentialData,
+                        storedLabel = metadata.label,
+                    )
+                    val cardArt = MobileWalletRegistryIcons.extractCardArt(
+                        metadata = stored.metadata,
+                        credentialData = credential.credentialData,
+                    )
+                    MobileWalletCredentialRegistryRecord(
+                        registryEntryId = registryEntryId,
+                        credentialId = stored.id,
+                        format = MobileWalletDigitalCredentialFormat.MDOC,
+                        type = credential.docType,
+                        fields = credential.credentialData
+                            .filterKeys { it != "docType" }
+                            .flatMap { (namespace, value) ->
+                                value.jsonObject.map { (element, elementValue) ->
+                                    MobileWalletCredentialRegistryField(
+                                        path = listOf(namespace, element),
+                                        valueJson = Json.encodeToString(JsonElement.serializer(), elementValue),
+                                        selectivelyDisclosable = true,
+                                    )
+                                }
+                            },
+                        displayName = display.title,
+                        subtitle = display.subtitle,
+                        cardArtImageUris = cardArt.imageUris,
+                        cardArtBackgroundColor = cardArt.backgroundColor,
+                        cardArtFallbackPng = cardArt.fallbackPng,
+                    )
+                }
                 else -> if (metadata.format in setOf("vc+sd-jwt", "dc+sd-jwt", "sd-jwt-vc")) {
                     val data = credential.credentialData
                     val type = data["vct"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
@@ -878,6 +932,16 @@ public class MobileWallet internal constructor(
                         .orEmpty()
                         .mapNotNull { disclosure -> disclosure.location?.toRegistryFieldPath() }
                         .toSet()
+                    val display = MobileWalletRegistryDisplay.resolve(
+                        format = MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                        type = type,
+                        credentialData = data,
+                        storedLabel = metadata.label,
+                    )
+                    val cardArt = MobileWalletRegistryIcons.extractCardArt(
+                        metadata = stored.metadata,
+                        credentialData = data,
+                    )
                     MobileWalletCredentialRegistryRecord(
                         registryEntryId = registryEntryId,
                         credentialId = stored.id,
@@ -891,11 +955,15 @@ public class MobileWallet internal constructor(
                                     selectivelyDisclosablePaths = selectivelyDisclosablePaths,
                                 )
                             },
-                        displayName = metadata.label ?: type,
+                        displayName = display.title,
+                        subtitle = display.subtitle,
+                        cardArtImageUris = cardArt.imageUris,
+                        cardArtBackgroundColor = cardArt.backgroundColor,
+                        cardArtFallbackPng = cardArt.fallbackPng,
                     )
                 } else null
             }
-        }
+        }.toList()
 
     /**
      * Maps an SD-JWT VC claim path onto the object-key path used by registry fields.
@@ -988,16 +1056,19 @@ internal fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPrese
         }
     }
 
-private fun AuthorizationRequest.toMobileRequestInfo(
+internal fun AuthorizationRequest.toMobileRequestInfo(
     preferredLocales: List<String>,
+    resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
     responseEncryption: ResponseEncryption.Metadata? = null,
     transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
 ): MobileWalletPresentationRequestInfo {
-    return MobileWalletPresentationRequestInfo(
-        clientId = requireNotNull(clientId) {
+    val verifiedClientId = requireNotNull(clientId) {
             "A validated presentation request must contain client_id."
-        },
+        }
+    return MobileWalletPresentationRequestInfo(
+        clientId = verifiedClientId,
         verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
+        requestAuthentication = resolvedAuthorizationRequest.toMobileRequestAuthentication(),
         responseUri = responseUri,
         state = state,
         nonce = requireNotNull(nonce) {
@@ -1024,19 +1095,46 @@ private fun AuthorizationRequest.toMobileDigitalCredentialRequestInfo(
         transactionData = transactionData,
     )
 
-private fun AuthorizationRequest.toMobileRequestContext(
+internal fun AuthorizationRequest.toMobileRequestContext(
     preferredLocales: List<String>,
-): MobileWalletPresentationRequestContext =
-    MobileWalletPresentationRequestContext(
-        clientId = requireNotNull(clientId) {
+    resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
+): MobileWalletPresentationRequestContext {
+    val verifiedClientId = requireNotNull(clientId) {
             "A reportable invalid presentation request must contain client_id."
-        },
+        }
+    return MobileWalletPresentationRequestContext(
+        clientId = verifiedClientId,
         verifierMetadata = clientMetadata?.toMobileVerifierMetadata(preferredLocales),
+        requestAuthentication = resolvedAuthorizationRequest.toMobileRequestAuthentication(),
         responseUri = responseUri,
         state = state,
         nonce = nonce,
         responseEncryption = null.toMobileResponseEncryption(),
     )
+}
+
+internal fun ResolvedAuthorizationRequest.toMobileRequestAuthentication(): MobileWalletRequestAuthentication =
+    when (this) {
+        is ResolvedAuthorizationRequest.Plain -> MobileWalletRequestAuthentication.Unauthenticated
+        is ResolvedAuthorizationRequest.UnsignedRequestObject -> MobileWalletRequestAuthentication.Unauthenticated
+        is ResolvedAuthorizationRequest.AuthenticatedRequestObject -> MobileWalletRequestAuthentication.Authenticated(
+            compactRequestObject = requestObject,
+            algorithm = authentication.algorithm,
+            keyId = authentication.keyId,
+            clientIdScheme = authentication.clientId.toMobileClientIdScheme(),
+        )
+    }
+
+private fun ClientId.toMobileClientIdScheme(): MobileWalletClientIdScheme = when (this) {
+    is PreRegistered -> MobileWalletClientIdScheme.PRE_REGISTERED
+    is RedirectUri -> MobileWalletClientIdScheme.REDIRECT_URI
+    is X509SanDns -> MobileWalletClientIdScheme.X509_SAN_DNS
+    is X509Hash -> MobileWalletClientIdScheme.X509_HASH
+    is DecentralizedIdentifier -> MobileWalletClientIdScheme.DECENTRALIZED_IDENTIFIER
+    is VerifierAttestation -> MobileWalletClientIdScheme.VERIFIER_ATTESTATION
+    is OpenIdFederation -> MobileWalletClientIdScheme.OPENID_FEDERATION
+    is Unsupported -> error("Unsupported client identifier cannot be authenticated: $prefix")
+}
 
 private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {
     WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED -> MobileWalletPresentationErrorCode.accessDenied

@@ -57,7 +57,13 @@ function eventColor(ev: SseEvent): string {
         <span
           v-if="status"
           class="text-xs font-semibold"
-          :class="status === 'SUCCESSFUL' ? 'text-green-600' : 'text-red-600'"
+          :class="
+            status === 'SUCCESSFUL'
+              ? 'text-green-600'
+              : isTerminal
+                ? 'text-red-600'
+                : 'text-blue-600'
+          "
         >
           {{ status }}
         </span>

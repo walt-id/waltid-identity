@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,23 +11,41 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import id.walt.walletdemo.compose.logic.ClaimItem
 import id.walt.walletdemo.compose.logic.ClaimItemPath
 import id.walt.walletdemo.compose.logic.DisplayValue
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun ClaimValueRow(item: ClaimItem, modifier: Modifier = Modifier) {
@@ -59,16 +78,24 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
             modifier = modifier,
             style = MaterialTheme.typography.bodyMedium,
         )
+        is DisplayValue.DeferredImage -> DeferredImageValue(value, path, modifier)
         is DisplayValue.Image -> ImageValue(value, path, modifier)
         is DisplayValue.ListValue -> Column(
             modifier = modifier,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            value.values.forEachIndexed { index, child ->
+            value.values.take(MaxListPreviewItems).forEachIndexed { index, child ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("${index + 1}.", style = MaterialTheme.typography.bodyMedium)
                     ClaimValue(child, path.indexedChild(index), Modifier.weight(1f))
                 }
+            }
+            if (value.values.size > MaxListPreviewItems) {
+                Text(
+                    "Showing first $MaxListPreviewItems of ${value.values.size} items",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
         DisplayValue.NullValue -> Text(
@@ -104,11 +131,39 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
     }
 }
 
+// Bound concurrent validation work, including ImageIO on Compose iOS.
+private val imageDecodeDispatcher = Dispatchers.Default.limitedParallelism(2)
+
+@Composable
+private fun DeferredImageValue(source: DisplayValue.DeferredImage, path: ClaimItemPath, modifier: Modifier) {
+    var visible by remember(source) { mutableStateOf(false) }
+    var resolved by remember(source) { mutableStateOf<DisplayValue?>(null) }
+    Box(modifier.onGloballyPositioned { coordinates ->
+        val bounds = coordinates.boundsInWindow()
+        visible = bounds.width > 0 && bounds.height > 0
+    }) {
+        val value = resolved
+        if (value == null) {
+            Box(Modifier.size(112.dp))
+        } else {
+            ClaimValue(value, path)
+        }
+    }
+    LaunchedEffect(source, visible) {
+        if (visible && resolved == null) {
+            resolved = withContext(imageDecodeDispatcher) { source.resolve() }
+        }
+    }
+}
+
+private const val MaxListPreviewItems = 25
+
 @Composable
 private fun ImageValue(value: DisplayValue.Image, path: ClaimItemPath, modifier: Modifier = Modifier) {
+    var viewerOpen by rememberSaveable(path.id) { mutableStateOf(false) }
+
     Column(
         modifier = modifier
-            .testTag(WalletUiTestTags.claimImage(path.id))
             .padding(top = 2.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -117,7 +172,12 @@ private fun ImageValue(value: DisplayValue.Image, path: ClaimItemPath, modifier:
                 .size(112.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                .testTag(WalletUiTestTags.claimImage(path.id))
+                .clickable(
+                    onClickLabel = "View credential image full screen",
+                    onClick = { viewerOpen = true },
+                ),
             contentAlignment = Alignment.Center,
         ) {
             AsyncImage(
@@ -133,11 +193,59 @@ private fun ImageValue(value: DisplayValue.Image, path: ClaimItemPath, modifier:
             fontWeight = FontWeight.Medium,
         )
         Text(
-            listOfNotNull(
-                "${value.byteCount} bytes",
-            ).joinToString(" • "),
+            "${value.byteCount} bytes",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+
+    if (viewerOpen) {
+        CredentialImageViewer(
+            value = value,
+            path = path,
+            onDismiss = { viewerOpen = false },
+        )
+    }
+}
+
+@Composable
+private fun CredentialImageViewer(
+    value: DisplayValue.Image,
+    path: ClaimItemPath,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.72f))
+                .testTag(WalletUiTestTags.claimImageViewer(path.id)),
+        ) {
+            AsyncImage(
+                model = value.bytes,
+                contentDescription = "Full-screen credential image",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp, vertical = 64.dp),
+                contentScale = ContentScale.Fit,
+            )
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .background(Color.Black.copy(alpha = 0.48f), CircleShape)
+                    .testTag(WalletUiTestTags.claimImageViewerClose(path.id)),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Close full-screen credential image",
+                    tint = Color.White,
+                )
+            }
+        }
     }
 }

@@ -1,5 +1,8 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.KeyProtectionLevel
+import id.walt.crypto2.keys.KeyAttestation
 import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
@@ -63,7 +66,7 @@ class SignumManagedKeyProviderTest {
 
     @Test
     fun `existing platform alias is adopted without replacing key material`() = runTest {
-        val backend = FakeBackend(protectionLevel = SignumProtectionLevel.HARDWARE)
+        val backend = FakeBackend(protectionLevel = KeyProtectionLevel.HARDWARE)
         val spec = KeySpec.Ec(EcCurve.P256)
         val usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
         backend.create("existing-alias", spec, usages, SignumKeyPolicy())
@@ -81,7 +84,7 @@ class SignumManagedKeyProviderTest {
             )
         )
 
-        assertEquals(SignumProtectionLevel.HARDWARE, restored.protectionLevel)
+        assertEquals(KeyProtectionLevel.HARDWARE, restored.protectionLevel)
         assertNotNull(restored.capabilities.signer).sign(
             "message".encodeToByteArray(),
             SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256),
@@ -135,17 +138,38 @@ class SignumManagedKeyProviderTest {
     }
 
     @Test
+    fun `malformed restored provider data is a stable metadata failure`() = runTest {
+        val backend = FakeBackend()
+        val generated = runtime(backend).generateManagedKey(
+            backend.id,
+            GenerateManagedKeyRequest(
+                id = KeyId("malformed-provider-data"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN),
+                providerOptions = SignumKeyOptions().encode(),
+            ),
+        )
+        val malformed = generated.storedKey.copy(
+            providerData = BinaryData("{not-signum-data".encodeToByteArray()),
+        )
+
+        assertFailsWith<SignumStoredKeyMetadataException> {
+            SignumManagedKeyProvider(backend).restoreSignumKey(malformed)
+        }
+    }
+
+    @Test
     fun `key survives restart with DER conversion and attestation`() = runTest {
         val challenge = BinaryData(byteArrayOf(1, 2, 3))
-        val attestation = SignumKeyAttestation("test", BinaryData(byteArrayOf(4, 5, 6)))
+        val attestation = KeyAttestation("test", BinaryData(byteArrayOf(4, 5, 6)))
         val backend = FakeBackend(
-            protectionLevel = SignumProtectionLevel.HARDWARE,
+            protectionLevel = KeyProtectionLevel.HARDWARE,
             attestation = attestation,
         )
         val options = SignumKeyOptions(
             alias = "hardware-key",
             policy = SignumKeyPolicy(
-                hardware = SignumHardwarePolicy.REQUIRED,
+                hardware = HardwarePreference.REQUIRED,
                 attestationChallenge = challenge,
             ),
         )
@@ -163,7 +187,7 @@ class SignumManagedKeyProviderTest {
                 StoredKeyCodec.decodeFromByteArray(StoredKeyCodec.encodeToByteArray(generated.storedKey))
             )
         )
-        assertEquals(SignumProtectionLevel.HARDWARE, restored.protectionLevel)
+        assertEquals(KeyProtectionLevel.HARDWARE, restored.protectionLevel)
         assertEquals(attestation, restored.attestation)
 
         val derAlgorithm = SignatureAlgorithm.Ecdsa(
@@ -247,7 +271,7 @@ class SignumManagedKeyProviderTest {
 
     @Test
     fun `required hardware failure deletes the generated alias`() = runTest {
-        val backend = FakeBackend(protectionLevel = SignumProtectionLevel.SOFTWARE)
+        val backend = FakeBackend(protectionLevel = KeyProtectionLevel.SOFTWARE)
 
         assertFailsWith<IllegalArgumentException> {
             runtime(backend).generateManagedKey(
@@ -257,7 +281,7 @@ class SignumManagedKeyProviderTest {
                     spec = KeySpec.Ec(EcCurve.P256),
                     usages = setOf(KeyUsage.SIGN),
                     providerOptions = SignumKeyOptions(
-                        policy = SignumKeyPolicy(hardware = SignumHardwarePolicy.REQUIRED)
+                        policy = SignumKeyPolicy(hardware = HardwarePreference.REQUIRED)
                     ).encode(),
                 ),
             )
@@ -266,36 +290,57 @@ class SignumManagedKeyProviderTest {
     }
 
     @Test
-    fun `self reported hardware without attestation is rejected`() = runTest {
-        val backend = FakeBackend(protectionLevel = SignumProtectionLevel.HARDWARE)
+    fun `required hardware does not require attestation`() = runTest {
+        val backend = FakeBackend(protectionLevel = KeyProtectionLevel.HARDWARE)
 
+        val generated = runtime(backend).generateManagedKey(
+            backend.id,
+            GenerateManagedKeyRequest(
+                id = KeyId("unattested-key"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN),
+                providerOptions = SignumKeyOptions(
+                    policy = SignumKeyPolicy(hardware = HardwarePreference.REQUIRED)
+                ).encode(),
+            ),
+        )
+
+        assertEquals(KeyProtectionLevel.HARDWARE, assertIs<SignumManagedKey>(generated).protectionLevel)
+        assertTrue(backend.deletedAliases.isEmpty())
+    }
+
+    @Test
+    fun `required hardware policy remains unknown without attestation evidence`() {
+        val policy = SignumKeyPolicy(hardware = HardwarePreference.REQUIRED)
+
+        assertEquals(KeyProtectionLevel.UNKNOWN, policy.effectiveProtection(null))
+        assertEquals(
+            KeyProtectionLevel.HARDWARE,
+            policy.effectiveProtection(KeyAttestation("test", BinaryData(byteArrayOf(1)))),
+        )
+    }
+
+    @Test
+    fun `explicit attestation still requires attestation evidence`() = runTest {
+        val backend = FakeBackend(protectionLevel = KeyProtectionLevel.HARDWARE)
         val failure = assertFailsWith<IllegalArgumentException> {
             runtime(backend).generateManagedKey(
                 backend.id,
                 GenerateManagedKeyRequest(
-                    id = KeyId("unattested-key"),
+                    id = KeyId("attested-key"),
                     spec = KeySpec.Ec(EcCurve.P256),
                     usages = setOf(KeyUsage.SIGN),
                     providerOptions = SignumKeyOptions(
-                        policy = SignumKeyPolicy(hardware = SignumHardwarePolicy.REQUIRED)
+                        policy = SignumKeyPolicy(
+                            hardware = HardwarePreference.REQUIRED,
+                            attestationChallenge = BinaryData(byteArrayOf(1)),
+                        ),
                     ).encode(),
                 ),
             )
         }
-
-        assertTrue(failure.message.orEmpty().contains("attested hardware"))
-        assertEquals(listOf("unattested-key"), backend.deletedAliases)
-    }
-
-    @Test
-    fun `required hardware policy is unknown without attestation evidence`() {
-        val policy = SignumKeyPolicy(hardware = SignumHardwarePolicy.REQUIRED)
-
-        assertEquals(SignumProtectionLevel.UNKNOWN, policy.effectiveProtection(null))
-        assertEquals(
-            SignumProtectionLevel.HARDWARE,
-            policy.effectiveProtection(SignumKeyAttestation("test", BinaryData(byteArrayOf(1)))),
-        )
+        assertTrue(failure.message.orEmpty().contains("required attestation"))
+        assertEquals(listOf("attested-key"), backend.deletedAliases)
     }
 
     @Test
@@ -346,8 +391,8 @@ class SignumManagedKeyProviderTest {
     )
 
     private class FakeBackend(
-        private val protectionLevel: SignumProtectionLevel = SignumProtectionLevel.UNKNOWN,
-        private val attestation: SignumKeyAttestation? = null,
+        private val protectionLevel: KeyProtectionLevel = KeyProtectionLevel.UNKNOWN,
+        private val attestation: KeyAttestation? = null,
         private val signFailure: Throwable? = null,
         private val createFailure: Throwable? = null,
     ) : SignumPlatformBackend {

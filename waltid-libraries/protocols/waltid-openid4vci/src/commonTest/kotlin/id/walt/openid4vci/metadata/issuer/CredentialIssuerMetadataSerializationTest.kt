@@ -3,6 +3,7 @@ package id.walt.openid4vci.metadata.issuer
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.prooftypes.ProofTypeId
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -407,6 +408,44 @@ class CredentialIssuerMetadataSerializationTest {
                 ?.jsonPrimitive
                 ?.content,
         )
+    }
+
+    @Test
+    fun `decodes mdoc signing algorithms as numeric cose identifiers`() {
+        val numeric = json.decodeFromString<CredentialConfiguration>(
+            """
+            {
+              "format": "mso_mdoc",
+              "credential_signing_alg_values_supported": [-7]
+            }
+            """.trimIndent(),
+        )
+        assertEquals(
+            setOf(SigningAlgId.CoseValue(-7)),
+            numeric.credentialSigningAlgValuesSupported,
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            json.decodeFromString<CredentialConfiguration>(
+                """
+                {
+                  "format": "mso_mdoc",
+                  "credential_signing_alg_values_supported": ["ES256"]
+                }
+                """.trimIndent(),
+            )
+        }
+
+        assertFailsWith<IllegalArgumentException> {
+            json.decodeFromString<CredentialConfiguration>(
+                """
+                {
+                  "format": "mso_mdoc",
+                  "credential_signing_alg_values_supported": ["UNKNOWN"]
+                }
+                """.trimIndent(),
+            )
+        }
     }
 
     // 8) null collections should be omitted

@@ -1,5 +1,7 @@
 package id.walt.wallet2.mobile.test
 
+import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
+import id.walt.wallet2.mobile.identity.SigningIdentity
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.mobile.test.backend.EnterpriseMobileAttestationConfig
@@ -10,9 +12,11 @@ import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.WalletAttestationConfig
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.util.UUID
@@ -56,7 +60,7 @@ class EnterpriseMobileWalletIntegrationTest {
         val offer = fixture.createOffer(scenario, EnterpriseMobilePlatform.ANDROID)
 
         val wallet1 = createWallet(walletId, offer.attestation)
-        val bootstrapResult = wallet1.bootstrap()
+        val bootstrapResult = wallet1.signingIdentity.initialize().activeIdentity()
         wallet1.receiveCredential(offer.offerUrl, offer.txCode)
 
         val wallet2 = createWallet(walletId, offer.attestation)
@@ -80,7 +84,7 @@ class EnterpriseMobileWalletIntegrationTest {
             walletId = "android-enterprise-receive-${scenario.id}-${UUID.randomUUID()}",
             attestation = offer.attestation,
         )
-        wallet.bootstrap()
+        wallet.signingIdentity.initialize().activeIdentity()
 
         val credentialIds = wallet.receiveCredential(offer.offerUrl, offer.txCode)
 
@@ -100,7 +104,7 @@ class EnterpriseMobileWalletIntegrationTest {
             walletId = "android-enterprise-present-${scenario.id}-${UUID.randomUUID()}",
             attestation = offer.attestation,
         )
-        val bootstrapResult = wallet.bootstrap()
+        val bootstrapResult = wallet.signingIdentity.initialize().activeIdentity()
 
         val credentialIds = wallet.receiveCredential(offer.offerUrl, offer.txCode)
         assertTrue(credentialIds.isNotEmpty(), "Should receive ${scenario.displayName}")
@@ -140,6 +144,7 @@ class EnterpriseMobileWalletIntegrationTest {
             walletId = walletId,
             attestationConfig = attestation?.toWalletAttestationConfig(),
             onEvent = { event -> println("WALLET EVENT: $event") },
+            defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
         )
     )
 
@@ -158,7 +163,7 @@ class EnterpriseMobileWalletIntegrationTest {
         when (
             val outcome = continuePreAuthorizedIssuance(
                 sessionId = startIssuance(
-                    MobileWalletIssuanceRequest(offerUrl = offerUrl)
+                    MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(offerUrl))
                 ).id,
                 transactionCode = transactionCode,
             )
@@ -169,3 +174,6 @@ class EnterpriseMobileWalletIntegrationTest {
             is WalletIssuanceOutcome.Failed -> error("Expected stored credentials, got failed outcome: ${outcome.error.message}")
         }
 }
+
+private fun SigningIdentityOperationResult.activeIdentity(): SigningIdentity =
+    kotlin.test.assertIs<SigningIdentityOperationResult.Active>(this).identity

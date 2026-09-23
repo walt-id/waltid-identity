@@ -13,6 +13,17 @@ import kotlin.test.assertTrue
 class CredentialDisplayNormalizerTest {
 
     @Test
+    fun deferredByteArrayStillValidatesValuesAfterTheImageHeader() {
+        val details = CredentialDisplayNormalizer.toDetails(CredentialSummary(
+            id = "bad-image", format = "mso_mdoc", issuer = null, label = "Portrait",
+            credentialDataJson = """{"portrait":[137,80,78,71,13,10,26,10,0,0,0,13,999]}""",
+        ))
+        val deferred = assertIs<DisplayValue.DeferredImage>(details.groups.single().items.single().value)
+        val fallback = assertIs<DisplayValue.ListValue>(deferred.resolve())
+        assertEquals(DisplayValue.NumberValue("999"), fallback.values.last())
+    }
+
+    @Test
     fun parsesCredentialJsonIntoReadableClaimGroups() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(
@@ -244,7 +255,7 @@ class CredentialDisplayNormalizerTest {
                 label = "PID",
                 credentialDataJson = """
                     {
-                      "portrait": "data:image/png;base64,$onePixelPngBase64",
+                      "portrait": "data:image/png;base64,$syntheticPngBase64",
                       "nationalities": ["AT", "CH"],
                       "place_of_birth": {
                         "region": "Vienna",
@@ -406,8 +417,6 @@ class CredentialDisplayNormalizerTest {
             val format: String,
             val label: String,
             val credentialDataJson: String,
-            val expectedHolderName: String,
-            val expectedCredentialType: String?,
             val expectedClaimPath: String,
         )
 
@@ -423,12 +432,10 @@ class CredentialDisplayNormalizerTest {
                       "credentialSubject": {
                         "given_name": "Ada",
                         "family_name": "Lovelace",
-                        "portrait": "data:image/png;base64,$onePixelPngBase64"
+                        "portrait": "data:image/png;base64,$syntheticPngBase64"
                       }
                     }
                 """.trimIndent(),
-                expectedHolderName = "Ada Lovelace",
-                expectedCredentialType = "Person credential",
                 expectedClaimPath = "credentialSubject.portrait",
             ),
             FormatCase(
@@ -446,8 +453,6 @@ class CredentialDisplayNormalizerTest {
                       }
                     }
                 """.trimIndent(),
-                expectedHolderName = "Jane Employee",
-                expectedCredentialType = "Employee credential",
                 expectedClaimPath = "credentialSubject.role",
             ),
             FormatCase(
@@ -472,8 +477,6 @@ class CredentialDisplayNormalizerTest {
                       }
                     }
                 """.trimIndent(),
-                expectedHolderName = "Lin Graduate",
-                expectedCredentialType = "University degree credential",
                 expectedClaimPath = "credentialSubject.degree.name",
             ),
             FormatCase(
@@ -491,8 +494,6 @@ class CredentialDisplayNormalizerTest {
                       }
                     }
                 """.trimIndent(),
-                expectedHolderName = "Legacy Holder",
-                expectedCredentialType = "Legacy person credential",
                 expectedClaimPath = "vc.credentialSubject.member_id",
             ),
             FormatCase(
@@ -508,8 +509,6 @@ class CredentialDisplayNormalizerTest {
                       "exp": 1894699800
                     }
                 """.trimIndent(),
-                expectedHolderName = "Alice Tester",
-                expectedCredentialType = "Pid 1",
                 expectedClaimPath = "cnf",
             ),
             FormatCase(
@@ -524,8 +523,6 @@ class CredentialDisplayNormalizerTest {
                       "iss": "https://issuer.example"
                     }
                 """.trimIndent(),
-                expectedHolderName = "Ali Alias",
-                expectedCredentialType = "Pid 1",
                 expectedClaimPath = "_sd",
             ),
             FormatCase(
@@ -539,8 +536,6 @@ class CredentialDisplayNormalizerTest {
                       "cnf": {"kid": "holder-key-2"}
                     }
                 """.trimIndent(),
-                expectedHolderName = "Sam Stored",
-                expectedCredentialType = "Mobile driving licence",
                 expectedClaimPath = "cnf",
             ),
             FormatCase(
@@ -556,8 +551,6 @@ class CredentialDisplayNormalizerTest {
                       }
                     }
                 """.trimIndent(),
-                expectedHolderName = "Anna Musterfrau",
-                expectedCredentialType = null,
                 expectedClaimPath = "eu.europa.ec.eudi.pid.1.resident_state",
             ),
             FormatCase(
@@ -573,8 +566,6 @@ class CredentialDisplayNormalizerTest {
                       }
                     }
                 """.trimIndent(),
-                expectedHolderName = "Max Driver",
-                expectedCredentialType = null,
                 expectedClaimPath = "org.iso.18013.5.1.document_number",
             ),
         )
@@ -591,10 +582,8 @@ class CredentialDisplayNormalizerTest {
                 )
             )
             val claims = details.groups.flatMap { it.items }
-            val card = details.toCardDisplayData()
 
-            assertEquals(case.expectedHolderName, card.holderName, case.label)
-            assertEquals(case.expectedCredentialType, card.credentialType, case.label)
+            assertEquals(details.toCardDisplayData(), details.summary.toCardDisplayData(), case.label)
             assertTrue(claims.any { it.path.id == case.expectedClaimPath }, case.label)
             assertTrue(claims.none { it.value is DisplayValue.ObjectValue }, case.label)
         }
@@ -722,7 +711,7 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
-    fun validatesDataUriImageBytesBeforeUsingMimeHint() {
+    fun usesDetectedImageTypeInsteadOfDeclaredDataUrlType() {
         val encodedJson = Base64.Default.encode("""{"purpose":"age proof"}""".encodeToByteArray())
         val encodedText = Base64.Default.encode("Hello, wallet".encodeToByteArray())
         val details = CredentialDisplayNormalizer.toDetails(
@@ -735,7 +724,7 @@ class CredentialDisplayNormalizerTest {
                     {
                       "json_note": "data:image/png;base64,$encodedJson",
                       "plain_note": "data:image/webp;base64,$encodedText",
-                      "portrait": "data:image/png;base64,$onePixelPngBase64"
+                      "portrait": "data:image/png;base64,$syntheticPngBase64"
                     }
                 """.trimIndent(),
             )
@@ -744,18 +733,54 @@ class CredentialDisplayNormalizerTest {
         val claims = details.groups.flatMap { it.items }
         assertEquals(DisplayValue.Text("age proof"), claims.first { it.path.id == "json_note.purpose" }.value)
         assertEquals(DisplayValue.DecodedText("Hello, wallet"), claims.first { it.path.id == "plain_note" }.value)
-        assertIs<DisplayValue.Image>(claims.first { it.path.id == "portrait" }.value)
+        assertIs<DisplayValue.Image>((claims.first { it.path.id == "portrait" }.value as DisplayValue.DeferredImage).resolve())
     }
 
     @Test
-    fun classifiesPortraitByteArrayDataAsImageAndUsesItForCards() {
+    fun explicitNonImageSchemaAndUnsupportedPayloadsDoNotRenderAsImages() {
+        val svg = Base64.Default.encode(
+            """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12"/></svg>"""
+                .encodeToByteArray()
+        )
+        val dataImage = "data:image/png;base64,$syntheticPngBase64"
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "vc+sd-jwt",
+                issuer = null,
+                label = "vc+sd-jwt",
+                credentialDataJson = """
+                    {
+                      "given_name": "$dataImage",
+                      "invalid_image": "data:image/png;base64,not-base64!",
+                      "unsupported_image": "data:image/svg+xml;base64,$svg",
+                      "non_image_data_url": "data:text/plain;base64,$syntheticPngBase64",
+                      "plain_base64": "$syntheticPngBase64"
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val claims = details.groups.flatMap { it.items }
+        listOf("given_name", "invalid_image", "unsupported_image", "non_image_data_url", "plain_base64")
+            .forEach { path ->
+                assertFalse(claims.first { it.path.id == path }.value is DisplayValue.Image)
+                assertFalse(claims.first { it.path.id == path }.value is DisplayValue.DeferredImage)
+            }
+        val invalidImage = claims.first { it.path.id == "invalid_image" }
+        assertEquals(DisplayValue.Text(CredentialDisplayText.ImageUnavailable), invalidImage.value)
+        assertTrue(invalidImage.rawValue?.contains("not-base64!") == true)
+    }
+
+    @Test
+    fun defersPortraitByteArrayUntilResolved() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(
                 id = "cred-1",
                 format = "mso_mdoc",
                 issuer = null,
                 label = "mso_mdoc",
-                credentialDataJson = """{"portrait":{"elementValue":${onePixelPngByteArrayJson()}}}""",
+                credentialDataJson = """{"portrait":{"elementValue":${syntheticPngByteArrayJson()}}}""",
             )
         )
 
@@ -763,11 +788,10 @@ class CredentialDisplayNormalizerTest {
             .flatMap { it.items }
             .first { it.path.id == "portrait.elementValue" }
         assertEquals("Portrait", portrait.label)
-        val image = assertIs<DisplayValue.Image>(portrait.value)
+        val image = assertIs<DisplayValue.Image>((portrait.value as DisplayValue.DeferredImage).resolve())
 
         assertEquals("image/png", image.mimeType)
-        assertTrue(image.bytes.contentEquals(Base64.Default.decode(onePixelPngBase64)))
-        assertEquals(image, details.toCardDisplayData().portrait)
+        assertTrue(image.bytes.contentEquals(Base64.Default.decode(syntheticPngBase64)))
     }
 
     @Test
@@ -782,7 +806,7 @@ class CredentialDisplayNormalizerTest {
                     {
                       "eu.europa.ec.eudi.pid.1": {
                         "portrait": {
-                          "elementValue": ${onePixelPngByteArrayJson()}
+                          "elementValue": ${syntheticPngByteArrayJson()}
                         }
                       }
                     }
@@ -794,7 +818,69 @@ class CredentialDisplayNormalizerTest {
             .flatMap { it.items }
             .first { it.path.id == "eu.europa.ec.eudi.pid.1.portrait.elementValue" }
         assertEquals("Portrait", portrait.label)
-        assertIs<DisplayValue.Image>(portrait.value)
+        assertIs<DisplayValue.Image>((portrait.value as DisplayValue.DeferredImage).resolve())
+    }
+
+    @Test
+    fun classifiesMdocSignatureUsualMarkByteArrayAsImage() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "mso_mdoc",
+                issuer = null,
+                label = "Mobile driving licence",
+                credentialDataJson = """
+                    {
+                      "org.iso.18013.5.1": {
+                        "signature_usual_mark": {
+                          "elementValue": ${syntheticPngByteArrayJson()}
+                        }
+                      }
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val signature = details.groups
+            .flatMap { it.items }
+            .first { it.path.id == "org.iso.18013.5.1.signature_usual_mark.elementValue" }
+        assertEquals("Signature or usual mark", signature.label)
+        assertIs<DisplayValue.Image>((signature.value as DisplayValue.DeferredImage).resolve())
+    }
+
+    @Test
+    fun classifiesStandardMdlBiometricTemplateByteArraysAsImages() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "mso_mdoc",
+                issuer = null,
+                label = "mso_mdoc",
+                credentialDataJson = """
+                    {
+                      "org.iso.18013.5.1": {
+                        "biometric_template_face": ${syntheticPngByteArrayJson()},
+                        "biometric_template_finger": ${syntheticPngByteArrayJson()},
+                        "biometric_template_signature_sign": ${syntheticPngByteArrayJson()},
+                        "biometric_template_iris": ${syntheticPngByteArrayJson()}
+                      }
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val claimsByPath = details.groups
+            .flatMap { it.items }
+            .associateBy { it.path.id }
+        listOf(
+            "biometric_template_face",
+            "biometric_template_finger",
+            "biometric_template_signature_sign",
+            "biometric_template_iris",
+        ).forEach { elementIdentifier ->
+            val claim = assertNotNull(claimsByPath["org.iso.18013.5.1.$elementIdentifier"])
+            assertIs<DisplayValue.Image>((claim.value as DisplayValue.DeferredImage).resolve())
+        }
     }
 
     @Test
@@ -825,7 +911,7 @@ class CredentialDisplayNormalizerTest {
                 WalletDemoPresentationDisclosure(
                     label = CredentialDisplayVocabulary.disclosureLabel("portrait", """["eu.europa.ec.eudi.pid.1","portrait"]"""),
                     path = """["eu.europa.ec.eudi.pid.1","portrait"]""",
-                    valueJson = onePixelPngByteArrayJson(),
+                    valueJson = syntheticPngByteArrayJson(),
                     displayValue = null,
                     selectivelyDisclosable = true,
                     required = false,
@@ -841,7 +927,7 @@ class CredentialDisplayNormalizerTest {
         assertEquals(listOf("Given name", "Portrait"), requested.items.map { it.label })
         assertEquals(listOf("disclosures[0].given_name", "disclosures[1].portrait"), requested.items.map { it.path.id })
         assertEquals(DisplayValue.Text("Ada"), requested.items.first().value)
-        assertIs<DisplayValue.Image>(requested.items.last().value)
+        assertIs<DisplayValue.Image>((requested.items.last().value as DisplayValue.DeferredImage).resolve())
 
         val personal = assertNotNull(details.groups.firstOrNull { it.title == "Personal details" })
         assertEquals(listOf("Given name", "Family name"), personal.items.map { it.label })
@@ -872,6 +958,35 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun presentationCredentialOptionSurfacesStoredCardArt() {
+        val option = WalletDemoPresentationCredentialOption(
+            queryId = "pid",
+            credentialId = "credential-1",
+            label = "PID",
+            issuer = "https://issuer.example",
+            subject = "did:key:holder",
+            format = "dc+sd-jwt",
+            credentialDataJson = """{"given_name":"Ada"}""",
+            disclosures = emptyList(),
+            metadataJson = """
+                {
+                  "credentialDisplay": [
+                    {
+                      "name": "Personal ID",
+                      "background_image": { "uri": "https://issuer.example/pid-bg.png" }
+                    }
+                  ]
+                }
+            """.trimIndent(),
+        )
+
+        val card = option.toCredentialDetails().toCardDisplayData()
+
+        assertEquals("https://issuer.example/pid-bg.png", card.backgroundImageUri)
+        assertEquals("Personal ID", card.title)
+    }
+
+    @Test
     fun leavesMalformedCredentialJsonWithoutDisplayGroups() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(
@@ -887,7 +1002,7 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
-    fun derivesCardSummaryFromClaims() {
+    fun derivesCardTitleFromCredentialType() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(
                 id = "cred-1",
@@ -908,10 +1023,7 @@ class CredentialDisplayNormalizerTest {
         ).toCardDisplayData()
 
         assertEquals("cred-1", details.id)
-        assertEquals("PID", details.title)
-        assertEquals("Mobile driving licence", details.credentialType)
-        assertEquals("Ada Lovelace", details.holderName)
-        assertEquals("Expires 2026-06-17", details.validity)
+        assertEquals("Mobile Driving Licence", details.title)
     }
 
     @Test
@@ -922,21 +1034,21 @@ class CredentialDisplayNormalizerTest {
                     type = "org.waltid.transaction-data.payment-authorization",
                     displayName = "Payment Authorization",
                     credentialQueryIds = listOf("pid", "payment"),
-                    supportedFields = listOf("amount", "currency", "payee"),
+                    supportedFields = listOf("merchant_name", "amount", "currency"),
                     detailsJson = """
                         {
+                          "merchant_name": "ACME Corp",
                           "amount": "42.00",
-                          "currency": "EUR",
-                          "payee": "ACME Corp"
+                          "currency": "EUR"
                         }
                     """.trimIndent(),
                     rawJson = """
                         {
                           "type": "org.waltid.transaction-data.payment-authorization",
                           "credential_ids": ["pid", "payment"],
+                          "merchant_name": "ACME Corp",
                           "amount": "42.00",
-                          "currency": "EUR",
-                          "payee": "ACME Corp"
+                          "currency": "EUR"
                         }
                     """.trimIndent(),
                 )
@@ -953,23 +1065,106 @@ class CredentialDisplayNormalizerTest {
 
         assertEquals("Payment Authorization", payment.title)
         assertEquals(
-            listOf("Amount", "Currency", "Payee"),
+            listOf("Merchant name", "Amount", "Currency"),
             payment.items.take(3).map { it.label },
         )
         assertEquals("org.waltid.transaction-data.payment-authorization", labelsToValues["Type"])
         assertEquals("pid, payment", labelsToValues["Credential queries"])
+        assertEquals("ACME Corp", labelsToValues["Merchant name"])
         assertEquals("42.00", labelsToValues["Amount"])
         assertEquals("EUR", labelsToValues["Currency"])
-        assertEquals("ACME Corp", labelsToValues["Payee"])
     }
 
-    private fun onePixelPngByteArrayJson(): String =
-        Base64.Default.decode(onePixelPngBase64).joinToString(prefix = "[", postfix = "]") { byte ->
+    @Test
+    fun transactionDataGroupsQualifyNestedScaPayloadLabelsWithTheirParent() {
+        val groups = CredentialDisplayNormalizer.transactionDataGroups(
+            listOf(
+                WalletDemoTransactionDataItem(
+                    type = "urn:eudi:sca:payment:1",
+                    displayName = "SCA Payment",
+                    credentialQueryIds = listOf("sca_payment_card"),
+                    supportedFields = listOf("payload"),
+                    detailsJson = """
+                        {
+                          "payload": {
+                            "transaction_id": "8D8AC610-566D-4EF0-9C22-186B2A5ED793",
+                            "payee": {
+                              "name": "Super Store",
+                              "id": "merchant-001"
+                            },
+                            "currency": "EUR",
+                            "amount": 11.56
+                          }
+                        }
+                    """.trimIndent(),
+                    rawJson = """
+                        {
+                          "type": "urn:eudi:sca:payment:1",
+                          "credential_ids": ["sca_payment_card"],
+                          "payload": {
+                            "transaction_id": "8D8AC610-566D-4EF0-9C22-186B2A5ED793",
+                            "payee": {
+                              "name": "Super Store",
+                              "id": "merchant-001"
+                            },
+                            "currency": "EUR",
+                            "amount": 11.56
+                          }
+                        }
+                    """.trimIndent(),
+                )
+            )
+        )
+
+        val payment = groups.single()
+        assertEquals("SCA Payment", payment.title)
+        assertTrue(payment.items.none { it.value is DisplayValue.ObjectValue })
+
+        val labelsByPath = payment.items.associate { it.path.id to it.label }
+        // The `payload` wrapper carries no meaning of its own, so its direct leaves stay unprefixed...
+        assertEquals("Amount", labelsByPath["transactionData[0].details.payload.amount"])
+        assertEquals("Currency", labelsByPath["transactionData[0].details.payload.currency"])
+        assertEquals("Transaction id", labelsByPath["transactionData[0].details.payload.transaction_id"])
+        // ...while a bare "Name" row would not say whose name it is.
+        assertEquals("Payee name", labelsByPath["transactionData[0].details.payload.payee.name"])
+        assertEquals("Payee id", labelsByPath["transactionData[0].details.payload.payee.id"])
+
+        val valuesByPath = payment.items.associate { it.path.id to it.value }
+        assertEquals(DisplayValue.NumberValue("11.56"), valuesByPath["transactionData[0].details.payload.amount"])
+        assertEquals(DisplayValue.Text("EUR"), valuesByPath["transactionData[0].details.payload.currency"])
+        assertEquals(DisplayValue.Text("Super Store"), valuesByPath["transactionData[0].details.payload.payee.name"])
+    }
+
+    @Test
+    fun credentialClaimsKeepUnqualifiedNestedLabels() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "dc+sd-jwt",
+                issuer = null,
+                label = "PID",
+                credentialDataJson = """{"place_of_birth":{"locality":"Vienna","country":"AT"}}""",
+            )
+        )
+
+        val claims = details.groups.flatMap { it.items }
+        assertEquals("Locality", claims.first { it.path.id == "place_of_birth.locality" }.label)
+        assertEquals("Country", claims.first { it.path.id == "place_of_birth.country" }.label)
+    }
+
+    private fun syntheticPngByteArrayJson(): String =
+        syntheticPngBytes.joinToString(prefix = "[", postfix = "]") { byte ->
             (byte.toInt() and 0xFF).toString()
         }
 
     private companion object {
-        const val onePixelPngBase64 =
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+        val syntheticPngBytes = byteArrayOf(
+            0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        )
+        val syntheticJpegBytes = byteArrayOf(
+            0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46,
+        )
+        val syntheticPngBase64 = Base64.Default.encode(syntheticPngBytes)
+        val syntheticJpegBase64 = Base64.Default.encode(syntheticJpegBytes)
     }
 }

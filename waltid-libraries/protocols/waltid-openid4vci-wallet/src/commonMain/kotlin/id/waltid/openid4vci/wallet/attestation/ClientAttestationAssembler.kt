@@ -24,9 +24,17 @@ class ClientAttestationAssembler(
         instanceKey: LegacyKey,
         clientId: String,
         audience: String,
+    ): ClientAttestationHeaders = buildAttestationHeaders(instanceKey, clientId, audience, null)
+
+    @Deprecated("Use the Crypto2Key overload")
+    suspend fun buildAttestationHeaders(
+        instanceKey: LegacyKey,
+        clientId: String,
+        audience: String,
+        challenge: String?,
     ): ClientAttestationHeaders {
         val attestationJwt = attestationProvider.getAttestationJwt(instanceKey.getPublicKey(), clientId)
-        val popJwt = popBuilder.buildPopJwt(instanceKey, clientId, audience)
+        val popJwt = popBuilder.buildPopJwt(instanceKey, clientId, audience, challenge)
         return ClientAttestationHeaders(attestationJwt, popJwt)
     }
 
@@ -34,13 +42,36 @@ class ClientAttestationAssembler(
         instanceKey: Key,
         clientId: String,
         audience: String,
+    ): ClientAttestationHeaders = buildAttestationHeaders(instanceKey, clientId, audience, null)
+
+    suspend fun buildAttestationHeaders(
+        instanceKey: Key,
+        clientId: String,
+        audience: String,
+        challenge: String?,
     ): ClientAttestationHeaders {
+        val attestationJwt = obtainAttestationJwt(instanceKey, clientId)
+        val popJwt = buildPopJwt(instanceKey, clientId, audience, challenge)
+        return ClientAttestationHeaders(attestationJwt, popJwt)
+    }
+
+    /** Obtains the reusable Wallet Attestation JWT for one protocol exchange. */
+    suspend fun obtainAttestationJwt(
+        instanceKey: Key,
+        clientId: String,
+    ): String {
         val exported = requireNotNull(instanceKey.capabilities.publicKeyExporter) {
             "Wallet attestation instance key does not export its public key"
         }.exportPublicKey()
         val publicJwk = exported.toPublicJwk(instanceKey.spec).publicOnly()
-        val attestationJwt = attestationProvider.getAttestationJwt(publicJwk, clientId)
-        val popJwt = popBuilder.buildPopJwt(instanceKey, clientId, audience)
-        return ClientAttestationHeaders(attestationJwt, popJwt)
+        return attestationProvider.getAttestationJwt(publicJwk, clientId)
     }
+
+    /** Builds a fresh proof for the specific HTTP request being sent. */
+    suspend fun buildPopJwt(
+        instanceKey: Key,
+        clientId: String,
+        audience: String,
+        challenge: String?,
+    ): String = popBuilder.buildPopJwt(instanceKey, clientId, audience, challenge)
 }

@@ -12,13 +12,13 @@ jobs:
     runs-on: windows-2025
     steps:
       - name: Checkout all repositories
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@982301c7176ee6d6abcf785cf1a2c0cac0a559bc
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
 
       - name: Configure Gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Run Windows native tests
         shell: bash
@@ -31,13 +31,13 @@ jobs:
     runs-on: macos-15-intel
     steps:
       - name: Checkout all repositories
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@982301c7176ee6d6abcf785cf1a2c0cac0a559bc
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
 
       - name: Configure Gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Run macOS x64 tests
         run: >-
@@ -49,13 +49,13 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Checkout all repositories
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@982301c7176ee6d6abcf785cf1a2c0cac0a559bc
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
 
       - name: Configure Gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Run macOS arm64 and iOS simulator tests
         run: >-

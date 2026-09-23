@@ -1,5 +1,8 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.KeyProtectionLevel
+import id.walt.crypto2.keys.KeyAttestation
 import at.asitplus.signum.indispensable.CryptoPublicKey
 import at.asitplus.signum.indispensable.CryptoSignature
 import at.asitplus.signum.indispensable.Digest
@@ -25,6 +28,8 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toSpkiDer
 import id.walt.crypto2.serialization.BinaryData
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.seconds
@@ -33,6 +38,7 @@ internal fun PlatformSigningKeyConfigurationBase<*>.configureSignumKey(
     spec: KeySpec,
     usages: Set<KeyUsage>,
     policy: SignumKeyPolicy,
+    configureHardware: PlatformSigningKeyConfigurationBase.SecureHardwareConfiguration.() -> Unit = {},
 ) {
     when (spec) {
         is KeySpec.Ec -> ec {
@@ -54,27 +60,23 @@ internal fun PlatformSigningKeyConfigurationBase<*>.configureSignumKey(
         }
         else -> error("Unsupported Signum key specification: $spec")
     }
-    if (policy.hardware != SignumHardwarePolicy.DISCOURAGED ||
-        policy.authentication !is SignumAuthenticationPolicy.None ||
-        policy.attestationChallenge != null
-    ) {
-        hardware {
-            backing = when (policy.hardware) {
-                SignumHardwarePolicy.REQUIRED -> REQUIRED
-                SignumHardwarePolicy.PREFERRED -> PREFERRED
-                SignumHardwarePolicy.DISCOURAGED -> DISCOURAGED
-            }
-            policy.attestationChallenge?.let { challenge ->
-                attestation { this.challenge = challenge.toByteArray() }
-            }
-            (policy.authentication as? SignumAuthenticationPolicy.UserPresence)?.let { auth ->
-                protection {
-                    timeout = auth.timeoutSeconds.seconds
-                    factors {
-                        biometry = auth.biometric
-                        biometryWithNewFactors = auth.allowNewBiometrics
-                        deviceLock = auth.deviceCredential
-                    }
+    hardware {
+        configureHardware()
+        backing = when (policy.hardware) {
+            HardwarePreference.REQUIRED -> REQUIRED
+            HardwarePreference.PREFERRED -> PREFERRED
+            HardwarePreference.DISCOURAGED -> DISCOURAGED
+        }
+        policy.attestationChallenge?.let { challenge ->
+            attestation { this.challenge = challenge.toByteArray() }
+        }
+        (policy.authentication as? SignumAuthenticationPolicy.UserPresence)?.let { auth ->
+            protection {
+                timeout = auth.timeoutSeconds.seconds
+                factors {
+                    biometry = auth.biometric
+                    biometryWithNewFactors = auth.allowNewBiometrics
+                    deviceLock = auth.deviceCredential
                 }
             }
         }
@@ -109,23 +111,31 @@ internal fun PlatformSignerConfigurationBase.configureSignumOperation(
 internal class SignumPlatformKeyHandle(
     override val alias: String,
     override val spec: KeySpec,
-    override val protectionLevel: SignumProtectionLevel,
-    override val attestation: SignumKeyAttestation?,
+    override val protectionLevel: KeyProtectionLevel,
+    override val attestation: KeyAttestation?,
     private val authentication: SignumAuthenticationPolicy,
     private val signerFor: suspend (SignatureAlgorithm) -> PlatformSigningProviderSigner<*, *>,
-    defaultSigner: PlatformSigningProviderSigner<*, *>,
+    private val operationFailureMapper: (Throwable) -> Throwable = { it },
+    private val nativePublicKey: CryptoPublicKey,
     keyAgreementEnabled: Boolean,
 ) : SignumPlatformKey {
-    override val publicKey = EncodedKey.SpkiDer(BinaryData(defaultSigner.publicKey.encodeToTlv().derEncoded))
+    override val publicKey = EncodedKey.SpkiDer(BinaryData(nativePublicKey.encodeToTlv().derEncoded))
     override val signatureAlgorithms = spec.nativeSignatureAlgorithms()
     override val keyAgreementAlgorithms = if (keyAgreementEnabled) setOf(KeyAgreementAlgorithm.Ecdh) else emptySet()
 
     override suspend fun sign(data: ByteArray, algorithm: SignatureAlgorithm): ByteArray {
         require(algorithm in signatureAlgorithms) { "Unsupported Signum signature algorithm" }
-        return when (val result = signerFor(algorithm).sign(data)) {
-            is SignatureResult.Success -> result.signature.rawByteArray
-            is SignatureResult.Failure -> throw SignumUserCancelledException(result.problem)
-            is SignatureResult.Error -> throw result.exception
+        return try {
+            when (val result = signerFor(algorithm).sign(data)) {
+                is SignatureResult.Success -> {
+                    currentCoroutineContext().ensureActive()
+                    result.signature.rawByteArray
+                }
+                is SignatureResult.Failure -> throw SignumUserCancelledException(result.problem)
+                is SignatureResult.Error -> throw result.exception
+            }
+        } catch (cause: Throwable) {
+            throw operationFailureMapper(cause)
         }
     }
 
@@ -137,7 +147,7 @@ internal class SignumPlatformKeyHandle(
             is KeySpec.Rsa -> CryptoSignature.RSA(signature)
             else -> error("Unsupported Signum key specification")
         }
-        return signumAlgorithm.verifierFor(signerFor(algorithm).publicKey).getOrThrow()
+        return signumAlgorithm.verifierFor(nativePublicKey).getOrThrow()
             .verify(SignatureInput(data), cryptoSignature).isSuccess
     }
 
@@ -171,8 +181,8 @@ internal suspend fun EncodedKey.toSignumEcdhPeer(spec: KeySpec.Ec): CryptoPublic
     return peer
 }
 
-internal fun PlatformSigningProviderSigner<*, *>.toAttestation(): SignumKeyAttestation? = attestation?.let {
-    SignumKeyAttestation(
+internal fun PlatformSigningProviderSigner<*, *>.toAttestation(): KeyAttestation? = attestation?.let {
+    KeyAttestation(
         format = "signum-json",
         statement = BinaryData(Json.encodeToString(it).encodeToByteArray()),
     )

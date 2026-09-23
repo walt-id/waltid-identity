@@ -10,11 +10,13 @@ import id.walt.crypto.keys.azure.WaltCryptoAzure
 import id.walt.did.dids.DidService
 import id.walt.issuer2.application.Issuer2Module
 import id.walt.issuer2.config.registerIssuer2ConfigDecoders
+import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
 import id.walt.issuer2.web.plugins.configureHTTP
 import id.walt.issuer2.web.plugins.configureMonitoring
 import id.walt.issuer2.web.plugins.configureRouting
 import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
 import io.ktor.server.application.Application
+import io.ktor.server.http.content.staticResources
 import io.ktor.server.routing.routing
 
 suspend fun main(args: Array<String>) {
@@ -43,13 +45,18 @@ fun Application.configurePlugins() {
     configureRouting()
 }
 
-fun Application.issuer2Module(withPlugins: Boolean = true) {
+@JvmOverloads
+fun Application.issuer2Module(
+    withPlugins: Boolean = true,
+    credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null,
+) {
     if (withPlugins) {
         configurePlugins()
     }
 
-    val module = Issuer2Module.load()
+    val module = Issuer2Module.load(credentialProofKeyAcceptance)
     routing {
+        staticResources("/static/credential-cards", "static/credential-cards")
         module.managementController.register(this)
         module.openId4VciController.register(this)
     }

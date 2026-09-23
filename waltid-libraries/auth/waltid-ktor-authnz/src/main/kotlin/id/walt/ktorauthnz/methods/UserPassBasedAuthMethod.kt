@@ -35,7 +35,7 @@ abstract class UserPassBasedAuthMethod(
      * 2. JSON document body
      * 3. Form post
      */
-    internal suspend fun ApplicationCall.getUsernamePasswordFromRequest(): UserPasswordCredential {
+    suspend fun ApplicationCall.getUsernamePasswordFromRequest(): UserPasswordCredential {
         val contentType = request.contentType()
         when {
             // As JSON document

@@ -6,6 +6,24 @@
 // - Show declarations: true
 
 // Library unique name: <id.walt.protocols:waltid-openid4vc-wallet-persistence-mobile>
+final enum class id.walt.wallet2.persistence.keys/WalletKeyProtection : kotlin/Enum<id.walt.wallet2.persistence.keys/WalletKeyProtection> { // id.walt.wallet2.persistence.keys/WalletKeyProtection|null[0]
+    enum entry HardwarePreferred // id.walt.wallet2.persistence.keys/WalletKeyProtection.HardwarePreferred|null[0]
+    enum entry HardwareRequired // id.walt.wallet2.persistence.keys/WalletKeyProtection.HardwareRequired|null[0]
+    enum entry NativeStorage // id.walt.wallet2.persistence.keys/WalletKeyProtection.NativeStorage|null[0]
+    enum entry PlatformDefault // id.walt.wallet2.persistence.keys/WalletKeyProtection.PlatformDefault|null[0]
+
+    final val entries // id.walt.wallet2.persistence.keys/WalletKeyProtection.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.persistence.keys/WalletKeyProtection> // id.walt.wallet2.persistence.keys/WalletKeyProtection.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.persistence.keys/WalletKeyProtection // id.walt.wallet2.persistence.keys/WalletKeyProtection.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.persistence.keys/WalletKeyProtection> // id.walt.wallet2.persistence.keys/WalletKeyProtection.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.wallet2.persistence.keys/WalletKeyProtection.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.persistence.keys/WalletKeyProtection> // id.walt.wallet2.persistence.keys/WalletKeyProtection.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.wallet2.persistence.keys/WalletKeyProtection.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 abstract interface id.walt.wallet2.persistence.db/WalletPersistenceDatabase : app.cash.sqldelight/Transacter { // id.walt.wallet2.persistence.db/WalletPersistenceDatabase|null[0]
     abstract val walletPersistenceQueries // id.walt.wallet2.persistence.db/WalletPersistenceDatabase.walletPersistenceQueries|{}walletPersistenceQueries[0]
         abstract fun <get-walletPersistenceQueries>(): id.walt.wallet2.persistence.db/WalletPersistenceQueries // id.walt.wallet2.persistence.db/WalletPersistenceDatabase.walletPersistenceQueries.<get-walletPersistenceQueries>|<get-walletPersistenceQueries>(){}[0]
@@ -23,19 +41,78 @@ abstract interface id.walt.wallet2.persistence.encryption/DatabaseEncryptionKeyP
     abstract suspend fun getOrCreateKey(kotlin/String, kotlin/String): id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey // id.walt.wallet2.persistence.encryption/DatabaseEncryptionKeyProvider.getOrCreateKey|getOrCreateKey(kotlin.String;kotlin.String){}[0]
 }
 
+abstract interface id.walt.wallet2.persistence.keys/MobileWalletKeyStore : id.walt.wallet2.data/WalletKeyStore { // id.walt.wallet2.persistence.keys/MobileWalletKeyStore|null[0]
+    abstract suspend fun keyUseAuthorizationPolicy(kotlin/String): id.walt.crypto2.keys/KeyUseAuthorizationPolicy? // id.walt.wallet2.persistence.keys/MobileWalletKeyStore.keyUseAuthorizationPolicy|keyUseAuthorizationPolicy(kotlin.String){}[0]
+}
+
 abstract interface id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider { // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider|null[0]
+    abstract fun keyUseAuthorizationPolicy(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.keyUseAuthorizationPolicy|keyUseAuthorizationPolicy(id.walt.crypto2.keys.StoredKey.Managed){}[0]
     abstract suspend fun deleteManagedKey(id.walt.crypto2.keys/StoredKey.Managed) // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.deleteManagedKey|deleteManagedKey(id.walt.crypto2.keys.StoredKey.Managed){}[0]
-    abstract suspend fun generateManagedKey(id.walt.crypto2.keys/KeyId, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.signum/SignumKeyPolicy? = ...): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.generateManagedKey|generateManagedKey(id.walt.crypto2.keys.KeyId;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.signum.SignumKeyPolicy?){}[0]
-    abstract suspend fun restoreManagedKey(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.restoreManagedKey|restoreManagedKey(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+    abstract suspend fun generateManagedKey(id.walt.wallet2.persistence.keys/WalletKeyCreationRequest): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.generateManagedKey|generateManagedKey(id.walt.wallet2.persistence.keys.WalletKeyCreationRequest){}[0]
+    abstract suspend fun preflight(id.walt.wallet2.persistence.keys/WalletKeyRequirements): id.walt.crypto2.keys/KeyUseAuthorizationSupport // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.preflight|preflight(id.walt.wallet2.persistence.keys.WalletKeyRequirements){}[0]
+    abstract suspend fun restoreManagedKey(id.walt.crypto2.keys/StoredKey.Managed): id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.restoreManagedKey|restoreManagedKey(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+    open fun supportsPrivateKeyImport(id.walt.wallet2.persistence.keys/WalletKeyRequirements): kotlin/Boolean // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.supportsPrivateKeyImport|supportsPrivateKeyImport(id.walt.wallet2.persistence.keys.WalletKeyRequirements){}[0]
+    open suspend fun deleteUncommittedKey(id.walt.wallet2.persistence.keys/WalletKeyCreationRequest, kotlin/Boolean) // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.deleteUncommittedKey|deleteUncommittedKey(id.walt.wallet2.persistence.keys.WalletKeyCreationRequest;kotlin.Boolean){}[0]
+    open suspend fun importManagedKey(id.walt.wallet2.persistence.keys/WalletKeyCreationRequest, id.walt.crypto2.keys/EncodedKey.Jwk): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.importManagedKey|importManagedKey(id.walt.wallet2.persistence.keys.WalletKeyCreationRequest;id.walt.crypto2.keys.EncodedKey.Jwk){}[0]
+    open suspend fun keyFacts(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.keys/PlatformKeyFacts // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.keyFacts|keyFacts(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+}
+
+sealed interface id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration { // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration|null[0]
+    abstract val authorizationPolicy // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.authorizationPolicy|{}authorizationPolicy[0]
+        abstract fun <get-authorizationPolicy>(): id.walt.crypto2.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.authorizationPolicy.<get-authorizationPolicy>|<get-authorizationPolicy>(){}[0]
+
+    final class Invalidated : id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration { // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Invalidated|null[0]
+        constructor <init>(id.walt.crypto2.keys/KeyUseAuthorizationPolicy) // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Invalidated.<init>|<init>(id.walt.crypto2.keys.KeyUseAuthorizationPolicy){}[0]
+
+        final val authorizationPolicy // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Invalidated.authorizationPolicy|{}authorizationPolicy[0]
+            final fun <get-authorizationPolicy>(): id.walt.crypto2.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Invalidated.authorizationPolicy.<get-authorizationPolicy>|<get-authorizationPolicy>(){}[0]
+
+        final fun component1(): id.walt.crypto2.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Invalidated.component1|component1(){}[0]
+        final fun copy(id.walt.crypto2.keys/KeyUseAuthorizationPolicy = ...): id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Invalidated // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Invalidated.copy|copy(id.walt.crypto2.keys.KeyUseAuthorizationPolicy){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Invalidated.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Invalidated.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Invalidated.toString|toString(){}[0]
+    }
+
+    final class Missing : id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration { // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Missing|null[0]
+        constructor <init>(id.walt.crypto2.keys/KeyUseAuthorizationPolicy) // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Missing.<init>|<init>(id.walt.crypto2.keys.KeyUseAuthorizationPolicy){}[0]
+
+        final val authorizationPolicy // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Missing.authorizationPolicy|{}authorizationPolicy[0]
+            final fun <get-authorizationPolicy>(): id.walt.crypto2.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Missing.authorizationPolicy.<get-authorizationPolicy>|<get-authorizationPolicy>(){}[0]
+
+        final fun component1(): id.walt.crypto2.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Missing.component1|component1(){}[0]
+        final fun copy(id.walt.crypto2.keys/KeyUseAuthorizationPolicy = ...): id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Missing // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Missing.copy|copy(id.walt.crypto2.keys.KeyUseAuthorizationPolicy){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Missing.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Missing.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Missing.toString|toString(){}[0]
+    }
+
+    final class Restored : id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration { // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Restored|null[0]
+        constructor <init>(id.walt.crypto2.keys/ManagedKey, id.walt.crypto2.keys/KeyUseAuthorizationPolicy) // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Restored.<init>|<init>(id.walt.crypto2.keys.ManagedKey;id.walt.crypto2.keys.KeyUseAuthorizationPolicy){}[0]
+
+        final val authorizationPolicy // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Restored.authorizationPolicy|{}authorizationPolicy[0]
+            final fun <get-authorizationPolicy>(): id.walt.crypto2.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Restored.authorizationPolicy.<get-authorizationPolicy>|<get-authorizationPolicy>(){}[0]
+        final val key // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Restored.key|{}key[0]
+            final fun <get-key>(): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Restored.key.<get-key>|<get-key>(){}[0]
+
+        final fun component1(): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Restored.component1|component1(){}[0]
+        final fun component2(): id.walt.crypto2.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Restored.component2|component2(){}[0]
+        final fun copy(id.walt.crypto2.keys/ManagedKey = ..., id.walt.crypto2.keys/KeyUseAuthorizationPolicy = ...): id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Restored // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Restored.copy|copy(id.walt.crypto2.keys.ManagedKey;id.walt.crypto2.keys.KeyUseAuthorizationPolicy){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Restored.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Restored.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration.Restored.toString|toString(){}[0]
+    }
 }
 
 final class id.walt.wallet2.persistence.db/Credentials { // id.walt.wallet2.persistence.db/Credentials|null[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, kotlin/String?) // id.walt.wallet2.persistence.db/Credentials.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.Long;kotlin.String?){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, kotlin/String?, kotlin/String?) // id.walt.wallet2.persistence.db/Credentials.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.Long;kotlin.String?;kotlin.String?){}[0]
 
     final val added_at // id.walt.wallet2.persistence.db/Credentials.added_at|{}added_at[0]
         final fun <get-added_at>(): kotlin/Long // id.walt.wallet2.persistence.db/Credentials.added_at.<get-added_at>|<get-added_at>(){}[0]
     final val format // id.walt.wallet2.persistence.db/Credentials.format|{}format[0]
         final fun <get-format>(): kotlin/String // id.walt.wallet2.persistence.db/Credentials.format.<get-format>|<get-format>(){}[0]
+    final val holder_key_binding // id.walt.wallet2.persistence.db/Credentials.holder_key_binding|{}holder_key_binding[0]
+        final fun <get-holder_key_binding>(): kotlin/String? // id.walt.wallet2.persistence.db/Credentials.holder_key_binding.<get-holder_key_binding>|<get-holder_key_binding>(){}[0]
     final val id // id.walt.wallet2.persistence.db/Credentials.id|{}id[0]
         final fun <get-id>(): kotlin/String // id.walt.wallet2.persistence.db/Credentials.id.<get-id>|<get-id>(){}[0]
     final val label // id.walt.wallet2.persistence.db/Credentials.label|{}label[0]
@@ -51,7 +128,8 @@ final class id.walt.wallet2.persistence.db/Credentials { // id.walt.wallet2.pers
     final fun component4(): kotlin/String? // id.walt.wallet2.persistence.db/Credentials.component4|component4(){}[0]
     final fun component5(): kotlin/Long // id.walt.wallet2.persistence.db/Credentials.component5|component5(){}[0]
     final fun component6(): kotlin/String? // id.walt.wallet2.persistence.db/Credentials.component6|component6(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/Long = ..., kotlin/String? = ...): id.walt.wallet2.persistence.db/Credentials // id.walt.wallet2.persistence.db/Credentials.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.Long;kotlin.String?){}[0]
+    final fun component7(): kotlin/String? // id.walt.wallet2.persistence.db/Credentials.component7|component7(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String? = ..., kotlin/Long = ..., kotlin/String? = ..., kotlin/String? = ...): id.walt.wallet2.persistence.db/Credentials // id.walt.wallet2.persistence.db/Credentials.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.Long;kotlin.String?;kotlin.String?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.db/Credentials.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.db/Credentials.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.persistence.db/Credentials.toString|toString(){}[0]
@@ -120,22 +198,28 @@ final class id.walt.wallet2.persistence.db/Key_references { // id.walt.wallet2.p
 final class id.walt.wallet2.persistence.db/WalletPersistenceQueries : app.cash.sqldelight/TransacterImpl { // id.walt.wallet2.persistence.db/WalletPersistenceQueries|null[0]
     constructor <init>(app.cash.sqldelight.db/SqlDriver) // id.walt.wallet2.persistence.db/WalletPersistenceQueries.<init>|<init>(app.cash.sqldelight.db.SqlDriver){}[0]
 
+    final fun <#A1: kotlin/Any> selectActiveIdentity(kotlin/String, kotlin/Function4<kotlin/String, kotlin/String, kotlin/String, kotlin/String, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectActiveIdentity|selectActiveIdentity(kotlin.String;kotlin.Function4<kotlin.String,kotlin.String,kotlin.String,kotlin.String,0:0>){0§<kotlin.Any>}[0]
     final fun <#A1: kotlin/Any> selectAll(kotlin/Function3<kotlin/String, kotlin/Long, kotlin/String, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAll|selectAll(kotlin.Function3<kotlin.String,kotlin.Long,kotlin.String,0:0>){0§<kotlin.Any>}[0]
-    final fun <#A1: kotlin/Any> selectAllCredentials(kotlin/Function6<kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, kotlin/String?, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAllCredentials|selectAllCredentials(kotlin.Function6<kotlin.String,kotlin.String,kotlin.String,kotlin.String?,kotlin.Long,kotlin.String?,0:0>){0§<kotlin.Any>}[0]
+    final fun <#A1: kotlin/Any> selectAllCredentials(kotlin/Function7<kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, kotlin/String?, kotlin/String?, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAllCredentials|selectAllCredentials(kotlin.Function7<kotlin.String,kotlin.String,kotlin.String,kotlin.String?,kotlin.Long,kotlin.String?,kotlin.String?,0:0>){0§<kotlin.Any>}[0]
     final fun <#A1: kotlin/Any> selectAllDids(kotlin/Function2<kotlin/String, kotlin/String, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAllDids|selectAllDids(kotlin.Function2<kotlin.String,kotlin.String,0:0>){0§<kotlin.Any>}[0]
     final fun <#A1: kotlin/Any> selectAllIssuanceSessionRecords(kotlin/Function5<kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Long, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAllIssuanceSessionRecords|selectAllIssuanceSessionRecords(kotlin.Function5<kotlin.String,kotlin.String,kotlin.String,kotlin.String,kotlin.Long,0:0>){0§<kotlin.Any>}[0]
     final fun <#A1: kotlin/Any> selectByKeyId(kotlin/String, kotlin/Function3<kotlin/String, kotlin/Long, kotlin/String, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectByKeyId|selectByKeyId(kotlin.String;kotlin.Function3<kotlin.String,kotlin.Long,kotlin.String,0:0>){0§<kotlin.Any>}[0]
-    final fun <#A1: kotlin/Any> selectCredentialById(kotlin/String, kotlin/Function6<kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, kotlin/String?, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectCredentialById|selectCredentialById(kotlin.String;kotlin.Function6<kotlin.String,kotlin.String,kotlin.String,kotlin.String?,kotlin.Long,kotlin.String?,0:0>){0§<kotlin.Any>}[0]
+    final fun <#A1: kotlin/Any> selectCredentialById(kotlin/String, kotlin/Function7<kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, kotlin/String?, kotlin/String?, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectCredentialById|selectCredentialById(kotlin.String;kotlin.Function7<kotlin.String,kotlin.String,kotlin.String,kotlin.String?,kotlin.Long,kotlin.String?,kotlin.String?,0:0>){0§<kotlin.Any>}[0]
     final fun <#A1: kotlin/Any> selectDidByDid(kotlin/String, kotlin/Function2<kotlin/String, kotlin/String, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectDidByDid|selectDidByDid(kotlin.String;kotlin.Function2<kotlin.String,kotlin.String,0:0>){0§<kotlin.Any>}[0]
+    final fun <#A1: kotlin/Any> selectIdentityRecord(kotlin/String, kotlin/Function3<kotlin/String, kotlin/String, kotlin/String, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectIdentityRecord|selectIdentityRecord(kotlin.String;kotlin.Function3<kotlin.String,kotlin.String,kotlin.String,0:0>){0§<kotlin.Any>}[0]
+    final fun <#A1: kotlin/Any> selectIdentityRecords(kotlin/Function3<kotlin/String, kotlin/String, kotlin/String, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectIdentityRecords|selectIdentityRecords(kotlin.Function3<kotlin.String,kotlin.String,kotlin.String,0:0>){0§<kotlin.Any>}[0]
     final fun <#A1: kotlin/Any> selectIssuanceSessionRecordById(kotlin/String, kotlin/Function5<kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Long, #A1>): app.cash.sqldelight/Query<#A1> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectIssuanceSessionRecordById|selectIssuanceSessionRecordById(kotlin.String;kotlin.Function5<kotlin.String,kotlin.String,kotlin.String,kotlin.String,kotlin.Long,0:0>){0§<kotlin.Any>}[0]
     final fun deleteByKeyId(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteByKeyId|deleteByKeyId(kotlin.String){}[0]
     final fun deleteCredentialById(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteCredentialById|deleteCredentialById(kotlin.String){}[0]
     final fun deleteDidByDid(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteDidByDid|deleteDidByDid(kotlin.String){}[0]
+    final fun deleteIdentityRecord(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteIdentityRecord|deleteIdentityRecord(kotlin.String){}[0]
     final fun deleteIssuanceSessionRecordById(kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.deleteIssuanceSessionRecordById|deleteIssuanceSessionRecordById(kotlin.String){}[0]
     final fun insert(kotlin/String, kotlin/Long, kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.insert|insert(kotlin.String;kotlin.Long;kotlin.String){}[0]
-    final fun insertCredential(kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, kotlin/String?): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.insertCredential|insertCredential(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.Long;kotlin.String?){}[0]
+    final fun insertCredential(kotlin/String, kotlin/String, kotlin/String, kotlin/String?, kotlin/Long, kotlin/String?, kotlin/String?): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.insertCredential|insertCredential(kotlin.String;kotlin.String;kotlin.String;kotlin.String?;kotlin.Long;kotlin.String?;kotlin.String?){}[0]
     final fun insertDid(kotlin/String, kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.insertDid|insertDid(kotlin.String;kotlin.String){}[0]
     final fun insertIssuanceSessionRecord(kotlin/String, kotlin/String, kotlin/String, kotlin/String, kotlin/Long): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.insertIssuanceSessionRecord|insertIssuanceSessionRecord(kotlin.String;kotlin.String;kotlin.String;kotlin.String;kotlin.Long){}[0]
+    final fun putIdentityRecord(kotlin/String, kotlin/String, kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.putIdentityRecord|putIdentityRecord(kotlin.String;kotlin.String;kotlin.String){}[0]
+    final fun selectActiveIdentity(kotlin/String): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Wallet_active_identity> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectActiveIdentity|selectActiveIdentity(kotlin.String){}[0]
     final fun selectAll(): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Key_references> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAll|selectAll(){}[0]
     final fun selectAllCredentials(): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Credentials> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAllCredentials|selectAllCredentials(){}[0]
     final fun selectAllDids(): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Dids> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectAllDids|selectAllDids(){}[0]
@@ -143,7 +227,51 @@ final class id.walt.wallet2.persistence.db/WalletPersistenceQueries : app.cash.s
     final fun selectByKeyId(kotlin/String): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Key_references> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectByKeyId|selectByKeyId(kotlin.String){}[0]
     final fun selectCredentialById(kotlin/String): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Credentials> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectCredentialById|selectCredentialById(kotlin.String){}[0]
     final fun selectDidByDid(kotlin/String): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Dids> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectDidByDid|selectDidByDid(kotlin.String){}[0]
+    final fun selectIdentityRecord(kotlin/String): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Wallet_identity_records> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectIdentityRecord|selectIdentityRecord(kotlin.String){}[0]
+    final fun selectIdentityRecords(): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Wallet_identity_records> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectIdentityRecords|selectIdentityRecords(){}[0]
     final fun selectIssuanceSessionRecordById(kotlin/String): app.cash.sqldelight/Query<id.walt.wallet2.persistence.db/Issuance_session_records> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.selectIssuanceSessionRecordById|selectIssuanceSessionRecordById(kotlin.String){}[0]
+    final fun setActiveIdentity(kotlin/String, kotlin/String, kotlin/String, kotlin/String): app.cash.sqldelight.db/QueryResult<kotlin/Long> // id.walt.wallet2.persistence.db/WalletPersistenceQueries.setActiveIdentity|setActiveIdentity(kotlin.String;kotlin.String;kotlin.String;kotlin.String){}[0]
+}
+
+final class id.walt.wallet2.persistence.db/Wallet_active_identity { // id.walt.wallet2.persistence.db/Wallet_active_identity|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String, kotlin/String) // id.walt.wallet2.persistence.db/Wallet_active_identity.<init>|<init>(kotlin.String;kotlin.String;kotlin.String;kotlin.String){}[0]
+
+    final val did // id.walt.wallet2.persistence.db/Wallet_active_identity.did|{}did[0]
+        final fun <get-did>(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_active_identity.did.<get-did>|<get-did>(){}[0]
+    final val identity_id // id.walt.wallet2.persistence.db/Wallet_active_identity.identity_id|{}identity_id[0]
+        final fun <get-identity_id>(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_active_identity.identity_id.<get-identity_id>|<get-identity_id>(){}[0]
+    final val key_id // id.walt.wallet2.persistence.db/Wallet_active_identity.key_id|{}key_id[0]
+        final fun <get-key_id>(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_active_identity.key_id.<get-key_id>|<get-key_id>(){}[0]
+    final val wallet_id // id.walt.wallet2.persistence.db/Wallet_active_identity.wallet_id|{}wallet_id[0]
+        final fun <get-wallet_id>(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_active_identity.wallet_id.<get-wallet_id>|<get-wallet_id>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_active_identity.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_active_identity.component2|component2(){}[0]
+    final fun component3(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_active_identity.component3|component3(){}[0]
+    final fun component4(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_active_identity.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ..., kotlin/String = ...): id.walt.wallet2.persistence.db/Wallet_active_identity // id.walt.wallet2.persistence.db/Wallet_active_identity.copy|copy(kotlin.String;kotlin.String;kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.db/Wallet_active_identity.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.db/Wallet_active_identity.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_active_identity.toString|toString(){}[0]
+}
+
+final class id.walt.wallet2.persistence.db/Wallet_identity_records { // id.walt.wallet2.persistence.db/Wallet_identity_records|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String) // id.walt.wallet2.persistence.db/Wallet_identity_records.<init>|<init>(kotlin.String;kotlin.String;kotlin.String){}[0]
+
+    final val payload // id.walt.wallet2.persistence.db/Wallet_identity_records.payload|{}payload[0]
+        final fun <get-payload>(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_identity_records.payload.<get-payload>|<get-payload>(){}[0]
+    final val phase // id.walt.wallet2.persistence.db/Wallet_identity_records.phase|{}phase[0]
+        final fun <get-phase>(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_identity_records.phase.<get-phase>|<get-phase>(){}[0]
+    final val wallet_id // id.walt.wallet2.persistence.db/Wallet_identity_records.wallet_id|{}wallet_id[0]
+        final fun <get-wallet_id>(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_identity_records.wallet_id.<get-wallet_id>|<get-wallet_id>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_identity_records.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_identity_records.component2|component2(){}[0]
+    final fun component3(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_identity_records.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ...): id.walt.wallet2.persistence.db/Wallet_identity_records // id.walt.wallet2.persistence.db/Wallet_identity_records.copy|copy(kotlin.String;kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.db/Wallet_identity_records.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.db/Wallet_identity_records.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.persistence.db/Wallet_identity_records.toString|toString(){}[0]
 }
 
 final class id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey { // id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey|null[0]
@@ -170,11 +298,111 @@ final class id.walt.wallet2.persistence.encryption/IosDatabaseEncryptionKeyProvi
 }
 
 final class id.walt.wallet2.persistence.keys/IosPlatformKeyProvider : id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider { // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider|null[0]
-    constructor <init>(kotlin/Boolean = ...) // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.<init>|<init>(kotlin.Boolean){}[0]
+    constructor <init>() // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.<init>|<init>(){}[0]
 
+    final fun keyUseAuthorizationPolicy(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.keyUseAuthorizationPolicy|keyUseAuthorizationPolicy(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+    final fun supportsPrivateKeyImport(id.walt.wallet2.persistence.keys/WalletKeyRequirements): kotlin/Boolean // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.supportsPrivateKeyImport|supportsPrivateKeyImport(id.walt.wallet2.persistence.keys.WalletKeyRequirements){}[0]
     final suspend fun deleteManagedKey(id.walt.crypto2.keys/StoredKey.Managed) // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.deleteManagedKey|deleteManagedKey(id.walt.crypto2.keys.StoredKey.Managed){}[0]
-    final suspend fun generateManagedKey(id.walt.crypto2.keys/KeyId, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.signum/SignumKeyPolicy?): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.generateManagedKey|generateManagedKey(id.walt.crypto2.keys.KeyId;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.signum.SignumKeyPolicy?){}[0]
-    final suspend fun restoreManagedKey(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.restoreManagedKey|restoreManagedKey(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+    final suspend fun deleteUncommittedKey(id.walt.wallet2.persistence.keys/WalletKeyCreationRequest, kotlin/Boolean) // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.deleteUncommittedKey|deleteUncommittedKey(id.walt.wallet2.persistence.keys.WalletKeyCreationRequest;kotlin.Boolean){}[0]
+    final suspend fun generateManagedKey(id.walt.wallet2.persistence.keys/WalletKeyCreationRequest): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.generateManagedKey|generateManagedKey(id.walt.wallet2.persistence.keys.WalletKeyCreationRequest){}[0]
+    final suspend fun importManagedKey(id.walt.wallet2.persistence.keys/WalletKeyCreationRequest, id.walt.crypto2.keys/EncodedKey.Jwk): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.importManagedKey|importManagedKey(id.walt.wallet2.persistence.keys.WalletKeyCreationRequest;id.walt.crypto2.keys.EncodedKey.Jwk){}[0]
+    final suspend fun keyFacts(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.keys/PlatformKeyFacts // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.keyFacts|keyFacts(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+    final suspend fun preflight(id.walt.wallet2.persistence.keys/WalletKeyRequirements): id.walt.crypto2.keys/KeyUseAuthorizationSupport // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.preflight|preflight(id.walt.wallet2.persistence.keys.WalletKeyRequirements){}[0]
+    final suspend fun restoreManagedKey(id.walt.crypto2.keys/StoredKey.Managed): id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration // id.walt.wallet2.persistence.keys/IosPlatformKeyProvider.restoreManagedKey|restoreManagedKey(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+}
+
+final class id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt { // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt|null[0]
+    constructor <init>(kotlin/String = ..., kotlin/String = ...) // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.<init>|<init>(kotlin.String;kotlin.String){}[0]
+
+    final val cancelText // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.cancelText|{}cancelText[0]
+        final fun <get-cancelText>(): kotlin/String // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.cancelText.<get-cancelText>|<get-cancelText>(){}[0]
+    final val reason // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.reason|{}reason[0]
+        final fun <get-reason>(): kotlin/String // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.reason.<get-reason>|<get-reason>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ...): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.copy|copy(kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt> { // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.$serializer|null[0]
+        final val descriptor // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt) // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt){}[0]
+    }
+
+    final object Companion { // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt> // id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class id.walt.wallet2.persistence.keys/WalletKeyCreationRequest { // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest|null[0]
+    constructor <init>(id.walt.crypto2.keys/KeyId, id.walt.wallet2.persistence.keys/WalletKeyRequirements, id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt = ..., kotlin/String = ...) // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.<init>|<init>(id.walt.crypto2.keys.KeyId;id.walt.wallet2.persistence.keys.WalletKeyRequirements;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt;kotlin.String){}[0]
+
+    final val id // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.id|{}id[0]
+        final fun <get-id>(): id.walt.crypto2.keys/KeyId // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.id.<get-id>|<get-id>(){}[0]
+    final val nativeAlias // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.nativeAlias|{}nativeAlias[0]
+        final fun <get-nativeAlias>(): kotlin/String // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.nativeAlias.<get-nativeAlias>|<get-nativeAlias>(){}[0]
+    final val prompt // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.prompt|{}prompt[0]
+        final fun <get-prompt>(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.prompt.<get-prompt>|<get-prompt>(){}[0]
+    final val requirements // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.requirements|{}requirements[0]
+        final fun <get-requirements>(): id.walt.wallet2.persistence.keys/WalletKeyRequirements // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.requirements.<get-requirements>|<get-requirements>(){}[0]
+
+    final fun component1(): id.walt.crypto2.keys/KeyId // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.component1|component1(){}[0]
+    final fun component2(): id.walt.wallet2.persistence.keys/WalletKeyRequirements // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.component2|component2(){}[0]
+    final fun component3(): id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.component3|component3(){}[0]
+    final fun component4(): kotlin/String // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.component4|component4(){}[0]
+    final fun copy(id.walt.crypto2.keys/KeyId = ..., id.walt.wallet2.persistence.keys/WalletKeyRequirements = ..., id.walt.wallet2.persistence.keys/KeyUseAuthorizationPrompt = ..., kotlin/String = ...): id.walt.wallet2.persistence.keys/WalletKeyCreationRequest // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.copy|copy(id.walt.crypto2.keys.KeyId;id.walt.wallet2.persistence.keys.WalletKeyRequirements;id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.persistence.keys/WalletKeyCreationRequest.toString|toString(){}[0]
+}
+
+final class id.walt.wallet2.persistence.keys/WalletKeyRequirements { // id.walt.wallet2.persistence.keys/WalletKeyRequirements|null[0]
+    constructor <init>(id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.keys/KeyUseAuthorizationPolicy = ..., id.walt.wallet2.persistence.keys/WalletKeyProtection = ..., id.walt.crypto2.keys/PlatformKeyConfiguration = ..., id.walt.crypto2.serialization/BinaryData? = ...) // id.walt.wallet2.persistence.keys/WalletKeyRequirements.<init>|<init>(id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.keys.KeyUseAuthorizationPolicy;id.walt.wallet2.persistence.keys.WalletKeyProtection;id.walt.crypto2.keys.PlatformKeyConfiguration;id.walt.crypto2.serialization.BinaryData?){}[0]
+
+    final val attestationChallenge // id.walt.wallet2.persistence.keys/WalletKeyRequirements.attestationChallenge|{}attestationChallenge[0]
+        final fun <get-attestationChallenge>(): id.walt.crypto2.serialization/BinaryData? // id.walt.wallet2.persistence.keys/WalletKeyRequirements.attestationChallenge.<get-attestationChallenge>|<get-attestationChallenge>(){}[0]
+    final val authorizationPolicy // id.walt.wallet2.persistence.keys/WalletKeyRequirements.authorizationPolicy|{}authorizationPolicy[0]
+        final fun <get-authorizationPolicy>(): id.walt.crypto2.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/WalletKeyRequirements.authorizationPolicy.<get-authorizationPolicy>|<get-authorizationPolicy>(){}[0]
+    final val platform // id.walt.wallet2.persistence.keys/WalletKeyRequirements.platform|{}platform[0]
+        final fun <get-platform>(): id.walt.crypto2.keys/PlatformKeyConfiguration // id.walt.wallet2.persistence.keys/WalletKeyRequirements.platform.<get-platform>|<get-platform>(){}[0]
+    final val protection // id.walt.wallet2.persistence.keys/WalletKeyRequirements.protection|{}protection[0]
+        final fun <get-protection>(): id.walt.wallet2.persistence.keys/WalletKeyProtection // id.walt.wallet2.persistence.keys/WalletKeyRequirements.protection.<get-protection>|<get-protection>(){}[0]
+    final val spec // id.walt.wallet2.persistence.keys/WalletKeyRequirements.spec|{}spec[0]
+        final fun <get-spec>(): id.walt.crypto2.keys/KeySpec // id.walt.wallet2.persistence.keys/WalletKeyRequirements.spec.<get-spec>|<get-spec>(){}[0]
+    final val usages // id.walt.wallet2.persistence.keys/WalletKeyRequirements.usages|{}usages[0]
+        final fun <get-usages>(): kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> // id.walt.wallet2.persistence.keys/WalletKeyRequirements.usages.<get-usages>|<get-usages>(){}[0]
+
+    final fun component1(): id.walt.crypto2.keys/KeySpec // id.walt.wallet2.persistence.keys/WalletKeyRequirements.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> // id.walt.wallet2.persistence.keys/WalletKeyRequirements.component2|component2(){}[0]
+    final fun component3(): id.walt.crypto2.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/WalletKeyRequirements.component3|component3(){}[0]
+    final fun component4(): id.walt.wallet2.persistence.keys/WalletKeyProtection // id.walt.wallet2.persistence.keys/WalletKeyRequirements.component4|component4(){}[0]
+    final fun component5(): id.walt.crypto2.keys/PlatformKeyConfiguration // id.walt.wallet2.persistence.keys/WalletKeyRequirements.component5|component5(){}[0]
+    final fun component6(): id.walt.crypto2.serialization/BinaryData? // id.walt.wallet2.persistence.keys/WalletKeyRequirements.component6|component6(){}[0]
+    final fun copy(id.walt.crypto2.keys/KeySpec = ..., kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage> = ..., id.walt.crypto2.keys/KeyUseAuthorizationPolicy = ..., id.walt.wallet2.persistence.keys/WalletKeyProtection = ..., id.walt.crypto2.keys/PlatformKeyConfiguration = ..., id.walt.crypto2.serialization/BinaryData? = ...): id.walt.wallet2.persistence.keys/WalletKeyRequirements // id.walt.wallet2.persistence.keys/WalletKeyRequirements.copy|copy(id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.keys.KeyUseAuthorizationPolicy;id.walt.wallet2.persistence.keys.WalletKeyProtection;id.walt.crypto2.keys.PlatformKeyConfiguration;id.walt.crypto2.serialization.BinaryData?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.persistence.keys/WalletKeyRequirements.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.persistence.keys/WalletKeyRequirements.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.persistence.keys/WalletKeyRequirements.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.wallet2.persistence.keys/WalletKeyRequirements> { // id.walt.wallet2.persistence.keys/WalletKeyRequirements.$serializer|null[0]
+        final val descriptor // id.walt.wallet2.persistence.keys/WalletKeyRequirements.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.wallet2.persistence.keys/WalletKeyRequirements.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.wallet2.persistence.keys/WalletKeyRequirements.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.wallet2.persistence.keys/WalletKeyRequirements // id.walt.wallet2.persistence.keys/WalletKeyRequirements.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.wallet2.persistence.keys/WalletKeyRequirements) // id.walt.wallet2.persistence.keys/WalletKeyRequirements.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.wallet2.persistence.keys.WalletKeyRequirements){}[0]
+    }
+
+    final object Companion { // id.walt.wallet2.persistence.keys/WalletKeyRequirements.Companion|null[0]
+        final val $childSerializers // id.walt.wallet2.persistence.keys/WalletKeyRequirements.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.persistence.keys/WalletKeyRequirements> // id.walt.wallet2.persistence.keys/WalletKeyRequirements.Companion.serializer|serializer(){}[0]
+    }
 }
 
 final class id.walt.wallet2.persistence.stores/DriverFactory { // id.walt.wallet2.persistence.stores/DriverFactory|null[0]
@@ -195,9 +423,10 @@ final class id.walt.wallet2.persistence.stores/SqlDelightCredentialStore : id.wa
 }
 
 final class id.walt.wallet2.persistence.stores/SqlDelightDidStore : id.walt.wallet2.data/WalletDidStore { // id.walt.wallet2.persistence.stores/SqlDelightDidStore|null[0]
-    constructor <init>(id.walt.wallet2.persistence.db/WalletPersistenceQueries) // id.walt.wallet2.persistence.stores/SqlDelightDidStore.<init>|<init>(id.walt.wallet2.persistence.db.WalletPersistenceQueries){}[0]
+    constructor <init>(id.walt.wallet2.persistence.db/WalletPersistenceQueries, kotlin/String = ...) // id.walt.wallet2.persistence.stores/SqlDelightDidStore.<init>|<init>(id.walt.wallet2.persistence.db.WalletPersistenceQueries;kotlin.String){}[0]
 
     final suspend fun addDid(id.walt.wallet2.data/WalletDidEntry) // id.walt.wallet2.persistence.stores/SqlDelightDidStore.addDid|addDid(id.walt.wallet2.data.WalletDidEntry){}[0]
+    final suspend fun getDefaultDid(): kotlin/String? // id.walt.wallet2.persistence.stores/SqlDelightDidStore.getDefaultDid|getDefaultDid(){}[0]
     final suspend fun getDid(kotlin/String): id.walt.wallet2.data/WalletDidEntry? // id.walt.wallet2.persistence.stores/SqlDelightDidStore.getDid|getDid(kotlin.String){}[0]
     final suspend fun listDids(): kotlinx.coroutines.flow/Flow<id.walt.wallet2.data/WalletDidEntry> // id.walt.wallet2.persistence.stores/SqlDelightDidStore.listDids|listDids(){}[0]
     final suspend fun removeDid(kotlin/String): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightDidStore.removeDid|removeDid(kotlin.String){}[0]
@@ -212,16 +441,24 @@ final class id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore : 
     final suspend fun remove(kotlin/String): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore.remove|remove(kotlin.String){}[0]
 }
 
-final class id.walt.wallet2.persistence.stores/SqlDelightKeyStore : id.walt.wallet2.data/WalletKeyStore { // id.walt.wallet2.persistence.stores/SqlDelightKeyStore|null[0]
-    constructor <init>(id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider, id.walt.wallet2.persistence.db/WalletPersistenceQueries) // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.<init>|<init>(id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider;id.walt.wallet2.persistence.db.WalletPersistenceQueries){}[0]
+final class id.walt.wallet2.persistence.stores/SqlDelightKeyStore : id.walt.wallet2.persistence.keys/MobileWalletKeyStore { // id.walt.wallet2.persistence.stores/SqlDelightKeyStore|null[0]
+    constructor <init>(id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider, id.walt.wallet2.persistence.db/WalletPersistenceQueries, kotlin/String = ...) // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.<init>|<init>(id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider;id.walt.wallet2.persistence.db.WalletPersistenceQueries;kotlin.String){}[0]
 
+    final fun storedKey(kotlin/String): id.walt.crypto2.keys/StoredKey? // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.storedKey|storedKey(kotlin.String){}[0]
     final suspend fun addCrypto2Key(id.walt.crypto2.keys/Key): kotlin/String // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.addCrypto2Key|addCrypto2Key(id.walt.crypto2.keys.Key){}[0]
     final suspend fun addKey(id.walt.crypto.keys/Key): kotlin/String // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.addKey|addKey(id.walt.crypto.keys.Key){}[0]
-    final suspend fun generateManagedKey(id.walt.crypto2.keys/KeyId, id.walt.crypto2.keys/KeySpec, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>, id.walt.crypto2.signum/SignumKeyPolicy? = ...): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.generateManagedKey|generateManagedKey(id.walt.crypto2.keys.KeyId;id.walt.crypto2.keys.KeySpec;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>;id.walt.crypto2.signum.SignumKeyPolicy?){}[0]
+    final suspend fun generateKey(id.walt.wallet2.persistence.keys/WalletKeyCreationRequest): id.walt.crypto2.keys/Key // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.generateKey|generateKey(id.walt.wallet2.persistence.keys.WalletKeyCreationRequest){}[0]
+    final suspend fun generateSoftwareKey(id.walt.wallet2.persistence.keys/WalletKeyCreationRequest): id.walt.crypto2.keys/Key // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.generateSoftwareKey|generateSoftwareKey(id.walt.wallet2.persistence.keys.WalletKeyCreationRequest){}[0]
     final suspend fun getCrypto2Key(kotlin/String, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>): id.walt.crypto2.keys/Key? // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.getCrypto2Key|getCrypto2Key(kotlin.String;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>){}[0]
+    final suspend fun getDefaultCrypto2Key(kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>): id.walt.crypto2.keys/Key? // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.getDefaultCrypto2Key|getDefaultCrypto2Key(kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>){}[0]
+    final suspend fun getDefaultKeyMaterial(kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>): id.walt.wallet2.data/WalletKeyStoreEntry? // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.getDefaultKeyMaterial|getDefaultKeyMaterial(kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>){}[0]
     final suspend fun getKey(kotlin/String): id.walt.crypto.keys/Key? // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.getKey|getKey(kotlin.String){}[0]
     final suspend fun getKeyMaterial(kotlin/String, kotlin.collections/Set<id.walt.crypto2.keys/KeyUsage>): id.walt.wallet2.data/WalletKeyStoreEntry? // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.getKeyMaterial|getKeyMaterial(kotlin.String;kotlin.collections.Set<id.walt.crypto2.keys.KeyUsage>){}[0]
+    final suspend fun getPublicKeyMaterial(kotlin/String): id.walt.wallet2.data/WalletPublicKeyMaterial? // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.getPublicKeyMaterial|getPublicKeyMaterial(kotlin.String){}[0]
+    final suspend fun importSoftwareKey(id.walt.crypto2.keys/StoredKey.Software): id.walt.crypto2.keys/Key // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.importSoftwareKey|importSoftwareKey(id.walt.crypto2.keys.StoredKey.Software){}[0]
+    final suspend fun keyUseAuthorizationPolicy(kotlin/String): id.walt.crypto2.keys/KeyUseAuthorizationPolicy? // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.keyUseAuthorizationPolicy|keyUseAuthorizationPolicy(kotlin.String){}[0]
     final suspend fun listKeys(): kotlinx.coroutines.flow/Flow<id.walt.wallet2.data/WalletKeyInfo> // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.listKeys|listKeys(){}[0]
+    final suspend fun preflight(id.walt.wallet2.persistence.keys/WalletKeyRequirements): id.walt.crypto2.keys/KeyUseAuthorizationSupport // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.preflight|preflight(id.walt.wallet2.persistence.keys.WalletKeyRequirements){}[0]
     final suspend fun removeKey(kotlin/String): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.removeKey|removeKey(kotlin.String){}[0]
 }
 

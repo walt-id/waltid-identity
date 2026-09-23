@@ -16,18 +16,24 @@ struct ContentView: UIViewControllerRepresentable {
     /// Called from Kotlin after the wallet's credential set changed, so this process can reconcile
     /// Apple's registration store. Only the app may call `IdentityDocumentServices`.
     let onDigitalCredentialRegistryChanged: () -> Void
+    let signingProtectionMode: String
 
     func makeUIViewController(context: Context) -> UIViewController {
-        sharedUI.WalletDemoIosKt.walletDemoViewController(
+        let nfcHost = ComposeNfcHostPlatformAdapter()
+        return sharedUI.WalletDemoIosKt.walletDemoViewController(
             appGroupIdentifier: appGroupIdentifier,
             keychainAccessGroup: keychainAccessGroup,
+            nfcHostPlatformAdapter: nfcHost,
+            systemPresentationActive: { KotlinBoolean(bool: nfcHost.isPresenting) },
+            requestNfcPresentment: { Task { await nfcHost.present() } },
             onDigitalCredentialRegistryChanged: onDigitalCredentialRegistryChanged,
             walletId: walletId,
             attestationBaseUrl: attestationBaseUrl,
             attestationAttesterPath: attestationAttesterPath,
             attestationBearerToken: attestationBearerToken,
             attestationHostHeader: attestationHostHeader,
-            transactionDataProfilesUrl: transactionDataProfilesUrl
+            transactionDataProfilesUrl: transactionDataProfilesUrl,
+            signingProtectionMode: signingProtectionMode
         )
     }
 
@@ -45,6 +51,7 @@ struct ContentView: UIViewControllerRepresentable {
         transactionDataProfilesUrl: "",
         appGroupIdentifier: "",
         keychainAccessGroup: "",
-        onDigitalCredentialRegistryChanged: {}
+        onDigitalCredentialRegistryChanged: {},
+        signingProtectionMode: "disabled"
     )
 }

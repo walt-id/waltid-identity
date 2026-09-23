@@ -9,8 +9,10 @@ public struct CredentialDetails: Equatable, Identifiable {
     public let format: String
     public let addedAt: Date?
     public let groups: [ClaimGroup]
-    public let metadataJSON: String?
     public let issuerDisplay: MetadataDisplay?
+    public let credentialDisplay: MetadataDisplay?
+    public let credentialDataJSON: String?
+    let cardTitle: String
 
     public init(
         id: String,
@@ -21,7 +23,9 @@ public struct CredentialDetails: Equatable, Identifiable {
         addedAt: Date?,
         groups: [ClaimGroup],
         metadataJSON: String? = nil,
-        issuerDisplay: MetadataDisplay? = nil
+        issuerDisplay: MetadataDisplay? = nil,
+        credentialDisplay: MetadataDisplay? = nil,
+        credentialDataJSON: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -30,9 +34,23 @@ public struct CredentialDetails: Equatable, Identifiable {
         self.format = format
         self.addedAt = addedAt
         self.groups = groups
-        self.metadataJSON = metadataJSON
         self.issuerDisplay = issuerDisplay
-            ?? StoredCredentialMetadataParser.issuerDisplay(from: metadataJSON)
+            ?? StoredCredentialMetadataParser.issuerDisplay(
+                from: metadataJSON,
+                preferredLocales: Locale.preferredLanguages
+            )
+        self.credentialDisplay = credentialDisplay
+            ?? StoredCredentialMetadataParser.credentialDisplay(
+                from: metadataJSON,
+                preferredLocales: Locale.preferredLanguages
+            )
+        self.credentialDataJSON = credentialDataJSON
+        self.cardTitle = CredentialTitles.displayName(
+            format: format,
+            credentialDataJSON: credentialDataJSON,
+            displayName: self.credentialDisplay?.name,
+            fallback: title
+        )
     }
 }
 
@@ -83,6 +101,7 @@ public enum DisplayValue: Equatable {
     case bool(Bool)
     case object([ClaimItem])
     case list([DisplayValue])
+    case deferredImage(DeferredCredentialImage)
     case image(encoded: String, data: Data, mimeType: String, byteCount: Int)
     case decodedText(String)
     case raw(String)
@@ -210,6 +229,7 @@ public enum ClaimRole: Hashable {
 
 public enum CredentialDisplayText {
     public static let unknown = "Unknown"
+    static let imageUnavailable = "Image unavailable or unsupported"
 
     public static func expires(_ date: String) -> String { "Expires \(date)" }
     public static func added(_ date: String) -> String { "Added \(date)" }
@@ -267,5 +287,22 @@ public enum DisplayTransactionDataField {
         case .details: return "details"
         case .raw: return "raw"
         }
+    }
+}
+
+/// Keeps encoded media out of list construction and view updates. The visible row owns the result.
+public final class DeferredCredentialImage: Equatable {
+    public let byteCount: Int?
+    private let decode: () -> DisplayValue
+
+    init(byteCount: Int? = nil, decode: @escaping () -> DisplayValue) {
+        self.byteCount = byteCount
+        self.decode = decode
+    }
+
+    public func resolve() -> DisplayValue { decode() }
+
+    public static func == (lhs: DeferredCredentialImage, rhs: DeferredCredentialImage) -> Bool {
+        lhs === rhs
     }
 }

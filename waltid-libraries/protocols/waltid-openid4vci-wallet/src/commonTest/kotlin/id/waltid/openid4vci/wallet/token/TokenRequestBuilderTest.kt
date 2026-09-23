@@ -1,5 +1,6 @@
 package id.waltid.openid4vci.wallet.token
 
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import io.ktor.client.*
@@ -24,6 +25,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class TokenRequestBuilderTest {
 
@@ -211,6 +213,63 @@ class TokenRequestBuilderTest {
 
         assertEquals(HttpStatusCode.OK.value, error.statusCode)
         assertEquals(null, error.oauthError)
+    }
+
+    @Test
+    fun testOAuthErrorDescriptionIsSurfaced() = runTest {
+        val client = createMockClient {
+            respond(
+                content = """{"error":"invalid_grant","error_description":"Pre-authorized code is invalid or has already been used"}""",
+                status = HttpStatusCode.BadRequest,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+
+        val error = assertFailsWith<TokenRequestException> {
+            TokenRequestBuilder(clientConfig, client).exchangePreAuthorizedCode(
+                tokenEndpoint = tokenEndpoint,
+                preAuthorizedCode = "pre-auth-code",
+            )
+        }
+
+        assertEquals("invalid_grant", error.oauthError)
+        // Available to callers that trust their token endpoint...
+        assertEquals("Pre-authorized code is invalid or has already been used", error.oauthErrorDescription)
+        // ...but never in the message, because for a wallet the token endpoint is a third-party
+        // issuer and the message can reach a response we return to our own client.
+        assertFalse(error.message.orEmpty().contains("already been used"), error.message.orEmpty())
+        assertTrue(error.message.orEmpty().contains("invalid_grant"), error.message.orEmpty())
+    }
+
+    /**
+     * A 400 that carries no OAuth error means the request failed before the grant was evaluated, and
+     * must not be indistinguishable from a refused grant. This is the missing call ID case.
+     */
+    @Test
+    fun testNonOAuthErrorBodyIsNamedWithoutBeingEchoed() = runTest {
+        val client = createMockClient {
+            respond(
+                content = "Missing call ID",
+                status = HttpStatusCode.BadRequest,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Text.Plain.toString()),
+            )
+        }
+
+        val error = assertFailsWith<TokenRequestException> {
+            TokenRequestBuilder(clientConfig, client).exchangePreAuthorizedCode(
+                tokenEndpoint = tokenEndpoint,
+                preAuthorizedCode = "pre-auth-code",
+            )
+        }
+
+        assertEquals(HttpStatusCode.BadRequest.value, error.statusCode)
+        assertNull(error.oauthError)
+        assertTrue(error.nonOAuthErrorBody)
+        // Still sanitized: the opaque body itself never reaches the message.
+        assertFalse(error.message.orEmpty().contains("Missing call ID"))
+        // But the failure is no longer a bare status code that reads like a refused grant. This text
+        // is ours, not the server's, so it is safe to surface.
+        assertTrue(error.message.orEmpty().contains("not an OAuth error object"), error.message.orEmpty())
     }
 
     @Test
@@ -491,6 +550,56 @@ class TokenRequestBuilderTest {
     }
 
     @Test
+    fun testSameOriginRedirectRegeneratesAttestationPopAfterChallenge() = runTest {
+        var callCount = 0
+        var challenge: String? = null
+        val popValues = mutableListOf<String?>()
+        val client = createMockClient { request ->
+            callCount += 1
+            popValues += request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP]
+            when (callCount) {
+                1 -> respond(
+                    content = "",
+                    status = HttpStatusCode.TemporaryRedirect,
+                    headers = headersOf(
+                        HttpHeaders.Location to listOf("https://auth.example.com/other-token"),
+                        CLIENT_ATTESTATION_CHALLENGE to listOf("challenge-2"),
+                    ),
+                )
+
+                2 -> {
+                    assertEquals("https://auth.example.com/other-token", request.url.toString())
+                    respond(
+                        content = """{"access_token":"redirected-token","token_type":"Bearer"}""",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                    )
+                }
+
+                else -> error("Token redirect should only be followed once")
+            }
+        }
+
+        val response = TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+            tokenEndpoint = tokenEndpoint,
+            code = "auth-code",
+            attestationHeadersFactory = {
+                ClientAttestationHeaders(
+                    attestationJwt = "attestation.jwt",
+                    popJwt = "pop-${challenge ?: "initial"}",
+                )
+            },
+            dpopProofFactory = null,
+            onResponseHeaders = { headers ->
+                challenge = headers[CLIENT_ATTESTATION_CHALLENGE]
+            },
+        )
+
+        assertEquals("redirected-token", response.access_token)
+        assertEquals(listOf<String?>("pop-initial", "pop-challenge-2"), popValues)
+    }
+
+    @Test
     fun testTransportFailureOnSameOriginRedirectIsTyped() = runTest {
         var callCount = 0
         val client = createMockClient { _ ->
@@ -600,6 +709,105 @@ class TokenRequestBuilderTest {
         )
 
         assertEquals("dpop-token", response.access_token)
+        assertEquals(
+            listOf(tokenEndpoint to null, tokenEndpoint to "server-nonce"),
+            proofInputs,
+        )
+    }
+
+    @Test
+    fun testAttestationChallengeErrorRegeneratesPop() = runTest {
+        var callCount = 0
+        var challenge: String? = null
+        val popValues = mutableListOf<String?>()
+        val client = createMockClient { request ->
+            callCount += 1
+            popValues += request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP]
+            if (callCount == 1) {
+                respond(
+                    content = """{"error":"use_attestation_challenge"}""",
+                    status = HttpStatusCode.BadRequest,
+                    headers = headersOf(
+                        HttpHeaders.ContentType to listOf("application/json"),
+                        CLIENT_ATTESTATION_CHALLENGE to listOf("challenge-2"),
+                    ),
+                )
+            } else {
+                respond(
+                    content = """{"access_token":"attested-token","token_type":"Bearer"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            }
+        }
+
+        val response = TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+            tokenEndpoint = tokenEndpoint,
+            code = "auth-code",
+            attestationHeadersFactory = {
+                ClientAttestationHeaders(
+                    attestationJwt = "attestation.jwt",
+                    popJwt = "pop-${challenge ?: "initial"}",
+                )
+            },
+            dpopProofFactory = null,
+            onResponseHeaders = { headers ->
+                challenge = headers[CLIENT_ATTESTATION_CHALLENGE]
+            },
+        )
+
+        assertEquals("attested-token", response.access_token)
+        assertEquals(listOf<String?>("pop-initial", "pop-challenge-2"), popValues)
+    }
+
+    @Test
+    fun testDpopNonceRetryRegeneratesAttestationPopAfterChallenge() = runTest {
+        var callCount = 0
+        var challenge: String? = null
+        val proofInputs = mutableListOf<Pair<String, String?>>()
+        val popValues = mutableListOf<String?>()
+        val client = createMockClient { request ->
+            callCount += 1
+            popValues += request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP]
+            if (callCount == 1) {
+                respond(
+                    content = "{}",
+                    status = HttpStatusCode.Unauthorized,
+                    headers = headersOf(
+                        HttpHeaders.WWWAuthenticate to listOf("DPoP error=\"use_dpop_nonce\""),
+                        "DPoP-Nonce" to listOf("server-nonce"),
+                        CLIENT_ATTESTATION_CHALLENGE to listOf("challenge-2"),
+                    ),
+                )
+            } else {
+                respond(
+                    content = """{"access_token":"attested-dpop-token","token_type":"DPoP"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+            }
+        }
+
+        val response = TokenRequestBuilder(clientConfig, client).exchangeAuthorizationCode(
+            tokenEndpoint = tokenEndpoint,
+            code = "auth-code",
+            attestationHeadersFactory = {
+                ClientAttestationHeaders(
+                    attestationJwt = "attestation.jwt",
+                    popJwt = "pop-${challenge ?: "initial"}",
+                )
+            },
+            dpopProofFactory = { endpoint, nonce ->
+                proofInputs += endpoint to nonce
+                "proof-${proofInputs.size}"
+            },
+            onResponseHeaders = { headers ->
+                challenge = headers[CLIENT_ATTESTATION_CHALLENGE]
+            },
+        )
+
+        assertEquals("attested-dpop-token", response.access_token)
+        assertEquals(listOf<String?>("pop-initial", "pop-challenge-2"), popValues)
         assertEquals(
             listOf(tokenEndpoint to null, tokenEndpoint to "server-nonce"),
             proofInputs,

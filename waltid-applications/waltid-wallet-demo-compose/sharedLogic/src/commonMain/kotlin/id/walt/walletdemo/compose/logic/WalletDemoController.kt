@@ -8,29 +8,76 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.seconds
 
 class WalletDemoController(
     private val wallet: DemoWallet,
     private val pinStore: DemoPinStore,
+    private val biometricAuthenticator: DemoBiometricAuthenticator = UnavailableDemoBiometricAuthenticator,
+    private val signingProtectionMode: WalletDemoSigningProtectionMode = WalletDemoSigningProtectionMode.Optional,
+    private val signingProtectionStore: WalletDemoSigningProtectionStore =
+        InMemoryWalletDemoSigningProtectionStore(),
+    private val sharingSettings: DemoSharingSettingsStore = InMemoryDemoSharingSettingsStore(),
+    private val skipPin: Boolean = false,
+    private val issuanceRedirectUri: String = "openid://",
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private var receiveJob: Job? = null
     private var issuanceSession: WalletDemoIssuanceSession? = null
+    private var pendingAuthorizationCallback: String? = null
     private var presentationJob: Job? = null
-    private val _state = MutableStateFlow(
-        WalletDemoUiState(
-            auth = readInitialAuthState(),
-        ),
-    )
+    private val _state = MutableStateFlow(initialState())
     val state: StateFlow<WalletDemoUiState> = _state.asStateFlow()
+    private var statusHideJob: Job? = null
+    private var biometricSigningAvailabilityJob: Job? = null
+    private var foregroundSequence = 0L
+    private var lastWarnedForegroundSequence: Long? = null
+
+    private fun initialState(): WalletDemoUiState = WalletDemoUiState(
+        auth = readInitialAuthState(),
+        biometricUnlockAvailable = !skipPin && biometricAuthenticator.isAvailable(),
+        signingProtectionMode = signingProtectionMode,
+        selectedSigningProtection = signingProtectionMode.resolve(signingProtectionStore.load()),
+        showDcApiPresentationPreview = sharingSettings.showDcApiPresentationPreview(),
+        proximityTransportProfile = sharingSettings.proximityTransportProfile(),
+        proximityApprovalMode = sharingSettings.proximityApprovalMode(),
+        pinLockEnabled = !skipPin,
+    )
+
+    init {
+        if (skipPin) {
+            bootstrapIfNeeded()
+        }
+        scope.launch(dispatcher) {
+            state
+                .map { ui ->
+                    ui.statusBanner()
+                        ?.takeIf { banner -> banner.kind == WalletStatusKind.Success && ui.isStatusVisible }
+                        ?.key
+                }
+                .distinctUntilChanged()
+                .collect { key ->
+                    statusHideJob?.cancel()
+                    if (key == null) return@collect
+                    statusHideJob = launch {
+                        delay(SuccessBannerAutoHide)
+                        dismissStatus(key)
+                    }
+                }
+        }
+    }
 
     fun updatePin(value: String) {
         _state.update { state ->
@@ -51,6 +98,304 @@ class WalletDemoController(
                 is WalletAuthState.StorageUnavailable,
                 WalletAuthState.Unlocked,
                 -> state
+            }
+        }
+    }
+
+    fun updateUseBiometrics(enabled: Boolean) {
+        if (_state.value.auth !is WalletAuthState.Setup) return
+        if (!enabled) {
+            _state.update { state ->
+                val current = state.auth as? WalletAuthState.Setup ?: return@update state
+                state.copy(auth = current.copy(useBiometrics = false, error = null))
+            }
+            return
+        }
+        if (_state.value.isAuthenticating) return
+        if (!biometricAuthenticator.isAvailable()) {
+            _state.update { state ->
+                val current = state.auth as? WalletAuthState.Setup ?: return@update state
+                state.copy(
+                    auth = current.copy(
+                        useBiometrics = false,
+                        error = WalletDisplayText.BiometricUnlockNotAuthorized,
+                    ),
+                )
+            }
+            return
+        }
+        _state.update { state ->
+            val current = state.auth as? WalletAuthState.Setup ?: return@update state
+            state.copy(
+                auth = current.copy(useBiometrics = true, error = null),
+                isAuthenticating = true,
+            )
+        }
+        scope.launch(dispatcher) {
+            val result = biometricAuthenticator.authenticate(WalletDisplayText.EnableBiometricUnlock)
+            _state.update { state ->
+                val current = state.auth as? WalletAuthState.Setup ?: return@update state.copy(isAuthenticating = false)
+                if (result == DemoBiometricResult.Succeeded) {
+                    state.copy(
+                        auth = current.copy(useBiometrics = true, error = null),
+                        isAuthenticating = false,
+                    )
+                } else {
+                    state.copy(
+                        auth = current.copy(
+                            useBiometrics = false,
+                            error = WalletDisplayText.BiometricUnlockNotAuthorized,
+                        ),
+                        isAuthenticating = false,
+                    )
+                }
+            }
+        }
+    }
+
+    fun isBiometricUnlockAvailable(): Boolean = biometricAuthenticator.isAvailable()
+
+    fun isBiometricUnlockEnabled(): Boolean = pinStore.isBiometricUnlockEnabled()
+
+    fun refreshBiometricUnlockAvailability() {
+        _state.update { it.copy(biometricUnlockAvailable = biometricAuthenticator.isAvailable()) }
+    }
+
+    fun handleApplicationForegrounded() {
+        refreshBiometricUnlockAvailability()
+        foregroundSequence += 1
+        refreshBiometricSigningAvailability(foregroundSequence)
+        unlockWithBiometrics()
+        if (_state.value.auth == WalletAuthState.Unlocked && _state.value.session is WalletSessionState.IdentitySetup) {
+            refreshIdentityChoices()
+        }
+    }
+
+    fun dismissSigningProtectionWarning() {
+        _state.update { it.copy(signingProtectionWarning = null) }
+    }
+
+    fun setShowDcApiPresentationPreview(enabled: Boolean) = saveSharingPreference(
+        "Could not save the wallet review preference. Try again.",
+        { sharingSettings.setShowDcApiPresentationPreview(enabled) },
+        { it.copy(showDcApiPresentationPreview = enabled) },
+    )
+
+    fun setProximityTransportProfile(profile: WalletDemoProximityTransportProfile) = saveSharingPreference(
+        "Could not save the connection method. Try again.",
+        { sharingSettings.setProximityTransportProfile(profile) },
+        { it.copy(proximityTransportProfile = profile) },
+    )
+
+    fun setProximityApprovalMode(mode: WalletDemoProximityApprovalMode) = saveSharingPreference(
+        "Could not save sharing approval. Try again.",
+        { sharingSettings.setProximityApprovalMode(mode) },
+        { it.copy(proximityApprovalMode = mode) },
+    )
+
+    private fun saveSharingPreference(message: String, persist: () -> Unit, update: (WalletDemoUiState) -> WalletDemoUiState) {
+        try {
+            persist()
+            _state.update { update(it).copy(sharingSettingsError = null) }
+        } catch (cause: CancellationException) { throw cause }
+        catch (_: Exception) { _state.update { it.copy(sharingSettingsError = message) } }
+    }
+
+    fun unlockWithBiometrics(force: Boolean = false) {
+        val auth = _state.value.auth as? WalletAuthState.Login ?: return
+        if ((!force && auth.biometricPromptConsumed) || _state.value.isAuthenticating) return
+        if (!pinStore.isBiometricUnlockEnabled() || !biometricAuthenticator.isAvailable()) return
+
+        _state.update { state ->
+            val login = state.auth as? WalletAuthState.Login ?: return@update state
+            state.copy(
+                auth = login.copy(biometricPromptConsumed = true),
+                isAuthenticating = true,
+            )
+        }
+        scope.launch(dispatcher) {
+            when (biometricAuthenticator.authenticate(WalletDisplayText.UnlockWithBiometrics)) {
+                DemoBiometricResult.Succeeded -> {
+                    _state.update {
+                        it.copy(
+                            auth = WalletAuthState.Unlocked,
+                            isAuthenticating = false,
+                        )
+                    }
+                    showBiometricSigningWarningIfNeeded(foregroundSequence.takeIf { it > 0 })
+                    bootstrapIfNeeded()
+                }
+                DemoBiometricResult.Failed -> _state.update { it.copy(isAuthenticating = false) }
+            }
+        }
+    }
+
+    fun selectSigningProtection(protection: WalletDemoSigningProtection) {
+        if (signingProtectionMode != WalletDemoSigningProtectionMode.Optional) return
+        _state.update { state ->
+            if (state.auth !is WalletAuthState.Setup ||
+                state.isAuthenticating ||
+                (protection == WalletDemoSigningProtection.Biometric &&
+                    state.biometricSigningAvailability != WalletDemoSigningProtectionAvailability.Available)
+            ) {
+                state
+            } else {
+                state.copy(
+                    selectedSigningProtection = protection,
+                    signingProtectionError = null,
+                )
+            }
+        }
+    }
+
+    fun requestSigningProtectionChange(protection: WalletDemoSigningProtection) {
+        val current = _state.value
+        if (!signingProtectionMode.allows(protection) || current.isBusy) return
+        if (current.signingProtectionReprovisionTarget != null) {
+            reprovisionWallet(
+                target = protection,
+                previousSelection = current.selectedSigningProtection,
+                recovering = true,
+            )
+            return
+        }
+        val applied = (current.session as? WalletSessionState.Ready)?.signingProtection
+        if (applied == protection) return
+        val previousSelection = current.selectedSigningProtection
+
+        _state.update {
+            it.copy(
+                selectedSigningProtection = protection,
+                isChangingSigningProtection = true,
+                pendingSigningProtectionChange = null,
+                signingProtectionError = null,
+            )
+        }
+        scope.launch(dispatcher) {
+            runCatching { wallet.signingProtectionAvailability(protection) }
+                .onSuccess { availability ->
+                    if (availability != WalletDemoSigningProtectionAvailability.Available) {
+                        _state.update {
+                            it.copy(
+                                isChangingSigningProtection = false,
+                                selectedSigningProtection = previousSelection,
+                                signingProtectionError = availability.displayMessage(),
+                            )
+                        }
+                    } else if (_state.value.session is WalletSessionState.Ready) {
+                        _state.update {
+                            it.copy(
+                                isChangingSigningProtection = false,
+                                pendingSigningProtectionChange = protection,
+                            )
+                        }
+                    } else {
+                        runCatching { signingProtectionStore.save(protection) }
+                            .onSuccess {
+                                _state.update {
+                                    it.copy(
+                                        selectedSigningProtection = protection,
+                                        isChangingSigningProtection = false,
+                                        signingProtectionError = null,
+                                    )
+                                }
+                                bootstrapIfNeeded()
+                            }
+                            .onFailure { error -> setSigningProtectionError(error, previousSelection) }
+                    }
+                }
+                .onFailure { error -> setSigningProtectionError(error, previousSelection) }
+        }
+    }
+
+    fun cancelSigningProtectionChange() {
+        _state.update {
+            it.copy(
+                selectedSigningProtection =
+                    (it.session as? WalletSessionState.Ready)?.signingProtection
+                        ?: signingProtectionMode.resolve(signingProtectionStore.load()),
+                pendingSigningProtectionChange = null,
+                signingProtectionError = null,
+            )
+        }
+    }
+
+    fun confirmSigningProtectionChange() {
+        val current = _state.value
+        val target = current.pendingSigningProtectionChange ?: return
+        if (current.isBusy) return
+        val previousSelection = (current.session as? WalletSessionState.Ready)?.signingProtection
+            ?: signingProtectionMode.resolve(signingProtectionStore.load())
+        reprovisionWallet(target, previousSelection, recovering = false)
+    }
+
+    private fun reprovisionWallet(
+        target: WalletDemoSigningProtection,
+        previousSelection: WalletDemoSigningProtection,
+        recovering: Boolean,
+    ) {
+        _state.update {
+            it.copy(
+                isChangingSigningProtection = true,
+                pendingSigningProtectionChange = null,
+                signingProtectionError = null,
+            )
+        }
+        scope.launch(dispatcher) {
+            var replacementStarted = recovering
+            runCatching {
+                val availability = wallet.signingProtectionAvailability(target)
+                check(availability == WalletDemoSigningProtectionAvailability.Available) {
+                    availability.displayMessage().orEmpty()
+                }
+                signingProtectionStore.save(target)
+                cancelActiveWalletWork()
+                replacementStarted = true
+                wallet.deleteWallet()
+                val result = wallet.bootstrap(target)
+                check(result.signingProtection == target) {
+                    "Reprovisioned wallet did not apply the selected signing protection"
+                }
+                val credentials = wallet.listCredentials()
+                result to credentials
+            }.onSuccess { (result, credentials) ->
+                statusHideJob?.cancel()
+                _state.update { state ->
+                    state.walletReplacementState(
+                        session = WalletSessionState.Ready(
+                            did = result.did,
+                            keyId = result.keyId,
+                            publicJwk = result.publicJwk,
+                            signingProtection = result.signingProtection,
+                            credentials = credentials,
+                        ),
+                        selectedSigningProtection = target,
+                    ).copy(warning = result.warning)
+                }
+            }.onFailure { error ->
+                if (!replacementStarted) {
+                    runCatching { signingProtectionStore.save(previousSelection) }
+                }
+                _state.update { state ->
+                    val message = WalletDisplayText.failure(
+                        WalletDisplayText.SigningProtectionChangeFailed,
+                        error,
+                    )
+                    if (replacementStarted) {
+                        state.walletReplacementState(
+                            session = WalletSessionState.Failed(message),
+                            selectedSigningProtection = target,
+                            signingProtectionReprovisionTarget = target,
+                        ).copy(signingProtectionError = message)
+                    } else {
+                        state.copy(
+                            selectedSigningProtection = previousSelection,
+                            pendingSigningProtectionChange = null,
+                            isChangingSigningProtection = false,
+                            signingProtectionError = message,
+                        )
+                    }
+                }
             }
         }
     }
@@ -76,11 +421,12 @@ class WalletDemoController(
     }
 
     fun lock() {
+        if (skipPin) return
         receiveJob?.cancel()
         presentationJob?.cancel()
         val previous = getAndUpdateState {
             it.copy(
-                auth = WalletAuthState.Login(),
+                auth = WalletAuthState.Login(biometricPromptConsumed = true),
                 operation = WalletOperationState.Idle,
                 requestDrafts = it.requestDrafts.copy(txCode = ""),
                 offerPreview = null,
@@ -97,19 +443,119 @@ class WalletDemoController(
         discardPresentationPreview(previous.activePresentationPreviewHandle())
     }
 
+    fun dismissStatus(key: String? = _state.value.statusBanner()?.key) {
+        val dismissedKey = key ?: return
+        _state.update { state ->
+            if (state.statusBanner()?.key != dismissedKey) {
+                state
+            } else {
+                state.copy(statusDismissedKey = dismissedKey, statusExpanded = false)
+            }
+        }
+    }
+
+    fun toggleStatusExpanded() {
+        _state.update { state ->
+            if (state.statusBanner()?.kind != WalletStatusKind.Error || !state.isStatusVisible) {
+                state
+            } else {
+                state.copy(statusExpanded = !state.statusExpanded)
+            }
+        }
+    }
+
+    fun deleteCredential(credentialId: String) {
+        if (_state.value.session !is WalletSessionState.Ready) return
+        scope.launch(dispatcher) {
+            runCatching { wallet.deleteCredential(credentialId) }
+                .onSuccess { removed ->
+                    if (!removed) return@onSuccess
+                    runCatching { wallet.listCredentials() }
+                        .onSuccess { credentials ->
+                            val previous = getAndUpdateState { state ->
+                                val currentReady = state.session as? WalletSessionState.Ready ?: return@getAndUpdateState state
+                                val hadReview = state.presentationReview != null
+                                state.copy(
+                                    session = currentReady.copy(credentials = credentials),
+                                    presentationReview = null,
+                                    selectedPresentationCredentialOptions = emptySet(),
+                                    selectedPresentationDisclosureOptions = emptySet(),
+                                    presentationCompleted = false,
+                                    presentationNavigationResetKey =
+                                        if (hadReview) state.presentationNavigationResetKey + 1 else state.presentationNavigationResetKey,
+                                )
+                            }
+                            if (previous.presentationReview != null) {
+                                discardPresentationPreview(previous.activePresentationPreviewHandle())
+                            }
+                        }
+                }
+                .onFailure { error ->
+                    setOperationError(WalletDisplayText.DeleteCredentialFailed, error, _state.value.selectedTab)
+                }
+        }
+    }
+
+    fun resetWallet(beforeDelete: suspend () -> Unit = {}) {
+        cancelActiveWalletWork()
+        scope.launch(dispatcher) {
+            val deleted = runCatching { beforeDelete(); wallet.deleteWallet() }
+            deleted.exceptionOrNull()?.let { error ->
+                setOperationError(WalletDisplayText.ResetWalletFailed, error, _state.value.selectedTab)
+                return@launch
+            }
+            val pinCleared = runCatching { pinStore.clear() }
+            statusHideJob?.cancel()
+            _state.value = initialState()
+            refreshBiometricSigningAvailability()
+            pinCleared.exceptionOrNull()?.let { error ->
+                val message = WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, error)
+                _state.update {
+                    it.copy(
+                        auth = if (skipPin) WalletAuthState.Unlocked else WalletAuthState.Setup(error = message),
+                        operation = WalletOperationState.Failed(message, WalletDemoTab.Credentials),
+                    ).withPublishedStatus()
+                }
+            }
+            if (skipPin && _state.value.auth is WalletAuthState.Unlocked) {
+                bootstrapIfNeeded()
+            }
+        }
+    }
+
     fun selectTab(tab: WalletDemoTab) {
         _state.update { it.copy(selectedTab = tab) }
+    }
+
+    /**
+     * Reloads credentials from the store into the ready session.
+     *
+     * Needed after a CREATE_CREDENTIAL provider activity (or another process-local wallet handle)
+     * writes credentials while this controller's in-memory list is still stale.
+     */
+    fun refreshCredentialsFromStore() {
+        scope.launch(dispatcher) {
+            if (_state.value.session !is WalletSessionState.Ready) return@launch
+            runCatching { wallet.listCredentials() }
+                .onSuccess { credentials ->
+                    _state.update { state ->
+                        val currentReady = state.session as? WalletSessionState.Ready ?: return@update state
+                        state.copy(session = currentReady.copy(credentials = credentials))
+                    }
+                }
+        }
     }
 
     fun completePresentationContinuation() {
         _state.update { state ->
             val pending = state.pendingPresentationContinuation ?: return@update state
-            state.copy(
+            state.withPublishedStatus().copy(
                 operation = WalletOperationState.Succeeded(
                     message = pending.successMessage,
                     tab = WalletDemoTab.Present,
                 ),
-                presentationCompleted = true,
+                presentationCompleted = false,
+                requestDrafts = state.requestDrafts.copy(presentationRequestUrl = ""),
                 pendingPresentationContinuation = null,
             )
         }
@@ -118,7 +564,7 @@ class WalletDemoController(
     fun failPresentationContinuation(reason: String) {
         _state.update { state ->
             if (state.pendingPresentationContinuation == null) return@update state
-            state.copy(
+            state.withPublishedStatus().copy(
                 operation = WalletOperationState.Failed(
                     message = WalletDisplayText.failure(WalletDisplayText.PresentationContinuationFailed, reason),
                     tab = WalletDemoTab.Present,
@@ -284,7 +730,7 @@ class WalletDemoController(
             try {
                 val session = wallet.startIssuance(
                     offerUrl = offerUrl,
-                    redirectUri = "openid://",
+                    redirectUri = issuanceRedirectUri,
                     did = (current.session as? WalletSessionState.Ready)?.did,
                 )
                 startedSession = session
@@ -311,11 +757,9 @@ class WalletDemoController(
                     withContext(NonCancellable) { runCatching { wallet.cancelIssuance(session.id) } }
                 }
                 updateIfCurrent(request, WalletOperationState.ResolvingOffer) {
-                    it.copy(
-                        operation = WalletOperationState.Failed(
-                            message = WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
-                            tab = WalletDemoTab.Receive,
-                        )
+                    it.withFailedOperation(
+                        WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
+                        WalletDemoTab.Receive,
                     )
                 }
             }
@@ -326,9 +770,12 @@ class WalletDemoController(
         val current = _state.value
         val ready = current.session as? WalletSessionState.Ready ?: return
         if (!current.acceptOfferEnabled) return
-        current.offerPreview ?: return
+        val preview = current.offerPreview ?: return
         val offerUrl = current.requestDrafts.offerUrl.trim()
+        // Only forward a tx_code when the offer actually requested one; issuers now reject
+        // an unsolicited tx_code (OpenID4VCI 1.0 §6.3).
         val txCode = current.requestDrafts.txCode.trim().ifBlank { null }
+            ?.takeIf { preview.transactionCode != null }
         val request = ReceiveRequest(offerUrl, current.receiveNavigationResetKey)
         if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.Receiving))) return
 
@@ -350,11 +797,9 @@ class WalletDemoController(
                 throw cancellation
             } catch (error: Throwable) {
                 updateIfCurrent(request, WalletOperationState.Receiving) {
-                    it.copy(
-                        operation = WalletOperationState.Failed(
-                            message = WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
-                            tab = WalletDemoTab.Receive,
-                        )
+                    it.withFailedOperation(
+                        WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
+                        WalletDemoTab.Receive,
                     )
                 }
             }
@@ -367,13 +812,14 @@ class WalletDemoController(
         _state.update {
             it.copy(
                 offerPreview = null, authorizationRequestUrl = null,
-                requestDrafts = it.requestDrafts.copy(txCode = ""),
+                requestDrafts = it.requestDrafts.copy(offerUrl = "", txCode = ""),
+                receiveCompleted = false,
                 operation = WalletOperationState.Succeeded(
                     message = WalletDisplayText.CredentialOfferDeclined,
                     tab = WalletDemoTab.Receive,
                 ),
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
-            )
+            ).withPublishedStatus()
         }
         scope.launch(dispatcher) {
             runCatching { wallet.cancelIssuance(sessionId) }
@@ -397,16 +843,34 @@ class WalletDemoController(
                         deferredCredentials = (it.deferredCredentials + outcome.credentials)
                             .distinctBy(WalletDemoDeferredCredential::id),
                         lastReceivedCredentialIds = outcome.storedCredentialIds,
-                        receiveCompleted = outcome.storedCredentialIds.isNotEmpty(),
+                        receiveCompleted = false,
                         operation = WalletOperationState.Succeeded(
                             "Credential issuance deferred",
                             WalletDemoTab.Receive,
                         ),
-                    )
+                    ).withPublishedStatus()
                 }
                 return
             }
-            WalletDemoIssuanceOutcome.Cancelled -> emptyList()
+            WalletDemoIssuanceOutcome.Cancelled -> {
+                issuanceSession = null
+                updateIfCurrent(request, WalletOperationState.Receiving) {
+                    it.copy(
+                        offerPreview = null,
+                        authorizationRequestUrl = null,
+                        requestDrafts = it.requestDrafts.copy(offerUrl = "", txCode = ""),
+                        lastReceivedCredentialIds = emptyList(),
+                        receiveCompleted = false,
+                        selectedTab = WalletDemoTab.Receive,
+                        operation = WalletOperationState.Succeeded(
+                            message = WalletDisplayText.CredentialOfferDeclined,
+                            tab = WalletDemoTab.Receive,
+                        ),
+                        receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
+                    ).withPublishedStatus()
+                }
+                return
+            }
             is WalletDemoIssuanceOutcome.Failed -> error(outcome.message)
         }
         issuanceSession = null
@@ -435,7 +899,7 @@ class WalletDemoController(
                         ),
                         WalletDemoTab.Receive,
                     ),
-                )
+                ).withPublishedStatus()
             }
             return
         }
@@ -444,14 +908,16 @@ class WalletDemoController(
                 session = ready.copy(credentials = credentials),
                 offerPreview = null,
                 authorizationRequestUrl = null,
-                requestDrafts = it.requestDrafts.copy(txCode = ""),
+                requestDrafts = it.requestDrafts.copy(offerUrl = "", txCode = ""),
                 operation = WalletOperationState.Succeeded(
                     WalletDisplayText.receivedCredentials(displayableReceivedCredentialIds.size),
-                    WalletDemoTab.Receive,
+                    WalletDemoTab.Credentials,
                 ),
                 lastReceivedCredentialIds = displayableReceivedCredentialIds,
-                receiveCompleted = true,
-            )
+                receiveCompleted = false,
+                receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
+                selectedTab = WalletDemoTab.Credentials,
+            ).withPublishedStatus()
         }
     }
 
@@ -467,16 +933,30 @@ class WalletDemoController(
                     is WalletDemoIssuanceOutcome.Stored -> {
                         val credentials = wallet.listCredentials()
                         _state.update {
+                            val remainingDeferred = it.deferredCredentials.filterNot { pending -> pending.id == deferredCredentialId }
+                            val received = outcome.credentialIds.isNotEmpty() && remainingDeferred.isEmpty()
                             it.copy(
                                 session = ready.copy(credentials = credentials),
-                                deferredCredentials = it.deferredCredentials.filterNot { pending -> pending.id == deferredCredentialId },
+                                deferredCredentials = remainingDeferred,
                                 lastReceivedCredentialIds = outcome.credentialIds,
-                                receiveCompleted = true,
+                                receiveCompleted = false,
+                                offerPreview = if (received) null else it.offerPreview,
+                                requestDrafts = if (received) {
+                                    it.requestDrafts.copy(offerUrl = "", txCode = "")
+                                } else {
+                                    it.requestDrafts
+                                },
+                                receiveNavigationResetKey = if (received) {
+                                    it.receiveNavigationResetKey + 1
+                                } else {
+                                    it.receiveNavigationResetKey
+                                },
+                                selectedTab = if (received) WalletDemoTab.Credentials else it.selectedTab,
                                 operation = WalletOperationState.Succeeded(
                                     WalletDisplayText.receivedCredentials(outcome.credentialIds.size),
-                                    WalletDemoTab.Receive,
+                                    if (received) WalletDemoTab.Credentials else WalletDemoTab.Receive,
                                 ),
-                            )
+                            ).withPublishedStatus()
                         }
                     }
                     is WalletDemoIssuanceOutcome.Deferred -> _state.update {
@@ -485,7 +965,7 @@ class WalletDemoController(
                                 it.deferredCredentials.filterNot { pending -> pending.id == deferredCredentialId } + outcome.credentials
                                 ).distinctBy(WalletDemoDeferredCredential::id),
                             operation = WalletOperationState.Succeeded("Credential issuance still pending", WalletDemoTab.Receive),
-                        )
+                        ).withPublishedStatus()
                     }
                     WalletDemoIssuanceOutcome.Cancelled -> _state.update {
                         it.copy(
@@ -494,7 +974,7 @@ class WalletDemoController(
                                 WalletDisplayText.CredentialOfferDeclined,
                                 WalletDemoTab.Receive,
                             ),
-                        )
+                        ).withPublishedStatus()
                     }
                     is WalletDemoIssuanceOutcome.Failed -> _state.update {
                         it.copy(
@@ -502,7 +982,7 @@ class WalletDemoController(
                                 WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, outcome.message),
                                 WalletDemoTab.Receive,
                             ),
-                        )
+                        ).withPublishedStatus()
                     }
                 }
             } catch (cancellation: CancellationException) {
@@ -516,11 +996,31 @@ class WalletDemoController(
     fun authorizationRequestOpened() { _state.update { it.copy(authorizationRequestUrl = null) } }
 
     private fun continueAuthorization(callbackUri: String) {
-        val session = issuanceSession ?: return
+        if (issuanceSession == null) {
+            issuanceSession = wallet.pendingAuthorizationIssuance()
+        }
+        val session = issuanceSession
+        if (session == null) return
         val current = _state.value
-        val ready = current.session as? WalletSessionState.Ready ?: return
-        val request = ReceiveRequest(current.requestDrafts.offerUrl.trim(), current.receiveNavigationResetKey)
-        if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.Receiving))) return
+        val ready = current.session as? WalletSessionState.Ready
+        if (ready == null) {
+            pendingAuthorizationCallback = callbackUri
+            return
+        }
+        pendingAuthorizationCallback = null
+        val offerUrl = current.requestDrafts.offerUrl.trim().ifBlank { callbackUri }
+        val request = ReceiveRequest(offerUrl, current.receiveNavigationResetKey)
+        if (!_state.compareAndSet(
+                current,
+                current.copy(
+                    selectedTab = WalletDemoTab.Receive,
+                    requestDrafts = current.requestDrafts.copy(offerUrl = offerUrl),
+                    operation = WalletOperationState.Receiving,
+                ),
+            )
+        ) {
+            return
+        }
         receiveJob = scope.launch(dispatcher) {
             try {
                 completeIssuanceOutcome(
@@ -532,15 +1032,18 @@ class WalletDemoController(
                 throw cancellation
             } catch (error: Throwable) {
                 updateIfCurrent(request, WalletOperationState.Receiving) {
-                    it.copy(
-                        operation = WalletOperationState.Failed(
-                            WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
-                            WalletDemoTab.Receive,
-                        ),
+                    it.withFailedOperation(
+                        WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
+                        WalletDemoTab.Receive,
                     )
                 }
             }
         }
+    }
+
+    private fun flushPendingAuthorizationCallback() {
+        val callback = pendingAuthorizationCallback ?: return
+        continueAuthorization(callback)
     }
 
     private fun isCurrent(request: ReceiveRequest): Boolean =
@@ -597,7 +1100,6 @@ class WalletDemoController(
         if (
             requestUrl.isBlank() ||
             current.presentationReview != null ||
-            current.presentationCompleted ||
             current.isBusy
         ) {
             return
@@ -646,11 +1148,9 @@ class WalletDemoController(
                     }
                 }
                 updatePresentationIfCurrent(request, WalletOperationState.ResolvingPresentation) {
-                    it.copy(
-                        operation = WalletOperationState.Failed(
-                            message = WalletDisplayText.failure(WalletDisplayText.PreviewFailed, error),
-                            tab = WalletDemoTab.Present,
-                        )
+                    it.withFailedOperation(
+                        WalletDisplayText.failure(WalletDisplayText.PreviewFailed, error),
+                        WalletDemoTab.Present,
                     )
                 }
             }
@@ -740,14 +1240,12 @@ class WalletDemoController(
         if (!current.presentationCredentialSelectionComplete()) {
             _state.compareAndSet(
                 current,
-                current.copy(
-                    operation = WalletOperationState.Failed(
-                        WalletDisplayText.failure(
-                            WalletDisplayText.PresentFailed,
-                            WalletDisplayText.SelectCredentialForEveryRequest,
-                        ),
-                        WalletDemoTab.Present,
-                    )
+                current.withFailedOperation(
+                    WalletDisplayText.failure(
+                        WalletDisplayText.PresentFailed,
+                        WalletDisplayText.SelectCredentialForEveryRequest,
+                    ),
+                    WalletDemoTab.Present,
                 ),
             )
             return
@@ -775,12 +1273,12 @@ class WalletDemoController(
                 throw cancellation
             } catch (error: Throwable) {
                 updatePresentationIfCurrent(request, WalletOperationState.Presenting) {
-                    it.copy(
-                        operation = WalletOperationState.Failed(
-                            message = WalletDisplayText.failure(WalletDisplayText.PresentFailed, error),
-                            tab = WalletDemoTab.Present,
-                        ),
+                    it.withFailedOperation(
+                        WalletDisplayText.failure(WalletDisplayText.PresentFailed, error),
+                        WalletDemoTab.Present,
+                    ).copy(
                         presentationReview = null,
+                        requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
                         presentationCompleted = false,
@@ -805,6 +1303,7 @@ class WalletDemoController(
         }
 
         return copy(
+            statusOccurrenceId = statusOccurrenceId + 1,
             operation = when {
                 result is WalletDemoOperationResult.Failure -> WalletOperationState.Failed(
                     message = result.message,
@@ -817,14 +1316,19 @@ class WalletDemoController(
                 )
             },
             presentationReview = if (clearPreview) null else presentationReview,
+            requestDrafts = if (clearPreview) {
+                requestDrafts.copy(presentationRequestUrl = "")
+            } else {
+                requestDrafts
+            },
             selectedPresentationCredentialOptions =
                 if (clearSelections) emptySet() else selectedPresentationCredentialOptions,
             selectedPresentationDisclosureOptions =
                 if (clearSelections) emptySet() else selectedPresentationDisclosureOptions,
-            presentationCompleted = success != null && pending == null,
+            presentationCompleted = false,
             pendingPresentationContinuation = pending,
             presentationNavigationResetKey =
-                if (resetNavigation) presentationNavigationResetKey + 1 else presentationNavigationResetKey,
+                if (resetNavigation || clearPreview) presentationNavigationResetKey + 1 else presentationNavigationResetKey,
         )
     }
 
@@ -834,12 +1338,13 @@ class WalletDemoController(
         val previewHandle = current.activePresentationPreviewHandle() ?: return
         if (!_state.compareAndSet(
                 current,
-                current.copy(
+                current.withPublishedStatus().copy(
                     operation = WalletOperationState.Succeeded(
                         message = WalletDisplayText.PresentationReviewCancelled,
                         tab = WalletDemoTab.Present,
                     ),
                     presentationReview = null,
+                    requestDrafts = current.requestDrafts.copy(presentationRequestUrl = ""),
                     selectedPresentationCredentialOptions = emptySet(),
                     selectedPresentationDisclosureOptions = emptySet(),
                     presentationCompleted = false,
@@ -886,12 +1391,12 @@ class WalletDemoController(
                 throw cancellation
             } catch (error: Throwable) {
                 updatePresentationIfCurrent(request, WalletOperationState.DecliningPresentation) {
-                    it.copy(
-                        operation = WalletOperationState.Failed(
-                            message = WalletDisplayText.failure(WalletDisplayText.RejectFailed, error),
-                            tab = WalletDemoTab.Present,
-                        ),
+                    it.withFailedOperation(
+                        WalletDisplayText.failure(WalletDisplayText.RejectFailed, error),
+                        WalletDemoTab.Present,
+                    ).copy(
                         presentationReview = null,
+                        requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
                         presentationCompleted = false,
@@ -917,8 +1422,16 @@ class WalletDemoController(
         }
     }
 
+    private fun cancelActiveWalletWork() {
+        receiveJob?.cancel()
+        presentationJob?.cancel()
+        val previous = _state.value
+        cancelIssuance()
+        discardPresentationPreview(previous.activePresentationPreviewHandle())
+    }
+
     private fun WalletDemoUiState.activePresentationPreviewHandle(): WalletDemoPresentationPreviewHandle? =
-        takeUnless { presentationCompleted }?.presentationReview?.previewHandle()
+        presentationReview?.previewHandle()
 
     private fun WalletDemoPresentationPreviewResult.previewHandle(): WalletDemoPresentationPreviewHandle =
         when (this) {
@@ -949,7 +1462,12 @@ class WalletDemoController(
 
         _state.update { it.copy(isAuthenticating = true) }
         scope.launch(dispatcher) {
-            runCatching { pinStore.setPin(pin) }
+            val protection = _state.value.selectedSigningProtection
+            runCatching {
+                signingProtectionStore.save(protection)
+                pinStore.setPin(pin)
+                pinStore.setBiometricUnlockEnabled(auth.useBiometrics)
+            }
                 .onSuccess {
                     _state.update {
                         it.copy(
@@ -957,10 +1475,11 @@ class WalletDemoController(
                             isAuthenticating = false,
                         )
                     }
+                    showBiometricSigningWarningIfNeeded(foregroundSequence.takeIf { it > 0 })
                     bootstrapIfNeeded()
                 }
-                .onFailure {
-                    setSetupPinError("PIN could not be saved")
+                .onFailure { error ->
+                    setSetupPinError(error.message ?: "PIN could not be saved")
                 }
         }
     }
@@ -986,11 +1505,104 @@ class WalletDemoController(
                             isAuthenticating = false,
                         )
                     }
+                    showBiometricSigningWarningIfNeeded(foregroundSequence.takeIf { it > 0 })
                     bootstrapIfNeeded()
                 }
                 .onFailure {
                     setLoginPinError("PIN could not be verified")
                 }
+        }
+    }
+
+    fun refreshIdentityDetails() {
+        val session = _state.value.session as? WalletSessionState.Ready ?: return
+        if (_state.value.identityBusy) return
+        fun isCurrentWallet(): Boolean = (_state.value.session as? WalletSessionState.Ready)?.let {
+            it.did == session.did && it.keyId == session.keyId
+        } == true
+        _state.update { it.copy(identityProgress = "Loading signing key details…", identityError = null, identityDetails = WalletDemoIdentityDetailsState.Loading) }
+        scope.launch(dispatcher) {
+            try {
+                val details = wallet.identityDetails()
+                if (isCurrentWallet()) _state.update {
+                    it.copy(identityDetails = details?.let(WalletDemoIdentityDetailsState::Available)
+                        ?: WalletDemoIdentityDetailsState.Unsupported)
+                }
+            } catch (cause: CancellationException) { throw cause }
+            catch (cause: Exception) {
+                if (isCurrentWallet()) _state.update {
+                    it.copy(identityDetails = WalletDemoIdentityDetailsState.Failed(
+                        "Could not load the signing key details. Try again."))
+                }
+            } finally { _state.update { it.copy(identityProgress = null) } }
+        }
+    }
+
+    fun performIdentityAction(choiceId: String) {
+        val session = _state.value.session as? WalletSessionState.Ready ?: return
+        if (_state.value.identityBusy) return
+        val choice = (_state.value.identityDetails as? WalletDemoIdentityDetailsState.Available)
+            ?.details?.choices?.find { it.id == choiceId } ?: return
+        fun isCurrentWallet(): Boolean = (_state.value.session as? WalletSessionState.Ready)?.let {
+            it.did == session.did && it.keyId == session.keyId
+        } == true
+        _state.update { it.copy(identityError = null,
+            identityProgress = if (choice.destructive) "Deleting key backup…" else "Backing up signing key…") }
+        scope.launch(dispatcher) {
+            try {
+                wallet.chooseIdentity(choiceId)
+                val details = wallet.identityDetails()
+                if (isCurrentWallet()) _state.update { it.copy(identityDetails = details?.let(WalletDemoIdentityDetailsState::Available)
+                    ?: WalletDemoIdentityDetailsState.Unsupported) }
+            } catch (cause: CancellationException) { throw cause }
+            catch (cause: Exception) {
+                if (isCurrentWallet()) _state.update { it.copy(identityError = (cause as? WalletDemoKeyOperationException)?.message
+                    ?: if (choice.destructive) "Could not delete the key backup. Try again." else "Could not back up the signing key. Try again.") }
+            } finally { if (isCurrentWallet()) _state.update { it.copy(identityProgress = null) } }
+        }
+    }
+
+    fun chooseIdentity(choiceId: String) {
+        val setup = (_state.value.session as? WalletSessionState.IdentitySetup)?.setup as? WalletDemoIdentitySetup.Choose
+        val restoring = setup?.options?.find { it.id == choiceId }?.restoring == true
+        runIdentityChoice(if (restoring) "Restoring key…" else "Creating key…") { wallet.chooseIdentity(choiceId) }
+    }
+    fun cancelIdentity(identityId: String) = runIdentityChoice("Cancelling setup…") { wallet.cancelIdentity(identityId) }
+    fun resumeSigningIdentity(identityId: String) = runIdentityChoice("Resuming setup…") { wallet.resumeSigningIdentity(identityId) }
+    fun refreshIdentityChoices() {
+        val session = _state.value.session as? WalletSessionState.IdentitySetup ?: return
+        if (_state.value.identityBusy) return
+        _state.update { it.copy(identityProgress = "Loading signing key options…") }
+        scope.launch(dispatcher) {
+            try {
+                val setup = wallet.identitySetup()
+                if (_state.value.session !== session) return@launch
+                _state.update { it.copy(session = setup?.let(WalletSessionState::IdentitySetup)
+                    ?: WalletSessionState.NotBootstrapped, warning = null) }
+                if (setup == null) bootstrapIfNeeded()
+            } catch (cause: CancellationException) { throw cause }
+            catch (cause: Exception) {
+                if (_state.value.session === session) _state.update {
+                    it.copy(warning = "Signing key options could not be loaded. Try again.")
+                }
+            } finally { _state.update { it.copy(identityProgress = null) } }
+        }
+    }
+
+    private fun runIdentityChoice(progress: String, action: suspend () -> Unit) {
+        if (_state.value.identityBusy || _state.value.session !is WalletSessionState.IdentitySetup) return
+        _state.update { it.copy(identityProgress = progress, warning = null) }
+        scope.launch(dispatcher) {
+            try {
+                try { action() }
+                catch (cause: CancellationException) { throw cause }
+                catch (cause: Exception) { _state.update { it.copy(warning = keyOperationFailure(cause)) } }
+                val setup = wallet.identitySetup()
+                _state.update { it.copy(session = setup?.let(WalletSessionState::IdentitySetup) ?: WalletSessionState.NotBootstrapped) }
+                if (setup == null) bootstrapIfNeeded()
+            } catch (cause: CancellationException) { throw cause }
+            catch (cause: Exception) { _state.update { it.copy(warning = keyOperationFailure(cause)) } }
+            finally { _state.update { it.copy(identityProgress = null) } }
         }
     }
 
@@ -1008,29 +1620,94 @@ class WalletDemoController(
                     operation = WalletOperationState.Idle,
                 )
             }
+            val setup = runCatching { wallet.identitySetup() }.getOrElse { error ->
+                if (error is CancellationException) throw error
+                _state.update { it.copy(session = WalletSessionState.Failed(keyOperationFailure(error))) }
+                return@launch
+            }
+            if (setup != null) {
+                _state.update { it.copy(session = WalletSessionState.IdentitySetup(setup)) }
+                return@launch
+            }
             runCatching {
-                val result = wallet.bootstrap()
+                val result = wallet.bootstrap(_state.value.selectedSigningProtection)
                 val credentials = wallet.listCredentials()
-                result to credentials
-            }.onSuccess { (result, credentials) ->
+                val selection = signingProtectionMode.resolve(result.signingProtection)
+                signingProtectionStore.save(selection)
+                Triple(result, credentials, selection)
+            }.onSuccess { (result, credentials, selection) ->
                 _state.update {
                     it.copy(
                         session = WalletSessionState.Ready(
                             did = result.did,
+                            keyId = result.keyId,
+                            publicJwk = result.publicJwk,
+                            signingProtection = result.signingProtection,
                             credentials = credentials,
                         ),
                         operation = WalletOperationState.Idle,
                         warning = result.warning,
-                    )
+                        selectedSigningProtection = selection,
+                        signingProtectionReprovisionTarget = null,
+                    ).withPublishedStatus()
                 }
+                showBiometricSigningWarningIfNeeded(foregroundSequence.takeIf { it > 0 })
+                flushPendingAuthorizationCallback()
             }.onFailure { error ->
                 _state.update {
                     it.copy(
                         session = WalletSessionState.Failed(WalletDisplayText.failure(WalletDisplayText.BootstrapFailed, error)),
                         operation = WalletOperationState.Idle,
-                    )
+                    ).withPublishedStatus()
                 }
             }
+        }
+    }
+
+    private fun refreshBiometricSigningAvailability(warningSequence: Long? = null) {
+        biometricSigningAvailabilityJob?.cancel()
+        biometricSigningAvailabilityJob = scope.launch(dispatcher) {
+            val availability = try {
+                wallet.signingProtectionAvailability(WalletDemoSigningProtection.Biometric)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Throwable) {
+                WalletDemoSigningProtectionAvailability.Unsupported
+            }
+            _state.update {
+                it.copy(
+                    biometricSigningAvailability = availability,
+                    signingProtectionWarning = if (availability == WalletDemoSigningProtectionAvailability.Available) {
+                        null
+                    } else {
+                        it.signingProtectionWarning
+                    },
+                )
+            }
+            showBiometricSigningWarningIfNeeded(warningSequence)
+        }
+    }
+
+    private fun showBiometricSigningWarningIfNeeded(warningSequence: Long?) {
+        val sequence = warningSequence ?: return
+        if (lastWarnedForegroundSequence == sequence) return
+        val state = _state.value
+        val applied = (state.session as? WalletSessionState.Ready)?.signingProtection
+        val availability = state.biometricSigningAvailability ?: return
+        if (state.auth != WalletAuthState.Unlocked ||
+            applied != WalletDemoSigningProtection.Biometric ||
+            availability == WalletDemoSigningProtectionAvailability.Available
+        ) {
+            return
+        }
+        lastWarnedForegroundSequence = sequence
+        _state.update {
+            it.copy(
+                signingProtectionWarning = WalletDisplayText.biometricSigningUnavailable(
+                    availability = availability,
+                    canChooseNoBiometricSigning = signingProtectionMode.allows(WalletDemoSigningProtection.None),
+                ),
+            )
         }
     }
 
@@ -1054,26 +1731,79 @@ class WalletDemoController(
         }
     }
 
-    private fun setOperationError(prefix: String, error: Throwable, tab: WalletDemoTab) {
+    private fun setSigningProtectionError(
+        error: Throwable,
+        previousSelection: WalletDemoSigningProtection,
+    ) {
         _state.update {
             it.copy(
-                operation = WalletOperationState.Failed(
-                    message = WalletDisplayText.failure(prefix, error),
-                    tab = tab,
-                )
+                selectedSigningProtection = previousSelection,
+                isChangingSigningProtection = false,
+                signingProtectionError = WalletDisplayText.failure(
+                    WalletDisplayText.SigningProtectionChangeFailed,
+                    error,
+                ),
             )
         }
     }
 
+    private fun WalletDemoUiState.walletReplacementState(
+        session: WalletSessionState,
+        selectedSigningProtection: WalletDemoSigningProtection,
+        signingProtectionReprovisionTarget: WalletDemoSigningProtection? = null,
+    ): WalletDemoUiState = copy(
+        session = session,
+        selectedSigningProtection = selectedSigningProtection,
+        pendingSigningProtectionChange = null,
+        signingProtectionReprovisionTarget = signingProtectionReprovisionTarget,
+        isChangingSigningProtection = false,
+        signingProtectionError = null,
+        operation = WalletOperationState.Idle,
+        requestDrafts = WalletRequestDrafts(),
+        offerPreview = null,
+        authorizationRequestUrl = null,
+        deferredCredentials = emptyList(),
+        lastReceivedCredentialIds = emptyList(),
+        receiveCompleted = false,
+        receiveNavigationResetKey = receiveNavigationResetKey + 1,
+        presentationReview = null,
+        selectedPresentationCredentialOptions = emptySet(),
+        selectedPresentationDisclosureOptions = emptySet(),
+        presentationCompleted = false,
+        presentationNavigationResetKey = presentationNavigationResetKey + 1,
+        warning = null,
+        signingProtectionWarning = null,
+        pendingPresentationContinuation = null,
+        statusDismissedKey = null,
+        statusExpanded = false,
+    ).withPublishedStatus()
+
+    private fun setOperationError(prefix: String, error: Throwable, tab: WalletDemoTab) {
+        _state.update {
+            it.withFailedOperation(WalletDisplayText.failure(prefix, error), tab)
+        }
+    }
+
+    private fun WalletDemoUiState.withFailedOperation(message: String, tab: WalletDemoTab): WalletDemoUiState =
+        withPublishedStatus().copy(operation = WalletOperationState.Failed(message = message, tab = tab))
+
+    private fun WalletDemoUiState.withPublishedStatus(): WalletDemoUiState =
+        copy(statusOccurrenceId = statusOccurrenceId + 1)
+
     private fun readInitialAuthState(): WalletAuthState =
-        runCatching {
-            if (pinStore.hasPin()) WalletAuthState.Login() else WalletAuthState.Setup()
-        }.getOrElse {
-            WalletAuthState.StorageUnavailable()
+        if (skipPin) {
+            WalletAuthState.Unlocked
+        } else {
+            runCatching {
+                if (pinStore.hasPin()) WalletAuthState.Login() else WalletAuthState.Setup()
+            }.getOrElse {
+                WalletAuthState.StorageUnavailable()
+            }
         }
 
     private companion object {
         val pinPattern = Regex("\\d{4,8}")
+        val SuccessBannerAutoHide = 4.seconds
 
         fun isValidPin(pin: String): Boolean = pin.matches(pinPattern)
     }

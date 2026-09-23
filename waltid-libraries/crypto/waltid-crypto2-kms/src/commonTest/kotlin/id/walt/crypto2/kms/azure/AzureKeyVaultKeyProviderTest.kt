@@ -125,7 +125,7 @@ class AzureKeyVaultKeyProviderTest {
                     assertEquals("/keys/ec-key/version-1/verify", request.url.encodedPath)
                     val body = request.bodyJson()
                     assertEquals("ES256", body.requiredString("alg"))
-                    assertContentEquals(p1363, base64Url.decode(body.requiredString("signature")))
+                    assertContentEquals(p1363, base64Url.decode(body.requiredString("value")))
                     assertEquals(32, base64Url.decode(body.requiredString("digest")).size)
                     respondJson("""{"value":true}""")
                 }

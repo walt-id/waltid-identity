@@ -66,7 +66,7 @@ class PidBirthDateIssuerSignedIntegrityReproTest {
         // PID `birth_date` is a `full-date` (CBOR tag 1004) and should be modeled as a date type.
         // If this is a String, the implementation is very likely losing tagged-CBOR semantics.
         assertTrue(
-            wrapped.value.elementValue is CborString && wrapped.value.elementValue.tags.contentEquals(ulongArrayOf(1004U)),
+            wrapped.value.elementValue is CborString && wrapped.value.elementValue.tags == listOf(1004UL),
             "PID birth_date must be handled as LocalDate (CBOR full-date tag 1004), but was ${wrapped.value.elementValue::class.simpleName} (tags: ${wrapped.value.elementValue.tags}). " +
                     "If this is String, tagged-CBOR semantics are likely lost, causing digest mismatch."
         )

@@ -6,14 +6,17 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.repository.IssuanceSessionCrypto2Keys
 import id.walt.openid4vci.offers.AuthenticationMethod
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
@@ -26,6 +29,19 @@ class OpenId4VciProtocolServiceCrypto2KeyTest {
         assertFailsWith<IllegalArgumentException> {
             restoreSessionIssuerCrypto2Key(session(), runtime)
         }
+    }
+
+    @Test
+    fun `JSON-persisted JWK session restores after attaching from the legacy issuer key`() = runTest {
+        val encoded = Json.encodeToString(IssuanceSession.serializer(), session())
+        val decoded = Json.decodeFromString(IssuanceSession.serializer(), encoded)
+        assertNull(decoded.crypto2IssuerStoredKey)
+        assertNotNull(
+            restoreSessionIssuerCrypto2Key(
+                IssuanceSessionCrypto2Keys.attachFromIssuerKey(decoded),
+                runtime,
+            )
+        )
     }
 
     @Test

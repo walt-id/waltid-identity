@@ -1,10 +1,16 @@
 package id.walt.issuer.web.controllers.onboarding.openapi
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profileIaCaRootCertificate
+import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer.services.onboarding.models.DocumentSignerOnboardingRequest
 import id.walt.issuer.services.onboarding.models.DocumentSignerOnboardingResponse
 import io.github.smiley4.ktoropenapi.config.RequestConfig
 import io.github.smiley4.ktoropenapi.config.ResponsesConfig
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profileIaCaRootCertificate
 
 object DocumentSignerDocs {
 
@@ -23,15 +29,7 @@ object DocumentSignerDocs {
                     """
                     {
                         "iacaSigner": {
-                            "certificateData": {
-                                "country": "US",
-                                "commonName": "Example IACA",
-                                "notBefore": "2025-05-28T12:23:01Z",
-                                "notAfter": "2040-05-24T12:23:01Z",
-                                "issuerAlternativeNameConf": {
-                                    "uri": "https://iaca.example.com"
-                                }
-                            },
+                            "iacaPem": "${iaCaPem}",
                             "iacaKey": {
                                 "type": "jwk",
                                 "jwk": {
@@ -47,7 +45,8 @@ object DocumentSignerDocs {
                         "certificateData": {
                             "country": "US",
                             "commonName": "Example DS",
-                            "crlDistributionPointUri": "https://iaca.example.com/crl"
+                            "crlDistributionPointUri": "https://iaca.example.com/crl",
+                            "issuerUri": "https://walt.id"
                         }
                     }
                 """.trimIndent()
@@ -61,15 +60,7 @@ object DocumentSignerDocs {
                     """
                     {
                         "iacaSigner": {
-                            "certificateData": {
-                                "country": "US",
-                                "commonName": "Example IACA",
-                                "notBefore": "2025-05-28T12:23:01Z",
-                                "notAfter": "2040-05-24T12:23:01Z",                                
-                                "issuerAlternativeNameConf": {
-                                    "uri": "https://iaca.example.com"
-                                }
-                            },
+                            "iacaPem": "${iaCaPem}",
                             "iacaKey": {
                                 "type": "jwk",
                                 "jwk": {
@@ -87,7 +78,8 @@ object DocumentSignerDocs {
                             "commonName": "Example DS",
                             "crlDistributionPointUri": "https://iaca.example.com/crl",
                             "notBefore": "2026-01-01T00:00:00Z",
-                            "notAfter": "2027-01-01T00:00:00Z"
+                            "notAfter": "2027-01-01T00:00:00Z",
+                            "issuerUri": "https://walt.id"
                         }
                     }
                 """.trimIndent()
@@ -101,19 +93,7 @@ object DocumentSignerDocs {
                     """
                     {
                         "iacaSigner": {
-                            "certificateData": {
-                                "country": "GR",
-                                "commonName": "Η καλυτερότερη αρχή πιστοποίησης στον κόσμο",
-                                "issuerAlternativeNameConf": {
-                                    "email": "iaca@gov.gr",
-                                    "uri": "https://iaca.gov.gr"
-                                },
-                                "stateOrProvinceName": "Αττική",
-                                "organizationName": "Υπουργείο Μεταφορών",
-                                "notBefore": "2026-01-01T00:00:00Z",
-                                "notAfter": "2040-05-01T00:00:00Z",
-                                "crlDistributionPointUri": "https://crl.gov.gr/iaca.crl"
-                            },
+                            "iacaPem": "${iaCaPem}",
                             "iacaKey": {
                                 "type": "jwk",
                                 "jwk": {
@@ -134,7 +114,8 @@ object DocumentSignerDocs {
                             "organizationName": "Υπουργείο Μεταφορών",
                             "localityName": "Χολαργός",
                             "notBefore": "2026-01-01T00:00:10Z",
-                            "notAfter": "2026-06-01T00:00:00Z"
+                            "notAfter": "2026-06-01T00:00:00Z",
+                            "issuerUri": "https://walt.id"
                         }
                     }
                 """.trimIndent()
@@ -148,15 +129,7 @@ object DocumentSignerDocs {
                     """
                     {
                         "iacaSigner": {
-                            "certificateData": {
-                                "country": "US",
-                                "commonName": "Example IACA",
-                                "notBefore": "2025-05-28T12:23:01Z",
-                                "notAfter": "2040-05-24T12:23:01Z",                                
-                                "issuerAlternativeNameConf": {
-                                    "uri": "https://iaca.example.com"
-                                }
-                            },
+                            "iacaPem": "${iaCaPem}",
                             "iacaKey": {
                                 "type": "jwk",
                                 "jwk": {
@@ -172,7 +145,8 @@ object DocumentSignerDocs {
                         "certificateData": {
                             "country": "US",
                             "commonName": "Example DS",
-                            "crlDistributionPointUri": "https://iaca.example.com/crl"
+                            "crlDistributionPointUri": "https://iaca.example.com/crl",
+                            "issuerUri": "https://walt.id"
                         },
                         "ecKeyGenRequestParams": {
                             "backend": "tse",
@@ -196,15 +170,7 @@ object DocumentSignerDocs {
                     """
                     {
                         "iacaSigner": {
-                            "certificateData": {
-                                "country": "US",
-                                "commonName": "Example IACA",
-                                "notBefore": "2025-05-28T12:23:01Z",
-                                "notAfter": "2040-05-24T12:23:01Z",                                
-                                "issuerAlternativeNameConf": {
-                                    "uri": "https://iaca.example.com"
-                                }
-                            },
+                            "iacaPem": "${iaCaPem}",
                             "iacaKey": {
                                 "type": "jwk",
                                 "jwk": {
@@ -220,7 +186,8 @@ object DocumentSignerDocs {
                         "certificateData": {
                             "country": "US",
                             "commonName": "Example DS",
-                            "crlDistributionPointUri": "https://iaca.example.com/crl"
+                            "crlDistributionPointUri": "https://iaca.example.com/crl",
+                            "issuerUri": "https://walt.id"
                         },
                         "ecKeyGenRequestParams": {
                             "backend": "tse",
@@ -245,15 +212,7 @@ object DocumentSignerDocs {
                     """
                     {
                         "iacaSigner": {
-                            "certificateData": {
-                                "country": "US",
-                                "commonName": "Example IACA",
-                                "notBefore": "2025-05-28T12:23:01Z",
-                                "notAfter": "2040-05-24T12:23:01Z",                                
-                                "issuerAlternativeNameConf": {
-                                    "uri": "https://iaca.example.com"
-                                }
-                            },
+                            "iacaPem": "${iaCaPem}",
                             "iacaKey": {
                                 "type": "jwk",
                                 "jwk": {
@@ -269,7 +228,8 @@ object DocumentSignerDocs {
                         "certificateData": {
                             "country": "US",
                             "commonName": "Example DS",
-                            "crlDistributionPointUri": "https://iaca.example.com/crl"
+                            "crlDistributionPointUri": "https://iaca.example.com/crl",
+                            "issuerUri": "https://walt.id"
                         },
                         "ecKeyGenRequestParams": {
                             "backend": "oci",
@@ -290,15 +250,7 @@ object DocumentSignerDocs {
                     """
                     {
                         "iacaSigner": {
-                            "certificateData": {
-                                "country": "US",
-                                "commonName": "Example IACA",
-                                "notBefore": "2025-05-28T12:23:01Z",
-                                "notAfter": "2040-05-24T12:23:01Z",                                
-                                "issuerAlternativeNameConf": {
-                                    "uri": "https://iaca.example.com"
-                                }
-                            },
+                            "iacaPem": "${iaCaPem}",
                             "iacaKey": {
                                 "type": "jwk",
                                 "jwk": {
@@ -314,7 +266,8 @@ object DocumentSignerDocs {
                         "certificateData": {
                             "country": "US",
                             "commonName": "Example DS",
-                            "crlDistributionPointUri": "https://iaca.example.com/crl"
+                            "crlDistributionPointUri": "https://iaca.example.com/crl",
+                            "issuerUri": "https://walt.id"
                         },
                         "ecKeyGenRequestParams": {
                             "backend": "oci",
@@ -340,15 +293,7 @@ object DocumentSignerDocs {
                     """
                     {
                         "iacaSigner": {
-                            "certificateData": {
-                                "country": "US",
-                                "commonName": "Example IACA",
-                                "notBefore": "2025-05-28T12:23:01Z",
-                                "notAfter": "2040-05-24T12:23:01Z",                                
-                                "issuerAlternativeNameConf": {
-                                    "uri": "https://iaca.example.com"
-                                }
-                            },
+                            "iacaPem": "${iaCaPem}",
                             "iacaKey": {
                                 "type": "jwk",
                                 "jwk": {
@@ -364,7 +309,8 @@ object DocumentSignerDocs {
                         "certificateData": {
                             "country": "US",
                             "commonName": "Example DS",
-                            "crlDistributionPointUri": "https://iaca.example.com/crl"
+                            "crlDistributionPointUri": "https://iaca.example.com/crl",
+                            "issuerUri": "https://walt.id"
                         },
                         "ecKeyGenRequestParams": {
                             "backend": "aws-rest-api",
@@ -388,15 +334,7 @@ object DocumentSignerDocs {
                     """
                     {
                         "iacaSigner": {
-                            "certificateData": {
-                                "country": "US",
-                                "commonName": "Example IACA",
-                                "notBefore": "2025-05-28T12:23:01Z",
-                                "notAfter": "2040-05-24T12:23:01Z",                                
-                                "issuerAlternativeNameConf": {
-                                    "uri": "https://iaca.example.com"
-                                }
-                            },
+                            "iacaPem": "${iaCaPem}",
                             "iacaKey": {
                                 "type": "jwk",
                                 "jwk": {
@@ -412,7 +350,8 @@ object DocumentSignerDocs {
                         "certificateData": {
                             "country": "US",
                             "commonName": "Example DS",
-                            "crlDistributionPointUri": "https://iaca.example.com/crl"
+                            "crlDistributionPointUri": "https://iaca.example.com/crl",
+                            "issuerUri": "https://walt.id"
                         },
                         "ecKeyGenRequestParams": {
                             "backend": "aws-rest-api",
@@ -435,15 +374,7 @@ object DocumentSignerDocs {
                     """
                     {
                         "iacaSigner": {
-                            "certificateData": {
-                                "country": "US",
-                                "commonName": "Example IACA",
-                                "notBefore": "2025-05-28T12:23:01Z",
-                                "notAfter": "2040-05-24T12:23:01Z",                                
-                                "issuerAlternativeNameConf": {
-                                    "uri": "https://iaca.example.com"
-                                }
-                            },
+                            "iacaPem": "${iaCaPem}",
                             "iacaKey": {
                                 "type": "jwk",
                                 "jwk": {
@@ -459,7 +390,8 @@ object DocumentSignerDocs {
                         "certificateData": {
                             "country": "US",
                             "commonName": "Example DS",
-                            "crlDistributionPointUri": "https://iaca.example.com/crl"
+                            "crlDistributionPointUri": "https://iaca.example.com/crl",
+                            "issuerUri": "https://walt.id"
                         },
                         "ecKeyGenRequestParams": {
                             "backend": "azure",
@@ -509,7 +441,8 @@ object DocumentSignerDocs {
                                 "notBefore": "2025-05-29T07:18:39Z",
                                 "notAfter": "2026-05-29T07:18:39Z",                                      
                                 "crlDistributionPointUri": "https://iaca.example.com/crl"
-                            }
+                            },
+                            "certificateValidationResult": []
                         }
                     """.trimIndent()
                     )
@@ -521,5 +454,32 @@ object DocumentSignerDocs {
             description = "Bad request"
         }
 
+    }
+
+    val iaCaKeyJwk = """{
+            "type": "jwk",
+            "jwk": {
+                "kty": "EC",
+                "crv": "P-256",
+                "kid": "R_E_QZ-Ea6etoAdWfUHSjjexRYz447ffnnfIO9kxn_Y",
+                "x": "n_b1GmZTSEhioK3z8MGqcb7nxXqyjFaLR-OfKOnspwU",
+                "y": "nGRVvuHTtEAZ1HjgdLaLZnYxrkiRV_e4V2Wz0qVWa-M",
+                "d": "u-UvsghdzpSXv5HmG5ngvm4Dv8yyRYw9fKA6mdp1KWs"
+            }
+        }
+    """.trimIndent()
+
+    val iaCaPem: String by lazy {
+        runBlocking {
+            val caKey = KeyManager.resolveSerializedKey(iaCaKeyJwk)
+            val cert = X509CertificateUtil.createSelfSignedCertificate(caKey) {
+                profileIaCaRootCertificate(
+                    issuerDn = "CN=Walt.id Test Root CA, C=AT",
+                    issuerEmailAddress = "office@walt.id",
+                    issuerUri = null
+                )
+            }
+            cert.encodedPem
+        }
     }
 }

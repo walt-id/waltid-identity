@@ -5,5 +5,8 @@
         <activity
             android:name=".DigitalCredentialTestVerifierActivity"
             android:exported="false" />
+        <activity
+            android:name=".DigitalCredentialTestIssuerActivity"
+            android:exported="false" />
     </application>
 </manifest>

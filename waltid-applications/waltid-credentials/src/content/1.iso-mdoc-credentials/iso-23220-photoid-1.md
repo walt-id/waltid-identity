@@ -120,7 +120,7 @@
       "age_over_98": null,
       "age_over_99": null,
       "age_birth_year": 1971,
-      "portrait_capture_date": "2020-03-14",
+      "portrait_capture_date": "2020-03-14T12:00:00Z",
       "birthplace": "Sample City",
       "name_at_birth": null,
       "resident_address": "Sample Street 123, 12345 Sample City, Sample State, Utopia",
@@ -622,7 +622,7 @@
 - **portrait_capture_date**
   - namespace: `org.iso.23220.1`
   - mandatory: `False`
-  - sampleValue: `"2020-03-14"`
+  - sampleValue: `"2020-03-14T12:00:00Z"`
 - **birthplace**
   - namespace: `org.iso.23220.1`
   - mandatory: `False`

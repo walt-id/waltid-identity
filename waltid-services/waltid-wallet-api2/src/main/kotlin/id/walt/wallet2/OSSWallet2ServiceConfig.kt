@@ -30,6 +30,14 @@ data class OSSWallet2ServiceConfig(
     val publicBaseUrl: Url,
     val attestationConfig: WalletAttestationConfig? = null,
     val clientIdTrust: ClientIdTrustConfig = ClientIdTrustConfig(),
+    /**
+     * `transaction_data` types this wallet understands, e.g. `["payment"]`.
+     *
+     * OpenID4VP 1.0 5.1 requires a wallet to reject any request containing an unrecognised
+     * `transaction_data` type, so the default of none is the safe behaviour - but it has to be
+     * configurable, otherwise the feature can never be turned on.
+     */
+    val transactionDataTypes: Set<String> = emptySet(),
 ) : WaltConfig()
 
 @Serializable

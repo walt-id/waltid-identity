@@ -43,18 +43,26 @@ class CredentialConfigurationSigningAlgorithmsTest {
     }
 
     @Test
-    fun `mso_mdoc allows cose numeric and cose name identifiers`() {
+    fun `mso_mdoc allows only numeric cose identifiers`() {
         CredentialConfiguration(
             format = CredentialFormat.MSO_MDOC,
             credentialSigningAlgValuesSupported = setOf(
                 SigningAlgId.coseValue(-7),
-                SigningAlgId.coseName("ES256"),
+                SigningAlgId.coseValue(-9),
             ),
         )
     }
 
     @Test
-    fun `mso_mdoc rejects jose and ld suite identifiers`() {
+    fun `mso_mdoc rejects cose names jose and ld suite identifiers`() {
+        assertFailsWith<IllegalArgumentException> {
+            CredentialConfiguration(
+                format = CredentialFormat.MSO_MDOC,
+                credentialSigningAlgValuesSupported = setOf(
+                    SigningAlgId.coseName("ES256"),
+                ),
+            )
+        }
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
                 format = CredentialFormat.MSO_MDOC,

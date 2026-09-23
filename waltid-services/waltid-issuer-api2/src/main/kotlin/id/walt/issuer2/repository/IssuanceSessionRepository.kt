@@ -7,4 +7,8 @@ interface IssuanceSessionRepository {
     suspend fun get(sessionId: String): IssuanceSession?
     suspend fun list(): List<IssuanceSession>
     suspend fun remove(sessionId: String)
+
+    /** Atomically removes and returns the session. Issuance repository implementations must override this method. */
+    suspend fun take(sessionId: String): IssuanceSession? =
+        throw UnsupportedOperationException("Atomic issuance session take is not implemented")
 }

@@ -25,6 +25,8 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.mdoc.objects.deviceretrieval.UseCase
+import id.walt.openid4vp.clientidprefix.ClientIdPrefix
+import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vp.policies.*
@@ -33,8 +35,11 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionDataStructure
 import id.walt.verifier2.data.*
+import id.walt.verifier2.handlers.authrequest.Verifier2RequestObjectKid
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
@@ -45,10 +50,23 @@ import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.uuid.Uuid
 import id.walt.crypto2.keys.Key as Crypto2Key
 
 @OptIn(ExperimentalSerializationApi::class)
+/**
+ * The OpenID4VP `redirect_uri` Client Identifier Prefix.
+ *
+ * Taken from the shared [ClientIdPrefix] vocabulary rather than restated. This module used to keep
+ * its own copy on the grounds that `waltid-openid4vp-clientidprefix` was wallet-only and a module
+ * dependency was too high a price for one string literal. That module also owns the canonical
+ * `x509_hash` derivation ([X509Hash.hashOfCertificate]), which the verifier needs in order to
+ * produce and validate its own `client_id`, so the dependency now carries real weight and the
+ * duplicate literal has no justification left.
+ */
+private val REDIRECT_URI_CLIENT_ID_PREFIX = ClientIdPrefix.REDIRECT_URI.value
+
 object VerificationSessionCreator {
 
     private val log = KotlinLogging.logger { }
@@ -83,16 +101,9 @@ object VerificationSessionCreator {
     ): List<Policy> =
         if (!shouldInclude || any { it.id == policy.id || it.id in equivalentPolicyIds }) this else this + policy
 
-    private suspend fun getKid(clientId: String?, key: VerifierSigningKey): String {
-        val keyId = when (key) {
-            is VerifierSigningKey.Legacy -> key.key.getKeyId()
-            is VerifierSigningKey.Crypto2 -> key.key.id.value
-        }
-        val prefix = "decentralized_identifier:"
-        return clientId
-            ?.takeIf { it.startsWith(prefix) && it.substringAfter(prefix).isNotBlank() }
-            ?.let { "${it.substringAfter(prefix)}#$keyId" }
-            ?: keyId
+    private suspend fun getKid(clientId: String?, key: VerifierSigningKey): String = when (key) {
+        is VerifierSigningKey.Legacy -> Verifier2RequestObjectKid.forClient(clientId, key.key)
+        is VerifierSigningKey.Crypto2 -> Verifier2RequestObjectKid.forClient(clientId, key.key)
     }
 
     @Deprecated("Use the crypto2 Key overload with explicit JWS and COSE algorithms for signed sessions")
@@ -104,6 +115,8 @@ object VerificationSessionCreator {
         urlHost: String,
         key: Key? = null,
         x5c: List<String>? = null,
+        typeRegistry: TransactionDataTypeRegistry? = null,
+        retention: Duration? = null,
     ): Verification2Session = createVerificationSessionInternal(
         setup = setup,
         clientId = clientId,
@@ -112,10 +125,12 @@ object VerificationSessionCreator {
         urlHost = urlHost,
         key = key,
         x5c = x5c,
+        retention = retention,
         crypto2Key = null,
         crypto2JwsAlgorithm = null,
         crypto2CoseAlgorithm = null,
         signingKeyReference = null,
+        typeRegistry = typeRegistry,
     )
 
     suspend fun createVerificationSession(
@@ -129,6 +144,8 @@ object VerificationSessionCreator {
         jwsAlgorithm: JwsAlgorithm,
         coseAlgorithm: Int,
         signingKeyReference: String? = null,
+        typeRegistry: TransactionDataTypeRegistry? = null,
+        retention: Duration? = null,
     ): Verification2Session = createVerificationSessionInternal(
         setup = setup,
         clientId = clientId,
@@ -141,6 +158,8 @@ object VerificationSessionCreator {
         crypto2JwsAlgorithm = jwsAlgorithm,
         crypto2CoseAlgorithm = coseAlgorithm,
         signingKeyReference = signingKeyReference,
+        typeRegistry = typeRegistry,
+        retention = retention,
     )
 
     private suspend fun createVerificationSessionInternal(
@@ -165,6 +184,9 @@ object VerificationSessionCreator {
         crypto2JwsAlgorithm: JwsAlgorithm?,
         crypto2CoseAlgorithm: Int?,
         signingKeyReference: String?,
+        typeRegistry: TransactionDataTypeRegistry?,
+        /** Verifier-level retention, overridden by the request and ignored when it is not finite. */
+        retention: Duration? = null,
     ): Verification2Session {
         require(key == null || crypto2Key == null) { "Provide either a v1 or crypto2 verifier signing key" }
         val signingKey = crypto2Key?.let {
@@ -196,10 +218,25 @@ object VerificationSessionCreator {
         if (isDcApi) {
             require(urlPrefix == null) { "URL prefix is not used for DC API" }
             require(!urlHost.startsWith("openid4vp://authorize")) { "URL Host has to be set to the DC API origin" }
-            if (isSignedRequest && !isAnnexC) {
-                require(!clientId.isNullOrBlank()) { "Signed DC API requests require non-empty client_id" }
-            }
         }
+
+        require(isCrossDevice || isDcApi || isAnnexC) { "No flow is selected" }
+        val responseUri = when {
+            isDcApi || isAnnexC -> null
+            isCrossDevice -> {
+                requireNotNull(urlPrefix) { "urlPrefix is required for cross-device flows" }
+                "$urlPrefix/$sessionId/response"
+            }
+            else -> throw IllegalStateException("No flow is selected")
+        }
+        val effectiveClientId = resolveEffectiveClientId(
+            clientId = clientId,
+            isSignedRequest = isSignedRequest,
+            isDcApi = isDcApi,
+            isAnnexC = isAnnexC,
+            responseUri = responseUri,
+        )
+        requireConsistentX509HashClientId(effectiveClientId, x5c)
 
         // Preserve OpenID4VP 1.0 algorithms while also advertising fully specified identifiers.
         val supportedJwsAlgorithms = JsonArray(
@@ -314,7 +351,6 @@ object VerificationSessionCreator {
 
 
         // TODO: Annex C is actually a kind of DC API...
-        require(isCrossDevice || isDcApi || isAnnexC) { "No flow is selected" } // list all flows here
         val nonce = Uuid.random().toString()
         val state = if (!isDcApi) Uuid.random().toString() else null
 
@@ -340,7 +376,7 @@ object VerificationSessionCreator {
             // request_uri_method=post so wallets can send wallet_nonce to prevent replay.
             requestUriMethod = if (isSignedRequest) RequestUriHttpMethod.POST else null,
 
-            clientId = clientId,
+            clientId = effectiveClientId,
 
             nonce = null, // not required in the initial request yet
             responseType = null
@@ -354,16 +390,22 @@ object VerificationSessionCreator {
                 .credentials
                 .associateBy { credentialQuery -> credentialQuery.id }
         }
-        val decodedTransactionData = validateRequestTransactionDataStructure(
-            transactionData = transactionData,
-            credentialQueriesById = credentialQueriesById,
-        )
+        val decodedTransactionData = if (typeRegistry != null) {
+            validateRequestTransactionData(
+                transactionData = transactionData,
+                typeRegistry = typeRegistry,
+                credentialQueriesById = credentialQueriesById,
+            )
+        } else {
+            validateRequestTransactionDataStructure(
+                transactionData = transactionData,
+                credentialQueriesById = credentialQueriesById,
+            )
+        }
         val transactionDataFormats = decodedTransactionData
             .flatMap { decodedItem -> decodedItem.transactionData.credentialIds }
             .mapNotNull { credentialId -> credentialQueriesById?.get(credentialId)?.format }
             .toSet()
-
-        val effectiveClientId = if ((isDcApi && !isSignedRequest) || isAnnexC) null else clientId
 
         val authorizationRequest = AuthorizationRequest(
             responseType = if (!isAnnexC) responseType else null,
@@ -374,11 +416,7 @@ object VerificationSessionCreator {
             issuer = effectiveClientId.takeIf { isSignedRequest },
             redirectUri = null, // For Same-Device flow (fragment/query/after code exchange etc)
             // TODO: url building (handle host alias)
-            responseUri = when {
-                isDcApi || isAnnexC -> null
-                isCrossDevice -> "$urlPrefix/$sessionId/response" // For Cross-Device flow (direct_post, direct_post.jwt)
-                else -> throw IllegalStateException("No flow is selected")
-            },
+            responseUri = responseUri,
             scope = openIdConfig?.scope,//OPTIONAL. OAuth 2.0 Scope value. Can be used for pre-defined DCQL queries or OpenID Connect scopes (e.g., "openid").
             state = state, // Opaque value used by the Verifier to maintain state between the request and callback.
             nonce = nonce, // String value used to mitigate replay attacks. Also used to establish holder binding.
@@ -439,14 +477,21 @@ object VerificationSessionCreator {
 
         val now = Clock.System.now()
         val expiration = setup.core.expirationDate
-        val retentionDate = now.plus(10, DateTimeUnit.YEAR, TimeZone.UTC)
+        // Per-session first, then whatever the verifier is configured to retain for, then the historical
+        // default. A configured retention of Duration.INFINITE means keep indefinitely, which
+        // persistenceExpirationDate() expresses as null - no expiry date, so nothing ever discards it.
+        val retentionDate = when {
+            setup.core.retentionDate != null -> setup.core.retentionDate
+            retention != null -> retention.takeIf { it.isFinite() }?.let { now.plus(it) }
+            else -> now.plus(DEFAULT_RETENTION_YEARS, DateTimeUnit.YEAR, TimeZone.UTC)
+        }
 
         val signedAuthorizationRequest = if (isSignedRequest) {
             val requestSigningKey = requireNotNull(signingKey)
 
             val headers = hashMapOf<String, JsonElement>(
                 "typ" to JsonPrimitive("oauth-authz-req+jwt"),
-                "kid" to JsonPrimitive(getKid(clientId, requestSigningKey))
+                "kid" to JsonPrimitive(getKid(effectiveClientId, requestSigningKey))
             )
             if (x5c != null) headers["x5c"] = JsonArray(x5c.map { JsonPrimitive(it) })
 
@@ -583,10 +628,13 @@ object VerificationSessionCreator {
             else -> null
         }
 
+        val setupForSession =
+            if (isSignedRequest && key != null) setup.withCoreKeyIfMissing(key) else setup
+
         @Suppress("SENSELESS_COMPARISON") // TODO
         val newSession = Verification2Session(
             id = sessionId,
-            setup = setup,
+            setup = setupForSession,
             data = customData?.let { Json.encodeToJsonElement(it) },
 
             creationDate = now,
@@ -644,6 +692,64 @@ object VerificationSessionCreator {
 
             is VerifierSigningKey.Crypto2 -> coseAlgorithm
         }
+
+    /**
+     * OpenID4VP 1.0 §5.9.3: unsigned requests without another client_id prefix use
+     * `redirect_uri:<response destination>`. That prefix cannot be signed.
+     */
+    private fun resolveEffectiveClientId(
+        clientId: String?,
+        isSignedRequest: Boolean,
+        isDcApi: Boolean,
+        isAnnexC: Boolean,
+        responseUri: String?,
+    ): String? {
+        if ((isDcApi && !isSignedRequest) || isAnnexC) return null
+        // The bare prefix counts as "not provided": OID4VP 1.0 Section 5.9.3-3.1.1 makes a
+        // redirect_uri client identifier the Response URI itself, which only exists once the session
+        // id has been generated, so callers that want it pass the prefix alone and it is completed
+        // here. A bare prefix carries no URI and is not a usable client identifier on its own, so
+        // this is unambiguous.
+        val provided = clientId?.takeIf { it.isNotBlank() && it != REDIRECT_URI_CLIENT_ID_PREFIX }
+        if (provided != null) {
+            require(!isSignedRequest || !provided.startsWith("$REDIRECT_URI_CLIENT_ID_PREFIX:")) {
+                "Signed requests cannot use the redirect_uri client_id prefix"
+            }
+            return provided
+        }
+        require(!isSignedRequest) {
+            "Signed requests require a client_id; omitting client_id only auto-generates the unsigned redirect_uri scheme"
+        }
+        val destination = requireNotNull(responseUri) {
+            "A redirect_uri client identifier is the Response URI, so it is only available for " +
+                "cross-device flows"
+        }
+        return "$REDIRECT_URI_CLIENT_ID_PREFIX:$destination"
+    }
+
+    /**
+     * OpenID4VP 1.0 §5.9.3: an `x509_hash` client identifier *is* the base64url-encoded SHA-256 hash
+     * of the DER encoding of the leaf certificate in `x5c`. The two are therefore not independent
+     * settings, and nothing downstream of session creation can catch them disagreeing: the request
+     * is signed and handed out happily, and the mismatch only surfaces inside the wallet as
+     * `X509HashMismatch`, with no trace on the verifier side. Rejecting it here turns a silent
+     * interop failure into a configuration error at the point the operator can act on it.
+     */
+    private fun requireConsistentX509HashClientId(clientId: String?, x5c: List<String>?) {
+        val prefix = "${ClientIdPrefix.X509_HASH.value}:"
+        val configuredHash = clientId?.takeIf { it.startsWith(prefix) }?.removePrefix(prefix) ?: return
+        val leafCertificate = requireNotNull(x5c?.firstOrNull()) {
+            "An $prefix client_id is derived from the leaf certificate, so x5c must be configured"
+        }
+        val leafDer = runCatching { Base64.decode(leafCertificate) }.getOrElse {
+            throw IllegalArgumentException("The x5c leaf certificate is not valid base64: ${it.message}", it)
+        }
+        val expectedHash = X509Hash.hashOfCertificate(leafDer)
+        require(configuredHash == expectedHash) {
+            "client_id '$clientId' does not match the configured certificate chain. " +
+                "The expected client_id for this x5c leaf is '$prefix$expectedHash'."
+        }
+    }
 
     private sealed interface VerifierSigningKey {
         data class Legacy(val key: Key) : VerifierSigningKey

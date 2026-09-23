@@ -1,5 +1,14 @@
 package id.walt.verifier2.mdocs
 
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.crypto2.serialization.BinaryData
+
 /**
  * Shared mDL test fixture, so the DC API round trip and the cross-device mdoc test verify the same
  * issuer-signed credential and a DC API failure is attributable to the DC API path.
@@ -52,3 +61,15 @@ internal const val HOLDER_JWK: String =
 /** [HOLDER_JWK] in the envelope `KeyManager.resolveSerializedKey` expects, for the crypto v1 callers. */
 internal const val HOLDER_SERIALIZED_KEY: String =
     """{"type":"jwk","jwk":""" + HOLDER_JWK + "}"
+
+/** Restores [HOLDER_JWK] as a Crypto2 signing key for mdoc device authentication. */
+internal suspend fun restoreMdlHolderCrypto2Key(keyId: String): Key =
+    CryptoRuntime(defaultSoftwareKeyProviders()).restore(
+        EncodedKey.Jwk(
+            BinaryData(HOLDER_JWK.encodeToByteArray()),
+            privateMaterial = true,
+        ).toStoredSoftwareKey(
+            id = KeyId(keyId),
+            usages = setOf(KeyUsage.SIGN),
+        )
+    )

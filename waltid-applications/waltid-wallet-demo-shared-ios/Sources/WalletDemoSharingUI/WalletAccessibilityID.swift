@@ -2,8 +2,60 @@ import Foundation
 
 public enum WalletAccessibilityID {
     public static let status = identifier("status")
+    public static let statusDismiss = identifier("statusDismiss")
+    public static let statusExpand = identifier("statusExpand")
+    public static let appTitle = identifier("appTitle")
+    public static let settingsButton = identifier("settingsButton")
+    public static let settingsAppTitle = identifier("settingsAppTitle")
+    public static let settingsDid = identifier("settingsDid")
+    public static let settingsDidCopy = identifier("settingsDidCopy")
+    public static let settingsKeyId = identifier("settingsKeyId")
+    public static let settingsKeyIdCopy = identifier("settingsKeyIdCopy")
+    public static let settingsPublicJwk = identifier("settingsPublicJwk")
+    public static let settingsPublicJwkCopy = identifier("settingsPublicJwkCopy")
+    public static let settingsCredentialSharing = identifier("settingsCredentialSharing")
+    public static let settingsShowDcApiPreview = identifier("settingsShowDcApiPreview")
+    public static let settingsReaderAuthentication = identifier("settingsReaderAuthentication")
+    public static let readerTrustPolicy = identifier("readerTrustPolicy")
+    public static let readerTrustAllowUntrusted = identifier("settingsReaderPolicyAllowUntrusted")
+    public static let readerTrustRequireTrusted = identifier("settingsReaderPolicyRequireTrusted")
+    public static let readerTrustImport = identifier("settingsReaderTrustImport")
+    public static let readerTrustImportProgress = identifier("readerTrustImportProgress")
+    public static let readerTrustImportReview = identifier("settingsReaderTrustImportReview")
+    public static let readerTrustImportConfirm = identifier("settingsReaderTrustImportConfirm")
+    public static let readerTrustImportCancel = identifier("settingsReaderTrustImportCancel")
+    public static let readerTrustReset = identifier("settingsReaderTrustReset")
+    public static let readerTrustResetConfirm = identifier("readerTrustResetConfirm")
+    public static let readerTrustError = identifier("settingsReaderTrustError")
+    public static let settingsProximityPresentation = identifier("settingsProximityPresentation")
+    public static let settingsProximityDefault = identifier("settingsProximityDefault")
+    public static let settingsProximityNfcV2Hybrid = identifier("settingsProximityNfcV2Hybrid")
+    public static let settingsProximityNfcV2Direct = identifier("settingsProximityNfcV2Direct")
+    public static let settingsLock = identifier("settingsLock")
+    public static let settingsReset = identifier("settingsReset")
+    public static let settingsResetConfirm = identifier("settingsResetConfirm")
+    public static let signingProtectionBiometric = identifier("signingProtectionBiometric")
+    public static let signingProtectionNone = identifier("signingProtectionNone")
+    public static let signingProtectionConfirm = identifier("signingProtectionConfirm")
+    public static let signingProtectionRetry = identifier("signingProtectionRetry")
+    public static let signingProtectionProgress = identifier("signingProtectionProgress")
+    public static let signingProtectionError = identifier("signingProtectionError")
+    public static let signingProtectionAvailability = identifier("signingProtectionAvailability")
+    public static let signingProtectionWarning = identifier("signingProtectionWarning")
+    public static let signingProtectionWarningDismiss = identifier("signingProtectionWarningDismiss")
+    public static let copyRawCredential = identifier("copyRawCredential")
+    public static let deleteCredential = identifier("deleteCredential")
+    public static let pinInput = identifier("pinInput")
+    public static let pinConfirmationInput = identifier("pinConfirmationInput")
+    public static let pinSubmitButton = identifier("pinSubmitButton")
+    public static let pinBiometricToggle = identifier("pinBiometricToggle")
+    public static let pinBiometricButton = identifier("pinBiometricButton")
     public static let transactionDataProfilesWarning = identifier("transactionDataProfilesWarning")
+    public static let credentialsLoading = identifier("credentials", "loading")
     public static let credentialsEmpty = identifier("credentials", "empty")
+    public static let credentialDetailsScreen = identifier("credentialDetailsScreen")
+    public static let detailsBack = identifier("detailsBack")
+    public static let detailsMenu = identifier("detailsMenu")
     public static let credentialsTabContent = identifier("credentialsTabContent")
     public static let offerInput = identifier("offerInput")
     public static let offerScanButton = identifier("offerScanButton")
@@ -14,6 +66,8 @@ public enum WalletAccessibilityID {
     public static let offerAcceptButton = identifier("offerAcceptButton")
     public static let offerDeclineButton = identifier("offerDeclineButton")
     public static let offerIssuerSection = identifier("offerIssuerSection")
+    public static let offerIssuerDetailsToggle = identifier("offerIssuerDetailsToggle")
+    public static let offerIssuerDetails = identifier("offerIssuerDetails")
     public static let offerCredentialsSection = identifier("offerCredentialsSection")
     public static let offerSupportedClaims = identifier("offerSupportedClaims")
     public static let offerAuthorizationSection = identifier("offerAuthorizationSection")
@@ -32,11 +86,30 @@ public enum WalletAccessibilityID {
     public static let presentationCancelButton = identifier("presentationCancelButton")
     public static let presentationVerifier = identifier("presentationVerifier")
     public static let presentationVerifierSection = identifier("presentationVerifierSection")
+    public static let presentationClaimsDialog = identifier("presentationClaimsDialog")
+    public static let presentationClaimsClose = identifier("presentationClaimsClose")
+    public static let presentationRequesterDetailsToggle = identifier("presentationRequesterDetailsToggle")
+    public static let presentationRequesterDetails = identifier("presentationRequesterDetails")
     public static let presentationReaderTrustSection = identifier("presentationReaderTrustSection")
     public static let presentationResponseProtectionSection = identifier("presentationResponseProtectionSection")
     public static let presentationTechnicalDetailsSection = identifier("presentationTechnicalDetailsSection")
     public static let verifierTechnicalDetailsToggle = identifier("verifierTechnicalDetailsToggle")
     public static let verifierTechnicalDetails = identifier("verifierTechnicalDetails")
+    public static let proximityStartButton = identifier("proximityStartButton")
+    public static let proximityScreen = identifier("proximityScreen")
+    public static let proximityStatus = identifier("proximityStatus")
+    public static let proximityQRCode = identifier("proximityQRCode")
+    public static let proximityReview = identifier("proximityReview")
+    public static let proximityReaderSection = identifier("proximityReaderSection")
+    public static let proximityReaderDetailsToggle = identifier("proximityReaderDetailsToggle")
+    public static let proximityReaderDetails = identifier("proximityReaderDetails")
+    public static let proximityContinueAfterResponse = identifier("proximityContinueAfterResponse")
+    public static let proximityApproveButton = identifier("proximityApproveButton")
+    public static let proximityDeclineButton = identifier("proximityDeclineButton")
+    public static let proximityCancelButton = identifier("proximityCancelButton")
+    public static let proximityDoneButton = identifier("proximityDoneButton")
+    public static let proximityRetryButton = identifier("proximityRetryButton")
+    public static let proximityError = identifier("proximityError")
 
     public static func claim(_ path: String) -> String {
         dynamicIdentifier("claim", path)
@@ -44,6 +117,14 @@ public enum WalletAccessibilityID {
 
     public static func claimImage(_ path: String) -> String {
         dynamicIdentifier("claimImage", path)
+    }
+
+    public static func claimImageViewer(_ path: String) -> String {
+        dynamicIdentifier("claimImageViewer", path)
+    }
+
+    public static func claimImageViewerClose(_ path: String) -> String {
+        dynamicIdentifier("claimImageViewerClose", path)
     }
 
     public static func claimGroup(_ title: String) -> String {
@@ -58,10 +139,6 @@ public enum WalletAccessibilityID {
         identifier("credentialCard", id)
     }
 
-    public static func credentialDetails(_ id: String) -> String {
-        identifier("credentialDetails", id)
-    }
-
     public static func credentialOverview(_ id: String) -> String {
         identifier("credentialOverview", id)
     }
@@ -70,8 +147,32 @@ public enum WalletAccessibilityID {
         identifier("presentationCredential", id)
     }
 
+    public static func presentationCredentialToggle(_ id: String) -> String {
+        identifier("presentationCredentialToggle", id)
+    }
+
+    public static func presentationClaimsToggle(_ id: String) -> String {
+        identifier("presentationClaimsToggle", id)
+    }
+
     public static func presentationDisclosureToggle(_ id: String) -> String {
         identifier("presentationDisclosureToggle", id)
+    }
+
+    public static func proximityCredential(requestIndex: Int, credentialID: String) -> String {
+        identifier("proximityCredential", String(requestIndex), credentialID.identifierSegment)
+    }
+
+    public static func proximityElement(
+        requestIndex: Int,
+        namespace: String,
+        elementIdentifier: String
+    ) -> String {
+        identifier(
+            "proximityElement",
+            String(requestIndex),
+            "\(namespace).\(elementIdentifier)".identifierSegment
+        )
     }
 
     private static func identifier(_ segments: String...) -> String {

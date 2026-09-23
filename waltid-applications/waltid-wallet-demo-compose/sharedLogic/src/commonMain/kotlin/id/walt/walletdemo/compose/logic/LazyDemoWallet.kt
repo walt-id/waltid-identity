@@ -3,19 +3,30 @@ package id.walt.walletdemo.compose.logic
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-internal class LazyDemoWallet(
-    private val createWallet: suspend () -> DemoWallet,
+internal open class LazyDemoWallet<Wallet : DemoWallet>(
+    private val createWallet: suspend () -> Wallet,
 ) : DemoWallet {
     private val mutex = Mutex()
-    private var wallet: DemoWallet? = null
+    private var wallet: Wallet? = null
 
-    private suspend fun wallet(): DemoWallet =
+    protected suspend fun wallet(): Wallet =
         wallet ?: mutex.withLock {
             wallet ?: createWallet().also { wallet = it }
         }
 
-    override suspend fun bootstrap(): WalletDemoBootstrapResult =
-        wallet().bootstrap()
+    override suspend fun identityDetails(): WalletDemoIdentityDetails? = wallet().identityDetails()
+    override suspend fun identitySetup(): WalletDemoIdentitySetup? = wallet().identitySetup()
+    override suspend fun chooseIdentity(choiceId: String) = wallet().chooseIdentity(choiceId)
+    override suspend fun cancelIdentity(identityId: String) = wallet().cancelIdentity(identityId)
+    override suspend fun resumeSigningIdentity(identityId: String) = wallet().resumeSigningIdentity(identityId)
+
+    override suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult =
+        wallet().bootstrap(signingProtection)
+
+    override suspend fun signingProtectionAvailability(
+        signingProtection: WalletDemoSigningProtection,
+    ): WalletDemoSigningProtectionAvailability =
+        wallet().signingProtectionAvailability(signingProtection)
 
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         wallet().listCredentials()
@@ -56,4 +67,14 @@ internal class LazyDemoWallet(
 
     override suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle) =
         wallet().discardPresentationPreview(previewHandle)
+
+    override suspend fun deleteCredential(credentialId: String): Boolean =
+        wallet().deleteCredential(credentialId)
+
+    override suspend fun deleteWallet() {
+        mutex.withLock {
+            wallet?.deleteWallet()
+            wallet = null
+        }
+    }
 }

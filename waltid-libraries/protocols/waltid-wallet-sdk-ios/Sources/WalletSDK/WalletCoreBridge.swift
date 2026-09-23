@@ -3,8 +3,12 @@ import Foundation
 @available(macOS 10.15, *)
 protocol WalletCoreBridge: Sendable {
     var events: AsyncStream<WalletEvent> { get }
+    var signingIdentityCore: any SigningIdentityCore { get }
 
-    func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult
+    func keyUseAuthorizationPreflight(
+        keyType: WalletKeyType,
+        policy: WalletKeyUseAuthorizationPolicy
+    ) async throws -> WalletKeyUseAuthorizationPreflight
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession
     func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome
@@ -12,6 +16,7 @@ protocol WalletCoreBridge: Sendable {
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
     func credentials() async throws -> [Credential]
+    func deleteCredential(id: String) async throws -> Bool
     func deleteLocalData() async throws
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
@@ -28,6 +33,12 @@ protocol WalletCoreBridge: Sendable {
         errorDescription: String?
     ) async throws -> PresentationResult
     func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws
+    func proximityPresentationCapabilities(
+        configuration: ProximityConfiguration
+    ) async throws -> ProximityCapabilities
+    func startProximityPresentation(
+        configuration: ProximityConfiguration
+    ) async throws -> any ProximitySessionBridge
     func digitalCredentialCapabilities() -> DigitalCredentialCapabilities
     func previewAnnexCPresentation(
         parsedRequest: AnnexCParsedRequest,
@@ -62,7 +73,12 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         }
     }
 
-    func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult {
+
+
+    func keyUseAuthorizationPreflight(
+        keyType: WalletKeyType,
+        policy: WalletKeyUseAuthorizationPolicy
+    ) async throws -> WalletKeyUseAuthorizationPreflight {
         throw unavailableError()
     }
 
@@ -94,6 +110,10 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     }
 
     func credentials() async throws -> [Credential] {
+        throw unavailableError()
+    }
+
+    func deleteCredential(id: String) async throws -> Bool {
         throw unavailableError()
     }
 
@@ -130,6 +150,18 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
         throw unavailableError()
     }
+
+    func proximityPresentationCapabilities(
+        configuration: ProximityConfiguration
+    ) async throws -> ProximityCapabilities {
+        throw unavailableError()
+    }
+
+    func startProximityPresentation(
+        configuration: ProximityConfiguration
+    ) async throws -> any ProximitySessionBridge {
+        throw unavailableError()
+    }
     func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
         DigitalCredentialCapabilities(
             platform: "unavailable",
@@ -157,4 +189,9 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     private func unavailableError() -> WalletError {
         .internalFailure("WalletCore is only available when the iOS XCFramework is linked.")
     }
+}
+
+@available(macOS 10.15, *)
+extension WalletCoreBridge {
+    var signingIdentityCore: any SigningIdentityCore { UnavailableSigningIdentityCore() }
 }

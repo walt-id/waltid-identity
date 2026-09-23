@@ -11,12 +11,37 @@ class WalletDemoAppAndroidTest {
     private val scenarios = WalletDemoAppTestScenarios()
 
     @Test
+    fun keySetupGroupsChoicesAndConfirmsSelectedConfiguration() = scenarios.keySetupGroupsChoicesAndConfirmsSelectedConfiguration()
+
+    @Test
     fun pinStorageFailureStaysLockedUntilRetrySucceeds() =
         scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
 
     @Test
+    fun pinSetupShowsDisabledBiometricToggleWhenUnavailable() =
+        scenarios.pinSetupShowsDisabledBiometricToggleWhenUnavailable()
+
+    @Test
+    fun pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable() =
+        scenarios.pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable()
+
+    @Test
+    fun pinSetupKeepsSubmitReachableWhenScrolled() =
+        scenarios.pinSetupKeepsSubmitReachableWhenScrolled()
+
+    @Test
+    fun pinSetupDoesNotAskForSigningApproval() =
+        scenarios.pinSetupDoesNotAskForSigningApproval()
+
+    @Test
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() =
         scenarios.credentialsTabShowsCompactCardsAndNavigatesToDetails()
+
+    @Test
+    fun credentialsTabWaitsForCredentialRead() = scenarios.credentialsTabWaitsForCredentialRead()
+
+    @Test
+    fun credentialsTabDoesNotShowEmptyOnLoadFailure() = scenarios.credentialsTabDoesNotShowEmptyOnLoadFailure()
 
     @Test
     fun credentialsTabShowsEmptyStateAndUpdatesAfterReceive() =
@@ -49,6 +74,10 @@ class WalletDemoAppAndroidTest {
     @Test
     fun receiveAndPresentTabsExposeQrScanActions() =
         scenarios.receiveAndPresentTabsExposeQrScanActions()
+
+    @Test
+    fun embeddedPresentationJourneyKeepsWalletChrome() =
+        scenarios.embeddedPresentationJourneyKeepsWalletChrome()
 
     @Test
     fun presentTabAllowsPreviewAndDeclineWithoutCredentials() =
@@ -101,4 +130,44 @@ class WalletDemoAppAndroidTest {
     @Test
     fun credentialsPersistAcrossControllerRecreation() =
         scenarios.credentialsPersistAcrossControllerRecreation()
+
+    @Test
+    fun customBrandingTitleAppearsInTheHeader() =
+        scenarios.customBrandingTitleAppearsInTheHeader()
+
+    @Test
+    fun sharingApprovalPreferenceIsConsistentAndPersistsAcrossJourneys() =
+        scenarios.sharingApprovalPreferenceIsConsistentAndPersistsAcrossJourneys()
+
+    @Test
+    fun settingsReplacesHeaderLockAndShowsDidAndKey() =
+        scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
+
+    @Test
+    fun technicalCopyPreservesFullValueWithoutChangingExpansion() =
+        scenarios.technicalCopyPreservesFullValueWithoutChangingExpansion()
+
+    @Test
+    fun readerTrustSettingsReviewAndPersistPublicCa() =
+        scenarios.readerTrustSettingsReviewAndPersistPublicCa()
+
+    @Test
+    fun lockDoesNotAutoPromptBiometrics() =
+        scenarios.lockDoesNotAutoPromptBiometrics()
+
+    @Test
+    fun settingsConfirmsAndAppliesSigningProtectionChange() =
+        scenarios.settingsConfirmsAndAppliesSigningProtectionChange()
+
+    @Test
+    fun credentialDetailsCanCopyAndDelete() =
+        scenarios.credentialDetailsCanCopyAndDelete()
+
+    @Test
+    fun deleteFromCredentialsWhileAReviewIsActive() =
+        scenarios.deleteFromCredentialsWhileAReviewIsActive()
+
+    @Test
+    fun successStatusCanBeDismissedFromTheHeader() =
+        scenarios.successStatusCanBeDismissedFromTheHeader()
 }

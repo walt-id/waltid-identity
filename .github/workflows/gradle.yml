@@ -21,6 +21,11 @@ on:
         required: false
         type: boolean
         default: false
+      run-conformance:
+        description: "Run the live OpenID4VP and OpenID4VCI conformance suites"
+        required: false
+        type: boolean
+        default: false
       run-issuer-conformance:
         description: "Run the OpenID4VCI Issuer2 conformance matrix"
         required: false
@@ -31,10 +36,26 @@ on:
         required: false
         type: boolean
         default: false
+      cacheless:
+        description: "Run a clean, cache-defeating Gradle rebuild"
+        required: false
+        type: boolean
+        default: false
+      conformance-report-check-name:
+        description: "Visible GitHub check run name for the conformance job JUnit report"
+        required: false
+        type: string
+        default: "conformance (ubuntu-22.04)"
 
 jobs:
   gradle:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      # KLOGGING_MIN_* only affect Klogging internals / delivery path. Application TRACE comes
+      # from test klogging.conf; this file is loaded first and keeps CI at INFO+.
+      KLOGGING_CONFIG_PATH: ${{ github.workspace }}/waltid-identity/.github/ci/klogging.conf
+      JUNIT_TIMEOUT_DEFAULT: 10m
     strategy:
       matrix:
         os: [ ubuntu-22.04 ]
@@ -48,12 +69,28 @@ jobs:
           sudo swapon /swapfile
 
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
+      - name: Verify CI klogging config
+        run: test -f "$KLOGGING_CONFIG_PATH"
+
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
+        with:
+          # Restricted to pushes to main because Dependabot only consumes the default-branch
+          # snapshot; submitting per PR just adds annotations and dependency-graph_*.json artifacts.
+          dependency-graph: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'generate-and-submit' || 'disabled' }}
+
+      - name: Check default Kotlin configuration
+        run: |
+          # Mobile-enabled builds can hide modules included without any Kotlin targets.
+          for project_dir in . waltid-identity; do
+            ./gradlew -p "$project_dir" checkKotlinGradlePluginConfigurationErrors \
+              -PenableAndroidBuild=false -PenableIosBuild=false -PenableWalletDemoComposeWeb=false \
+              --no-configuration-cache --console=plain
+          done
 
       - name: Install SoftHSM for PKCS11 tests
         run: |
@@ -62,45 +99,195 @@ jobs:
 
       - name: Enable Android build
         if: ${{ inputs.enable-android-build }}
-        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        uses: ./waltid-identity/.github/actions/set-properties
         with:
           file: 'waltid-identity/gradle.properties'
           properties: 'enableAndroidBuild=true'
 
       - name: Enable Android build in unified-build root
         if: ${{ inputs.enable-android-build }}
-        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        uses: ./waltid-identity/.github/actions/set-properties
         with:
           file: 'gradle.properties'
           properties: 'enableAndroidBuild=true'
 
-      - name: Start tunnel and get URL
+      - name: Write Google services config
+        if: ${{ inputs.enable-android-build }}
+        env:
+          GOOGLE_SERVICES_PREVIEW_JSON: ${{ secrets.GOOGLE_SERVICES_PREVIEW_JSON }}
+          GOOGLE_SERVICES_PRODUCTION_JSON: ${{ secrets.GOOGLE_SERVICES_PRODUCTION_JSON }}
+        run: bash waltid-identity/.github/scripts/mobile-ci/write-google-services.sh
+
+      # `playwright install --with-deps` shells out to apt-get, and three modules register an
+      # installPlaywrightBrowsers task that the build runs in parallel. They then race for
+      # /var/lib/dpkg/lock-frontend and whichever loses fails with "Failed to install browsers".
+      # Installing once, serially, keeps the same dep-install mechanism while taking apt out of the
+      # parallel phase; the browsers land in ~/.cache/ms-playwright, so the tasks in the build below
+      # find them already present and become no-ops with --with-deps switched off.
+      - name: Install Playwright browsers and system dependencies once
+        run: ./gradlew :waltid-services:waltid-issuer-api2:installPlaywrightBrowsers --no-daemon --console=plain
+        env:
+          CI: "true"
+          PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
+
+      - name: Record runner memory before Gradle
+        if: always()
+        run: |
+          {
+            echo "## Runner memory before Gradle"
+            echo '```'
+            free -h || true
+            swapon --show || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build and test
+        if: ${{ !inputs.cacheless }}
+        run: |
+          set -o pipefail
+          ./gradlew build allTests -PskipLiveConformance=true --continue --console=plain --warning-mode=summary | tee "$RUNNER_TEMP/gradle-build.log"
+        env:
+          CI: "true"
+          SKIP_LIVE_CONFORMANCE: "true"
+          # Already installed serially above; leaving this on would reintroduce the dpkg race.
+          PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
+      - name: Clean and build with all tests
+        if: ${{ inputs.cacheless }}
+        run: |
+          set -o pipefail
+          ./gradlew clean cleanAllTests build allTests -PskipLiveConformance=true --rerun-tasks --no-daemon --continue --console=plain --warning-mode=summary | tee "$RUNNER_TEMP/gradle-build.log"
+        env:
+          CI: "true"
+          SKIP_LIVE_CONFORMANCE: "true"
+          PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
+      - name: Summarize Gradle task outcomes and memory
+        if: always()
+        run: |
+          {
+            echo "## Gradle task outcomes"
+            log="$RUNNER_TEMP/gradle-build.log"
+            if [ -f "$log" ]; then
+              echo "- UP-TO-DATE: $(grep -c ' UP-TO-DATE$' "$log" || true)"
+              echo "- FROM-CACHE: $(grep -c ' FROM-CACHE$' "$log" || true)"
+              echo "- SKIPPED: $(grep -c ' SKIPPED$' "$log" || true)"
+              echo "- NO-SOURCE: $(grep -c ' NO-SOURCE$' "$log" || true)"
+              echo "- task lines: $(grep -cE '^> Task ' "$log" || true)"
+            else
+              echo "_No Gradle log was captured._"
+            fi
+            echo
+            echo "## Runner memory after Gradle"
+            echo '```'
+            free -h || true
+            swapon --show || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Require proximity JVM and JS test discovery
+        if: always()
+        run: |
+          python3 waltid-identity/.github/scripts/mobile-ci/verify_proximity_suites.py --platform jvm
+          python3 waltid-identity/.github/scripts/mobile-ci/verify_proximity_suites.py --platform js-node
+
+      - name: Require proximity Android host test discovery
+        if: ${{ always() && inputs.enable-android-build }}
+        run: python3 waltid-identity/.github/scripts/mobile-ci/verify_proximity_suites.py --platform android-host
+
+      - name: Publish test report
+        uses: mikepenz/action-junit-report@v6
+        if: always()
+        with:
+          update_check: true
+          job_name: ${{ inputs.report-check-name }}
+          report_paths: '**/build/test-results/**/*.xml'
+          detailed_summary: true
+          include_passed: false
+          include_skipped: false
+
+  conformance:
+    name: conformance (ubuntu-22.04)
+    if: ${{ inputs.run-conformance || inputs.run-issuer-conformance || inputs.run-haip-conformance }}
+    runs-on: ubuntu-22.04
+    env:
+      KLOGGING_CONFIG_PATH: ${{ github.workspace }}/waltid-identity/.github/ci/klogging.conf
+    steps:
+      - name: Set up swap space
+        run: |
+          sudo swapoff -a
+          sudo fallocate -l 15G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Verify CI klogging config
+        run: test -f "$KLOGGING_CONFIG_PATH"
+
+      - name: Configure gradle
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
+
+      - name: Start tunnels and get URLs
         id: tunnel
         env:
           CLOUDFLARED_VERSION: "2026.7.3"
         run: |
-          # Start tunnel on port 7003
           wget -q -O cloudflared "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
           chmod +x cloudflared
-          ./cloudflared tunnel --url http://localhost:7003 > lt_output.txt 2>&1 &
-          CF_PID=$!
 
-          TUNNEL_URL=""
-          for i in $(seq 1 60); do
-            TUNNEL_URL=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' lt_output.txt | head -n 1)
-            [ -n "$TUNNEL_URL" ] && break
-            kill -0 "$CF_PID" 2>/dev/null || { echo "cloudflared exited before printing a URL"; break; }
-            sleep 1
-          done
+          start_tunnel() {
+            local port="$1"
+            local log="$2"
+            ./cloudflared tunnel --url "http://localhost:${port}" > "$log" 2>&1 &
+            echo $!
+          }
 
-          if [ -z "$TUNNEL_URL" ]; then
-            echo "Failed to get tunnel URL after ${i}s"
-            cat lt_output.txt
-            exit 1
-          fi
+          wait_for_url() {
+            local pid="$1"
+            local log="$2"
+            local name="$3"
+            local url=""
+            local i
+            for i in $(seq 1 60); do
+              url=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$log" | head -n 1)
+              [ -n "$url" ] && break
+              kill -0 "$pid" 2>/dev/null || { echo "$name cloudflared exited before printing a URL"; cat "$log"; return 1; }
+              sleep 1
+            done
+            if [ -z "$url" ]; then
+              echo "Failed to get $name tunnel URL after ${i}s"
+              cat "$log"
+              return 1
+            fi
+            echo "$url"
+          }
 
-          echo "Tunnel URL: $TUNNEL_URL (ready after ${i}s)"
-          echo "url=$TUNNEL_URL" >> "$GITHUB_OUTPUT"
+          # Sequential start+wait: concurrent trycloudflare sessions can stall before printing a URL.
+          # 7003: OpenID4VP verifier E2E server
+          # 7006: OpenID4VP wallet adapter authorization endpoint
+          # 7007: OpenID4VCI wallet adapter credential-offer endpoint
+          VERIFIER_PID=$(start_tunnel 7003 lt_verifier.txt)
+          VERIFIER_URL=$(wait_for_url "$VERIFIER_PID" lt_verifier.txt verifier) || exit 1
+          VP_WALLET_PID=$(start_tunnel 7006 lt_vp_wallet.txt)
+          VP_WALLET_URL=$(wait_for_url "$VP_WALLET_PID" lt_vp_wallet.txt vp-wallet) || exit 1
+          VCI_WALLET_PID=$(start_tunnel 7007 lt_vci_wallet.txt)
+          VCI_WALLET_URL=$(wait_for_url "$VCI_WALLET_PID" lt_vci_wallet.txt vci-wallet) || exit 1
+
+          echo "Verifier tunnel: $VERIFIER_URL"
+          echo "VP wallet adapter tunnel: $VP_WALLET_URL"
+          echo "VCI wallet adapter tunnel: $VCI_WALLET_URL"
+          echo "url=$VERIFIER_URL" >> "$GITHUB_OUTPUT"
+          echo "vp_wallet_url=$VP_WALLET_URL" >> "$GITHUB_OUTPUT"
+          echo "vci_wallet_url=$VCI_WALLET_URL" >> "$GITHUB_OUTPUT"
 
       - name: Replace URLs in Kotlin test
         if: ${{ steps.tunnel.outputs.url != '' }}
@@ -112,13 +299,45 @@ jobs:
             -e "s#8443#443#g" \
             "$FILE"
 
-      - name: Clean and build with all tests
-        run: ./gradlew clean cleanAllTests build allTests --rerun-tasks --no-daemon --continue --console=plain --warning-mode=summary
+      # `playwright install --with-deps` shells out to apt-get, and three modules register an
+      # installPlaywrightBrowsers task that the build runs in parallel. They then race for
+      # /var/lib/dpkg/lock-frontend and whichever loses fails with "Failed to install browsers".
+      # Installing once, serially, keeps the same dep-install mechanism while taking apt out of the
+      # parallel phase; the browsers land in ~/.cache/ms-playwright, so the tasks in the build below
+      # find them already present and become no-ops with --with-deps switched off.
+      - name: Install Playwright browsers and system dependencies once
+        run: ./gradlew :waltid-services:waltid-issuer-api2:installPlaywrightBrowsers --no-daemon --console=plain
         env:
           CI: "true"
           PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
+
+      - name: Run conformance tests
+        if: ${{ !inputs.cacheless }}
+        run: ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --continue --console=plain --warning-mode=summary
+        env:
+          CI: "true"
+          PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
           CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
           OPENID4VCI_CONFORMANCE_STRICT: ${{ vars.CONFORMANCE_ALLOW_FAILURE == 'false' }}
+          CONFORMANCE_HOST: conformance.waltid.cloud
+          CONFORMANCE_PORT: "443"
+          CONFORMANCE_VP_WALLET_ADAPTER_URL: ${{ steps.tunnel.outputs.vp_wallet_url }}/openid4vp/authorize
+          CONFORMANCE_VCI_WALLET_ADAPTER_BASE_URL: ${{ steps.tunnel.outputs.vci_wallet_url }}
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
+      - name: Clean and run conformance tests
+        if: ${{ inputs.cacheless }}
+        run: ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --rerun-tasks --no-daemon --continue --console=plain --warning-mode=summary
+        env:
+          CI: "true"
+          PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
+          CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
+          OPENID4VCI_CONFORMANCE_STRICT: ${{ vars.CONFORMANCE_ALLOW_FAILURE == 'false' }}
+          CONFORMANCE_HOST: conformance.waltid.cloud
+          CONFORMANCE_PORT: "443"
+          CONFORMANCE_VP_WALLET_ADAPTER_URL: ${{ steps.tunnel.outputs.vp_wallet_url }}/openid4vp/authorize
+          CONFORMANCE_VCI_WALLET_ADAPTER_BASE_URL: ${{ steps.tunnel.outputs.vci_wallet_url }}
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
@@ -127,8 +346,8 @@ jobs:
         if: always()
         with:
           update_check: true
-          job_name: ${{ inputs.report-check-name }}
-          report_paths: '**/build/test-results/**/*.xml'
+          job_name: ${{ inputs.conformance-report-check-name }}
+          report_paths: '**/waltid-openid4vp-conformance-runners/build/test-results/**/*.xml'
           detailed_summary: true
           include_passed: false
           include_skipped: false
@@ -149,17 +368,47 @@ jobs:
             echo
           } >> "$GITHUB_STEP_SUMMARY"
 
+          append_role_summary() {
+            local role_dir="$1"
+            local title="$2"
+            local summary=""
+            local candidate
+            while IFS= read -r candidate; do
+              summary="$candidate"
+              break
+            done < <(find . -path "*/build/reports/openid-conformance/${role_dir}/summary.md" 2>/dev/null)
+
+            echo >> "$GITHUB_STEP_SUMMARY"
+            if [ -n "$summary" ] && [ -f "$summary" ]; then
+              cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+              found=$((found + 1))
+            else
+              {
+                echo "# ${title} Conformance Summary"
+                echo
+                if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
+                  echo "- Soft-fail (\`CONFORMANCE_ALLOW_FAILURE\`): \`enabled\`"
+                else
+                  echo "- Soft-fail (\`CONFORMANCE_ALLOW_FAILURE\`): \`disabled\`"
+                fi
+                echo "- Total: 0"
+                echo "- Passed: 0"
+                echo "- Failed: 0"
+                echo
+                echo "| Test | Status | Suite | Log | Error |"
+                echo "|------|--------|-------|-----|-------|"
+                echo
+                echo "_No ${title} conformance results were produced (suite skipped, unavailable, or failed before writing a report)._"
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo >> "$GITHUB_STEP_SUMMARY"
+          }
+
           found=0
-          while IFS= read -r -d '' summary; do
-            found=$((found + 1))
-            {
-              echo
-              cat "$summary"
-              echo
-            } >> "$GITHUB_STEP_SUMMARY"
-          done < <(find . \
-            -path '*/build/reports/openid-conformance/*/summary.md' \
-            -print0 2>/dev/null)
+          append_role_summary vp-verifier "OpenID4VP Verifier"
+          append_role_summary vp-wallet "OpenID4VP Wallet"
+          append_role_summary vci-wallet "OpenID4VCI Wallet"
+          append_role_summary vci-issuer "OpenID4VCI Issuer"
 
           while IFS= read -r -d '' summary; do
             found=$((found + 1))
@@ -172,428 +421,465 @@ jobs:
             -path '*/build/reports/openid4vci-issuer-matrix/summary.md' \
             -print0 2>/dev/null)
 
-          if [ "$found" -eq 0 ]; then
-            echo "_No OpenID conformance suite summaries were produced (suites skipped or unavailable)._" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "Appended $found OpenID conformance summary file(s) to the job summary."
-          fi
+          echo "Published OpenID conformance summaries for verifier, OpenID4VP wallet, OpenID4VCI wallet, and issuer (${found} file(s) found)."
+
+  # Maven publish waits for the default Gradle job and, when requested, the live
+  # conformance job. Leaving publish on the gradle job let release/fix-release upload
+  # artifacts while conformance was still running or after it had failed.
+  publish:
+    name: publish
+    needs: [gradle, conformance]
+    if: >-
+      always() && !cancelled()
+      && inputs.publish
+      && inputs.version != ''
+      && needs.gradle.result == 'success'
+      && (needs.conformance.result == 'success' || needs.conformance.result == 'skipped')
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Configure gradle
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
+
+      - name: Enable Android build
+        if: ${{ inputs.enable-android-build }}
+        uses: ./waltid-identity/.github/actions/set-properties
+        with:
+          file: 'waltid-identity/gradle.properties'
+          properties: 'enableAndroidBuild=true'
+
+      - name: Enable Android build in unified-build root
+        if: ${{ inputs.enable-android-build }}
+        uses: ./waltid-identity/.github/actions/set-properties
+        with:
+          file: 'gradle.properties'
+          properties: 'enableAndroidBuild=true'
+
+      - name: Write Google services config
+        if: ${{ inputs.enable-android-build }}
+        env:
+          GOOGLE_SERVICES_PREVIEW_JSON: ${{ secrets.GOOGLE_SERVICES_PREVIEW_JSON }}
+          GOOGLE_SERVICES_PRODUCTION_JSON: ${{ secrets.GOOGLE_SERVICES_PRODUCTION_JSON }}
+        run: bash waltid-identity/.github/scripts/mobile-ci/write-google-services.sh
 
       - name: Set version
-        if: ${{ inputs.version != '' && runner.os == 'linux' }}
         run: |
           sed -i "s/1.0.0-SNAPSHOT/${{ inputs.version }}/g" build.gradle.kts
 
       - name: Publish
-        if: ${{ inputs.version != '' && inputs.publish && runner.os == 'linux' }}
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
         run: ./gradlew publish --no-daemon
 
-  openid4vci-conformance:
-    name: openid4vci1.0-conformance-tests
-    if: ${{ inputs.run-issuer-conformance }}
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Set up swap space
-        run: |
-          sudo swapoff -a
-          sudo fallocate -l 15G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+  # openid4vci-conformance:
+  #   name: openid4vci1.0-conformance-tests
+  #   if: ${{ inputs.run-issuer-conformance }}
+  #   runs-on: ubuntu-22.04
+  #   steps:
+  #     - name: Set up swap space
+  #       run: |
+  #         sudo swapoff -a
+  #         sudo fallocate -l 15G /swapfile
+  #         sudo chmod 600 /swapfile
+  #         sudo mkswap /swapfile
+  #         sudo swapon /swapfile
 
-      - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
-        with:
-          token: ${{ secrets.GH_ACCESS_TOKEN }}
+  #     - name: Checkout all repos with ref fallback
+  #       uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+  #       with:
+  #         token: ${{ secrets.GH_ACCESS_TOKEN }}
 
-      - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+  #     - name: Configure gradle
+  #       uses: ./waltid-identity/.github/actions/gradle-setup-action
 
-      - name: Prepare Issuer2 conformance runtime
-        id: issuer-tunnel
-        env:
-          CLOUDFLARED_VERSION: "2026.7.3"
-          PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-        run: |
-          set -euo pipefail
+  #     - name: Prepare Issuer2 conformance runtime
+  #       id: issuer-tunnel
+  #       env:
+  #         CLOUDFLARED_VERSION: "2026.7.3"
+  #         PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
+  #         MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+  #         MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+  #       run: |
+  #         set -euo pipefail
 
-          ./gradlew :waltid-services:waltid-issuer-api2:buildFatJar --no-daemon --console=plain --warning-mode=summary
+  #         ./gradlew :waltid-services:waltid-issuer-api2:buildFatJar --no-daemon --console=plain --warning-mode=summary
 
-          CLOUDFLARED="$RUNNER_TEMP/cloudflared"
-          TUNNEL_LOG="$RUNNER_TEMP/cloudflared-issuer2.log"
-          ISSUER_LOG="$RUNNER_TEMP/issuer2.log"
-          ISSUER_CONFIG="$RUNNER_TEMP/issuer-service-conformance.conf"
-          TEMPLATE="waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/issuer2/issuer-service-ci.conf.template"
+  #         CLOUDFLARED="$RUNNER_TEMP/cloudflared"
+  #         TUNNEL_LOG="$RUNNER_TEMP/cloudflared-issuer2.log"
+  #         ISSUER_LOG="$RUNNER_TEMP/issuer2.log"
+  #         ISSUER_CONFIG="$RUNNER_TEMP/issuer-service-conformance.conf"
+  #         TEMPLATE="waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/issuer2/issuer-service-ci.conf.template"
 
-          wget -q -O "$CLOUDFLARED" "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
-          chmod +x "$CLOUDFLARED"
-          "$CLOUDFLARED" tunnel --url http://127.0.0.1:7005 > "$TUNNEL_LOG" 2>&1 &
-          CF_PID=$!
-          echo "$CF_PID" > "$RUNNER_TEMP/cloudflared-issuer2.pid"
+  #         wget -q -O "$CLOUDFLARED" "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
+  #         chmod +x "$CLOUDFLARED"
+  #         "$CLOUDFLARED" tunnel --url http://127.0.0.1:7005 > "$TUNNEL_LOG" 2>&1 &
+  #         CF_PID=$!
+  #         echo "$CF_PID" > "$RUNNER_TEMP/cloudflared-issuer2.pid"
 
-          TUNNEL_URL=""
-          for i in $(seq 1 60); do
-            TUNNEL_URL=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" | head -n 1 || true)
-            [ -n "$TUNNEL_URL" ] && break
-            kill -0 "$CF_PID" 2>/dev/null || { echo "cloudflared exited before printing a URL"; break; }
-            sleep 1
-          done
+  #         TUNNEL_URL=""
+  #         for i in $(seq 1 60); do
+  #           TUNNEL_URL=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" | head -n 1 || true)
+  #           [ -n "$TUNNEL_URL" ] && break
+  #           kill -0 "$CF_PID" 2>/dev/null || { echo "cloudflared exited before printing a URL"; break; }
+  #           sleep 1
+  #         done
 
-          if [ -z "$TUNNEL_URL" ]; then
-            echo "Failed to get a Cloudflare Quick Tunnel URL"
-            cat "$TUNNEL_LOG"
-            exit 1
-          fi
+  #         if [ -z "$TUNNEL_URL" ]; then
+  #           echo "Failed to get a Cloudflare Quick Tunnel URL"
+  #           cat "$TUNNEL_LOG"
+  #           exit 1
+  #         fi
 
-          sed "s|__ISSUER_BASE_URL__|$TUNNEL_URL|g" "$TEMPLATE" > "$ISSUER_CONFIG"
+  #         sed "s|__ISSUER_BASE_URL__|$TUNNEL_URL|g" "$TEMPLATE" > "$ISSUER_CONFIG"
 
-          pushd waltid-identity/waltid-services/waltid-issuer-api2 >/dev/null
-          nohup java -Dconfig.file.issuer-service="$ISSUER_CONFIG" \
-            -jar build/libs/waltid-issuer-api2-all.jar > "$ISSUER_LOG" 2>&1 &
-          ISSUER_PID=$!
-          popd >/dev/null
-          echo "$ISSUER_PID" > "$RUNNER_TEMP/issuer2.pid"
+  #         pushd waltid-identity/waltid-services/waltid-issuer-api2 >/dev/null
+  #         nohup java -Dconfig.file.issuer-service="$ISSUER_CONFIG" \
+  #           -jar build/libs/waltid-issuer-api2-all.jar > "$ISSUER_LOG" 2>&1 &
+  #         ISSUER_PID=$!
+  #         popd >/dev/null
+  #         echo "$ISSUER_PID" > "$RUNNER_TEMP/issuer2.pid"
 
-          METADATA_PATH="/.well-known/openid-credential-issuer/openid4vci"
-          for i in $(seq 1 90); do
-            if curl --fail --silent --show-error "http://127.0.0.1:7005$METADATA_PATH" >/dev/null; then
-              break
-            fi
-            kill -0 "$ISSUER_PID" 2>/dev/null || { echo "Issuer2 exited during startup"; cat "$ISSUER_LOG"; exit 1; }
-            sleep 1
-          done
-          curl --fail --silent --show-error "$TUNNEL_URL$METADATA_PATH" >/dev/null
+  #         METADATA_PATH="/.well-known/openid-credential-issuer/openid4vci"
+  #         for i in $(seq 1 90); do
+  #           if curl --fail --silent --show-error "http://127.0.0.1:7005$METADATA_PATH" >/dev/null; then
+  #             break
+  #           fi
+  #           kill -0 "$ISSUER_PID" 2>/dev/null || { echo "Issuer2 exited during startup"; cat "$ISSUER_LOG"; exit 1; }
+  #           sleep 1
+  #         done
+  #         curl --fail --silent --show-error "$TUNNEL_URL$METADATA_PATH" >/dev/null
 
-          echo "Issuer2 conformance tunnel: $TUNNEL_URL"
-          echo "url=$TUNNEL_URL" >> "$GITHUB_OUTPUT"
+  #         echo "Issuer2 conformance tunnel: $TUNNEL_URL"
+  #         echo "url=$TUNNEL_URL" >> "$GITHUB_OUTPUT"
 
-          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers --no-daemon --console=plain --warning-mode=summary
+  #         ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers --no-daemon --console=plain --warning-mode=summary
 
-      - name: Run OpenID4VCI Issuer2 conformance
-        run: >-
-          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test
-          --tests id.walt.openid4vp.conformance.IssuerConformanceTests
-          --rerun-tasks --no-daemon --console=plain --warning-mode=summary
-        env:
-          CI: "true"
-          CONFORMANCE_ALLOW_FAILURE: "false"
-          OPENID4VCI_CONFORMANCE_STRICT: "true"
-          OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL: ${{ steps.issuer-tunnel.outputs.url }}/openid4vci
-          OPENID4VCI_CONFORMANCE_SUITE_HOST: conformance.waltid.cloud
-          OPENID4VCI_CONFORMANCE_SUITE_PORT: "443"
-          OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID: identity_credential
-          OPENID4VCI_CONFORMANCE_MDOC_CREDENTIAL_CONFIGURATION_ID: org.iso.18013.5.1.mDL
-          OPENID4VCI_CONFORMANCE_FILTER_FAPI_PROFILES: vci
-          OPENID4VCI_CONFORMANCE_FILTER_FORMATS: sd_jwt_vc,mdoc
-          OPENID4VCI_CONFORMANCE_FILTER_GRANT_TYPES: authorization_code,pre_authorization_code
-          OPENID4VCI_CONFORMANCE_FILTER_FLOW_VARIANTS: issuer_initiated,wallet_initiated
-          OPENID4VCI_CONFORMANCE_FILTER_CLIENT_AUTH_TYPES: client_attestation
-          OPENID4VCI_CONFORMANCE_FILTER_SENDER_CONSTRAINTS: dpop
-          OPENID4VCI_CONFORMANCE_FILTER_AUTH_REQUEST_TYPES: simple
-          OPENID4VCI_CONFORMANCE_FILTER_REQUEST_METHODS: unsigned
-          OPENID4VCI_CONFORMANCE_FILTER_CREDENTIAL_ENCRYPTION: plain,encrypted
-          OPENID4VCI_CONFORMANCE_MODULE_GROUPS: metadata,positive,negative
-          OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES: oid4vci-1_0-issuer-happy-flow-additional-requests,fapi2-security-profile-final-discovery-end-point-verification
-          OPENID4VCI_CONFORMANCE_EXCLUDE_PREAUTH_MULTIPLE_CLIENTS: "true"
-          OPENID4VCI_CONFORMANCE_STATIC_TX_CODE: "493536"
-          OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION: "true"
-          OPENID4VCI_CONFORMANCE_AUTH_USERNAME: jane@walt.id
-          OPENID4VCI_CONFORMANCE_AUTH_PASSWORD: jane
-          PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+  #     - name: Run OpenID4VCI Issuer2 conformance
+  #       run: >-
+  #         ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test
+  #         --tests id.walt.openid4vp.conformance.IssuerConformanceTests
+  #         --rerun-tasks --no-daemon --console=plain --warning-mode=summary
+  #       env:
+  #         CI: "true"
+  #         CONFORMANCE_ALLOW_FAILURE: "false"
+  #         OPENID4VCI_CONFORMANCE_STRICT: "true"
+  #         OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL: ${{ steps.issuer-tunnel.outputs.url }}/openid4vci
+  #         OPENID4VCI_CONFORMANCE_SUITE_HOST: conformance.waltid.cloud
+  #         OPENID4VCI_CONFORMANCE_SUITE_PORT: "443"
+  #         OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID: identity_credential
+  #         OPENID4VCI_CONFORMANCE_MDOC_CREDENTIAL_CONFIGURATION_ID: org.iso.18013.5.1.mDL
+  #         OPENID4VCI_CONFORMANCE_FILTER_FAPI_PROFILES: vci
+  #         OPENID4VCI_CONFORMANCE_FILTER_FORMATS: sd_jwt_vc,mdoc
+  #         OPENID4VCI_CONFORMANCE_FILTER_GRANT_TYPES: authorization_code,pre_authorization_code
+  #         OPENID4VCI_CONFORMANCE_FILTER_FLOW_VARIANTS: issuer_initiated,wallet_initiated
+  #         OPENID4VCI_CONFORMANCE_FILTER_CLIENT_AUTH_TYPES: client_attestation
+  #         OPENID4VCI_CONFORMANCE_FILTER_SENDER_CONSTRAINTS: dpop
+  #         OPENID4VCI_CONFORMANCE_FILTER_AUTH_REQUEST_TYPES: simple
+  #         OPENID4VCI_CONFORMANCE_FILTER_REQUEST_METHODS: unsigned
+  #         OPENID4VCI_CONFORMANCE_FILTER_CREDENTIAL_ENCRYPTION: plain,encrypted
+  #         OPENID4VCI_CONFORMANCE_MODULE_GROUPS: metadata,positive,negative
+  #         OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES: oid4vci-1_0-issuer-happy-flow-additional-requests,fapi2-security-profile-final-discovery-end-point-verification
+  #         OPENID4VCI_CONFORMANCE_EXCLUDE_PREAUTH_MULTIPLE_CLIENTS: "true"
+  #         OPENID4VCI_CONFORMANCE_STATIC_TX_CODE: "493536"
+  #         OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION: "true"
+  #         OPENID4VCI_CONFORMANCE_AUTH_USERNAME: jane@walt.id
+  #         OPENID4VCI_CONFORMANCE_AUTH_PASSWORD: jane
+  #         PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
+  #         MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+  #         MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
-      - name: Stop Issuer2 conformance services
-        if: always()
-        run: |
-          for pid_file in "$RUNNER_TEMP/issuer2.pid" "$RUNNER_TEMP/cloudflared-issuer2.pid"; do
-            [ -f "$pid_file" ] || continue
-            pid=$(cat "$pid_file")
-            kill "$pid" 2>/dev/null || true
-          done
+  #     - name: Stop Issuer2 conformance services
+  #       if: always()
+  #       run: |
+  #         for pid_file in "$RUNNER_TEMP/issuer2.pid" "$RUNNER_TEMP/cloudflared-issuer2.pid"; do
+  #           [ -f "$pid_file" ] || continue
+  #           pid=$(cat "$pid_file")
+  #           kill "$pid" 2>/dev/null || true
+  #         done
 
-      - name: Upload OpenID4VCI 1.0 conformance results and logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: openid4vci1.0-conformance-test-results
-          if-no-files-found: warn
-          path: |
-            waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/build/reports/openid-conformance/vci-issuer/
-            ${{ runner.temp }}/issuer2.log
-            ${{ runner.temp }}/cloudflared-issuer2.log
+  #     - name: Upload OpenID4VCI 1.0 conformance results and logs
+  #       if: always()
+  #       uses: actions/upload-artifact@v7
+  #       with:
+  #         name: openid4vci1.0-conformance-test-results
+  #         if-no-files-found: warn
+  #         path: |
+  #           waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/build/reports/openid-conformance/vci-issuer/
+  #           ${{ runner.temp }}/issuer2.log
+  #           ${{ runner.temp }}/cloudflared-issuer2.log
 
-      - name: Show OpenID4VCI 1.0 conformance results
-        if: always()
-        run: |
-          ARTIFACT_NAME="openid4vci1.0-conformance-test-results"
-          ARTIFACTS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
-          echo "OpenID4VCI 1.0 results and logs: $ARTIFACTS_URL (artifact: $ARTIFACT_NAME)"
+  #     - name: Show OpenID4VCI 1.0 conformance results
+  #       if: always()
+  #       run: |
+  #         ARTIFACT_NAME="openid4vci1.0-conformance-test-results"
+  #         ARTIFACTS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
+  #         echo "OpenID4VCI 1.0 results and logs: $ARTIFACTS_URL (artifact: $ARTIFACT_NAME)"
 
-          {
-            echo "## OpenID4VCI 1.0 Conformance Results"
-            echo
-            echo "> This matrix runs in strict mode. A non-accepted selected variant fails this job."
-            echo
-            echo "Full diagnostics: download [\`$ARTIFACT_NAME\`]($ARTIFACTS_URL) for \`results.json\`, \`matrix.json\`, \`summary.md\`, and Issuer2/Cloudflare logs. Each failed module below links to its exact suite log."
-            echo "Suite results are also available at [conformance.waltid.cloud](https://conformance.waltid.cloud/logs.html)."
-            echo
-          } >> "$GITHUB_STEP_SUMMARY"
+  #         {
+  #           echo "## OpenID4VCI 1.0 Conformance Results"
+  #           echo
+  #           echo "> This matrix runs in strict mode. A non-accepted selected variant fails this job."
+  #           echo
+  #           echo "Full diagnostics: download [\`$ARTIFACT_NAME\`]($ARTIFACTS_URL) for \`results.json\`, \`matrix.json\`, \`summary.md\`, and Issuer2/Cloudflare logs. Each failed module below links to its exact suite log."
+  #           echo "Suite results are also available at [conformance.waltid.cloud](https://conformance.waltid.cloud/logs.html)."
+  #           echo
+  #         } >> "$GITHUB_STEP_SUMMARY"
 
-          {
-            echo "### Failed Modules"
-            results_found=0
-            failures_found=0
-            while IFS= read -r -d '' results; do
-              results_found=$((results_found + 1))
-              while IFS= read -r failure; do
-                failures_found=$((failures_found + 1))
-                echo "$failure"
-              done < <(jq -r '
-                def compact:
-                  gsub("[\\r\\n|]"; " ") as $error
-                  | if ($error | length) > 500 then "\($error[0:500])..." else $error end;
-                .[] | (.modules // [])[]
-                | select(.accepted != true)
-                | "- `\(.testModule)` (status=`\(.status // "unknown")`, result=`\(.result // "unknown")`)" +
-                  (if .error then " - \(.error | compact)" else "" end) +
-                  (if .logUrl then " - [Suite log](\(.logUrl))" else "" end)
-              ' "$results")
-            done < <(find . \
-              -path '*/build/reports/openid-conformance/vci-issuer/results.json' \
-              -print0 2>/dev/null)
+  #         {
+  #           echo "### Failed Modules"
+  #           results_found=0
+  #           failures_found=0
+  #           while IFS= read -r -d '' results; do
+  #             results_found=$((results_found + 1))
+  #             while IFS= read -r failure; do
+  #               failures_found=$((failures_found + 1))
+  #               echo "$failure"
+  #             done < <(jq -r '
+  #               def compact:
+  #                 gsub("[\\r\\n|]"; " ") as $error
+  #                 | if ($error | length) > 500 then "\($error[0:500])..." else $error end;
+  #               .[] | (.modules // [])[]
+  #               | select(.accepted != true)
+  #               | "- `\(.testModule)` (status=`\(.status // "unknown")`, result=`\(.result // "unknown")`)" +
+  #                 (if .error then " - \(.error | compact)" else "" end) +
+  #                 (if .logUrl then " - [Suite log](\(.logUrl))" else "" end)
+  #             ' "$results")
+  #           done < <(find . \
+  #             -path '*/build/reports/openid-conformance/vci-issuer/results.json' \
+  #             -print0 2>/dev/null)
 
-            if [ "$results_found" -eq 0 ]; then
-              echo "_No \`results.json\` file was produced; download the artifact for Issuer2 and Cloudflare logs._"
-            elif [ "$failures_found" -eq 0 ]; then
-              echo "_No non-accepted modules were reported._"
-            fi
-            echo
-          } >> "$GITHUB_STEP_SUMMARY"
+  #           if [ "$results_found" -eq 0 ]; then
+  #             echo "_No \`results.json\` file was produced; download the artifact for Issuer2 and Cloudflare logs._"
+  #           elif [ "$failures_found" -eq 0 ]; then
+  #             echo "_No non-accepted modules were reported._"
+  #           fi
+  #           echo
+  #         } >> "$GITHUB_STEP_SUMMARY"
 
-          found=0
-          while IFS= read -r -d '' summary; do
-            found=$((found + 1))
-            {
-              echo
-              cat "$summary"
-              echo
-            } >> "$GITHUB_STEP_SUMMARY"
-          done < <(find . \
-            -path '*/build/reports/openid-conformance/vci-issuer/summary.md' \
-            -print0 2>/dev/null)
+  #         found=0
+  #         while IFS= read -r -d '' summary; do
+  #           found=$((found + 1))
+  #           {
+  #             echo
+  #             cat "$summary"
+  #             echo
+  #           } >> "$GITHUB_STEP_SUMMARY"
+  #         done < <(find . \
+  #           -path '*/build/reports/openid-conformance/vci-issuer/summary.md' \
+  #           -print0 2>/dev/null)
 
-          if [ "$found" -eq 0 ]; then
-            echo "_No OpenID4VCI 1.0 conformance summary was produced._" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "Appended $found OpenID4VCI 1.0 conformance summary file(s) to the job summary."
-          fi
+  #         if [ "$found" -eq 0 ]; then
+  #           echo "_No OpenID4VCI 1.0 conformance summary was produced._" >> "$GITHUB_STEP_SUMMARY"
+  #         else
+  #           echo "Appended $found OpenID4VCI 1.0 conformance summary file(s) to the job summary."
+  #         fi
 
-  openid4vc-haip-conformance:
-    name: openid4vc-haip1.0-conformance-tests
-    if: ${{ inputs.run-haip-conformance }}
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Set up swap space
-        run: |
-          sudo swapoff -a
-          sudo fallocate -l 15G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+  # openid4vc-haip-conformance:
+  #   name: openid4vc-haip1.0-conformance-tests
+  #   if: ${{ inputs.run-haip-conformance }}
+  #   runs-on: ubuntu-22.04
+  #   steps:
+  #     - name: Set up swap space
+  #       run: |
+  #         sudo swapoff -a
+  #         sudo fallocate -l 15G /swapfile
+  #         sudo chmod 600 /swapfile
+  #         sudo mkswap /swapfile
+  #         sudo swapon /swapfile
 
-      - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@73cf58a0edcc4c978304fdfd1a91372d34f65da2
-        with:
-          token: ${{ secrets.GH_ACCESS_TOKEN }}
+  #     - name: Checkout all repos with ref fallback
+  #       uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+  #       with:
+  #         token: ${{ secrets.GH_ACCESS_TOKEN }}
 
-      - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+  #     - name: Configure gradle
+  #       uses: ./waltid-identity/.github/actions/gradle-setup-action
 
-      - name: Prepare Issuer2 HAIP conformance runtime
-        id: issuer-tunnel
-        env:
-          CLOUDFLARED_VERSION: "2026.7.3"
-          PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-        run: |
-          set -euo pipefail
+  #     - name: Prepare Issuer2 HAIP conformance runtime
+  #       id: issuer-tunnel
+  #       env:
+  #         CLOUDFLARED_VERSION: "2026.7.3"
+  #         PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
+  #         MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+  #         MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+  #       run: |
+  #         set -euo pipefail
 
-          ./gradlew :waltid-services:waltid-issuer-api2:buildFatJar --no-daemon --console=plain --warning-mode=summary
+  #         ./gradlew :waltid-services:waltid-issuer-api2:buildFatJar --no-daemon --console=plain --warning-mode=summary
 
-          CLOUDFLARED="$RUNNER_TEMP/cloudflared"
-          TUNNEL_LOG="$RUNNER_TEMP/cloudflared-issuer2-haip.log"
-          ISSUER_LOG="$RUNNER_TEMP/issuer2-haip.log"
-          ISSUER_CONFIG="$RUNNER_TEMP/issuer-service-haip-conformance.conf"
-          TEMPLATE="waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/issuer2/issuer-service-ci.conf.template"
+  #         CLOUDFLARED="$RUNNER_TEMP/cloudflared"
+  #         TUNNEL_LOG="$RUNNER_TEMP/cloudflared-issuer2-haip.log"
+  #         ISSUER_LOG="$RUNNER_TEMP/issuer2-haip.log"
+  #         ISSUER_CONFIG="$RUNNER_TEMP/issuer-service-haip-conformance.conf"
+  #         TEMPLATE="waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/issuer2/issuer-service-ci.conf.template"
 
-          wget -q -O "$CLOUDFLARED" "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
-          chmod +x "$CLOUDFLARED"
-          "$CLOUDFLARED" tunnel --url http://127.0.0.1:7005 > "$TUNNEL_LOG" 2>&1 &
-          CF_PID=$!
-          echo "$CF_PID" > "$RUNNER_TEMP/cloudflared-issuer2-haip.pid"
+  #         wget -q -O "$CLOUDFLARED" "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
+  #         chmod +x "$CLOUDFLARED"
+  #         "$CLOUDFLARED" tunnel --url http://127.0.0.1:7005 > "$TUNNEL_LOG" 2>&1 &
+  #         CF_PID=$!
+  #         echo "$CF_PID" > "$RUNNER_TEMP/cloudflared-issuer2-haip.pid"
 
-          TUNNEL_URL=""
-          for i in $(seq 1 60); do
-            TUNNEL_URL=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" | head -n 1 || true)
-            [ -n "$TUNNEL_URL" ] && break
-            kill -0 "$CF_PID" 2>/dev/null || { echo "cloudflared exited before printing a URL"; break; }
-            sleep 1
-          done
+  #         TUNNEL_URL=""
+  #         for i in $(seq 1 60); do
+  #           TUNNEL_URL=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" | head -n 1 || true)
+  #           [ -n "$TUNNEL_URL" ] && break
+  #           kill -0 "$CF_PID" 2>/dev/null || { echo "cloudflared exited before printing a URL"; break; }
+  #           sleep 1
+  #         done
 
-          if [ -z "$TUNNEL_URL" ]; then
-            echo "Failed to get a Cloudflare Quick Tunnel URL"
-            cat "$TUNNEL_LOG"
-            exit 1
-          fi
+  #         if [ -z "$TUNNEL_URL" ]; then
+  #           echo "Failed to get a Cloudflare Quick Tunnel URL"
+  #           cat "$TUNNEL_LOG"
+  #           exit 1
+  #         fi
 
-          sed "s|__ISSUER_BASE_URL__|$TUNNEL_URL|g" "$TEMPLATE" > "$ISSUER_CONFIG"
+  #         sed "s|__ISSUER_BASE_URL__|$TUNNEL_URL|g" "$TEMPLATE" > "$ISSUER_CONFIG"
 
-          pushd waltid-identity/waltid-services/waltid-issuer-api2 >/dev/null
-          nohup java -Dconfig.file.issuer-service="$ISSUER_CONFIG" \
-            -jar build/libs/waltid-issuer-api2-all.jar > "$ISSUER_LOG" 2>&1 &
-          ISSUER_PID=$!
-          popd >/dev/null
-          echo "$ISSUER_PID" > "$RUNNER_TEMP/issuer2-haip.pid"
+  #         pushd waltid-identity/waltid-services/waltid-issuer-api2 >/dev/null
+  #         nohup java -Dconfig.file.issuer-service="$ISSUER_CONFIG" \
+  #           -jar build/libs/waltid-issuer-api2-all.jar > "$ISSUER_LOG" 2>&1 &
+  #         ISSUER_PID=$!
+  #         popd >/dev/null
+  #         echo "$ISSUER_PID" > "$RUNNER_TEMP/issuer2-haip.pid"
 
-          METADATA_PATH="/.well-known/openid-credential-issuer/openid4vci"
-          for i in $(seq 1 90); do
-            if curl --fail --silent --show-error "http://127.0.0.1:7005$METADATA_PATH" >/dev/null; then
-              break
-            fi
-            kill -0 "$ISSUER_PID" 2>/dev/null || { echo "Issuer2 exited during startup"; cat "$ISSUER_LOG"; exit 1; }
-            sleep 1
-          done
-          curl --fail --silent --show-error "$TUNNEL_URL$METADATA_PATH" >/dev/null
+  #         METADATA_PATH="/.well-known/openid-credential-issuer/openid4vci"
+  #         for i in $(seq 1 90); do
+  #           if curl --fail --silent --show-error "http://127.0.0.1:7005$METADATA_PATH" >/dev/null; then
+  #             break
+  #           fi
+  #           kill -0 "$ISSUER_PID" 2>/dev/null || { echo "Issuer2 exited during startup"; cat "$ISSUER_LOG"; exit 1; }
+  #           sleep 1
+  #         done
+  #         curl --fail --silent --show-error "$TUNNEL_URL$METADATA_PATH" >/dev/null
 
-          echo "Issuer2 HAIP conformance tunnel: $TUNNEL_URL"
-          echo "url=$TUNNEL_URL" >> "$GITHUB_OUTPUT"
+  #         echo "Issuer2 HAIP conformance tunnel: $TUNNEL_URL"
+  #         echo "url=$TUNNEL_URL" >> "$GITHUB_OUTPUT"
 
-          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers --no-daemon --console=plain --warning-mode=summary
+  #         ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers --no-daemon --console=plain --warning-mode=summary
 
-      - name: Run OpenID4VCI HAIP Issuer2 conformance
-        run: >-
-          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test
-          --tests id.walt.openid4vp.conformance.IssuerConformanceTests
-          --rerun-tasks --no-daemon --console=plain --warning-mode=summary
-        env:
-          CI: "true"
-          CONFORMANCE_ALLOW_FAILURE: "false"
-          OPENID4VCI_CONFORMANCE_STRICT: "true"
-          OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL: ${{ steps.issuer-tunnel.outputs.url }}/openid4vci
-          OPENID4VCI_CONFORMANCE_SUITE_HOST: conformance.waltid.cloud
-          OPENID4VCI_CONFORMANCE_SUITE_PORT: "443"
-          OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID: identity_credential_haip
-          OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID: org.iso.18013.5.1.mDL.haip
-          OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem
-          OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem
-          OPENID4VCI_CONFORMANCE_FILTER_FAPI_PROFILES: vci_haip
-          OPENID4VCI_CONFORMANCE_FILTER_FORMATS: sd_jwt_vc,mdoc
-          OPENID4VCI_CONFORMANCE_FILTER_GRANT_TYPES: authorization_code
-          OPENID4VCI_CONFORMANCE_FILTER_FLOW_VARIANTS: issuer_initiated,wallet_initiated
-          OPENID4VCI_CONFORMANCE_FILTER_CLIENT_AUTH_TYPES: client_attestation
-          OPENID4VCI_CONFORMANCE_FILTER_SENDER_CONSTRAINTS: dpop
-          OPENID4VCI_CONFORMANCE_FILTER_AUTH_REQUEST_TYPES: simple
-          OPENID4VCI_CONFORMANCE_FILTER_REQUEST_METHODS: unsigned
-          OPENID4VCI_CONFORMANCE_FILTER_CREDENTIAL_ENCRYPTION: plain,encrypted
-          OPENID4VCI_CONFORMANCE_MODULE_GROUPS: metadata,positive,negative
-          # Cloudflare Quick Tunnels do not provide the suite's required TLS policy evidence.
-          OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES: oid4vci-1_0-issuer-happy-flow-additional-requests
-          OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION: "true"
-          OPENID4VCI_CONFORMANCE_AUTH_USERNAME: jane@walt.id
-          OPENID4VCI_CONFORMANCE_AUTH_PASSWORD: jane
-          OPENID4VCI_CONFORMANCE_AUTH_TIMEOUT_SECONDS: "90"
-          PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+  #     - name: Run OpenID4VCI HAIP Issuer2 conformance
+  #       run: >-
+  #         ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test
+  #         --tests id.walt.openid4vp.conformance.IssuerConformanceTests
+  #         --rerun-tasks --no-daemon --console=plain --warning-mode=summary
+  #       env:
+  #         CI: "true"
+  #         CONFORMANCE_ALLOW_FAILURE: "false"
+  #         OPENID4VCI_CONFORMANCE_STRICT: "true"
+  #         OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL: ${{ steps.issuer-tunnel.outputs.url }}/openid4vci
+  #         OPENID4VCI_CONFORMANCE_SUITE_HOST: conformance.waltid.cloud
+  #         OPENID4VCI_CONFORMANCE_SUITE_PORT: "443"
+  #         OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID: identity_credential_haip
+  #         OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID: org.iso.18013.5.1.mDL.haip
+  #         OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem
+  #         OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem
+  #         OPENID4VCI_CONFORMANCE_FILTER_FAPI_PROFILES: vci_haip
+  #         OPENID4VCI_CONFORMANCE_FILTER_FORMATS: sd_jwt_vc,mdoc
+  #         OPENID4VCI_CONFORMANCE_FILTER_GRANT_TYPES: authorization_code
+  #         OPENID4VCI_CONFORMANCE_FILTER_FLOW_VARIANTS: issuer_initiated,wallet_initiated
+  #         OPENID4VCI_CONFORMANCE_FILTER_CLIENT_AUTH_TYPES: client_attestation
+  #         OPENID4VCI_CONFORMANCE_FILTER_SENDER_CONSTRAINTS: dpop
+  #         OPENID4VCI_CONFORMANCE_FILTER_AUTH_REQUEST_TYPES: simple
+  #         OPENID4VCI_CONFORMANCE_FILTER_REQUEST_METHODS: unsigned
+  #         OPENID4VCI_CONFORMANCE_FILTER_CREDENTIAL_ENCRYPTION: plain,encrypted
+  #         OPENID4VCI_CONFORMANCE_MODULE_GROUPS: metadata,positive,negative
+  #         # Cloudflare Quick Tunnels do not provide the suite's required TLS policy evidence.
+  #         OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES: oid4vci-1_0-issuer-happy-flow-additional-requests
+  #         OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION: "true"
+  #         OPENID4VCI_CONFORMANCE_AUTH_USERNAME: jane@walt.id
+  #         OPENID4VCI_CONFORMANCE_AUTH_PASSWORD: jane
+  #         OPENID4VCI_CONFORMANCE_AUTH_TIMEOUT_SECONDS: "90"
+  #         PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
+  #         MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+  #         MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
-      - name: Stop Issuer2 HAIP conformance services
-        if: always()
-        run: |
-          for pid_file in "$RUNNER_TEMP/issuer2-haip.pid" "$RUNNER_TEMP/cloudflared-issuer2-haip.pid"; do
-            [ -f "$pid_file" ] || continue
-            pid=$(cat "$pid_file")
-            kill "$pid" 2>/dev/null || true
-          done
+  #     - name: Stop Issuer2 HAIP conformance services
+  #       if: always()
+  #       run: |
+  #         for pid_file in "$RUNNER_TEMP/issuer2-haip.pid" "$RUNNER_TEMP/cloudflared-issuer2-haip.pid"; do
+  #           [ -f "$pid_file" ] || continue
+  #           pid=$(cat "$pid_file")
+  #           kill "$pid" 2>/dev/null || true
+  #         done
 
-      - name: Upload OpenID4VC HAIP 1.0 conformance results and logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: openid4vc-haip1.0-conformance-test-results
-          if-no-files-found: warn
-          path: |
-            waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/build/reports/openid-conformance/vci-issuer/
-            ${{ runner.temp }}/issuer2-haip.log
-            ${{ runner.temp }}/cloudflared-issuer2-haip.log
+  #     - name: Upload OpenID4VC HAIP 1.0 conformance results and logs
+  #       if: always()
+  #       uses: actions/upload-artifact@v7
+  #       with:
+  #         name: openid4vc-haip1.0-conformance-test-results
+  #         if-no-files-found: warn
+  #         path: |
+  #           waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/build/reports/openid-conformance/vci-issuer/
+  #           ${{ runner.temp }}/issuer2-haip.log
+  #           ${{ runner.temp }}/cloudflared-issuer2-haip.log
 
-      - name: Show OpenID4VC HAIP 1.0 conformance results
-        if: always()
-        run: |
-          ARTIFACT_NAME="openid4vc-haip1.0-conformance-test-results"
-          ARTIFACTS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
-          echo "OpenID4VC HAIP 1.0 results and logs: $ARTIFACTS_URL (artifact: $ARTIFACT_NAME)"
+  #     - name: Show OpenID4VC HAIP 1.0 conformance results
+  #       if: always()
+  #       run: |
+  #         ARTIFACT_NAME="openid4vc-haip1.0-conformance-test-results"
+  #         ARTIFACTS_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts"
+  #         echo "OpenID4VC HAIP 1.0 results and logs: $ARTIFACTS_URL (artifact: $ARTIFACT_NAME)"
 
-          {
-            echo "## OpenID4VC HAIP 1.0 Conformance Results"
-            echo
-            echo "> This matrix runs in strict mode and excludes dedicated FAPI modules. A non-accepted selected variant fails this job."
-            echo
-            echo "Full diagnostics: download [\`$ARTIFACT_NAME\`]($ARTIFACTS_URL) for \`results.json\`, \`matrix.json\`, \`summary.md\`, and Issuer2/Cloudflare logs. Each failed module below links to its exact suite log."
-            echo "Suite results are also available at [conformance.waltid.cloud](https://conformance.waltid.cloud/logs.html)."
-            echo
-          } >> "$GITHUB_STEP_SUMMARY"
+  #         {
+  #           echo "## OpenID4VC HAIP 1.0 Conformance Results"
+  #           echo
+  #           echo "> This matrix runs in strict mode and excludes dedicated FAPI modules. A non-accepted selected variant fails this job."
+  #           echo
+  #           echo "Full diagnostics: download [\`$ARTIFACT_NAME\`]($ARTIFACTS_URL) for \`results.json\`, \`matrix.json\`, \`summary.md\`, and Issuer2/Cloudflare logs. Each failed module below links to its exact suite log."
+  #           echo "Suite results are also available at [conformance.waltid.cloud](https://conformance.waltid.cloud/logs.html)."
+  #           echo
+  #         } >> "$GITHUB_STEP_SUMMARY"
 
-          {
-            echo "### Failed Modules"
-            results_found=0
-            failures_found=0
-            while IFS= read -r -d '' results; do
-              results_found=$((results_found + 1))
-              while IFS= read -r failure; do
-                failures_found=$((failures_found + 1))
-                echo "$failure"
-              done < <(jq -r '
-                def compact:
-                  gsub("[\\r\\n|]"; " ") as $error
-                  | if ($error | length) > 500 then "\($error[0:500])..." else $error end;
-                .[] | (.modules // [])[]
-                | select(.accepted != true)
-                | "- `\(.testModule)` (status=`\(.status // "unknown")`, result=`\(.result // "unknown")`)" +
-                  (if .error then " - \(.error | compact)" else "" end) +
-                  (if .logUrl then " - [Suite log](\(.logUrl))" else "" end)
-              ' "$results")
-            done < <(find . \
-              -path '*/build/reports/openid-conformance/vci-issuer/results.json' \
-              -print0 2>/dev/null)
+  #         {
+  #           echo "### Failed Modules"
+  #           results_found=0
+  #           failures_found=0
+  #           while IFS= read -r -d '' results; do
+  #             results_found=$((results_found + 1))
+  #             while IFS= read -r failure; do
+  #               failures_found=$((failures_found + 1))
+  #               echo "$failure"
+  #             done < <(jq -r '
+  #               def compact:
+  #                 gsub("[\\r\\n|]"; " ") as $error
+  #                 | if ($error | length) > 500 then "\($error[0:500])..." else $error end;
+  #               .[] | (.modules // [])[]
+  #               | select(.accepted != true)
+  #               | "- `\(.testModule)` (status=`\(.status // "unknown")`, result=`\(.result // "unknown")`)" +
+  #                 (if .error then " - \(.error | compact)" else "" end) +
+  #                 (if .logUrl then " - [Suite log](\(.logUrl))" else "" end)
+  #             ' "$results")
+  #           done < <(find . \
+  #             -path '*/build/reports/openid-conformance/vci-issuer/results.json' \
+  #             -print0 2>/dev/null)
 
-            if [ "$results_found" -eq 0 ]; then
-              echo "_No \`results.json\` file was produced; download the artifact for Issuer2 and Cloudflare logs._"
-            elif [ "$failures_found" -eq 0 ]; then
-              echo "_No non-accepted modules were reported._"
-            fi
-            echo
-          } >> "$GITHUB_STEP_SUMMARY"
+  #           if [ "$results_found" -eq 0 ]; then
+  #             echo "_No \`results.json\` file was produced; download the artifact for Issuer2 and Cloudflare logs._"
+  #           elif [ "$failures_found" -eq 0 ]; then
+  #             echo "_No non-accepted modules were reported._"
+  #           fi
+  #           echo
+  #         } >> "$GITHUB_STEP_SUMMARY"
 
-          found=0
-          while IFS= read -r -d '' summary; do
-            found=$((found + 1))
-            {
-              echo
-              cat "$summary"
-              echo
-            } >> "$GITHUB_STEP_SUMMARY"
-          done < <(find . \
-            -path '*/build/reports/openid-conformance/vci-issuer/summary.md' \
-            -print0 2>/dev/null)
+  #         found=0
+  #         while IFS= read -r -d '' summary; do
+  #           found=$((found + 1))
+  #           {
+  #             echo
+  #             cat "$summary"
+  #             echo
+  #           } >> "$GITHUB_STEP_SUMMARY"
+  #         done < <(find . \
+  #           -path '*/build/reports/openid-conformance/vci-issuer/summary.md' \
+  #           -print0 2>/dev/null)
 
-          if [ "$found" -eq 0 ]; then
-            echo "_No OpenID4VC HAIP 1.0 conformance summary was produced._" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "Appended $found OpenID4VC HAIP 1.0 conformance summary file(s) to the job summary."
-          fi
+  #         if [ "$found" -eq 0 ]; then
+  #           echo "_No OpenID4VC HAIP 1.0 conformance summary was produced._" >> "$GITHUB_STEP_SUMMARY"
+  #         else
+  #           echo "Appended $found OpenID4VC HAIP 1.0 conformance summary file(s) to the job summary."
+  #         fi

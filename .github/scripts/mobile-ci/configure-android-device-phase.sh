@@ -4,34 +4,55 @@ set -euo pipefail
 phase="${1:?Android device test phase is required}"
 emulator_api_level="34"
 emulator_profile=""
+emulator_avd_name=""
 
 case "$phase" in
   wallet-mobile)
     script="./waltid-identity/.github/scripts/mobile-ci/run-android-wallet-mobile-tests.sh"
     emulator_options="-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
-    report_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**/*.xml\nwaltid-identity/waltid-libraries/crypto/waltid-crypto2-signum/build/outputs/androidTest-results/**/*.xml'
+    # This phase runs connectedAndroidDeviceTest for two modules
+    # (protocols/waltid-openid4vc-wallet-mobile and crypto/waltid-crypto2-signum), but
+    # mikepenz/action-junit-report splits report_paths on newlines *and* commas and then expects
+    # check_name to have either 1 or exactly that many entries. Two paths against one check name
+    # warns once per path, so keep this a single glob: `*` does not cross a path separator, so
+    # `*/*` covers both modules and nothing outside waltid-libraries/<group>/<module>.
+    report_paths='waltid-identity/waltid-libraries/*/*/build/outputs/androidTest-results/**/*.xml'
     artifact_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**\nwaltid-identity/waltid-libraries/crypto/waltid-crypto2-signum/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/crypto/waltid-crypto2-signum/build/outputs/androidTest-results/**'
     emulator_target="default"
     ;;
+  wallet-recovery)
+    script="./waltid-identity/.github/scripts/mobile-ci/run-android-wallet-recovery-tests.sh"
+    emulator_api_level="35"
+    emulator_target="google_apis"
+    emulator_options="-no-snapshot -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
+    report_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/build/outputs/androidTest-results/**/*.xml\nwaltid-identity/build/reports/wallet-recovery/**/results.xml'
+    artifact_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/build/outputs/androidTest-results/**\nwaltid-identity/build/reports/wallet-recovery/**'
+    ;;
   compose-demo)
-    script="./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
+    # The default image has no Google Play services. Keep GMS-only classes out of
+    # instrumentation discovery; their class-level assumption would otherwise
+    # collapse the reported test count and make Gradle fail the phase.
+    compose_demo_excluded_classes="id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest,id.walt.walletdemo.compose.android.DigitalCredentialIssuanceE2ETest"
+    script="ANDROID_TEST_NOT_CLASS=$compose_demo_excluded_classes ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
     emulator_options="-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
     report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**/*.xml"
     artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**'
     emulator_target="default"
     ;;
   dc-api-compose)
-    # Dedicated Play Store lane; these tests require Google Play services. Every Digital Credentials
-    # test class must be named here: other phases only skip them, and a skip reads as green, so a
-    # class left out of this list runs nowhere without failing anything.
-    dc_api_test_classes="id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest"
-    script="ANDROID_TEST_CLASS=$dc_api_test_classes ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
-    emulator_options="-no-window -gpu auto -noaudio -no-boot-anim -camera-back none -memory 4096 -feature GLDirectMem,HasSharedSlotsHostMemoryAllocator"
+    # Dedicated Google APIs lane for the GMS-gated Digital Credentials E2Es.
+    dc_api_test_classes="id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest,id.walt.walletdemo.compose.android.DigitalCredentialIssuanceE2ETest"
+    script="ANDROID_TEST_CLASS=$dc_api_test_classes EXPECTED_ANDROID_TEST_CASE_COUNT=13 ./waltid-identity/.github/scripts/mobile-ci/run-android-dc-api-compose-tests.sh"
+    # The cached artifact is the configured userdata disk, not a Quick Boot state. Always cold-boot
+    # it so the first process/ADB/GMS state is recreated for every job and never restored from a
+    # potentially poisoned host snapshot.
+    emulator_options="-no-snapshot -no-snapshot-save -no-window -gpu auto -noaudio -no-boot-anim -camera-back none -memory 4096 -feature GLDirectMem,HasSharedSlotsHostMemoryAllocator"
+    emulator_avd_name="dc-api-api37-pixel7-google-apis"
     report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**/*.xml"
     artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**'
     emulator_api_level="37.0"
     emulator_profile="pixel_7"
-    emulator_target="playstore_ps16k"
+    emulator_target="google_apis"
     ;;
   enterprise-mobile)
     script="./waltid-identity/.github/scripts/mobile-ci/run-enterprise-android-mobile-tests.sh"
@@ -50,6 +71,7 @@ esac
   echo "script=$script"
   echo "emulator_api_level=$emulator_api_level"
   echo "emulator_profile=$emulator_profile"
+  echo "emulator_avd_name=$emulator_avd_name"
   echo "emulator_options=$emulator_options"
   echo "emulator_target=$emulator_target"
   echo "report_paths<<ANDROID_TEST_REPORT_PATHS"

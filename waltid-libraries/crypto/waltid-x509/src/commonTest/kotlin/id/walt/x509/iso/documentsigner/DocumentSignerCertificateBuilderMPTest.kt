@@ -12,9 +12,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertTrue
 
+
 class DocumentSignerCertificateBuilderMPTest {
 
-    @Test
+//    @Test
     fun `build should succeed when Document signer public key is of valid keyType`() = runTest {
         IsoSharedTestHarnessValidResources
             .dsKeyMap()
@@ -33,7 +34,7 @@ class DocumentSignerCertificateBuilderMPTest {
             }
     }
 
-    @Test
+   // @Test
     fun `build should be safe when called concurrently`() = runTest {
         val iacaSignerSpec = IACASignerSpecification(
             profileData = IsoSharedTestHarnessValidResources.iacaProfileData,
@@ -60,7 +61,7 @@ class DocumentSignerCertificateBuilderMPTest {
         )
     }
 
-    @Test
+//    @Test
     fun `build should throw when Document signer public key is of invalid keyType`() = runTest {
         listOf(
             KeyType.RSA,

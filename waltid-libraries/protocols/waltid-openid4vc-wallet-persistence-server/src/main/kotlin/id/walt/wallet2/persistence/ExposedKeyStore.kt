@@ -8,12 +8,15 @@ import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.migration.v1.V1KeyMigration
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletKeyStoreEntry
+import id.walt.wallet2.data.WalletPublicKeyMaterial
+import id.walt.wallet2.data.WalletKeyUsageUnsupportedException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -55,11 +58,28 @@ class ExposedKeyStore(
     override suspend fun getCrypto2Key(keyId: String, usages: Set<KeyUsage>): Crypto2Key? =
         getKeyMaterial(keyId, usages)?.crypto2Key
 
+    override suspend fun getPublicKeyMaterial(keyId: String): WalletPublicKeyMaterial? =
+        suspendTransaction(db) {
+            val row = selectKey(keyId) ?: return@suspendTransaction null
+            val stored = row[Wallet2Tables.Keys.crypto2StoredKey]
+                ?.let(StoredKeyCodec::decodeFromString)
+                ?: row[Wallet2Tables.Keys.serializedKey]?.let { serialized ->
+                    migrateSerializedDescriptor(row[Wallet2Tables.Keys.keyId], serialized)
+                }
+            when (stored) {
+                is StoredKey.Software -> stored.material.toPublicJwk(stored.spec)
+                is StoredKey.Managed -> stored.publicKey?.toPublicJwk(stored.spec)
+                null -> null
+            }?.let(::WalletPublicKeyMaterial)
+        }
+
     override suspend fun getKeyMaterial(keyId: String, usages: Set<KeyUsage>): WalletKeyStoreEntry? =
         suspendTransaction(db) {
             val row = selectKey(keyId) ?: return@suspendTransaction null
             val crypto2Key = resolveCrypto2Key(row)?.also { key ->
-                require(usages.all(key.usages::contains)) { "Wallet crypto2 key does not permit requested usages" }
+                if (!usages.all(key.usages::contains)) {
+                    throw WalletKeyUsageUnsupportedException("Wallet crypto2 key does not permit requested usages")
+                }
             }
             val legacyKey = resolveLegacyKey(row)
             if (legacyKey != null || crypto2Key != null) WalletKeyStoreEntry(keyId, legacyKey, crypto2Key) else null
@@ -163,13 +183,7 @@ class ExposedKeyStore(
     }
 
     private suspend fun migrateSerializedKey(keyId: String, serializedKey: String): MigratedKey? {
-        val serialized = runCatching { Json.parseToJsonElement(serializedKey).jsonObject }.getOrNull()
-            ?: return null
-        if (serialized["type"]?.jsonPrimitive?.content != "jwk") return null
-        val jwk = serialized["jwk"] as? JsonObject ?: return null
-        val privateMaterial = listOf("d", "p", "q", "dp", "dq", "qi", "oth", "k").any(jwk::containsKey)
-        val usages = if (privateMaterial) setOf(KeyUsage.SIGN, KeyUsage.VERIFY) else setOf(KeyUsage.VERIFY)
-        val stored = migration.migrate(KeyId(keyId), serialized, usages)
+        val stored = migrateSerializedDescriptor(keyId, serializedKey) ?: return null
         return try {
             MigratedKey(
                 encoded = StoredKeyCodec.encodeToString(stored),
@@ -180,6 +194,16 @@ class ExposedKeyStore(
         } catch (_: Exception) {
             null
         }
+    }
+
+    private suspend fun migrateSerializedDescriptor(keyId: String, serializedKey: String): StoredKey? {
+        val serialized = runCatching { Json.parseToJsonElement(serializedKey).jsonObject }.getOrNull()
+            ?: return null
+        if (serialized["type"]?.jsonPrimitive?.content != "jwk") return null
+        val jwk = serialized["jwk"] as? JsonObject ?: return null
+        val privateMaterial = listOf("d", "p", "q", "dp", "dq", "qi", "oth", "k").any(jwk::containsKey)
+        val usages = if (privateMaterial) setOf(KeyUsage.SIGN, KeyUsage.VERIFY) else setOf(KeyUsage.VERIFY)
+        return migration.migrate(KeyId(keyId), serialized, usages)
     }
 
     /** Compare-and-set so a concurrent writer is detected rather than overwritten. */

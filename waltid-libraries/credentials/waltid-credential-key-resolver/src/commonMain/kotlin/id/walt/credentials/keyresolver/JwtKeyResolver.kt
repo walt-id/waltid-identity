@@ -62,7 +62,7 @@ object JwtKeyResolver {
         } catch (cause: CancellationException) {
             throw cause
         } catch (cause: Exception) {
-            log.debug { "Could not resolve JWT signer key: ${cause.stackTraceToString()}" }
+            log.error { "Could not resolve JWT signer key: ${cause.stackTraceToString()}" }
             null
         }
     }

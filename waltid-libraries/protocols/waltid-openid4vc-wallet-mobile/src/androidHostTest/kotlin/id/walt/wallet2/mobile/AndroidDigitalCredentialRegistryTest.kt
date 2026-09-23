@@ -1,10 +1,17 @@
 package id.walt.wallet2.mobile
 
 import androidx.credentials.registry.digitalcredentials.mdoc.MdocEntry
+import androidx.credentials.registry.digitalcredentials.openid4vp.OpenId4VpRegistry
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtEntry
+import androidx.credentials.registry.provider.digitalcredentials.VerificationEntryDisplayProperties
+import androidx.credentials.registry.provider.digitalcredentials.VerificationFieldDisplayProperties
 import id.walt.cose.coseCompliantCbor
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -12,6 +19,7 @@ import org.junit.runner.RunWith
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
@@ -20,7 +28,7 @@ class AndroidDigitalCredentialRegistryTest {
     private val registry = AndroidDigitalCredentialRegistry(RuntimeEnvironment.getApplication())
 
     @Test
-    fun capabilityMatrixReportsOnlyUnsignedOpenId4VpAsSupportable() {
+    fun capabilityMatrixReportsUnsignedOpenId4VpAndOpenId4VciAsSupportableWhenRegistered() {
         val capabilities = registry.capabilities
 
         assertTrue(capabilities.platformAvailable)
@@ -31,6 +39,11 @@ class AndroidDigitalCredentialRegistryTest {
         // Unsupported here only because registration has not run; the combination itself is implemented.
         assertFalse(unsigned.supported)
         assertTrue(unsigned.unsupportedReason?.contains("registration") == true)
+        val openId4Vci = capabilities.capabilities.single {
+            it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1
+        }
+        assertFalse(openId4Vci.supported)
+        assertTrue(openId4Vci.unsupportedReason?.contains("creation registration") == true)
         // Both DC API response modes: dc_api and dc_api.jwt.
         assertEquals(
             listOf(
@@ -76,9 +89,13 @@ class AndroidDigitalCredentialRegistryTest {
                     )
                 ),
                 displayName = "Driving licence",
+                subtitle = "D-123-456",
             ).toAndroidEntry()
         } as MdocEntry
 
+        val display = entry.entryDisplayPropertySet.filterIsInstance<VerificationEntryDisplayProperties>().single()
+        assertEquals("Driving licence", display.title)
+        assertEquals("D-123-456", display.subtitle)
         assertEquals("org.iso.18013.5.1.mDL", entry.docType)
         assertEquals("given_name", entry.fields.single().identifier)
         assertEquals("Ada", entry.fields.single().fieldValue)
@@ -101,13 +118,137 @@ class AndroidDigitalCredentialRegistryTest {
                     )
                 ),
                 displayName = "PID",
+                subtitle = "Personal ID",
             ).toAndroidEntry()
         } as SdJwtEntry
 
+        val display = entry.entryDisplayPropertySet.filterIsInstance<VerificationEntryDisplayProperties>().single()
+        assertEquals("PID", display.title)
+        assertEquals("Personal ID", display.subtitle)
         assertEquals(listOf("address", "locality"), entry.claims.single().path)
         assertEquals("Vienna", entry.claims.single().value)
         assertTrue(entry.claims.single().isSelectivelyDisclosable)
         assertEquals("opaque-id", entry.id)
+    }
+
+    @Test
+    fun registryRetainsMediaPathsWithoutEmbeddingPayloadsAndPreservesScalarMatching() {
+        val mediaValues = mapOf(
+            "arbitrary_binary" to List(50_000) { it % 128 }.joinToString(prefix = "[", postfix = "]"),
+            "arbitrary_attachment" to "\"data:image/png;base64,${"A".repeat(100_000)}\"",
+            "raw_image" to "\"/9j/${"A".repeat(100_000)}\"",
+            "structured_value" to """{"member":"value"}""",
+            "null_value" to "null",
+        )
+        val scalarValues = mapOf(
+            "empty_text" to "\"\"",
+            "null_text" to "\"null\"",
+            "age" to "42",
+            "eligible" to "false",
+            "description" to "\"${"D".repeat(300)}\"",
+        )
+        val records = MobileWalletDigitalCredentialFormat.entries.map { format ->
+            MobileWalletCredentialRegistryRecord(
+                registryEntryId = "entry-$format",
+                credentialId = "credential-$format",
+                format = format,
+                type = "example.credential",
+                fields = (mediaValues + scalarValues).map { (name, value) ->
+                    MobileWalletCredentialRegistryField(listOf("namespace", name), value, true)
+                },
+                displayName = "Example",
+            )
+        }
+        val entries = records.map { record -> with(registry) { record.toAndroidEntry() } }
+        entries.forEach { entry ->
+            val values = when (entry) {
+                is MdocEntry -> entry.fields.associate { it.identifier to it.fieldValue }
+                is SdJwtEntry -> entry.claims.associate { it.path.last() to it.value }
+                else -> error("Unexpected entry")
+            }
+            assertEquals(mediaValues.keys + scalarValues.keys, values.keys)
+            mediaValues.keys.forEach { assertNull(values.getValue(it)) }
+            assertEquals("", values.getValue("empty_text"))
+            assertEquals("null", values.getValue("null_text"))
+            assertEquals(42L, values.getValue("age"))
+            assertEquals(false, values.getValue("eligible"))
+            assertEquals("D".repeat(300), values.getValue("description"))
+        }
+        val bytes = OpenId4VpRegistry(entries, "registry").credentials
+        assertTrue(bytes.size < 50_000, "Platform registry must not contain encoded media payloads")
+        val offset = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN).int
+        val payload = Json.parseToJsonElement(bytes.copyOfRange(offset, bytes.size).decodeToString()).jsonObject
+        val jsonText = payload.toString()
+        mediaValues.keys.forEach { assertTrue(jsonText.contains(it), "Field presence must survive: $it") }
+        assertFalse(jsonText.contains("data:image"))
+        val mdoc = entries.filterIsInstance<MdocEntry>().single()
+        val display = mdoc.fields.first { it.identifier == "description" }.fieldDisplayPropertySet
+            .filterIsInstance<VerificationFieldDisplayProperties>().single()
+        assertEquals("D".repeat(128), display.displayValue)
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @Test
+    fun annexCMediaFieldRemainsSelectableWithoutPayloadOrFakeMatchValue() {
+        val bytes = registry.encodeAnnexCCredentialDatabase(listOf(
+            MobileWalletCredentialRegistryRecord(
+                registryEntryId = "opaque-id", credentialId = "private-id",
+                format = MobileWalletDigitalCredentialFormat.MDOC, type = "example.credential",
+                fields = listOf(MobileWalletCredentialRegistryField(
+                    listOf("namespace", "arbitrary_attachment"),
+                    "\"data:application/pdf;base64,${"A".repeat(100_000)}\"", true,
+                )), displayName = "Example",
+            ),
+        ))
+        val database = coseCompliantCbor.decodeFromByteArray<AndroidAnnexCCredentialDatabase>(bytes)
+        assertEquals(listOf("arbitrary_attachment", "", ""), database.credentials.single().mdoc.namespaces
+            .getValue("namespace").getValue("arbitrary_attachment"))
+        assertTrue(bytes.size < 50_000)
+    }
+
+    @Test
+    fun openId4VciCreationOptionsMatchesGoogleIssuanceContract() {
+        val icon = byteArrayOf(1, 2, 3, 4)
+        val bytes = registry.encodeOpenId4VciCreationOptions(
+            entryId = "openid4vci",
+            applicationName = "walt.id Wallet",
+            subtitle = "Save a credential to this wallet",
+            explainer = "Save a credential to this wallet.",
+            icon = icon,
+        )
+        val jsonOffset = java.nio.ByteBuffer.wrap(bytes, 0, 4)
+            .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            .int
+        assertEquals(4 + icon.size, jsonOffset)
+        assertEquals(icon.toList(), bytes.slice(4 until jsonOffset))
+        val json = Json.parseToJsonElement(bytes.copyOfRange(jsonOffset, bytes.size).decodeToString()).jsonObject
+        assertEquals("openid4vci", json["entry_id"]?.jsonPrimitive?.content)
+        val entry = json["entries"]!!.jsonArray.single().jsonObject
+        assertEquals("Save a credential to this wallet", entry["subtitle"]?.jsonPrimitive?.content)
+        assertEquals(
+            "Save a credential to this wallet.",
+            entry["explainer"]?.jsonObject?.get("default")?.jsonPrimitive?.content,
+        )
+        assertEquals(Json.parseToJsonElement("{\"Pass\":{}}"), json["filter"])
+        val expectedCreateProtocols = listOf(
+            MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+            "openid4vci1.0",
+            "openid4vci-1.0",
+            "openid4vci1.1",
+            "openid4vci-1.1",
+        )
+        assertEquals(expectedCreateProtocols, OPENID4VCI_CREATE_PROTOCOLS)
+        assertEquals(
+            expectedCreateProtocols,
+            json["preferred_protocols"]!!.jsonArray.map { it.jsonPrimitive.content },
+        )
+        assertEquals("walt.id Wallet", json["package_info"]!!.jsonObject["name"]?.jsonPrimitive?.content)
+        assertEquals(4, json["package_info"]!!.jsonObject["icon"]!!.jsonArray[0].jsonPrimitive.content.toInt())
+        assertEquals(
+            4 + icon.size,
+            json["package_info"]!!.jsonObject["icon"]!!.jsonArray[1].jsonPrimitive.content.toInt(),
+        )
+        assertFalse(json.containsKey("display"))
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -128,12 +269,15 @@ class AndroidDigitalCredentialRegistryTest {
                         )
                     ),
                     displayName = "Driving licence",
+                    subtitle = "D-123-456",
                 )
             )
         )
         val database = coseCompliantCbor.decodeFromByteArray<AndroidAnnexCCredentialDatabase>(bytes)
         val credential = database.credentials.single()
 
+        assertEquals("Driving licence", credential.title)
+        assertEquals("D-123-456", credential.subtitle)
         assertEquals(listOf("org-iso-mdoc"), database.protocols)
         assertEquals("opaque-id", credential.mdoc.documentId)
         assertEquals("org.iso.18013.5.1.mDL", credential.mdoc.docType)
@@ -141,5 +285,41 @@ class AndroidDigitalCredentialRegistryTest {
             listOf("given_name", "Ada", "Ada"),
             credential.mdoc.namespaces.getValue("org.iso.18013.5.1").getValue("given_name"),
         )
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @Test
+    fun annexCMatcherDatabaseUsesPerRecordIconWhenPresent() {
+        val customIcon = byteArrayOf(7, 8, 9, 10)
+        val bytes = registry.encodeAnnexCCredentialDatabase(
+            listOf(
+                MobileWalletCredentialRegistryRecord(
+                    registryEntryId = "opaque-id",
+                    credentialId = "wallet-private-id",
+                    format = MobileWalletDigitalCredentialFormat.MDOC,
+                    type = "org.iso.18013.5.1.mDL",
+                    fields = listOf(
+                        MobileWalletCredentialRegistryField(
+                            path = listOf("org.iso.18013.5.1", "given_name"),
+                            valueJson = "\"Ada\"",
+                            selectivelyDisclosable = true,
+                        )
+                    ),
+                    displayName = "Driving licence",
+                    iconPng = customIcon,
+                )
+            )
+        )
+        val database = coseCompliantCbor.decodeFromByteArray<AndroidAnnexCCredentialDatabase>(bytes)
+
+        assertEquals(customIcon.toList(), database.credentials.single().bitmap.toList())
+    }
+
+    @Test
+    fun bestEffortRefreshDoesNotClearSuccessfulInitialRegistration() {
+        assertTrue(registrationAvailableAfterRefresh(initialSucceeded = true, refreshSucceeded = true))
+        assertTrue(registrationAvailableAfterRefresh(initialSucceeded = true, refreshSucceeded = false))
+        assertTrue(registrationAvailableAfterRefresh(initialSucceeded = false, refreshSucceeded = true))
+        assertFalse(registrationAvailableAfterRefresh(initialSucceeded = false, refreshSucceeded = false))
     }
 }

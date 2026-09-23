@@ -1,5 +1,6 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
+import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
@@ -20,7 +21,6 @@ kotlin {
     if (enableWalletDemoComposeWeb) {
         wasmJs {
             browser()
-            binaries.executable()
         }
     }
 
@@ -44,13 +44,18 @@ kotlin {
             implementation(identityLibs.compose.navigation3.ui)
             implementation(identityLibs.coil.compose)
             implementation(identityLibs.coil.network.ktor3)
+            implementation(identityLibs.coil.svg)
+            implementation(compose.components.resources)
+            implementation(identityLibs.kotlinx.serialization.json)
         }
 
         if (enableAndroidBuild || enableIosBuild) {
             val mobileMain by creating {
                 dependsOn(commonMain.get())
                 dependencies {
+                    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
                     implementation(identityLibs.easyqrscan)
+                    implementation(identityLibs.kotlinx.datetime)
                 }
             }
 
@@ -60,11 +65,27 @@ kotlin {
                     // The system back gesture is registered against the host Activity's own
                     // dispatcher, so a provider surface can turn it into an Activity result.
                     implementation(identityLibs.androidx.activity.compose)
+                    implementation(identityLibs.zxing.core)
+                    implementation(identityLibs.androidx.core.ktx)
+                    implementation(identityLibs.androidx.lifecycle.runtime.ktx)
+                    implementation(identityLibs.androidx.lifecycle.runtime.compose)
                 }
             }
 
             if (enableIosBuild) {
-                iosMain.get().dependsOn(mobileMain)
+                iosMain.get().apply {
+                    dependsOn(mobileMain)
+                    dependencies {
+                        implementation(identityLibs.zxing.cpp.kotlin.native)
+                    }
+                }
+            }
+        }
+
+        if (enableWalletDemoComposeWeb) {
+            getByName("wasmJsMain").dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-browser:0.3")
+                implementation(identityLibs.kotlinx.coroutines.core)
             }
         }
 
@@ -102,8 +123,37 @@ kotlin {
     }
 }
 
+compose {
+    resources {
+        publicResClass = true
+        packageOfResClass = "id.walt.walletdemo.compose.ui.resources"
+        if (enableIosBuild) {
+            customDirectory(
+                sourceSetName = "iosTest",
+                directoryProvider = provider {
+                    layout.projectDirectory.dir("../../waltid-wallet-demo-test-fixtures/resources")
+                },
+            )
+        }
+    }
+}
+
 tasks.withType<Test>().configureEach {
     if (name == "testAndroidHostTest") {
         useJUnit()
+        systemProperty(
+            "walletDemoImageFixturesDir",
+            layout.projectDirectory.dir("../../waltid-wallet-demo-test-fixtures/resources/files").asFile.absolutePath,
+        )
+    }
+}
+
+// Asset processing is off by default for Android KMP libraries. Compose Multiplatform resources
+// copy into those assets; without this the generated waltid_logo never reaches the APK.
+if (enableAndroidBuild) {
+    extensions.configure<KotlinMultiplatformAndroidComponentsExtension>("androidComponents") {
+        finalizeDsl { android ->
+            android.androidResources.enable = true
+        }
     }
 }

@@ -7,3 +7,5 @@ import androidx.compose.runtime.Composable
 internal actual fun SystemBackHandler(enabled: Boolean, onBack: () -> Unit) {
     BackHandler(enabled = enabled, onBack = onBack)
 }
+
+internal actual val hasSystemBackNavigation: Boolean = true

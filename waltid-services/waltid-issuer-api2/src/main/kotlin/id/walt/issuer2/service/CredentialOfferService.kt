@@ -30,7 +30,10 @@ class CredentialOfferService(
     private val config: Issuer2ServiceConfig,
     private val notificationService: IssuanceNotificationService,
 ) {
-    suspend fun createCredentialOffer(request: CredentialOfferCreateRequest): CredentialOfferCreateResponse {
+    suspend fun createCredentialOffer(
+        request: CredentialOfferCreateRequest,
+        requestId: String,
+    ): CredentialOfferCreateResponse {
         val profile = profileService.resolveProfile(request.profileId)
         val sessionId = request.sessionId ?: UUID.randomUUID().toString()
         val expiresAt = expirationTimestamp(request.expiresInSeconds)
@@ -60,6 +63,7 @@ class CredentialOfferService(
                         session = oauthSession,
                         scopes = emptySet(),
                         audience = emptySet(),
+                        issuanceSessionId = sessionId,
                     )
                 )
                 resolvedTxCodeValue = preAuthorizedCode.txCodeValue
@@ -92,12 +96,15 @@ class CredentialOfferService(
             authenticationMethod = request.authMethod,
             credentialConfigurationId = profile.credentialConfigurationId,
             issuerKey = issuerKey,
+            expectedCredentialProofKeyJwk = overrides?.expectedCredentialProofKeyJwk,
             credentialData = credentialData,
             mapping = overrides?.mapping ?: profile.mapping,
             selectiveDisclosure = overrides?.selectiveDisclosure ?: profile.selectiveDisclosure,
             idTokenClaimsMapping = idTokenClaimsMapping,
             mDocNameSpacesDataMappingConfig =
                 overrides?.mDocNameSpacesDataMappingConfig ?: profile.mDocNameSpacesDataMappingConfig,
+            authorizedTransactionDataTypes = overrides?.authorizedTransactionDataTypes
+                ?: profile.authorizedTransactionDataTypes,
             x5Chain = overrides?.x5Chain ?: profile.x5Chain,
             issuerDid = issuerDid,
             credentialOffer = credentialOffer,
@@ -106,6 +113,12 @@ class CredentialOfferService(
             credentialStatus = overrides?.credentialStatus ?: profile.credentialStatus,
         )
         sessionService.createSession(session)
+        // BY_VALUE offers are never dereferenced, so this is their only offer-stage event.
+        notificationService.notify(
+            requestId = requestId,
+            session = session,
+            event = IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+        )
 
         val offerRequest = when (request.valueMode) {
             CredentialOfferValueMode.BY_VALUE -> CredentialOfferRequest(credentialOffer = credentialOffer)
@@ -125,15 +138,20 @@ class CredentialOfferService(
         )
     }
 
-    suspend fun getCredentialOffer(sessionId: String): CredentialOffer? {
+    suspend fun getCredentialOffer(sessionId: String, requestId: String): CredentialOffer? {
         val session = sessionService.getSessionOrNull(sessionId) ?: return null
         val credentialOffer = session.credentialOffer ?: return null
         notificationService.notify(
+            requestId = requestId,
             session = session,
-            event = IssuanceSessionEvent.resolved_credential_offer,
+            event = IssuanceSessionEvent.CREDENTIAL_OFFER_RETRIEVED,
         )
         return credentialOffer
     }
+
+    suspend fun getIssuanceSession(sessionId: String): IssuanceSession? = sessionService.getSessionOrNull(sessionId)
+
+    suspend fun removeIssuanceSession(sessionId: String) = sessionService.removeSession(sessionId)
 
     private fun issuerBaseUrl(): String = config.openId4VciBaseUrl()
 

@@ -24,6 +24,11 @@ data class StoredCredential(
     val addedAt: Instant? = null,
     /** Optional arbitrary metadata to store alongside the credential (e.g., issuer info, policy results). */
     val metadata: JsonObject? = null,
+    /**
+     * Durable holder-key binding for credentials whose presentation requires proof of possession.
+     * The wallet revalidates this binding against the credential before every presentation.
+     */
+    val holderKeyBinding: HolderKeyBinding? = null,
 ) {
     /** Returns a metadata-only view of this credential (no raw encoded data). */
     fun toMetadata() = StoredCredentialMetadata(

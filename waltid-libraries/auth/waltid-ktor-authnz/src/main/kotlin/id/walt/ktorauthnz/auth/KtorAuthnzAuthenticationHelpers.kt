@@ -31,8 +31,12 @@ suspend fun ApplicationCall.getAuthenticatedAccount(): String = KtorAuthnzManage
 fun ApplicationCall.getEffectiveRequestAuthToken(): String? {
     val ktorAuthnzHeader = request.headers.get("ktor-authnz-auth")
     val cookie = request.cookies["ktor-authnz-auth"] ?: request.cookies["auth.token"]
-    val authHeader = request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")
+    val authHeader = request.headers[HttpHeaders.Authorization]
+        ?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }
+        ?.substringAfter(' ')
+        ?.trim()
+        ?.takeIf(String::isNotEmpty)
 
-    val effectiveToken = ktorAuthnzHeader ?: cookie ?: authHeader
+    val effectiveToken = ktorAuthnzHeader ?: authHeader ?: cookie
     return effectiveToken
 }

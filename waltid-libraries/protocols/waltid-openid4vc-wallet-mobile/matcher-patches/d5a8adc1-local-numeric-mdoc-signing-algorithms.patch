@@ -1,0 +1,90 @@
+diff --git a/CredentialProvider/wasm/matcher-rs/src/issuance.rs b/CredentialProvider/wasm/matcher-rs/src/issuance.rs
+index e18384f..38ccb83 100644
+--- a/CredentialProvider/wasm/matcher-rs/src/issuance.rs
++++ b/CredentialProvider/wasm/matcher-rs/src/issuance.rs
+@@ -623,6 +623,73 @@ mod test {
+         assert_eq!(credman.added_entries.len(), 1);
+     }
+
++    #[test]
++    fn match_portal_mdoc_metadata_with_numeric_signing_algorithms() {
++        let mut credman = FakeCredman {
++            request_json: r#"
++{
++  "requests": [{
++    "protocol": "openid4vci-v1",
++    "data": {
++      "credential_issuer": "https://issuer.example",
++      "credential_configuration_ids": ["org.iso.18013.5.1.mDL"],
++      "grants": {
++        "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
++          "pre-authorized_code": "redacted"
++        }
++      },
++      "credential_issuer_metadata": {
++        "credential_configurations_supported": {
++          "org.iso.18013.5.1.mDL": {
++            "format": "mso_mdoc",
++            "doctype": "org.iso.18013.5.1.mDL",
++            "credential_signing_alg_values_supported": [-7, -9],
++            "cryptographic_binding_methods_supported": ["cose_key"],
++            "proof_types_supported": {
++              "jwt": {
++                "proof_signing_alg_values_supported": ["ES256", "EdDSA"]
++              }
++            }
++          }
++        }
++      },
++      "authorization_server_metadata": {
++        "issuer": "https://issuer.example",
++        "token_endpoint": "https://issuer.example/token"
++      }
++    }
++  }]
++}"#,
++            registered_json: r#"
++{
++  "entry_id": "openid4vci",
++  "entries": [{
++    "subtitle": "Save a credential to this wallet",
++    "explainer": {"default": "Save a credential to this wallet."}
++  }],
++  "preferred_protocols": ["openid4vci-v1"],
++  "filter": {
++    "AllowedMdocDoctypes": {
++      "doctypes": ["org.iso.18013.5.1.mDL"]
++    }
++  }
++}"#,
++            icon: Vec::new(),
++            added_entries: Vec::new(),
++            wasm_version: 9,
++            declared_package_info: None,
++        };
++
++        issuance_main(&mut credman).unwrap();
++
++        assert_eq!(credman.added_entries.len(), 1);
++        let entry = &credman.added_entries[0];
++        assert_eq!(entry.call_type, CallType::Issuance);
++        assert_eq!(entry.entry_id, c"openid4vci_0");
++        assert_eq!(entry.subtitle.as_ref().unwrap(), c"Save a credential to this wallet");
++        assert_eq!(entry.metadata.as_ref().unwrap(), c"{\"eidx\":0,\"ridx\":0}");
++    }
++
+     #[test]
+     fn match_custom_protocol() {
+         let mut credman = FakeCredman {
+diff --git a/CredentialProvider/wasm/matcher-rs/src/openid4vci.rs b/CredentialProvider/wasm/matcher-rs/src/openid4vci.rs
+index 8cc789d..dee750c 100644
+--- a/CredentialProvider/wasm/matcher-rs/src/openid4vci.rs
++++ b/CredentialProvider/wasm/matcher-rs/src/openid4vci.rs
+@@ -152,7 +152,6 @@ mod credential_issuer_metadata {
+         pub scope: String,
+         pub doctype: String,
+         pub vct: String,
+-        pub credential_signing_alg_values_supported: Vec<String>,
+         pub cryptographic_binding_methods_supported: Vec<String>,
+         pub proof_types_supported: DeterministicMap<String, ProofType>,
+     }

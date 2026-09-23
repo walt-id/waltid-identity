@@ -1,74 +1,206 @@
 import SwiftUI
+import UIKit
 import WalletDemoSharingUI
 import WalletSDK
 
 struct CredentialsTabView: View {
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
+    let onOpenSettings: () -> Void
+    @Environment(\.walletDemoBranding) private var branding
+    @State private var othersHidden = false
+    @State private var selectedAtTop = false
+    @State private var showDetailsBody = false
+    @State private var motionGeneration = 0
+    @State private var confirmDelete = false
 
-    private var details: [CredentialDetails] {
-        viewModel.credentials.map(CredentialDisplayNormalizer.details(for:))
+    @State private var cards: [CredentialCardItem] = []
+    @State private var expanded: CredentialDetails?
+
+    private var selectedCredential: Credential? {
+        viewModel.credentials.first { $0.id == selectedDetailsID }
+    }
+
+    private var expandedRawCredential: String {
+        viewModel.credentials.first(where: { $0.id == selectedDetailsID })?.credentialDataJSON
+            ?? "No raw credential available"
     }
 
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    StatusBannerView(
-                        message: viewModel.statusMessage(for: .credentials),
-                        isLoading: viewModel.statusIsLoading(for: .credentials),
-                        isError: viewModel.statusIsError(for: .credentials)
-                    )
+                    if selectedDetailsID == nil {
+                        WalletTabStatusBanner(viewModel: viewModel, tab: .credentials)
 
-                    if let warning = viewModel.transactionDataProfilesWarning {
-                        WarningBannerView(message: warning)
+                        if let warning = viewModel.transactionDataProfilesWarning {
+                            WarningBannerView(message: warning)
+                        }
                     }
 
-                    if details.isEmpty {
+                    if !viewModel.isReady {
+                        if viewModel.isLoading {
+                            ProgressView("Loading credentials…")
+                                .accessibilityIdentifier(WalletAccessibilityID.credentialsLoading)
+                        }
+                    } else if viewModel.credentials.isEmpty {
                         EmptyCredentialsView()
+                    } else if cards.isEmpty {
+                        ProgressView("Loading credentials…")
+                            .accessibilityIdentifier(WalletAccessibilityID.credentialsLoading)
                     } else {
-                        ForEach(details) { item in
-                            CredentialCardButton(details: item) {
-                                selectedDetailsID = item.id
+                        CredentialCardStackView(
+                            cards: cards,
+                            expandedID: selectedDetailsID,
+                            othersHidden: othersHidden,
+                            selectedAtTop: selectedAtTop
+                        ) { id in
+                            if selectedDetailsID == id {
+                                closeDetails()
+                            } else {
+                                openDetails(id)
                             }
+                        }
+
+                        if showDetailsBody, let expanded {
+                            CredentialDetailsView(details: expanded)
+                            .transition(.opacity)
+                        } else if showDetailsBody, selectedCredential != nil {
+                            ProgressView("Loading details…")
                         }
                     }
                 }
-                .padding()
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .padding(.bottom)
+                .animation(.easeOut(duration: 0.16), value: showDetailsBody)
             }
-            .navigationTitle("Credentials")
-            .background(detailsNavigationLink)
-            .accessibilityIdentifier(WalletAccessibilityID.credentialsTabContent)
-        }
-        .navigationViewStyle(.stack)
-    }
-
-    private var detailsNavigationLink: some View {
-        NavigationLink(
-            destination: detailsDestination,
-            isActive: Binding(
-                get: { selectedDetailsID != nil },
-                set: { isActive in
-                    if !isActive {
-                        selectedDetailsID = nil
+            .animation(.easeOut(duration: 0.2), value: selectedDetailsID)
+            .navigationTitle(selectedDetailsID == nil ? branding.appTitle : "")
+            .accessibilityIdentifier(WalletAccessibilityID.appTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(selectedDetailsID != nil)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Group {
+                        if selectedDetailsID != nil {
+                            Button {
+                                closeDetails()
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
+                        }
                     }
                 }
-            )
-        ) {
-            EmptyView()
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Group {
+                        if selectedDetailsID != nil {
+                            Menu {
+                                Button("Copy") {
+                                    UIPasteboard.general.string = expandedRawCredential
+                                }
+                                .accessibilityIdentifier(WalletAccessibilityID.copyRawCredential)
+                                Button("Delete", role: .destructive) {
+                                    confirmDelete = true
+                                }
+                                .accessibilityIdentifier(WalletAccessibilityID.deleteCredential)
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 16, weight: .semibold))
+                            }
+                            .accessibilityIdentifier(WalletAccessibilityID.detailsMenu)
+                        } else {
+                            Button(action: onOpenSettings) {
+                                Image(systemName: "gearshape")
+                            }
+                            .accessibilityLabel("Settings")
+                .accessibilityIdentifier(WalletAccessibilityID.settingsButton)
+                        }
+                    }
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(selectedDetailsID == nil
+                ? WalletAccessibilityID.credentialsTabContent
+                : WalletAccessibilityID.credentialDetailsScreen)
+            .confirmationDialog(
+                "Delete credential?",
+                isPresented: $confirmDelete,
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    if let id = selectedDetailsID {
+                        motionGeneration += 1
+                        selectedDetailsID = nil
+                        showDetailsBody = false
+                        othersHidden = false
+                        selectedAtTop = false
+                        viewModel.deleteCredential(id: id)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes the credential from the wallet. This cannot be undone.")
+            }
         }
-        .hidden()
+        .navigationViewStyle(.stack)
+        .task(id: viewModel.credentials) {
+            cards = []
+            let snapshot = await CredentialDisplayNormalizer.cards(for: viewModel.credentials)
+            guard !Task.isCancelled else { return }
+            cards = snapshot
+        }
+        .task(id: selectedCredential) {
+            expanded = nil
+            guard let selectedCredential else { return }
+            let snapshot = await CredentialDisplayNormalizer.details(for: [selectedCredential])
+            guard !Task.isCancelled else { return }
+            expanded = snapshot.first
+        }
     }
 
-    private var detailsDestination: some View {
-        Group {
-            if let detailsID = selectedDetailsID {
-                CredentialDetailsDestination(
-                    detailsID: detailsID,
-                    details: details
-                )
-            } else {
-                EmptyView()
+    private func openDetails(_ id: String) {
+        motionGeneration += 1
+        let generation = motionGeneration
+        selectedDetailsID = id
+        showDetailsBody = false
+        selectedAtTop = false
+        withAnimation(.easeOut(duration: 0.22)) {
+            othersHidden = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
+            guard generation == motionGeneration, selectedDetailsID == id else { return }
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+                selectedAtTop = true
+            }
+            withAnimation(.easeIn(duration: 0.16)) {
+                showDetailsBody = true
+            }
+        }
+    }
+
+    private func closeDetails(resetSelection: Bool = true) {
+        guard selectedDetailsID != nil else { return }
+        motionGeneration += 1
+        let generation = motionGeneration
+        withAnimation(.easeOut(duration: 0.2)) {
+            showDetailsBody = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            guard generation == motionGeneration else { return }
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+                selectedAtTop = false
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) {
+                guard generation == motionGeneration else { return }
+                withAnimation(.easeIn(duration: 0.22)) {
+                    othersHidden = false
+                }
+                if resetSelection {
+                    selectedDetailsID = nil
+                }
             }
         }
     }

@@ -1,30 +1,51 @@
 package id.walt.walletdemo.compose.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import id.walt.walletdemo.compose.logic.ClaimItem
+import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
+import id.walt.walletdemo.compose.logic.resolvedCardTitle
 import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.logic.toRequestedDisclosureGroup
+import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.exportTestTagsForPlatformAutomation
+import id.walt.walletdemo.compose.ui.resources.Res
+import id.walt.walletdemo.compose.ui.resources.proximity_approve
+import id.walt.walletdemo.compose.ui.resources.proximity_cancel
+import id.walt.walletdemo.compose.ui.resources.proximity_decline
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The wallet's single presentation-review surface, shared by every transport that can ask for a
@@ -44,11 +65,12 @@ internal fun SharingReviewSection(
     enabled: Boolean,
     onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
-    onCredentialClick: (String) -> Unit,
     onSubmit: () -> Unit,
     onCancel: () -> Unit,
     onReject: (() -> Unit)? = null,
     readOnly: Boolean = false,
+    compact: Boolean = false,
+    showActions: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -59,65 +81,61 @@ internal fun SharingReviewSection(
     ) {
         SharingRequestSections(review.request)
 
-        Text(
-            "Select credentials to share",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-
-        review.credentialOptions.forEach { option ->
-            val details = option.toCredentialDetails()
-            val credentialDisplay = details.toCardDisplayData()
-            val requestedDisclosureItems = option.toRequestedDisclosureGroup()?.items.orEmpty()
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(WalletUiTestTags.presentationCredential(option.selection.id)),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                if (!readOnly) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Checkbox(
-                            checked = option.selection in selectedCredentialOptions,
-                            onCheckedChange = { onToggleCredential(option.selection) },
-                            enabled = enabled,
-                            modifier = Modifier.testTag(WalletUiTestTags.presentationCredentialToggle(option.selection.id)),
-                        )
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(option.label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                            Text(credentialDisplay.issuer, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            option.subject?.let {
-                                Text("Subject: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Text(option.format, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-
-                CredentialCard(
-                    details = details,
-                    modifier = Modifier.padding(start = if (readOnly) 0.dp else 48.dp),
-                    onClick = { onCredentialClick(details.summary.id) },
+        if (compact) {
+            var claimsOptionId by rememberSaveable { mutableStateOf<String?>(null) }
+            val claimsOption = review.credentialOptions.firstOrNull { it.selection.id == claimsOptionId }
+            SystemBackHandler(enabled = claimsOption != null) {
+                claimsOptionId = null
+            }
+            CredentialCardStack(
+                cards = remember(review.credentialOptions) {
+                    review.credentialOptions.map { it.toCredentialDetails().toCardDisplayData() }
+                },
+                onOpenDetails = { detailsId ->
+                    claimsOptionId = detailsId
+                },
+            )
+            claimsOption?.let { option ->
+                SharingClaimsDialog(
+                    option = option,
+                    details = remember(option) { option.toCredentialDetails() },
+                    credentialSelected = option.selection in selectedCredentialOptions,
+                    selectedDisclosureOptions = selectedDisclosureOptions,
+                    requestedDisclosureItems = remember(option) { option.toRequestedDisclosureGroup()?.items.orEmpty() },
+                    enabled = enabled,
+                    readOnly = readOnly,
+                    onToggleDisclosure = onToggleDisclosure,
+                    onDismiss = { claimsOptionId = null },
                 )
-                if (option.disclosures.isNotEmpty()) {
-                    SharingDisclosureList(
-                        option = option,
-                        credentialSelected = option.selection in selectedCredentialOptions,
-                        selectedDisclosureOptions = selectedDisclosureOptions,
-                        requestedDisclosureItems = requestedDisclosureItems,
-                        enabled = enabled,
-                        readOnly = readOnly,
-                        onToggleDisclosure = onToggleDisclosure,
-                    )
-                }
-                HorizontalDivider()
+            }
+        } else {
+            Text(
+                "Select credentials to share",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (review.credentialOptions.isEmpty()) {
+                Text(
+                    "No credentials available",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
+            review.credentialOptions.forEach { option ->
+                SelectableCredentialRow(
+                    option = option,
+                    selectedCredentialOptions = selectedCredentialOptions,
+                    selectedDisclosureOptions = selectedDisclosureOptions,
+                    enabled = enabled,
+                    readOnly = readOnly,
+                    onToggleCredential = onToggleCredential,
+                    onToggleDisclosure = onToggleDisclosure,
+                )
             }
         }
 
-        if (!readOnly) {
+        if (!readOnly && showActions) {
             SharingActionsRow(
                 enabled = enabled,
                 selectionComplete = selectionComplete,
@@ -125,6 +143,139 @@ internal fun SharingReviewSection(
                 onCancel = onCancel,
                 onReject = onReject,
             )
+        }
+    }
+}
+
+@Composable
+private fun SelectableCredentialRow(
+    option: WalletDemoPresentationCredentialOption,
+    selectedCredentialOptions: Set<WalletDemoPresentationCredentialSelection>,
+    selectedDisclosureOptions: Set<WalletDemoPresentationDisclosureSelection>,
+    enabled: Boolean,
+    readOnly: Boolean,
+    onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
+    onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
+) {
+    val details = remember(option) { option.toCredentialDetails() }
+    val requestedDisclosureItems = remember(option) { option.toRequestedDisclosureGroup()?.items.orEmpty() }
+    var claimsOpen by rememberSaveable(option.selection.id) { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(WalletUiTestTags.presentationCredential(option.selection.id)),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (!readOnly) {
+            Checkbox(
+                checked = option.selection in selectedCredentialOptions,
+                onCheckedChange = { onToggleCredential(option.selection) },
+                enabled = enabled,
+                modifier = Modifier.testTag(WalletUiTestTags.presentationCredentialToggle(option.selection.id)),
+            )
+        }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .testTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id))
+                .clickable { claimsOpen = true },
+        ) {
+            CredentialCard(
+                details = details,
+                compact = true,
+                onClick = { claimsOpen = true },
+            )
+        }
+    }
+
+    if (claimsOpen) {
+        SharingClaimsDialog(
+            option = option,
+            details = details,
+            credentialSelected = option.selection in selectedCredentialOptions,
+            selectedDisclosureOptions = selectedDisclosureOptions,
+            requestedDisclosureItems = requestedDisclosureItems,
+            enabled = enabled,
+            readOnly = readOnly,
+            onToggleDisclosure = onToggleDisclosure,
+            onDismiss = { claimsOpen = false },
+        )
+    }
+}
+
+@Composable
+private fun SharingClaimsDialog(
+    option: WalletDemoPresentationCredentialOption,
+    details: CredentialDetails,
+    credentialSelected: Boolean,
+    selectedDisclosureOptions: Set<WalletDemoPresentationDisclosureSelection>,
+    requestedDisclosureItems: List<ClaimItem>,
+    enabled: Boolean,
+    readOnly: Boolean,
+    onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 560.dp)
+                .exportTestTagsForPlatformAutomation()
+                .testTag(WalletUiTestTags.PresentationClaimsDialog),
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        option.resolvedCardTitle(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.testTag(WalletUiTestTags.PresentationClaimsClose),
+                    ) {
+                        Text("Close")
+                    }
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 460.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    CredentialOverviewSection(details)
+                    if (option.disclosures.isEmpty()) {
+                        Text(
+                            "No additional claims to review",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        SharingDisclosureList(
+                            option = option,
+                            credentialSelected = credentialSelected,
+                            selectedDisclosureOptions = selectedDisclosureOptions,
+                            requestedDisclosureItems = requestedDisclosureItems,
+                            enabled = enabled,
+                            readOnly = readOnly,
+                            onToggleDisclosure = onToggleDisclosure,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -140,7 +291,7 @@ private fun SharingDisclosureList(
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
 ) {
     Column(
-        modifier = Modifier.padding(start = if (readOnly) 0.dp else 48.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
@@ -197,13 +348,26 @@ private fun SharingDisclosureList(
 }
 
 @Composable
-private fun SharingActionsRow(
+internal fun SharingActionsRow(
     enabled: Boolean,
     selectionComplete: Boolean,
     onSubmit: () -> Unit,
     onCancel: () -> Unit,
     onReject: (() -> Unit)?,
+    presentation: ReviewActionPresentation = ReviewActionPresentation.Sharing,
 ) {
+    val submitLabel = when (presentation) {
+        ReviewActionPresentation.Sharing -> "Share"
+        ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_approve)
+    }
+    val rejectLabel = when (presentation) {
+        ReviewActionPresentation.Sharing -> "Reject"
+        ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_decline)
+    }
+    val cancelLabel = when (presentation) {
+        ReviewActionPresentation.Sharing -> if (onReject == null) "Cancel" else "Cancel review"
+        ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_cancel)
+    }
     Row(
         modifier = Modifier.testTag(WalletUiTestTags.PresentationActions),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -211,25 +375,48 @@ private fun SharingActionsRow(
         Button(
             onClick = onSubmit,
             enabled = enabled && selectionComplete,
-            modifier = Modifier.testTag(WalletUiTestTags.PresentationSubmitButton),
+            modifier = Modifier.testTag(presentation.submitTestTag),
         ) {
-            Text("Share")
+            Text(submitLabel)
+        }
+        TextButton(
+            onClick = onCancel,
+            enabled = enabled || presentation == ReviewActionPresentation.Proximity,
+            modifier = Modifier.testTag(presentation.cancelTestTag),
+        ) {
+            Text(cancelLabel)
         }
         onReject?.let { reject ->
             TextButton(
                 onClick = reject,
                 enabled = enabled,
-                modifier = Modifier.testTag(WalletUiTestTags.PresentationRejectButton),
+                modifier = Modifier.testTag(presentation.rejectTestTag),
             ) {
-                Text("Reject")
+                Text(rejectLabel)
             }
         }
-        TextButton(
-            onClick = onCancel,
-            enabled = enabled,
-            modifier = Modifier.testTag(WalletUiTestTags.PresentationCancelButton),
-        ) {
-            Text(if (onReject == null) "Cancel" else "Cancel review")
-        }
     }
+}
+
+internal enum class ReviewActionPresentation {
+    Sharing,
+    Proximity;
+
+    val submitTestTag: String
+        get() = when (this) {
+            Sharing -> WalletUiTestTags.PresentationSubmitButton
+            Proximity -> WalletUiTestTags.ProximityApprove
+        }
+
+    val rejectTestTag: String
+        get() = when (this) {
+            Sharing -> WalletUiTestTags.PresentationRejectButton
+            Proximity -> WalletUiTestTags.ProximityDecline
+        }
+
+    val cancelTestTag: String
+        get() = when (this) {
+            Sharing -> WalletUiTestTags.PresentationCancelButton
+            Proximity -> WalletUiTestTags.ProximityCancel
+        }
 }

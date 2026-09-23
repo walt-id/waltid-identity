@@ -83,6 +83,7 @@ data class CertificateDer(
  *
  * @throws X509ValidationException when validation fails.
  */
+@Deprecated("Use id.walt.certificate.x509.X509CertificateUtil instead")
 @Throws(X509ValidationException::class)
 expect fun validateCertificateChain(
     leaf: CertificateDer,

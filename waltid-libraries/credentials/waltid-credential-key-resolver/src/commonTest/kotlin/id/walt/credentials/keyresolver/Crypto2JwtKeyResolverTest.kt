@@ -71,6 +71,56 @@ class Crypto2JwtKeyResolverTest {
         assertFailsWith<IllegalArgumentException> { resolver.resolveFromDid(DID, "shared") }
     }
 
+    @Test
+    fun `did jwk key is selected by method verification fragment`() = runTest {
+        val resolved = resolver("$DID_JWK#0").resolveFromJwt(
+            jwtHeader = buildJsonObject { put("kid", "$DID_JWK#0") },
+            jwtPayload = buildJsonObject { put("iss", DID_JWK) },
+        )
+
+        assertEquals(JwtKeyResolutionSource.DID, resolved?.source)
+        assertEquals(KeyId("$DID_JWK#0"), resolved?.key?.id)
+    }
+
+    @Test
+    fun `did jwk resolution accepts kid that is the DID without fragment`() = runTest {
+        val resolved = resolver("$DID_JWK#0").resolveFromJwt(
+            jwtHeader = buildJsonObject { put("kid", DID_JWK) },
+            jwtPayload = buildJsonObject { put("iss", DID_JWK) },
+        )
+
+        assertEquals(JwtKeyResolutionSource.DID, resolved?.source)
+        assertEquals(KeyId("$DID_JWK#0"), resolved?.key?.id)
+    }
+
+    @Test
+    fun `did jwk resolution accepts kid that is not the method verification fragment`() = runTest {
+        val resolved = resolver("$DID_JWK#0").resolveFromJwt(
+            jwtHeader = buildJsonObject { put("kid", "$DID_JWK#org.tenant.kms.key_issuer") },
+            jwtPayload = buildJsonObject { put("iss", DID_JWK) },
+        )
+
+        assertEquals(JwtKeyResolutionSource.DID, resolved?.source)
+        assertEquals(KeyId("$DID_JWK#0"), resolved?.key?.id)
+    }
+
+    @Test
+    fun `did jwk resolution rejects multiple verification keys`() = runTest {
+        assertFailsWith<IllegalArgumentException> {
+            resolver("$DID_JWK#0", "$DID_JWK#1").resolveFromDid(DID_JWK, "$DID_JWK#0")
+        }
+    }
+
+    @Test
+    fun `did jwk single key is used when kid is omitted`() = runTest {
+        val resolved = resolver("$DID_JWK#0").resolveFromJwt(
+            jwtHeader = null,
+            jwtPayload = buildJsonObject { put("iss", DID_JWK) },
+        )
+
+        assertEquals(KeyId("$DID_JWK#0"), resolved?.key?.id)
+    }
+
     private suspend fun resolver(vararg keyIds: String): Crypto2JwtKeyResolver {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val keys = keyIds.map { keyId ->
@@ -87,5 +137,7 @@ class Crypto2JwtKeyResolverTest {
 
     private companion object {
         const val DID = "did:example:issuer"
+        const val DID_JWK =
+            "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6ImVCVkJMaC16eVQ0NWZTbklWUTBtbmVvTUc0dTU4eHFhSHk1aE5SOVZPdGciLCJ5IjoiRTl0ZTdyX3A5dWIyaS1ER01SUzVwSVQ2ZWpzdDd4OTRkLTBFTWoteVEzbyJ9"
     }
 }

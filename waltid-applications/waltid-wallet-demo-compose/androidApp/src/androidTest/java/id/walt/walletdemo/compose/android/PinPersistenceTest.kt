@@ -3,9 +3,15 @@ package id.walt.walletdemo.compose.android
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.Until
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchExpectingSetupAndUnlock
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.findResourceAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.relaunchAndUnlock
 import org.junit.After
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -27,6 +33,36 @@ class PinPersistenceTest {
 
         launchExpectingSetupAndUnlock(context, device)
         relaunchAndUnlock(context, device)
+    }
+
+    @Test
+    fun settingsSurviveRotationAndActivityRecreationWithoutLocking() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val device = UiDevice.getInstance(instrumentation)
+        launchExpectingSetupAndUnlock(instrumentation.targetContext, device)
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsButton")
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsProximityPresentation")
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsReaderAuthentication")
+        try {
+            device.setOrientationLeft()
+            assertTrue(device.wait(Until.hasObject(By.res("wallet.settingsReaderPolicyAllowUntrusted")), 10_000))
+            assertTrue(!device.hasObject(By.res("wallet.pinInput")))
+            instrumentation.runOnMainSync {
+                ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                    .filterIsInstance<MainActivity>().single().recreate()
+            }
+            instrumentation.waitForIdleSync()
+            assertTrue(device.wait(Until.hasObject(By.res("wallet.settingsReaderPolicyAllowUntrusted")), 10_000))
+            assertTrue(!device.hasObject(By.res("wallet.pinInput")))
+            WalletComposeE2EHelper.clickByTag(device, "wallet.settingsBack")
+            // Small landscape viewports require scrolling to reveal these destination rows.
+            assertNotNull("Nearby sharing was not restored", findResourceAfterScrolling(device, "wallet.settingsConnectionMethod"))
+            WalletComposeE2EHelper.clickByTag(device, "wallet.settingsBack")
+            assertNotNull("Settings root was not restored", findResourceAfterScrolling(device, "wallet.settingsSigningKey"))
+        } finally {
+            device.setOrientationNatural()
+            device.unfreezeRotation()
+        }
     }
 
     private fun clearPersistedPin() {

@@ -61,7 +61,7 @@ tasks.test {
 }
 mavenPublishing {
     pom {
-        name.set("Walt.id Crypto Azure")
-        description.set("Walt.id Crypto Azure Key Vault Integration")
+        name.set("walt.id Crypto Azure")
+        description.set("walt.id Crypto Azure Key Vault Integration")
     }
 }

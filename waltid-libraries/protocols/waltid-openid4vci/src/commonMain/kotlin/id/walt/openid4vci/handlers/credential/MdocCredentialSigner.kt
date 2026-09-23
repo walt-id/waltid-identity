@@ -13,7 +13,10 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.mdoc.dataelement.DataElement as LegacyMdocDataElement
+import id.walt.mdoc.encoding.mapPortraitCaptureDate
+import id.walt.mdoc.encoding.PortraitCaptureDateMapping
 import id.walt.mdoc.issuance.MdocIssuer
+import id.walt.mdoc.objects.mso.KeyAuthorization
 import id.walt.mdoc.objects.mso.Status
 import id.walt.mdoc.schema.MdocsSchemaMappingFunction.toCborElement
 import id.walt.openid4vci.proofs.VerifiedCredentialProof
@@ -30,6 +33,16 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
 object MdocCredentialSigner {
+
+    /**
+     * The data elements our own [id.waltid.openid4vp.wallet.presentation.MdocPresenter] device-signs
+     * for transaction data. OpenID4VP 1.0 Appendix B.2.1 deliberately defines no element names: each
+     * transaction data type defines the (NameSpace, DataElementIdentifier, DataElementValue) it
+     * contributes. `transaction_data_hash_alg` is emitted only when the request carries
+     * `transaction_data_hashes_alg`, so both are authorized to cover either case.
+     */
+    private val TRANSACTION_DATA_HASH_ELEMENTS = listOf("transaction_data_hash", "transaction_data_hash_alg")
+
     @OptIn(ExperimentalSerializationApi::class)
     @Deprecated("Use the Crypto2Key overload")
     suspend fun generateMdocCredential(
@@ -43,6 +56,8 @@ object MdocCredentialSigner {
         status: Status? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
         verifiedProof: VerifiedCredentialProof? = null,
+        authorizedTransactionDataTypes: List<String>? = null,
+        signedAt: Instant? = null,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -53,6 +68,7 @@ object MdocCredentialSigner {
         credentialRequest = credentialRequest,
         credentialData = credentialData,
         issuerSigningKey = IssuerSigningKey.Legacy(issuerKey),
+        signedAt = signedAt,
         issuerCertificate = issuerCertificate,
         docType = docType,
         validFrom = validFrom,
@@ -60,6 +76,7 @@ object MdocCredentialSigner {
         status = status,
         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
         verifiedProof = verifiedProof,
+        authorizedTransactionDataTypes = authorizedTransactionDataTypes,
         valueMappingFunction = valueMappingFunction,
     )
 
@@ -76,6 +93,8 @@ object MdocCredentialSigner {
         status: Status? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
         verifiedProof: VerifiedCredentialProof? = null,
+        authorizedTransactionDataTypes: List<String>? = null,
+        signedAt: Instant? = null,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -86,6 +105,7 @@ object MdocCredentialSigner {
         credentialRequest = credentialRequest,
         credentialData = credentialData,
         issuerSigningKey = IssuerSigningKey.Crypto2(issuerKey, signatureAlgorithm),
+        signedAt = signedAt,
         issuerCertificate = issuerCertificate,
         docType = docType,
         validFrom = validFrom,
@@ -93,6 +113,7 @@ object MdocCredentialSigner {
         status = status,
         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
         verifiedProof = verifiedProof,
+        authorizedTransactionDataTypes = authorizedTransactionDataTypes,
         valueMappingFunction = valueMappingFunction,
     )
 
@@ -101,6 +122,7 @@ object MdocCredentialSigner {
         credentialRequest: CredentialRequest,
         credentialData: JsonObject,
         issuerSigningKey: IssuerSigningKey,
+        signedAt: Instant?,
         issuerCertificate: List<CoseCertificate>,
         docType: String,
         validFrom: Instant?,
@@ -108,6 +130,7 @@ object MdocCredentialSigner {
         status: Status?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         verifiedProof: VerifiedCredentialProof?,
+        authorizedTransactionDataTypes: List<String>?,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -126,18 +149,24 @@ object MdocCredentialSigner {
 
         val effectiveValueMappingFunction =
             { docTypeValue: String, namespace: String, elementIdentifier: String, elementValueJson: JsonElement ->
-                mDocNameSpacesDataMappingConfig
-                    ?.get(namespace)
-                    ?.entriesConfigMap
-                    ?.get(elementIdentifier)
-                    ?.executeMapping(elementValueJson)
-                    ?.toKotlinxCborElement()
-                    ?: valueMappingFunction(docTypeValue, namespace, elementIdentifier, elementValueJson)
+                when (val portrait = mapPortraitCaptureDate(namespace, elementIdentifier, elementValueJson)) {
+                    PortraitCaptureDateMapping.Omit -> null
+                    is PortraitCaptureDateMapping.Mapped -> portrait.value
+                    PortraitCaptureDateMapping.NotApplicable -> mDocNameSpacesDataMappingConfig
+                        ?.get(namespace)
+                        ?.entriesConfigMap
+                        ?.get(elementIdentifier)
+                        ?.executeMapping(elementValueJson)
+                        ?.toKotlinxCborElement()
+                        ?: valueMappingFunction(docTypeValue, namespace, elementIdentifier, elementValueJson)
+                }
             }
 
         val issuanceData = MdocIssuer.MdocUniversalIssuanceData(namespaces)
+        val keyAuthorizations = authorizedTransactionDataTypes.toKeyAuthorizations()
         val issuedCredential = when (issuerSigningKey) {
             is IssuerSigningKey.Legacy -> MdocIssuer.issueUniversal(
+                signedAt = signedAt,
                 issuerKey = issuerSigningKey.key,
                 issuerCertificate = issuerCertificate,
                 holderKey = holderKey,
@@ -146,10 +175,12 @@ object MdocCredentialSigner {
                 validFrom = validFrom,
                 validUntil = validUntil,
                 status = status,
+                keyAuthorizations = keyAuthorizations,
                 valueMappingFunction = effectiveValueMappingFunction,
             )
 
             is IssuerSigningKey.Crypto2 -> MdocIssuer.issueUniversal(
+                signedAt = signedAt,
                 issuerKey = issuerSigningKey.key,
                 signatureAlgorithm = issuerSigningKey.algorithm,
                 issuerCertificate = issuerCertificate,
@@ -159,12 +190,33 @@ object MdocCredentialSigner {
                 validFrom = validFrom,
                 validUntil = validUntil,
                 status = status,
+                keyAuthorizations = keyAuthorizations,
                 valueMappingFunction = effectiveValueMappingFunction,
             )
         }
 
         return coseCompliantCbor.encodeToByteArray(issuedCredential).encodeToBase64Url()
     }
+
+    /**
+     * Authorizes the device key to sign transaction data of the given types. Without this the holder
+     * cannot sign transaction data at all, because presentation requires the type to appear in the
+     * MSO's KeyAuthorizations.
+     *
+     * OpenID4VP Appendix B.2.1 leaves the concrete namespace and data element mapping to the
+     * transaction data type. Using the type itself as the response namespace is the walt.id
+     * convention, matching what [id.waltid.openid4vp.wallet.presentation.MdocPresenter] emits, so that
+     * is what gets authorized here.
+     *
+     * The grant is granular rather than a blanket `nameSpaces` entry, because our presenter only ever
+     * device-signs [TRANSACTION_DATA_HASH_ELEMENTS] under that namespace. Authorizing the whole
+     * namespace would also permit arbitrary future device-signed elements.
+     */
+    private fun List<String>?.toKeyAuthorizations(): KeyAuthorization? =
+        this?.filter { it.isNotBlank() }
+            ?.distinct()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { types -> KeyAuthorization(dataElements = types.associateWith { TRANSACTION_DATA_HASH_ELEMENTS }) }
 
     suspend fun resolveHolderKey(credentialRequest: CredentialRequest): CoseKey {
         val jwtProof = credentialRequest.proofs?.jwt?.firstOrNull()

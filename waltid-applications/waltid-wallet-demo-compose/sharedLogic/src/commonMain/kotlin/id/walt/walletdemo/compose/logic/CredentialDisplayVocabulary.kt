@@ -75,6 +75,41 @@ internal object CredentialDisplayVocabulary {
         ClaimDescriptor("picture", roles = setOf(ClaimRole.Image), displayOrder = 72),
         ClaimDescriptor("image", roles = setOf(ClaimRole.Image), displayOrder = 73),
         ClaimDescriptor("logo", roles = setOf(ClaimRole.Image), displayOrder = 74),
+        ClaimDescriptor(
+            "signature_usual_mark",
+            label = "Signature or usual mark",
+            group = ClaimGroupKind.Personal,
+            roles = setOf(ClaimRole.Image),
+            displayOrder = 75,
+        ),
+        ClaimDescriptor(
+            "biometric_template_face",
+            label = "Biometric template face",
+            group = ClaimGroupKind.Personal,
+            roles = setOf(ClaimRole.Image),
+            displayOrder = 76,
+        ),
+        ClaimDescriptor(
+            "biometric_template_finger",
+            label = "Biometric template finger",
+            group = ClaimGroupKind.Personal,
+            roles = setOf(ClaimRole.Image),
+            displayOrder = 77,
+        ),
+        ClaimDescriptor(
+            "biometric_template_signature_sign",
+            label = "Biometric template signature or sign",
+            group = ClaimGroupKind.Personal,
+            roles = setOf(ClaimRole.Image),
+            displayOrder = 78,
+        ),
+        ClaimDescriptor(
+            "biometric_template_iris",
+            label = "Biometric template iris",
+            group = ClaimGroupKind.Personal,
+            roles = setOf(ClaimRole.Image),
+            displayOrder = 79,
+        ),
         ClaimDescriptor("age", group = ClaimGroupKind.Personal, displayOrder = 80),
         ClaimDescriptor("age_over_18", label = "Age over 18", group = ClaimGroupKind.Personal, displayOrder = 81),
         ClaimDescriptor("resident_address", label = "Resident address", group = ClaimGroupKind.Address, displayOrder = 100),
@@ -145,6 +180,11 @@ internal object CredentialDisplayVocabulary {
         "validFrom",
         "validUntil",
     ).map(NormalizedClaimKey::from).toSet()
+    // Containers that only wrap a transaction data payload; prefixing rows with them adds no meaning.
+    private val transactionDataTransparentContainerNames = setOf(
+        TransactionDataField.Details.id,
+        "payload",
+    ).map(NormalizedClaimKey::from).toSet()
     private val technicalContainerNames = setOf(
         "@context",
         "credentialSchema",
@@ -182,6 +222,24 @@ internal object CredentialDisplayVocabulary {
 
     fun humanizedClaimLabel(key: String): String =
         descriptorFor(key)?.label ?: ClaimLabelFormatter.humanize(key)
+
+    /**
+     * Transaction data payloads nest freely (`payee.name`, `payee.id`), and a bare "Name" row on the
+     * sharing screen does not say what is being authorized. Credential claims keep their plain labels,
+     * because their vocabulary already disambiguates them (`resident_address.locality` -> "Locality").
+     */
+    fun qualifiesNestedClaimLabels(parentPath: ClaimPath): Boolean =
+        parentPath.topLevel == ClaimPathRoot.TransactionData.id &&
+                NormalizedClaimKey.from(parentPath.leaf) !in transactionDataTransparentContainerNames
+
+    fun qualifiedClaimLabel(parentLabel: String, childLabel: String): String {
+        val parent = parentLabel.trim()
+        val child = childLabel.trim()
+        if (parent.isEmpty()) return child
+        if (child.isEmpty()) return parent
+        if (child.startsWith(parent, ignoreCase = true)) return child
+        return "$parent ${child.replaceFirstChar { it.lowercaseChar() }}"
+    }
 
     fun disclosureLabel(name: String?, path: String): String =
         name
@@ -223,6 +281,9 @@ internal object CredentialDisplayVocabulary {
 
     fun hasRole(path: ClaimPath, role: ClaimRole): Boolean =
         role in roles(path = path)
+
+    fun hasLeafDescriptor(path: ClaimPath): Boolean =
+        descriptorFor(path.leaf) != null
 
     fun isGenericCredentialType(value: String): Boolean =
         CredentialTypeIdentifier.token(value)?.equals(GenericVerifiableCredentialType, ignoreCase = true) == true

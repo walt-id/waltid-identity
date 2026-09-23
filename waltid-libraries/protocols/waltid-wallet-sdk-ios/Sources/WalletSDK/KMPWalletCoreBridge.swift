@@ -14,10 +14,14 @@ func parseWalletISO8601Date(_ value: String) -> Date? {
 @preconcurrency import WalletCore
 
 final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
-    private let bridge: WalletSdkBridge
+    let bridge: WalletSdkBridge
+    var signingIdentityCore: any SigningIdentityCore { KMPSigningIdentityCore(bridge: bridge) }
+    private let nfcHost = IOSNfcHostPlatformAdapter()
 
     init(configuration: WalletConfiguration) async throws {
-        let result = try await WalletSdkBridgeFactory().create(
+        let result = try await WalletSdkBridgeFactory(
+            nfcHostPlatformAdapter: nfcHost
+        ).create(
             configuration: configuration.toKMPConfiguration()
         )
         self.bridge = try Self.successValue(result, as: WalletSdkBridge.self, operation: "create wallet bridge")
@@ -43,28 +47,54 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         }
     }
 
-    func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult {
-        let result = try await bridge.bootstrap(
+
+
+    func keyUseAuthorizationPreflight(
+        keyType: WalletKeyType,
+        policy: WalletKeyUseAuthorizationPolicy
+    ) async throws -> WalletKeyUseAuthorizationPreflight {
+        let result = try await bridge.keyUseAuthorizationPreflight(
             keyType: keyType.toKMPKeyType(),
-            didMethod: didMethod
+            policy: policy.toKMPAuthorizationPolicy()
         )
         let value = try Self.successValue(
             result,
-            as: MobileWalletBootstrapResult.self,
-            operation: "bootstrap wallet"
+            as: WalletBridgeKeyPreflight.self,
+            operation: "key authorization preflight"
         )
-
-        return .init(keyID: value.keyId, did: value.did)
+        switch (value.supported, value.effectivePolicy, value.reuseEnforcement, value.timeoutValidation, value.failure) {
+        case (true, let policy?, let reuseEnforcement?, let timeoutValidation?, nil):
+            guard (policy.timeoutSeconds?.intValue ?? 0) > 0 else {
+                throw WalletError.internalFailure("Invalid timed key authorization preflight result")
+            }
+            return .supported(
+                effectivePolicy: policy.toSwiftAuthorizationPolicy(),
+                reuseEnforcement: reuseEnforcement.toSwiftAuthorizationReuseEnforcement(),
+                timeoutValidation: timeoutValidation.toSwiftAuthorizationTimeoutValidation()
+            )
+        case (true, let policy?, nil, nil, nil):
+            guard (policy.timeoutSeconds?.intValue ?? 0) == 0 else {
+                throw WalletError.internalFailure("Timed key authorization preflight lacks timeout metadata")
+            }
+            return .supported(
+                effectivePolicy: policy.toSwiftAuthorizationPolicy(),
+                reuseEnforcement: nil,
+                timeoutValidation: nil
+            )
+        case (false, nil, nil, nil, let failure?): return .unsupported(failure.toSwiftAuthorizationUnsupportedReason())
+        default: throw WalletError.internalFailure("Invalid key authorization preflight result")
+        }
     }
 
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
         let result = try await bridge.startIssuance(
             request: MobileWalletIssuanceRequest(
-                offerUrl: request.offer.absoluteString,
+                offer: MobileWalletCredentialOfferUri(value: request.offer.absoluteString),
                 clientId: request.clientID,
                 redirectUri: request.redirectURI.absoluteString,
                 keyId: request.keyID,
-                did: request.did
+                did: request.did,
+                keyPolicy: request.keyPolicy.toKMPSigningIdentityPolicy()
             )
         )
         let value = try Self.successValue(
@@ -129,6 +159,18 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         }
 
         throw WalletError.internalFailure("Unexpected credentials result type: \(type(of: value))")
+    }
+
+    func deleteCredential(id: String) async throws -> Bool {
+        let result = try await bridge.deleteCredential(credentialId: id)
+        let value = try Self.successAnyValue(result, operation: "delete credential")
+        if let flag = value as? KotlinBoolean {
+            return flag.boolValue
+        }
+        if let flag = value as? Bool {
+            return flag
+        }
+        throw WalletError.internalFailure("Unexpected delete credential result type: \(type(of: value))")
     }
 
     func deleteLocalData() async throws {
@@ -222,6 +264,33 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         _ = try Self.successAnyValue(result, operation: "discard presentation preview")
     }
 
+    func proximityPresentationCapabilities(
+        configuration: ProximityConfiguration
+    ) async throws -> ProximityCapabilities {
+        let result = try await bridge.proximityPresentationCapabilities(
+            configuration: configuration.toKMPConfiguration()
+        )
+        return try Self.successValue(
+            result,
+            as: WalletCore.ProximityCapabilities.self,
+            operation: "check proximity presentation capabilities"
+        ).toSwiftCapabilities()
+    }
+
+    func startProximityPresentation(
+        configuration: ProximityConfiguration
+    ) async throws -> any ProximitySessionBridge {
+        let result = try await bridge.startProximityPresentation(
+            configuration: configuration.toKMPConfiguration()
+        )
+        let session = try Self.successValue(
+            result,
+            as: WalletCore.ProximitySession.self,
+            operation: "start proximity presentation"
+        )
+        return KMPProximityPresentationSessionBridge(session: session, nfcHost: nfcHost)
+    }
+
     func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
         bridge.digitalCredentialCapabilities().toSwiftCapabilities()
     }
@@ -276,7 +345,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return DigitalCredentialResponse(protocolIdentifier: value.protocol, dataJSON: value.dataJson)
     }
 
-    private static func successValue<T>(
+    static func successValue<T>(
         _ result: any WalletBridgeResult,
         as type: T.Type,
         operation: String
@@ -320,6 +389,623 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     }
 }
 
+private protocol KMPBackedProximityReaderTrustEvaluator {
+    var kmpReaderTrustEvaluator: any WalletCore.ProximityReaderTrustEvaluator { get }
+}
+
+extension ProximityConfiguration {
+    func toKMPConfiguration() -> WalletCore.ProximityConfiguration {
+        WalletCore.ProximityConfiguration(
+            profile: profile.toKMPProfile(),
+            session: session.toKMPConfiguration(),
+            readerPolicy: readerPolicy.toKMPPolicy(),
+            deviceAuthenticationPolicy: deviceAuthenticationPolicy.toKMPPolicy(),
+            readerTrustEvaluator: readerTrustEvaluator.map { evaluator in
+                (evaluator as? any KMPBackedProximityReaderTrustEvaluator)?.kmpReaderTrustEvaluator ??
+                    KMPProximityReaderTrustEvaluatorAdapter(evaluator: evaluator)
+            } ?? WalletCore.UnconfiguredProximityReaderTrustEvaluator.shared,
+            credentialStatusEvaluator: credentialStatusEvaluator.map {
+                KMPProximityCredentialStatusEvaluatorAdapter(evaluator: $0)
+            } ?? WalletCore.UnconfiguredProximityCredentialStatusEvaluator.shared,
+            applicationProfiles: WalletCore.ProximityApplicationProfileRegistry(
+                profiles: applicationProfiles.map(KMPProximityApplicationProfileAdapter.init)
+            ),
+            maximumMessageBytes: Int32(maximumMessageBytes),
+            approval: approval.toKMPApproval()
+        )
+    }
+}
+
+private extension ProximityApproval {
+    func toKMPApproval() -> any WalletCore.ProximityApproval {
+        switch self {
+        case .askEachTime: return WalletCore.ProximityApprovalAskEachTime.shared
+        case .prepareBeforeSharing: return WalletCore.ProximityApprovalPrepareBeforeSharing.shared
+        case .prepared(let sharing):
+            guard let bridge = sharing.bridge as? KMPPreparedSharingBridge else {
+                preconditionFailure("Prepared sharing must be issued by this wallet SDK")
+            }
+            return WalletCore.ProximityApprovalPrepared(sharing: bridge.sharing)
+        }
+    }
+}
+
+private final class KMPSharingPlanBridge: ProximitySharingPlanBridge, @unchecked Sendable {
+    let plan: WalletCore.ProximitySharingPlan
+    init(_ plan: WalletCore.ProximitySharingPlan) { self.plan = plan }
+    var isExpired: Bool { plan.isExpired }
+
+    func approve(_ submission: ProximitySubmission) throws -> ProximityPreparationResult {
+        switch onEnum(of: plan.approve(submission: submission.toKMPSubmission())) {
+        case .prepared(let value): return .prepared(try value.sharing.toSwiftPreparedSharing())
+        case .rejected(let value): return .rejected(value.error.toSwiftError())
+        }
+    }
+}
+
+private final class KMPPreparedSharingBridge: ProximityPreparedSharingBridge, @unchecked Sendable {
+    let sharing: WalletCore.ProximityPreparedSharing
+    init(_ sharing: WalletCore.ProximityPreparedSharing) { self.sharing = sharing }
+    var remainingSeconds: Int { Int(sharing.remainingSeconds) }
+    func revoke() async { try? await sharing.revoke() }
+}
+
+private extension WalletCore.ProximitySharingPlan {
+    func toSwiftSharingPlan() throws -> ProximitySharingPlan {
+        .init(review: try review.toSwiftReview(), expiresAt: expiresAt.toDate(),
+              readerCertificateSHA256: readerCertificateSha256, bridge: KMPSharingPlanBridge(self))
+    }
+}
+
+private extension WalletCore.ProximityPreparedSharing {
+    func toSwiftPreparedSharing() throws -> ProximityPreparedSharing {
+        .init(review: try review.toSwiftReview(), submission: try submission.toSwiftSubmission(),
+              expiresAt: expiresAt.toDate(), bridge: KMPPreparedSharingBridge(self))
+    }
+}
+
+private extension WalletCore.ProximitySharingReceipt {
+    func toSwiftReceipt() throws -> ProximitySharingReceipt {
+        .init(review: try review.toSwiftReview(), submission: try submission.toSwiftSubmission(),
+              approvalTiming: approvalTiming == .beforeConnection ? .beforeConnection : .duringConnection,
+              completedAt: completedAt.toDate())
+    }
+}
+
+private extension ProximitySubmission {
+    func toKMPSubmission() -> WalletCore.ProximitySubmission {
+        .init(documents: documents.map { document in
+            WalletCore.ProximityDocumentSubmission(requestIndex: Int32(document.requestIndex), credentialId: document.credentialID,
+                disclosedElements: Set(document.disclosedElements.map {
+                    WalletCore.ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
+                }))
+        }, continueAfterResponse: continueAfterResponse)
+    }
+}
+
+extension WalletCore.ProximitySubmission {
+    func toSwiftSubmission() throws -> ProximitySubmission {
+        try .init(documents: swiftArray(documents, of: WalletCore.ProximityDocumentSubmission.self).map { document in
+            try ProximityDocumentSubmission(requestIndex: Int(document.requestIndex), credentialID: document.credentialId,
+                disclosedElements: Set(try swiftSet(document.disclosedElements, of: WalletCore.ProximityElementReference.self).map {
+                    try ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
+                }))
+        }, continueAfterResponse: continueAfterResponse)
+    }
+}
+
+/// Swift-native facade for the shared ISO reader-certificate and RICAL trust evaluator.
+public final class ProximityConfiguredReaderTrustEvaluator:
+    ProximityReaderTrustEvaluator,
+    KMPBackedProximityReaderTrustEvaluator,
+    @unchecked Sendable {
+    private let evaluator: WalletCore.ProximityConfiguredReaderTrustEvaluator
+
+    public init(configuration: ProximityReaderTrustConfiguration) {
+        evaluator = WalletCore.ProximityConfiguredReaderTrustEvaluator(
+            configuration: configuration.toKMPConfiguration()
+        )
+    }
+
+    fileprivate var kmpReaderTrustEvaluator: any WalletCore.ProximityReaderTrustEvaluator {
+        evaluator
+    }
+
+    public func evaluate(
+        _ evidence: ProximityReaderEvidence
+    ) async throws -> ProximityReaderTrustDecision {
+        try await evaluator.evaluate(evidence: evidence.toKMPEvidence()).toSwiftDecision()
+    }
+}
+
+/// Swift-native access to shared direct complete-CRL verification.
+///
+/// The application supplies issuer lookup certificates, selects the checked path scope, and owns
+/// transport/cache policy. Lookup certificates do not establish trust. Unsupported CRL forms and
+/// unavailable status remain indeterminate; verified revocation prevents disclosure.
+public final class ProximityCRLRevocationEvaluator: ProximityReaderRevocationEvaluator, @unchecked Sendable {
+    fileprivate let evaluator: WalletCore.ProximityCrlRevocationEvaluator
+
+    /// Creates an explicit CRL evaluator for a reader revocation policy.
+    /// - Parameters:
+    ///   - issuerCertificatesDER: Public issuer lookup certificates, up to ten certificates.
+    ///   - scope: Whether to check only the reader or also its issuing authorities.
+    ///   - fetcher: Application transport with explicit timeout, redirect and destination policy.
+    /// - Throws: ``WalletError/invalidInput(_:)`` when issuer input is invalid or exceeds bounds.
+    public init(
+        issuerCertificatesDER: [Data],
+        scope: ProximityCRLScope,
+        fetcher: any ProximityCRLFetcher
+    ) throws {
+        guard (1...10).contains(issuerCertificatesDER.count),
+              issuerCertificatesDER.allSatisfy({ !$0.isEmpty && $0.count <= 65_536 }) else {
+            throw WalletError.invalidInput("CRL issuer certificates exceed the supported bounds.")
+        }
+        let kmpScope: WalletCore.ProximityCrlScope
+        switch scope {
+        case .readerCertificate: kmpScope = .readerCertificate
+        case .validatedPath: kmpScope = .validatedPath
+        case .readerCertificateAndIssuingAuthorities: kmpScope = .readerCertificateAndIssuingAuthorities
+        }
+        do {
+            evaluator = try WalletCore.ProximityCrlRevocationEvaluator(
+                issuerCertificatesDerBase64Url: issuerCertificatesDER.map { $0.base64URLEncodedString() },
+                scope: kmpScope,
+                fetcher: KMPProximityCRLFetcherAdapter(fetcher)
+            )
+        } catch {
+            throw WalletError.invalidInput("CRL issuer certificates are invalid or exceed the supported bounds.")
+        }
+    }
+
+    /// Verifies the configured certificate scope using current complete CRLs.
+    /// - Parameter evidence: Authenticated reader evidence for one request scope.
+    /// - Returns: Good, revoked or indeterminate status, independently of certificate-path trust.
+    public func evaluate(_ evidence: ProximityReaderEvidence) async throws -> ProximityCertificateRevocationResult {
+        try Task.checkCancellation()
+        let result: any WalletCore.ProximityCertificateRevocationResult
+        do {
+            result = try await evaluator.evaluate(evidence: evidence.toKMPEvidence())
+        } catch {
+            try Task.checkCancellation()
+            throw WalletError.internalFailure("CRL evaluation could not complete.")
+        }
+        try Task.checkCancellation()
+        switch onEnum(of: result) {
+        case .good:
+            return .good
+        case let .revoked(value):
+            return .revoked(reason: value.reason)
+        case let .indeterminate(value):
+            return .indeterminate(reason: value.reason)
+        }
+    }
+}
+
+private final class KMPProximityCRLFetcherAdapter: WalletCore.ProximityCrlFetcher, @unchecked Sendable {
+    private let fetcher: any ProximityCRLFetcher
+
+    init(_ fetcher: any ProximityCRLFetcher) {
+        self.fetcher = fetcher
+    }
+
+    func __fetch(url: String, maximumBytes: Int32) async throws -> any WalletCore.ProximityCrlFetchResult {
+        guard let destination = URL(string: url) else {
+            return WalletCore.ProximityCrlFetchResultUnavailable.shared
+        }
+        switch try await fetcher.fetch(from: destination, maximumBytes: Int(maximumBytes)) {
+        case let .available(data):
+            guard !data.isEmpty, data.count <= Int(maximumBytes) else {
+                return WalletCore.ProximityCrlFetchResultUnavailable.shared
+            }
+            return WalletCore.ProximityCrlFetchResultAvailable(crlDerBase64Url: data.base64URLEncodedString())
+        case .unavailable:
+            return WalletCore.ProximityCrlFetchResultUnavailable.shared
+        }
+    }
+}
+
+private final class KMPProximityReaderRevocationEvaluatorAdapter:
+    WalletCore.ProximityReaderRevocationEvaluator,
+    @unchecked Sendable {
+    private let evaluator: any ProximityReaderRevocationEvaluator
+
+    init(_ evaluator: any ProximityReaderRevocationEvaluator) {
+        self.evaluator = evaluator
+    }
+
+    func __evaluate(
+        evidence: WalletCore.ProximityReaderEvidence
+    ) async throws -> any WalletCore.ProximityCertificateRevocationResult {
+        switch try await evaluator.evaluate(evidence.toSwiftEvidence()).storage {
+        case .good:
+            return WalletCore.ProximityCertificateRevocationResultGood.shared
+        case let .revoked(reason):
+            return WalletCore.ProximityCertificateRevocationResultRevoked(reason: reason)
+        case let .indeterminate(reason):
+            return WalletCore.ProximityCertificateRevocationResultIndeterminate(reason: reason)
+        }
+    }
+}
+
+private final class KMPProximityRICALSignerRevocationEvaluatorAdapter:
+    WalletCore.ProximityRicalSignerRevocationEvaluator,
+    @unchecked Sendable {
+    private let evaluator: any ProximityRICALSignerRevocationEvaluator
+
+    init(_ evaluator: any ProximityRICALSignerRevocationEvaluator) {
+        self.evaluator = evaluator
+    }
+
+    func __evaluate(
+        evidence: WalletCore.ProximityRicalSignerEvidence
+    ) async throws -> any WalletCore.ProximityCertificateRevocationResult {
+        let result = try await evaluator.evaluate(
+            ProximityRICALSignerEvidence(
+                providerID: evidence.providerId,
+                certificateChainDER: try evidence.certificateChainDerBase64Url.map {
+                    try decodedBase64URL($0, context: "RICAL signer certificate evidence")
+                }
+            )
+        )
+        switch result.storage {
+        case .good:
+            return WalletCore.ProximityCertificateRevocationResultGood.shared
+        case let .revoked(reason):
+            return WalletCore.ProximityCertificateRevocationResultRevoked(reason: reason)
+        case let .indeterminate(reason):
+            return WalletCore.ProximityCertificateRevocationResultIndeterminate(reason: reason)
+        }
+    }
+}
+
+private final class KMPProximityRICALProviderAdapter:
+    WalletCore.ProximityRicalProvider,
+    @unchecked Sendable {
+    private let provider: any ProximityRICALProvider
+
+    init(_ provider: any ProximityRICALProvider) {
+        self.provider = provider
+    }
+
+    func __current() async throws -> any WalletCore.ProximityRicalProviderResult {
+        switch try await provider.current().storage {
+        case let .available(signedRICAL):
+            return WalletCore.ProximityRicalProviderResultAvailable(
+                signedRicalBase64Url: signedRICAL.base64URLEncodedString()
+            )
+        case let .unavailable(reason):
+            return WalletCore.ProximityRicalProviderResultUnavailable(reason: reason)
+        case let .conflict(reason):
+            return WalletCore.ProximityRicalProviderResultConflict(reason: reason)
+        }
+    }
+}
+
+private final class KMPProximityRICALConstraintEvaluatorAdapter:
+    WalletCore.ProximityRicalConstraintEvaluator,
+    @unchecked Sendable {
+    private let evaluator: any ProximityRICALConstraintEvaluator
+
+    init(_ evaluator: any ProximityRICALConstraintEvaluator) {
+        self.evaluator = evaluator
+    }
+
+    func __accepts(
+        constraints: [WalletCore.ProximityRicalTrustConstraint],
+        reader: WalletCore.ProximityReaderEvidence
+    ) async throws -> KotlinBoolean {
+        let values = try constraints.map { constraint in
+            ProximityRICALTrustConstraint(
+                valuesCBOR: try constraint.valuesCborBase64Url.mapValues {
+                    try decodedBase64URL($0, context: "RICAL trust constraint")
+                }
+            )
+        }
+        return KotlinBoolean(bool: try await evaluator.accepts(values, reader: reader.toSwiftEvidence()))
+    }
+}
+
+private extension ProximityReaderTrustConfiguration {
+    func toKMPConfiguration() -> WalletCore.ProximityReaderTrustConfiguration {
+        WalletCore.ProximityReaderTrustConfiguration(
+            trustAnchors: trustAnchors.map {
+                WalletCore.ProximityReaderTrustAnchor(
+                    certificateDerBase64Url: $0.certificateDER.base64URLEncodedString(),
+                    displayName: $0.displayName
+                )
+            },
+            ricalProviders: ricalProviders.map { configuration in
+                WalletCore.ProximityRicalConfiguration(
+                    providerId: configuration.providerID,
+                    acceptedTypes: configuration.acceptedTypes,
+                    providerTrustAnchors: configuration.providerTrustAnchors.map {
+                        WalletCore.ProximityRicalProviderTrustAnchor(
+                            certificateDerBase64Url: $0.certificateDER.base64URLEncodedString()
+                        )
+                    },
+                    acceptedSignerCertificatePolicyOids: configuration.acceptedSignerCertificatePolicyOIDs,
+                    signerRevocationPolicy: configuration.signerRevocationPolicy.toKMPPolicy(),
+                    establishReaderTrust: configuration.establishReaderTrust,
+                    provider: KMPProximityRICALProviderAdapter(configuration.provider),
+                    constraintEvaluator: configuration.constraintEvaluator.map {
+                        KMPProximityRICALConstraintEvaluatorAdapter($0)
+                    }
+                )
+            },
+            revocationPolicy: revocationPolicy.toKMPPolicy(),
+            requiredIacaIssuerCertificateDerBase64Url: requiredIACAIssuerCertificateDER?.base64URLEncodedString()
+        )
+    }
+}
+
+private extension ProximityRICALSignerRevocationPolicy {
+    func toKMPPolicy() -> any WalletCore.ProximityRicalSignerRevocationPolicy {
+        switch self {
+        case .notChecked:
+            return WalletCore.ProximityRicalSignerRevocationPolicyNotChecked.shared
+        case let .check(evaluator):
+            return WalletCore.ProximityRicalSignerRevocationPolicyCheck(
+                evaluator: KMPProximityRICALSignerRevocationEvaluatorAdapter(evaluator)
+            )
+        }
+    }
+}
+
+private extension ProximityReaderRevocationPolicy {
+    func toKMPPolicy() -> any WalletCore.ProximityReaderRevocationPolicy {
+        switch self {
+        case .notChecked:
+            return WalletCore.ProximityReaderRevocationPolicyNotChecked.shared
+        case let .check(evaluator):
+            return WalletCore.ProximityReaderRevocationPolicyCheck(
+                evaluator: (evaluator as? ProximityCRLRevocationEvaluator)?.evaluator
+                    ?? KMPProximityReaderRevocationEvaluatorAdapter(evaluator)
+            )
+        }
+    }
+}
+
+private extension ProximityReaderEvidence {
+    func toKMPEvidence() -> WalletCore.ProximityReaderEvidence {
+        WalletCore.ProximityReaderEvidence(
+            scope: scope.toKMPScope(),
+            authenticationIndex: Int32(authenticationIndex),
+            certificateChainDerBase64Url: certificateChainDER.map { $0.base64URLEncodedString() }
+        )
+    }
+}
+
+private extension WalletCore.ProximityReaderEvidence {
+    func toSwiftEvidence() throws -> ProximityReaderEvidence {
+        ProximityReaderEvidence(
+            scope: scope.toSwiftScope(),
+            authenticationIndex: Int(authenticationIndex),
+            certificateChainDER: try certificateChainDerBase64Url.map {
+                try decodedBase64URL($0, context: "reader certificate evidence")
+            }
+        )
+    }
+}
+
+private extension WalletCore.ProximityReaderTrustDecision {
+    func toSwiftDecision() throws -> ProximityReaderTrustDecision {
+        try ProximityReaderTrustDecision(
+            state: state.toSwiftTrust(),
+            certificatePath: certificatePath.toSwiftPath(),
+            revocation: revocation.toSwiftRevocation(),
+            rical: rical.toSwiftRICAL(),
+            displayName: displayName,
+            reason: reason
+        )
+    }
+}
+
+private final class KMPProximityReaderTrustEvaluatorAdapter:
+    WalletCore.ProximityReaderTrustEvaluator,
+    @unchecked Sendable {
+    private let evaluator: any ProximityReaderTrustEvaluator
+
+    init(evaluator: any ProximityReaderTrustEvaluator) {
+        self.evaluator = evaluator
+    }
+
+    func __evaluate(
+        evidence: WalletCore.ProximityReaderEvidence
+    ) async throws -> WalletCore.ProximityReaderTrustDecision {
+        let decision = try await evaluator.evaluate(evidence.toSwiftEvidence())
+        return WalletCore.ProximityReaderTrustDecision(
+            state: decision.state.toKMPState(),
+            certificatePath: decision.certificatePath.toKMPState(),
+            revocation: decision.revocation.toKMPState(),
+            rical: decision.rical.toKMPState(),
+            displayName: decision.displayName,
+            reason: decision.reason
+        )
+    }
+}
+
+private final class KMPProximityCredentialStatusEvaluatorAdapter:
+    WalletCore.ProximityCredentialStatusEvaluator,
+    @unchecked Sendable {
+    private let evaluator: any ProximityCredentialStatusEvaluator
+
+    init(evaluator: any ProximityCredentialStatusEvaluator) {
+        self.evaluator = evaluator
+    }
+
+    func __evaluate(
+        credential: WalletCore.ProximityCredentialStatusInput
+    ) async throws -> WalletCore.ProximityCredentialStatus {
+        let status = try await evaluator.evaluate(
+            ProximityCredentialStatusInput(
+                credentialID: credential.credentialId,
+                documentType: credential.docType,
+                issuer: credential.issuer,
+                validFrom: credential.validFrom.toDate(),
+                validUntil: credential.validUntil.toDate()
+            )
+        )
+        switch status {
+        case .valid: return .valid
+        case .revoked: return .revoked
+        case .indeterminate: return .indeterminate
+        }
+    }
+}
+
+private final class KMPProximityApplicationProfileAdapter:
+    WalletCore.ProximityApplicationProfile,
+    @unchecked Sendable {
+    private let profile: any ProximityApplicationProfile
+
+    init(_ profile: any ProximityApplicationProfile) {
+        self.profile = profile
+    }
+
+    var id: String { profile.id }
+
+    func __evaluate(
+        input: WalletCore.ProximityApplicationProfileInput
+    ) async throws -> any WalletCore.ProximityApplicationProfileResult {
+        guard let deviceRequest = Data(base64URLEncoded: input.deviceRequestBase64Url) else {
+            throw WalletError.internalFailure("Wallet core returned an invalid application-profile request")
+        }
+        let result = try await profile.evaluate(
+            ProximityApplicationProfileInput(
+                deviceRequest: deviceRequest,
+                credentials: swiftArray(input.credentials, of: WalletCore.ProximityApplicationCredential.self).map {
+                    ProximityApplicationCredential(
+                        credentialID: $0.credentialId,
+                        documentType: $0.docType,
+                        label: $0.label
+                    )
+                },
+                requestedDocuments: swiftArray(
+                    input.requestedDocuments,
+                    of: WalletCore.ProximityApplicationDocumentRequest.self
+                ).map { try $0.toSwiftRequest() },
+                readerAuthentication: swiftArray(
+                    input.readerAuthentication,
+                    of: WalletCore.ProximityReaderAuthentication.self
+                ).map { try $0.toSwiftAuthentication() }
+            )
+        )
+        switch result {
+        case .notRecognized:
+            return WalletCore.ProximityApplicationProfileResultNotRecognized()
+        case let .rejected(reason):
+            return WalletCore.ProximityApplicationProfileResultRejected(reason: reason)
+        case let .recognized(authorization):
+            return WalletCore.ProximityApplicationProfileResultRecognized(
+                authorization: WalletCore.ProximityApplicationAuthorization(
+                    profileId: authorization.profileID,
+                    displayTitle: authorization.displayTitle,
+                    details: authorization.details.map {
+                        WalletCore.ProximityApplicationAuthorizationDetail(
+                            id: $0.id,
+                            label: $0.label,
+                            value: $0.value
+                        )
+                    },
+                    compatibleCredentialIds: authorization.compatibleCredentialIDs,
+                    deviceSignedElements: authorization.deviceSignedElements.map {
+                        WalletCore.ProximityDeviceSignedElement(
+                            credentialId: $0.credentialID,
+                            namespace: $0.namespace,
+                            elementIdentifier: $0.elementIdentifier,
+                            valueCborBase64Url: $0.valueCBOR.base64URLEncodedString()
+                        )
+                    },
+                    resultBindingDigestBase64Url: authorization.resultBindingDigest.base64URLEncodedString()
+                )
+            )
+        }
+    }
+}
+
+final class KMPProximityPresentationSessionBridge:
+    ProximitySessionBridge,
+    @unchecked Sendable {
+    private let session: any WalletCore.ProximitySession
+    private let nfcHost: IOSNfcHostPlatformAdapter
+
+    init(session: any WalletCore.ProximitySession, nfcHost: IOSNfcHostPlatformAdapter) {
+        self.session = session
+        self.nfcHost = nfcHost
+    }
+
+    var connectedRoute: ProximityConnectedRoute? {
+        guard let route = session.connectedRoute else { return nil }
+        let engagement: ProximityEngagementMethod
+        switch route.engagement {
+        case .qr: engagement = .qr
+        case .nfc: engagement = .nfc
+        }
+        let transport: ProximityTransport
+        switch route.transport {
+        case .bluetoothLowEnergy: transport = .bluetoothLowEnergy
+        case .nfc: transport = .nfc
+        case .wifiAware: transport = .wifiAware
+        }
+        return .init(engagement: engagement, transport: transport)
+    }
+
+    var sharingPlan: ProximitySharingPlan? { try? session.sharingPlan?.toSwiftSharingPlan() }
+
+    var systemPresentationActive: Bool {
+        guard let projected = try? session.state.value.toSwiftState(),
+              projected.legalActions.contains(.cancel) else { return false }
+        return nfcHost.isPresenting
+    }
+
+    func presentNfc() async {
+        guard let projected = try? session.state.value.toSwiftState(),
+              case .engagementReady(let engagements) = projected,
+              engagements.contains(where: { if case .nfc = $0 { return true }; return false }) else { return }
+        await nfcHost.present()
+    }
+
+    var states: AsyncStream<ProximityState> {
+        AsyncStream { continuation in
+            let task = Task { [session] in
+                let flow = SkieSwiftFlow<any WalletCore.ProximityState>(
+                    SkieKotlinFlow(session.state)
+                )
+                for await state in flow {
+                    do {
+                        continuation.yield(try state.toSwiftState())
+                    } catch {
+                        continuation.yield(
+                            .failed(
+                                ProximityError(
+                                    category: .internalFailure,
+                                    code: "invalid_sdk_state",
+                                    message: "The wallet returned an invalid proximity session state",
+                                    recovery: .none
+                                )
+                            )
+                        )
+                        break
+                    }
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    func dispatch(
+        _ action: ProximityAction
+    ) async throws -> ProximityActionResult {
+        try await session.dispatch(action: action.toKMPAction()).toSwiftResult()
+    }
+
+    func close() async {
+        try? await session.close()
+    }
+}
+
 private extension Waltid_openid4vc_walletWalletIssuanceSession {
     func toSwiftIssuanceSession() throws -> IssuanceSession {
         IssuanceSession(
@@ -348,8 +1034,29 @@ private extension Waltid_openid4vc_walletWalletIssuanceIssuerPreview {
             name: name,
             locale: locale,
             logoURI: logoUri.flatMap(URL.init(string:)),
-            logoAltText: logoAltText
+            logoAltText: logoAltText,
+            metadataProvenance: metadataProvenance.toSwiftMetadataProvenance()
         )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceMetadataProvenance {
+    func toSwiftMetadataProvenance() -> MetadataProvenance {
+        switch self {
+        case is Waltid_openid4vc_walletWalletIssuanceMetadataProvenanceUnsigned:
+            return .unsigned
+        case let signed as Waltid_openid4vc_walletWalletIssuanceMetadataProvenanceSigned:
+            return .signed(
+                SignedMetadataProvenance(
+                    compactJWT: signed.compactJwt,
+                    algorithm: signed.algorithm,
+                    keyID: signed.keyId,
+                    trustType: signed.trustType == .trustedIssuer ? .trustedIssuer : .trustedDelegate
+                )
+            )
+        default:
+            preconditionFailure("Unsupported issuer metadata provenance: \(type(of: self))")
+        }
     }
 }
 
@@ -360,7 +1067,13 @@ private extension Waltid_openid4vc_walletWalletIssuanceCredentialPreview {
             format: format,
             name: name,
             descriptionText: descriptionText,
-            logoURI: logoUri.flatMap(URL.init(string:))
+            logoURI: logoUri.flatMap(URL.init(string:)),
+            logoAltText: logoAltText,
+            backgroundColor: backgroundColor,
+            backgroundImageURI: backgroundImageUri.flatMap(URL.init(string:)),
+            textColor: textColor,
+            vct: vct,
+            doctype: doctype
         )
     }
 }
@@ -455,22 +1168,64 @@ private extension WalletConfiguration {
     func toKMPConfiguration() -> WalletBridgeConfiguration {
         WalletBridgeConfiguration(
             walletId: walletID,
-            defaultKeyType: defaultKeyType.toKMPKeyType(),
             persistence: persistence.toKMPPersistence(),
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
             attestation: attestation?.toKMPAttestationConfiguration(),
+            issuerMetadataTrustResolver: issuerMetadataTrustResolver.map {
+                KMPIssuerMetadataTrustResolverAdapter(resolver: $0)
+            },
             preferredLocales: preferredLocales,
             transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
             clientIdTrustConfiguration: clientIDTrustConfiguration.toKMPClientIDTrustConfiguration(),
             appGroupIdentifier: crossProcessAccess?.appGroupIdentifier,
-            keychainAccessGroup: crossProcessAccess?.keychainAccessGroup
+            keychainAccessGroup: crossProcessAccess?.keychainAccessGroup,
+            defaultKeyUseAuthorizationPolicy: defaultKeyUseAuthorizationPolicy.toKMPAuthorizationPolicy(),
+            keyUseAuthorizationPrompt: Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPrompt(
+                reason: keyUseAuthorizationPrompt.message,
+                cancelText: keyUseAuthorizationPrompt.cancelText
+            ),
+            signingIdentity: signingIdentity.toKMPSigningIdentityConfiguration()
         )
+    }
+}
+
+private final class KMPIssuerMetadataTrustResolverAdapter: WalletBridgeIssuerMetadataTrustResolver, @unchecked Sendable {
+    private let resolver: any IssuerMetadataTrustResolver
+
+    init(resolver: any IssuerMetadataTrustResolver) {
+        self.resolver = resolver
+    }
+
+    func __verify(compactJwt: String, expectedCredentialIssuer: String) async throws -> WalletBridgeIssuerMetadataSigner {
+        let signer = try await resolver.verify(
+            compactJWT: compactJwt,
+            expectedCredentialIssuer: expectedCredentialIssuer
+        )
+        return WalletBridgeIssuerMetadataSigner(
+            keyId: signer.keyID,
+            algorithm: signer.algorithm,
+            trustType: signer.trustType.toKMPTrustType()
+        )
+    }
+}
+
+private extension MetadataTrustType {
+    func toKMPTrustType() -> WalletBridgeIssuerMetadataSignerTrustType {
+        switch self {
+        case .trustedIssuer:
+            return .trustedIssuer
+        case .trustedDelegate:
+            return .trustedDelegate
+        }
     }
 }
 
 private extension WalletClientIDTrustConfiguration {
     func toKMPClientIDTrustConfiguration() -> WalletBridgeClientIdTrustConfiguration {
-        WalletBridgeClientIdTrustConfiguration(x509TrustAnchorsPem: x509TrustAnchorsPEM)
+        WalletBridgeClientIdTrustConfiguration(
+            x509TrustAnchorsPem: x509TrustAnchorsPEM,
+            preRegisteredClientMetadataJson: preRegisteredClientMetadataJSON
+        )
     }
 }
 
@@ -630,7 +1385,7 @@ private extension WalletBridgeStoredDid {
     }
 }
 
-private extension Data {
+extension Data {
     func toKotlinByteArray() -> KotlinByteArray {
         let bytes = [UInt8](self)
         let array = KotlinByteArray(size: Int32(bytes.count))
@@ -673,6 +1428,114 @@ private extension WalletKeyType {
             return .rsa3072
         case .rsa4096:
             return .rsa4096
+        }
+    }
+}
+
+extension WalletKeyUseAuthorizationPolicy {
+    func toKMPAuthorizationPolicy() -> WalletBridgeKeyUseAuthorizationPolicy {
+        switch self {
+        case .none:
+            return WalletBridgeKeyUseAuthorizationPolicy(
+                type: .none,
+                timeoutSeconds: nil
+            )
+        case .biometricCurrentSet:
+            return WalletBridgeKeyUseAuthorizationPolicy(
+                type: .biometricCurrentSet,
+                timeoutSeconds: nil
+            )
+        case .biometricAny:
+            return WalletBridgeKeyUseAuthorizationPolicy(type: .biometricAny, timeoutSeconds: nil)
+        case .deviceCredential(let timeoutSeconds):
+            precondition((0...30).contains(timeoutSeconds))
+            return WalletBridgeKeyUseAuthorizationPolicy(type: .deviceCredential, timeoutSeconds: KotlinInt(int: Int32(timeoutSeconds)))
+        case .biometricOrDeviceCredential(let timeoutSeconds):
+            precondition((0...30).contains(timeoutSeconds))
+            return WalletBridgeKeyUseAuthorizationPolicy(type: .biometricOrDeviceCredential, timeoutSeconds: KotlinInt(int: Int32(timeoutSeconds)))
+        case .biometricTimedReuse(let timeoutSeconds):
+            precondition((1...30).contains(timeoutSeconds), "Timed biometric reuse timeout must be between 1 and 30 seconds")
+            return WalletBridgeKeyUseAuthorizationPolicy(
+                type: .biometricTimedReuse,
+                timeoutSeconds: KotlinInt(int: Int32(timeoutSeconds))
+            )
+        }
+    }
+}
+
+private extension WalletBridgeKeyUseAuthorizationPolicy {
+    func toSwiftAuthorizationPolicy() -> WalletKeyUseAuthorizationPolicy {
+        switch type {
+        case .none: return .none
+        case .biometricCurrentSet: return .biometricCurrentSet
+        case .biometricAny: return .biometricAny
+        case .deviceCredential: return .deviceCredential(timeoutSeconds: Int(timeoutSeconds?.intValue ?? 0))
+        case .biometricOrDeviceCredential: return .biometricOrDeviceCredential(timeoutSeconds: Int(timeoutSeconds?.intValue ?? 0))
+        case .biometricTimedReuse:
+            guard let timeoutSeconds else {
+                preconditionFailure("Timed biometric reuse preflight omitted its timeout")
+            }
+            return .biometricTimedReuse(timeoutSeconds: Int(timeoutSeconds.intValue))
+        }
+    }
+}
+
+func toSwiftAuthorizationPolicy(
+    _ policy: any Waltid_crypto2KeyUseAuthorizationPolicy
+) -> WalletKeyUseAuthorizationPolicy {
+    switch onEnum(of: policy) {
+    case .none:
+        return .none
+    case .biometricCurrentSet:
+        return .biometricCurrentSet
+    case .biometricAny: return .biometricAny
+    case .deviceCredential(let credential): return .deviceCredential(timeoutSeconds: Int(credential.timeoutSeconds))
+    case .biometricOrDeviceCredential(let credential): return .biometricOrDeviceCredential(timeoutSeconds: Int(credential.timeoutSeconds))
+    case .biometricTimedReuse(let timedReuse):
+        return .biometricTimedReuse(timeoutSeconds: Int(timedReuse.timeoutSeconds))
+    }
+}
+
+private extension WalletBridgeKeyUseAuthorizationReuseEnforcement {
+    func toSwiftAuthorizationReuseEnforcement() -> WalletKeyUseAuthorizationReuseEnforcement {
+        switch self {
+        case .platformKeyStore: return .platformKeyStore
+        case .providerProcess: return .providerProcess
+        }
+    }
+}
+
+private extension WalletBridgeKeyUseAuthorizationReuseTimeoutValidation {
+    func toSwiftAuthorizationTimeoutValidation() -> WalletKeyUseAuthorizationReuseTimeoutValidation {
+        switch self {
+        case .independentReadback: return .independentReadback
+        case .providerConfigurationOnly: return .providerConfigurationOnly
+        }
+    }
+}
+
+private extension Waltid_crypto2KeyUseAuthorizationUnsupportedReason {
+    func toSwiftAuthorizationUnsupportedReason() -> WalletKeyUseAuthorizationUnsupportedReason {
+        switch self {
+        case .unsupportedCombination: return .unsupportedCombination
+        case .biometricUnavailable: return .biometricUnavailable
+        case .biometricNotEnrolled: return .biometricNotEnrolled
+        case .deviceCredentialNotSet: return .deviceCredentialNotSet
+        }
+    }
+}
+
+private extension Waltid_crypto2KeyUseAuthorizationFailure {
+    func toSwiftAuthorizationFailure() -> WalletKeyUseAuthorizationFailure {
+        switch self {
+        case .unsupportedCombination: return .unsupportedCombination
+        case .biometricUnavailable: return .biometricUnavailable
+        case .biometricNotEnrolled: return .biometricNotEnrolled
+        case .deviceCredentialNotSet: return .deviceCredentialNotSet
+        case .interactionContextUnavailable: return .interactionContextUnavailable
+        case .authorizationNotCompleted: return .authorizationNotCompleted
+        case .protectedKeyUnavailable: return .protectedKeyUnavailable
+        case .invalidStoredKeyMetadata: return .invalidStoredKeyMetadata
         }
     }
 }
@@ -755,7 +1618,7 @@ private extension MobileWalletAnnexCPreview {
             verifiedOrigin: verifiedOrigin,
             parsedRequest: AnnexCParsedRequest(
                 documents: swiftArray(parsedRequest.documents, of: MobileWalletAnnexCDocumentRequest.self).map {
-                    AnnexCDocumentRequest(documentType: $0.docType, namespaces: $0.namespaces as? [String: [String]] ?? [:])
+                    AnnexCDocumentRequest(documentType: $0.docType, namespaces: $0.namespaces)
                 }
             ),
             credentialOptions: swiftArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self).map { $0.toSwiftCredentialOption() },
@@ -795,6 +1658,7 @@ private extension MobileWalletPresentationRequestContext {
         PresentationRequestContext(
             clientID: clientId,
             verifierMetadata: verifierMetadata?.toSwiftVerifierMetadata(),
+            requestAuthentication: requestAuthentication.toSwiftRequestAuthentication(),
             responseURI: responseUri.flatMap(URL.init(string:)),
             state: state,
             nonce: nonce,
@@ -808,6 +1672,7 @@ private extension MobileWalletPresentationRequestInfo {
         PresentationRequestInfo(
             clientID: clientId,
             verifierMetadata: verifierMetadata?.toSwiftVerifierMetadata(),
+            requestAuthentication: requestAuthentication.toSwiftRequestAuthentication(),
             responseURI: responseUri.flatMap(URL.init(string:)),
             state: state,
             nonce: nonce,
@@ -815,6 +1680,45 @@ private extension MobileWalletPresentationRequestInfo {
             transactionData: swiftArray(transactionData, of: MobileWalletTransactionDataItem.self)
                 .map { $0.toSwiftTransactionData() }
         )
+    }
+}
+
+private extension MobileWalletRequestAuthentication {
+    func toSwiftRequestAuthentication() -> PresentationRequestAuthentication {
+        switch self {
+        case is MobileWalletRequestAuthenticationUnauthenticated:
+            return .unauthenticated
+        case let authenticated as MobileWalletRequestAuthenticationAuthenticated:
+            return .authenticated(
+                compactRequestObject: authenticated.compactRequestObject,
+                algorithm: authenticated.algorithm,
+                keyID: authenticated.keyId,
+                clientIDScheme: authenticated.clientIdScheme.toSwiftClientIDScheme()
+            )
+        default:
+            preconditionFailure("Unsupported request authentication: \(type(of: self))")
+        }
+    }
+}
+
+private extension MobileWalletClientIdScheme {
+    func toSwiftClientIDScheme() -> PresentationClientIDScheme {
+        switch self {
+        case .preRegistered:
+            return .preRegistered
+        case .redirectUri:
+            return .redirectURI
+        case .x509SanDns:
+            return .x509SanDNS
+        case .x509Hash:
+            return .x509Hash
+        case .decentralizedIdentifier:
+            return .decentralizedIdentifier
+        case .verifierAttestation:
+            return .verifierAttestation
+        case .openidFederation:
+            return .openIDFederation
+        }
     }
 }
 
@@ -875,7 +1779,8 @@ private extension MobileWalletPresentationCredentialOption {
             label: label,
             credentialDataJSON: requiredCredentialDataJSON(credentialDataJson),
             disclosures: swiftArray(disclosures, of: MobileWalletPresentationDisclosure.self)
-                .map { $0.toSwiftDisclosure() }
+                .map { $0.toSwiftDisclosure() },
+            metadataJSON: metadataJson
         )
     }
 }
@@ -1073,12 +1978,729 @@ private extension WalletBridgeError {
             return .crypto(message)
         case .credentialNotFound:
             return .credentialNotFound(message)
+        case .authorization:
+            guard let authorizationFailure else {
+                return .internalFailure("Authorization error did not include a failure reason")
+            }
+            return .keyUseAuthorization(authorizationFailure.toSwiftAuthorizationFailure())
         case .cancelled:
             return .cancelled
         case .internalFailure:
             return .internalFailure(message)
         }
     }
+}
+
+private extension ProximityProfile {
+    func toKMPProfile() -> WalletCore.ProximityProfile {
+        switch self {
+        case .iso1801352021: return .iso1801352021
+        case .iso180135Edition2DIS2026: return .iso180135Edition2Dis2026
+        case .eudiARF3FCAF202608: return .eudiArf3Fcaf202608
+        }
+    }
+}
+
+private extension WalletCore.ProximityProfile {
+    func toSwiftProfile() -> ProximityProfile {
+        switch self {
+        case .iso1801352021: return .iso1801352021
+        case .iso180135Edition2Dis2026: return .iso180135Edition2DIS2026
+        case .eudiArf3Fcaf202608: return .eudiARF3FCAF202608
+        }
+    }
+}
+
+private extension ProximityBLERoles {
+    func toKMPRoles() -> WalletCore.ProximityBleRoles {
+        switch self {
+        case .centralClient: return .centralClient
+        case .peripheralServer: return .peripheralServer
+        case .dual: return .dual
+        }
+    }
+}
+
+private extension ProximityBLEBearerPolicy {
+    func toKMPPolicy() -> WalletCore.ProximityBleBearerPolicy {
+        switch self {
+        case .gattOnly: return .gattOnly
+        case .preferL2CAP: return .preferL2cap
+        }
+    }
+}
+
+private extension ProximityBLEConfiguration {
+    func toKMPConfiguration() -> WalletCore.ProximityBleConfiguration {
+        WalletCore.ProximityBleConfiguration(
+            roles: roles.toKMPRoles(),
+            bearerPolicy: bearerPolicy.toKMPPolicy()
+        )
+    }
+}
+
+private extension ProximityNFCRetrievalConfiguration {
+    func toKMPConfiguration() -> WalletCore.ProximityNfcRetrievalConfiguration {
+        WalletCore.ProximityNfcRetrievalConfiguration(
+            maximumCommandDataLength: Int32(maximumCommandDataLength),
+            maximumResponseDataLength: Int32(maximumResponseDataLength)
+        )
+    }
+}
+
+private extension ProximityRetrievalOptions {
+    func toKMPConfiguration() -> WalletCore.ProximityRetrievalOptions {
+        WalletCore.ProximityRetrievalOptions(
+            bluetoothLowEnergy: bluetoothLowEnergy?.toKMPConfiguration(),
+            nfc: nfc?.toKMPConfiguration(),
+            wifiAware: wifiAware
+        )
+    }
+}
+
+private extension ProximitySessionConfiguration {
+    func toKMPConfiguration() -> any WalletCore.ProximitySessionConfiguration {
+        switch self {
+        case let .qr(retrieval):
+            return WalletCore.ProximitySessionConfigurationQr(retrieval: retrieval.toKMPConfiguration())
+        case let .nfc(configuration):
+            return WalletCore.ProximitySessionConfigurationConventionalNfc(
+                handover: configuration.handover == .staticHandover ? .static : .negotiated,
+                retrieval: configuration.retrieval.toKMPConfiguration(),
+                qrFallback: configuration.qrFallback?.toKMPConfiguration()
+            )
+        case let .provisionalNFCV2(configuration):
+            return WalletCore.ProximitySessionConfigurationProvisionalNfcV2(
+                maximumCommandDataLength: Int32(configuration.maximumCommandDataLength),
+                bluetoothLowEnergy: configuration.bluetoothLowEnergy?.toKMPConfiguration(),
+                qrFallback: configuration.qrFallback?.toKMPConfiguration(),
+                wifiAware: configuration.wifiAware
+            )
+        }
+    }
+}
+
+private extension WalletCore.ProximityBleConfiguration {
+    func toSwiftConfiguration() -> ProximityBLEConfiguration {
+        ProximityBLEConfiguration(
+            roles: roles == .centralClient ? .centralClient : roles == .peripheralServer ? .peripheralServer : .dual,
+            bearerPolicy: bearerPolicy == .gattOnly ? .gattOnly : .preferL2CAP
+        )
+    }
+}
+
+private extension WalletCore.ProximityRetrievalOptions {
+    func toSwiftConfiguration() -> ProximityRetrievalOptions {
+        ProximityRetrievalOptions(
+            bluetoothLowEnergy: bluetoothLowEnergy?.toSwiftConfiguration(),
+            nfc: nfc.map { ProximityNFCRetrievalConfiguration(
+                maximumCommandDataLength: Int($0.maximumCommandDataLength),
+                maximumResponseDataLength: Int($0.maximumResponseDataLength)
+            ) },
+            wifiAware: wifiAware
+        )
+    }
+}
+
+func swiftSession(_ session: any WalletCore.ProximitySessionConfiguration) -> ProximitySessionConfiguration {
+    switch onEnum(of: session) {
+    case let .qr(value): return .qr(value.retrieval.toSwiftConfiguration())
+    case let .conventionalNfc(value):
+        return .nfc(.init(
+            handover: value.handover == .static ? .staticHandover : .negotiatedHandover,
+            retrieval: value.retrieval.toSwiftConfiguration(),
+            qrFallback: value.qrFallback?.toSwiftConfiguration()
+        ))
+    case let .provisionalNfcV2(value):
+        return .provisionalNFCV2(.init(
+            maximumCommandDataLength: Int(value.maximumCommandDataLength),
+            bluetoothLowEnergy: value.bluetoothLowEnergy?.toSwiftConfiguration(),
+            qrFallback: value.qrFallback?.toSwiftConfiguration(),
+            wifiAware: value.wifiAware
+        ))
+    }
+}
+
+private extension ProximityReaderPolicy {
+    func toKMPPolicy() -> WalletCore.ProximityReaderPolicy {
+        switch self {
+        case .allowAnonymousOrUntrusted: return .allowAnonymousOrUntrusted
+        case .requireTrusted: return .requireTrusted
+        }
+    }
+}
+
+private extension ProximityDeviceAuthenticationPolicy {
+    func toKMPPolicy() -> WalletCore.ProximityDeviceAuthenticationPolicy {
+        switch self {
+        case .signatureOnly: return .signatureOnly
+        case .macOnly: return .macOnly
+        case .preferSignature: return .preferSignature
+        case .preferMAC: return .preferMac
+        }
+    }
+}
+
+private extension WalletCore.ProximityReaderAuthenticationScope {
+    func toSwiftScope() -> ProximityReaderAuthenticationScope {
+        switch onEnum(of: self) {
+        case let .document(value): return .document(index: Int(value.index))
+        case .wholeRequest: return .wholeRequest
+        }
+    }
+}
+
+private extension ProximityReaderAuthenticationScope {
+    func toKMPScope() -> WalletCore.ProximityReaderAuthenticationScope {
+        switch self {
+        case .document(let index): return WalletCore.ProximityReaderAuthenticationScopeDocument(index: Int32(index.value))
+        case .wholeRequest: return WalletCore.ProximityReaderAuthenticationScopeWholeRequest.shared
+        }
+    }
+}
+
+private extension ProximityReaderTrustState {
+    func toKMPState() -> WalletCore.ProximityReaderTrustState {
+        switch self {
+        case .notEvaluated: return .notEvaluated
+        case .validButUntrusted: return .validButUntrusted
+        case .revoked: return .revoked
+        case .trusted: return .trusted
+        }
+    }
+}
+
+private extension ProximityReaderCertificatePathState {
+    func toKMPState() -> WalletCore.ProximityReaderCertificatePathState {
+        switch self {
+        case .notEvaluated: return .notEvaluated
+        case .unknownAuthority: return .unknownAuthority
+        case .invalid: return .invalid
+        case .valid: return .valid
+        }
+    }
+}
+
+private extension ProximityReaderRevocationState {
+    func toKMPState() -> WalletCore.ProximityReaderRevocationState {
+        switch self {
+        case .notChecked: return .notChecked
+        case .good: return .good
+        case .revoked: return .revoked
+        case .indeterminate: return .indeterminate
+        }
+    }
+}
+
+private extension ProximityRICALState {
+    func toKMPState() -> WalletCore.ProximityRicalState {
+        switch self {
+        case .notEvaluated: return .notEvaluated
+        case .unavailable: return .unavailable
+        case .invalid: return .invalid
+        case .noMatchingAuthority: return .noMatchingAuthority
+        case .matched: return .matched
+        }
+    }
+}
+
+extension WalletCore.ProximityCapabilities {
+    func toSwiftCapabilities() -> ProximityCapabilities {
+        ProximityCapabilities(
+            profile: profile.toSwiftProfile(),
+            session: swiftSession(session),
+            qrEngagement: qrEngagement.toSwiftCapability(),
+            nfcEngagement: nfcEngagement.toSwiftCapability(),
+            bluetoothLowEnergy: bluetoothLowEnergy.toSwiftCapability(),
+            nfcRetrieval: nfcRetrieval.toSwiftCapability(),
+            nfcV2Retrieval: nfcV2Retrieval.toSwiftCapability(),
+            wifiAwareRetrieval: wifiAwareRetrieval.toSwiftCapability()
+        )
+    }
+}
+
+extension WalletCore.ProximityTransportCapability {
+    func toSwiftCapability() -> ProximityTransportCapability {
+        let observation: ProximityRuntimeObservation
+        switch onEnum(of: runtime) {
+        case .notChecked: observation = .notChecked
+        case .available: observation = .available
+        case let .unavailable(value):
+            observation = .unavailable(
+                value.error.toSwiftError(),
+                remediationActions: swiftArray(value.remediationActions, of: WalletCore.ProximityRemediationAction.self)
+                    .map { $0.toSwiftAction() }
+            )
+        }
+        return ProximityTransportCapability(
+            implemented: implemented,
+            profilePermitted: profilePermitted,
+            runtime: observation,
+            selected: selected
+        )
+    }
+}
+
+private extension WalletCore.ProximityRecovery {
+    func toSwiftRecovery() -> ProximityRecovery {
+        switch self {
+        case .none: .none
+        case .retryPrerequisites: .retryPrerequisites
+        case .startNewSession: .startNewSession
+        }
+    }
+}
+
+extension WalletCore.ProximityRemediationAction {
+    func toSwiftAction() -> ProximityRemediationAction {
+        switch self {
+        case .requestBluetoothPermission: return .requestBluetoothPermission
+        case .requestNearbyWifiPermission: return .requestNearbyWifiPermission
+        case .requestLocalNetworkPermission: return .requestLocalNetworkPermission
+        case .openApplicationSettings: return .openApplicationSettings
+        case .enableBluetooth: return .enableBluetooth
+        case .enableWifi: return .enableWifi
+        case .enableNfc: return .enableNFC
+        case .useSupportedDevice: return .useSupportedDevice
+        case .retry: return .retry
+        }
+    }
+}
+
+private extension WalletCore.ProximityError {
+    func toSwiftError() -> ProximityError {
+        ProximityError(
+            category: category.toSwiftCategory(),
+            code: code,
+            message: message,
+            recovery: recovery.toSwiftRecovery(),
+            remediationActions: swiftArray(remediationActions, of: WalletCore.ProximityRemediationAction.self)
+                .map { $0.toSwiftAction() }
+        )
+    }
+}
+
+private extension WalletCore.ProximityErrorCategory {
+    func toSwiftCategory() -> ProximityErrorCategory {
+        switch self {
+        case .capability: return .capability
+        case .engagement: return .engagement
+        case .transport: return .transport
+        case .protocol: return .protocolFailure
+        case .readerAuthentication: return .readerAuthentication
+        case .trust: return .trust
+        case .credential: return .credential
+        case .holderKey: return .holderKey
+        case .applicationProfile: return .applicationProfile
+        case .staleSubmission: return .staleSubmission
+        case .policy: return .policy
+        case .internal: return .internalFailure
+        }
+    }
+}
+
+private extension ProximityAction {
+    func toKMPAction() -> any WalletCore.ProximityAction {
+        switch self {
+        case .cancel:
+            return WalletCore.ProximityActionCancel()
+        case let .decline(reviewID):
+            return WalletCore.ProximityActionDecline(reviewId: WalletCore.ProximityReviewId(value: reviewID.value))
+        case .retryPrerequisites:
+            return WalletCore.ProximityActionRetryPrerequisites()
+        case let .reportRemediation(action, result):
+            return WalletCore.ProximityActionReportRemediation(
+                action: action.toKMPAction(),
+                result: result.toKMPResult()
+            )
+        case let .approve(reviewID, submission):
+            return WalletCore.ProximityActionApprove(
+                reviewId: WalletCore.ProximityReviewId(value: reviewID.value),
+                submission: submission.toKMPSubmission()
+            )
+        }
+    }
+}
+
+private extension ProximityRemediationAction {
+    func toKMPAction() -> WalletCore.ProximityRemediationAction {
+        switch self {
+        case .requestBluetoothPermission: return .requestBluetoothPermission
+        case .requestNearbyWifiPermission: return .requestNearbyWifiPermission
+        case .requestLocalNetworkPermission: return .requestLocalNetworkPermission
+        case .openApplicationSettings: return .openApplicationSettings
+        case .enableBluetooth: return .enableBluetooth
+        case .enableWifi: return .enableWifi
+        case .enableNFC: return .enableNfc
+        case .useSupportedDevice: return .useSupportedDevice
+        case .retry: return .retry
+        }
+    }
+}
+
+private extension ProximityHostActionResult {
+    func toKMPResult() -> WalletCore.ProximityHostActionResult {
+        switch self {
+        case .completed: return .completed
+        case .cancelled: return .cancelled
+        case .failed: return .failed
+        }
+    }
+}
+
+private extension WalletCore.ProximityActionResult {
+    func toSwiftResult() -> ProximityActionResult {
+        switch onEnum(of: self) {
+        case .accepted:
+            return .accepted
+        case let .rejected(value):
+            return .rejected(value.error.toSwiftError())
+        }
+    }
+}
+
+extension WalletCore.ProximityState {
+    func toSwiftState() throws -> ProximityState {
+        switch onEnum(of: self) {
+        case let .checkingPrerequisites(value):
+            return .checkingPrerequisites(value.capabilities.toSwiftCapabilities())
+        case let .preparing(value):
+            return .preparing(profile: value.profile.toSwiftProfile())
+        case let .engagementReady(value):
+            return .engagementReady(
+                swiftArray(value.engagements, of: WalletCore.ProximityEngagement.self).map {
+                    $0.toSwiftEngagement()
+                }
+            )
+        case let .connecting(value):
+            return .connecting(
+                swiftArray(value.engagements, of: WalletCore.ProximityEngagement.self).map {
+                    $0.toSwiftEngagement()
+                }
+            )
+        case let .awaitingRequest(value):
+            return .awaitingRequest(exchange: Int(value.exchange))
+        case let .reviewRequired(value):
+            return .reviewRequired(try value.review.toSwiftReview(), reason: value.reason.toSwiftReason())
+        case let .preparationRequired(value):
+            return .preparationRequired(try value.plan.toSwiftSharingPlan(), reason: value.reason.toSwiftReason())
+        case let .authorizingHolderKey(value):
+            return .authorizingHolderKey(value.authorization.toSwiftAuthorization())
+        case let .sendingResponse(value):
+            return .sendingResponse(exchange: Int(value.exchange))
+        case let .awaitingNextRequest(value):
+            return .awaitingNextRequest(completedExchanges: Int(value.completedExchanges))
+        case let .terminating(value):
+            return .terminating(exchange: Int(value.exchange))
+        case let .noData(value):
+            return .noData(exchange: Int(value.exchange))
+        case let .completed(value):
+            return .completed(exchanges: Int(value.exchanges), declined: value.declined, receipt: try value.receipt?.toSwiftReceipt())
+        case .cancelled:
+            return .cancelled
+        case let .failed(value):
+            return .failed(value.error.toSwiftError())
+        }
+    }
+}
+
+private extension WalletCore.ProximityReviewReason {
+    func toSwiftReason() -> ProximityReviewReason {
+        switch self {
+        case .requestReceived: .requestReceived
+        case .preparedSharingChanged: .preparedSharingChanged
+        }
+    }
+}
+
+private extension WalletCore.ProximityEngagement {
+    func toSwiftEngagement() -> ProximityEngagement {
+        switch onEnum(of: self) {
+        case let .qr(value): return .qr(payload: value.payload)
+        case .nfc: return .nfc
+        }
+    }
+}
+
+private extension WalletCore.ProximityHolderAuthorization {
+    func toSwiftAuthorization() -> ProximityHolderAuthorization {
+        ProximityHolderAuthorization(
+            reviewID: ProximityReviewID(value: reviewId.value),
+            exchange: Int(exchange),
+            requests: swiftArray(
+                requests,
+                of: WalletCore.ProximityHolderAuthorizationRequest.self
+            ).map { request in
+                ProximityHolderAuthorizationRequest(
+                    requestIndex: Int(request.requestIndex),
+                    credentialID: request.credentialId,
+                    deviceAuthentication: request.deviceAuthentication.toSwiftMethod()
+                )
+            }
+        )
+    }
+}
+
+private extension WalletCore.ProximityReview {
+    func toSwiftReview() throws -> ProximityReview {
+        try ProximityReview(
+            reviewID: ProximityReviewID(value: reviewId.value),
+            exchange: Int(exchange),
+            documents: try swiftArray(documents, of: WalletCore.ProximityDocumentReview.self).map {
+                try $0.toSwiftReview()
+            },
+            readerAuthentication: swiftArray(
+                readerAuthentication,
+                of: WalletCore.ProximityReaderAuthentication.self
+            ).map { try $0.toSwiftAuthentication() },
+            readerAuthenticationSummary: readerAuthenticationSummary.toSwiftSummary(),
+            useCases: swiftArray(useCases, of: WalletCore.ProximityUseCase.self).map {
+                $0.toSwiftUseCase()
+            },
+            applicationAuthorizations: try swiftArray(
+                applicationAuthorizations,
+                of: WalletCore.ProximityApplicationAuthorization.self
+            ).map { try $0.toSwiftAuthorization() }
+        )
+    }
+}
+
+extension WalletCore.ProximityDocumentReview {
+    func toSwiftReview() throws -> ProximityDocumentReview {
+        try ProximityDocumentReview(
+            requestIndex: Int(requestIndex),
+            documentType: docType,
+            credentialOptions: try swiftArray(
+                credentialOptions,
+                of: WalletCore.ProximityCredentialOption.self
+            ).map { try $0.toSwiftOption() },
+            requiredElements: Set(swiftSet(requiredElements, of: WalletCore.ProximityElementReference.self).map {
+                try ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
+            })
+        )
+    }
+}
+
+private extension WalletCore.ProximityCredentialOption {
+    func toSwiftOption() throws -> ProximityCredentialOption {
+        try ProximityCredentialOption(
+            credentialID: credentialId,
+            label: label,
+            issuer: issuer,
+            validUntil: validUntil.toDate(),
+            deviceAuthentication: deviceAuthentication.toSwiftMethod(),
+            requestedElements: swiftArray(
+                requestedElements,
+                of: WalletCore.ProximityRequestedElement.self
+            ).map { try $0.toSwiftElement() }
+        )
+    }
+}
+
+private extension WalletCore.ProximityDeviceAuthenticationMethod {
+    func toSwiftMethod() -> ProximityDeviceAuthenticationMethod {
+        switch self {
+        case .signature: return .signature
+        case .mac: return .mac
+        }
+    }
+}
+
+private extension WalletCore.ProximityApplicationDocumentRequest {
+    func toSwiftRequest() throws -> ProximityApplicationDocumentRequest {
+        try ProximityApplicationDocumentRequest(
+            requestIndex: Int(requestIndex),
+            documentType: docType,
+            requestedElements: swiftArray(
+                requestedElements,
+                of: WalletCore.ProximityRequestedElement.self
+            ).map { try $0.toSwiftElement() }
+        )
+    }
+}
+
+private extension WalletCore.ProximityRequestedElement {
+    func toSwiftElement() throws -> ProximityRequestedElement {
+        try ProximityRequestedElement(
+            namespace: namespace,
+            elementIdentifier: elementIdentifier,
+            intentToRetain: intentToRetain,
+            satisfiesRequestedElements: swiftArray(
+                satisfiesRequestedElements,
+                of: WalletCore.ProximityElementReference.self
+            ).map { try ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier) }
+        )
+    }
+}
+
+private extension WalletCore.ProximityReaderAuthentication {
+    func toSwiftAuthentication() throws -> ProximityReaderAuthentication {
+        let result: ProximityReaderAuthenticationOutcome
+        switch onEnum(of: outcome) {
+        case .absent: result = .absent
+        case let .malformed(value): result = .malformed(reason: value.reason)
+        case let .invalid(value): result = .invalid(reason: value.reason)
+        case let .valid(value):
+            let trust = value.trust
+            result = .valid(try ProximityReaderTrustDecision(
+                state: trust.state.toSwiftTrust(),
+                certificatePath: trust.certificatePath.toSwiftPath(),
+                revocation: trust.revocation.toSwiftRevocation(),
+                rical: trust.rical.toSwiftRICAL(),
+                displayName: trust.displayName,
+                reason: trust.reason
+            ))
+        }
+        return ProximityReaderAuthentication(
+            scope: scope.toSwiftScope(),
+            authenticationIndex: Int(authenticationIndex),
+            outcome: result
+        )
+    }
+}
+
+private extension WalletCore.ProximityReaderAuthenticationSummary {
+    func toSwiftSummary() -> ProximityReaderAuthenticationSummary {
+        switch self {
+        case .absent: return .absent
+        case .malformed: return .malformed
+        case .invalid: return .invalid
+        case .revoked: return .revoked
+        case .partial: return .partial
+        case .validButUntrusted: return .validButUntrusted
+        case .trusted: return .trusted
+        }
+    }
+}
+
+private extension WalletCore.ProximityReaderTrustState {
+    func toSwiftTrust() -> ProximityReaderTrustState {
+        switch self {
+        case .notEvaluated: return .notEvaluated
+        case .validButUntrusted: return .validButUntrusted
+        case .revoked: return .revoked
+        case .trusted: return .trusted
+        }
+    }
+}
+
+private extension WalletCore.ProximityReaderCertificatePathState {
+    func toSwiftPath() -> ProximityReaderCertificatePathState {
+        switch self {
+        case .notEvaluated: return .notEvaluated
+        case .unknownAuthority: return .unknownAuthority
+        case .invalid: return .invalid
+        case .valid: return .valid
+        }
+    }
+}
+
+private extension WalletCore.ProximityReaderRevocationState {
+    func toSwiftRevocation() -> ProximityReaderRevocationState {
+        switch self {
+        case .notChecked: return .notChecked
+        case .good: return .good
+        case .revoked: return .revoked
+        case .indeterminate: return .indeterminate
+        }
+    }
+}
+
+private extension WalletCore.ProximityRicalState {
+    func toSwiftRICAL() -> ProximityRICALState {
+        switch self {
+        case .notEvaluated: return .notEvaluated
+        case .unavailable: return .unavailable
+        case .invalid: return .invalid
+        case .noMatchingAuthority: return .noMatchingAuthority
+        case .matched: return .matched
+        }
+    }
+}
+
+private extension WalletCore.ProximityUseCase {
+    func toSwiftUseCase() -> ProximityUseCase {
+        ProximityUseCase(
+            index: Int(index),
+            mandatory: mandatory,
+            documentRequestIndices: swiftArray(documentRequestIndices, of: KotlinInt.self).map {
+                Int($0.int32Value)
+            },
+            purposeHints: swiftArray(purposeHints, of: WalletCore.ProximityPurposeHint.self).map {
+                ProximityPurposeHint(
+                    type: $0.type,
+                    code: Int($0.code),
+                    readerAsserted: $0.readerAsserted
+                )
+            }
+        )
+    }
+}
+
+private extension WalletCore.ProximityApplicationAuthorization {
+    func toSwiftAuthorization() throws -> ProximityApplicationAuthorization {
+        let digest = try decodedBase64URL(resultBindingDigestBase64Url, context: "application binding digest")
+        return try ProximityApplicationAuthorization(
+            profileID: profileId,
+            displayTitle: displayTitle,
+            details: swiftArray(
+                details,
+                of: WalletCore.ProximityApplicationAuthorizationDetail.self
+            ).map { try ProximityApplicationAuthorizationDetail(id: $0.id, label: $0.label, value: $0.value) },
+            compatibleCredentialIDs: swiftSet(compatibleCredentialIds, of: String.self),
+            deviceSignedElements: try swiftArray(
+                deviceSignedElements,
+                of: WalletCore.ProximityDeviceSignedElement.self
+            ).map {
+                try ProximityDeviceSignedElement(
+                    credentialID: $0.credentialId,
+                    namespace: $0.namespace,
+                    elementIdentifier: $0.elementIdentifier,
+                    valueCBOR: try decodedBase64URL($0.valueCborBase64Url, context: "device-signed value")
+                )
+            },
+            resultBindingDigest: digest
+        )
+    }
+}
+
+extension KotlinInstant {
+    func toDate() -> Date {
+        Date(timeIntervalSince1970: TimeInterval(epochSeconds) + TimeInterval(nanosecondsOfSecond) / 1_000_000_000)
+    }
+}
+
+extension Data {
+    init?(base64URLEncoded value: String) {
+        var base64 = value.replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        base64.append(String(repeating: "=", count: (4 - base64.count % 4) % 4))
+        self.init(base64Encoded: base64)
+    }
+
+    func base64URLEncodedString() -> String {
+        base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+}
+
+private func decodedBase64URL(_ value: String, context: String) throws -> Data {
+    guard let data = Data(base64URLEncoded: value) else {
+        throw WalletError.internalFailure("Wallet core returned an invalid \(context)")
+    }
+    return data
+}
+
+private func swiftSet<T: Hashable>(_ value: Any, of type: T.Type) -> Set<T> {
+    if let values = value as? Set<T> {
+        return values
+    }
+    if let values = value as? NSSet {
+        return Set(values.compactMap { $0 as? T })
+    }
+    return []
 }
 
 #endif

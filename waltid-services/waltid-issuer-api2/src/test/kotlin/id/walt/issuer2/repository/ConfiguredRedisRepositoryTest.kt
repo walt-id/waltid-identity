@@ -60,16 +60,21 @@ class ConfiguredRedisRepositoryTest {
         val rotatedRefreshToken = testRefreshToken("$suffix-rotated")
 
         try {
+            // Compared against the saved session because save() attaches the crypto2 sidecar.
             val savedSession = sessionRepository.save(session)
-            assertEquals(savedSession, sessionRepository.get(session.sessionId))
+            val restartedSessionRepository = ConfiguredIssuanceSessionRepository()
+            assertEquals(savedSession, restartedSessionRepository.get(session.sessionId))
+            assertEquals(savedSession, restartedSessionRepository.take(session.sessionId))
+            assertNull(sessionRepository.take(session.sessionId))
 
             authorizationCodeRepository.save(authorizationCode)
             assertEquals(authorizationCode, authorizationCodeRepository.consume(authorizationCode.code))
             assertNull(authorizationCodeRepository.consume(authorizationCode.code))
 
             preAuthorizedCodeRepository.save(preAuthorizedCode)
-            assertEquals(preAuthorizedCode, preAuthorizedCodeRepository.get(preAuthorizedCode.code))
-            assertEquals(preAuthorizedCode, preAuthorizedCodeRepository.consume(preAuthorizedCode.code))
+            val restartedPreAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository()
+            assertEquals(preAuthorizedCode, restartedPreAuthorizedCodeRepository.get(preAuthorizedCode.code))
+            assertEquals(preAuthorizedCode, restartedPreAuthorizedCodeRepository.consume(preAuthorizedCode.code))
             assertNull(preAuthorizedCodeRepository.get(preAuthorizedCode.code))
 
             parRepository.save(pushedAuthorizationRequest)

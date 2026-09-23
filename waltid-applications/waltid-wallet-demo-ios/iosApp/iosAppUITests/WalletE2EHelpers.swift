@@ -5,20 +5,64 @@ import TestHelpers
 @MainActor
 final class WalletE2EUI {
     let app: XCUIApplication
+    private let pin = "1234"
 
     init(app: XCUIApplication) {
         self.app = app
     }
 
-    func launch(attestation: [String: String] = [:], environment: [String: String] = [:]) {
+    func completeKeySetupIfNeeded() {
+        let button = app.buttons["wallet.keySetupContinue"]
+        guard button.waitForExistence(timeout: 10) else { return }
+        for heading in ["1 of 3 · Recovery", "2 of 3 · Key storage", "3 of 3 · Signing approval"] {
+            XCTAssertTrue(app.staticTexts[heading].waitForExistence(timeout: 10), "Missing setup step: \(heading)")
+            button.tap()
+        }
+    }
+
+    func launch(attestation: [String: String] = [:], environment: [String: String] = [:], initializeSigningIdentity: Bool = true) {
         app.launchEnvironment["E2E_WALLET_ID"] = app.launchEnvironment["E2E_WALLET_ID"] ?? "e2e-\(UUID().uuidString)"
+        app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] =
+            app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] ?? "disabled"
         for (key, value) in attestation {
             app.launchEnvironment[key] = value
         }
         for (key, value) in environment {
             app.launchEnvironment[key] = value
         }
+        if app.launchEnvironment["E2E_MOCK_WALLET"] == "1" {
+            addCredentialImageFixtures()
+        }
         app.launch()
+        unlockWallet()
+        if initializeSigningIdentity && app.launchEnvironment["E2E_MOCK_WALLET"] != "1" {
+            completeKeySetupIfNeeded()
+        }
+    }
+
+    private func addCredentialImageFixtures() {
+        let fixtures = [
+            ("E2E_MOCK_PORTRAIT_DATA_URL", "synthetic-portrait", "jpg", "image/jpeg"),
+            ("E2E_MOCK_SIGNATURE_DATA_URL", "synthetic-signature", "png", "image/png"),
+            (
+                "E2E_MOCK_VERIFICATION_DOCUMENT_DATA_URL",
+                "synthetic-verification-document",
+                "jpg",
+                "image/jpeg"
+            ),
+        ]
+
+        for (environmentKey, resourceName, resourceExtension, mimeType) in fixtures
+            where app.launchEnvironment[environmentKey] == nil {
+            guard let url = Bundle(for: WalletE2EUI.self).url(
+                forResource: resourceName,
+                withExtension: resourceExtension
+            ), let data = try? Data(contentsOf: url) else {
+                XCTFail("Missing credential image fixture: \(resourceName).\(resourceExtension)")
+                continue
+            }
+            app.launchEnvironment[environmentKey] = "data:\(mimeType);base64,\(data.base64EncodedString())"
+        }
     }
 
     func waitForStatus(prefixes: [String], timeout: TimeInterval) -> String? {
@@ -44,18 +88,30 @@ final class WalletE2EUI {
     }
 
     func openDeepLink(_ value: String) {
-        guard let url = URL(string: value) else {
+        guard URL(string: value) != nil else {
             XCTFail("Invalid deep link URL: \(value)")
             return
         }
 
-        guard #available(iOS 16.4, *) else {
-            XCTFail("Opening deep links from UI tests requires iOS 16.4 or newer")
-            return
+        // XCUIApplication.open launches a new process. Enter the link in Safari
+        // to exercise delivery to the running wallet and its navigation state.
+        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
+        safari.activate()
+        let address = safari.textFields.firstMatch
+        if !address.waitForExistence(timeout: 5), safari.buttons["Continue"].exists {
+            safari.buttons["Continue"].tap()
         }
-
-        app.open(url)
-        app.activate()
+        XCTAssertTrue(address.waitForExistence(timeout: 10), safari.debugDescription)
+        address.tap()
+        address.typeText(value + XCUIKeyboardKey.return.rawValue)
+        let open = safari.buttons["Open"]
+        if open.waitForExistence(timeout: 5) {
+            // Safari's external-app confirmation reports no XCTest hit point on
+            // iOS 26. Tap the visible button's own frame, not a fixed coordinate.
+            XCTAssertFalse(open.frame.isEmpty)
+            open.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
     }
 
     func waitForTextInputValue(identifier: String, fallbackLabel: String, value: String, timeout: TimeInterval) -> Bool {
@@ -130,6 +186,11 @@ final class WalletE2EUI {
     }
 
     func tapNavigationBack() {
+        let close = app.buttons["wallet.detailsBack"]
+        if close.waitForExistence(timeout: 2) {
+            close.tap()
+            return
+        }
         let button = app.navigationBars.buttons.firstMatch
         XCTAssertTrue(button.waitForExistence(timeout: 20), "Navigation back button not found")
         button.tap()
@@ -149,6 +210,11 @@ final class WalletE2EUI {
 
     func replaceText(in element: XCUIElement, value: String) {
         XCTAssertTrue(element.waitForExistence(timeout: 20), "Input element not found")
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: element)
+        guard XCTWaiter.wait(for: [enabled], timeout: 20) == .completed else {
+            XCTFail("Input did not become enabled: \(element.identifier)")
+            return
+        }
         makeHittable(element)
         XCTAssertTrue(element.isHittable, "Input element is not hittable")
         element.tap()
@@ -239,17 +305,16 @@ final class WalletE2EUI {
         switch label {
         case "Credentials":
             return app.staticTexts["No credentials yet"].exists
-                || app.staticTexts["Credential details"].exists
+                || app.otherElements["wallet.credentialDetailsScreen"].exists
                 || firstHittableElement(identifierPrefix: "wallet.credentialCard.") != nil
         case "Receive":
             return textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL").isHittable
                 || app.staticTexts["Received credentials"].exists
-                || app.staticTexts["Credential details"].exists
+                || app.otherElements["wallet.credentialDetailsScreen"].exists
         case "Present":
             return textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL").isHittable
                 || app.staticTexts["Review presentation request"].exists
-                || app.staticTexts["Credential details"].exists
-                || app.buttons["wallet.presentationNewButton"].exists
+                || app.otherElements["wallet.credentialDetailsScreen"].exists
         default:
             return false
         }
@@ -279,7 +344,18 @@ final class WalletE2EUI {
         return app.descendants(matching: .any)
             .matching(predicate)
             .allElementsBoundByIndex
-            .first { $0.exists && $0.isHittable }
+            .first { element in
+                guard element.exists, element.isHittable else { return false }
+                // XCTest considers a partly visible card hittable even when its center is
+                // covered by the pinned review actions. Scroll before tapping that card.
+                if element.identifier.hasPrefix("wallet.presentationClaimsToggle.") {
+                    let submit = app.buttons["wallet.presentationSubmitButton"]
+                    if submit.exists && submit.isHittable {
+                        return element.frame.midY < submit.frame.minY
+                    }
+                }
+                return true
+            }
     }
 
     private func firstExisting(_ elements: [XCUIElement]) -> XCUIElement {
@@ -287,6 +363,28 @@ final class WalletE2EUI {
             return element
         }
         return elements[0]
+    }
+
+    private func unlockWallet() {
+        let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
+        guard pinInput.waitForExistence(timeout: 10) else {
+            return
+        }
+
+        replaceText(in: pinInput, value: pin)
+
+        let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
+        if confirmation.waitForExistence(timeout: 2) {
+            replaceText(in: confirmation, value: pin)
+        }
+
+        let submit = firstExisting([
+            app.buttons["wallet.pinSubmitButton"],
+            app.buttons["Set PIN"],
+            app.buttons["Unlock"],
+        ])
+        XCTAssertTrue(submit.waitForExistence(timeout: 10), "PIN submit button not found")
+        submit.tap()
     }
 }
 

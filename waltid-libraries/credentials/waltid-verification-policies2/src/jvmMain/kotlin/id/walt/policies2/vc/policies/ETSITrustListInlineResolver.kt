@@ -1,17 +1,20 @@
 package id.walt.policies2.vc.policies
 
-import id.walt.trust.model.*
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.trust.model.SourceAcceptancePolicy
+import id.walt.trust.model.SourceLoadOptions
+import id.walt.trust.model.TrustDecision
+import id.walt.trust.model.TrustedEntityType
 import id.walt.trust.service.DefaultTrustRegistryService
 import id.walt.trust.store.InMemoryTrustStore
-import id.walt.x509.CertificateDer
-import id.walt.x509.X509ValidationException
-import id.walt.x509.validateCertificateChain
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import kotlinx.serialization.json.*
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlin.time.Clock
+import id.walt.certificate.x509.truststore.InMemoryTrustStore as X509TrustStore
 
 private val log = KotlinLogging.logger { }
 
@@ -196,6 +199,8 @@ actual object ETSITrustListInlineResolver {
 /**
  * JVM implementation of certificate chain validation using waltid-x509 library.
  * Uses PKIX path building and validation for proper certificate chain verification.
+ * @param certificateChain List of PEM-encoded certificates
+ * @param trustedIndex Index of the first trusted certificate in the chain 0 -> leaf, 1 -> intermediate, etc. last -> root.
  */
 actual fun validateCertificateChainToIndex(
     certificateChain: List<String>,
@@ -205,35 +210,22 @@ actual fun validateCertificateChainToIndex(
         // The leaf certificate itself is trusted, no chain to validate
         return true to null
     }
-    
+
     if (trustedIndex >= certificateChain.size) {
         return false to "Trusted index $trustedIndex is out of bounds (chain size: ${certificateChain.size})"
     }
-    
-    try {
-        // Convert PEM strings to CertificateDer
-        val certs = certificateChain.take(trustedIndex + 1).map { pem ->
-            CertificateDer.fromPEMEncodedString(pem)
-        }
-        
-        val leaf = certs.first()
-        val chain = certs.drop(1).dropLast(1)  // Intermediates (exclude leaf and trust anchor)
-        val trustAnchor = listOf(certs.last())  // The trusted certificate is our anchor
-        
-        // Use waltid-x509 PKIX validation
-        validateCertificateChain(
-            leaf = leaf,
-            chain = chain,
-            trustAnchors = trustAnchor,
-            enableTrustedChainRoot = false,  // We provide explicit trust anchor
-            enableSystemTrustAnchors = false,
-            enableRevocation = false  // TODO: Consider enabling for production
-        )
-        
-        return true to null
-    } catch (e: X509ValidationException) {
-        return false to "Certificate chain validation failed: ${e.message}"
-    } catch (e: Exception) {
-        return false to "Certificate chain validation error: ${e.message}"
+
+    // Convert PEM strings to CertificateDer
+    val certs = certificateChain.map {
+        X509CertificateUtil.parseCertificatePem(it)
     }
+
+    val trustStore = X509TrustStore(certs.subList(trustedIndex, certs.size))
+    val validationResult = runBlocking {
+        X509CertificateUtil.validateCertificateChain(certs, trustStore)
+    }
+    val validationMessage = validationResult.log.map {
+        "${it.severity} ${it.subjectDn} (${it.validatorId}):  ${it.message}"
+    }.reduce { acc, line -> "$acc\n$line" }
+    return validationResult.valid to validationMessage
 }

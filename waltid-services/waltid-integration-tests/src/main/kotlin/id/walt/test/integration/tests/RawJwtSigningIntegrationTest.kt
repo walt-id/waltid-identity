@@ -21,6 +21,8 @@ class RawJwtSigningIntegrationTest : AbstractIntegrationTest() {
     private val issuerKey = loadJsonResource("issuance/key.json")
     private val issuerDid = loadResource("issuance/did.txt")
 
+    private val testSubjectDid = "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"
+
     @Test
     fun shouldSignRawJwtCredential() = runTest {
         val client = environment.testHttpClient()
@@ -28,7 +30,7 @@ class RawJwtSigningIntegrationTest : AbstractIntegrationTest() {
         val signRequest = buildJsonObject {
             put("issuerKey", issuerKey)
             put("issuerDid", JsonPrimitive(issuerDid))
-            put("subjectDid", JsonPrimitive("did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"))
+            put("subjectDid", JsonPrimitive(testSubjectDid))
             putJsonObject("credentialData") {
                 putJsonArray("@context") {
                     add(JsonPrimitive("https://www.w3.org/2018/credentials/v1"))
@@ -38,7 +40,7 @@ class RawJwtSigningIntegrationTest : AbstractIntegrationTest() {
                     add(JsonPrimitive("TestCredential"))
                 }
                 putJsonObject("credentialSubject") {
-                    put("id", "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp")
+                    put("id", testSubjectDid)
                     put("name", "Test User")
                     put("testClaim", "test value")
                 }
@@ -62,7 +64,7 @@ class RawJwtSigningIntegrationTest : AbstractIntegrationTest() {
         val signRequest = buildJsonObject {
             put("issuerKey", issuerKey)
             put("issuerDid", JsonPrimitive(issuerDid))
-            put("subjectDid", JsonPrimitive("did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"))
+            put("subjectDid", JsonPrimitive(testSubjectDid))
             putJsonObject("credentialData") {
                 putJsonArray("@context") {
                     add(JsonPrimitive("https://www.w3.org/2018/credentials/v1"))
@@ -72,7 +74,7 @@ class RawJwtSigningIntegrationTest : AbstractIntegrationTest() {
                     add(JsonPrimitive("UniversityDegreeCredential"))
                 }
                 putJsonObject("credentialSubject") {
-                    put("id", "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp")
+                    put("id", testSubjectDid)
                     put("degree", "Bachelor of Science")
                     put("university", "Test University")
                 }
@@ -108,7 +110,7 @@ class RawJwtSigningIntegrationTest : AbstractIntegrationTest() {
         val signRequest = buildJsonObject {
             put("issuerKey", issuerKey)
             put("issuerDid", issuerDid)
-            put("subjectDid", "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp")
+            put("subjectDid", testSubjectDid)
             put("credentialData", credentialData)
         }
         
@@ -129,7 +131,7 @@ class RawJwtSigningIntegrationTest : AbstractIntegrationTest() {
         val signRequest = buildJsonObject {
             put("issuerKey", issuerKey)
             put("issuerDid", JsonPrimitive(issuerDid))
-            put("subjectDid", JsonPrimitive("did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"))
+            put("subjectDid", JsonPrimitive(testSubjectDid))
             putJsonObject("credentialData") {
                 putJsonArray("@context") {
                     add(JsonPrimitive("https://www.w3.org/2018/credentials/v1"))
@@ -138,7 +140,7 @@ class RawJwtSigningIntegrationTest : AbstractIntegrationTest() {
                     add(JsonPrimitive("VerifiableCredential"))
                 }
                 putJsonObject("credentialSubject") {
-                    put("id", "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp")
+                    put("id", testSubjectDid)
                 }
             }
         }

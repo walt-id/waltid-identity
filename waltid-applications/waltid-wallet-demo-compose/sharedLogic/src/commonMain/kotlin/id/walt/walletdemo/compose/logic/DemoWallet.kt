@@ -1,7 +1,17 @@
 package id.walt.walletdemo.compose.logic
 
 interface DemoWallet {
-    suspend fun bootstrap(): WalletDemoBootstrapResult
+    /** Returns null only when this wallet does not support identity management. */
+    suspend fun identityDetails(): WalletDemoIdentityDetails? = null
+    suspend fun identitySetup(): WalletDemoIdentitySetup? = null
+    suspend fun chooseIdentity(choiceId: String): Unit = error("Identity choices are unavailable")
+    suspend fun cancelIdentity(identityId: String): Unit = error("Identity recovery is unavailable")
+    suspend fun resumeSigningIdentity(identityId: String): Unit = error("Identity recovery is unavailable")
+
+    suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult
+    suspend fun signingProtectionAvailability(
+        signingProtection: WalletDemoSigningProtection,
+    ): WalletDemoSigningProtectionAvailability
     suspend fun listCredentials(): List<WalletDemoCredential>
     suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?): WalletDemoIssuanceSession
     suspend fun beginAuthorizationIssuance(sessionId: String): WalletDemoIssuanceAuthorization
@@ -25,4 +35,12 @@ interface DemoWallet {
     ): WalletDemoOperationResult
     suspend fun rejectPresentation(previewHandle: WalletDemoPresentationPreviewHandle): WalletDemoOperationResult
     suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle)
+    suspend fun deleteCredential(credentialId: String): Boolean
+    suspend fun deleteWallet()
+
+    /**
+     * Web hosts persist authorization-code issuance across a full-page issuer redirect.
+     * Mobile keeps the session in memory, so the default is no pending session.
+     */
+    fun pendingAuthorizationIssuance(): WalletDemoIssuanceSession? = null
 }

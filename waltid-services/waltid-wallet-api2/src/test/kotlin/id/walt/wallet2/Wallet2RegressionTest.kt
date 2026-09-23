@@ -45,12 +45,13 @@ class Wallet2RegressionTest {
     fun `wallet creation with non-existing store returns 400`() {
         OSSWallet2Service.walletStore = InMemoryWalletStore()
 
-        E2ETest(host, 17060, failEarly = true).testBlock(
+        val port = freePort()
+        E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "wallet-service",
-                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:17060"))
+                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port"))
                 )
             },
             init = { DidService.minimalInit() },
@@ -104,12 +105,13 @@ class Wallet2RegressionTest {
     fun `duplicate named store creation returns 409`() {
         OSSWallet2Service.walletStore = InMemoryWalletStore()
 
-        E2ETest(host, 17061, failEarly = true).testBlock(
+        val port = freePort()
+        E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "wallet-service",
-                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:17061"))
+                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port"))
                 )
             },
             init = {},
@@ -157,12 +159,13 @@ class Wallet2RegressionTest {
     fun `set-default key and DID routes work`() {
         OSSWallet2Service.walletStore = InMemoryWalletStore()
 
-        E2ETest(host, 17062, failEarly = true).testBlock(
+        val port = freePort()
+        E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "wallet-service",
-                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:17062"))
+                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port"))
                 )
             },
             init = { DidService.minimalInit() },
@@ -263,12 +266,13 @@ class Wallet2RegressionTest {
         OSSWallet2Service.credentialStoreFactory = { id -> ExposedCredentialStore(id, db) }
         OSSWallet2Service.didStoreFactory = { id -> ExposedDidStore(id, db) }
 
-        E2ETest(host, 17063, failEarly = true).testBlock(
+        val port = freePort()
+        E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "wallet-service",
-                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:17063"))
+                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port"))
                 )
             },
             init = { DidService.minimalInit() },
@@ -335,12 +339,13 @@ class Wallet2RegressionTest {
     fun `match-credentials-from-store returns wallet credential IDs not indices`() {
         OSSWallet2Service.walletStore = InMemoryWalletStore()
 
-        E2ETest(host, 17064, failEarly = true).testBlock(
+        val port = freePort()
+        E2ETest(host, port, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
             preload = {
                 ConfigManager.preloadConfig(
                     "wallet-service",
-                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:17064"))
+                    OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port"))
                 )
             },
             init = { DidService.minimalInit() },

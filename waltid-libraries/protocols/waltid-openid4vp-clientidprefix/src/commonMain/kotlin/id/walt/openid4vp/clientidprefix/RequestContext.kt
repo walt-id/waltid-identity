@@ -2,8 +2,9 @@
 
 package id.walt.openid4vp.clientidprefix
 
+import id.walt.certificate.x509.X509CertificateTrustStore
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.verifier.openid.models.authorization.ClientMetadata
-import id.walt.x509.CertificateDer
 import kotlinx.serialization.Serializable
 
 /**
@@ -26,30 +27,69 @@ data class RequestContext(
 }
 
 data class ClientIdTrustConfiguration(
-    val x509TrustAnchors: List<CertificateDer> = emptyList(),
+    /**
+     * List of trusted X.509 certificate DERs in base64 format.
+     */
+    val x509TrustAnchors: X509CertificateTrustStore? = null,
     val trustedVerifierAttestationIssuers: Set<String> = emptySet(),
     val preRegisteredClients: Map<String, ClientMetadata> = emptyMap(),
-)
+) {
+    val x509TrustStore: X509CertificateTrustStore
+        get() = x509TrustAnchors ?: InMemoryTrustStore()
+}
 
 /**
  * A sealed class representing all possible validation errors for clear, type-safe error handling.
+ *
+ * Every subtype is `@Serializable`, including the parameterless ones. kotlinx.serialization does not
+ * inherit the annotation from the sealed parent, so leaving them plain made
+ * `Json.encodeToString(ClientValidationResult.Failure(...))` throw for exactly the errors the X.509
+ * prefixes raise most often ([X509HashMismatch], [MissingX509TrustAnchors]).
  */
 @Serializable
 sealed class ClientIdError(val message: String) {
-    object MissingRequestObject : ClientIdError("Signed request object is required but was not provided.")
-    object InvalidSignature : ClientIdError("Request object signature validation failed.")
-    object DoesNotSupportSignature : ClientIdError("This client id prefix does not support signatures.")
-    object InvalidJws : ClientIdError("JWS cannot be parsed.")
-    object MissingX5cHeader : ClientIdError("Missing 'x5c' header in JWS.")
-    object EmptyX5cHeader : ClientIdError("Empty 'x5c' header in JWS.")
-    object MissingClientMetadata : ClientIdError("client_metadata parameter is required for this prefix but was not provided.")
-    object CannotExtractSanDnsNamesFromDer : ClientIdError("Could not extract SAN dNSNames from DER (leaf cert DER of x5c header).")
-    object X509HashMismatch : ClientIdError("The client_id hash does not match the hash of the provided certificate.")
-    object MissingX509TrustAnchors : ClientIdError("No X.509 trust anchors are configured.")
+    @Serializable
+    data object MissingRequestObject : ClientIdError("Signed request object is required but was not provided.")
 
     @Serializable
-    data class ResponseUriHostMismatch(val expectedDnsName: String, val actualHost: String) :
-        ClientIdError("The response URI host '$actualHost' is not within '$expectedDnsName'.")
+    data object InvalidSignature : ClientIdError("Request object signature validation failed.")
+
+    @Serializable
+    data object DoesNotSupportSignature : ClientIdError("This client id prefix does not support signatures.")
+
+    @Serializable
+    data object InvalidJws : ClientIdError("JWS cannot be parsed.")
+
+    @Serializable
+    data object MissingX5cHeader : ClientIdError("Missing 'x5c' header in JWS.")
+
+    @Serializable
+    data object EmptyX5cHeader : ClientIdError("Empty 'x5c' header in JWS.")
+
+    @Serializable
+    data object MissingClientMetadata :
+        ClientIdError("client_metadata parameter is required for this prefix but was not provided.")
+
+    @Serializable
+    data object CannotExtractSanDnsNamesFromDer :
+        ClientIdError("Could not extract SAN dNSNames from DER (leaf cert DER of x5c header).")
+
+    @Serializable
+    data object X509HashMismatch :
+        ClientIdError("The client_id hash does not match the hash of the provided certificate.")
+
+    @Serializable
+    data object MissingX509TrustAnchors : ClientIdError("No X.509 trust anchors are configured.")
+
+    /**
+     * The `redirect_uri`'s FQDN did not match an `x509_san_dns` Client Identifier.
+     *
+     * Only ever raised for `redirect_uri`; see the OpenID4VP 1.0 §5.9.3 / §14.3.1 split documented in
+     * [id.walt.openid4vp.clientidprefix.prefixes.X509SanDns].
+     */
+    @Serializable
+    data class RedirectUriHostMismatch(val expectedDnsName: String, val actualHost: String) :
+        ClientIdError("The redirect URI host '$actualHost' is not within '$expectedDnsName'.")
 
     @Serializable
     data class DidResolutionFailed(val reason: String) : ClientIdError("DID resolution failed: $reason")

@@ -27,10 +27,25 @@ const verifiedClaims = computed(() => {
   <div class="grid gap-4">
     <template v-if="session.result.value">
       <QrDisplay
+        v-if="
+          session.result.value.flowType === 'qr' &&
+          session.result.value.authorizationRequestUrl
+        "
         :value="session.result.value.authorizationRequestUrl"
         :wallet-url="walletUrl"
         wallet-path="api/siop/initiatePresentation"
       />
+
+      <div
+        v-else
+        class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"
+      >
+        <p class="font-semibold">Digital Credentials API session</p>
+        <p class="mt-1">
+          Session <code>{{ session.result.value.sessionId }}</code> is running
+          through the browser Digital Credentials API.
+        </p>
+      </div>
 
       <div v-if="verifiedClaims" class="grid gap-2">
         <span class="form-label">Verified Claims</span>
@@ -42,9 +57,9 @@ const verifiedClaims = computed(() => {
 
     <div
       v-else
-      class="flex items-center justify-center min-h-[200px] text-sm text-[--color-text-muted] text-center"
+      class="flex items-center justify-center min-h-[160px] md:min-h-[200px] text-sm text-[--color-text-muted] text-center px-2"
     >
-      QR code will appear here after creating a session
+      Session result will appear here after starting verification
     </div>
   </div>
 </template>

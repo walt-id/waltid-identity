@@ -43,6 +43,9 @@ fun interface DigestSigner {
 }
 
 fun interface Verifier {
+    /**
+     * @param signature the raw signature bytes, not the ASN.1 DER-encoded signature
+     */
     suspend fun verify(data: ByteArray, signature: ByteArray, algorithm: SignatureAlgorithm): Boolean
 }
 

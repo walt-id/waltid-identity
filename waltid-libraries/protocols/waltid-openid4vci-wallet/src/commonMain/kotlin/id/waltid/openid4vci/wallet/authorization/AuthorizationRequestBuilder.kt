@@ -107,6 +107,16 @@ class AuthorizationRequestBuilder(
         metadata: AuthorizationServerMetadata? = null,
         redirectUri: String? = null,
         dpopJkt: String? = null,
+        /**
+         * `locations` for each `openid_credential` authorization detail.
+         *
+         * OID4VCI 1.0 Section 5.1.1: when the Credential Issuer metadata advertises
+         * `authorization_servers`, `locations` MUST be present and equal the Credential Issuer
+         * Identifier - it tells the authorization server which issuer the grant is for, since one
+         * authorization server can front several. Omit it when only one authorization server is
+         * implied, where the parameter is optional.
+         */
+        credentialIssuerLocations: List<String>? = null,
     ): AuthorizationRequest {
         require(authorizationEndpoint.isNotBlank()) { "Authorization endpoint cannot be blank" }
         require(credentialConfigurationIds.isNotEmpty() && credentialConfigurationIds.all { it.isNotBlank() }) {
@@ -134,7 +144,9 @@ class AuthorizationRequestBuilder(
 
         // Build authorization_details
         val authzDetailsJson = json.encodeToString(
-            credentialConfigurationIds.distinct().map { AuthorizationDetails(credential_configuration_id = it) }
+            credentialConfigurationIds.distinct().map {
+                AuthorizationDetails(credential_configuration_id = it, locations = credentialIssuerLocations)
+            }
         )
         log.trace { "Authorization details JSON: ${authzDetailsJson.take(100)}${if (authzDetailsJson.length > 100) "..." else ""}" }
 
@@ -145,7 +157,12 @@ class AuthorizationRequestBuilder(
             append("client_id", clientConfig.clientId)
             append("redirect_uri", redirectUri ?: clientConfig.primaryRedirectUri)
             append("state", state)
-            append("authorization_details", authzDetailsJson)
+            // OID4VCI 1.0 Section 5.1.2 offers two alternative ways to say which credential is wanted:
+            // `authorization_details` (RAR) or a `scope` the issuer publishes on the credential
+            // configuration. They are alternatives, not companions - sending both leaves the authorization
+            // server to guess, and a server driving the scope-based profile counts the extra
+            // `authorization_details` as an unexpected parameter. A supplied scope therefore replaces it.
+            if (scope == null) append("authorization_details", authzDetailsJson)
 
             // Add issuer_state if present (from authorization code grant offer)
             issuerState?.let {
@@ -233,6 +250,16 @@ class AuthorizationRequestBuilder(
         metadata: AuthorizationServerMetadata? = null,
         redirectUri: String? = null,
         dpopJkt: String? = null,
+        /**
+         * `locations` for each `openid_credential` authorization detail.
+         *
+         * OID4VCI 1.0 Section 5.1.1: when the Credential Issuer metadata advertises
+         * `authorization_servers`, `locations` MUST be present and equal the Credential Issuer
+         * Identifier - it tells the authorization server which issuer the grant is for, since one
+         * authorization server can front several. Omit it when only one authorization server is
+         * implied, where the parameter is optional.
+         */
+        credentialIssuerLocations: List<String>? = null,
     ): PushedAuthorizationRequest {
         require(credentialConfigurationIds.isNotEmpty() && credentialConfigurationIds.all { it.isNotBlank() }) {
             "At least one non-blank credential configuration ID is required"
@@ -247,7 +274,9 @@ class AuthorizationRequestBuilder(
         }
 
         val authzDetailsJson = json.encodeToString(
-            credentialConfigurationIds.distinct().map { AuthorizationDetails(credential_configuration_id = it) }
+            credentialConfigurationIds.distinct().map {
+                AuthorizationDetails(credential_configuration_id = it, locations = credentialIssuerLocations)
+            }
         )
 
         val parameters = mutableMapOf<String, String>()
@@ -255,7 +284,12 @@ class AuthorizationRequestBuilder(
         parameters["client_id"] = clientConfig.clientId
         parameters["redirect_uri"] = redirectUri ?: clientConfig.primaryRedirectUri
         parameters["state"] = state
-        parameters["authorization_details"] = authzDetailsJson
+        // OID4VCI 1.0 Section 5.1.2 offers two alternative ways to say which credential is wanted:
+        // `authorization_details` (RAR) or a `scope` the issuer publishes on the credential
+        // configuration. They are alternatives, not companions - sending both leaves the authorization
+        // server to guess, and a server driving the scope-based profile counts the extra
+        // `authorization_details` as an unexpected parameter. A supplied scope therefore replaces it.
+        if (scope == null) parameters["authorization_details"] = authzDetailsJson
 
         issuerState?.let { parameters["issuer_state"] = it }
         scope?.let { parameters["scope"] = it }

@@ -17,6 +17,10 @@ actor MockWalletClient: WalletClient {
     private let rejectionResult: PresentationResult
     private let responseEncryptionRequired: Bool
     private let mdocMetadata: Bool
+    private let sampleCredentialDataJSON: String?
+    private let samplePortraitDisclosureValueJSON: String?
+    private let deleteLocalDataDelayNanoseconds: UInt64
+    private let deleteLocalDataError: Error?
     private(set) var rejectedPresentationPreviewHandles: [PresentationPreviewHandle] = []
     private(set) var discardedPresentationPreviewHandles: [PresentationPreviewHandle] = []
 
@@ -30,7 +34,11 @@ actor MockWalletClient: WalletClient {
         presentationPreviewResult: PresentationPreviewResult? = nil,
         rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}")),
         responseEncryptionRequired: Bool = true,
-        mdocMetadata: Bool = false
+        mdocMetadata: Bool = false,
+        sampleCredentialDataJSON: String? = nil,
+        samplePortraitDisclosureValueJSON: String? = nil,
+        deleteLocalDataDelayMilliseconds: UInt64 = 0,
+        deleteLocalDataError: Error? = nil
     ) {
         self.storedCredentials = storedCredentials
         self.operationDelayNanoseconds = operationDelayMilliseconds * 1_000_000
@@ -42,14 +50,33 @@ actor MockWalletClient: WalletClient {
         self.rejectionResult = rejectionResult
         self.responseEncryptionRequired = responseEncryptionRequired
         self.mdocMetadata = mdocMetadata
+        self.sampleCredentialDataJSON = sampleCredentialDataJSON
+        self.samplePortraitDisclosureValueJSON = samplePortraitDisclosureValueJSON
+        self.deleteLocalDataDelayNanoseconds = deleteLocalDataDelayMilliseconds * 1_000_000
+        self.deleteLocalDataError = deleteLocalDataError
     }
 
-    func bootstrap() async throws -> WalletBootstrapResult {
-        WalletBootstrapResult(keyID: "mock-key-1", did: "did:key:mock")
+    private(set) var bootstrapCalls = 0
+
+    func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletDemoBootstrapResult {
+        bootstrapCalls += 1
+        return WalletDemoBootstrapResult(
+            keyID: "mock-key-1",
+            did: "did:key:mock",
+            publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#,
+            keyUseAuthorizationPolicy: signingProtection.authorizationPolicy
+        )
+    }
+
+    func signingProtectionAvailability(
+        _ signingProtection: WalletDemoSigningProtection
+    ) async throws -> WalletDemoSigningProtectionAvailability {
+        .available
     }
 
     func credentials() async throws -> [Credential] {
-        storedCredentials
+        try await delayOperation()
+        return storedCredentials
     }
 
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
@@ -58,7 +85,14 @@ actor MockWalletClient: WalletClient {
             id: "mock-session",
             offer: .init(
                 grant: issuanceGrant,
-                issuer: .init(identifier: "https://issuer.example", name: "Example Issuer", locale: nil, logoURI: nil, logoAltText: nil),
+                issuer: .init(
+                    identifier: "https://issuer.example",
+                    name: "Example Issuer",
+                    locale: nil,
+                    logoURI: nil,
+                    logoAltText: nil,
+                    metadataProvenance: .unsigned
+                ),
                 credentials: [.init(configurationID: "ExampleCredential", format: "dc+sd-jwt", name: "Example", descriptionText: nil, logoURI: nil)],
                 transactionCode: transactionCodeRequired
                     ? .init(inputMode: "numeric", length: 6, descriptionText: "Enter the six-digit code")
@@ -82,7 +116,7 @@ actor MockWalletClient: WalletClient {
 
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome {
         try await delayOperation()
-        storedCredentials = [mdocMetadata ? Self.photoIDCredential : Self.sampleCredential]
+        storedCredentials = [mdocMetadata ? Self.photoIDCredential : sampleCredential]
         return .stored(sessionID: sessionID, credentialIDs: storedCredentials.map(\.id))
     }
 
@@ -114,7 +148,7 @@ actor MockWalletClient: WalletClient {
             PresentationPreview(
                 previewHandle: PresentationPreviewHandle(value: "mock-presentation-preview"),
                 request: previewRequestInfo,
-                credentialOptions: duplicatePresentationOptions ? Self.duplicateOptions : [Self.defaultOption],
+                credentialOptions: duplicatePresentationOptions ? duplicateOptions : [defaultOption],
                 credentialRequirements: [
                     PresentationCredentialRequirement(options: [duplicatePresentationOptions ? ["identity", "age"] : ["pid"]])
                 ]
@@ -142,6 +176,23 @@ actor MockWalletClient: WalletClient {
         discardedPresentationPreviewHandles.append(previewHandle)
     }
 
+    func deleteCredential(id: String) async throws -> Bool {
+        let remaining = storedCredentials.filter { $0.id != id }
+        let removed = remaining.count != storedCredentials.count
+        storedCredentials = remaining
+        return removed
+    }
+
+    func deleteLocalData() async throws {
+        if deleteLocalDataDelayNanoseconds > 0 {
+            try await Task.sleep(nanoseconds: deleteLocalDataDelayNanoseconds)
+        }
+        if let deleteLocalDataError {
+            throw deleteLocalDataError
+        }
+        storedCredentials = []
+    }
+
     private func delayOperation() async throws {
         guard operationDelayNanoseconds > 0 else { return }
         try await Task.sleep(nanoseconds: operationDelayNanoseconds)
@@ -163,6 +214,7 @@ actor MockWalletClient: WalletClient {
                     termsOfServiceURI: "https://verifier.example/terms"
                 )
             },
+            requestAuthentication: .unauthenticated,
             responseURI: URL(string: "https://verifier.example/response"),
             state: "state-123",
             nonce: "nonce-456",
@@ -199,8 +251,6 @@ actor MockWalletClient: WalletClient {
 
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
-    private static let samplePortraitDisclosureValueJSON = "[-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]"
-
     private static let paymentAuthorizationTransactionData = PresentationTransactionData(
         type: "org.waltid.transaction-data.payment-authorization",
         displayName: "Payment Authorization",
@@ -225,76 +275,84 @@ actor MockWalletClient: WalletClient {
         """
     )
 
-    private static let defaultOption = PresentationCredentialOption(
-        queryID: "pid",
-        credentialID: sampleCredential.id,
-        format: sampleCredential.format,
-        issuer: sampleCredential.issuer,
-        subject: sampleCredential.subject,
-        label: sampleCredential.label,
-        credentialDataJSON: sampleCredential.credentialDataJSON,
-        disclosures: [
+    private var defaultOption: PresentationCredentialOption {
+        var disclosures = [
             PresentationDisclosure(
                 path: "$.given_name",
                 name: "given_name",
                 valueJSON: "\"Ada\"",
                 displayValue: "Ada",
                 selectivelyDisclosable: true
-            ),
-            PresentationDisclosure(
+            )
+        ]
+        if let samplePortraitDisclosureValueJSON {
+            disclosures.append(PresentationDisclosure(
                 path: "$.portrait",
                 name: nil,
                 valueJSON: samplePortraitDisclosureValueJSON,
                 displayValue: nil,
                 selectivelyDisclosable: true
-            )
-        ]
-    )
-
-    private static let duplicateOptions = [
-        defaultOption.with(queryID: "identity", disclosures: [
-            PresentationDisclosure(
-                path: "$.given_name",
-                name: "Identity disclosure",
-                valueJSON: "\"Ada\"",
-                displayValue: "Ada",
-                selectivelyDisclosable: true
-            )
-        ]),
-        defaultOption.with(queryID: "age", disclosures: [
-            PresentationDisclosure(
-                path: "$.age_over_18",
-                name: "Age disclosure",
-                valueJSON: "\"Over 18\"",
-                displayValue: "Over 18",
-                selectivelyDisclosable: true
-            )
-        ])
-    ]
-
-    private static let sampleCredential = Credential(
-        id: "cred-1",
-        format: "jwt_vc_json",
-        issuer: "Example Issuer",
-        subject: nil,
-        label: "Example Credential",
-        addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z"),
-        credentialDataJSON: """
-        {
-          "vct": "https://issuer.example/credential-types/mobile-driving-licence",
-          "given_name": "Ada",
-          "family_name": "Lovelace",
-          "valid_to": 1781654400,
-          "resident_address": {
-            "street_address": "Main Street 1",
-            "locality": "Vienna"
-          },
-          "portrait": {
-            "elementValue": [-119, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 4, 0, 0, 0, -75, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, -38, 99, -4, -1, 31, 0, 3, 3, 2, 0, -17, -65, -89, -34, 0, 0, 0, 0, 73, 69, 78, 68, -82, 66, 96, -126]
-          }
+            ))
         }
-        """
-    )
+        return PresentationCredentialOption(
+            queryID: "pid",
+            credentialID: sampleCredential.id,
+            format: sampleCredential.format,
+            issuer: sampleCredential.issuer,
+            subject: sampleCredential.subject,
+            label: sampleCredential.label,
+            credentialDataJSON: sampleCredential.credentialDataJSON,
+            disclosures: disclosures
+        )
+    }
+
+    private var duplicateOptions: [PresentationCredentialOption] {
+        [
+            defaultOption.with(queryID: "identity", disclosures: [
+                PresentationDisclosure(
+                    path: "$.given_name",
+                    name: "Identity disclosure",
+                    valueJSON: "\"Ada\"",
+                    displayValue: "Ada",
+                    selectivelyDisclosable: true
+                )
+            ]),
+            defaultOption.with(queryID: "age", disclosures: [
+                PresentationDisclosure(
+                    path: "$.age_over_18",
+                    name: "Age disclosure",
+                    valueJSON: "\"Over 18\"",
+                    displayValue: "Over 18",
+                    selectivelyDisclosable: true
+                )
+            ])
+        ]
+    }
+
+    private var sampleCredential: Credential {
+        Credential(
+            id: "cred-1",
+            format: "jwt_vc_json",
+            issuer: "Example Issuer",
+            subject: nil,
+            label: "Example Credential",
+            addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z"),
+            credentialDataJSON: sampleCredentialDataJSON ?? Self.defaultSampleCredentialDataJSON
+        )
+    }
+
+    private static let defaultSampleCredentialDataJSON = """
+    {
+      "vct": "https://issuer.example/credential-types/mobile-driving-licence",
+      "given_name": "Ada",
+      "family_name": "Lovelace",
+      "valid_to": 1781654400,
+      "resident_address": {
+        "street_address": "Main Street 1",
+        "locality": "Vienna"
+      }
+    }
+    """
 
     private static let photoIDCredential = Credential(
         id: "photo-id-1",

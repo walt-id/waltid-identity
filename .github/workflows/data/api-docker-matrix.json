@@ -26,5 +26,13 @@
   {
     "commandPath": ":waltid-enterprise-api",
     "image": "waltid-enterprise-api"
+  },
+  {
+    "commandPath": ":waltid-license-server",
+    "image": "license-server"
+  },
+  {
+    "commandPath": ":waltid-license-admin-server",
+    "image": "license-admin-server"
   }
 ]
