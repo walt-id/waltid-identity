@@ -347,7 +347,9 @@ object PresentationVerificationEngine {
             val afterParse = phaseStart.elapsedNow()
 
             session.updateSession(SessionEvent.parsed_presentation_available) {
-                presentedPresentations = parsedPresentations.map { it.key.second.id to it.value }.toMap()
+                // Byte arrays compacted before storage; see CompactStoredBytes.
+                presentedPresentations = parsedPresentations
+                    .map { it.key.second.id to it.value.withCompactByteArrays() }.toMap()
             }
 
             val presentationValidationResult = verifyAllPresentations(parsedPresentations, session, verificationTime)
@@ -421,6 +423,7 @@ object PresentationVerificationEngine {
 
             session.updateSession(SessionEvent.validated_credentials_available) {
                 presentedCredentials = allSuccessfullyValidatedAndProcessedData
+                    .mapValues { (_, credentials) -> credentials.map { it.withCompactByteArrays() } }
             }
 
             // --- trusted_authorities check ---
