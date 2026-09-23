@@ -7,7 +7,7 @@ import XCTest
 final class WalletViewModelReceiveTests: XCTestCase {
     func testRequiredTransactionCodeIsPromptedAndForwardedOnce() async throws {
         let client = TransactionCodeWalletClient()
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -46,7 +46,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
     func testChangingOfferClearsTransactionCodeState() async throws {
         let client = TransactionCodeWalletClient()
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -65,7 +65,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let client = TransactionCodeWalletClient(
             transactionCode: IssuanceTransactionCode(inputMode: "numeric", length: 6, descriptionText: nil)
         )
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -85,7 +85,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
     func testAuthorizationCodeOfferOpensIssuerSignInContinuation() async throws {
         let client = TransactionCodeWalletClient(transactionCode: nil, issuanceGrant: .authorizationCode)
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -103,7 +103,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
     func testStaleIssuanceStartCannotOverwriteIncomingDeepLink() async throws {
         let client = TransactionCodeWalletClient(issuanceStartDelayNanoseconds: 100_000_000)
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -122,7 +122,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let client = TransactionCodeWalletClient()
         let pinStore = InMemoryDemoPinStore()
         try await pinStore.setPin("1234")
-        let viewModel = WalletViewModel(walletClient: client, pinStore: pinStore)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {}, pinStore: pinStore)
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
         let bootstrapCallsAfterUnlock = await client.bootstrapCalls
@@ -168,7 +168,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
     func testPresentationDeepLinkCancelsActiveIssuanceSession() async throws {
         let client = TransactionCodeWalletClient(startsWithCredential: true)
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -195,7 +195,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             startsWithCredential: true,
             presentationPreviewDelayNanoseconds: 100_000_000
         )
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -215,7 +215,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             startsWithCredential: true,
             presentationPreviewDelayNanoseconds: 100_000_000
         )
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -238,7 +238,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             startsWithCredential: true,
             presentationActionDelayNanoseconds: 100_000_000
         )
-        let viewModel = WalletViewModel(walletClient: client)
+        let viewModel = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
 
@@ -269,7 +269,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: store,
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
 
         viewModel.selectSigningProtection(.none)
@@ -282,23 +283,20 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertEqual(protections, [.none])
     }
 
-    func testRequiredBiometricSetupStopsBeforeBootstrapWhenNotEnrolled() async throws {
+    func testPinSetupDoesNotDependOnSigningBiometricEnrollment() async throws {
         let client = TransactionCodeWalletClient()
         await client.setSigningProtectionAvailability(.biometricNotEnrolled)
         let viewModel = WalletViewModel(
             signingProtectionMode: .required,
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(),
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
 
         try await waitUntil { viewModel.biometricSigningAvailability == .biometricNotEnrolled }
         viewModel.unlockForTests()
-        try await waitUntil { viewModel.signingProtectionError != nil }
-
-        XCTAssertEqual(viewModel.auth, .setup)
-        XCTAssertFalse(viewModel.isReady)
-        let protections = await client.bootstrappedSigningProtections
-        XCTAssertTrue(protections.isEmpty)
+        try await waitUntil { viewModel.auth == .unlocked }
+        XCTAssertNil(viewModel.pinError)
     }
 
     func testUnavailableBiometricSigningCannotBeSelectedButNoneRemainsSelectable() async throws {
@@ -307,7 +305,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(),
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         try await waitUntil { viewModel.biometricSigningAvailability == .biometricNotEnrolled }
 
@@ -322,7 +321,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(.biometric),
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -332,7 +332,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         try await waitUntil { viewModel.signingProtectionWarning != nil }
 
         XCTAssertEqual(viewModel.biometricSigningAvailability, .biometricNotEnrolled)
-        XCTAssertTrue(viewModel.signingProtectionWarning?.contains("will fail") == true)
+        XCTAssertTrue(viewModel.signingProtectionWarning?.contains("cannot be used again") == true)
 
         viewModel.dismissSigningProtectionWarning()
         XCTAssertNil(viewModel.signingProtectionWarning)
@@ -351,7 +351,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(
                 WalletDemoSigningProtection.none
             ),
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -361,7 +362,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         try await waitUntil { viewModel.signingProtectionWarning != nil }
 
         XCTAssertEqual(viewModel.appliedSigningProtection, .biometric)
-        XCTAssertTrue(viewModel.signingProtectionWarning?.contains("choose no biometric signing") == true)
+        XCTAssertTrue(viewModel.signingProtectionWarning?.contains("reset the wallet") == true)
     }
 
     func testRequiredModeWarningDoesNotOfferAProhibitedSigningChoice() async throws {
@@ -369,7 +370,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .required,
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(.biometric),
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -379,7 +381,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         try await waitUntil { viewModel.signingProtectionWarning != nil }
 
         XCTAssertTrue(viewModel.signingProtectionWarning?.contains("required by app configuration") == true)
-        XCTAssertFalse(viewModel.signingProtectionWarning?.contains("choose no biometric signing") == true)
+        XCTAssertFalse(viewModel.signingProtectionWarning?.contains("reset the wallet") == true)
     }
 
     func testForegroundWarningWaitsUntilPinUnlock() async throws {
@@ -387,7 +389,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(.biometric),
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -402,7 +405,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         viewModel.submitPin()
         try await waitUntil { viewModel.auth == .unlocked }
 
-        XCTAssertTrue(viewModel.signingProtectionWarning?.contains("will fail") == true)
+        XCTAssertTrue(viewModel.signingProtectionWarning?.contains("cannot be used again") == true)
     }
 
     func testUnavailableSigningProtectionDoesNotReplaceWallet() async throws {
@@ -411,7 +414,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: store,
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -432,7 +436,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: store,
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -457,7 +462,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: store,
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -486,7 +492,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let viewModel = WalletViewModel(
             signingProtectionMode: .optional,
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(.biometric),
-            walletClient: client
+            walletClient: client,
+            identityDocumentRegistrationUpdate: {}
         )
         viewModel.unlockForTests()
         try await waitUntil { viewModel.isReady }
@@ -579,7 +586,7 @@ private actor TransactionCodeWalletClient: WalletClient {
 
     private(set) var bootstrapCalls = 0
 
-    func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletBootstrapResult {
+    func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletDemoBootstrapResult {
         bootstrapCalls += 1
         bootstrappedSigningProtections.append(signingProtection)
         if shouldFailNextBootstrap {
@@ -588,7 +595,7 @@ private actor TransactionCodeWalletClient: WalletClient {
         }
         let reportedSigningProtection = nextReportedSigningProtection ?? signingProtection
         nextReportedSigningProtection = nil
-        return WalletBootstrapResult(
+        return WalletDemoBootstrapResult(
             keyID: "key-1",
             did: "did:key:test",
             publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#,

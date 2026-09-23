@@ -2,7 +2,8 @@ import Foundation
 import WalletSDK
 
 protocol WalletClient {
-    func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletBootstrapResult
+    func signingIdentityManager() async throws -> SigningIdentityManager?
+    func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletDemoBootstrapResult
     func signingProtectionAvailability(
         _ signingProtection: WalletDemoSigningProtection
     ) async throws -> WalletDemoSigningProtectionAvailability
@@ -27,6 +28,10 @@ protocol WalletClient {
     func deleteLocalData() async throws
 }
 
+extension WalletClient {
+    func signingIdentityManager() async throws -> SigningIdentityManager? { nil }
+}
+
 final class SDKWalletClient: WalletClient {
     private let configuration: WalletConfiguration
     private var cachedWallet: Wallet?
@@ -35,8 +40,15 @@ final class SDKWalletClient: WalletClient {
         self.configuration = configuration
     }
 
-    func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletBootstrapResult {
-        try await wallet().bootstrap(keyUseAuthorizationPolicy: signingProtection.authorizationPolicy)
+    func signingIdentityManager() async throws -> SigningIdentityManager? { try await wallet().signingIdentity }
+
+    func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletDemoBootstrapResult {
+        let service = try await wallet().signingIdentity
+        guard case .active(let identity) = try await service.state() else {
+            throw WalletError.invalidInput("Select a signing identity before opening the wallet")
+        }
+        return WalletDemoBootstrapResult(keyID: identity.keyID, did: identity.did,
+            publicJWK: identity.publicJWK, keyUseAuthorizationPolicy: identity.authorization)
     }
 
     func signingProtectionAvailability(
@@ -45,6 +57,7 @@ final class SDKWalletClient: WalletClient {
         switch try await wallet().keyUseAuthorizationPreflight(policy: signingProtection.authorizationPolicy) {
         case .supported: .available
         case .unsupported(.biometricNotEnrolled): .biometricNotEnrolled
+        case .unsupported(.deviceCredentialNotSet): .deviceCredentialNotSet
         case .unsupported(.biometricUnavailable): .biometricUnavailable
         case .unsupported(.unsupportedCombination): .unsupported
         }
@@ -108,5 +121,54 @@ final class SDKWalletClient: WalletClient {
         let wallet = try await Wallet(configuration: configuration)
         cachedWallet = wallet
         return wallet
+    }
+}
+
+@MainActor
+extension SDKWalletClient: ProximityWalletClient {
+    func proximityPresentationCapabilities(
+        configuration: ProximityConfiguration
+    ) async throws -> ProximityCapabilities {
+        try await wallet().proximityPresentationCapabilities(configuration: configuration)
+    }
+
+    func startProximityPresentation(
+        configuration: ProximityConfiguration
+    ) async throws -> any DemoProximityPresentationSession {
+        try await wallet().startProximityPresentation(configuration: configuration)
+    }
+}
+
+/// Result of bootstrapping wallet key material and DID state.
+struct WalletDemoBootstrapResult: Equatable, Sendable {
+    /// Identifier of the created or selected wallet key.
+    let keyID: String
+
+    /// DID created for the wallet.
+    let did: String
+
+    /// Public JWK of ``keyID`` as a JSON object string. Private material is never included.
+    let publicJWK: String
+
+    /// Immutable authorization policy of the persisted signing key.
+    let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+
+    /// Creates a bootstrap result.
+    ///
+    /// - Parameters:
+    ///   - keyID: Identifier of the created or selected wallet key.
+    ///   - did: DID created for the wallet.
+    ///   - publicJWK: Public JWK of the wallet key as a JSON object string.
+    ///   - keyUseAuthorizationPolicy: Authorization required for private-key use.
+    init(
+        keyID: String,
+        did: String,
+        publicJWK: String,
+        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy
+    ) {
+        self.keyID = keyID
+        self.did = did
+        self.publicJWK = publicJWK
+        self.keyUseAuthorizationPolicy = keyUseAuthorizationPolicy
     }
 }

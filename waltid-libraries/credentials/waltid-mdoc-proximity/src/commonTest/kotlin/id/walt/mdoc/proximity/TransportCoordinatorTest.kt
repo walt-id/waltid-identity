@@ -1,0 +1,292 @@
+@file:OptIn(
+    ExperimentalSerializationApi::class,
+    ExperimentalCoroutinesApi::class,
+)
+
+package id.walt.mdoc.proximity
+
+import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+
+class TransportCoordinatorTest {
+    private val method = DeviceRetrievalMethod.Nfc(256u, 256u)
+
+    @Test
+    fun `first successful transport wins and the loser is closed once`() = runTest {
+        val winningConnection = FakeProximityLoopback.create().holder
+        val failing = TrackingPrepared(ProximityTransportKind.BLE, failure = IllegalStateException("no peer"))
+        val winning = TrackingPrepared(ProximityTransportKind.NFC, connection = winningConnection)
+
+        val result = TransportCoordinator().awaitWinner(PreparedTransports(listOf(failing, winning), emptyMap()))
+
+        assertSame(winning, result.prepared)
+        assertSame(winningConnection, result.connection)
+        assertEquals(listOf(ProximityCloseReason.LOST_RACE), failing.closeReasons)
+        assertEquals(emptyList(), winning.closeReasons)
+    }
+
+    @Test
+    fun `all connection failures close every prepared transport`() = runTest {
+        val first = TrackingPrepared(ProximityTransportKind.BLE, failure = IllegalStateException("one"))
+        val second = TrackingPrepared(ProximityTransportKind.NFC, failure = IllegalStateException("two"))
+
+        assertFailsWith<ProximityException> {
+            TransportCoordinator().awaitWinner(PreparedTransports(listOf(first, second), emptyMap()))
+        }
+        assertEquals(listOf(ProximityCloseReason.PEER_DISCONNECTED), first.closeReasons)
+        assertEquals(listOf(ProximityCloseReason.PEER_DISCONNECTED), second.closeReasons)
+    }
+
+    @Test
+    fun `platform permission failure survives preparation and connection aggregation`() = runTest {
+        val denied = ProximityException(ProximityError.Capability("ble_permission_denied", "Bluetooth access is denied"))
+        val preparation = assertFailsWith<ProximityException> {
+            TransportCoordinator().prepare(
+                listOf(provider(ProximityTransportKind.BLE) { throw denied }),
+                EngagementContext(MdocProximityProfile.ISO_18013_5_ED2_DIS_2026, 1024, MdocEngagementMode.Qr), this,
+            )
+        }
+        assertSame(denied, preparation)
+        val connection = assertFailsWith<ProximityException> {
+            TransportCoordinator().awaitWinner(PreparedTransports(listOf(
+                TrackingPrepared(ProximityTransportKind.BLE, failure = denied),
+            ), emptyMap()))
+        }
+        assertSame(denied, connection)
+    }
+
+    @Test
+    fun `a transport-local cancellation is a failed candidate rather than a stalled race`() = runTest {
+        val cancelled = TrackingPrepared(
+            ProximityTransportKind.NFC,
+            failure = CancellationException("The transport stopped itself"),
+        )
+
+        val failure = assertFailsWith<ProximityException> {
+            TransportCoordinator().awaitWinner(PreparedTransports(listOf(cancelled), emptyMap()))
+        }
+
+        assertEquals("connection_failed", failure.error.code)
+        assertEquals(listOf(ProximityCloseReason.PEER_DISCONNECTED), cancelled.closeReasons)
+    }
+
+    @Test
+    fun `cancelling connection selection closes every prepared transport exactly once`() = runTest {
+        val first = TrackingPrepared(ProximityTransportKind.BLE, waitForever = true)
+        val second = TrackingPrepared(ProximityTransportKind.NFC, waitForever = true)
+        val selection = async {
+            TransportCoordinator().awaitWinner(PreparedTransports(listOf(first, second), emptyMap()))
+        }
+        runCurrent()
+
+        selection.cancelAndJoin()
+
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), first.closeReasons)
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), second.closeReasons)
+    }
+
+    @Test
+    fun `cancelling preparation closes transports already prepared`() = runTest {
+        val first = TrackingPrepared(ProximityTransportKind.BLE, waitForever = true)
+        val firstProvider = provider(ProximityTransportKind.BLE) { first }
+        val blockingProvider = provider(ProximityTransportKind.NFC) { awaitCancellation() }
+        val preparation = async {
+            TransportCoordinator().prepare(
+                listOf(firstProvider, blockingProvider),
+                EngagementContext(MdocProximityProfile.ISO_18013_5_ED2_DIS_2026, 1024, MdocEngagementMode.Qr),
+                this,
+            )
+        }
+        runCurrent()
+
+        preparation.cancelAndJoin()
+
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), first.closeReasons)
+    }
+
+    @Test
+    fun `prepared transport with a mismatched identifier is closed and rejected`() = runTest {
+        val candidate = TrackingPrepared(
+            kind = ProximityTransportKind.BLE,
+            id = PreparedTransportId("unexpected"),
+            waitForever = true,
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            TransportCoordinator().prepare(
+                listOf(provider(ProximityTransportKind.BLE) { candidate }),
+                EngagementContext(MdocProximityProfile.ISO_18013_5_ED2_DIS_2026, 1024, MdocEngagementMode.Qr),
+                this,
+            )
+        }
+
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), candidate.closeReasons)
+    }
+
+    @Test
+    fun `a connection delivered after cancellation is discarded and closed`() = runTest {
+        val release = CompletableDeferred<Unit>()
+        val lateConnection = TrackingConnection()
+        val prepared = object : PreparedTransport {
+            override val kind = ProximityTransportKind.BLE
+            override val connectionMethod = method
+            val closeReasons = mutableListOf<ProximityCloseReason>()
+            override suspend fun awaitConnection(): ProximityConnection = withContext(NonCancellable) {
+                release.await()
+                lateConnection
+            }
+            override suspend fun close(reason: ProximityCloseReason) { closeReasons += reason }
+        }
+        val selection = async {
+            TransportCoordinator().awaitWinner(PreparedTransports(listOf(prepared), emptyMap()))
+        }
+        runCurrent()
+
+        selection.cancel()
+        release.complete(Unit)
+        selection.join()
+
+        assertEquals(listOf(ProximityCloseReason.LOST_RACE), lateConnection.closeReasons)
+        assertEquals(listOf(ProximityCloseReason.CANCELLED), prepared.closeReasons)
+    }
+
+    @Test
+    fun `an available but unselected transport is not prepared or advertised`() = runTest {
+        val selected = TrackingPrepared(ProximityTransportKind.BLE, waitForever = true)
+        var unselectedPrepareCalls = 0
+        val prepared = TransportCoordinator().prepare(
+            listOf(
+                provider(ProximityTransportKind.BLE) { selected },
+                provider(
+                    ProximityTransportKind.NFC,
+                    ProximityCapability(true, true, true, sessionSelected = false),
+                ) {
+                    unselectedPrepareCalls++
+                    TrackingPrepared(ProximityTransportKind.NFC, waitForever = true)
+                },
+            ),
+            EngagementContext(MdocProximityProfile.ISO_18013_5_ED2_DIS_2026, 1024, MdocEngagementMode.Qr),
+            this,
+        )
+
+        assertEquals(listOf(selected), prepared.transports)
+        assertEquals(0, unselectedPrepareCalls)
+        assertNotNull(prepared.unavailable[ProximityTransportKind.NFC])
+    }
+
+    @Test
+    fun `closing a losing or cancelled transport unblocks its worker before joining`() = runTest {
+        for (cancel in listOf(false, true)) {
+            val release = CompletableDeferred<Unit>()
+            val closeReasons = mutableListOf<ProximityCloseReason>()
+            val blocked = object : PreparedTransport {
+                override val kind = ProximityTransportKind.NFC
+                override val connectionMethod = method
+                override suspend fun awaitConnection(): ProximityConnection = withContext(NonCancellable) {
+                    release.await()
+                    throw IllegalStateException("Native accept was closed")
+                }
+                override suspend fun close(reason: ProximityCloseReason) {
+                    closeReasons += reason
+                    release.complete(Unit)
+                }
+            }
+            val connection = TrackingConnection()
+            val winner = TrackingPrepared(ProximityTransportKind.BLE, connection = connection)
+            val selection = async {
+                TransportCoordinator().awaitWinner(PreparedTransports(
+                    if (cancel) listOf(blocked) else listOf(blocked, winner), emptyMap(),
+                ))
+            }
+            try {
+                runCurrent()
+                if (cancel) {
+                    selection.cancel()
+                    runCurrent()
+                }
+                assertTrue(selection.isCompleted, "Resource closure must unblock a worker before joining it")
+                if (!cancel) assertSame(connection, selection.await().connection)
+                assertEquals(
+                    listOf(if (cancel) ProximityCloseReason.CANCELLED else ProximityCloseReason.LOST_RACE),
+                    closeReasons,
+                )
+            } finally {
+                release.complete(Unit)
+                selection.cancelAndJoin()
+            }
+        }
+    }
+
+    @Test
+    fun `prepared transports own input and exported collections`() = runTest {
+        val winner = TrackingPrepared(ProximityTransportKind.BLE, connection = TrackingConnection())
+        val loser = TrackingPrepared(ProximityTransportKind.NFC, waitForever = true)
+        val inputs = mutableListOf<PreparedTransport>(winner, loser)
+        val unavailable = linkedMapOf(ProximityTransportKind.WIFI_AWARE to ProximityError.Capability("offline", "Offline"))
+        val prepared = PreparedTransports(inputs, unavailable)
+        inputs.clear()
+        unavailable.clear()
+        (prepared.transports as MutableList).clear()
+        assertSame(winner, TransportCoordinator().awaitWinner(prepared).prepared)
+        assertEquals(listOf(ProximityCloseReason.LOST_RACE), loser.closeReasons)
+        assertEquals(setOf(ProximityTransportKind.WIFI_AWARE), prepared.unavailable.keys)
+    }
+
+    private fun provider(
+        kind: ProximityTransportKind,
+        capability: ProximityCapability = ProximityCapability(true, true, true, sessionSelected = true),
+        prepare: suspend CoroutineScope.() -> PreparedTransport,
+    ) = object : ProximityTransportProvider {
+        override val kind = kind
+        override suspend fun capability(context: EngagementContext) = capability
+        override suspend fun prepare(context: EngagementContext, sessionScope: CoroutineScope): PreparedTransport =
+            sessionScope.prepare()
+    }
+
+    private inner class TrackingPrepared(
+        override val kind: ProximityTransportKind,
+        override val id: PreparedTransportId = PreparedTransportId(kind.name),
+        private val connection: ProximityConnection? = null,
+        private val failure: Throwable? = null,
+        private val waitForever: Boolean = false,
+    ) : PreparedTransport {
+        override val connectionMethod: DeviceRetrievalMethod = method
+        val closeReasons = mutableListOf<ProximityCloseReason>()
+        override suspend fun awaitConnection(): ProximityConnection = when {
+            waitForever -> awaitCancellation()
+            connection != null -> connection
+            else -> throw requireNotNull(failure)
+        }
+        override suspend fun close(reason: ProximityCloseReason) { closeReasons += reason }
+    }
+
+    private class TrackingConnection : ProximityConnection {
+        override val kind = ProximityTransportKind.BLE
+        val closeReasons = mutableListOf<ProximityCloseReason>()
+        private val closure = CompletableDeferred<ProximityCloseReason>()
+        override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
+        override suspend fun receive(): ImmutableBytes? = null
+        override suspend fun send(message: ImmutableBytes) = Unit
+        override suspend fun close(reason: ProximityCloseReason) {
+            closure.complete(reason)
+            closeReasons += reason
+        }
+    }
+}

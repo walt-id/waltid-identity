@@ -46,7 +46,7 @@ data class DeviceSigned(
          * @param namespacedItems A map where the key is the namespace and the value is a list of
          * `DeviceSignedItem`s to be included.
          * @param deviceAuth The complete `DeviceAuth` object, which can be either a
-         * `DeviceAuth.Signature` or a `DeviceAuth.Mac`.
+         * `DeviceAuth.deviceSignature` or `DeviceAuth.deviceMac`.
          * @return A new, correctly structured [DeviceSigned] instance.
          */
         fun fromDeviceSignedItems(

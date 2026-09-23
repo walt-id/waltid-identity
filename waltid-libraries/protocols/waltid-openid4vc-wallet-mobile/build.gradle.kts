@@ -3,6 +3,9 @@
 import com.android.build.api.artifact.SingleArtifact
 import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFrameworkTask
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
 import org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 import java.util.zip.ZipFile
@@ -29,6 +32,16 @@ skie {
     }
 }
 
+// Physical classes, reader dependency, host components and APK identity are opt-in together.
+val enableProximityPhysicalTests = providers.gradleProperty("enableProximityPhysicalTests").orNull == "true"
+val enableWalletSdkPhysicalFixtures = providers.gradleProperty("enableWalletSdkPhysicalFixtures").orNull == "true"
+if (enableProximityPhysicalTests) require(enableAndroidBuild) { "Physical test APK requires enableAndroidBuild=true" }
+if (enableWalletSdkPhysicalFixtures) require(enableIosBuild) { "Physical fixture framework requires enableIosBuild=true" }
+if (enableProximityPhysicalTests || enableWalletSdkPhysicalFixtures) {
+    require(listOf("CI", "GITHUB_ACTIONS", "GITLAB_CI", "BUILD_BUILDID", "JENKINS_URL", "TEAMCITY_VERSION")
+        .none { providers.environmentVariable(it).isPresent }) { "Physical tests cannot be enabled in CI" }
+}
+
 kotlin {
     explicitApi()
 
@@ -52,14 +65,23 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(identityLibs.whyoleg.cryptography.random)
+            implementation(identityLibs.signum.indispensable)
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile"))
             api(project(":waltid-libraries:waltid-did"))
+            implementation(project(":waltid-libraries:credentials:waltid-mdoc-proximity"))
+            api(project(":waltid-libraries:credentials:waltid-mdoc-proximity-mobile"))
             implementation(project(":waltid-libraries:crypto:waltid-x509"))
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.datetime)
+            implementation(identityLibs.kotlincrypto.hash.sha2)
             implementation(identityLibs.ktor.client.core)
+        }
+        commonTest {
+            kotlin.srcDir("../../credentials/waltid-mdoc-proximity/src/commonTestFixtures/kotlin")
+            kotlin.srcDir("../../crypto/waltid-x509/src/commonTestFixtures/kotlin")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -89,6 +111,8 @@ kotlin {
                     implementation(kotlin("test"))
                     implementation(identityLibs.junit)
                     implementation(identityLibs.robolectric)
+                    // Independent reader oracle; never part of the published wallet runtime.
+                    implementation("org.multipaz:multipaz-jvm:0.100.0")
                 }
             }
             named("androidHostTest") {
@@ -103,10 +127,27 @@ kotlin {
                 implementation(identityLibs.signum.indispensable)
                 implementation(identityLibs.signum.supreme)
             }
+            iosTest {
+                kotlin.srcDir("src/recoveryTest/kotlin")
+                if (providers.gradleProperty("enableIosRecoveryTests").orNull == "true") {
+                    kotlin.srcDir("src/iosRecoveryTest/kotlin")
+                }
+                dependencies {
+                    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-keychain"))
+                }
+            }
         }
         if (enableAndroidBuild) {
             val androidDeviceTest by getting {
+                if (enableProximityPhysicalTests) {
+                    kotlin.srcDir("src/physicalDeviceTest/kotlin")
+                    kotlin.srcDir("src/physicalTestFixtures/kotlin")
+                    kotlin.srcDir("src/androidHostTest/kotlin/id/walt/wallet2/mobile/peer")
+                    dependencies { implementation("org.multipaz:multipaz-android:0.100.0") }
+                }
+                kotlin.srcDir("src/recoveryTest/kotlin")
                 dependencies {
+                    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-blockstore"))
                     implementation(kotlin("test"))
                     implementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
                     implementation(identityLibs.kotlinx.coroutines.test)
@@ -115,6 +156,57 @@ kotlin {
                     implementation(identityLibs.ktor.client.android)
                 }
             }
+        }
+    }
+
+    if (enableIosBuild && enableWalletSdkPhysicalFixtures) {
+        val physicalFramework = XCFramework("WalletCorePhysicalFixtures")
+        val iosProductionSources = sourceSets.getByName("iosMain")
+        targets.withType<KotlinNativeTarget>().matching { it.name in setOf("iosArm64", "iosSimulatorArm64") }.configureEach {
+            val fixtures = compilations.create("physicalFixtures") {
+                defaultSourceSet {
+                    dependsOn(iosProductionSources)
+                    kotlin.srcDir("src/physicalTestFixtures/kotlin")
+                    kotlin.srcDir("src/iosPhysicalFixtures/kotlin")
+                }
+            }
+            binaries.framework("physicalFixtures", listOf(NativeBuildType.RELEASE)) {
+                compilation = fixtures
+                baseName = "WalletCore"
+                isStatic = true
+                binaryOption("bundleId", "id.walt.wallet.core.physical-fixtures")
+                physicalFramework.add(this)
+            }
+        }
+        tasks.named<XCFrameworkTask>("assembleWalletCorePhysicalFixturesReleaseXCFramework") {
+            baseName = providers.provider { "WalletCore" }
+            outputDir = layout.buildDirectory.dir("physical-fixtures/XCFrameworks").get().asFile
+        }
+    }
+
+    // A separate simulator binary compiles the unchanged SDK sources with native bridge fixtures.
+    // It never replaces the publishable WalletCore framework or enters ordinary build/test tasks.
+    if (enableIosBuild && providers.gradleProperty("enableWalletSdkBridgeFixtures").orNull == "true") {
+        val bridgeFramework = XCFramework("WalletCoreBridgeFixtures")
+        val iosProductionSources = sourceSets.getByName("iosMain")
+        targets.named<KotlinNativeTarget>("iosSimulatorArm64") {
+            val fixtures = compilations.create("bridgeFixtures") {
+                defaultSourceSet {
+                    dependsOn(iosProductionSources)
+                    kotlin.srcDir("src/iosBridgeFixtures/kotlin")
+                }
+            }
+            binaries.framework("bridgeFixtures", listOf(NativeBuildType.RELEASE)) {
+                compilation = fixtures
+                baseName = "WalletCore"
+                isStatic = true
+                binaryOption("bundleId", "id.walt.wallet.core.bridge-fixtures")
+                bridgeFramework.add(this)
+            }
+        }
+        tasks.named<XCFrameworkTask>("assembleWalletCoreBridgeFixturesReleaseXCFramework") {
+            baseName = providers.provider { "WalletCore" }
+            outputDir = layout.buildDirectory.dir("bridge-fixtures/XCFrameworks").get().asFile
         }
     }
 }
@@ -138,6 +230,11 @@ if (enableAndroidBuild) extensions.configure<KotlinMultiplatformAndroidComponent
     // The host tests read the matcher through the asset API, which still passes when the published AAR
     // carries no assets at all, so assert on the artifact itself.
     onVariants { variant ->
+        if (enableProximityPhysicalTests) variant.deviceTests.values.forEach { physical ->
+            physical.applicationId.set("id.walt.proximity.physical")
+            physical.sources.manifests.addStaticManifestFile("src/physicalDeviceTest/AndroidManifest.xml")
+            physical.sources.res?.addStaticSourceDirectory("src/physicalDeviceTest/res")
+        }
         val aar = variant.artifacts.get(SingleArtifact.AAR)
         val verifyMatcherPackaging = tasks.register("verifyMatcherPackaging") {
             description = "Fails if the AAR does not carry the vendored matcher assets and notices."

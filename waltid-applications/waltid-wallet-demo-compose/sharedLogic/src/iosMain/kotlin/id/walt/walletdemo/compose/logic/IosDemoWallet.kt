@@ -1,10 +1,11 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
 import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import platform.Foundation.NSLocale
 import platform.Foundation.preferredLanguages
 
@@ -15,6 +16,8 @@ import platform.Foundation.preferredLanguages
  * extension opens this same wallet. Only the Swift host can resolve them - the Keychain group needs a
  * build-expanded Team ID - so they are passed in rather than defaulted here, and they stay off the
  * portable [DemoWalletConfig] because they describe Apple host configuration, not demo behavior.
+ * @param nfcHostPlatformAdapter Swift-owned Core NFC adapter shared with the native demo. Keeping
+ * CardSession outside Kotlin limits common code to protocol state and APDU routing.
  * @param onDigitalCredentialRegistryChanged Called after the wallet re-published its desired Apple
  * registration state. Writing Apple's registration store needs `IdentityDocumentServices`, which only
  * the Swift host may call, so the host reconciles here; see [MobileWalletConfig].
@@ -22,15 +25,22 @@ import platform.Foundation.preferredLanguages
 fun createIosDemoWallet(
     config: DemoWalletConfig = DemoWalletConfig(),
     crossProcessAccess: MobileWalletCrossProcessAccess,
+    nfcHostPlatformAdapter: NfcHostPlatformAdapter,
     onDigitalCredentialRegistryChanged: suspend () -> Unit,
-): DemoWallet {
+): ProximityDemoWallet {
 
-    return LazyDemoWallet {
+    return LazyProximityDemoWallet {
         val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
         MobileDemoWallet(
-            MobileWalletFactory().create(
+            MobileWalletFactory(nfcHostPlatformAdapter).create(
                 MobileWalletConfig(
                     walletId = config.walletId,
+                    signingIdentity = id.walt.wallet2.mobile.identity.SigningIdentityConfiguration(
+                        recoveryProviders = listOf(id.walt.wallet2.recovery.keychain.KeychainIdentityRecovery("wallet-demo", crossProcessAccess.keychainAccessGroup)),
+                        alternativeAuthorizations = if (config.signingProtectionMode.allows(WalletDemoSigningProtection.None))
+                        listOf(KeyUseAuthorizationPolicy.None) else emptyList(),
+                        platform = id.walt.crypto2.keys.PlatformKeyConfiguration.IosKeychain(accessGroup = crossProcessAccess.keychainAccessGroup),
+                    ),
                     attestationConfig = config.toWalletAttestationConfig(),
                     transactionDataProfiles = transactionDataProfiles.profiles,
                     preferredLocales = NSLocale.preferredLanguages.mapNotNull { it as? String },
@@ -45,6 +55,7 @@ fun createIosDemoWallet(
                 )
             ),
             warning = transactionDataProfiles.warning,
+            isIos = true,
         )
     }
 }

@@ -169,7 +169,7 @@ struct CredentialReviewCard: View {
                 })) {
                     EmptyView()
                 }
-                .toggleStyle(SharingCheckboxToggleStyle())
+                .toggleStyle(ReviewCheckboxToggleStyle())
                 .labelsHidden()
                 .disabled(isLoading)
                 .accessibilityIdentifier(WalletAccessibilityID.presentationCredentialToggle(option.selection.id))
@@ -244,6 +244,7 @@ private struct SharingClaimsSheet: View {
                 .padding()
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsDialog)
     }
 }
@@ -267,14 +268,20 @@ private struct SharingClaimsIssuerRow: View {
     }
 }
 
-private struct SharingCheckboxToggleStyle: ToggleStyle {
-    func makeBody(configuration: Configuration) -> some View {
+public struct ReviewCheckboxToggleStyle: ToggleStyle {
+    public init() {}
+
+    public func makeBody(configuration: Configuration) -> some View {
         Button {
             configuration.isOn.toggle()
         } label: {
-            Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
-                .font(.title2)
-                .foregroundStyle(configuration.isOn ? Color.accentColor : Color.secondary)
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
+                    .font(.title2)
+                    .foregroundStyle(configuration.isOn ? Color.accentColor : Color.secondary)
+                configuration.label
+            }
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(configuration.isOn ? [.isSelected] : [])
@@ -368,7 +375,43 @@ private struct DisclosureTextView: View {
     }
 }
 
-/// Share, and the ways of declining the transport actually supports.
+/// The supported transport-specific presentations for the shared review actions.
+public enum ReviewActionPresentation {
+    case sharing
+    case proximity
+
+    var submitTitle: String {
+        String(localized: "Share", bundle: .module)
+    }
+
+    var rejectTitle: String {
+        self == .sharing ? String(localized: "Reject", bundle: .module) : String(localized: "Decline", bundle: .module)
+    }
+
+    var cancelTitle: String? {
+        self == .sharing ? nil : String(localized: "Cancel", bundle: .module)
+    }
+
+    var submitAccessibilityIdentifier: String {
+        self == .sharing
+            ? WalletAccessibilityID.presentationSubmitButton
+            : WalletAccessibilityID.proximityApproveButton
+    }
+
+    var rejectAccessibilityIdentifier: String {
+        self == .sharing
+            ? WalletAccessibilityID.presentationRejectButton
+            : WalletAccessibilityID.proximityDeclineButton
+    }
+
+    var cancelAccessibilityIdentifier: String {
+        self == .sharing
+            ? WalletAccessibilityID.presentationCancelButton
+            : WalletAccessibilityID.proximityCancelButton
+    }
+}
+
+/// Presentation actions, with transport-specific labels and accessibility identifiers when needed.
 public struct ReviewActions: View {
     @Environment(\.walletDemoBranding) private var branding
     let selectionComplete: Bool
@@ -376,42 +419,50 @@ public struct ReviewActions: View {
     let onSubmit: () -> Void
     let onReject: (() -> Void)?
     let onCancel: () -> Void
+    let presentation: ReviewActionPresentation
 
     public init(
         selectionComplete: Bool,
         isLoading: Bool,
         onSubmit: @escaping () -> Void,
         onReject: (() -> Void)?,
-        onCancel: @escaping () -> Void
+        onCancel: @escaping () -> Void,
+        presentation: ReviewActionPresentation = .sharing
     ) {
         self.selectionComplete = selectionComplete
         self.isLoading = isLoading
         self.onSubmit = onSubmit
         self.onReject = onReject
         self.onCancel = onCancel
+        self.presentation = presentation
     }
 
     public var body: some View {
         HStack(spacing: 10) {
-            Button("Share", action: onSubmit)
-                .buttonStyle(.borderedProminent)
-                .tint(branding.primary)
-                .disabled(isLoading || !selectionComplete)
-                .accessibilityIdentifier(WalletAccessibilityID.presentationSubmitButton)
+            actionButtons
+        }
+    }
 
-            // Labelled "Cancel review" only where a protocol-level Reject also exists, so the two
-            // ways of declining cannot be mistaken for each other.
-            Button(onReject == nil ? "Cancel" : "Cancel review", action: onCancel)
+    @ViewBuilder
+    private var actionButtons: some View {
+        Button(presentation.submitTitle, action: onSubmit)
+            .buttonStyle(.borderedProminent)
+            .tint(branding.primary)
+            .disabled(isLoading || !selectionComplete)
+            .accessibilityIdentifier(presentation.submitAccessibilityIdentifier)
+
+        // By default this says String(localized: "Cancel review", bundle: .module) where a protocol-level Reject also exists, so the two
+        // ways of declining cannot be mistaken for each other. Transports may supply a more precise label.
+        Button(presentation.cancelTitle ?? (onReject == nil ? String(localized: "Cancel", bundle: .module) : String(localized: "Cancel review", bundle: .module)), action: onCancel)
+            .buttonStyle(.bordered)
+            .disabled(isLoading && presentation != .proximity)
+            .accessibilityIdentifier(presentation.cancelAccessibilityIdentifier)
+
+        if let onReject {
+            Button(presentation.rejectTitle, action: onReject)
                 .buttonStyle(.bordered)
                 .disabled(isLoading)
-                .accessibilityIdentifier(WalletAccessibilityID.presentationCancelButton)
-
-            if let onReject {
-                Button("Reject", action: onReject)
-                    .buttonStyle(.bordered)
-                    .disabled(isLoading)
-                    .accessibilityIdentifier(WalletAccessibilityID.presentationRejectButton)
-            }
+                .accessibilityIdentifier(presentation.rejectAccessibilityIdentifier)
         }
     }
 }

@@ -38,6 +38,7 @@ class MetadataService(
         encodeDefaults = true
     }
 
+    private val issuerHttpBaseUrl = serviceConfig.baseUrl.trimEnd('/')
     private val baseUrl = serviceConfig.openId4VciBaseUrl()
     private val tokenSigningKeyConfig = serviceConfig.ciTokenKey
     private val credentialEncryptionKeyConfig = serviceConfig.credentialEncryptionKey
@@ -46,13 +47,16 @@ class MetadataService(
 
     private val issuerDisplay: List<IssuerDisplay>? =
         metadataConfig.issuerDisplay
+            ?.map { DisplayUriResolver.resolve(it, issuerHttpBaseUrl) }
             ?.map { json.decodeFromJsonElement(IssuerDisplay.serializer(), it) }
             ?.takeIf { it.isNotEmpty() }
 
     private val credentialConfigurations: Map<String, CredentialConfiguration> =
         metadataConfig.credentialConfigurations.mapValues { (configurationId, value) ->
-            json.decodeFromJsonElement(CredentialConfiguration.serializer(), value)
-                .withResolvedVct(configurationId)
+            json.decodeFromJsonElement(
+                CredentialConfiguration.serializer(),
+                DisplayUriResolver.resolve(value, issuerHttpBaseUrl),
+            ).withResolvedVct(configurationId)
         }
 
     fun getCredentialIssuerMetadata(): CredentialIssuerMetadata =

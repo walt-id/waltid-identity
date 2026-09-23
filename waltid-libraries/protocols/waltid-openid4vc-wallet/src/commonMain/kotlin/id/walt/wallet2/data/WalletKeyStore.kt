@@ -60,6 +60,10 @@ interface WalletKeyStore {
     suspend fun getDefaultCrypto2Key(usages: Set<KeyUsage> = emptySet()): Crypto2Key? =
         listKeys().toList().firstNotNullOfOrNull { getCrypto2Key(it.keyId, usages) }
 
+    /** Resolves this store's explicitly selected default; identity-aware stores may return null while pending. */
+    suspend fun getDefaultKeyMaterial(usages: Set<KeyUsage> = emptySet()): WalletKeyStoreEntry? =
+        listKeys().firstOrNull()?.let { getKeyMaterial(it.keyId, usages) }
+
     /** Convenience: collect all keys as a list. */
     suspend fun listKeysAsList(): List<WalletKeyInfo> =
         listKeys().toList()

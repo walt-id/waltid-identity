@@ -17,6 +17,10 @@ runs:
       if: steps.check-kdoctor.outputs.installed == 'false' && runner.os == 'macOS'
       shell: bash
       run: |
+        # The macOS-26 images ship a preinstalled aws/tap that Homebrew no longer trusts, so any
+        # `brew install` prints "Homebrew tap aws/tap is not trusted". Dropping the tap is the fix
+        # Homebrew itself recommends; nothing here installs from it.
+        brew untap aws/tap 2>/dev/null || true
         echo "Installing KDoctor on macOS using Homebrew..."
         brew install kdoctor
 

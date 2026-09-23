@@ -1,5 +1,6 @@
 package id.walt.certificate.x509.signum
 
+import at.asitplus.signum.indispensable.asn1.Asn1Exception
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateParser
 import kotlinx.io.bytestring.ByteString
@@ -15,7 +16,10 @@ class SignumCertificateParser : X509CertificateParser {
         return SignumX509Certificate(result.getOrThrow())
     }
 
-    override fun parseCertificateDerEncoded(derEncoded: ByteString): X509Certificate {
-        return SignumX509Certificate(SignumCertificate.decodeFromDer(derEncoded.toByteArray()))
+    override fun parseCertificateDerEncoded(derEncoded: ByteString): X509Certificate = try {
+        SignumX509Certificate(SignumCertificate.decodeFromDer(derEncoded.toByteArray()))
+    } catch (error: Asn1Exception) {
+        // Signum's parse failures extend Throwable directly; keep the provider detail here.
+        throw IllegalArgumentException("Invalid DER certificate", error)
     }
 }

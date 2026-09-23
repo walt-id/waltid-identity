@@ -47,25 +47,22 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
      * @param audience The credential issuer URL
      * @param nonce The optional c_nonce obtained from the issuer's Nonce Endpoint
      * @param binding How the proof header identifies [key]
+     * @param clientId OAuth `client_id` written as `iss` when the token request is client-bound
      * @return Proofs object containing the JWT proof
      */
     @Deprecated("Use the Crypto2Key overload")
-    override suspend fun buildProof(
+    suspend fun buildProof(
         key: Key,
         audience: String,
         nonce: String?,
         binding: ProofKeyBinding,
+        clientId: String?,
     ): Proofs {
-        ProofBuilderUtils.validateProofParameters(audience, nonce)
+        ProofBuilderUtils.validateProofParameters(audience, nonce, clientId)
 
         log.debug { "Building JWT proof for audience: $audience" }
 
-        // Build JWT payload
-        val payload = buildJsonObject {
-            put("aud", audience)
-            put("iat", ProofBuilderUtils.currentTimestampSeconds())
-            nonce?.let { put("nonce", it) }
-        }
+        val payload = proofPayload(audience, nonce, clientId)
 
         // Build JWT header with typ
         val header = buildJsonObject {
@@ -116,19 +113,16 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
         )
     }
 
-    override suspend fun buildProof(
+    suspend fun buildProof(
         key: Crypto2Key,
         algorithm: JwsAlgorithm,
         audience: String,
         nonce: String?,
         binding: ProofKeyBinding,
+        clientId: String?,
     ): Proofs {
-        ProofBuilderUtils.validateProofParameters(audience, nonce)
-        val payload = buildJsonObject {
-            put("aud", audience)
-            put("iat", ProofBuilderUtils.currentTimestampSeconds())
-            nonce?.let { put("nonce", it) }
-        }
+        ProofBuilderUtils.validateProofParameters(audience, nonce, clientId)
+        val payload = proofPayload(audience, nonce, clientId)
         val header = buildJsonObject {
             put("typ", "openid4vci-proof+jwt")
             when (binding) {
@@ -148,6 +142,40 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
             )
         )
     }
+
+    /**
+     * Implements the [ProofOfPossessionBuilder] contract. Kept at its original arity for binary
+     * compatibility; the `iss` claim is offered through the additional [clientId] overload, so this
+     * form omits `iss`.
+     */
+    @Deprecated("Use the Crypto2Key overload")
+    override suspend fun buildProof(
+        key: Key,
+        audience: String,
+        nonce: String?,
+        binding: ProofKeyBinding,
+    ): Proofs = buildProof(key, audience, nonce, binding, clientId = null)
+
+    /**
+     * Implements the [Crypto2ProofOfPossessionBuilder] contract. Kept at its original arity for
+     * binary compatibility; the `iss` claim is offered through the additional [clientId] overload,
+     * so this form omits `iss`.
+     */
+    override suspend fun buildProof(
+        key: Crypto2Key,
+        algorithm: JwsAlgorithm,
+        audience: String,
+        nonce: String?,
+        binding: ProofKeyBinding,
+    ): Proofs = buildProof(key, algorithm, audience, nonce, binding, clientId = null)
+
+    private fun proofPayload(audience: String, nonce: String?, clientId: String?): JsonObject =
+        buildJsonObject {
+            clientId?.let { put("iss", it) }
+            put("aud", audience)
+            put("iat", ProofBuilderUtils.currentTimestampSeconds())
+            nonce?.let { put("nonce", it) }
+        }
 }
 
 private suspend fun Crypto2Key.exportPublicJwk(): EncodedKey.Jwk {

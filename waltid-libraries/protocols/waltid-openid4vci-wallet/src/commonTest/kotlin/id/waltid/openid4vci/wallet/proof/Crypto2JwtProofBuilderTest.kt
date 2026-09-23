@@ -26,6 +26,7 @@ class Crypto2JwtProofBuilderTest {
             audience = "https://issuer.example",
             nonce = "nonce",
             binding = ProofKeyBinding.Jwk,
+            clientId = null,
         )
         val token = assertNotNull(proof.jwt).single()
         val verified = CompactJws.verify(token, key, JwsAlgorithm.ES256)
@@ -35,6 +36,52 @@ class Crypto2JwtProofBuilderTest {
         assertTrue(verified.protectedHeader["jwk"] is JsonObject)
         assertEquals("https://issuer.example", payload["aud"]?.jsonPrimitive?.content)
         assertEquals("nonce", payload["nonce"]?.jsonPrimitive?.content)
+        assertNull(payload["iss"])
+    }
+
+    @Test
+    fun `client-bound proof writes iss and anonymous proof omits it`() = runTest {
+        val key = generate(KeySpec.Ec(EcCurve.P256), "proof-iss-key")
+        val bound = assertNotNull(
+            builder.buildProof(
+                key = key,
+                algorithm = JwsAlgorithm.ES256,
+                audience = "https://issuer.example",
+                nonce = "nonce",
+                binding = ProofKeyBinding.Jwk,
+                clientId = "eudiw-abca",
+            ).jwt
+        ).single()
+        val boundPayload = Json.parseToJsonElement(
+            CompactJws.verify(bound, key, JwsAlgorithm.ES256).payload.decodeToString()
+        ) as JsonObject
+        assertEquals("eudiw-abca", boundPayload["iss"]?.jsonPrimitive?.content)
+
+        val anonymous = assertNotNull(
+            builder.buildProof(
+                key = key,
+                algorithm = JwsAlgorithm.ES256,
+                audience = "https://issuer.example",
+                nonce = "nonce",
+                binding = ProofKeyBinding.Jwk,
+                clientId = null,
+            ).jwt
+        ).single()
+        val anonymousPayload = Json.parseToJsonElement(
+            CompactJws.verify(anonymous, key, JwsAlgorithm.ES256).payload.decodeToString()
+        ) as JsonObject
+        assertNull(anonymousPayload["iss"])
+
+        assertFailsWith<IllegalArgumentException> {
+            builder.buildProof(
+                key = key,
+                algorithm = JwsAlgorithm.ES256,
+                audience = "https://issuer.example",
+                nonce = "nonce",
+                binding = ProofKeyBinding.Jwk,
+                clientId = "  ",
+            )
+        }
     }
 
     @Test
@@ -47,6 +94,7 @@ class Crypto2JwtProofBuilderTest {
                 audience = "https://issuer.example",
                 nonce = "nonce",
                 binding = ProofKeyBinding.KeyId("did:example:holder#key-1"),
+                clientId = null,
             ).jwt
         ).single()
         assertEquals(
@@ -62,6 +110,7 @@ class Crypto2JwtProofBuilderTest {
                 audience = "https://issuer.example",
                 nonce = "nonce",
                 binding = ProofKeyBinding.JwkThumbprint,
+                clientId = null,
             ).jwt
         ).single()
         assertEquals(
@@ -81,6 +130,7 @@ class Crypto2JwtProofBuilderTest {
                 audience = "https://issuer.example",
                 nonce = null,
                 binding = ProofKeyBinding.Jwk,
+                clientId = null,
             ).jwt
         ).single()
         val payload = Json.parseToJsonElement(
@@ -91,7 +141,7 @@ class Crypto2JwtProofBuilderTest {
         assertEquals("https://issuer.example", payload["aud"]?.jsonPrimitive?.content)
 
         assertFailsWith<IllegalArgumentException> {
-            builder.buildProof(key, JwsAlgorithm.ES256, "https://issuer.example", "  ", ProofKeyBinding.Jwk)
+            builder.buildProof(key, JwsAlgorithm.ES256, "https://issuer.example", "  ", ProofKeyBinding.Jwk, null)
         }
     }
 
@@ -99,7 +149,7 @@ class Crypto2JwtProofBuilderTest {
     fun `incompatible explicit algorithm is rejected`() = runTest {
         val key = generate(KeySpec.Ec(EcCurve.P384), "p384")
         assertFailsWith<IllegalArgumentException> {
-            builder.buildProof(key, JwsAlgorithm.ES256, "https://issuer.example", "nonce", ProofKeyBinding.Jwk)
+            builder.buildProof(key, JwsAlgorithm.ES256, "https://issuer.example", "nonce", ProofKeyBinding.Jwk, null)
         }
     }
 

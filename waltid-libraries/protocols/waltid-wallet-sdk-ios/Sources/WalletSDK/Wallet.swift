@@ -33,6 +33,9 @@ public actor Wallet {
         self.bridge = bridge
     }
 
+    /// Signing identity creation and recovery. Options are issued and validated by the shared core.
+    public var signingIdentity: SigningIdentityManager { SigningIdentityManager(core: bridge.signingIdentityCore) }
+
     /// Emits wallet issuance and presentation progress events.
     ///
     /// The stream is backed by the wallet core event flow. Iteration ends when
@@ -41,41 +44,17 @@ public actor Wallet {
         bridge.events
     }
 
-    /// Bootstraps wallet key material and DID state.
-    ///
-    /// - Parameters:
-    ///   - keyType: Optional key type override. When omitted, the wallet uses
-    ///     ``WalletConfiguration/defaultKeyType``.
-    ///   - didMethod: DID method to create for the bootstrapped wallet DID.
-    ///   - keyUseAuthorizationPolicy: Optional per-bootstrap authorization
-    ///     policy override. When omitted, the configured default is used.
-    /// - Returns: Persisted key and DID information for subsequent wallet
-    ///   operations.
-    /// - Throws: ``WalletError`` when key creation, DID creation, persistence,
-    ///   or bridge communication fails.
-    public func bootstrap(
-        keyType: WalletKeyType? = nil,
-        didMethod: String = "key",
-        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy? = nil
-    ) async throws -> WalletBootstrapResult {
-        try await bridge.bootstrap(
-            keyType: keyType ?? configuration.defaultKeyType,
-            didMethod: didMethod,
-            keyUseAuthorizationPolicy: keyUseAuthorizationPolicy
-        )
-    }
-
     /// Checks whether a key-use authorization request is supported without creating a key.
     ///
     /// - Parameters:
-    ///   - keyType: Optional key type override. When omitted, the configured default is used.
+    ///   - keyType: Algorithm to check; defaults to the identity algorithm, P-256.
     ///   - policy: Optional authorization policy override. When omitted, the configured default is used.
     public func keyUseAuthorizationPreflight(
-        keyType: WalletKeyType? = nil,
+        keyType: WalletKeyType = .secp256r1,
         policy: WalletKeyUseAuthorizationPolicy? = nil
     ) async throws -> WalletKeyUseAuthorizationPreflight {
         try await bridge.keyUseAuthorizationPreflight(
-            keyType: keyType ?? configuration.defaultKeyType,
+            keyType: keyType,
             policy: policy ?? configuration.defaultKeyUseAuthorizationPolicy
         )
     }
@@ -264,6 +243,26 @@ public actor Wallet {
     /// - Throws: ``WalletError`` when the handle cannot be discarded.
     public func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
         try await bridge.discardPresentationPreview(previewHandle)
+    }
+
+    /// Checks the selected proximity prerequisites without creating keys, UUIDs, or radio resources.
+    /// - Parameter configuration: Capability dimensions and policy to evaluate.
+    /// - Returns: A truthful capability report for every modeled dimension.
+    public func proximityPresentationCapabilities(
+        configuration: ProximityConfiguration = .init()
+    ) async throws -> ProximityCapabilities {
+        try await bridge.proximityPresentationCapabilities(configuration: configuration)
+    }
+
+    /// Starts one single-use in-person proximity presentation session.
+    /// - Parameter configuration: Immutable configuration for this session.
+    /// - Returns: A session whose state stream drives all host presentation and actions.
+    public func startProximityPresentation(
+        configuration: ProximityConfiguration = .init()
+    ) async throws -> ProximitySession {
+        ProximitySession(
+            bridge: try await bridge.startProximityPresentation(configuration: configuration)
+        )
     }
     /// Returns the current IdentityDocumentServices capability snapshot.
     public func digitalCredentialCapabilities() async -> DigitalCredentialCapabilities {

@@ -49,7 +49,7 @@ class AndroidCryptographyFormatCapabilitiesTest {
         )
         assertEquals(setOf(KeyEncodingFormat.JWK), CryptographyCapabilityProfile.Portable.privateKeyExportFormats)
         assertEquals(
-            setOf(KeySpec.Rsa(2048), KeySpec.Rsa(3072), KeySpec.Rsa(4096)),
+            setOf(KeySpec.Rsa(2048), KeySpec.Rsa(3072), KeySpec.Rsa(4096), KeySpec.Ec(EcCurve.P256)),
             CryptographyCapabilityProfile.Portable.privateJwkValidationSpecs,
         )
         val attemptedOverride = CryptographySoftwareKeyProvider(
@@ -179,11 +179,19 @@ class AndroidCryptographyFormatCapabilitiesTest {
             usages = usages,
             keyEncoding = KeyEncodingFormat.JWK,
         )
-        assertFalse(provider.supports(privateImport))
-        assertEquals(
-            "Unsupported stored software key",
-            assertFailsWith<IllegalArgumentException> { provider.restore(privateKey.storedKey) }.message,
-        )
+        if (spec == KeySpec.Ec(EcCurve.P256)) {
+            assertTrue(provider.supports(privateImport))
+            val restored = provider.restore(privateKey.storedKey)
+            val message = "restored-p256".encodeToByteArray()
+            val signature = assertNotNull(restored.capabilities.signer).sign(message, algorithm)
+            assertTrue(assertNotNull(privateKey.capabilities.verifier).verify(message, signature, algorithm))
+        } else {
+            assertFalse(provider.supports(privateImport))
+            assertEquals(
+                "Unsupported stored software key",
+                assertFailsWith<IllegalArgumentException> { provider.restore(privateKey.storedKey) }.message,
+            )
+        }
         assertIs<EncodedKey.Jwk>(assertNotNull(privateKey.capabilities.privateKeyExporter).exportPrivateKey())
         assertEquals(
             "Private key export format is not supported: PKCS8_DER",

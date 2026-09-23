@@ -227,8 +227,7 @@ internal suspend fun Wallet.resolveKeyMaterial(
         if (keyId != null) return null
     }
     keyStores.forEachIndexed { index, store ->
-        val defaultKeyId = store.listKeys().firstOrNull()?.keyId ?: return@forEachIndexed
-        store.getKeyMaterial(defaultKeyId, crypto2Usages)?.let { material ->
+        store.getDefaultKeyMaterial(crypto2Usages)?.let { material ->
             requireMatchingKeyMaterial(material.legacyKey, material.crypto2Key)
             return material.copy(keyReference = walletStoreKeyReference(index, material.keyId))
         }

@@ -1,0 +1,353 @@
+{
+  "schemaVersion": 1,
+  "physicalClassPrefixes": [
+    "id.walt.proximity.physical.",
+    "ProximityPhysicalDeviceTests"
+  ],
+  "suites": {
+    "independent-session-vectors": {
+      "executionClass": "deterministic",
+      "sources": [
+        "waltid-libraries/credentials/waltid-mdoc-proximity/src/commonTest/kotlin/id/walt/mdoc/proximity/IndependentSessionVectorTest.kt"
+      ],
+      "reportsByPlatform": {
+        "android-host": "waltid-libraries/credentials/waltid-mdoc-proximity/build/test-results/testAndroidHostTest/*.xml",
+        "jvm": "waltid-libraries/credentials/waltid-mdoc-proximity/build/test-results/jvmTest/*.xml",
+        "ios-simulator": "waltid-libraries/credentials/waltid-mdoc-proximity/build/test-results/iosSimulatorArm64Test/*.xml",
+        "js-node": "waltid-libraries/credentials/waltid-mdoc-proximity/build/test-results/jsNodeTest/*.xml"
+      },
+      "requiredTests": [
+        {
+          "class": "id.walt.mdoc.proximity.IndependentSessionVectorTest",
+          "name": "publicPeerVectorMatchesKeyAgreementTranscriptAndBothDirections",
+          "oracle": "Exact external request/response ciphertext and plaintext match through real platform ECDH and production derivation/cipher."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.IndependentSessionVectorTest",
+          "name": "publicPeerCiphertextMutationsFailClosedAndFreshControlRecovers",
+          "oracle": "Body/tag mutations, truncation and reflected direction fail closed and each retains a valid control."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.IndependentSessionVectorTest",
+          "name": "publicPeerTranscriptMutationCannotAuthenticateTheCanonicalRequest",
+          "oracle": "A single transcript mutation cannot authenticate the canonical request; unchanged control succeeds."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.IndependentSessionVectorTest",
+          "name": "publicPeerCounterOneCannotBeReplayedAsCounterTwo",
+          "oracle": "A successfully decrypted counter-one message cannot be replayed as counter two."
+        }
+      ]
+    },
+    "android-ble-callbacks": {
+      "executionClass": "deterministic",
+      "sources": [
+        "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/src/androidHostTest/kotlin/id/walt/mdoc/proximity/mobile/AndroidCentralGattCallbackTest.kt",
+        "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/src/androidHostTest/kotlin/id/walt/mdoc/proximity/mobile/AndroidPeripheralGattCallbackTest.kt"
+      ],
+      "reportsByPlatform": {
+        "android-host": "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/build/test-results/testAndroidHostTest/*.xml"
+      },
+      "requiredTests": [
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidCentralGattCallbackTest",
+          "name": "foreignGattCannotDeliverDataOrCompleteAnOperation",
+          "oracle": "Only the owned GATT can deliver data or complete the pending native operation."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidCentralGattCallbackTest",
+          "name": "notificationSnapshotsBytesAndIgnoresUnknownCharacteristics",
+          "oracle": "Notification bytes are copied at callback delivery and unknown characteristics are ignored."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidCentralGattCallbackTest",
+          "name": "disconnectIsTerminalAndLateCallbacksCannotReviveSession",
+          "oracle": "Disconnect produces one terminal result, closes owned resources and suppresses late callbacks."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidCentralGattCallbackTest",
+          "name": "closeUnblocksPendingConnectionWithoutAdvancingVirtualTime",
+          "oracle": "Cancellation unblocks pending connect immediately and disposes owned GATT."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidCentralGattCallbackTest",
+          "name": "writeWaitsForMatchingCompletionAndDiscardsAlreadyDeliveredDuplicates",
+          "oracle": "Writes wait for the matching completion; an already queued obsolete callback cannot acknowledge a new write."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidCentralGattCallbackTest",
+          "name": "cccdCompletionMustBelongToTheSubscribedCharacteristic",
+          "oracle": "Descriptor UUID alone cannot acknowledge subscription to a different characteristic."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidPeripheralGattCallbackTest",
+          "name": "wrongPeerAndQueuedDuplicateCannotAcknowledgeANotification",
+          "oracle": "Only the selected peer can acknowledge notifications and already queued duplicates are discarded."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidPeripheralGattCallbackTest",
+          "name": "disconnectWhileSendingUnblocksNotificationAndFreshRoleRecovers",
+          "oracle": "Disconnect releases a blocked notification and a fresh role can send."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidPeripheralGattCallbackTest",
+          "name": "wrongPeerWritesAndDuplicateTerminationDoNotDiscloseOrRetainResources",
+          "oracle": "Wrong-peer writes cannot inject data and repeated termination disposes resources once."
+        }
+      ]
+    },
+    "ios-ble-callbacks": {
+      "executionClass": "deterministic",
+      "sources": [
+        "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/src/iosSimulatorArm64Test/kotlin/id/walt/mdoc/proximity/mobile/IosCentralGattCallbackTest.kt",
+        "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/src/iosSimulatorArm64Test/kotlin/id/walt/mdoc/proximity/mobile/IosPeripheralGattCallbackTest.kt"
+      ],
+      "reportsByPlatform": {
+        "ios-simulator": "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/build/test-results/iosSimulatorArm64Test/*.xml"
+      },
+      "requiredTests": [
+        {
+          "class": "id.walt.mdoc.proximity.mobile.IosCentralGattCallbackTest",
+          "name": "foreignPeripheralCannotInjectNotificationsOrDisconnectTheSelectedPeer",
+          "oracle": "Foreign CoreBluetooth peripheral callbacks cannot inject bytes or terminate the selected connection."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.IosCentralGattCallbackTest",
+          "name": "backpressureRequiresTheMatchingReadyCallbackAndAnActuallyWritableQueue",
+          "oracle": "A ready callback releases backpressure only for the selected peer and when CoreBluetooth reports writable capacity."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.IosCentralGattCallbackTest",
+          "name": "disconnectUnblocksSendingDisposesOnceAndFreshSessionRecovers",
+          "oracle": "Disconnect interrupts pending sends, disposes once and permits a fresh session."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.IosCentralGattCallbackTest",
+          "name": "readMatchesCharacteristicAndSubscriptionChecksNativeState",
+          "oracle": "Read completion matches its characteristic and notification subscription confirms native state."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.IosPeripheralGattCallbackTest",
+          "name": "backpressurePreservesExactPacketOrderAndCancellationDisposesOnce",
+          "oracle": "Peripheral backpressure preserves packet order; cancellation disposes owned resources once."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.IosPeripheralGattCallbackTest",
+          "name": "unsubscribeUnblocksSendingWithoutWaitingForTheOuterDeadline",
+          "oracle": "Selected-peer unsubscribe releases blocked sending without waiting for the outer deadline."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.IosPeripheralGattCallbackTest",
+          "name": "selectedPeerWritesReachTheChannelAndOtherPeerCannotInjectOrTerminate",
+          "oracle": "Only selected-peer writes reach the incoming channel or terminate the connection."
+        }
+      ]
+    },
+    "independent-nfc-reader": {
+      "executionClass": "deterministic",
+      "source": "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/androidHostTest/kotlin/id/walt/wallet2/mobile/IndependentNfcReaderTest.kt",
+      "requiredTests": [
+        {
+          "class": "id.walt.wallet2.mobile.IndependentNfcReaderTest",
+          "name": "stockPeerRetrievalSelectIsRejectedAndCorrectedSelectCanRecover",
+          "oracle": "Reject the stock peer SELECT conflict with the selected standard and retain a valid corrected control."
+        },
+        {
+          "class": "id.walt.wallet2.mobile.IndependentNfcReaderTest",
+          "name": "staticHandoverAndFragmentedResponseAreIndependentlyAuthenticated",
+          "oracle": "Pinned reader authenticates issuer/device signatures, field digests and configured issuer trust after fragmented NFC retrieval."
+        },
+        {
+          "class": "id.walt.wallet2.mobile.IndependentNfcReaderTest",
+          "name": "requestTwoRetainsConnectionCountersAndRequiresNewSelectiveConsent",
+          "oracle": "One connection carries two encrypted exchanges with fresh selective consent and rejects stale approval."
+        },
+        {
+          "class": "id.walt.wallet2.mobile.IndependentNfcReaderTest",
+          "name": "tamperedCiphertextIsRejectedWithoutConsentAndFreshSessionRecovers",
+          "oracle": "One ciphertext mutation produces status 10 without disclosure; the same wallet completes a fresh session."
+        },
+        {
+          "class": "id.walt.wallet2.mobile.IndependentNfcReaderTest",
+          "name": "cancelledReviewCannotDiscloseAndFreshSessionRecovers",
+          "oracle": "Cancelled approval cannot disclose and the same wallet completes a fresh session."
+        }
+      ],
+      "reportsByPlatform": {
+        "android-host": "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/test-results/testAndroidHostTest/*.xml"
+      }
+    },
+    "android-nfc-callbacks": {
+      "executionClass": "deterministic",
+      "requiredTests": [
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidMdocHostApduServiceTest",
+          "name": "successfulCloseKeepsRoutingUntilTheLastResponseFragmentIsSent",
+          "oracle": "Successful native close cannot discard the pending response or its GET RESPONSE fragments."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidMdocHostApduServiceTest",
+          "name": "frameworkSendFailureReleasesRoutingAndTheWorkerServesAFreshGeneration",
+          "oracle": "Framework send failure disposes the generation and preserves service-worker recovery."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidNfcSessionRegistryTest",
+          "name": "unfinishedResponseDrainIsBoundedAndDisconnectCanInterruptIt",
+          "oracle": "An unfinished successful-close drain has a finite deadline, disconnect interrupts it, and fresh routing remains available."
+        }
+      ],
+      "reportsByPlatform": {
+        "android-host": "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/build/test-results/testAndroidHostTest/*.xml"
+      }
+    },
+    "swift-bridge": {
+      "executionClass": "simulated-platform",
+      "sources": [
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/KMPProximityProjectionTests.swift",
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/ProximityBridgeContractTests.swift",
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/ProximityInputValidationTests.swift"
+      ],
+      "requiredTests": [
+        {
+          "class": "KMPProximityProjectionTests",
+          "name": "testSubmissionProjectionPreservesEveryApprovedField",
+          "oracle": "Every approved field and document survives the real WalletCore-to-Swift projection, with both continuation choices."
+        },
+        {
+          "class": "KMPProximityProjectionTests",
+          "name": "testReviewProjectionPreservesRequiredFieldsAndAllowsNone",
+          "oracle": "Empty and nonempty required-field sets survive projection without dropping credential options."
+        },
+        {
+          "class": "KMPProximityProjectionTests",
+          "name": "testRealBridgeStreamsReviewAndForwardsEverySelectedField",
+          "oracle": "Native StateFlow review and exact approval pass through the real bridge into a receipt preserving all selected fields."
+        },
+        {
+          "class": "KMPProximityProjectionTests",
+          "name": "testRealBridgeCancellationRemovesReviewAndStopsLaterStates",
+          "oracle": "Cancellation removes review and terminal stream completion prevents a later native review from resurfacing."
+        },
+        {
+          "class": "KMPProximityProjectionTests",
+          "name": "testFailedStatePreservesCodeRecoveryAndHasNoLegalActions",
+          "oracle": "Stable error identity and recovery survive projection with no remaining legal actions."
+        },
+        {
+          "class": "ProximityBridgeContractTests",
+          "name": "testAggregateRoutesAndRemediationOrderMatchKMP",
+          "oracle": "192 configured route combinations preserve shared start decisions and ordered remediation actions."
+        },
+        {
+          "class": "ProximityBridgeContractTests",
+          "name": "testTransportDecisionsMatchKMPForEveryFlagAndRuntimeState",
+          "oracle": "All 24 transport flag and runtime combinations preserve the shared capability decision."
+        },
+        {
+          "class": "ProximityInputValidationTests",
+          "name": "testConfigurationRejectsInvalidLimitsAndProfilePolicyRecoverably",
+          "oracle": "Configuration bounds and profile policy reject invalid host input without trapping."
+        },
+        {
+          "class": "ProximityInputValidationTests",
+          "name": "testTrustDecisionRejectsIncoherentEvidenceWithoutGrantingTrust",
+          "oracle": "Incoherent host trust evidence fails recoverably without granting trust."
+        },
+        {
+          "class": "ProximityInputValidationTests",
+          "name": "testProfileAuthorizationRejectsIncompleteOrUnboundHostResults",
+          "oracle": "Profile authorization retains completeness, uniqueness and credential binding checks."
+        },
+        {
+          "class": "ProximityInputValidationTests",
+          "name": "testDisclosureRejectsEmptyAndDuplicateSelectionsRecoverably",
+          "oracle": "Empty, duplicate and out-of-range disclosure selections fail recoverably."
+        },
+        {
+          "class": "ProximityInputValidationTests",
+          "name": "testStoredPolicyCannotDowngradeAProfileThatRequiresTrustedReaders",
+          "oracle": "Stored settings cannot override the trusted-reader policy required by the selected profile."
+        }
+      ]
+    },
+    "compose-consent-android-host": {
+      "executionClass": "simulated-platform",
+      "sources": [
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/mobileUiTest/kotlin/id/walt/walletdemo/compose/ui/WalletDemoProximityTestScenarios.kt"
+      ],
+      "reportsByPlatform": {
+        "android-host": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/testAndroidHostTest/*.xml"
+      },
+      "requiredTests": [
+        {
+          "class": "id.walt.walletdemo.compose.ui.WalletDemoProximityAndroidTest",
+          "name": "replacementReviewAndCancellationRemoveStaleConsentFromTheScreen",
+          "oracle": "Replacement review removes stale credential fields; cancellation removes approval and review controls."
+        },
+        {
+          "class": "id.walt.walletdemo.compose.ui.PreparedProximitySharingAndroidTest",
+          "name": "preparationShowsExplicitActionAndReadyStateKeepsScopeAndCancellationVisible",
+          "oracle": "Rendered approved-data detail contains both selected fields and excludes the unselected field."
+        }
+      ]
+    },
+    "compose-consent-ios-simulator": {
+      "executionClass": "simulated-platform",
+      "sources": [
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/mobileUiTest/kotlin/id/walt/walletdemo/compose/ui/WalletDemoProximityTestScenarios.kt"
+      ],
+      "reportsByPlatform": {
+        "ios-simulator": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/iosSimulatorArm64Test/*.xml"
+      },
+      "requiredTests": [
+        {
+          "class": "id.walt.walletdemo.compose.ui.WalletDemoProximityIosTest",
+          "name": "replacementReviewAndCancellationRemoveStaleConsentFromTheScreen",
+          "oracle": "Replacement review removes stale credential fields; cancellation removes approval and review controls."
+        }
+      ]
+    },
+    "native-demo-consent": {
+      "executionClass": "simulated-platform",
+      "source": "waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppTests/ProximityPresentationViewModelTests.swift",
+      "requiredTests": [
+        {
+          "class": "ProximityPresentationViewModelTests",
+          "name": "testCombinedReviewDefaultsAndApprovalPreserveExactHolderSelections",
+          "oracle": "Combined review submits exactly the selected elements and proof in each document."
+        }
+      ]
+    },
+    "android-aware-callbacks": {
+      "executionClass": "deterministic",
+      "sources": [
+        "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/src/androidHostTest/kotlin/id/walt/mdoc/proximity/mobile/AndroidWifiAwareCallbackTest.kt"
+      ],
+      "reportsByPlatform": {
+        "android-host": "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/build/test-results/testAndroidHostTest/*.xml"
+      },
+      "requiredTests": [
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidWifiAwareCallbackTest",
+          "name": "attachFailureClosesLateSuccessAndFreshPublisherCanStart",
+          "oracle": "Attach failure cleans a late successful resource and a fresh publisher can start."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidWifiAwareCallbackTest",
+          "name": "publishFailureDisposesAttachAndLatePublishResourceOnce",
+          "oracle": "Publish failure disposes attach and late publish resources once."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidWifiAwareCallbackTest",
+          "name": "networkFailureClosesPendingAcceptAndDisposesItsCallback",
+          "oracle": "Network unavailability closes a real pending socket accept and unregisters the owned callback."
+        },
+        {
+          "class": "id.walt.mdoc.proximity.mobile.AndroidWifiAwareCallbackTest",
+          "name": "cancellationAtAttachOrPublishDisposesLateNativeResources",
+          "oracle": "Cancellation at attach and publish cleans resources delivered by late native callbacks."
+        }
+      ]
+    }
+  }
+}

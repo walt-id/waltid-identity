@@ -481,7 +481,7 @@ class Wallet2ExtendedIntegrationTest {
                             put("issuing_country", "DE")
                         },
                         selectiveDisclosure = null,
-                        proofValidationContext = proofSupport.validationContext(request)
+                        proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization])
                     )
                     if (credentialResponse !is CredentialResponseResult.Success) {
                         val failure = credentialResponse as CredentialResponseResult.Failure

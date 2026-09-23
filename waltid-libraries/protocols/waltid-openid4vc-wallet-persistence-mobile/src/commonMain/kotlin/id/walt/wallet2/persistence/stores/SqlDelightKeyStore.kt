@@ -1,5 +1,6 @@
 package id.walt.wallet2.persistence.stores
 
+import id.walt.crypto2.keys.Key as StoredKeyMaterial
 import id.walt.crypto.keys.Key
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.KeyId
@@ -8,7 +9,6 @@ import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.keys.toPublicJwk
-import id.walt.crypto2.keys.Key as StoredKeyMaterial
 import id.walt.crypto2.keys.KeyEncodingFormat
 import id.walt.crypto2.providers.CryptoOperation
 import id.walt.crypto2.providers.CryptoRequirement
@@ -23,15 +23,15 @@ import id.walt.wallet2.data.WalletKeyUsageUnsupportedException
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationException
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationFailure
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationUnsupportedReason
+import id.walt.crypto2.keys.KeyUseAuthorizationException
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
 import id.walt.wallet2.persistence.keys.WalletKeyRequirements
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
-import id.walt.wallet2.persistence.keys.toAuthorizationFailure
+import id.walt.crypto2.keys.toAuthorizationFailure
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -48,6 +48,7 @@ import kotlin.time.Clock
 public class SqlDelightKeyStore(
     private val managedKeyProvider: PlatformManagedKeyProvider,
     private val queries: WalletPersistenceQueries,
+    private val identityWalletId: String = "default",
 ) : MobileWalletKeyStore {
     private val softwareRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
 
@@ -104,7 +105,7 @@ public class SqlDelightKeyStore(
         managedKeyProvider.preflight(requirements).let { managedSupport ->
             if (managedSupport is KeyUseAuthorizationSupport.Supported) {
                 managedSupport
-            } else if (requirements.authorizationPolicy !is KeyUseAuthorizationPolicy.None) {
+            } else if (!requirements.permitsSoftwareFallback()) {
                 managedSupport
             } else if (supportsSoftware(requirements)) {
                 KeyUseAuthorizationSupport.Supported(requirements.authorizationPolicy)
@@ -126,7 +127,7 @@ public class SqlDelightKeyStore(
                 managedKeyProvider.generateManagedKey(request)
 
             is KeyUseAuthorizationSupport.Unsupported -> {
-                if (request.requirements.authorizationPolicy !is KeyUseAuthorizationPolicy.None) {
+                if (!request.requirements.permitsSoftwareFallback()) {
                     throw KeyUseAuthorizationException(
                         failure = managedSupport.reason.toAuthorizationFailure(),
                         message = "The platform cannot enforce ${request.requirements.authorizationPolicy} for ${request.requirements.spec}",
@@ -161,6 +162,40 @@ public class SqlDelightKeyStore(
         }
         return key
     }
+
+    /** Creates software material only when no native authorization requirement is selected. */
+    public suspend fun generateSoftwareKey(request: WalletKeyCreationRequest): StoredKeyMaterial {
+        require(request.requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
+            "Software storage cannot enforce native key-use authorization"
+        }
+        return softwareRuntime.generateSoftwareKey(GenerateSoftwareKeyRequest(
+            request.id, request.requirements.spec, request.requirements.usages,
+        )).also { addCrypto2Key(it) }
+    }
+
+    /** Validates and persists an explicitly supplied software key. */
+    public suspend fun importSoftwareKey(stored: StoredKey.Software): StoredKeyMaterial =
+        softwareRuntime.restore(stored).also { addCrypto2Key(it) }
+
+    /** Returns a validated descriptor to trusted identity/recovery services. It can contain private material. */
+    public fun storedKey(keyId: String): StoredKey? = queries.selectByKeyId(keyId).executeAsOneOrNull()?.let {
+        decodeStoredKey(it.key_id, it.stored_key)
+    }
+
+    /** An established identity controls default-key selection, including when its key is missing. */
+    override suspend fun getDefaultCrypto2Key(usages: Set<KeyUsage>): StoredKeyMaterial? {
+        val active = queries.selectActiveIdentity(identityWalletId).executeAsOneOrNull() ?: return null
+        return getCrypto2Key(active.key_id, usages)
+    }
+
+    /** Keeps issuance/presentation key resolution on the same active identity as default-key lookup. */
+    override suspend fun getDefaultKeyMaterial(usages: Set<KeyUsage>): WalletKeyStoreEntry? =
+        getDefaultCrypto2Key(usages)?.let { WalletKeyStoreEntry(it.id.value, null, it) }
+
+    private fun WalletKeyRequirements.permitsSoftwareFallback(): Boolean =
+        authorizationPolicy == KeyUseAuthorizationPolicy.None &&
+            protection == id.walt.wallet2.persistence.keys.WalletKeyProtection.PlatformDefault &&
+            platform == id.walt.crypto2.keys.PlatformKeyConfiguration.Default
 
     private fun supportsSoftware(requirements: WalletKeyRequirements): Boolean = runCatching {
         softwareRuntime.resolveSoftwareProvider(
@@ -220,6 +255,7 @@ public class SqlDelightKeyStore(
         is StoredKey.Managed -> {
             val restoration = managedKeyProvider.restoreManagedKey(stored)
             when (restoration) {
+                is PlatformManagedKeyRestoration.Invalidated,
                 is PlatformManagedKeyRestoration.Missing -> {
                     if (restoration.authorizationPolicy !is KeyUseAuthorizationPolicy.None) {
                         throw KeyUseAuthorizationException(

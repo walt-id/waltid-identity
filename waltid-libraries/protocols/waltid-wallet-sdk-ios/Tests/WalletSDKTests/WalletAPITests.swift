@@ -2,6 +2,33 @@ import XCTest
 @testable import WalletSDK
 
 final class WalletAPITests: XCTestCase {
+    func testProximityStreamCompletesAtEveryTerminalStateWithoutForwardingLaterStates() async throws {
+        let review = ProximityReview(reviewID: .init(value: UUID().uuidString), exchange: 1,
+            documents: [.init(requestIndex: 0, documentType: "org.iso.18013.5.1.mDL", credentialOptions: [
+                .init(credentialID: "fixture", label: "Identity", issuer: nil, validUntil: .distantFuture,
+                    deviceAuthentication: .signature, requestedElements: [.init(namespace: "org.iso.18013.5.1",
+                        elementIdentifier: "given_name", intentToRetain: false, satisfiesRequestedElements: [])])])],
+            readerAuthentication: [], readerAuthenticationSummary: .absent, useCases: [], applicationAuthorizations: [])
+        let plan = ProximitySharingPlan(review: review, expiresAt: .distantFuture,
+            readerCertificateSHA256: "display-fixture", bridge: DisplayOnlySharingPlanBridge())
+        let terminals: [ProximityState] = [
+            .preparationRequired(plan),
+            .completed(exchanges: 1, declined: false), .noData(exchange: 2), .cancelled,
+            .failed(.init(category: .transport, code: "closed", message: "Closed", recovery: .startNewSession)),
+        ]
+        for terminal in terminals {
+            let bridge = TerminalProximityStreamBridge()
+            let session = ProximitySession(bridge: bridge)
+            bridge.continuation.yield(.terminating(exchange: 1))
+            bridge.continuation.yield(terminal)
+            bridge.continuation.yield(.preparing(profile: .iso180135Edition2DIS2026))
+            bridge.continuation.finish()
+            var values: [ProximityState] = []
+            for await state in session.states { values.append(state) }
+            XCTAssertEqual(values, [.terminating(exchange: 1), terminal])
+        }
+    }
+
     func testParsesKotlinInstantTimestampsWithOptionalFractionalSeconds() throws {
         let wholeSeconds = try XCTUnwrap(parseWalletISO8601Date("2026-07-21T17:20:00Z"))
         let fractionalSeconds = try XCTUnwrap(parseWalletISO8601Date("2026-07-21T17:20:00.123456Z"))
@@ -18,7 +45,6 @@ final class WalletAPITests: XCTestCase {
 
         acceptsSendable(configuration)
         XCTAssertEqual(configuration.walletID, "default")
-        XCTAssertEqual(configuration.defaultKeyType, .secp256r1)
         XCTAssertTrue(configuration.persistence.databaseKey.isManaged)
         XCTAssertNil(configuration.persistence.credentialStore)
         XCTAssertNil(configuration.persistence.didStore)
@@ -283,47 +309,307 @@ final class WalletAPITests: XCTestCase {
         XCTAssertNotNil(wallet)
     }
 
-    func testBootstrapForwardsDefaultKeyTypeAndDidMethod() async throws {
-        let bridge = FakeWalletCoreBridge()
-        bridge.bootstrapResult = .init(
-            keyID: "key-1",
-            did: "did:jwk:abc",
-            publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#,
-            keyUseAuthorizationPolicy: .none
-        )
-        let wallet = Wallet(
-            configuration: .init(defaultKeyType: .ed25519),
-            bridge: bridge
-        )
+    func testProximityConfigurationUsesStableNativeDefaults() throws {
+        let configuration = ProximityConfiguration()
 
-        let result = try await wallet.bootstrap(didMethod: "jwk")
-
-        XCTAssertEqual(result, bridge.bootstrapResult)
-        XCTAssertEqual(bridge.bootstrapCalls.count, 1)
-        XCTAssertEqual(bridge.bootstrapCalls.first?.keyType, .ed25519)
-        XCTAssertEqual(bridge.bootstrapCalls.first?.didMethod, "jwk")
+        acceptsSendable(configuration)
+        XCTAssertEqual(configuration.profile, .iso180135Edition2DIS2026)
+        XCTAssertEqual(configuration.readerPolicy, .allowAnonymousOrUntrusted)
+        XCTAssertEqual(configuration.deviceAuthenticationPolicy, .signatureOnly)
+        XCTAssertEqual(configuration.session, .qr())
+        XCTAssertEqual(configuration.maximumMessageBytes, 1_048_576)
+        XCTAssertTrue(configuration.applicationProfiles.isEmpty)
     }
 
-    func testBootstrapForwardsExplicitKeyType() async throws {
-        let bridge = FakeWalletCoreBridge()
-        let wallet = Wallet(
-            configuration: .init(defaultKeyType: .secp256r1),
-            bridge: bridge
+    func testProximityConfigurationRepresentsCombinedNFCSessionPrecisely() throws {
+        let ble = ProximityBLEConfiguration(roles: .peripheralServer, bearerPolicy: .gattOnly)
+        let qr = ProximityRetrievalOptions(
+            bluetoothLowEnergy: ble,
+            nfc: .init(maximumCommandDataLength: 4_095, maximumResponseDataLength: 4_096)
         )
-
-        _ = try await wallet.bootstrap(keyType: .rsa4096)
-
-        XCTAssertEqual(bridge.bootstrapCalls.first?.keyType, .rsa4096)
+        let session = ProximitySessionConfiguration.provisionalNFCV2(.init(
+            maximumCommandDataLength: 4_096, bluetoothLowEnergy: ble, qrFallback: qr
+        ))
+        let configuration = try ProximityConfiguration(session: session)
+        XCTAssertEqual(configuration.session, session)
+        XCTAssertEqual(configuration.session.qrRetrieval, qr)
     }
 
-    func testBootstrapForwardsTimedKeyUseAuthorizationPolicy() async throws {
+    func testProximitySessionConfigurationMatrix() throws {
+        let ble = ProximityRetrievalOptions()
+        let nfc = ProximityRetrievalOptions(bluetoothLowEnergy: nil, nfc: .init())
+        let plans = [ble, nfc, .init(nfc: .init())]
+        for retrieval in plans {
+            XCTAssertEqual(try ProximityConfiguration(session: .qr(retrieval)).session, .qr(retrieval))
+            for handover in [ProximityNFCHandover.staticHandover, .negotiatedHandover] {
+                for qr in [nil] + plans.map(Optional.some) {
+                    let session = ProximitySessionConfiguration.nfc(.init(
+                        handover: handover, retrieval: retrieval, qrFallback: qr
+                    ))
+                    XCTAssertEqual(try ProximityConfiguration(session: session).session.qrRetrieval, qr)
+                }
+            }
+            let session = ProximitySessionConfiguration.provisionalNFCV2(.init(qrFallback: retrieval))
+            XCTAssertEqual(try ProximityConfiguration(session: session).session.qrRetrieval, retrieval)
+        }
+    }
+
+    func testApplyingReaderTrustSettingsPreservesTransportConfiguration() throws {
+        let configuration = try ProximityConfiguration(
+            session: .provisionalNFCV2(.init(
+                bluetoothLowEnergy: .init(roles: .peripheralServer, bearerPolicy: .gattOnly)
+            )),
+            maximumMessageBytes: 2_097_152
+        )
+        let updated = try ProximityReaderTrustSettings(readerPolicy: .requireTrusted).applying(to: configuration)
+        XCTAssertEqual(updated.session, configuration.session)
+        XCTAssertEqual(updated.readerPolicy, ProximityReaderPolicy.requireTrusted)
+        XCTAssertEqual(updated.maximumMessageBytes, configuration.maximumMessageBytes)
+    }
+
+    func testProximityConfigurationRepresentsWifiAwareWithoutEnablingBLE() {
+        let wifiAware = true
+        let conventional = ProximityRetrievalOptions(
+            bluetoothLowEnergy: nil,
+            wifiAware: wifiAware
+        )
+        let provisionalNFCV2 = ProximityNFCV2SessionConfiguration(
+            wifiAware: wifiAware
+        )
+
+        XCTAssertNil(conventional.bluetoothLowEnergy)
+        XCTAssertEqual(conventional.wifiAware, wifiAware)
+        XCTAssertNil(provisionalNFCV2.bluetoothLowEnergy)
+        XCTAssertEqual(provisionalNFCV2.wifiAware, wifiAware)
+        let remediations: [ProximityRemediationAction] = [
+            .requestNearbyWifiPermission,
+            .requestLocalNetworkPermission,
+            .enableWifi,
+        ]
+        let unavailable = ProximityTransportCapability(
+            implemented: true,
+            profilePermitted: true,
+            runtime: .unavailable(.init(category: .capability, code: "wifi_unavailable", message: "Wi-Fi unavailable", recovery: .retryPrerequisites), remediationActions: remediations),
+            selected: true
+        )
+        XCTAssertEqual(unavailable.remediationActions, remediations)
+    }
+
+    func testWifiOnlyQRFallbackAndNFCV2DeriveIndependentViableRoutes() {
+        let wifiOnly = ProximityRetrievalOptions(bluetoothLowEnergy: nil, wifiAware: true)
+        for nfcAvailable in [false, true] {
+            for wifiAvailable in [false, true] {
+                func capability(_ available: Bool, selected: Bool) -> ProximityTransportCapability {
+                    .init(implemented: true, profilePermitted: true,
+                        runtime: available ? .available : .unavailable(.init(category: .capability,
+                            code: "unavailable", message: "Unavailable", recovery: .retryPrerequisites), remediationActions: []),
+                        selected: selected)
+                }
+                let result = ProximityCapabilities(
+                    profile: .iso180135Edition2DIS2026,
+                    session: .provisionalNFCV2(.init(qrFallback: wifiOnly, wifiAware: true)),
+                    qrEngagement: capability(true, selected: true),
+                    nfcEngagement: capability(nfcAvailable, selected: true),
+                    bluetoothLowEnergy: capability(false, selected: false),
+                    nfcRetrieval: capability(false, selected: false),
+                    nfcV2Retrieval: capability(nfcAvailable, selected: true),
+                    wifiAwareRetrieval: capability(wifiAvailable, selected: true))
+                XCTAssertEqual(result.qrMayStart, wifiAvailable)
+                XCTAssertEqual(result.nfcMayStart, nfcAvailable)
+                XCTAssertEqual(result.mayStart, nfcAvailable || wifiAvailable)
+            }
+        }
+    }
+
+    func testProximityReaderEvidenceRetainsAuthenticationStatementIndex() {
+        let evidence = ProximityReaderEvidence(
+            scope: .wholeRequest,
+            authenticationIndex: 1,
+            certificateChainDER: [Data([0x30, 0x00])]
+        )
+
+        XCTAssertEqual(evidence.authenticationIndex, 1)
+        XCTAssertNil(evidence.scope.documentRequestIndex)
+    }
+
+    #if canImport(WalletCore) && os(iOS)
+    func testConfiguredReaderTrustFacadeKeepsMalformedEvidenceUntrusted() async throws {
+        let trustAnchorBase64 = [
+            "MIIBjjCCATOgAwIBAgIIQAAAAAAAAAEwCgYIKoZIzj0EAwIwGjEYMBYGA1UEAwwP",
+            "UklDQUwgVGVzdCBSb290MB4XDTI2MDgzMDIwNDIwNloXDTI3MDgzMDIwNDIwNlow",
+            "GjEYMBYGA1UEAwwPUklDQUwgVGVzdCBSb290MFkwEwYHKoZIzj0CAQYIKoZIzj0D",
+            "AQcDQgAE4Fc8ezWNtclkN8nWzjzYGxLUF0J6FO0r8pq5/YWiprJBGwTK0CIcesf",
+            "DL+/pxMofjHC5p4TRlb4yuCg9XlIW46NjMGEwHwYDVR0jBBgwFoAU0wI39+8eny",
+            "K9prUvHV4RWCaylxkwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAQYwHQ",
+            "YDVR0OBBYEFNMCN/fvHp8ivaa1Lx1eEVgmspcZMAoGCCqGSM49BAMCA0kAMEYCIQ",
+            "DYcsOwU11G+fme3xD2EgCgE45qXt3Rg8nhJY2IuA2+3QIhALVJKhK8NfsJMONZo",
+            "8amHvX43b2PuSWhmB3DHufEOnE0",
+        ].joined()
+        let trustAnchor = try XCTUnwrap(Data(base64Encoded: trustAnchorBase64))
+        let evaluator = ProximityConfiguredReaderTrustEvaluator(
+            configuration: ProximityReaderTrustConfiguration(
+                trustAnchors: [
+                    ProximityReaderTrustAnchor(certificateDER: trustAnchor)
+                ]
+            )
+        )
+
+        let decision = try await evaluator.evaluate(
+            ProximityReaderEvidence(
+                scope: .wholeRequest,
+                certificateChainDER: [Data([0x02])]
+            )
+        )
+
+        XCTAssertEqual(decision.state, .validButUntrusted)
+        XCTAssertEqual(decision.certificatePath, .invalid)
+        XCTAssertEqual(decision.revocation, .notChecked)
+        XCTAssertEqual(decision.rical, .notEvaluated)
+    }
+    #endif
+
+    func testProximityHolderAuthorizationKeepsPerDocumentMethods() {
+        let authorization = ProximityHolderAuthorization(
+            reviewID: ProximityReviewID(value: UUID().uuidString),
+            exchange: 2,
+            requests: [
+                ProximityHolderAuthorizationRequest(
+                    requestIndex: 0,
+                    credentialID: "signature-credential",
+                    deviceAuthentication: .signature
+                ),
+                ProximityHolderAuthorizationRequest(
+                    requestIndex: 1,
+                    credentialID: "mac-credential",
+                    deviceAuthentication: .mac
+                )
+            ]
+        )
+
+        XCTAssertEqual(authorization.requests.map(\.requestIndex), [0, 1])
+        XCTAssertEqual(authorization.requests.map(\.deviceAuthentication), [.signature, .mac])
+    }
+
+    func testProximityFacadeForwardsCapabilitiesAndOwnsSessionLifecycle() async throws {
         let bridge = FakeWalletCoreBridge()
-        let wallet = Wallet(configuration: .init(), bridge: bridge)
-        let policy = WalletKeyUseAuthorizationPolicy.biometricTimedReuse(timeoutSeconds: 10)
+        let wallet = Wallet(bridge: bridge)
 
-        _ = try await wallet.bootstrap(keyUseAuthorizationPolicy: policy)
+        let capabilities = try await wallet.proximityPresentationCapabilities()
+        XCTAssertTrue(capabilities.mayStart)
 
-        XCTAssertEqual(bridge.bootstrapCalls.first?.keyUseAuthorizationPolicy, policy)
+        let session = try await wallet.startProximityPresentation()
+        await session.presentNfc()
+        var states = session.states.makeAsyncIterator()
+        let firstState = await states.next()
+        XCTAssertEqual(firstState, .checkingPrerequisites(capabilities))
+        let actionResult = try await session.dispatch(.cancel)
+        XCTAssertEqual(actionResult, .accepted)
+        await session.close()
+        await session.close()
+        await session.presentNfc()
+
+        XCTAssertEqual(bridge.proximityCapabilityCalls, 1)
+        XCTAssertEqual(bridge.proximitySessionStarts, 1)
+        XCTAssertEqual(bridge.proximitySession.dispatches, [.cancel])
+        XCTAssertEqual(bridge.proximitySession.closeCalls, 1)
+        XCTAssertEqual(bridge.proximitySession.presentNfcCalls, 1)
+    }
+
+    func testProximityCapabilitiesAllowUnavailableSelectedAlternatives() throws {
+        let available = ProximityTransportCapability(
+            implemented: true,
+            profilePermitted: true,
+            runtime: .available,
+            selected: true
+        )
+        let unavailable = ProximityTransportCapability(
+            implemented: false,
+            profilePermitted: true,
+            runtime: .notChecked,
+            selected: true
+        )
+        let capabilities = ProximityCapabilities(
+            profile: .iso180135Edition2DIS2026,
+            session: .nfc(.init(handover: .staticHandover, retrieval: .init(), qrFallback: .init())),
+            qrEngagement: available,
+            nfcEngagement: unavailable,
+            bluetoothLowEnergy: available,
+            nfcRetrieval: unavailable,
+            nfcV2Retrieval: unavailable,
+            wifiAwareRetrieval: unavailable
+        )
+
+        XCTAssertTrue(capabilities.mayStart)
+        XCTAssertTrue(capabilities.nfcEngagement.selected)
+        XCTAssertFalse(capabilities.nfcEngagement.mayStart)
+    }
+
+    func testProximityScopeOutcomeAndRuntimeFactsAreIndependent() throws {
+        let evidence = ProximityReaderEvidence(
+            scope: .document(index: 2), authenticationIndex: 0, certificateChainDER: [Data([0x30, 0x00])]
+        )
+        XCTAssertEqual(evidence.scope.documentRequestIndex, 2)
+        let absent = ProximityReaderAuthentication(scope: .wholeRequest, authenticationIndex: 0, outcome: .absent)
+        XCTAssertEqual(absent.validity, .absent)
+        XCTAssertEqual(absent.trust, .notEvaluated)
+        let capability = ProximityTransportCapability(
+            implemented: true, profilePermitted: true, runtime: .notChecked, selected: false
+        )
+        XCTAssertNil(capability.unavailable)
+        XCTAssertFalse(capability.runtimeAvailable)
+        XCTAssertEqual(capability.remediationActions, [])
+        let error = ProximityError(
+            category: .transport, code: "link_lost", message: "Link lost", recovery: .startNewSession
+        )
+        XCTAssertEqual(error.recovery, .startNewSession)
+    }
+
+    func testProximityActionsCarryTheReviewIdentityThroughTheFacade() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+        let session = try await wallet.startProximityPresentation()
+        let reviewID = ProximityReviewID(value: UUID().uuidString)
+        let submission = try ProximitySubmission(documents: [
+            try ProximityDocumentSubmission(requestIndex: 0, credentialID: "credential-1", disclosedElements: [
+                try ProximityElementReference(namespace: "org.example", elementIdentifier: "name")
+            ])
+        ])
+        _ = try await session.dispatch(.approve(reviewID: reviewID, submission: submission))
+        _ = try await session.dispatch(.decline(reviewID: reviewID))
+        XCTAssertEqual(bridge.proximitySession.dispatches, [
+            .approve(reviewID: reviewID, submission: submission), .decline(reviewID: reviewID)
+        ])
+        await session.close()
+    }
+
+    func testProximityCapabilitiesDoNotBorrowBearersFromAnotherRoute() {
+        let available = ProximityTransportCapability(
+            implemented: true, profilePermitted: true, runtime: .available, selected: true
+        )
+        let unavailable = ProximityTransportCapability(
+            implemented: true, profilePermitted: true, runtime: .notChecked, selected: true
+        )
+        for session in [
+            ProximitySessionConfiguration.nfc(.init(
+                handover: .staticHandover, retrieval: .init(),
+                qrFallback: .init(bluetoothLowEnergy: nil, nfc: .init())
+            )),
+            .provisionalNFCV2(.init(qrFallback: .init(bluetoothLowEnergy: nil, nfc: .init())))
+        ] {
+            let capabilities = ProximityCapabilities(
+                profile: .iso180135Edition2DIS2026,
+                session: session,
+                qrEngagement: available,
+                nfcEngagement: unavailable,
+                bluetoothLowEnergy: available,
+                nfcRetrieval: unavailable,
+                nfcV2Retrieval: available,
+                wifiAwareRetrieval: unavailable
+            )
+            XCTAssertFalse(capabilities.qrMayStart)
+            XCTAssertFalse(capabilities.nfcMayStart)
+            XCTAssertFalse(capabilities.mayStart)
+        }
     }
 
     func testIssuanceSessionOperationsForwardTypedInputs() async throws {
@@ -849,12 +1135,36 @@ private extension Array {
     }
 }
 
+private func makeTestProximityCapabilities() -> ProximityCapabilities {
+    let unavailable = ProximityTransportCapability(
+        implemented: false,
+        profilePermitted: true,
+        runtime: .notChecked,
+        selected: false
+    )
+    return ProximityCapabilities(
+        profile: .iso180135Edition2DIS2026,
+        session: .qr(),
+        qrEngagement: ProximityTransportCapability(
+            implemented: true,
+            profilePermitted: true,
+            runtime: .available,
+            selected: true
+        ),
+        nfcEngagement: unavailable,
+        bluetoothLowEnergy: ProximityTransportCapability(
+            implemented: true,
+            profilePermitted: true,
+            runtime: .available,
+            selected: true
+        ),
+        nfcRetrieval: unavailable,
+        nfcV2Retrieval: unavailable,
+        wifiAwareRetrieval: unavailable
+    )
+}
+
 private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
-    struct BootstrapCall {
-        let keyType: WalletKeyType
-        let didMethod: String
-        let keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy?
-    }
 
     struct PresentCall {
         let request: URL
@@ -892,12 +1202,6 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
 
     var events: AsyncStream<WalletEvent>
     var error: WalletError?
-    var bootstrapResult = WalletBootstrapResult(
-        keyID: "key",
-        did: "did:key:wallet",
-        publicJWK: #"{"kty":"OKP","crv":"Ed25519","x":"test"}"#,
-        keyUseAuthorizationPolicy: .biometricCurrentSet
-    )
     var keyUseAuthorizationPreflightResult: WalletKeyUseAuthorizationPreflight?
     var issuanceSessionResult = IssuanceSession(
         id: "issuance-session-1",
@@ -947,7 +1251,10 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         readerTrust: .untrusted(reason: "not configured")
     )
     var digitalCredentialResponseResult = DigitalCredentialResponse(protocolIdentifier: "org-iso-mdoc", dataJSON: "{}")
-    private(set) var bootstrapCalls: [BootstrapCall] = []
+    var proximityCapabilitiesResult = makeTestProximityCapabilities()
+    let proximitySession = FakeProximityPresentationSessionBridge()
+    private(set) var proximityCapabilityCalls = 0
+    private(set) var proximitySessionStarts = 0
     private(set) var issuanceRequests: [IssuanceRequest] = []
     private(set) var authorizationStartSessionIDs: [String] = []
     private(set) var preAuthorizedIssuanceCalls: [(String, String?)] = []
@@ -972,25 +1279,6 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
             }
             continuation.finish()
         }
-    }
-
-    func bootstrap(
-        keyType: WalletKeyType,
-        didMethod: String,
-        keyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy?
-    ) async throws -> WalletBootstrapResult {
-        if let error {
-            throw error
-        }
-
-        bootstrapCalls.append(
-            .init(
-                keyType: keyType,
-                didMethod: didMethod,
-                keyUseAuthorizationPolicy: keyUseAuthorizationPolicy
-            )
-        )
-        return bootstrapResult
     }
 
     func keyUseAuthorizationPreflight(
@@ -1147,6 +1435,22 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         if let error { throw error }
     }
 
+    func proximityPresentationCapabilities(
+        configuration: ProximityConfiguration
+    ) async throws -> ProximityCapabilities {
+        if let error { throw error }
+        proximityCapabilityCalls += 1
+        return proximityCapabilitiesResult
+    }
+
+    func startProximityPresentation(
+        configuration: ProximityConfiguration
+    ) async throws -> any ProximitySessionBridge {
+        if let error { throw error }
+        proximitySessionStarts += 1
+        return proximitySession
+    }
+
     func digitalCredentialCapabilities() -> DigitalCredentialCapabilities {
         digitalCredentialCapabilitiesResult
     }
@@ -1184,6 +1488,29 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     }
 }
 
+private final class FakeProximityPresentationSessionBridge: ProximitySessionBridge, @unchecked Sendable {
+    let systemPresentationActive = false
+    lazy var states = AsyncStream<ProximityState> { [unowned self] continuation in
+        continuation.yield(.checkingPrerequisites(capabilities))
+        continuation.finish()
+    }
+    var capabilities = makeTestProximityCapabilities()
+    private(set) var dispatches: [ProximityAction] = []
+    private(set) var closeCalls = 0
+    private(set) var presentNfcCalls = 0
+
+    func presentNfc() async { presentNfcCalls += 1 }
+
+    func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult {
+        dispatches.append(action)
+        return .accepted
+    }
+
+    func close() async {
+        closeCalls += 1
+    }
+}
+
 private let testVerifierMetadata = VerifierMetadata(
     display: MetadataDisplay(
         name: "Example Verifier",
@@ -1195,3 +1522,24 @@ private let testVerifierMetadata = VerifierMetadata(
     policyURI: "https://verifier.example/privacy",
     termsOfServiceURI: "https://verifier.example/terms"
 )
+
+private struct TerminalProximityStreamBridge: ProximitySessionBridge {
+    let systemPresentationActive = false
+    let states: AsyncStream<ProximityState>
+    let continuation: AsyncStream<ProximityState>.Continuation
+    init() {
+        let pair = AsyncStream<ProximityState>.makeStream()
+        states = pair.stream
+        continuation = pair.continuation
+    }
+    func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult { .accepted }
+    func close() async { continuation.finish() }
+    func presentNfc() async {}
+}
+
+private struct DisplayOnlySharingPlanBridge: ProximitySharingPlanBridge {
+    var isExpired: Bool { false }
+    func approve(_ submission: ProximitySubmission) throws -> ProximityPreparationResult {
+        .rejected(.init(category: .policy, code: "display_fixture", message: "Display fixture only", recovery: .none))
+    }
+}

@@ -12,7 +12,7 @@ internal fun validateCertificateChainWithExplicitTrust(
     now: Instant = Clock.System.now(),
     additionalProcessedCriticalExtensionOids: Set<String> = emptySet(),
     requiredExtendedKeyUsageOid: String? = null,
-) {
+): List<CertificateDer> {
     val parsedLeaf = parseCertificate(leaf, "leaf certificate")
     val parsedChain = chain.mapIndexed { index, certificate ->
         parseCertificate(certificate, "chain certificate at position $index")
@@ -55,6 +55,7 @@ internal fun validateCertificateChainWithExplicitTrust(
     if (path == null) {
         throw X509ValidationException("Certificate path could not be built with the provided certificates.")
     }
+    return path.map { it.der }
 }
 
 private data class ParsedCertificate(

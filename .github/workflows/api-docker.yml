@@ -38,11 +38,11 @@ jobs:
         include: ${{ fromJSON(needs.api-docker-matrix.outputs.json) }}
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d123dc039bd55e193b3d54350791868fcfa6ac04
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
       - name: Update version in build.gradle.kts
         run: |
           sed -i 's/version = ".*"/version = "${{ inputs.version }}"/' build.gradle.kts
