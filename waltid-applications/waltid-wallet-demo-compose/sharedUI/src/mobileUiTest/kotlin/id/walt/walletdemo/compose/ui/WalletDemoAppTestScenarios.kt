@@ -442,6 +442,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
         onNodeWithTag("wallet.credentialCard.cred-1").performClick()
         onNodeWithTag("wallet.credentialDetailsScreen").assertIsDisplayed()
+        awaitTaggedNode(WalletUiTestTags.claim("given_name"))
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
 
         onNodeWithTag("wallet.tab.receive").performClick()
