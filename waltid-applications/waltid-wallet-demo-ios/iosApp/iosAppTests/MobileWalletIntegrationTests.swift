@@ -161,7 +161,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
                 defaultKeyUseAuthorizationPolicy: .none
             )
         )
-        _ = try await wallet.bootstrap()
+        _ = try await initializeSigningIdentity(wallet)
 
         let result = try await wallet.previewPresentation(request: X509RequestObjectFixture.authorizationRequestURL)
         guard case let .ready(preview) = result else {
