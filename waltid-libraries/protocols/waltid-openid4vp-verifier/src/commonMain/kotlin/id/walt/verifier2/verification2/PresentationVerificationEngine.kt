@@ -29,6 +29,7 @@ import id.walt.verifier2.handlers.vpresponse.ParsedVpToken
 import id.walt.verifier2.handlers.vpresponse.Verifier2SessionCredentialPolicyValidation
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationRejectionException
+import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationVerificationUnavailableException
 import id.walt.verifier2.verification.DcqlFulfillmentChecker
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonObject
@@ -562,6 +563,23 @@ object PresentationVerificationEngine {
                 )
             }
             session.failSession(SessionEvent.presentation_validation_failed)
+
+            // An infrastructure failure is not the wallet's fault and the wallet cannot fix it by
+            // changing its request, so it must not be reported as invalid_request. A load test at
+            // concurrency 128 produced 1,676 such responses from MongoDB connection-pool timeouts:
+            // every one told the wallet its presentation was malformed, which is both wrong and
+            // terminal - 400 gives a wallet no reason to retry a request that would have succeeded
+            // a second later.
+            //
+            // Classification is by cause chain rather than by type because this is commonMain and
+            // the store drivers are not visible here. Typed store exceptions would be better and
+            // are worth doing when the session store interface is next touched.
+            if (e.isInfrastructureFailure()) {
+                throw PresentationVerificationUnavailableException(
+                    "Verification could not be completed because a dependency was unavailable: ${e.message}",
+                    cause = e
+                )
+            }
             throw PresentationRejectionException(
                 "Verification failed due to an internal error: ${e.message}",
                 cause = e
@@ -575,6 +593,39 @@ object PresentationVerificationEngine {
  * Hard document limit of the stores Verifier2 is deployed against: MongoDB, and DocumentDB which inherits it.
  */
 internal const val STORE_DOCUMENT_LIMIT_BYTES = 16_793_600
+
+/**
+ * Exception class-name fragments that identify a dependency failure rather than a bad presentation.
+ *
+ * Matching on names is a compromise: this is commonMain, so neither the MongoDB driver's exceptions
+ * nor JVM IO types are referenceable, and the alternative - every store wrapping its own failures in
+ * a typed exception - is a wider change than a status-code fix should carry. Fragments are matched
+ * against the whole cause chain, because the driver's timeout arrives wrapped by the store layer.
+ */
+private val INFRASTRUCTURE_FAILURE_MARKERS = listOf(
+    "Timeout", "TimedOut", "Socket", "Connect", "IOException", "Unreachable", "PoolClear",
+    "NotPrimary", "NodeIsRecovering", "ShutdownInProgress", "Interrupted",
+)
+
+/**
+ * True when this exception, or anything that caused it, looks like a dependency being unavailable.
+ *
+ * Deliberately conservative: an unrecognised exception stays a rejection, because misreporting a bad
+ * presentation as a server outage would hide a real client bug behind a retry loop. The observed
+ * case this exists for is `MongoTimeoutException: Timed out after 5087 ms while waiting for a
+ * connection to server`, which a load test turned into 1,676 responses telling wallets their
+ * presentations were malformed.
+ */
+internal fun Throwable.isInfrastructureFailure(): Boolean {
+    var current: Throwable? = this
+    val seen = mutableSetOf<Throwable>()
+    while (current != null && seen.add(current)) {
+        val name = current::class.simpleName ?: ""
+        if (INFRASTRUCTURE_FAILURE_MARKERS.any { name.contains(it, ignoreCase = true) }) return true
+        current = current.cause
+    }
+    return false
+}
 
 /**
  * Times a presentation is retained in a session, measured rather than assumed.
