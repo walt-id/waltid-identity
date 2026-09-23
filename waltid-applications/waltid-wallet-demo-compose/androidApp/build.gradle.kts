@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
+    id("waltid.licensee")
     kotlin("plugin.compose")
     alias(identityLibs.plugins.google.services)
 }
