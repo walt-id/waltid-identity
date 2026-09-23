@@ -230,7 +230,7 @@ class Wallet2MoreUseCasesTest {
                         configuration = configuration, issuerKey = issuerKey,
                         issuerId = issuerBase, issuanceInputData = testIssuanceInputData(credentialData),
                         selectiveDisclosure = selectiveDisclosure,
-                        proofValidationContext = proofSupport.validationContext(request)
+                        proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization])
                     )
                     if (credResp !is CredentialResponseResult.Success) {
                         val failure = credResp as CredentialResponseResult.Failure
@@ -251,7 +251,7 @@ class Wallet2MoreUseCasesTest {
                         configuration = configuration, issuerKey = issuerKey,
                         issuerId = issuerBase, issuanceInputData = testIssuanceInputData(data),
                         selectiveDisclosure = null,
-                        proofValidationContext = proofSupport.validationContext(request)
+                        proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization])
                     )
                     if (credResp !is CredentialResponseResult.Success) {
                         val failure = credResp as CredentialResponseResult.Failure

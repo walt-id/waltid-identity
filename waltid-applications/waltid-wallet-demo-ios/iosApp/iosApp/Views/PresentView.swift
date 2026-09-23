@@ -14,11 +14,13 @@ struct PresentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.walletDemoBranding) private var branding
     @ObservedObject var viewModel: WalletViewModel
+    let onOpenSettings: () -> Void
     @ObservedObject private var readerTrustSettings: DemoReaderTrustSettingsController
     @ObservedObject private var proximityPresentation: ProximityPresentationViewModel
     @StateObject private var proximityScreenPolicy = ProximityScreenPolicy()
 
-    init(viewModel: WalletViewModel) {
+    init(viewModel: WalletViewModel, onOpenSettings: @escaping () -> Void) {
+        self.onOpenSettings = onOpenSettings
         _viewModel = ObservedObject(wrappedValue: viewModel)
         _readerTrustSettings = ObservedObject(wrappedValue: viewModel.readerTrustSettings)
         _proximityPresentation = ObservedObject(wrappedValue: viewModel.proximityPresentation)
@@ -37,7 +39,8 @@ struct PresentView: View {
             }
             .navigationTitle("Present")
             .navigationBarTitleDisplayMode(proximityPresentation.active ? .inline : .large)
-            .walletSettingsToolbar(viewModel: viewModel)
+            .walletSettingsToolbar(onOpenSettings: onOpenSettings)
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
         }
         .navigationViewStyle(.stack)

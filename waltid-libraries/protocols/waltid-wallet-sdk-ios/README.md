@@ -90,7 +90,10 @@ let wallet = try await Wallet(
     configuration: WalletConfiguration(walletID: "consumer-wallet")
 )
 
-let bootstrap = try await wallet.bootstrap(didMethod: "key")
+guard case .active(let identity) = try await wallet.signingIdentity.initialize() else {
+    // Show pending setup or an unavailable identity before continuing.
+    return
+}
 let session = try await wallet.startIssuance(
     IssuanceRequest(
         offer: credentialOfferURL,
@@ -107,7 +110,7 @@ let outcome = try await wallet.continuePreAuthorizedIssuance(
 let credentials = try await wallet.credentials()
 let presentation = try await wallet.present(
     request: authorizationRequestURL,
-    did: bootstrap.did
+    did: identity.did
 )
 ```
 
@@ -503,3 +506,17 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
+
+## Signing identity recovery
+
+`wallet.signingIdentity` owns creation, backup and same-key restoration.
+Use `initialize()` for the default identity without recovery, or request complete SDK-issued
+options for explicit protection and recovery choices. The unreleased `bootstrap` API is removed. This version requires a fresh database; no compatibility migration is provided.
+
+The base `WalletSDK` product has no backup provider. Add `WalletSDKKeychainRecovery` and
+register `KeychainIdentityRecovery(namespace:)` to opt in, or implement the replaceable
+`IdentityRecoveryProvider` contract. Same-key Secure Enclave recovery is unavailable;
+iOS recovery uses ordinary Keychain or encrypted database signing.
+
+See [Identity recovery](Sources/WalletSDK/Documentation.docc/IdentityRecovery.md) and the
+[platform/configuration matrix](../waltid-openid4vc-wallet-mobile/docs/identity-recovery.md).

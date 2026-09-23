@@ -109,4 +109,17 @@ object ProofBuilderUtils {
         require(audience.isNotBlank()) { "Audience (issuer URL) cannot be blank" }
         require(nonce == null || nonce.isNotBlank()) { "Nonce (c_nonce) cannot be blank" }
     }
+
+    /**
+     * Validates required parameters for proof generation, including the optional `iss` [clientId].
+     * Kept as a separate overload so the original two-argument entry point stays binary compatible.
+     */
+    fun validateProofParameters(
+        audience: String,
+        nonce: String?,
+        clientId: String?,
+    ) {
+        validateProofParameters(audience, nonce)
+        require(clientId == null || clientId.isNotBlank()) { "Client id (iss) cannot be blank" }
+    }
 }

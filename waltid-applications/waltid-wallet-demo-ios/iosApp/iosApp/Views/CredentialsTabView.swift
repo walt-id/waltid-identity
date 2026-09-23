@@ -6,6 +6,7 @@ import WalletSDK
 struct CredentialsTabView: View {
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
+    let onOpenSettings: () -> Void
     @Environment(\.walletDemoBranding) private var branding
     @State private var othersHidden = false
     @State private var selectedAtTop = false
@@ -111,16 +112,16 @@ struct CredentialsTabView: View {
                             }
                             .accessibilityIdentifier(WalletAccessibilityID.detailsMenu)
                         } else {
-                            NavigationLink {
-                                SettingsView(viewModel: viewModel)
-                            } label: {
+                            Button(action: onOpenSettings) {
                                 Image(systemName: "gearshape")
                             }
-                            .accessibilityIdentifier(WalletAccessibilityID.settingsButton)
+                            .accessibilityLabel("Settings")
+                .accessibilityIdentifier(WalletAccessibilityID.settingsButton)
                         }
                     }
                 }
             }
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier(selectedDetailsID == nil
                 ? WalletAccessibilityID.credentialsTabContent
                 : WalletAccessibilityID.credentialDetailsScreen)

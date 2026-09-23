@@ -2,10 +2,13 @@ package id.walt.walletdemo.compose.ui.screens
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
+import id.walt.walletdemo.compose.ui.components.SettingsNotice
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Scaffold
@@ -13,6 +16,7 @@ import androidx.compose.ui.Modifier
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.ui.rememberAuthorizationRequestOpener
 
 @Composable
@@ -21,13 +25,20 @@ internal fun WalletScreen(
     state: WalletDemoUiState,
     onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
-    sharingSettingsContent: (@Composable () -> Unit)? = null,
+    readerTrustSettingsContent: (@Composable () -> Unit)? = null,
+    readerTrustPolicySummary: String? = null,
     onOpenSettings: () -> Unit = {},
     onResetWallet: () -> Unit = { controller.resetWallet() },
     onSignOut: (() -> Unit)? = null,
+    resetWalletDescription: String? = null,
 ) {
+    val setup = state.session as? WalletSessionState.IdentitySetup
+    if (setup != null) {
+        IdentitySetupScreen(setup.setup, state.warning, controller::chooseIdentity, controller::resumeSigningIdentity, controller::cancelIdentity, controller::refreshIdentityChoices, progress = state.identityProgress)
+        return
+    }
     val openAuthorizationRequest = rememberAuthorizationRequestOpener()
-    var showingSettings by remember { mutableStateOf(false) }
+    var showingSettings by rememberSaveable { mutableStateOf(false) }
     var detailsChrome by remember { mutableStateOf<CredentialDetailsChrome?>(null) }
 
     LaunchedEffect(state.authorizationRequestUrl) {
@@ -38,6 +49,10 @@ internal fun WalletScreen(
     }
 
     if (showingSettings) {
+        val ready = state.session as? WalletSessionState.Ready
+        LaunchedEffect(ready?.did, ready?.keyId) {
+            if (ready != null) controller.refreshIdentityDetails()
+        }
         SettingsScreen(
             state = state,
             onShowDcApiPresentationPreviewChange = controller::setShowDcApiPresentationPreview,
@@ -45,13 +60,17 @@ internal fun WalletScreen(
                 controller::setProximityTransportProfile
             },
             onBack = { showingSettings = false },
+            onIdentityAction = controller::performIdentityAction,
+            onRefreshIdentityDetails = controller::refreshIdentityDetails,
             onLock = controller::lock,
             onResetWallet = onResetWallet,
             onSignOut = onSignOut,
+            resetWalletDescription = resetWalletDescription,
             onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
             onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
             onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,
-            sharingSettingsContent = sharingSettingsContent,
+            readerTrustSettingsContent = readerTrustSettingsContent,
+            readerTrustPolicySummary = readerTrustPolicySummary,
             onProximityApprovalModeChange = onStartProximityPresentation?.let { controller::setProximityApprovalMode },
         )
         return
@@ -63,12 +82,15 @@ internal fun WalletScreen(
             if (chrome != null) {
                 CredentialDetailsTopBar(chrome)
             } else {
-                WalletHeader(
-                    state = state,
-                    onSettings = { onOpenSettings(); showingSettings = true },
-                    onDismissStatus = controller::dismissStatus,
-                    onToggleStatusExpanded = controller::toggleStatusExpanded,
-                )
+                Column {
+                    WalletHeader(
+                        state = state,
+                        onSettings = { onOpenSettings(); showingSettings = true },
+                        onDismissStatus = controller::dismissStatus,
+                        onToggleStatusExpanded = controller::toggleStatusExpanded,
+                    )
+                    state.sharingSettingsError?.let { SettingsNotice(it, error = true) }
+                }
             }
         },
         bottomBar = {

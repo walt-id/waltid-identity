@@ -437,7 +437,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
                         issuerId = issuerBase,
                         issuanceInputData = testIssuanceInputData(credentialData),
                         selectiveDisclosure = selectiveDisclosure,
-                        proofValidationContext = proofSupport.validationContext(request)
+                        proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization])
                     )
                     if (credentialResponse !is CredentialResponseResult.Success) {
                         val failure = credentialResponse as CredentialResponseResult.Failure

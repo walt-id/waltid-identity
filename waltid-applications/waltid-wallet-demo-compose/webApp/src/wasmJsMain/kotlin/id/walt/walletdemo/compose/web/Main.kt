@@ -119,7 +119,10 @@ private fun WebWalletSession(
         }
     }
 
-    WalletDemoApp(controller, branding = branding, onSignOut = onSignOut)
+    WalletDemoApp(
+        controller, branding = branding, onSignOut = onSignOut,
+        resetWalletDescription = "This deletes the current wallet, including its keys and credentials, from the server and creates an empty wallet. Your account remains signed in.",
+    )
 }
 
 private fun isAuthorizationCallbackHref(href: String): Boolean {

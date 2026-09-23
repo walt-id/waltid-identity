@@ -88,3 +88,37 @@ VALUES (?, ?, ?, ?, ?);
 
 deleteIssuanceSessionRecordById:
 DELETE FROM issuance_session_records WHERE record_id = ?;
+
+-- Identity operations are journaled before native or backup side effects.
+CREATE TABLE wallet_identity_records (
+    wallet_id TEXT NOT NULL PRIMARY KEY,
+    phase TEXT NOT NULL,
+    payload TEXT NOT NULL
+);
+
+CREATE TABLE wallet_active_identity (
+    wallet_id TEXT NOT NULL PRIMARY KEY,
+    identity_id TEXT NOT NULL,
+    key_id TEXT NOT NULL,
+    did TEXT NOT NULL
+);
+
+selectIdentityRecords:
+SELECT * FROM wallet_identity_records;
+
+selectIdentityRecord:
+SELECT * FROM wallet_identity_records WHERE wallet_id = ?;
+
+putIdentityRecord:
+INSERT OR REPLACE INTO wallet_identity_records (wallet_id, phase, payload) VALUES (?, ?, ?);
+
+deleteIdentityRecord:
+DELETE FROM wallet_identity_records WHERE wallet_id = ?;
+
+selectActiveIdentity:
+SELECT active.* FROM wallet_active_identity AS active
+INNER JOIN wallet_identity_records AS record ON record.wallet_id = active.wallet_id
+WHERE active.wallet_id = ? AND record.phase = 'Active';
+
+setActiveIdentity:
+INSERT OR REPLACE INTO wallet_active_identity (wallet_id, identity_id, key_id, did) VALUES (?, ?, ?, ?);

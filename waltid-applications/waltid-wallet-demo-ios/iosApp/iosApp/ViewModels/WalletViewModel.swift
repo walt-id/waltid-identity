@@ -2,6 +2,7 @@ import Foundation
 import WalletDemoIdentityDocumentSupport
 import WalletDemoSharingUI
 import WalletSDK
+import WalletSDKKeychainRecovery
 
 enum WalletTab: Hashable {
     case credentials
@@ -93,6 +94,7 @@ private enum WalletStatusText {
 class WalletViewModel: ObservableObject {
     let proximityPresentation: ProximityPresentationViewModel
     let readerTrustSettings: DemoReaderTrustSettingsController
+    @Published var identityScreen: WalletIdentityScreenModel?
     @Published var isReady = false
     @Published var did = ""
     @Published var keyID = ""
@@ -329,6 +331,7 @@ class WalletViewModel: ObservableObject {
             do {
                 await proximityPresentation.closeAndAwait()
                 try await walletClient.deleteLocalData()
+                identityScreen = nil
                 pinStore.clear()
                 clearWalletState()
                 pin = ""
@@ -563,6 +566,7 @@ class WalletViewModel: ObservableObject {
             selectedSigningProtection = target
             do {
                 try await walletClient.deleteLocalData()
+                identityScreen = nil
                 clearWalletState()
                 setLoading(WalletStatusText.bootstrappingWallet)
                 try await loadWallet(
@@ -627,11 +631,15 @@ class WalletViewModel: ObservableObject {
             ),
             transactionDataProfiles: transactionDataProfiles.profiles,
             crossProcessAccess: Self.crossProcessAccessConfiguration(),
-            defaultKeyUseAuthorizationPolicy: selectedProtection.authorizationPolicy,
+            defaultKeyUseAuthorizationPolicy: signingProtectionMode.defaultSelection.authorizationPolicy,
             keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(
                 message: "Authorize wallet signing",
                 cancelText: "Cancel"
-            )
+            ),
+            signingIdentity: .init(alternativeAuthorizations: signingProtectionMode.allows(.none) ? [.none] : [],
+                keychain: .init(accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup),
+                recoveryProviders: [KeychainIdentityRecovery(namespace: "wallet-demo",
+                    accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup)])
         )
         let resolvedWalletClient = walletClient ?? SDKWalletClient(configuration: configuration)
         self.signingProtectionMode = signingProtectionMode
@@ -1414,6 +1422,11 @@ class WalletViewModel: ObservableObject {
         }
     }
 
+    func retryOpeningWallet() {
+        guard !isLoading, !isReady else { return }
+        bootstrapIfNeeded()
+    }
+
     private func bootstrapIfNeeded() {
         guard !isReady else { return }
         bootstrap(signingProtection: selectedSigningProtection)
@@ -1432,10 +1445,6 @@ class WalletViewModel: ObservableObject {
         pinError = nil
         Task {
             let selection = signingProtectionMode.resolve(selectedSigningProtection)
-            guard await validateSigningProtection(selection) else {
-                isAuthenticating = false
-                return
-            }
             do {
                 signingProtectionStore.save(selection)
                 selectedSigningProtection = selection
@@ -1484,8 +1493,9 @@ class WalletViewModel: ObservableObject {
         Task {
             do {
                 try await loadWallet(signingProtection: signingProtection)
-                setSuccess(WalletStatusText.walletReady)
-                logE2E("Bootstrap: completed successfully, wallet is ready")
+                if isReady { setSuccess(WalletStatusText.walletReady) }
+                else { isLoading = false; statusMessage = "Set up your wallet" }
+                logE2E(isReady ? "Bootstrap: wallet ready" : "Bootstrap: awaiting key setup")
             } catch {
                 logE2E("Bootstrap: FAILED with error: \(error.localizedDescription)")
                 setError(WalletStatusText.failure(WalletStatusText.bootstrapFailed, error))
@@ -1497,7 +1507,16 @@ class WalletViewModel: ObservableObject {
         signingProtection: WalletDemoSigningProtection,
         requiredAppliedSigningProtection: WalletDemoSigningProtection? = nil
     ) async throws {
-        logE2E("Bootstrap: calling wallet.bootstrap()")
+        if let service = try await walletClient.signingIdentityManager() {
+            let model = identityScreen ?? WalletIdentityScreenModel(service: service) { [weak self] in
+                guard let self else { return }
+                self.bootstrap(signingProtection: self.selectedSigningProtection)
+            }
+            identityScreen = model
+            await model.refresh()
+            guard model.identity != nil else { isReady = false; return }
+        }
+        logE2E("Opening selected wallet identity")
         let result = try await walletClient.bootstrap(signingProtection: signingProtection)
         logE2E("Bootstrap: success, DID: \(result.did)")
 

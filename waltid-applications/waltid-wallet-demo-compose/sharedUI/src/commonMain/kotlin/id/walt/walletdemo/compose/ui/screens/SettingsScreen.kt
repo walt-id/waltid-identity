@@ -1,57 +1,43 @@
 package id.walt.walletdemo.compose.ui.screens
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
-import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionAvailability
-import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
-import id.walt.walletdemo.compose.logic.WalletDemoUiState
-import id.walt.walletdemo.compose.logic.WalletDemoProximityTransportProfile
-import id.walt.walletdemo.compose.logic.WalletDemoProximityApprovalMode
-import id.walt.walletdemo.compose.ui.components.ProximityApprovalModeChoice
-import id.walt.walletdemo.compose.logic.WalletSessionState
-import id.walt.walletdemo.compose.logic.displayMessage
-import id.walt.walletdemo.compose.logic.isBusy
+import androidx.navigation3.runtime.NavEntry
+import androidx.navigation3.ui.NavDisplay
+import id.walt.walletdemo.compose.logic.*
+import id.walt.walletdemo.compose.ui.digitalCredentialsRequirements
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
-import id.walt.walletdemo.compose.ui.components.SigningProtectionChoice
-import id.walt.walletdemo.compose.ui.components.title
+import id.walt.walletdemo.compose.ui.components.*
+import id.walt.walletdemo.compose.ui.resources.*
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
+
+private enum class SettingsDestination(val title: StringResource) {
+    Main(Res.string.settings_title),
+    SigningKey(Res.string.settings_signing_key),
+    Technical(Res.string.settings_technical),
+    Nearby(Res.string.settings_nearby),
+    Connection(Res.string.settings_connection),
+    ReaderAuthentication(Res.string.settings_reader_authentication),
+    DigitalCredentialsApi(Res.string.settings_dc_api),
+}
 
 @Composable
 internal fun SettingsScreen(
@@ -59,431 +45,229 @@ internal fun SettingsScreen(
     onShowDcApiPresentationPreviewChange: (Boolean) -> Unit,
     onProximityTransportProfileChange: ((WalletDemoProximityTransportProfile) -> Unit)?,
     onBack: () -> Unit,
+    onIdentityAction: (String) -> Unit,
+    onRefreshIdentityDetails: () -> Unit,
     onLock: () -> Unit,
     onResetWallet: () -> Unit,
-    onSignOut: (() -> Unit)? = null,
     onRequestSigningProtectionChange: (WalletDemoSigningProtection) -> Unit,
     onConfirmSigningProtectionChange: () -> Unit,
     onCancelSigningProtectionChange: () -> Unit,
-    sharingSettingsContent: (@Composable () -> Unit)? = null,
+    onSignOut: (() -> Unit)? = null,
+    readerTrustSettingsContent: (@Composable () -> Unit)? = null,
+    readerTrustPolicySummary: String? = null,
     onProximityApprovalModeChange: ((WalletDemoProximityApprovalMode) -> Unit)? = null,
+    resetWalletDescription: String? = null,
 ) {
-    val ready = state.session as? WalletSessionState.Ready
-    val clipboard = LocalClipboardManager.current
-    var confirmReset by remember { mutableStateOf(false) }
+    val currentState by rememberUpdatedState(state)
+    val currentReaderPolicy by rememberUpdatedState(readerTrustPolicySummary)
+    var deleteRecovery by remember { mutableStateOf<String?>(null) }
+    var confirmReset by rememberSaveable { mutableStateOf(false) }
+    var path by rememberSaveable(stateSaver = listSaver(
+        save = { entries: List<SettingsDestination> -> entries.map { it.name } },
+        restore = { entries -> entries.map(SettingsDestination::valueOf) },
+    )) { mutableStateOf(listOf(SettingsDestination.Main)) }
+    val back = { if (path.size > 1) path = path.dropLast(1) else onBack() }
+    fun open(destination: SettingsDestination) { path = path + destination }
+    SystemBackHandler(enabled = path.size == 1, onBack = back)
 
-    SystemBackHandler(enabled = true, onBack = onBack)
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .safeDrawingPadding()
-            .testTag(WalletUiTestTags.SettingsScreen),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 4.dp, end = 20.dp, top = 8.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.testTag(WalletUiTestTags.SettingsBack),
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                )
-            }
-            Text(
-                "Settings",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
-            SettingsCopyRow(
-                title = "Wallet DID",
-                value = ready?.did.orEmpty().ifBlank { "Not available" },
-                valueTag = WalletUiTestTags.SettingsDid,
-                copyTag = WalletUiTestTags.SettingsDidCopy,
-                onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
-            )
-            SettingsCopyRow(
-                title = "Wallet key",
-                value = ready?.keyId.orEmpty().ifBlank { "Not available" },
-                valueTag = WalletUiTestTags.SettingsKeyId,
-                copyTag = WalletUiTestTags.SettingsKeyIdCopy,
-                onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
-            )
-            SettingsCopyRow(
-                title = "Public JWK",
-                value = ready?.publicJwk.orEmpty().ifBlank { "Not available" },
-                valueTag = WalletUiTestTags.SettingsPublicJwk,
-                copyTag = WalletUiTestTags.SettingsPublicJwkCopy,
-                onCopy = { text -> clipboard.setText(AnnotatedString(text)) },
-            )
-            if (state.pinLockEnabled) {
-                SigningProtectionSettings(
-                    state = state,
-                    ready = ready,
-                    onRequestChange = onRequestSigningProtectionChange,
-                )
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(WalletUiTestTags.SettingsCredentialSharing),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        "Credential Sharing",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Text(
-                                "Show Walt Wallet preview for DC API Presentation",
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-                            Text(
-                                "When off, Digital Credentials presentations skip the wallet review and continue from the system picker to biometrics.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+    Surface(Modifier.fillMaxSize().testTag(WalletUiTestTags.SettingsScreen), color = MaterialTheme.colorScheme.background) {
+        NavDisplay(backStack = path, onBack = back) { destination ->
+            NavEntry(destination) {
+                Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+                    Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 20.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(back, Modifier.testTag(WalletUiTestTags.SettingsBack)) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.settings_back))
                         }
-                        Switch(
-                            checked = state.showDcApiPresentationPreview,
-                            onCheckedChange = onShowDcApiPresentationPreviewChange,
-                            modifier = Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview),
-                        )
+                        Text(stringResource(destination.title), style = MaterialTheme.typography.titleLarge)
                     }
-                }
-                if (onProximityTransportProfileChange != null) {
-                    HorizontalDivider()
-                    ProximityPresentationSettings(
-                        selected = state.proximityTransportProfile,
-                        onSelect = onProximityTransportProfileChange,
-                        approvalMode = state.proximityApprovalMode,
-                        onSelectApprovalMode = onProximityApprovalModeChange,
-                    )
-                }
-                sharingSettingsContent?.invoke()
-                OutlinedButton(
-                    onClick = onLock,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(WalletUiTestTags.SettingsLock),
-                ) {
-                    Text("Lock")
-                }
-            }
-            Button(
-                onClick = { confirmReset = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(WalletUiTestTags.SettingsReset),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError,
-                ),
-            ) {
-                Text("Reset wallet")
-            }
-            if (onSignOut != null) {
-                OutlinedButton(
-                    onClick = onSignOut,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(WalletUiTestTags.SettingsSignOut),
-                ) {
-                    Text("Sign out")
-                }
-            }
-        }
-    }
-
-    state.pendingSigningProtectionChange?.let { target ->
-        AlertDialog(
-            onDismissRequest = onCancelSigningProtectionChange,
-            title = { Text("Change signing protection?") },
-            text = {
-                Text(
-                    "Changing to ${target.title().lowercase()} creates a new wallet key and DID. " +
-                        "Your current credentials will be removed and must be issued again.",
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = onConfirmSigningProtectionChange,
-                    modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionConfirm),
-                ) {
-                    Text("Recreate wallet")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onCancelSigningProtectionChange) {
-                    Text("Cancel")
-                }
-            },
-        )
-    }
-
-    if (confirmReset) {
-        AlertDialog(
-            onDismissRequest = { confirmReset = false },
-            title = { Text("Reset wallet?") },
-            text = { Text("This deletes the wallet DID, keys, credentials, and PIN. This cannot be undone.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmReset = false
-                        onResetWallet()
-                    },
-                    modifier = Modifier.testTag(WalletUiTestTags.SettingsResetConfirm),
-                ) {
-                    Text("Reset")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmReset = false }) {
-                    Text("Cancel")
-                }
-            },
-        )
-    }
-}
-
-@Composable
-private fun ProximityPresentationSettings(
-    selected: WalletDemoProximityTransportProfile,
-    onSelect: (WalletDemoProximityTransportProfile) -> Unit,
-    approvalMode: WalletDemoProximityApprovalMode,
-    onSelectApprovalMode: ((WalletDemoProximityApprovalMode) -> Unit)?,
-) {
-    var choosing by remember { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        TextButton(
-            onClick = { choosing = true },
-            modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.SettingsProximityPresentation),
-        ) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Nearby sharing", modifier = Modifier.weight(1f))
-                Text(selected.title(), modifier = Modifier.weight(1f), textAlign = TextAlign.End)
-            }
-        }
-        Text(
-            "Updates sharing before connection or approval. Otherwise applies to your next presentation.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-    if (choosing) {
-        AlertDialog(
-            onDismissRequest = { choosing = false },
-            title = { Text("Nearby sharing") },
-            text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    if (onSelectApprovalMode != null) {
-                        ProximityApprovalModeChoice(approvalMode, onSelectApprovalMode)
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-                    }
-                    Text("Connection", style = MaterialTheme.typography.titleSmall)
-                    Text("Use Automatic unless your reader requires a specific connection.")
-                    WalletDemoProximityTransportProfile.entries.forEach { profile ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                onSelect(profile)
-                                choosing = false
-                            }.padding(vertical = 8.dp).testTag(profile.testTag()),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = profile == selected, onClick = null)
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(profile.title(), style = MaterialTheme.typography.bodyLarge)
-                                Text(profile.description(), style = MaterialTheme.typography.bodySmall)
+                    Column(
+                        Modifier.weight(1f).verticalScroll(rememberScrollState()).fillMaxWidth()
+                            .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 640.dp)
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(24.dp),
+                    ) {
+                        currentState.sharingSettingsError?.let { SettingsNotice(it, error = true) }
+                        when (destination) {
+                            SettingsDestination.Main -> {
+                                SettingsSection(stringResource(Res.string.settings_wallet)) {
+                                    if (currentState.pinLockEnabled) {
+                                        SettingsNavigationRow(stringResource(Res.string.settings_signing_key),
+                                            { open(SettingsDestination.SigningKey) }, Modifier.testTag(WalletUiTestTags.SettingsSigningKey), summary = stringResource(Res.string.settings_key_subtitle),
+                                            icon = { SettingsSymbol(Res.drawable.settings_key) })
+                                        SettingsDivider()
+                                    }
+                                    SettingsNavigationRow(stringResource(Res.string.settings_technical),
+                                        { open(SettingsDestination.Technical) }, Modifier.testTag(WalletUiTestTags.SettingsTechnicalDetails), summary = stringResource(Res.string.settings_technical_subtitle),
+                                        icon = { SettingsSymbol(Res.drawable.settings_code) })
+                                }
+                                if (currentState.pinLockEnabled) {
+                                    SettingsSection(stringResource(Res.string.settings_sharing),
+                                        modifier = Modifier.testTag(WalletUiTestTags.SettingsCredentialSharing)) {
+                                        if (onProximityTransportProfileChange != null) {
+                                            SettingsNavigationRow(stringResource(Res.string.settings_nearby),
+                                                { open(SettingsDestination.Nearby) },
+                                                Modifier.testTag(WalletUiTestTags.SettingsProximityPresentation),
+                                                summary = stringResource(currentState.proximityTransportProfile.titleResource),
+                                                icon = { SettingsSymbol(Res.drawable.settings_nearby) })
+                                            SettingsDivider()
+                                        }
+                                        SettingsNavigationRow(stringResource(Res.string.settings_dc_api),
+                                            { open(SettingsDestination.DigitalCredentialsApi) }, Modifier.testTag(WalletUiTestTags.SettingsDigitalCredentialsApi),
+                                            summary = stringResource(if (currentState.showDcApiPresentationPreview) Res.string.settings_review_on else Res.string.settings_review_off),
+                                            icon = { SettingsSymbol(Res.drawable.settings_id_card) })
+                                    }
+                                }
+                                SettingsSection {
+                                    if (currentState.pinLockEnabled) {
+                                        SettingsActionRow(stringResource(Res.string.settings_lock), onLock,
+                                            Modifier.testTag(WalletUiTestTags.SettingsLock), icon = { Icon(Icons.Default.Lock, null) })
+                                        SettingsDivider()
+                                    }
+                                    onSignOut?.let { signOut ->
+                                        SettingsActionRow(stringResource(Res.string.settings_sign_out), signOut,
+                                            Modifier.testTag(WalletUiTestTags.SettingsSignOut),
+                                            icon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null) })
+                                        SettingsDivider()
+                                    }
+                                    SettingsActionRow(stringResource(Res.string.settings_reset), { confirmReset = true },
+                                        Modifier.testTag(WalletUiTestTags.SettingsReset), destructive = true,
+                                        icon = { Icon(Icons.Default.Refresh, null) })
+                                }
+                            }
+                            SettingsDestination.SigningKey -> {
+                                when (val details = currentState.identityDetails) {
+                                    WalletDemoIdentityDetailsState.Loading -> CircularProgressIndicator()
+                                    WalletDemoIdentityDetailsState.Unsupported -> SigningProtectionSettings(currentState, currentState.session as? WalletSessionState.Ready, onRequestSigningProtectionChange)
+                                    is WalletDemoIdentityDetailsState.Failed -> SettingsSection {
+                                        SettingsNotice(details.message, error = true)
+                                        SettingsActionRow(stringResource(Res.string.settings_try_again), onRefreshIdentityDetails)
+                                    }
+                                    is WalletDemoIdentityDetailsState.Available -> {
+                                        val identity = details.details
+                                        SettingsSection(stringResource(Res.string.settings_key_protection),
+                                            footer = stringResource(Res.string.settings_change_key_notice)) {
+                                            SettingsDetailRow(stringResource(Res.string.settings_storage_policy), identity.storage)
+                                            SettingsDivider()
+                                            SettingsDetailRow(stringResource(Res.string.settings_key_protection), identity.protection)
+                                            SettingsDivider()
+                                            SettingsDetailRow(stringResource(Res.string.settings_key_origin), identity.origin)
+                                            SettingsDivider()
+                                            SettingsDetailRow(stringResource(Res.string.settings_signing_approval), identity.authorization)
+                                        }
+                                        SettingsSection(stringResource(Res.string.settings_key_backup)) {
+                                            SettingsDetailRow(stringResource(Res.string.settings_backup_status), identity.recovery)
+                                            identity.choices.forEach { choice ->
+                                                SettingsDivider()
+                                                SettingsActionRow(choice.title, {
+                                                    if (choice.destructive) deleteRecovery = choice.id else onIdentityAction(choice.id)
+                                                }, detail = choice.detail, enabled = !currentState.identityBusy,
+                                                    destructive = choice.destructive,
+                                                    icon = { if (choice.destructive) Icon(Icons.Default.Delete, null) else SettingsSymbol(Res.drawable.settings_backup) })
+                                            }
+                                            currentState.identityProgress?.let { SettingsNotice(it); LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                                            currentState.identityError?.let { SettingsNotice(it, error = true) }
+                                        }
+                                        if (identity.providerFailures.isNotEmpty()) ProviderAvailability(identity.providerFailures, !currentState.identityBusy, onRefreshIdentityDetails)
+                                    }
+                                }
+                            }
+                            SettingsDestination.Technical -> {
+                                SettingsCopyRow(stringResource(Res.string.settings_did), (currentState.session as? WalletSessionState.Ready)?.did,
+                                    WalletUiTestTags.SettingsDid, WalletUiTestTags.SettingsDidCopy, stringResource(Res.string.settings_copy_did), stringResource(Res.string.settings_did_copied))
+                                SettingsCopyRow(stringResource(Res.string.settings_key_id), (currentState.session as? WalletSessionState.Ready)?.keyId,
+                                    WalletUiTestTags.SettingsKeyId, WalletUiTestTags.SettingsKeyIdCopy, stringResource(Res.string.settings_copy_key_id), stringResource(Res.string.settings_key_id_copied))
+                                SettingsCopyRow(stringResource(Res.string.settings_public_key), (currentState.session as? WalletSessionState.Ready)?.publicJwk,
+                                    WalletUiTestTags.SettingsPublicJwk, WalletUiTestTags.SettingsPublicJwkCopy,
+                                    stringResource(Res.string.settings_copy_public_key), stringResource(Res.string.settings_public_key_copied),
+                                    disclosureLabels = stringResource(Res.string.settings_show_public_key) to stringResource(Res.string.settings_hide_public_key), formatJson = true)
+                            }
+                            SettingsDestination.Nearby -> {
+                                onProximityApprovalModeChange?.let { onChange ->
+                                    SettingsSection(stringResource(Res.string.settings_approval)) {
+                                        ProximityApprovalModeChoice(currentState.proximityApprovalMode, onChange)
+                                    }
+                                }
+                                SettingsSection {
+                                    SettingsNavigationRow(stringResource(Res.string.settings_connection),
+                                        { open(SettingsDestination.Connection) }, Modifier.testTag(WalletUiTestTags.SettingsConnectionMethod), summary = stringResource(currentState.proximityTransportProfile.titleResource),
+                                        icon = { SettingsSymbol(Res.drawable.settings_connection) })
+                                    if (readerTrustSettingsContent != null) {
+                                        SettingsDivider()
+                                        SettingsNavigationRow(stringResource(Res.string.settings_reader_authentication),
+                                            { open(SettingsDestination.ReaderAuthentication) },
+                                            Modifier.testTag(WalletUiTestTags.SettingsReaderAuthentication),
+                                            summary = currentReaderPolicy ?: stringResource(Res.string.settings_reader_subtitle),
+                                            icon = { SettingsSymbol(Res.drawable.settings_shield) })
+                                    }
+                                }
+                            }
+                            SettingsDestination.Connection -> Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                                val profiles = WalletDemoProximityTransportProfile.entries
+                                for (group in listOf(profiles.take(3), profiles.drop(3))) {
+                                    SettingsSection(title = if (group == profiles.take(3)) null else stringResource(Res.string.settings_provisional)) {
+                                        group.forEachIndexed { index, profile ->
+                                            if (index > 0) SettingsDivider()
+                                            SettingsChoiceRow(stringResource(profile.titleResource), stringResource(profile.descriptionResource),
+                                                profile == currentState.proximityTransportProfile, { onProximityTransportProfileChange?.invoke(profile) },
+                                                Modifier.testTag(profile.settingsTag))
+                                        }
+                                    }
+                                }
+                                SettingsNotice(stringResource(Res.string.settings_connection_footer))
+                            }
+                            SettingsDestination.ReaderAuthentication -> readerTrustSettingsContent?.invoke()
+                            SettingsDestination.DigitalCredentialsApi -> {
+                                SettingsSection(footer = stringResource(Res.string.settings_review_description)) {
+                                SettingsToggleRow(stringResource(Res.string.settings_show_review), currentState.showDcApiPresentationPreview,
+                                    onShowDcApiPresentationPreviewChange, Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview))
+                                }
+                                SettingsNotice(stringResource(digitalCredentialsRequirements))
                             }
                         }
                     }
                 }
-            },
-            confirmButton = { TextButton(onClick = { choosing = false }) { Text("Done") } },
-        )
+            }
+        }
     }
+    deleteRecovery?.let { id ->
+        AlertDialog(onDismissRequest = { deleteRecovery = null }, title = { Text(stringResource(Res.string.settings_delete_backup_question)) },
+            text = { Text(stringResource(Res.string.settings_delete_backup_notice,
+                (currentState.identityDetails as? WalletDemoIdentityDetailsState.Available)?.details?.choices?.find { it.id == id }?.detail ?: "the backup provider")) },
+            confirmButton = { TextButton(onClick = { deleteRecovery = null; onIdentityAction(id) }) { Text(stringResource(Res.string.settings_delete_backup)) } },
+            dismissButton = { TextButton(onClick = { deleteRecovery = null }) { Text(stringResource(Res.string.settings_cancel)) } })
+    }
+    currentState.pendingSigningProtectionChange?.let { target ->
+        AlertDialog(onDismissRequest = onCancelSigningProtectionChange, title = { Text("Change signing protection?") },
+            text = { Text("Changing to ${target.title().lowercase()} creates a new wallet key and DID. Your current credentials will be removed and must be issued again.") },
+            confirmButton = { TextButton(onConfirmSigningProtectionChange, Modifier.testTag(WalletUiTestTags.SigningProtectionConfirm)) { Text("Create new wallet") } },
+            dismissButton = { TextButton(onCancelSigningProtectionChange) { Text(stringResource(Res.string.settings_cancel)) } })
+    }
+    if (confirmReset) AlertDialog(onDismissRequest = { confirmReset = false },
+        title = { Text(stringResource(Res.string.settings_reset_question)) }, text = { Text(resetWalletDescription ?: stringResource(Res.string.settings_reset_description)) },
+        confirmButton = { TextButton({ confirmReset = false; onResetWallet() }, Modifier.testTag(WalletUiTestTags.SettingsResetConfirm)) { Text(stringResource(Res.string.settings_reset)) } },
+        dismissButton = { TextButton({ confirmReset = false }) { Text(stringResource(Res.string.settings_cancel)) } })
 }
 
-private fun WalletDemoProximityTransportProfile.title(): String = when (this) {
-    WalletDemoProximityTransportProfile.Default -> "Automatic"
-    WalletDemoProximityTransportProfile.Bluetooth -> "Bluetooth transfer"
-    WalletDemoProximityTransportProfile.WifiAware -> "Wi-Fi Aware transfer"
-    WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid -> "NFCv2 + Bluetooth"
-    WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct -> "NFCv2 direct"
-    WalletDemoProximityTransportProfile.ProvisionalNfcV2WifiAware -> "NFCv2 + Wi-Fi Aware"
+private val WalletDemoProximityTransportProfile.titleResource: StringResource get() = when (this) {
+    WalletDemoProximityTransportProfile.Default -> Res.string.settings_automatic
+    WalletDemoProximityTransportProfile.Bluetooth -> Res.string.settings_bluetooth
+    WalletDemoProximityTransportProfile.WifiAware -> Res.string.settings_wifi_aware
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid -> Res.string.settings_nfc_bluetooth
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct -> Res.string.settings_nfc_direct
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2WifiAware -> Res.string.settings_nfc_wifi
 }
-
-private fun WalletDemoProximityTransportProfile.description(): String = when (this) {
-    WalletDemoProximityTransportProfile.Default -> "Use available connections supported by the reader."
-    WalletDemoProximityTransportProfile.Bluetooth -> "Start with NFC or QR; transfer over Bluetooth."
-    WalletDemoProximityTransportProfile.WifiAware -> "Start with NFC or QR; requires Wi-Fi Aware on both devices."
-    WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid -> "Provisional profile. Start with NFCv2; transfer over Bluetooth."
-    WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct -> "Provisional profile. Keep the connection on NFCv2."
-    WalletDemoProximityTransportProfile.ProvisionalNfcV2WifiAware -> "Provisional profile. Start with NFCv2; allow Wi-Fi Aware transfer."
+private val WalletDemoProximityTransportProfile.descriptionResource: StringResource get() = when (this) {
+    WalletDemoProximityTransportProfile.Default -> Res.string.settings_automatic_detail
+    WalletDemoProximityTransportProfile.Bluetooth -> Res.string.settings_bluetooth_detail
+    WalletDemoProximityTransportProfile.WifiAware -> Res.string.settings_wifi_detail
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid -> Res.string.settings_nfc_bluetooth_detail
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct -> Res.string.settings_nfc_direct_detail
+    WalletDemoProximityTransportProfile.ProvisionalNfcV2WifiAware -> Res.string.settings_nfc_wifi_detail
 }
-
-private fun WalletDemoProximityTransportProfile.testTag(): String = when (this) {
+private val WalletDemoProximityTransportProfile.settingsTag: String get() = when (this) {
     WalletDemoProximityTransportProfile.Default -> WalletUiTestTags.SettingsProximityDefault
     WalletDemoProximityTransportProfile.ProvisionalNfcV2Hybrid -> WalletUiTestTags.SettingsProximityNfcV2Hybrid
     WalletDemoProximityTransportProfile.ProvisionalNfcV2Direct -> WalletUiTestTags.SettingsProximityNfcV2Direct
     else -> "wallet.settingsProximity$name"
-}
-
-@Composable
-private fun SigningProtectionSettings(
-    state: WalletDemoUiState,
-    ready: WalletSessionState.Ready?,
-    onRequestChange: (WalletDemoSigningProtection) -> Unit,
-) {
-    val current = ready?.signingProtection
-    val biometricSigningAvailable =
-        state.biometricSigningAvailability == WalletDemoSigningProtectionAvailability.Available
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Signing protection", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Text("Current: ${current?.title() ?: "Not available"}", style = MaterialTheme.typography.bodyLarge)
-        Text(
-            "Changing signing protection creates a new wallet key and DID.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        when (state.signingProtectionMode) {
-            WalletDemoSigningProtectionMode.Optional -> {
-                SigningProtectionChoice(
-                    protection = WalletDemoSigningProtection.Biometric,
-                    selected = state.selectedSigningProtection == WalletDemoSigningProtection.Biometric,
-                    enabled = biometricSigningAvailable && !state.isBusy,
-                    testTag = WalletUiTestTags.SigningProtectionBiometric,
-                    onSelect = { onRequestChange(WalletDemoSigningProtection.Biometric) },
-                )
-                SigningProtectionChoice(
-                    protection = WalletDemoSigningProtection.None,
-                    selected = state.selectedSigningProtection == WalletDemoSigningProtection.None,
-                    enabled = !state.isBusy,
-                    testTag = WalletUiTestTags.SigningProtectionNone,
-                    onSelect = { onRequestChange(WalletDemoSigningProtection.None) },
-                )
-            }
-            WalletDemoSigningProtectionMode.Required,
-            WalletDemoSigningProtectionMode.Disabled,
-            -> {
-                val required = state.signingProtectionMode.defaultSelection
-                SigningProtectionChoice(
-                    protection = required,
-                    selected = state.selectedSigningProtection == required,
-                    enabled = ready != null && ready.signingProtection != required &&
-                        !state.isBusy &&
-                        (required == WalletDemoSigningProtection.None || biometricSigningAvailable),
-                    testTag = if (required == WalletDemoSigningProtection.Biometric) {
-                        WalletUiTestTags.SigningProtectionBiometric
-                    } else {
-                        WalletUiTestTags.SigningProtectionNone
-                    },
-                    onSelect = { onRequestChange(required) },
-                )
-                Text(
-                    "Managed by app configuration.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        if (!biometricSigningAvailable && state.signingProtectionMode != WalletDemoSigningProtectionMode.Disabled) {
-            Text(
-                state.biometricSigningAvailability?.displayMessage()
-                    ?: "Checking strong biometric availability...",
-                style = MaterialTheme.typography.bodySmall,
-                color = if (state.biometricSigningAvailability == null) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.error
-                },
-                modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionAvailability),
-            )
-        }
-
-        if (ready == null) {
-            OutlinedButton(
-                onClick = { onRequestChange(state.selectedSigningProtection) },
-                enabled = !state.isBusy && (
-                    state.selectedSigningProtection != WalletDemoSigningProtection.Biometric ||
-                        biometricSigningAvailable
-                    ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(WalletUiTestTags.SigningProtectionRetry),
-            ) {
-                Text("Retry wallet setup")
-            }
-        }
-
-        if (state.isChangingSigningProtection) {
-            CircularProgressIndicator()
-        }
-        state.signingProtectionError?.let { error ->
-            Text(
-                error,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionError),
-            )
-        }
-    }
-}
-
-@Composable
-private fun SettingsCopyRow(
-    title: String,
-    value: String,
-    valueTag: String,
-    copyTag: String,
-    onCopy: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Text(
-                value,
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag(valueTag),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            TextButton(
-                onClick = { onCopy(value) },
-                modifier = Modifier.testTag(copyTag),
-            ) {
-                Text("Copy")
-            }
-        }
-    }
 }

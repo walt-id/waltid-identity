@@ -42,6 +42,7 @@ val chromeExecutable = providers.environmentVariable("CHROME_BIN").orNull
 
 plugins {
     id("waltid.full.library")
+    id("waltid.optional-ios-abi")
     id("waltid.publish.maven")
 }
 
@@ -103,6 +104,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(identityLibs.cryptography.provider.optimal)
+            implementation(identityLibs.whyoleg.cryptography.random)
             api(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.coroutines.core)
         }

@@ -30,6 +30,14 @@
 
 ### Module traits
 
+#### ABI validation with optional iOS targets
+
+`waltid.optional-ios-abi` keeps a single complete ABI baseline in `api/` for modules whose iOS
+targets depend on `enableIosBuild`. With iOS disabled, it prepares a temporary reference without
+the iOS targets; all other declarations remain checked by Kotlin's ABI validator. With iOS enabled,
+validation uses the complete baseline. Run `updateKotlinAbi -PenableIosBuild=true` on macOS to update
+these baselines; updates with iOS disabled are rejected to preserve the iOS declarations.
+
 #### Publishing
 
 - `waltid.publish.maven` - The module shall be published to a Maven repository (no matter if JVM,

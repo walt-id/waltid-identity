@@ -9,14 +9,11 @@ precondition(!(physicalFixtures && bridgeFixtures), "Select only one isolated te
 
 let package = Package(
     name: "WalletSDK",
-    platforms: [
-        .iOS("15.4"),
-    ],
+    platforms: [.iOS("15.4")],
     products: [
-        .library(
-            name: "WalletSDK",
-            targets: ["WalletSDK"]
-        ),
+        .library(name: "WalletSDK", targets: ["WalletSDK"]),
+        .library(name: "WalletSDKKeychainRecovery", targets: ["WalletSDKKeychainRecovery"]),
+        .library(name: "WalletSDKEnterpriseCustody", targets: ["WalletSDKEnterpriseCustody"]),
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.5.0"),
@@ -34,20 +31,15 @@ let package = Package(
         .target(
             name: "WalletSDK",
             dependencies: [
-                .target(
-                    name: "WalletCore",
-                    condition: .when(platforms: [.iOS])
-                ),
-                .product(
-                    name: "SQLCipher",
-                    package: "SQLCipher.swift",
-                    condition: .when(platforms: [.iOS])
-                ),
+                .target(name: "WalletCore", condition: .when(platforms: [.iOS])),
+                .product(name: "SQLCipher", package: "SQLCipher.swift", condition: .when(platforms: [.iOS])),
             ]
         ),
+        .target(name: "WalletSDKKeychainRecovery", dependencies: ["WalletSDK"]),
+        .target(name: "WalletSDKEnterpriseCustody", dependencies: ["WalletSDK"]),
         .testTarget(
             name: "WalletSDKTests",
-            dependencies: ["WalletSDK"],
+            dependencies: ["WalletSDK", "WalletSDKKeychainRecovery", "WalletSDKEnterpriseCustody"],
             swiftSettings: bridgeFixtures ? [.define("WALLET_SDK_BRIDGE_FIXTURES")] : []
         ),
     ]

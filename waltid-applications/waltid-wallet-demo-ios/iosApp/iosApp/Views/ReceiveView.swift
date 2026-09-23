@@ -4,6 +4,7 @@ import WalletSDK
 
 struct ReceiveView: View {
     @ObservedObject var viewModel: WalletViewModel
+    let onOpenSettings: () -> Void
     @Environment(\.openURL) private var openURL
     @Environment(\.walletDemoBranding) private var branding
 
@@ -17,7 +18,8 @@ struct ReceiveView: View {
                 }
             }
             .navigationTitle("Receive")
-            .walletSettingsToolbar(viewModel: viewModel)
+            .walletSettingsToolbar(onOpenSettings: onOpenSettings)
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
         }
         .navigationViewStyle(.stack)

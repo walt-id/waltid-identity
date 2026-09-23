@@ -5,6 +5,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -23,6 +25,7 @@ internal fun WalletBottomBar(selectedTab: WalletDemoTab, onSelectedTab: (WalletD
         WalletDemoTab.entries.forEach { tab ->
             NavigationBarItem(
                 selected = selectedTab == tab,
+                colors = NavigationBarItemDefaults.colors(selectedTextColor = MaterialTheme.colorScheme.onSurface),
                 onClick = { onSelectedTab(tab) },
                 icon = {
                     Icon(
