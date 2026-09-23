@@ -24,7 +24,7 @@ class ReportTest(unittest.TestCase):
         ET.SubElement(self.suite[1], "error", message="private error payload")
         self.write()
         summary = render(read_results(self.path))
-        self.assertIn("8 passed; 1 failed; 1 errors", summary)
+        self.assertIn(f"{len(self.suite) - 2} passed; 1 failed; 1 errors", summary)
         self.assertIn("| FAIL |", summary)
         self.assertIn("| ERROR |", summary)
         self.assertNotIn("private", summary)
@@ -60,7 +60,7 @@ class ReportTest(unittest.TestCase):
         self.suite[0].set("name", "check | <markup>\nnext")
         self.write()
         summary = render(read_results(self.path))
-        self.assertIn("10 passed; 0 failed; 0 errors", summary)
+        self.assertIn(f"{len(self.suite)} passed; 0 failed; 0 errors", summary)
         self.assertIn("check \\| &lt;markup&gt; next", summary)
         self.assertIn("not hosted ITB results", summary)
 
