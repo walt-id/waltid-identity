@@ -137,7 +137,7 @@ allowlist: they must pass normally when their product behavior is corrected.
 
 | Area | Local checks | Baseline | Boundary / dependency |
 | --- | --- | --- | --- |
-| CS-01 | Real authorization-code credential receipt; verify proof signature, audience, nonce and bound client `iss` | 1 fail: absent `iss` | Reported in WAL-495; external [#2246](https://github.com/walt-id/waltid-identity/pull/2246). Starts after authorization; does not qualify PAR, DPoP, browser login, pre-authorized grants or WIA/KA. |
+| CS-01 | Real authorization-code credential receipt; verify proof signature, audience, nonce and bound client `iss` | 1 fail: absent `iss` | Historical baseline; [#2246](https://github.com/walt-id/waltid-identity/pull/2246) has since merged. Starts after authorization; does not qualify PAR, DPoP, browser login, pre-authorized grants or WIA/KA. |
 | CS-02 | Accept trusted X.509 signed request; reject absent trust and altered payload | 3 pass | Fresh CA/leaf certificates and actual signature authentication. Does not qualify credential presentation, selective disclosure or native consent. |
 | CS-02 | Strict profile rejects unsigned `redirect_uri` request objects and JSON returned by GET `request_uri` | 2 fail: unsigned input accepted | [WAL-896](https://linear.app/walt-new/issue/WAL-896) request-authentication scope; keep failures visible until the owning implementation enforces the profile. |
 | CS-07 | Resolve an authentic signed DC API request and bind its platform-origin audience | 1 fail: signed protocol unsupported | External WAL-896 / [#2141](https://github.com/walt-id/waltid-identity/pull/2141). A DID fixture isolates shared protocol dispatch; native and X.509 DC API qualification remain separate. |
@@ -151,11 +151,11 @@ confirmed blocker for the current 21-case matrix. It does not require every
 conforming issuer to reject an absent claim. See
 [OpenID4VCI JWT proofs](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-jwt-proof-type).
 
-Other open PRs remain external dependencies. Do not copy their production fixes
-into this baseline or disable affected cases. In particular,
-[#2222](https://github.com/walt-id/waltid-identity/pull/2222) remains separate
+Owning changes remain separate from this runner. Do not copy their production
+fixes into this baseline or disable affected cases. The merged
+[#2222](https://github.com/walt-id/waltid-identity/pull/2222) covers independent
 identity/recovery work; these local checks do not require it. Refresh from main
-and rerun against the actual merged dependency revisions as they become available.
+and rerun against actual merged dependency revisions as they become available.
 Merging an owning PR alone does not prove that all profile assertions pass.
 
 ## Pinned requirements and outstanding acceptance work
