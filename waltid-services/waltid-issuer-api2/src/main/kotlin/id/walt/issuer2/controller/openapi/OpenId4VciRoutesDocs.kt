@@ -64,7 +64,9 @@ object OpenId4VciRoutesDocs {
     fun vctTypeMetadata(): RouteConfig.() -> Unit = {
         tags = listOf(OPENID4VCI_TAG)
         summary = "Get SD-JWT VC type metadata"
-        description = "Resolve self-hosted SD-JWT VC type metadata from a VCT URL path."
+        description = "Resolve configured self-hosted SD-JWT VC type metadata through " +
+                "`/.well-known/vct/{type}` or `/openid4vci/{type}`. Unknown types return 404. " +
+                "OpenID4VCI protocol path names are reserved and cannot be used for self-hosted VCT URLs."
         request {
             pathParameter<String>("type")
         }
@@ -72,6 +74,9 @@ object OpenId4VciRoutesDocs {
             HttpStatusCode.OK to {
                 description = "SD-JWT VC type metadata"
                 body<JsonObject>()
+            }
+            HttpStatusCode.NotFound to {
+                description = "The type has no self-hosted metadata or uses a reserved protocol path name."
             }
         }
     }
@@ -174,7 +179,31 @@ object OpenId4VciRoutesDocs {
 
     fun credential(): RouteConfig.() -> Unit = {
         summary = "Credential endpoint"
-        description = "The credential endpoint. Accepts plaintext JSON requests and encrypted JWT requests."
+        description = """
+            Issue one or more credentials for a single credential target. Plaintext JSON and encrypted
+            JWT requests are accepted.
+
+            For batch issuance, provide multiple proof JWTs in `proofs.jwt`. Credentials returned by one
+            request share the Credential Format and Credential Dataset selected by either
+            `credential_identifier` or `credential_configuration_id`; each proof supplies the cryptographic
+            binding data for one issued credential. Use separate Credential Endpoint requests for different
+            formats or datasets. The maximum accepted batch size is advertised as
+            `batch_credential_issuance.batch_size` in Credential Issuer metadata.
+
+            Multiple proofs when batch issuance is disabled, or more proofs than the advertised limit,
+            return `invalid_credential_request`. Invalid proof signatures return `invalid_proof`.
+            Each offered credential uses its configured `credentialStatus` for all copies issued from it.
+            When multiple proofs are supplied, those copies share the same status entry. Revoking that
+            entry revokes every credential referencing it, including copies issued by later requests.
+            Shared status references also make the copies linkable.
+            Different `credentials[]` items can supply different statuses, each used for its corresponding item.
+            These rules apply to both single-profile and multi-credential offers.
+
+            When several authorized datasets share a configuration, selecting it by
+            `credential_configuration_id` is ambiguous and returns `invalid_credential_request`.
+            Request `authorization_details` during authorization or token exchange to obtain dataset
+            identifiers, then send a separate request using `credential_identifier` for each dataset.
+        """.trimIndent()
         request {
             headerParameter<String>("Authorization") {
                 required = true
@@ -187,6 +216,12 @@ object OpenId4VciRoutesDocs {
             body<JsonObject> {
                 description = "Credential request"
                 mediaTypes(ContentType.Application.Json)
+                example("[batch][credential_configuration_id][two JWT proofs]") {
+                    value = Issuer2RequestExamples.BATCH_CREDENTIAL_REQUEST_BY_CONFIGURATION_ID
+                }
+                example("[batch][credential_identifier][two JWT proofs]") {
+                    value = Issuer2RequestExamples.BATCH_CREDENTIAL_REQUEST_BY_CREDENTIAL_IDENTIFIER
+                }
             }
             body<String> {
                 description = "Encrypted Credential Request as compact JWE"
@@ -196,7 +231,11 @@ object OpenId4VciRoutesDocs {
         response {
             HttpStatusCode.OK to {
                 description = "Credential response"
-                body<JsonObject>()
+                body<JsonObject> {
+                    example("Batch credential response") {
+                        value = Issuer2RequestExamples.BATCH_CREDENTIAL_RESPONSE
+                    }
+                }
                 body<String> {
                     mediaTypes(ContentType.parse(CredentialEncryptionProfile.MEDIA_TYPE_JWT))
                 }

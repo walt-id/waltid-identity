@@ -10,6 +10,7 @@ import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.repository.refresh.DefaultRefreshTokenRecord
 import id.walt.openid4vci.repository.refresh.RefreshTokenRecord
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
+import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.serialization.Serializable
@@ -71,6 +72,7 @@ private data class StoredRefreshTokenRecord(
     val grantedAudience: Set<String>,
     val session: StoredSession,
     val expiresAt: Long,
+    val grantedAuthorizationDetails: List<AuthorizationDetail>? = null,
 )
 
 @Serializable
@@ -84,6 +86,7 @@ private data class StoredAccessTokenRequest(
     val grantedScopes: Set<String>,
     val requestedAudience: Set<String>,
     val grantedAudience: Set<String>,
+    val authorizationDetails: List<AuthorizationDetail> = emptyList(),
     val requestForm: Map<String, List<String>>,
     val session: StoredSession?,
     val issClaim: String?,
@@ -117,6 +120,7 @@ private fun RefreshTokenRecord.toStoredRecord(): StoredRefreshTokenRecord =
         grantedAudience = grantedAudience,
         session = session.toStoredSession(),
         expiresAt = expiresAt.toEpochMilliseconds(),
+        grantedAuthorizationDetails = grantedAuthorizationDetails,
     )
 
 private fun StoredRefreshTokenRecord.toLibraryRecord(): DefaultRefreshTokenRecord =
@@ -130,6 +134,7 @@ private fun StoredRefreshTokenRecord.toLibraryRecord(): DefaultRefreshTokenRecor
         grantedAudience = grantedAudience,
         session = session.toSession(),
         expiresAt = Instant.fromEpochMilliseconds(expiresAt),
+        grantedAuthorizationDetails = grantedAuthorizationDetails,
     )
 
 private fun AccessTokenRequest.toStoredRequest(): StoredAccessTokenRequest =
@@ -143,6 +148,7 @@ private fun AccessTokenRequest.toStoredRequest(): StoredAccessTokenRequest =
         grantedScopes = grantedScopes,
         requestedAudience = requestedAudience,
         grantedAudience = grantedAudience,
+        authorizationDetails = authorizationDetails,
         requestForm = requestForm,
         session = session?.toStoredSession(),
         issClaim = issClaim,
@@ -159,6 +165,7 @@ private fun StoredAccessTokenRequest.toAccessTokenRequest(): DefaultAccessTokenR
         grantedScopes = grantedScopes,
         requestedAudience = requestedAudience,
         grantedAudience = grantedAudience,
+        authorizationDetails = authorizationDetails,
         requestForm = requestForm,
         session = session?.toSession(),
         issClaim = issClaim,

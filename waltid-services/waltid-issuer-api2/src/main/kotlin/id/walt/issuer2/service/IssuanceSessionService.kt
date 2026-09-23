@@ -31,7 +31,6 @@ class IssuanceSessionService(
         sessionId: String,
         status: IssuanceSessionStatus,
         reason: String? = null,
-        issuedCredentialFormat: String? = null,
         close: Boolean = false,
         failure: IssuanceSessionFailure? = null,
     ): IssuanceSession {
@@ -39,7 +38,6 @@ class IssuanceSessionService(
         val updated = existing.copy(
             status = status,
             statusReason = reason,
-            issuedCredentialFormat = issuedCredentialFormat ?: existing.issuedCredentialFormat,
             isClosed = existing.isClosed || close,
             failure = failure ?: existing.failure,
         )

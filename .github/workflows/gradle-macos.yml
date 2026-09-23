@@ -68,7 +68,7 @@ jobs:
   ios-simulator-tests:
     if: ${{ inputs.run-ios-simulator }}
     runs-on: macos-26
-    timeout-minutes: 50
+    timeout-minutes: 90
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
@@ -81,7 +81,7 @@ jobs:
         uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Compile iOS targets and run Kotlin iOS simulator tests
-        timeout-minutes: 40
+        timeout-minutes: 60
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'

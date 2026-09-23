@@ -5,6 +5,7 @@ import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
@@ -192,10 +193,14 @@ class TokenEventTest {
                 override suspend fun createAccessTokenResponse(
                     request: AccessTokenRequest,
                     options: TokenResponseOptions,
-                ) = AccessTokenResponseResult.Success(
-                    request = request.withSession(DefaultSession(subject = session.sessionId)),
-                    response = AccessTokenResponse(accessToken = "access-token"),
-                )
+                ): AccessTokenResponseResult {
+                    val validatedRequest = request.withSession(DefaultSession(subject = session.sessionId))
+                    return AccessTokenResponseResult.Success(
+                        request = validatedRequest,
+                        response = AccessTokenResponse(accessToken = "access-token"),
+                        credentialAuthorization = options.credentialAuthorizationResolver?.invoke(validatedRequest, null),
+                    )
+                }
             }
         }
 
@@ -288,11 +293,16 @@ class TokenEventTest {
 
     private fun issuanceSession(sessionId: String) = IssuanceSession(
         sessionId = sessionId,
-        profileId = "test-profile",
         authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
-        credentialConfigurationId = "identity_credential",
-        issuerKey = JsonObject(emptyMap()),
-        credentialData = JsonObject(emptyMap()),
+        issuanceRequests = listOf(
+            IssuanceRequest(
+                credentialIdentifier = "credential",
+                profileId = "test-profile",
+                credentialConfigurationId = "identity_credential",
+                issuerKey = JsonObject(emptyMap()),
+                credentialData = JsonObject(emptyMap()),
+            )
+        ),
         expiresAt = Clock.System.now() + 1.hours,
     )
 
@@ -342,6 +352,8 @@ class TokenEventTest {
 
     private class InMemorySessionRepository(initial: List<IssuanceSession>) : IssuanceSessionRepository {
         private val sessions = initial.associateBy { it.sessionId }.toMutableMap()
+
+        override suspend fun take(sessionId: String): IssuanceSession? = sessions.remove(sessionId)
 
         override suspend fun save(session: IssuanceSession): IssuanceSession =
             session.also { sessions[it.sessionId] = it }

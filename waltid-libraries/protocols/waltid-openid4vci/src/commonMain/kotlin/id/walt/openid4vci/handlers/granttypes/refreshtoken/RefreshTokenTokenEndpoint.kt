@@ -14,6 +14,8 @@ import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.sanitizeForStorage
 import id.walt.openid4vci.responses.token.AccessTokenResponse
+import id.walt.openid4vci.responses.token.TokenResponseOptions
+import id.walt.openid4vci.responses.token.InvalidTokenCredentialAuthorization
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
@@ -34,7 +36,7 @@ class RefreshTokenTokenEndpoint(
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
         request.grantTypes.contains(GrantType.RefreshToken.value)
 
-    override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): AccessTokenResponseResult {
+    override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest, options: TokenResponseOptions): AccessTokenResponseResult {
         val unresolvedRequest = request.withSession(null)
 
         if (!canHandleTokenEndpointRequest(request)) {
@@ -161,6 +163,8 @@ class RefreshTokenTokenEndpoint(
                 .withGrantedScopes(grantedScopes)
                 .withGrantedAudience(record.grantedAudience)
 
+            val credentialAuthorization = options.credentialAuthorizationResolver?.invoke(updatedRequest, record.grantedAuthorizationDetails)
+
             val now = Clock.System.now()
             val sessionExpiresAt = session.expiresAt[TokenType.ACCESS_TOKEN]?.takeIf { it > now }
             val accessTokenExpiresAt = sessionExpiresAt ?: (now + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds)
@@ -174,6 +178,7 @@ class RefreshTokenTokenEndpoint(
                     issuedAt = now,
                     expiresAt = accessTokenExpiresAt,
                     additional = buildMap {
+                        credentialAuthorization?.let { putAll(it.tokenClaims()) }
                         effectiveClientId?.let { put("client_id", it) }
                         session.customAttributes["issuance_session_id"]?.let {
                             put("issuance_session_id", it)
@@ -202,6 +207,7 @@ class RefreshTokenTokenEndpoint(
                 grantedAudience = record.grantedAudience,
                 session = session,
                 expiresAt = record.expiresAt,
+                grantedAuthorizationDetails = record.grantedAuthorizationDetails,
             )
 
             if (refreshTokenRepository.rotate(refreshTokenSignature, newRecord) == null) {
@@ -220,6 +226,7 @@ class RefreshTokenTokenEndpoint(
 
             AccessTokenResponseResult.Success(
                 request = updatedRequest,
+                credentialAuthorization = credentialAuthorization,
                 response = AccessTokenResponse(
                     accessToken = accessToken,
                     tokenType = TOKEN_TYPE_BEARER,
@@ -233,6 +240,10 @@ class RefreshTokenTokenEndpoint(
                 resolvedRequest,
                 OAuthError(OAuthErrorCodes.SERVER_ERROR, e.message),
             )
+        } catch (e: InvalidTokenCredentialAuthorization) {
+            // The provider maps selection errors to invalid_request. The refresh
+            // token is still valid and has not been rotated at this point.
+            throw e
         } catch (_: IllegalArgumentException) {
             AccessTokenResponseResult.Failure(
                 resolvedRequest,

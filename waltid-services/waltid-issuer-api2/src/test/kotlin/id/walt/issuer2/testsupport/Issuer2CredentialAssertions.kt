@@ -3,7 +3,7 @@ package id.walt.issuer2.testsupport
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.repository.IssuanceSessionStorageCodec
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.sdjwt.SDJwt
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
@@ -46,7 +46,7 @@ suspend fun assertSessionStatus(
 
     // ACTIVE is the default enum value and is omitted from JSON when encodeDefaults=false.
     // Decode the session so Kotlin serialization applies the same default the service uses.
-    val session = response.body<IssuanceSession>()
+    val session = response.bodyAsText().let(IssuanceSessionStorageCodec::decode)
     assertEquals(expectedStatus, session.status.name)
 }
 

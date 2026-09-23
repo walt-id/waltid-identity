@@ -4,6 +4,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.WaltConfig
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
+import id.walt.commons.web.plugins.configureStatusPages
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.issuer2.config.AuthenticationServiceConfig
@@ -11,6 +12,9 @@ import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.config.registerIssuer2ConfigDecoders
+import id.walt.issuer2.application.Issuer2Module
+import id.walt.issuer2.configurePlugins
+import id.walt.issuer2.controller.Issuer2RouteSurface
 import id.walt.issuer2.issuer2Module
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
 import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
@@ -32,11 +36,13 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.statement.readRawBytes
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import io.ktor.http.contentType
 import io.ktor.http.getSplitValues
 import io.ktor.serialization.kotlinx.json.json
@@ -44,6 +50,7 @@ import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -75,6 +82,43 @@ class Issuer2MetadataEndpointTest {
         configFiles.forEach { (id, _) -> System.clearProperty("config.file.$id") }
         ConfigManager.preclear()
         FeatureManager.preclear()
+    }
+
+    @Test
+    fun unknownVctTypesReturnNotFoundThroughBothMetadataUrls() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        listOf("/.well-known/vct/missing-type", "$OPENID4VCI_PREFIX/missing-type").forEach { path ->
+            assertEquals(HttpStatusCode.NotFound, client.get(path).status, path)
+        }
+    }
+
+    @Test
+    fun restrictedIssuerDoesNotTreatProtocolPathsAsVctTypes() = testApplication {
+        installIssuer2WithConfigFiles(Issuer2RouteSurface.preAuthorizedCodeOnly)
+        val client = apiClient()
+        val disabledPaths = listOf(
+            "authorize", "credential-offer?id=any-session", "par", "token", "nonce", "credential",
+            "external_login", "external_login/request", "external", "external/oauth/callback", "%61uthorize",
+        )
+        // Collect all responses before asserting so a failure does not hide a second route collision.
+        val statuses = disabledPaths.associateWith { client.get("$OPENID4VCI_PREFIX/$it").status }
+        assertEquals(disabledPaths.associateWith { HttpStatusCode.NotFound }, statuses)
+        assertEquals(HttpStatusCode.NotFound, client.post("$OPENID4VCI_PREFIX/par").status)
+        (disabledPaths.take(6) + listOf("jwks", "external_login", "external")).forEach { name ->
+            assertEquals(HttpStatusCode.NotFound, client.get("/.well-known/vct/$name").status, name)
+        }
+        assertEquals(HttpStatusCode.OK, client.get("$OPENID4VCI_PREFIX/jwks").status)
+        val metadata = client.get("/.well-known/openid-credential-issuer/openid4vci").body<CredentialIssuerMetadata>()
+        assertSelfHostedSdJwtVcTypeMetadata(client, metadata)
+    }
+
+    @Test
+    fun fullIssuerStillEvaluatesAuthorizationRequests() = testApplication {
+        installIssuer2WithConfigFiles()
+        val response = apiClient().get("$OPENID4VCI_PREFIX/authorize")
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertTrue(response.bodyAsText().contains("client_id"), "Expected validation of the missing OAuth client_id")
     }
 
     @Test
@@ -324,12 +368,15 @@ class Issuer2MetadataEndpointTest {
             )
             val publishedVct = assertNotNull(configuration.vct)
 
-            val vctTypeMetadataRaw = client.get("/.well-known/vct/$credentialConfigurationId")
-            assertEquals(HttpStatusCode.OK, vctTypeMetadataRaw.status)
-            val vctTypeMetadata = vctTypeMetadataRaw.body<SdJwtVcTypeMetadataDraft04>()
-            assertEquals(publishedVct, vctTypeMetadata.vct)
-            assertEquals(credentialConfigurationId, vctTypeMetadata.name)
-            assertEquals("$credentialConfigurationId Verifiable Credential", vctTypeMetadata.description)
+            // The in-memory test server uses port 80; exercise the published URL's path on that server.
+            listOf("/.well-known/vct/$credentialConfigurationId", Url(publishedVct).encodedPath).forEach { metadataUrl ->
+                val vctTypeMetadataRaw = client.get(metadataUrl)
+                assertEquals(HttpStatusCode.OK, vctTypeMetadataRaw.status, metadataUrl)
+                val vctTypeMetadata = vctTypeMetadataRaw.body<SdJwtVcTypeMetadataDraft04>()
+                assertEquals(publishedVct, vctTypeMetadata.vct)
+                assertEquals(credentialConfigurationId, vctTypeMetadata.name)
+                assertEquals("$credentialConfigurationId Verifiable Credential", vctTypeMetadata.description)
+            }
         }
     }
 
@@ -429,15 +476,22 @@ class Issuer2MetadataEndpointTest {
         )
     }
 
-    private fun ApplicationTestBuilder.installIssuer2WithConfigFiles() {
+    private fun ApplicationTestBuilder.installIssuer2WithConfigFiles(surfaces: Set<Issuer2RouteSurface>? = null) {
         loadIssuer2ConfigFiles()
         application {
             install(ServerContentNegotiation) {
                 json(json)
             }
+            configureStatusPages()
             runBlocking { issuer2AuthenticationPluginAmendment() }
             AuthenticationServiceModule.run { enable() }
-            issuer2Module(withPlugins = true)
+            if (surfaces == null) {
+                issuer2Module(withPlugins = true)
+            } else {
+                configurePlugins()
+                val module = Issuer2Module.load()
+                routing { module.openId4VciController.register(this, surfaces) }
+            }
         }
     }
 
