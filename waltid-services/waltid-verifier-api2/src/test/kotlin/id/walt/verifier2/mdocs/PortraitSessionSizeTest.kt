@@ -176,6 +176,24 @@ class PortraitSessionSizeTest {
                             "so they are carrying the presented values rather than a reference to them",
                 )
 
+                // The same rule for the other results field, which was measured holding 3,228,057 bytes of a
+                // 10,046,803-byte session against a deployed service - a third full copy of the credential
+                // beside the two deliberate audit copies, because a credential policy's payload was kept
+                // verbatim (see StoredPolicyResultBounds).
+                //
+                // Honest limitation: in this fixture the presentation fails on
+                // mso_mdoc/transaction-data-hash-check before credential policies run, so policy_results is
+                // empty and this assertion is currently vacuous - it guards against regression rather than
+                // proving the bounding is wired in. The engine call site is therefore NOT covered by any
+                // test; StoredPolicyResultBoundsTest covers the bounding function alone. Closing that gap
+                // needs a fixture whose presentation passes validation.
+                val policyResultChars = encoded["policy_results"]?.toString()?.length ?: 0
+                assertTrue(
+                    policyResultChars < encodedPortraitChars / 10,
+                    "policy_results holds $policyResultChars chars for a $encodedPortraitChars char portrait, " +
+                            "so credential policy payloads are repeating the credential rather than referencing it",
+                )
+
                 assertTrue(
                     encoded.toString().length < bsonDocumentLimit,
                     "a session with a ${portraitBytes / 1000} KB portrait serialises to " +
@@ -306,8 +324,13 @@ class PortraitSessionSizeTest {
                 // Both credential shapes at the same concurrency, which is the comparison a deployment needs.
                 // Sized so each phase runs for tens of seconds rather than one, at the ratio their costs imply.
                 val concurrency = 32
-                val minimalRate = throughputFor(minimal, concurrency, total = 6_000, label = "minimal")
-                val portraitRate = throughputFor(portrait, concurrency, total = 600, label = "portrait")
+                // 6,000 / 600 killed the Gradle daemon on a 24-core, memory-constrained machine: every
+                // portrait session retains a 250 KB credential in-process, and the writes backed up to
+                // 3.6 s each before the JVM died. A unit test must not be able to take the build down, and
+                // these numbers are printed rather than asserted, so a shorter run costs nothing. Real
+                // throughput comes from loadtest-harness/local5.sh against a deployed service.
+                val minimalRate = throughputFor(minimal, concurrency, total = 600, label = "minimal")
+                val portraitRate = throughputFor(portrait, concurrency, total = 60, label = "portrait")
                 println(
                     "THROUGHPUT concurrency=$concurrency " +
                             "minimalPerSecond=${"%.1f".format(minimalRate)} " +
