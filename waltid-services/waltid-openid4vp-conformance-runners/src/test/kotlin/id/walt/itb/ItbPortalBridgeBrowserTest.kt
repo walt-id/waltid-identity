@@ -79,6 +79,19 @@ class ItbPortalBridgeBrowserTest {
         }
     }
 
+    @Test
+    fun identifiesAStartControlTimeoutWithoutStartingAnotherSession() = runBlocking<Unit> {
+        withPage { page ->
+            val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+            val session = bridge.prepare(suite, case)
+            page.evaluate("document.querySelector('#start').disabled = true")
+            page.setDefaultTimeout(100.0)
+            val failure = assertFailsWith<ItbPortalStepTimeout> { bridge.read(session) }
+            assertEquals(ItbPortalStepTimeout.Step.START, failure.step)
+            assertEquals(0, page.evaluate("window.startCount"))
+        }
+    }
+
     private suspend fun withPage(
         systemName: String = catalogue.systemName,
         interactionDelayMillis: Int = 30,

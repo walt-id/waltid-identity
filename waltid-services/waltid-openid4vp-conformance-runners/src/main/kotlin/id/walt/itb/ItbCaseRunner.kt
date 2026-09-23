@@ -106,8 +106,13 @@ class ItbCaseRunner(
         } catch (error: Exception) {
             // Messages and stack traces may contain offers, protocol payloads or browser input values.
             failure = error::class.simpleName ?: "Exception"
-            errorCode = (error as? ItbWalletRejection)?.code
+            errorCode = when (error) {
+                is ItbWalletRejection -> error.code
+                is ItbPortalStepTimeout -> error.step.name.lowercase()
+                else -> null
+            }
             outcome = when {
+                error is ItbPortalStepTimeout -> ItbCaseResult.Outcome.TIMED_OUT
                 error is ItbAuthenticationUnavailable && adapterInvoked -> ItbCaseResult.Outcome.AUTH_UNAVAILABLE
                 adapterInvoked && !walletSucceeded -> ItbCaseResult.Outcome.WALLET_FAILED
                 else -> ItbCaseResult.Outcome.ERROR
