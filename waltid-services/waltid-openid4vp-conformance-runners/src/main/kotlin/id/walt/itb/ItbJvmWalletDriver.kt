@@ -3,13 +3,21 @@ package id.walt.itb
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.openid4vp.conformance.wallet.WalletCredentialIssuer
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.handlers.WalletScaPresentationAuthorizer
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import io.ktor.client.HttpClient
 import io.ktor.http.Url
 import java.util.UUID
 
-/** Headless execution deliberately has no authentication-factor provider. */
+/** A hosted software wallet cannot attest to an end user's authentication factors. */
+internal class ItbAuthenticationUnavailable : IllegalStateException("Per-use authentication is unavailable in this runner")
+
+private val itbHeadlessScaAuthorizer = WalletScaPresentationAuthorizer { _, _ ->
+    throw ItbAuthenticationUnavailable()
+}
+
+/** Headless execution has no factor source; the callback declines without supplying evidence. */
 suspend fun ItbWalletDriver.Companion.create(
     client: HttpClient,
     trustedOrigin: Url,
@@ -22,5 +30,5 @@ suspend fun ItbWalletDriver.Companion.create(
         keyStores = listOf(InMemoryKeyStore().apply { addCrypto2Key(holder) }),
         credentialStores = listOf(InMemoryCredentialStore()),
     )
-    return ItbWalletDriver(wallet, client, trustedOrigin, clientIdTrust, authorize)
+    return ItbWalletDriver(wallet, client, trustedOrigin, clientIdTrust, authorize, itbHeadlessScaAuthorizer)
 }
