@@ -6,6 +6,7 @@ plugins {
     id("waltid.base.library")
     kotlin("multiplatform")
     kotlin("plugin.power-assert")
+    id("waltid.licensee")
 }
 
 extensions.create<WaltidMobileLibraryExtension>("waltidMobile")
