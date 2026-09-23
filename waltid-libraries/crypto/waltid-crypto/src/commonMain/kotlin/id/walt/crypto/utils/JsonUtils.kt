@@ -220,3 +220,51 @@ private fun CborArray.integerValuesOrNull(): LongArray? {
     forEach { if (it !is CborInteger) return null }
     return LongArray(size) { (this[it] as CborInteger).long }
 }
+
+/** Text longer than this is stored as a descriptor. 1 KB keeps every human-readable claim whole. */
+const val MAX_STORED_JSON_TEXT: Int = 1024
+
+/** Arrays longer than this are stored as a descriptor. 64 keeps short arrays and coordinate pairs whole. */
+const val MAX_STORED_JSON_ARRAY: Int = 64
+
+/**
+ * A copy of this element with bulk leaves replaced by `{type, length, truncated, prefix}` descriptors.
+ *
+ * Lives beside [JsonByteArray] because this is the fix for what that creates. A CBOR byte string becomes
+ * one JSON number per byte (see `toJsonElement`), which costs nothing in memory - [JsonByteArray] is a
+ * facade over the bytes - but on **serialisation** a 250 KB portrait becomes a 250,000 element array:
+ * 912,135 characters of JSON, and 3,232,078 bytes of BSON once Mongo adds a key and a type tag per
+ * element. Measured, not estimated.
+ *
+ * Changing the representation itself is not an option: `toJsonElement` has ~450 call sites and a test
+ * pins the byte-per-number form deliberately, because consumers round-trip CBOR through JSON. So the
+ * bulk is bounded where it is **persisted** instead, and every store that keeps a decoded copy beside
+ * the encoded original should call this.
+ *
+ * Small values survive verbatim - they are what DCQL matches on and what diagnoses a serialisation
+ * problem. Only bulk is replaced, and the descriptor keeps the length so the loss is visible.
+ */
+fun JsonElement.withoutBulkValues(
+    maxText: Int = MAX_STORED_JSON_TEXT,
+    maxArray: Int = MAX_STORED_JSON_ARRAY,
+): JsonElement = when (this) {
+    is JsonPrimitive ->
+        if (isString && content.length > maxText) buildJsonObject {
+            put("type", "string")
+            put("length", content.length)
+            put("truncated", true)
+            put("prefix", content.take(maxText))
+        } else this
+
+    is JsonArray ->
+        if (size > maxArray) buildJsonObject {
+            put("type", "array")
+            put("length", size)
+            put("truncated", true)
+            put("prefix", JsonArray(take(maxArray).map { it.withoutBulkValues(maxText, maxArray) }))
+        } else JsonArray(map { it.withoutBulkValues(maxText, maxArray) })
+
+    // Objects are walked rather than bounded by key count: the shape of a claim set is the useful part,
+    // and it is the leaves that carry a portrait.
+    is JsonObject -> JsonObject(mapValues { (_, value) -> value.withoutBulkValues(maxText, maxArray) })
+}
