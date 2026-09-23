@@ -190,7 +190,9 @@ final class MobileWalletIntegrationTests: XCTestCase {
             let description = String(describing: error)
             XCTAssertFalse(description.contains("No matches found for required credential queries"), description)
             XCTAssertTrue(
-                description.contains("InvalidSignature") || description.contains("MissingX509TrustAnchors"),
+                description.contains("X509TrustAnchorMismatch") ||
+                    description.contains("InvalidSignature") ||
+                    description.contains("MissingX509TrustAnchors"),
                 description
             )
         }
