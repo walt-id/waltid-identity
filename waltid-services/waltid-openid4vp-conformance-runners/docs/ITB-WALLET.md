@@ -71,14 +71,19 @@ recorded in [the fixture provenance](../src/main/resources/itb/README.md).
 `ITB_X509_TRUST_ANCHORS` optionally replaces it with an operator-supplied PEM
 file. Request `x5c` chains are never automatically trusted.
 
-The **WeBuild ITB live wallet cases** workflow is manually dispatched and strict.
+The **WeBuild ITB live wallet cases** workflow runs all 21 deployed cases on
+pushes to the two WAL-1423 investigation branches. It remains strict on the
+wallet-runner branch; the separate diagnostic branch labels its conditional
+results. Runs share one concurrency group so their tenant sessions do not
+overlap. The offline profile checks remain a separate PR check.
+
 Configure repository Actions secrets `ITB_ORGANISATION_KEY`, `ITB_USERNAME` and
 `ITB_PASSWORD`
 and repository variable `ITB_ORGANISATION_ID=20`, following the existing conformance
 workflows. A dedicated GitHub environment is not required. Tenant credentials are
-injected only into the manually dispatched live test step, never into the ITB PR
-checks. As with other repository secrets, maintainers must review workflow changes
-that could access them; this does not create a branch-specific secret boundary.
+injected only into the live test step, not the offline profile checks. As with
+other repository secrets, maintainers must review workflow changes that could
+access them; the branch trigger does not create a branch-specific secret boundary.
 
 The JVM version and JSON/JUnit/Markdown reporting follow the existing conformance
 setup. ITB uses an outbound portal bridge, so it does not need the other suites'
@@ -88,11 +93,10 @@ switch does not change ITB outcomes.
 
 The live workflow uses a read-only GitHub token, does not persist checkout
 credentials or write Gradle caches, and retains only sanitized reports for 14 days.
-The workflow must exist on the default branch before its first manual dispatch.
-After it lands, dispatch `itb-wallet-live.yml` on the intended commit with
-`cases=tc_vp_002` for a small issuance-plus-encrypted-presentation run, then leave
-`cases` empty for all 21 cases. The checked-in workflow alone is not a successful
-hosted run.
+Manual dispatch is also available once the workflow exists on the default
+branch. Its `cases` input can select a subset, such as `tc_vp_002` with its
+issuance prerequisites; an empty input runs all 21. The checked-in workflow
+alone is not a successful hosted run.
 
 ## Local profile checks
 
@@ -104,7 +108,7 @@ Any assertion failure fails the task. An explicit local diagnostic run can keep
 collecting reports with `-PitbAllowFailures=true`; failures remain in JUnit.
 Results are under `build/test-results/itbTest` and `build/reports/tests/itbTest`.
 
-The **WeBuild ITB profile checks** workflow runs the runner's unit tests and these
+The **WeBuild ITB offline profile checks** workflow runs the runner's unit tests and these
 profile assertions on relevant PR changes. PR runs are strict; a manual run may
 explicitly disable enforcement. Compilation, setup and incomplete report
 collection always fail. The report collector checks the exact eleven-check
