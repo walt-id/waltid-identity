@@ -7,6 +7,7 @@ plugins {
 
     kotlin("jvm")
     kotlin("plugin.power-assert")
+    id("waltid.licensee")
 }
 
 kotlin {
