@@ -501,10 +501,14 @@ object PresentationVerificationEngine {
             )
             log.debug { "Verification phases: credentialPolicies=${credentialPolicyStart.elapsedNow()}" }
 
+            // Bounded before it reaches the session: a credential policy's payload is kept verbatim,
+            // which for a portrait mDL was a third full copy of the credential. See
+            // StoredPolicyResultBounds. The unbounded results below still decide pass/fail.
             val verificationSessionPolicyResults = Verifier2PolicyResults(
                 vpPolicies = presentationValidationResult,
-                vcPolicies = credentialPolicyResults.vcPolicies,
-                specificVcPolicies = credentialPolicyResults.specificVcPolicies,
+                vcPolicies = credentialPolicyResults.vcPolicies.map { it.boundedForStorage() },
+                specificVcPolicies = credentialPolicyResults.specificVcPolicies
+                    .mapValues { (_, results) -> results.map { it.boundedForStorage() } },
             )
 
             val vcPolicyViolations =
