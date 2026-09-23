@@ -43,7 +43,7 @@ data class ItbCaseResult(
     val cleanupFailed: Boolean = false,
     val errorCode: String? = null,
 ) {
-    enum class Outcome { PASSED, WALLET_FAILED, ITB_FAILED, ERROR, TIMED_OUT, INCOMPLETE, NOT_RUN }
+    enum class Outcome { PASSED, WALLET_FAILED, AUTH_UNAVAILABLE, ITB_FAILED, ERROR, TIMED_OUT, INCOMPLETE, NOT_RUN }
     enum class Phase { START, INTERACTION, WALLET, VERDICT }
 }
 
@@ -107,7 +107,11 @@ class ItbCaseRunner(
             // Messages and stack traces may contain offers, protocol payloads or browser input values.
             failure = error::class.simpleName ?: "Exception"
             errorCode = (error as? ItbWalletRejection)?.code
-            outcome = if (adapterInvoked && !walletSucceeded) ItbCaseResult.Outcome.WALLET_FAILED else ItbCaseResult.Outcome.ERROR
+            outcome = when {
+                error is ItbAuthenticationUnavailable && adapterInvoked -> ItbCaseResult.Outcome.AUTH_UNAVAILABLE
+                adapterInvoked && !walletSucceeded -> ItbCaseResult.Outcome.WALLET_FAILED
+                else -> ItbCaseResult.Outcome.ERROR
+            }
         } finally {
             withContext(NonCancellable) {
                 // Only the session created by this invocation is eligible for cleanup.

@@ -77,6 +77,15 @@ wallet-runner branch; the separate diagnostic branch labels its conditional
 results. Runs share one concurrency group so their tenant sessions do not
 overlap. The offline profile checks remain a separate PR check.
 
+The portal bridge gives a started, owned session up to 45 seconds to display its
+wallet interaction and reports the portal's generic execution error separately.
+It never clicks Start again or creates a replacement session after an uncertain
+start. A hosted JVM payment that reaches the SCA callback is reported as
+`AUTH_UNAVAILABLE`: that runner has no verified end-user factors and sends no
+proof with invented `amr`. Other request and credential failures retain their
+own non-passing results. Operator-assisted native execution is described in
+[ITB-NATIVE.md](ITB-NATIVE.md); it is not an unattended hosted CI check.
+
 Configure repository Actions secrets `ITB_ORGANISATION_KEY`, `ITB_USERNAME` and
 `ITB_PASSWORD`
 and repository variable `ITB_ORGANISATION_ID=20`, following the existing conformance
