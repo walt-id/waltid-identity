@@ -70,6 +70,17 @@ class ItbPortalBridgeBrowserTest {
     }
 
     @Test
+    fun waitsForTheSamePreviewDownloadBeyondTheOrdinaryDomTimeout() = runBlocking<Unit> {
+        withPage(downloadDelayMillis = 200) { page ->
+            val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+            val session = bridge.prepare(suite, case)
+            page.setDefaultTimeout(100.0)
+            assertIs<ItbWalletInteraction.Presentation>(bridge.read(session))
+            assertEquals(1, page.evaluate("window.startCount"))
+        }
+    }
+
+    @Test
     fun reportsPortalExecutionErrorWithoutRetryingTheStart() = runBlocking<Unit> {
         withPage(failStart = true) { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
@@ -95,6 +106,7 @@ class ItbPortalBridgeBrowserTest {
     private suspend fun withPage(
         systemName: String = catalogue.systemName,
         interactionDelayMillis: Int = 30,
+        downloadDelayMillis: Int = 0,
         failStart: Boolean = false,
         block: suspend (Page) -> Unit,
     ) {
@@ -106,7 +118,7 @@ class ItbPortalBridgeBrowserTest {
                         if (route.request().url() == statementsUrl.substringBefore('#')) {
                             val session = "00000000-0000-0000-0000-${(++sessionNumber).toString().padStart(12, '0')}"
                             route.fulfill(Route.FulfillOptions().setContentType("text/html")
-                                .setBody(fixture(session, systemName, interactionDelayMillis, failStart)))
+                                .setBody(fixture(session, systemName, interactionDelayMillis, downloadDelayMillis, failStart)))
                         } else route.abort()
                     }
                     val page = context.newPage()
@@ -117,7 +129,9 @@ class ItbPortalBridgeBrowserTest {
         }
     }
 
-    private fun fixture(session: String, systemName: String, interactionDelayMillis: Int, failStart: Boolean) = """
+    private fun fixture(
+        session: String, systemName: String, interactionDelayMillis: Int, downloadDelayMillis: Int, failStart: Boolean,
+    ) = """
         <button>$systemName</button><button onclick="showTests()">${suite.statement}</button>
         <script>
         window.started = false;
@@ -165,10 +179,12 @@ class ItbPortalBridgeBrowserTest {
             }, $interactionDelayMillis);
         }
         function download() {
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob(['openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest']));
-            a.download = 'interaction.txt';
-            a.click();
+            setTimeout(() => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob(['openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest']));
+                a.download = 'interaction.txt';
+                a.click();
+            }, $downloadDelayMillis);
         }
         </script>
     """.trimIndent()
