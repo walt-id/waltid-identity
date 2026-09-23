@@ -7,6 +7,9 @@ import io.ktor.http.Url
 import java.util.regex.Pattern
 import java.nio.file.Files
 
+/** The owned session started, but the portal displayed its generic execution error. */
+internal class ItbPortalExecutionError : IllegalStateException("The ITB portal could not start the wallet interaction")
+
 /** Interactive GITB 1.29.5 execution. Browser storage, traces and screenshots are never exported. */
 class ItbPortalBridge(
     private val page: Page,
@@ -45,9 +48,17 @@ class ItbPortalBridge(
         // Interactive execution keeps DC API instructions pending; REST background starts skip those steps.
         startButton().click()
         val dialog = page.locator("ngb-modal-window:not([aria-hidden=true])")
-        dialog.getByText(Pattern.compile(
+        val interaction = dialog.getByText(Pattern.compile(
             "^\\s*(VCI request|VP request|(?:TS12 payment )?Digital Credentials API presentation request)\\s*$",
-        )).waitFor()
+        ))
+        val portalError = page.getByText("Unexpected Error", Page.GetByTextOptions().setExact(true))
+        // Some reference-service starts take longer than the ordinary 15-second DOM timeout.
+        // Wait for this owned session's interaction, without clicking Start or creating a session again.
+        page.waitForCondition(
+            { interaction.count() > 0 || portalError.count() > 0 },
+            Page.WaitForConditionOptions().setTimeout(45_000.0),
+        )
+        if (portalError.count() > 0 && interaction.count() == 0) throw ItbPortalExecutionError()
         val text = dialog.innerText()
         return when {
             text.contains("VCI request") -> {

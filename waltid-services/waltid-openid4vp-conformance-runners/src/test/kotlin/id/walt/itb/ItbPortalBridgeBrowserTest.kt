@@ -59,7 +59,32 @@ class ItbPortalBridgeBrowserTest {
         }
     }
 
-    private suspend fun withPage(systemName: String = catalogue.systemName, block: suspend (Page) -> Unit) {
+    @Test
+    fun waitsForTheOwnedInteractionBeyondTheOrdinaryDomTimeout() = runBlocking<Unit> {
+        withPage(interactionDelayMillis = 200) { page ->
+            val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+            val session = bridge.prepare(suite, case)
+            page.setDefaultTimeout(100.0)
+            assertIs<ItbWalletInteraction.Presentation>(bridge.read(session))
+        }
+    }
+
+    @Test
+    fun reportsPortalExecutionErrorWithoutRetryingTheStart() = runBlocking<Unit> {
+        withPage(failStart = true) { page ->
+            val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+            val session = bridge.prepare(suite, case)
+            assertFailsWith<ItbPortalExecutionError> { bridge.read(session) }
+            assertEquals(1, page.evaluate("window.startCount"))
+        }
+    }
+
+    private suspend fun withPage(
+        systemName: String = catalogue.systemName,
+        interactionDelayMillis: Int = 30,
+        failStart: Boolean = false,
+        block: suspend (Page) -> Unit,
+    ) {
         Playwright.create().use { playwright ->
             playwright.chromium().launch(BrowserType.LaunchOptions().setHeadless(true)).use { browser ->
                 browser.newContext().use { context ->
@@ -67,7 +92,8 @@ class ItbPortalBridgeBrowserTest {
                     context.route("**/*") { route ->
                         if (route.request().url() == statementsUrl.substringBefore('#')) {
                             val session = "00000000-0000-0000-0000-${(++sessionNumber).toString().padStart(12, '0')}"
-                            route.fulfill(Route.FulfillOptions().setContentType("text/html").setBody(fixture(session, systemName)))
+                            route.fulfill(Route.FulfillOptions().setContentType("text/html")
+                                .setBody(fixture(session, systemName, interactionDelayMillis, failStart)))
                         } else route.abort()
                     }
                     val page = context.newPage()
@@ -78,10 +104,11 @@ class ItbPortalBridgeBrowserTest {
         }
     }
 
-    private fun fixture(session: String, systemName: String) = """
+    private fun fixture(session: String, systemName: String, interactionDelayMillis: Int, failStart: Boolean) = """
         <button>$systemName</button><button onclick="showTests()">${suite.statement}</button>
         <script>
         window.started = false;
+        window.startCount = 0;
         window.interactive = false;
         function showTests() {
             document.body.innerHTML = `
@@ -108,14 +135,21 @@ class ItbPortalBridgeBrowserTest {
         }
         function start() {
             window.started = true;
+            window.startCount++;
             document.querySelector('#start').disabled = true;
             setTimeout(() => {
+                if ($failStart) {
+                    const error = document.createElement('div');
+                    error.textContent = 'Unexpected Error';
+                    document.body.append(error);
+                    return;
+                }
                 const dialog = document.createElement('ngb-modal-window');
                 dialog.innerHTML = `<app-any-content-view><div> VP request QR code </div><button>Download</button></app-any-content-view>
                   <app-any-content-view><div> VP request </div><button ngbtooltip="Download" onclick="download()">Download</button></app-any-content-view>
                   <button onclick="this.parentElement.remove()">Close</button>`;
                 document.body.append(dialog);
-            }, 30);
+            }, $interactionDelayMillis);
         }
         function download() {
             const a = document.createElement('a');
