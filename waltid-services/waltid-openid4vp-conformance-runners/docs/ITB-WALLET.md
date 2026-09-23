@@ -3,7 +3,7 @@
 [WAL-1423](https://linear.app/walt-new/issue/WAL-1423/itb-initial-tests) covers the
 21 deployed CS-01, CS-02, CS-07 and TS12 cases. `itbWallet` drives their actual
 ITB interactions through the production JVM wallet, using a fresh holder and
-an in-memory credential store. `itbTest` provides ten separate local protocol
+an in-memory credential store. `itbTest` provides eleven separate local protocol
 checks with synthetic fixtures and mock issuance responses.
 
 Neither entry point proves native platform delivery, consent UX or full EUDI
@@ -107,7 +107,7 @@ Results are under `build/test-results/itbTest` and `build/reports/tests/itbTest`
 The **WeBuild ITB profile checks** workflow runs the runner's unit tests and these
 profile assertions on relevant PR changes. PR runs are strict; a manual run may
 explicitly disable enforcement. Compilation, setup and incomplete report
-collection always fail. The report collector checks the exact ten-check
+collection always fail. The report collector checks the exact eleven-check
 inventory, duplicates and skipped results:
 
 ```bash
