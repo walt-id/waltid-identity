@@ -1,4 +1,4 @@
-name: WeBuild ITB profile checks
+name: WeBuild ITB offline profile checks
 
 on:
   pull_request:
@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   wallet-profile:
-    name: Wallet profile checks
+    name: Offline wallet profile checks
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     env:
