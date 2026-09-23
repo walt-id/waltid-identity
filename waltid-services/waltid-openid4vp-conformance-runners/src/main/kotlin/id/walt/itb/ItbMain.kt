@@ -50,7 +50,8 @@ private suspend fun runItb(): Int {
     }.toMutableList()
     fun writeReport() = ItbReportWriter.write(directory, ItbRunReport(
         revision, catalogue.observedOn, results.toList(),
-        walletExecution = if (androidPort == null) ItbRunReport.WalletExecution.JVM_SOFTWARE else ItbRunReport.WalletExecution.ANDROID_NATIVE,
+        walletExecution = if (androidPort == null) ItbRunReport.WalletExecution.JVM_SOFTWARE_DIAGNOSTIC
+            else ItbRunReport.WalletExecution.ANDROID_NATIVE_DIAGNOSTIC,
         androidApkSha256 = androidApkSha256,
     ))
     writeReport()

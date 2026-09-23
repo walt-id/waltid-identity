@@ -1,5 +1,8 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.itb
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -12,10 +15,11 @@ data class ItbRunReport(
     val buildRevision: String,
     val catalogueObservedOn: String,
     val cases: List<ItbCaseResult>,
-    val walletExecution: WalletExecution = WalletExecution.JVM_SOFTWARE,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
+    val walletExecution: WalletExecution = WalletExecution.JVM_SOFTWARE_DIAGNOSTIC,
     val androidApkSha256: String? = null,
 ) {
-    enum class WalletExecution { JVM_SOFTWARE, ANDROID_NATIVE }
+    enum class WalletExecution { JVM_SOFTWARE_DIAGNOSTIC, ANDROID_NATIVE_DIAGNOSTIC }
 }
 
 /** Only bounded outcome metadata is published; raw reports, browser state and protocol payloads stay private. */
@@ -25,7 +29,9 @@ object ItbReportWriter {
         writeAtomically(directory.resolve("results.json"), Json { prettyPrint = true }.encodeToString(report))
         val failures = report.cases.count { it.outcome != ItbCaseResult.Outcome.PASSED }
         writeAtomically(directory.resolve("summary.md"), buildString {
-            appendLine("# WeBuild ITB wallet sessions")
+            appendLine("# WeBuild ITB wallet sessions — CONDITIONAL DIAGNOSTIC")
+            appendLine()
+            appendLine("This build may relax identified reference-service checks. Inspect its exact source revision; passes are not strict interoperability or conformance results.")
             appendLine()
             appendLine("Build: `${report.buildRevision}`. Catalogue: ${report.catalogueObservedOn}.")
             appendLine("Wallet execution: ${report.walletExecution}.")
@@ -49,7 +55,7 @@ object ItbReportWriter {
         })
         writeAtomically(directory.resolve("junit.xml"), buildString {
             appendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
-            appendLine("<testsuite name=\"WeBuild ITB\" tests=\"${report.cases.size}\" failures=\"$failures\" errors=\"0\" skipped=\"0\">")
+            appendLine("<testsuite name=\"WeBuild ITB DIAGNOSTIC\" tests=\"${report.cases.size}\" failures=\"$failures\" errors=\"0\" skipped=\"0\">")
             report.cases.forEach { result ->
                 appendLine("  <testcase classname=\"${escape(result.suite)}\" name=\"${escape(result.case)}\">")
                 if (result.outcome != ItbCaseResult.Outcome.PASSED) {
