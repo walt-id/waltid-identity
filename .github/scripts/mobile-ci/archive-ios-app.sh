@@ -49,16 +49,23 @@ assignments = {
 team_id = sys.argv[6]
 
 
-def pbx_quote(value: str) -> str:
+def pbx_token(value: str) -> str:
     if re.fullmatch(r"[A-Za-z0-9._/]+", value):
         return value
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def upsert(settings: str, key: str, value: str) -> str:
-    replacement = f"{key} = {pbx_quote(value)};"
-    if re.search(rf"^[ \t]*{re.escape(key)} = ", settings, flags=re.M):
-        return re.sub(rf"^([ \t]*){re.escape(key)} = [^;]*;", rf"\1{replacement}", settings, count=1, flags=re.M)
+    replacement = f"{pbx_token(key)} = {pbx_token(value)};"
+    quoted_key = re.escape(key)
+    if re.search(rf"^[ \t]*(\"{quoted_key}\"|{quoted_key}) = ", settings, flags=re.M):
+        return re.sub(
+            rf"^([ \t]*)(\"{quoted_key}\"|{quoted_key}) = [^;]*;",
+            rf"\1{replacement}",
+            settings,
+            count=1,
+            flags=re.M,
+        )
     return re.sub(r"(buildSettings = \{)", rf"\1\n\t\t\t\t{replacement}", settings, count=1)
 
 
@@ -72,7 +79,6 @@ def patch_settings(settings: str) -> str:
         return settings
     settings = upsert(settings, "CODE_SIGN_STYLE", "Manual")
     settings = upsert(settings, "CODE_SIGN_IDENTITY", "Apple Distribution")
-    settings = upsert(settings, "CODE_SIGN_IDENTITY[sdk=iphoneos*]", "Apple Distribution")
     settings = upsert(settings, "DEVELOPMENT_TEAM", team_id)
     settings = upsert(settings, "PROVISIONING_PROFILE_SPECIFIER", profile)
     return settings
