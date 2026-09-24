@@ -1,5 +1,7 @@
 package id.walt.itb
 
+import id.walt.openid4vci.errors.CredentialError
+import id.walt.wallet2.handlers.CredentialEndpointException
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -75,6 +77,31 @@ class ItbCaseRunnerTest {
             assertFalse(bridge.completed)
             assertTrue(result.adapterInvoked)
             assertFalse(result.walletSucceeded)
+        }
+    }
+
+    @Test
+    fun credentialEndpointFailureReportsOnlyBoundedProtocolCodes() = runBlocking<Unit> {
+        for ((issuerCode, expected) in listOf(
+            "invalid_proof" to "credential_endpoint_http_400_invalid_proof",
+            "private_response_value" to "credential_endpoint_http_400",
+        )) {
+            HttpClient(MockEngine { request ->
+                respond(when (request.url.encodedPath.substringAfterLast('/')) {
+                    "status" -> status(false, "UNDEFINED")
+                    "stop" -> ""
+                    session -> report.replace("<result>SUCCESS</result>", "<result>UNDEFINED</result>")
+                    else -> error("Unexpected request")
+                })
+            }).use { client ->
+                val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), Bridge(), {
+                    throw CredentialEndpointException(400, CredentialError(issuerCode, "private response details"))
+                }).run(suite, case)
+                assertEquals(ItbCaseResult.Outcome.WALLET_FAILED, result.outcome)
+                assertEquals("CredentialEndpointException", result.errorType)
+                assertEquals(expected, result.errorCode)
+                assertFalse(result.toString().contains("private"))
+            }
         }
     }
 
