@@ -13,9 +13,11 @@ data class ItbRunReport(
     val catalogueObservedOn: String,
     val cases: List<ItbCaseResult>,
     val walletExecution: WalletExecution = WalletExecution.JVM_SOFTWARE,
+    val keyAttestation: KeyAttestation,
     val androidApkSha256: String? = null,
 ) {
     enum class WalletExecution { JVM_SOFTWARE, ANDROID_NATIVE }
+    enum class KeyAttestation { SYNTHETIC_TEST_FIXTURE }
 }
 
 /** Only bounded outcome metadata is published; raw reports, browser state and protocol payloads stay private. */
@@ -29,6 +31,7 @@ object ItbReportWriter {
             appendLine()
             appendLine("Build: `${report.buildRevision}`. Catalogue: ${report.catalogueObservedOn}.")
             appendLine("Wallet execution: ${report.walletExecution}.")
+            appendLine("Key attestation: ${report.keyAttestation}; security, certification and status claims are simulated.")
             report.androidApkSha256?.let { appendLine("Android test APK SHA-256: `$it`.") }
             appendLine("${report.cases.size - failures}/${report.cases.size} passed; $failures non-passing.")
             appendLine()

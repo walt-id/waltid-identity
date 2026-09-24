@@ -6,10 +6,10 @@ The desktop retains the portal login, organisation API key, case/session correla
 
 This is operator-assisted protocol testing, not transaction-consent UI, browser-mediated DC API delivery, formal SCA qualification or an unattended CI mode. The iOS synthetic physical fixture is separate; this live bridge currently supports Android only.
 
-The current issuer requires an accepted wallet-provider key attestation before
-issuing an SCA credential. Until that prerequisite succeeds, a payment run will
-not reach the device authentication prompt. See the
-[current evidence](ITB-BASELINE.md) before starting an operator-assisted run.
+The issuer requires a wallet-provider key attestation before issuing an SCA
+credential. This test uses the runner's [synthetic attestation fixture](ITB-WALLET.md)
+to reach the payment flow. Its acceptance by the test issuer is not evidence
+of Wallet Provider assurance or certification.
 
 ## Run
 
