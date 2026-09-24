@@ -59,7 +59,7 @@ internal class ItbAndroidWalletDriver private constructor(
                         }
                     }
                     continuation.invokeOnCancellation {
-                        socket.close()
+                        runCatching { socket.close() }
                         worker.cancel()
                     }
                 }
