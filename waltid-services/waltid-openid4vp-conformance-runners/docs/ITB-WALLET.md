@@ -2,7 +2,7 @@
 
 [WAL-1423](https://linear.app/walt-new/issue/WAL-1423/itb-initial-tests) covers the
 21 deployed CS-01, CS-02, CS-07 and TS12 cases. `itbWallet` drives their actual
-ITB interactions through the production JVM wallet, using a fresh holder and
+ITB interactions through the production wallet, using a fresh holder and
 an in-memory credential store. `itbTest` provides eleven separate local protocol
 checks with synthetic fixtures and mock issuance responses.
 
@@ -38,6 +38,18 @@ case IDs (for example `tc_vp_002`); required issuance cases are automatically
 included. A failed prerequisite does not skip its presentation cases. Unknown
 or empty selections are configuration errors.
 
+When `CI=true`, selection is restricted to the 15 cases that do not need a
+user-authentication prompt: seven CS-01, four CS-02, one CS-07 and three TS12
+issuance cases. Explicitly requesting any of the six TS12 payment cases fails
+before a session starts. The local default remains all 21; for the six payment
+cases with their three issuance prerequisites, use the [operator-assisted native
+setup](ITB-NATIVE.md) and select them explicitly:
+
+```bash
+ITB_CASES=ts12_pay_01,ts12_pay_02,ts12_pay_03,ts12_pay_dc_api_01,ts12_pay_dc_api_02,ts12_pay_dc_api_03 \
+  ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbWallet
+```
+
 `ITB_REPORT_DIR` selects the report directory; the default is this module's
 `build/reports/itb-wallet`. Every selected case appears in `results.json`,
 `junit.xml` and `summary.md`, including cases not reached after report initialization. Invalid build identity or
@@ -71,11 +83,13 @@ recorded in [the fixture provenance](../src/main/resources/itb/README.md).
 `ITB_X509_TRUST_ANCHORS` optionally replaces it with an operator-supplied PEM
 file. Request `x5c` chains are never automatically trusted.
 
-The **WeBuild ITB live wallet cases** workflow runs all 21 deployed cases on
+The **WeBuild ITB live wallet cases** workflow runs the 15 unattended cases on
 pushes to the two WAL-1423 investigation branches. It remains strict on the
 wallet-runner branch; the separate diagnostic branch labels its conditional
 results. Runs share one concurrency group so their tenant sessions do not
-overlap. The offline profile checks remain a separate PR check.
+overlap. The six payment cases remain local, operator-assisted coverage; CI
+success means 15/15 selected cases, not 21/21. The offline profile checks remain
+a separate PR check.
 
 The portal bridge gives a started, owned session up to 45 seconds to display its
 wallet interaction and reports the portal's generic execution error separately.
@@ -103,8 +117,9 @@ switch does not change ITB outcomes.
 The live workflow uses a read-only GitHub token, does not persist checkout
 credentials or write Gradle caches, and retains only sanitized reports for 14 days.
 Manual dispatch is also available once the workflow exists on the default
-branch. Its `cases` input can select a subset, such as `tc_vp_002` with its
-issuance prerequisites; an empty input runs all 21. The checked-in workflow
+branch. Its `cases` input can select an unattended subset, such as `tc_vp_002`
+with its issuance prerequisite; an empty input runs all 15. An operator-required
+case is rejected before any tenant session starts. The checked-in workflow
 alone is not a successful hosted run.
 
 ## Local profile checks
