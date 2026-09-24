@@ -29,6 +29,8 @@ suspend fun ItbWalletDriver.Companion.create(
         id = "itb-${UUID.randomUUID()}",
         keyStores = listOf(InMemoryKeyStore().apply { addCrypto2Key(holder) }),
         credentialStores = listOf(InMemoryCredentialStore()),
+    ).attachKeyAttestationProvider(
+        ItbDiagnosticKeyAttester(WalletCredentialIssuer().holderCrypto2Key())
     )
     return ItbWalletDriver(wallet, client, trustedOrigin, clientIdTrust, authorize, itbHeadlessScaAuthorizer)
 }
