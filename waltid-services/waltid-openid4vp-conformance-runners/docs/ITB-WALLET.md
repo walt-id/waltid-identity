@@ -92,11 +92,11 @@ recorded in [the fixture provenance](../src/main/resources/itb/README.md).
 `ITB_X509_TRUST_ANCHORS` optionally replaces it with an operator-supplied PEM
 file. Request `x5c` chains are never automatically trusted.
 
-The **WeBuild ITB live wallet cases** workflow runs the 15 unattended cases on
-pushes to the WAL-1423 runner branch. Runs share one concurrency group so their tenant sessions do not
-overlap. The six payment cases remain local, operator-assisted coverage; CI
-success means 15/15 selected cases, not 21/21. The offline profile checks remain
-a separate PR check.
+The **WeBuild ITB live wallet cases** workflow is explicitly dispatched by an
+operator because it uses a shared external tenant. Runs share one concurrency
+group so their tenant sessions do not overlap. The six payment cases remain
+local, operator-assisted coverage; CI success means 15/15 selected cases, not
+21/21. The offline profile checks remain a separate PR check.
 
 The portal bridge gives a started, owned session up to 45 seconds to display its
 wallet interaction and reports the portal's generic execution error separately.
@@ -113,7 +113,7 @@ and repository variable `ITB_ORGANISATION_ID=20`, following the existing conform
 workflows. A dedicated GitHub environment is not required. Tenant credentials are
 injected only into the live test step, not the offline profile checks. As with
 other repository secrets, maintainers must review workflow changes that could
-access them; the branch trigger does not create a branch-specific secret boundary.
+access them; manual dispatch does not create an additional secret boundary.
 
 The JVM version and JSON/JUnit/Markdown reporting follow the existing conformance
 setup. ITB uses an outbound portal bridge, so it does not need the other suites'
@@ -123,9 +123,9 @@ switch does not change ITB outcomes.
 
 The live workflow uses a read-only GitHub token, does not persist checkout
 credentials or write Gradle caches, and retains only sanitized reports for 14 days.
-Manual dispatch is also available once the workflow exists on the default
-branch. Its `cases` input can select an unattended subset, such as `tc_vp_002`
-with its issuance prerequisite; an empty input runs all 15. An operator-required
+Dispatch becomes available once the workflow exists on the default branch. Its
+`cases` input can select an unattended subset, such as `tc_vp_002` with its
+issuance prerequisite; an empty input runs all 15. An operator-required
 case is rejected before any tenant session starts. The checked-in workflow
 alone is not a successful hosted run.
 
@@ -198,8 +198,9 @@ send only `Accept: application/xml`; a combined JSON/XML header is rejected.
 
 The REST reports omit the offers and request context. The bridge downloads these
 from the owned session's pending interaction. It never substitutes a separate
-issuer offer or verifier request and attributes that to an ITB case. A dated
-standalone result is in the [historical baseline](ITB-BASELINE.md).
+issuer offer or verifier request and attributes that to an ITB case. The initial
+standalone outcome and regression rationale are in the
+[historical baseline](ITB-BASELINE.md).
 
 ### Offline runner checks
 

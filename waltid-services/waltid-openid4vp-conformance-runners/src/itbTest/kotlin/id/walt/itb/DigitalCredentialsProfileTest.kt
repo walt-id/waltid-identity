@@ -62,7 +62,7 @@ class DigitalCredentialsProfileTest {
             data = buildJsonObject { put("request", jwt) },
             origin = WalletFixtures.VERIFIER,
         )
-        assertEquals("dc-api-nonce", resolved.authorizationRequest.nonce, "WAL-896 / Identity #2141")
+        assertEquals("dc-api-nonce", resolved.authorizationRequest.nonce, "Signed DC API resolution must preserve the request nonce")
         assertEquals("origin:${WalletFixtures.VERIFIER}", resolved.holderBindingAudience)
     }
 }
