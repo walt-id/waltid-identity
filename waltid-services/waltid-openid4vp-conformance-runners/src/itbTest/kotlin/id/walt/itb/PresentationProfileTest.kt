@@ -58,8 +58,8 @@ class PresentationProfileTest {
         val header = """{"alg":"none","typ":"oauth-authz-req+jwt"}""".encodeToByteArray().encodeToBase64Url()
         val body = JsonObject(payload() + ("client_id" to JsonPrimitive(clientId)))
             .toString().encodeToByteArray().encodeToBase64Url()
-        // External dependency WAL-896: the baseline's redirect_uri exception violates this profile.
-        assertFailsWith<IllegalArgumentException>("WAL-896: WeBuild does not permit unsigned requests") {
+        // The strict WE BUILD profile rejects unsigned redirect_uri requests.
+        assertFailsWith<IllegalArgumentException>("WE BUILD does not permit unsigned requests") {
             AuthorizationRequestResolver.resolve(inlineRequest(clientId, "$header.$body."), strict) { _, _ ->
                 error("Inline request must not use HTTP")
             }
@@ -72,7 +72,7 @@ class PresentationProfileTest {
             parameters.append("client_id", WalletFixtures.CLIENT_ID)
             parameters.append("request_uri", "${WalletFixtures.VERIFIER}/request")
         }.build()
-        assertFailsWith<IllegalArgumentException>("WAL-896: unsigned JSON must not bypass the strict policy") {
+        assertFailsWith<IllegalArgumentException>("Unsigned JSON must not bypass the strict policy") {
             AuthorizationRequestResolver.resolve(requestUrl, strict) { _, method ->
                 assertTrue(method == null || method == RequestUriHttpMethod.GET)
                 AuthorizationRequestResolver.RequestUriFetchResponse(

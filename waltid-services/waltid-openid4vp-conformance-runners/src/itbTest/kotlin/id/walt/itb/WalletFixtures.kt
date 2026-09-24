@@ -18,8 +18,6 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.handlers.*
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
-import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
-import io.ktor.http.Url
 import kotlinx.serialization.json.*
 
 /** Synthetic credentials and fresh holder keys; no ITB credentials or captured personal data. */
@@ -59,27 +57,6 @@ internal class WalletFixtures {
             put("dcql_query", query(vct))
             if (transactionData.isNotEmpty()) put("transaction_data", JsonArray(transactionData.map(::JsonPrimitive)))
         })
-
-    /** Tests the real store selection, presentation and holder signing path, without HTTP transport. */
-    suspend fun present(vct: String = IDENTITY_VCT, transactions: List<String> = emptyList()): JsonObject {
-        val wallet = wallet()
-        val stored = WalletCredentialHandler.importCredential(wallet, ImportCredentialRequest(credential(vct)))
-        val request = request(vct, transactions)
-        val result = WalletPresentationHandler.buildVpToken(
-            wallet = wallet,
-            request = BuildVpTokenRequest(
-                requestUrl = Url("$VERIFIER/request"),
-                selectedCredentialIds = mapOf("credential" to listOf(stored.id)),
-            ),
-            transactionDataTypeRegistry = TransactionDataTypeRegistry(PAYMENT_TYPE),
-            resolveAuthorizationRequest = { ResolvedAuthorizationRequest.Plain(request) },
-        )
-        val presentation = json.parseToJsonElement(result.vpToken).jsonObject
-            .getValue("credential").jsonArray.single().jsonPrimitive.content
-        val kbJwt = presentation.substringAfterLast('~')
-        val verified = CompactJws.verify(kbJwt, issuer.holderCrypto2Key(), JwsAlgorithm.ES256)
-        return json.parseToJsonElement(verified.payload.decodeToString()).jsonObject
-    }
 
     /** Reviewed submission with explicitly simulated factors; never used by the live runner. */
     suspend fun presentPayment(authorizer: WalletScaPresentationAuthorizer?): JsonObject {

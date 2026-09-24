@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.itb
 
 import com.nimbusds.jose.JWEObject
@@ -23,8 +25,7 @@ class ResponseEncryptionProfileTest {
 
     @Test
     fun `CS07 encrypted response can be decrypted by the intended independent verifier`() = runTest {
-        // Exercise response encryption independently of signed-request resolution, so WAL-896's
-        // missing signed protocol cannot hide a regression in already-supported encryption.
+        // Isolate response encryption from request validation so failures identify the right boundary.
         val response = DcApiWallet.buildResponse(
             request = ResolvedDcApiRequest(
                 protocol = DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,

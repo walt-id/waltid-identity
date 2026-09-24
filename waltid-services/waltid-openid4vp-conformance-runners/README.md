@@ -15,7 +15,7 @@ role-specific guide rather than assuming that one setup applies to every runner.
 | OpenID4VP verifier | [docs/VP-VERIFIER.md](docs/VP-VERIFIER.md) |
 | OpenID4VCI wallet | [docs/VCI-WALLET.md](docs/VCI-WALLET.md) |
 | OpenID4VP wallet | [docs/VP-WALLET.md](docs/VP-WALLET.md) |
-| WeBuild wallet profile checks / ITB preparation | [docs/ITB-WALLET.md](docs/ITB-WALLET.md) |
+| WE BUILD wallet profile checks and live execution | [docs/ITB-WALLET.md](docs/ITB-WALLET.md) |
 
 The OSS issuer2 workflow is intentionally documented only in
 [docs/VCI-ISSUER.md](docs/VCI-ISSUER.md). It covers the issuer2 configuration,

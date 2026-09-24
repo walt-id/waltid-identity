@@ -133,7 +133,7 @@ class ItbDeviceWireTest {
     }
 
     @Test
-    fun `host cancellation closes the device channel`() = runBlocking {
+    fun `host cancellation closes the device channel`(): Unit = runBlocking {
         withTimeout(5_000) {
             ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { listener ->
                 val received = CompletableDeferred<Unit>()
