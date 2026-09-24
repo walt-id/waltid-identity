@@ -29,6 +29,7 @@ import id.walt.verifier2.handlers.vpresponse.ParsedVpToken
 import id.walt.verifier2.handlers.vpresponse.Verifier2SessionCredentialPolicyValidation
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationRejectionException
+import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationVerificationUnavailableException
 import id.walt.verifier2.verification.DcqlFulfillmentChecker
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonObject
@@ -327,6 +328,17 @@ object PresentationVerificationEngine {
         //      an unprocessable credential should not be a 500)
         try {
 
+            // Refuse a presentation the store cannot hold, before the session grows around it.
+            //
+            // A session retains the presentation about four times over: as received, as decoded, as validated
+            // credentials, and in policy results. A persistent store has a hard document limit - 16 MB in MongoDB
+            // and DocumentDB - so beyond roughly a quarter of that the session becomes unwritable. That used to
+            // surface as HTTP 500 carrying BsonMaximumSizeExceededException, and not because the guard below was
+            // missing: the guard stores the reason on the session, and for an oversized session that write fails
+            // too, so the failure could not even be recorded. Checked here, the wallet gets a 400 naming the
+            // sizes, the session records why, and none of the verification work is done first.
+            checkPresentationIsStorable(vpTokenContents)
+
             // Phase timings for the verifier's real work. The enclosing call is ~13ms of a 40ms
             // presentation while an isolated mdoc verification is 1.4ms, so most of it is elsewhere in
             // these phases and this is what says where.
@@ -335,7 +347,9 @@ object PresentationVerificationEngine {
             val afterParse = phaseStart.elapsedNow()
 
             session.updateSession(SessionEvent.parsed_presentation_available) {
-                presentedPresentations = parsedPresentations.map { it.key.second.id to it.value }.toMap()
+                // Byte arrays compacted before storage; see CompactStoredBytes.
+                presentedPresentations = parsedPresentations
+                    .map { it.key.second.id to it.value.withCompactByteArrays() }.toMap()
             }
 
             val presentationValidationResult = verifyAllPresentations(parsedPresentations, session, verificationTime)
@@ -409,6 +423,7 @@ object PresentationVerificationEngine {
 
             session.updateSession(SessionEvent.validated_credentials_available) {
                 presentedCredentials = allSuccessfullyValidatedAndProcessedData
+                    .mapValues { (_, credentials) -> credentials.map { it.withCompactByteArrays() } }
             }
 
             // --- trusted_authorities check ---
@@ -489,10 +504,14 @@ object PresentationVerificationEngine {
             )
             log.debug { "Verification phases: credentialPolicies=${credentialPolicyStart.elapsedNow()}" }
 
+            // Bounded before it reaches the session: a credential policy's payload is kept verbatim,
+            // which for a portrait mDL was a third full copy of the credential. See
+            // StoredPolicyResultBounds. The unbounded results below still decide pass/fail.
             val verificationSessionPolicyResults = Verifier2PolicyResults(
                 vpPolicies = presentationValidationResult,
-                vcPolicies = credentialPolicyResults.vcPolicies,
-                specificVcPolicies = credentialPolicyResults.specificVcPolicies,
+                vcPolicies = credentialPolicyResults.vcPolicies.map { it.boundedForStorage() },
+                specificVcPolicies = credentialPolicyResults.specificVcPolicies
+                    .mapValues { (_, results) -> results.map { it.boundedForStorage() } },
             )
 
             val vcPolicyViolations =
@@ -551,11 +570,100 @@ object PresentationVerificationEngine {
                 )
             }
             session.failSession(SessionEvent.presentation_validation_failed)
+
+            // An infrastructure failure is not the wallet's fault and the wallet cannot fix it by
+            // changing its request, so it must not be reported as invalid_request. A load test at
+            // concurrency 128 produced 1,676 such responses from MongoDB connection-pool timeouts:
+            // every one told the wallet its presentation was malformed, which is both wrong and
+            // terminal - 400 gives a wallet no reason to retry a request that would have succeeded
+            // a second later.
+            //
+            // Classification is by cause chain rather than by type because this is commonMain and
+            // the store drivers are not visible here. Typed store exceptions would be better and
+            // are worth doing when the session store interface is next touched.
+            if (e.isInfrastructureFailure()) {
+                throw PresentationVerificationUnavailableException(
+                    "Verification could not be completed because a dependency was unavailable: ${e.message}",
+                    cause = e
+                )
+            }
             throw PresentationRejectionException(
                 "Verification failed due to an internal error: ${e.message}",
                 cause = e
             )
         }
 
+    }
+}
+
+/**
+ * Hard document limit of the stores Verifier2 is deployed against: MongoDB, and DocumentDB which inherits it.
+ */
+internal const val STORE_DOCUMENT_LIMIT_BYTES = 16_793_600
+
+/**
+ * Exception class-name fragments that identify a dependency failure rather than a bad presentation.
+ *
+ * Matching on names is a compromise: this is commonMain, so neither the MongoDB driver's exceptions
+ * nor JVM IO types are referenceable, and the alternative - every store wrapping its own failures in
+ * a typed exception - is a wider change than a status-code fix should carry. Fragments are matched
+ * against the whole cause chain, because the driver's timeout arrives wrapped by the store layer.
+ */
+private val INFRASTRUCTURE_FAILURE_MARKERS = listOf(
+    "Timeout", "TimedOut", "Socket", "Connect", "IOException", "Unreachable", "PoolClear",
+    "NotPrimary", "NodeIsRecovering", "ShutdownInProgress", "Interrupted",
+)
+
+/**
+ * True when this exception, or anything that caused it, looks like a dependency being unavailable.
+ *
+ * Deliberately conservative: an unrecognised exception stays a rejection, because misreporting a bad
+ * presentation as a server outage would hide a real client bug behind a retry loop. The observed
+ * case this exists for is `MongoTimeoutException: Timed out after 5087 ms while waiting for a
+ * connection to server`, which a load test turned into 1,676 responses telling wallets their
+ * presentations were malformed.
+ */
+internal fun Throwable.isInfrastructureFailure(): Boolean {
+    var current: Throwable? = this
+    val seen = mutableSetOf<Throwable>()
+    while (current != null && seen.add(current)) {
+        val name = current::class.simpleName ?: ""
+        if (INFRASTRUCTURE_FAILURE_MARKERS.any { name.contains(it, ignoreCase = true) }) return true
+        current = current.cause
+    }
+    return false
+}
+
+/**
+ * Times a presentation is retained in a session, measured rather than assumed.
+ *
+ * An mDL with a 250 KB portrait produced a 1.24 MB session: the raw device response as received, the decoded
+ * presentation, and the policy results - each kept deliberately, because a decoder changes between versions and
+ * what a deployment understood at the time is the record worth keeping. Four leaves a little room above the
+ * measured 3.7.
+ */
+internal const val PRESENTATION_RETENTION_FACTOR = 4
+
+/** Largest presentation whose session still fits, with a tenth of the limit left for everything else. */
+internal val maxStorablePresentationBytes =
+    (STORE_DOCUMENT_LIMIT_BYTES * 9 / 10) / PRESENTATION_RETENTION_FACTOR
+
+/**
+ * Fails fast when a `vp_token` is too large for a session to be stored.
+ *
+ * Deliberately a rejection of the presentation rather than a storage error: the wallet sent something this
+ * deployment cannot process, which is a 400, and the message has to carry the numbers because the alternative is
+ * an operator reading a driver exception about a document size with no idea which credential caused it.
+ */
+internal fun checkPresentationIsStorable(vpTokenContents: ParsedVpToken) {
+    val presentedBytes = vpTokenContents.values.sumOf { presentations -> presentations.sumOf { it.length.toLong() } }
+    if (presentedBytes > maxStorablePresentationBytes) {
+        error(
+            "Presentation of $presentedBytes bytes is too large to store: a session retains it about " +
+                    "${PRESENTATION_RETENTION_FACTOR}x and the store's document limit is " +
+                    "$STORE_DOCUMENT_LIMIT_BYTES bytes, so at most $maxStorablePresentationBytes bytes can be " +
+                    "presented. A large binary claim such as a portrait is the usual cause; request fewer claims, " +
+                    "or a smaller image."
+        )
     }
 }
