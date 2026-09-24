@@ -216,12 +216,15 @@ class KeyAttestationProofTest {
         assertEquals(2, proofs.size)
         assertEquals(2, nonceCalls)
         for ((index, proof) in proofs.withIndex()) {
-            CompactJws.verify(proof, proofKey, JwsAlgorithm.ES256)
-            val attestation = CompactJws.decodeUnverified(proof).protectedHeader.getValue("key_attestation").jsonPrimitive.content
-            CompactJws.verify(attestation, provider.verificationKey, JwsAlgorithm.ES256)
-            assertEquals(requests[index].nonce, Json.parseToJsonElement(
-                CompactJws.decodeUnverified(proof).payload.decodeToString(),
-            ).jsonObject["nonce"]?.jsonPrimitive?.content)
+            val verifiedProof = CompactJws.verify(proof, proofKey, JwsAlgorithm.ES256)
+            val attestation = verifiedProof.protectedHeader.getValue("key_attestation").jsonPrimitive.content
+            val verifiedAttestation = CompactJws.verify(attestation, provider.verificationKey, JwsAlgorithm.ES256)
+            val proofNonce = Json.parseToJsonElement(verifiedProof.payload.decodeToString())
+                .jsonObject["nonce"]?.jsonPrimitive?.content
+            val attestationNonce = Json.parseToJsonElement(verifiedAttestation.payload.decodeToString())
+                .jsonObject["nonce"]?.jsonPrimitive?.content
+            assertEquals(requests[index].nonce, attestationNonce)
+            assertEquals(proofNonce, attestationNonce)
             assertEquals(Jwk.sha256Thumbprint(proofKey.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(proofKey.spec)),
                 Jwk.sha256Thumbprint(requests[index].proofKey))
         }
