@@ -8,7 +8,7 @@ import java.net.InetSocketAddress
 import java.net.Socket
 
 /** Opt-in operator fixture. The forwarded device executes whole wallet operations with a native key. */
-internal class ItbAndroidWalletDriver private constructor(private val socket: Socket) : AutoCloseable {
+internal class ItbAndroidWalletDriver private constructor(private val socket: Socket) : AutoCloseable by socket {
     private var sequence = 0
 
     suspend fun execute(interaction: ItbWalletInteraction) {
@@ -36,14 +36,14 @@ internal class ItbAndroidWalletDriver private constructor(private val socket: So
         }
     }
 
-    override fun close() = socket.close()
-
     companion object {
-        suspend fun connect(port: Int, token: String, origin: Url, trustPem: String): ItbAndroidWalletDriver {
+        suspend fun connect(
+            port: Int, token: String, origin: Url, trustPem: String, connectDispatcher: CoroutineDispatcher,
+        ): ItbAndroidWalletDriver {
             require(port in 1024..65535 && token.matches(Regex("[0-9a-f]{64}")))
             val socket = Socket()
             try {
-                withContext(Dispatchers.IO) {
+                withContext(connectDispatcher) {
                     socket.connect(InetSocketAddress(InetAddress.getByName("127.0.0.1"), port), 5_000)
                 }
                 withTimeout(30_000) {
