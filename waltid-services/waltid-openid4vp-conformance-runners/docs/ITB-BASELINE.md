@@ -125,7 +125,11 @@ payment cases remain local and operator-assisted. Each report is evidence only
 for its exact revision and selected cases. Manual dispatch becomes available
 once the workflow reaches the default branch.
 
-The current gate is an issuer-accepted wallet-provider key attestation with
-truthful WE BUILD profile claims and status. The strict runner must then pass
-15/15 in CI and all 21 with operator authentication where needed. Failures,
-timeouts and unexecuted cases remain non-passing; WAL-1423 stays open.
+The runner now has a test-only, issuer-accepted key-attestation fixture with
+explicitly synthetic profile values. This removes the execution gate for the
+deployed test cases; it does not supply truthful Wallet Provider certification
+or status evidence. Current results must be attributed to their exact run and
+reported separately from this historical baseline. The strict runner still
+needs a 15/15 hosted CI result and operator-assisted coverage of the six
+payment cases. Failures, timeouts and unexecuted cases remain non-passing;
+WAL-1423 stays open until its acceptance evidence is reviewed.

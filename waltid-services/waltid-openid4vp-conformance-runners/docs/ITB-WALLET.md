@@ -6,6 +6,14 @@ ITB interactions through the production wallet, using a fresh holder and
 an in-memory credential store. `itbTest` provides eleven separate local protocol
 checks with synthetic fixtures and mock issuance responses.
 
+The live runner supplies a short-lived, self-signed **test key attestation**
+bound to each proof key and issuer nonce. Its storage, authentication,
+certification and status values are visibly synthetic `example.invalid` values.
+The deployed issuer currently accepts them for these test sessions; their
+acceptance does not establish a certified Wallet Provider, trusted attester,
+real status service or WE BUILD assurance level. This fixture is confined to
+the conformance runner and its device test, not the production wallet.
+
 Neither entry point proves native platform delivery, consent UX or full EUDI
 conformance. The [live baseline](ITB-BASELINE.md) records the exercised cases,
 failures, evidence boundary and remaining qualification work.
@@ -59,6 +67,7 @@ both the wallet adapter and its own terminal ITB report. Failures, timeouts,
 incomplete results and unexecuted cases remain failures in JUnit; none become
 expected failures or skips. `adapterInvoked` records entry into the adapter,
 not proof that every wallet protocol stage ran.
+The summary and JSON report identify the synthetic attestation fixture.
 
 The runner starts one session at a time, never retries an uncertain start, and
 records each prepared session ID before starting its test steps. Cleanup stops
