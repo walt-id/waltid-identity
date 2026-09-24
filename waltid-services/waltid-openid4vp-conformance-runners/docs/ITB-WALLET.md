@@ -222,8 +222,9 @@ send only `Accept: application/xml`; a combined JSON/XML header is rejected.
 
 The REST reports omit the offers and request context. The bridge downloads these
 from the owned session's pending interaction. It never substitutes a separate
-issuer offer or verifier request and attributes that to an ITB case. Full results
-and the remaining external dependencies are in [ITB-BASELINE.md](ITB-BASELINE.md).
+issuer offer or verifier request and attributes that to an ITB case. A dated
+standalone result and the current qualification boundary are in the
+[live baseline](ITB-BASELINE.md).
 
 ### Offline runner checks
 
