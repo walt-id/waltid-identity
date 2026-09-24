@@ -260,7 +260,8 @@ class ItbCaseRunnerTest {
         val bridge = object : ItbInteractionBridge {
             override suspend fun prepare(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case) =
                 ItbSession(suite.id, case.id, session)
-            override suspend fun read(session: ItbSession): ItbWalletInteraction = error("Browser failed after starting")
+            override suspend fun read(session: ItbSession): ItbWalletInteraction =
+                throw ItbPortalStepTimeout(ItbPortalStepTimeout.Step.START)
             override suspend fun complete() = error("Must not complete")
         }
         HttpClient(MockEngine { request ->
@@ -279,7 +280,8 @@ class ItbCaseRunnerTest {
             }).run(suite, case)
             assertEquals(listOf("""{"session":["$session"]}"""), stopped)
             assertEquals(session, result.session)
-            assertEquals(ItbCaseResult.Outcome.ERROR, result.outcome)
+            assertEquals(ItbCaseResult.Outcome.TIMED_OUT, result.outcome)
+            assertEquals("start", result.errorCode)
             assertEquals(ItbCaseResult.Phase.INTERACTION, result.phase)
             assertFalse(result.adapterInvoked || result.cleanupFailed)
             assertTrue(result.testBedCompleted)

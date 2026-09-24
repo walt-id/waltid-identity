@@ -15,8 +15,8 @@ real status service or WE BUILD assurance level. This fixture is confined to
 the conformance runner and its device test, not the production wallet.
 
 Neither entry point proves native platform delivery, consent UX or full EUDI
-conformance. The [live baseline](ITB-BASELINE.md) records the exercised cases,
-failures, evidence boundary and remaining qualification work.
+conformance. Use per-run reports and [WAL-1423](https://linear.app/walt-new/issue/WAL-1423/itb-initial-tests)
+for current qualification; [ITB-BASELINE.md](ITB-BASELINE.md) is a dated historical result.
 
 ## Hosted cases
 
@@ -93,9 +93,7 @@ recorded in [the fixture provenance](../src/main/resources/itb/README.md).
 file. Request `x5c` chains are never automatically trusted.
 
 The **WeBuild ITB live wallet cases** workflow runs the 15 unattended cases on
-pushes to the two WAL-1423 investigation branches. It remains strict on the
-wallet-runner branch; the separate diagnostic branch labels its conditional
-results. Runs share one concurrency group so their tenant sessions do not
+pushes to the WAL-1423 runner branch. Runs share one concurrency group so their tenant sessions do not
 overlap. The six payment cases remain local, operator-assisted coverage; CI
 success means 15/15 selected cases, not 21/21. The offline profile checks remain
 a separate PR check.
@@ -151,38 +149,7 @@ inventory, duplicates and skipped results:
 python3 -m unittest discover -s scripts/itb -p 'test_*.py'
 ```
 
-## Coverage and external dependencies
-
-Initial baseline: main at `78e6929fc360729feb45af81697405ca3cf01fa1`, the merge of
-[Identity #2168](https://github.com/walt-id/waltid-identity/pull/2168) on 2026-09-21.
-Its tree matches the assessed PR head `cd5520ba44c4418fcc25a3b4d29244922ca1f805`.
-The four failing local checks below are observed results at that baseline, not an
-allowlist: they must pass normally when their product behavior is corrected.
-
-| Area | Local checks | Baseline | Boundary / dependency |
-| --- | --- | --- | --- |
-| CS-01 | Real authorization-code credential receipt; verify proof signature, audience, nonce and bound client `iss` | 1 fail: absent `iss` | Historical baseline; [#2246](https://github.com/walt-id/waltid-identity/pull/2246) has since merged. Starts after authorization; does not qualify PAR, DPoP, browser login, pre-authorized grants or WIA/KA. |
-| CS-02 | Accept trusted X.509 signed request; reject absent trust and altered payload | 3 pass | Fresh CA/leaf certificates and actual signature authentication. Does not qualify credential presentation, selective disclosure or native consent. |
-| CS-02 | Strict profile rejects unsigned `redirect_uri` request objects and JSON returned by GET `request_uri` | 2 fail: unsigned input accepted | [WAL-896](https://linear.app/walt-new/issue/WAL-896) request-authentication scope; keep failures visible until the owning implementation enforces the profile. |
-| CS-07 | Resolve an authentic signed DC API request and bind its platform-origin audience | 1 fail: signed protocol unsupported | External WAL-896 / [#2141](https://github.com/walt-id/waltid-identity/pull/2141). A DID fixture isolates shared protocol dispatch; native and X.509 DC API qualification remain separate. |
-| CS-07 encryption | Independently decrypt a real wallet response with Nimbus; reject an encryption JWK missing `alg` | 2 pass | Exercises encryption independently of signed dispatch. Independent regression coverage; the fresh deployed VP002 flow also passes (see live baseline). |
-| TS-12 transaction binding | Present a stored SD-JWT with nested payment data; verify holder signature, audience, nonce and independently calculated SHA-256 hash | 1 pass | Narrows [WAL-1295](https://linear.app/walt-new/issue/WAL-1295) to remaining UI, verifier and native E2E work. Does not establish normative SCA support. |
-
-OpenID4VCI makes the proof `iss` claim optional for this bound-grant case. The
-issuance assertion preserves the historical stricter interoperability regression;
-all five deployed SD-JWT issuance cases passed without this fix, so it is not a
-confirmed blocker for the current 21-case matrix. It does not require every
-conforming issuer to reject an absent claim. See
-[OpenID4VCI JWT proofs](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-jwt-proof-type).
-
-Owning changes remain separate from this runner. Do not copy their production
-fixes into this baseline or disable affected cases. The merged
-[#2222](https://github.com/walt-id/waltid-identity/pull/2222) covers independent
-identity/recovery work; these local checks do not require it. Refresh from main
-and rerun against actual merged dependency revisions as they become available.
-Merging an owning PR alone does not prove that all profile assertions pass.
-
-## Pinned requirements and outstanding acceptance work
+## Requirements and coverage
 
 The requirement references are WeBuild architecture commit
 `da58a26a84ab3b5bd04c15cb63d5e9ab7479c292`:
@@ -196,7 +163,7 @@ The [public ITB base-protocol inventory](https://github.com/webuild-consortium/w
 at `9cd45c78483766e7bc60d9028def9103214a4529` contains eight issuance and seven
 presentation holder cases. Its `test-suite12.xml` is an issuance suite, not TS12
 payment testing. The authenticated tenant catalogue differs from that snapshot.
-Do not equate these ten local checks with the deployed cases.
+Do not equate the eleven local profile checks with the deployed cases.
 
 ### Deployed catalogue
 
@@ -232,8 +199,7 @@ send only `Accept: application/xml`; a combined JSON/XML header is rejected.
 The REST reports omit the offers and request context. The bridge downloads these
 from the owned session's pending interaction. It never substitutes a separate
 issuer offer or verifier request and attributes that to an ITB case. A dated
-standalone result and the current qualification boundary are in the
-[live baseline](ITB-BASELINE.md).
+standalone result is in the [historical baseline](ITB-BASELINE.md).
 
 ### Offline runner checks
 
@@ -248,14 +214,3 @@ ordinary JVM tests do not. It intercepts all browser traffic and verifies suite
 selection, interactive mode, download labels, session identity and stale-dialog
 cleanup against local DOM fixtures. PR checks run these without tenant secrets.
 These tests protect the runner; they do not establish live wallet conformance.
-
-The reference issuer's [credential metadata](https://dss.aegean.gr/rfc-issuer/.well-known/openid-credential-issuer)
-and [authorization-server metadata](https://dss.aegean.gr/rfc-issuer/.well-known/oauth-authorization-server)
-observed on 2026-09-21 advertise JWT/ES256 proofs, mandatory PAR, token endpoint
-authentication `none` and anonymous pre-authorized access; they do not advertise
-WIA/KA requirements. [WAL-1060](https://linear.app/walt-new/issue/WAL-1060) is thus
-related to the current CS-01 profile's WUA requirement, but is not established as
-a blocker for those deployed reference flows. This metadata is not proof of the
-tenant's selected cases or of current CS-01 compliance. Likewise, broader
-[WAL-1326](https://linear.app/walt-new/issue/WAL-1326) trust-list work is conditional
-on the selected trust model, beyond the explicit request anchors checked here.

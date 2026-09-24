@@ -92,14 +92,15 @@ class ItbPortalBridgeBrowserTest {
 
     @Test
     fun identifiesAStartControlTimeoutWithoutStartingAnotherSession() = runBlocking<Unit> {
-        withPage { page ->
+        withPage(startNeverEnabled = true) { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
             val session = bridge.prepare(suite, case)
-            page.evaluate("document.querySelector('#start').disabled = true")
+            assertEquals(false, page.evaluate("window.started"))
             page.setDefaultTimeout(100.0)
             val failure = assertFailsWith<ItbPortalStepTimeout> { bridge.read(session) }
             assertEquals(ItbPortalStepTimeout.Step.START, failure.step)
             assertEquals(0, page.evaluate("window.startCount"))
+            assertEquals(session.session, page.locator(".session-table-title-value .value").innerText().trim())
         }
     }
 
@@ -108,6 +109,7 @@ class ItbPortalBridgeBrowserTest {
         interactionDelayMillis: Int = 30,
         downloadDelayMillis: Int = 0,
         failStart: Boolean = false,
+        startNeverEnabled: Boolean = false,
         block: suspend (Page) -> Unit,
     ) {
         Playwright.create().use { playwright ->
@@ -118,7 +120,7 @@ class ItbPortalBridgeBrowserTest {
                         if (route.request().url() == statementsUrl.substringBefore('#')) {
                             val session = "00000000-0000-0000-0000-${(++sessionNumber).toString().padStart(12, '0')}"
                             route.fulfill(Route.FulfillOptions().setContentType("text/html")
-                                .setBody(fixture(session, systemName, interactionDelayMillis, downloadDelayMillis, failStart)))
+                                .setBody(fixture(session, systemName, interactionDelayMillis, downloadDelayMillis, failStart, startNeverEnabled)))
                         } else route.abort()
                     }
                     val page = context.newPage()
@@ -131,6 +133,7 @@ class ItbPortalBridgeBrowserTest {
 
     private fun fixture(
         session: String, systemName: String, interactionDelayMillis: Int, downloadDelayMillis: Int, failStart: Boolean,
+        startNeverEnabled: Boolean,
     ) = """
         <button>$systemName</button><button onclick="showTests()">${suite.statement}</button>
         <script>
@@ -158,7 +161,7 @@ class ItbPortalBridgeBrowserTest {
             window.selectedSuite = selected;
             document.body.innerHTML = `<div class="session-table-title-value"><div class="value">$session</div></div>
               <button id="start" disabled onclick="start()">Start</button>`;
-            setTimeout(() => document.querySelector('#start').disabled = false, 30);
+            if (!$startNeverEnabled) setTimeout(() => document.querySelector('#start').disabled = false, 30);
         }
         function start() {
             window.started = true;

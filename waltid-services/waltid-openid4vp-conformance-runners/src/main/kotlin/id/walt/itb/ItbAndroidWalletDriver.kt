@@ -6,14 +6,19 @@ import kotlinx.serialization.json.*
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /** Opt-in operator fixture. The forwarded device executes whole wallet operations with a native key. */
-internal class ItbAndroidWalletDriver private constructor(private val socket: Socket) : AutoCloseable by socket {
+internal class ItbAndroidWalletDriver private constructor(
+    private val socket: Socket,
+    private val ioDispatcher: CoroutineDispatcher,
+) : AutoCloseable by socket {
     private var sequence = 0
 
     suspend fun execute(interaction: ItbWalletInteraction) {
         val result = try {
-            withTimeout(110_000) {
+            withSocketDeadline(socket, 110_000, ioDispatcher) {
                 ItbDeviceWire.write(socket, buildJsonObject {
                     put("sequence", ++sequence); put("interaction", ItbDeviceWire.encode(interaction))
                 })
@@ -37,6 +42,29 @@ internal class ItbAndroidWalletDriver private constructor(private val socket: So
     }
 
     companion object {
+        /** Closing the socket must not depend on a blocked OutputStream.write returning. */
+        internal suspend fun <T> withSocketDeadline(
+            socket: Socket, timeoutMillis: Long, ioDispatcher: CoroutineDispatcher, operation: suspend () -> T,
+        ): T =
+            withTimeout(timeoutMillis) {
+                suspendCancellableCoroutine { continuation ->
+                    val workerScope = CoroutineScope(ioDispatcher + SupervisorJob())
+                    val worker = workerScope.launch {
+                        try {
+                            continuation.resume(operation())
+                        } catch (error: Throwable) {
+                            if (continuation.isActive) continuation.resumeWithException(error)
+                        } finally {
+                            workerScope.cancel()
+                        }
+                    }
+                    continuation.invokeOnCancellation {
+                        socket.close()
+                        worker.cancel()
+                    }
+                }
+            }
+
         suspend fun connect(
             port: Int, token: String, origin: Url, trustPem: String, connectDispatcher: CoroutineDispatcher,
         ): ItbAndroidWalletDriver {
@@ -46,7 +74,7 @@ internal class ItbAndroidWalletDriver private constructor(private val socket: So
                 withContext(connectDispatcher) {
                     socket.connect(InetSocketAddress(InetAddress.getByName("127.0.0.1"), port), 5_000)
                 }
-                withTimeout(30_000) {
+                withSocketDeadline(socket, 30_000, connectDispatcher) {
                     ItbDeviceWire.write(socket, buildJsonObject {
                         put("version", 1); put("token", token); put("origin", origin.toString())
                         put("trustPem", trustPem)
@@ -57,7 +85,7 @@ internal class ItbAndroidWalletDriver private constructor(private val socket: So
                         "Native device fixture is not ready"
                     }
                 }
-                return ItbAndroidWalletDriver(socket)
+                return ItbAndroidWalletDriver(socket, connectDispatcher)
             } catch (error: Exception) { socket.close(); throw error }
         }
     }
