@@ -114,7 +114,7 @@ val result = WalletIssuanceHandler.receiveCredential(wallet, request) { event ->
 println("Received ${result.credentialIds.size} credential(s)")
 ```
 
-When issuer metadata requires a key attestation, attach a `KeyAttestationProvider` to the wallet before issuance. The provider receives the actual proof key's public JWK, the credential issuer, the current nonce, and any advertised storage or authentication constraints. It returns a signed `key-attestation+jwt` and exposes its public verification key. The wallet checks the signature, key binding, nonce, lifetime, and advertised constraints before placing the attestation in the JWT proof header. Without a provider, a required-attestation request fails before sending the proof. The issuer must independently trust the attester; attaching a provider does not establish issuer trust or certify the key's security properties.
+When issuer metadata requires a key attestation, attach a `KeyAttestationProvider` to the wallet before issuance. The provider receives the actual proof key's public JWK, the credential issuer, the current nonce, and any advertised storage or authentication constraints. It returns a signed `key-attestation+jwt` and exposes its public verification key. The wallet checks the signature, key binding, nonce, lifetime, and advertised constraints before placing the attestation in the JWT proof header. The provider is runtime configuration: reattach it after restoring or copying a wallet. Without a provider, a required-attestation request fails before sending the proof. The issuer must independently trust the attester; attaching a provider does not establish issuer trust or certify the key's security properties.
 
 ### Presenting Credentials (OpenID4VP 1.0)
 
