@@ -30,6 +30,7 @@ class PrivateNetworkGuardTest {
     fun resetSettings() {
         PrivateNetworkGuardSettings.allowLoopback = false
         PrivateNetworkGuardSettings.allowPrivateNetworks = false
+        PrivateNetworkGuardSettings.trustedHostSuffixes = emptySet()
     }
 
     private fun guardedClient(engine: MockEngine): HttpClient = HttpClient(engine) {
@@ -124,6 +125,59 @@ class PrivateNetworkGuardTest {
         val engine = MockEngine { respondOk() }
         val client = guardedClient(engine)
         assertFailsWith<BlockedAddressException> { client.get("http://10.0.0.5/") }
+    }
+
+    @Test
+    fun `trustedHostSuffixes does not affect an untrusted loopback hostname`() = runTest {
+        val engine = MockEngine { respondOk() }
+        val client = guardedClient(engine)
+        assertFailsWith<BlockedAddressException> { client.get("http://localhost/admin") }
+    }
+
+    @Test
+    fun `allows a loopback-resolving hostname that exactly matches a trusted suffix`() = runTest {
+        PrivateNetworkGuardSettings.trustedHostSuffixes = setOf("localhost")
+        val engine = MockEngine { respondOk("hello") }
+        val client = guardedClient(engine)
+        assertTrue(client.get("http://localhost/admin").status.isSuccess())
+    }
+
+    @Test
+    fun `allows a loopback-resolving hostname that is a subdomain of a trusted suffix`() = runTest {
+        // Mirrors the real scenario: org1.enterprise.waltid.cloud is a subdomain of the deployment's own
+        // base domain, and split-horizon or NAT-hairpin DNS can resolve it to a loopback/private address.
+        PrivateNetworkGuardSettings.trustedHostSuffixes = setOf("localhost")
+        val engine = MockEngine { respondOk("hello") }
+        val client = guardedClient(engine)
+        assertTrue(client.get("http://org1.localhost/admin").status.isSuccess())
+    }
+
+    @Test
+    fun `a trusted host still cannot reach the cloud metadata address`() = runTest {
+        // The always-blocked categories (link-local/multicast/wildcard) are checked before host trust, so
+        // trusting a suffix can never be used to reach one - even if DNS somehow pointed a trusted hostname
+        // there (compromised record, cache poisoning, ...).
+        PrivateNetworkGuardSettings.trustedHostSuffixes = setOf("trusted.example")
+        val engine = MockEngine { respondOk() }
+        val client = guardedClient(engine)
+        assertFailsWith<BlockedAddressException> { client.get("http://169.254.169.254/latest/meta-data/") }
+    }
+
+    @Test
+    fun `follows a relative redirect refusal as unsupported, not as a blocked address`() = runTest {
+        val engine = MockEngine { request ->
+            if (request.url.encodedPath == "/redirect-me") {
+                respond(
+                    content = "",
+                    status = HttpStatusCode.Found,
+                    headers = headersOf(HttpHeaders.Location, "/relative-path"),
+                )
+            } else {
+                error("unexpected request: ${request.url}")
+            }
+        }
+        val client = guardedClient(engine)
+        assertFailsWith<UnsupportedRedirectException> { client.get("http://8.8.8.8/redirect-me") }
     }
 
     @Test
