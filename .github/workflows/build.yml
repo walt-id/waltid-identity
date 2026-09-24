@@ -151,6 +151,7 @@ jobs:
       report-check-name: 'gradle-build / gradle (ubuntu-22.04)'
       conformance-report-check-name: 'gradle-build / conformance (ubuntu-22.04)'
       run-conformance: ${{ needs.conformance-eligibility.outputs.should-run == 'true' }}
+      run-issuer-conformance: ${{ needs.conformance-eligibility.outputs.should-run == 'true' }}
   distribute-android-preview:
     name: distribute-android-preview
     needs: ci-gate

@@ -1,6 +1,11 @@
-# Test-only Issuer2 configuration for the Basic OpenID4VCI conformance CI job.
+# Test-only Issuer2 configuration for the combined basic VCI / HAIP / batch CI job.
 # The workflow replaces __ISSUER_BASE_URL__ with its Cloudflare Quick Tunnel URL.
 baseUrl = "__ISSUER_BASE_URL__"
+
+# Requires the completed batch/legacy-offer compatibility implementation.
+batchCredentialIssuance {
+  batchSize = 10
+}
 
 ciTokenKey = """{"type":"jwk","jwk":{"kty":"EC","d":"KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}}"""
 

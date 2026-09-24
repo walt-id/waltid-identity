@@ -320,6 +320,69 @@ Do not use `./gradlew build` as the local conformance command. It neither starts
 the conformance Docker stack nor issuer2, and the issuer conformance test is
 skipped when no issuer target is configured.
 
+### Existing GitHub Actions CI
+
+The reusable `.github/workflows/gradle.yml` contains one dedicated
+`openid4vci-conformance` job for the combined basic VCI / HAIP / batch matrix.
+The regular build enables it through conformance eligibility; the existing
+`run-issuer-conformance` and `run-haip-conformance` inputs both select this combined
+job. Release workflows already set those inputs. Wallet/verifier conformance runs
+in its existing separate job, so ports, processes and test reports are isolated.
+
+CI invokes the existing Gradle `test` task with `--tests
+id.walt.openid4vp.conformance.IssuerConformanceTests`, not the local wrapper and not
+a new Gradle task. It uses `conformance.waltid.cloud:443` and checks `/api/server`
+for revision `db1080a`, tag `release-v5.2.3`, version `5.2.4` before starting the
+issuer. A hosted-suite upgrade requires reviewing the pin and batch exceptions;
+never bypass that check to get a green build.
+
+The job builds Issuer2 from the exact Identity commit under test. That commit must
+include the completed batch/legacy-offer compatibility implementation. The runner
+branch alone does not supply it. CI-only files under `src/test/resources/issuer2/`
+enable batch size 10 and define exactly four basic/HAIP SD-JWT VC/mdoc profiles.
+The keys and certificates are public test fixtures; do not use them in production.
+Certificate validity and key/root matching are checked by `IssuerCiConfigurationTest`.
+
+A Cloudflare Quick Tunnel supplies the public issuer base URL. Authentication
+still uses the issuer's configured demo Keycloak and the existing Jane test user.
+The Keycloak client must allow the tunnel's
+`https://<assigned-host>.trycloudflare.com/openid4vci/external/oauth/callback`.
+Client registration/redirect permissions are an operator prerequisite, not changed
+by this workflow. A callback rejection or demo outage is a real CI failure to
+diagnose, not a reason to skip authorization-code coverage.
+
+CI selects metadata, positive and negative modules, including batch, for both
+formats, supported grants/initiation flows, client attestation, DPoP, simple
+unsigned authorization requests, and plain/encrypted responses. Dedicated FAPI
+modules remain outside this run. Existing runner exclusions are preserved; the
+old commented jobs' additional tunnel-related exclusions are not restored. If a
+module fails because of tunnel TLS behavior, investigate it and report the
+coverage difference rather than silently excluding it.
+
+`CONFORMANCE_ALLOW_FAILURE=false`, strict mode and `REQUIRE_BATCH_PASS=true` are
+explicit. The Kotlin runner enforces successful selected variants and executed
+batch coverage; CI also rejects missing/empty results. The configured matrix
+selects 20 variants, with 16 applicable batch variants and four encrypted-HAIP
+variants where batch is not offered at this suite pin. Skipped batch execution
+does not establish coverage. Suite and metadata preflight checks use `curl`/`jq`
+directly in the workflow; there is no separate Python validation layer.
+
+The job summary shows variant and batch result counts. The
+`issuer-conformance-basic-haip-batch` artifact contains suite/Identity revision
+information and result identifiers/statuses (including plan and test IDs for
+looking up suite logs). Error bodies, raw issuer/tunnel/test logs, JUnit output,
+rendered configuration and test keys are not uploaded. The issuer and tunnel are
+stopped on completion or failure.
+
+Focused checks (no live conformance):
+
+```bash
+# From the unified-build root:
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+  -PskipLiveConformance=true \
+  --tests id.walt.openid4vp.conformance.IssuerCiConfigurationTest
+```
+
 ### Default Selection
 
 With no selection variables set, the wrapper uses
