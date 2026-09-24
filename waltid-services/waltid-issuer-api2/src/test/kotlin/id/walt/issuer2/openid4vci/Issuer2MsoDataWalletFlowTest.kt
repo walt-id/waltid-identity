@@ -141,7 +141,7 @@ class Issuer2MsoDataWalletFlowTest {
             resolvedOffer = walletFlow.resolve(createdOffer),
             scenario = scenario,
         )
-        assertEquals(offerMsoData, client.getSession(createdOffer.offerId).msoData)
+        assertEquals(offerMsoData, client.getSession(createdOffer.offerId).issuanceRequests.single().msoData)
     }
 
     @Test
@@ -160,10 +160,10 @@ class Issuer2MsoDataWalletFlowTest {
             scenario = scenario,
         )
         val authorizationSession = client.listSessions().single { session ->
-            session.profileId == scenario.profileId && session.sessionId != createdOffer.offerId
+            session.issuanceRequests.single().profileId == scenario.profileId && session.sessionId != createdOffer.offerId
         }
         assertNotEquals(createdOffer.offerId, authorizationSession.sessionId)
-        assertEquals(PROFILE_MSO_DATA, authorizationSession.msoData)
+        assertEquals(PROFILE_MSO_DATA, authorizationSession.issuanceRequests.single().msoData)
     }
 
     private suspend fun ApplicationTestBuilder.assertOfferlessSessionCopiesProfileMsoData(
@@ -173,8 +173,8 @@ class Issuer2MsoDataWalletFlowTest {
         installIssuer2WithConfigFiles(configureProfilesConfig = withIsoMdlMsoData())
         val client = apiClient()
         Issuer2WalletFlowDriver(client).startOfferlessAuthorizationCodeFlow(scenario, requestMode)
-        val session = client.listSessions().single { it.profileId == scenario.profileId }
-        assertEquals(PROFILE_MSO_DATA, session.msoData)
+        val session = client.listSessions().single { it.issuanceRequests.single().profileId == scenario.profileId }
+        assertEquals(PROFILE_MSO_DATA, session.issuanceRequests.single().msoData)
     }
 
     private suspend fun ApplicationTestBuilder.issueIsoMdl(

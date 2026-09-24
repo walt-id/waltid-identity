@@ -42,7 +42,7 @@ class ProviderCredentialProofVerificationTest {
         )
         config.credentialEndpointHandlers.register(
             CredentialFormat.SD_JWT_VC,
-            CredentialEndpointHandler { _, _, _, _, issuanceBatch, _, _, _, _, _, _, _, _, _ ->
+            CredentialEndpointHandler { _, _, _, _, issuanceBatch, _, _, _, _, _, _, _, _, _, _ ->
                 handlerInvocations += 1
                 handledInputCount = issuanceBatch.inputs.size
                 handledProofCount = issuanceBatch.verifiedProofs.size
