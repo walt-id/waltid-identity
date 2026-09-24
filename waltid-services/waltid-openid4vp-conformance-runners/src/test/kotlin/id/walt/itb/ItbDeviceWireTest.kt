@@ -8,6 +8,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.io.EOFException
+import java.io.IOException
 import kotlin.test.*
 
 class ItbDeviceWireTest {
@@ -153,6 +154,28 @@ class ItbDeviceWireTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `cancellation still stops the worker if closing the socket fails`() = runBlocking {
+        val started = CompletableDeferred<Unit>()
+        val stopped = CompletableDeferred<Unit>()
+        val socket = object : Socket() {
+            override fun close(): Unit = throw IOException("close failed")
+        }
+        val pending = launch {
+            ItbAndroidWalletDriver.withSocketDeadline(socket, 5_000, Dispatchers.IO) {
+                started.complete(Unit)
+                try {
+                    awaitCancellation()
+                } finally {
+                    stopped.complete(Unit)
+                }
+            }
+        }
+        started.await()
+        pending.cancelAndJoin()
+        withTimeout(1_000) { stopped.await() }
     }
 
     @Test
