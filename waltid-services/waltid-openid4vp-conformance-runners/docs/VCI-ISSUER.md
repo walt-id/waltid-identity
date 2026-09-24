@@ -322,12 +322,21 @@ skipped when no issuer target is configured.
 
 ### Existing GitHub Actions CI
 
-The reusable `.github/workflows/gradle.yml` contains one dedicated
-`openid4vci-conformance` job for the combined basic VCI / HAIP / batch matrix.
-The regular build enables it through conformance eligibility; the existing
-`run-issuer-conformance` and `run-haip-conformance` inputs both select this combined
-job. Release workflows already set those inputs. Wallet/verifier conformance runs
-in its existing separate job, so ports, processes and test reports are isolated.
+The reusable `.github/workflows/gradle.yml` runs the combined basic VCI / HAIP /
+batch matrix in the existing `conformance` job, after wallet/verifier tests.
+The regular build enables the issuer phase through conformance eligibility; the
+existing `run-issuer-conformance` and `run-haip-conformance` inputs both select it.
+Release workflows already set those inputs. Checkout, Gradle setup and browser
+installation are shared; there is no separate issuer job.
+
+Wallet/verifier test commands and soft-fail settings are unchanged. Their JUnit
+report and conformance summaries are published before issuer-only Gradle runs can
+overwrite test output. Their tunnels are stopped after reporting, and issuer
+startup rejects an occupied port 7005 rather than terminating an unknown process.
+Issuer settings are step-scoped, and its tests run in a separate Gradle invocation.
+A wallet/verifier test failure does not skip the issuer phase when shared setup
+succeeded; either phase can still fail the shared job. Maven publication already
+waits for this job, so an issuer failure now also prevents publication.
 
 CI invokes the existing Gradle `test` task with `--tests
 id.walt.openid4vp.conformance.IssuerConformanceTests`, not the local wrapper and not
@@ -336,7 +345,8 @@ for revision `db1080a`, tag `release-v5.2.3`, version `5.2.4` before starting th
 issuer. A hosted-suite upgrade requires reviewing the pin and batch exceptions;
 never bypass that check to get a green build.
 
-The job builds Issuer2 from the exact Identity commit under test. That commit must
+The job builds Issuer2 from the same checked-out Identity revision as the
+wallet/verifier tests and records that revision in the issuer artifact. It must
 include the completed batch/legacy-offer compatibility implementation. The runner
 branch alone does not supply it. CI-only files under `src/test/resources/issuer2/`
 enable batch size 10 and define exactly four basic/HAIP SD-JWT VC/mdoc profiles.
@@ -603,9 +613,10 @@ results.json
 summary.md
 ```
 
-CI publishes these summaries into the GitHub Actions job summary. Soft-fail is
-controlled by `CONFORMANCE_ALLOW_FAILURE` (see the module
-[README](../README.md#ci-summaries-and-soft-fail)); locally you can still use
+CI publishes result summaries into the GitHub Actions job summary. The issuer CI
+phase explicitly disables soft-fail; wallet/verifier settings are unchanged.
+Outside that phase, soft-fail is controlled by `CONFORMANCE_ALLOW_FAILURE` (see the
+module [README](../README.md#ci-summaries-and-soft-fail)); locally you can still use
 `OPENID4VCI_CONFORMANCE_STRICT=false` for exploration.
 Result states have these meanings:
 
