@@ -47,7 +47,6 @@ import kotlinx.serialization.json.*
  * @param testDid Optional DID to use for credential requests
  * @param testKeyId Optional key ID to use for proof signing
  * @param attestationAuthority Test attester for plans using attestation-based client authentication
- * @param useScope Authorize by `scope` instead of `authorization_details`, as HAIP requires
  */
 class VciWalletConformanceAdapter(
     private val walletApiUrl: String = "http://127.0.0.1:7005",
@@ -56,7 +55,6 @@ class VciWalletConformanceAdapter(
     private val testDid: String? = null,
     private val testKeyId: String? = null,
     private val attestationAuthority: ClientAttestationTestAuthority? = null,
-    private val useScope: Boolean = false,
 ) {
 
     private var server: EmbeddedServer<*, *>? = null
@@ -313,7 +311,6 @@ class VciWalletConformanceAdapter(
                     // than by authorization_details; the suite's ExtractRequestedScopes then rejects a
                     // request that carries none. Not derivable from metadata - nothing an issuer
                     // publishes says which of the two it expects - so it is selected per plan.
-                    if (useScope) put("useScope", true)
                 }.toString()
             )
         }

@@ -117,7 +117,7 @@ class WalletIssuanceSessionServiceTest {
                       "issuer": "https://attacker.example",
                       "authorization_endpoint": "https://attacker.example/authorize",
                       "token_endpoint": "https://attacker.example/token",
-                      "response_types_supported": ["code"]
+                      "authorization_details_types_supported":["openid_credential"],"response_types_supported": ["code"]
                     }
                     """.trimIndent(),
                 ),
@@ -1268,7 +1268,7 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
-    fun immediateResponseStoresW3cJwtSdJwtVcAndMdocWithoutAppParsing() = runTest {
+    fun separateRequestsStoreW3cJwtSdJwtVcAndMdocWithoutAppParsing() = runTest {
         val issuerKey = JWKKey.generate(KeyType.secp256r1)
         val holderKey = crypto2SigningKey("batch-holder")
         val keyStore = InMemoryKeyStore().apply { addCrypto2Key(holderKey) }
@@ -1281,21 +1281,32 @@ class WalletIssuanceSessionServiceTest {
             SdJwtExamples.sdJwtVcSignedExample2,
             mdocCredential(holderKey),
         )
+        val configurationIds = listOf("w3c", "sdjwt", "mdoc")
+        val configurations = listOf(
+            """{"format":"jwt_vc_json","credential_definition":{"type":["VerifiableCredential","TestCredential"]}}""",
+            """{"format":"dc+sd-jwt","vct":"identity"}""",
+            """{"format":"mso_mdoc","doctype":"org.iso.18013.5.1.mDL"}""",
+        )
+        var credentialRequests = 0
         val store = RecordingCredentialStore()
         val client = client { request ->
             when (request.url.toString()) {
-                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                ISSUER_METADATA -> jsonResponse(buildJsonObject {
+                    put("credential_issuer", ISSUER)
+                    put("credential_endpoint", CREDENTIAL_ENDPOINT)
+                    put("credential_configurations_supported", JsonObject(configurationIds.zip(configurations.map { Json.parseToJsonElement(it) }).toMap()))
+                }.toString())
                 AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
                 TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
-                CREDENTIAL_ENDPOINT -> jsonResponse(
-                    buildJsonObject {
+                CREDENTIAL_ENDPOINT -> {
+                    val config = Json.parseToJsonElement(request.bodyText()).jsonObject["credential_configuration_id"]!!.jsonPrimitive.content
+                    credentialRequests++
+                    jsonResponse(buildJsonObject {
                         put("credentials", buildJsonArray {
-                            issuedCredentials.forEach { credential ->
-                                add(buildJsonObject { put("credential", credential) })
-                            }
+                            add(buildJsonObject { put("credential", issuedCredentials[configurationIds.indexOf(config)]) })
                         })
-                    }.toString()
-                )
+                    }.toString())
+                }
                 else -> respondError(HttpStatusCode.NotFound)
             }
         }
@@ -1304,9 +1315,10 @@ class WalletIssuanceSessionServiceTest {
             httpClient = client,
         )
 
-        val session = service.start(preAuthorizedRequest().copy(keyId = holderKey.id.value))
+        val session = service.start(preAuthorizedRequest(configurationIds).copy(keyId = holderKey.id.value))
         val result = assertIs<WalletIssuanceOutcome.Stored>(service.continuePreAuthorized(session.id))
 
+        assertEquals(3, credentialRequests)
         assertEquals(3, result.credentialIds.size)
         assertEquals(3, store.credentials.size)
         assertEquals(setOf("jwt_vc_json", "dc+sd-jwt", "mso_mdoc"), store.credentials.map { it.credential.format }.toSet())
@@ -1540,7 +1552,7 @@ class WalletIssuanceSessionServiceTest {
             when (request.url.toString()) {
                 ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
                 AS_METADATA -> jsonResponse(
-                    """{"issuer":"$ISSUER","authorization_endpoint":"$AUTHORIZATION_ENDPOINT","token_endpoint":"$TOKEN_ENDPOINT","response_types_supported":["code"],"dpop_signing_alg_values_supported":["ES256"]}"""
+                    """{"issuer":"$ISSUER","authorization_endpoint":"$AUTHORIZATION_ENDPOINT","token_endpoint":"$TOKEN_ENDPOINT","authorization_details_types_supported":["openid_credential"],"response_types_supported":["code"],"dpop_signing_alg_values_supported":["ES256"]}"""
                 )
                 TOKEN_ENDPOINT -> {
                     assertNotNull(request.headers["DPoP"])
@@ -1575,7 +1587,7 @@ class WalletIssuanceSessionServiceTest {
             when (request.url.toString()) {
                 ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
                 AS_METADATA -> jsonResponse(
-                    """{"issuer":"$ISSUER","authorization_endpoint":"$AUTHORIZATION_ENDPOINT","token_endpoint":"$TOKEN_ENDPOINT","pushed_authorization_request_endpoint":"$PAR_ENDPOINT","response_types_supported":["code"],"dpop_signing_alg_values_supported":["RS256"]}"""
+                    """{"issuer":"$ISSUER","authorization_endpoint":"$AUTHORIZATION_ENDPOINT","token_endpoint":"$TOKEN_ENDPOINT","pushed_authorization_request_endpoint":"$PAR_ENDPOINT","authorization_details_types_supported":["openid_credential"],"response_types_supported":["code"],"dpop_signing_alg_values_supported":["RS256"]}"""
                 )
                 PAR_ENDPOINT -> {
                     parCalls += 1
@@ -1691,7 +1703,7 @@ class WalletIssuanceSessionServiceTest {
                       "token_endpoint":"$TOKEN_ENDPOINT",
                       "pushed_authorization_request_endpoint":"$PAR_ENDPOINT",
                       "require_pushed_authorization_requests":true,
-                      "response_types_supported":["code"],
+                      "authorization_details_types_supported":["openid_credential"],"response_types_supported":["code"],
                       "grant_types_supported":["authorization_code"],
                       "dpop_signing_alg_values_supported":["ES256"]
                     }
@@ -1741,7 +1753,7 @@ class WalletIssuanceSessionServiceTest {
                           "authorization_endpoint":"$AUTHORIZATION_ENDPOINT",
                           "token_endpoint":"$TOKEN_ENDPOINT",
                           "pushed_authorization_request_endpoint":"$PAR_ENDPOINT",
-                          "response_types_supported":["code"]
+                          "authorization_details_types_supported":["openid_credential"],"response_types_supported":["code"]
                         }
                         """.trimIndent()
                     )
@@ -1787,7 +1799,7 @@ class WalletIssuanceSessionServiceTest {
             when (request.url.toString()) {
                 ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
                 AS_METADATA -> jsonResponse(
-                    """{"issuer":"$ISSUER","authorization_endpoint":"$AUTHORIZATION_ENDPOINT","token_endpoint":"$TOKEN_ENDPOINT","pushed_authorization_request_endpoint":"$PAR_ENDPOINT","response_types_supported":["code"]}"""
+                    """{"issuer":"$ISSUER","authorization_endpoint":"$AUTHORIZATION_ENDPOINT","token_endpoint":"$TOKEN_ENDPOINT","pushed_authorization_request_endpoint":"$PAR_ENDPOINT","authorization_details_types_supported":["openid_credential"],"response_types_supported":["code"]}"""
                 )
                 PAR_ENDPOINT -> jsonResponse(parBody, parStatus)
                 else -> respondError(HttpStatusCode.NotFound)
@@ -2050,6 +2062,7 @@ class WalletIssuanceSessionServiceTest {
           "authorization_endpoint":"$AUTHORIZATION_ENDPOINT",
           "token_endpoint":"$TOKEN_ENDPOINT",
           "response_types_supported":["code"],
+          "authorization_details_types_supported":["openid_credential"],
           "pushed_authorization_request_endpoint":"$PAR_ENDPOINT",
           "challenge_endpoint":"$CHALLENGE_ENDPOINT",
           "token_endpoint_auth_methods_supported":["attest_jwt_client_auth"],
@@ -2069,6 +2082,7 @@ class WalletIssuanceSessionServiceTest {
           "issuer":"$ISSUER",
           ${if (authorizationCode || !advertiseSelectedGrant) "\"authorization_endpoint\":\"$AUTHORIZATION_ENDPOINT\"," else ""}
           "token_endpoint":"$TOKEN_ENDPOINT",
+          "authorization_details_types_supported":["openid_credential"],
           "response_types_supported":["code"],
           "grant_types_supported":["${if (authorizationCode || !advertiseSelectedGrant) "authorization_code" else "urn:ietf:params:oauth:grant-type:pre-authorized_code"}"]
           ${if (dpop) ",\"dpop_signing_alg_values_supported\":[${(dpopAlgorithms ?: listOf("ES256")).joinToString(",") { "\"$it\"" }}]" else ""}

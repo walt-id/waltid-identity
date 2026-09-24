@@ -8,6 +8,16 @@ package id.walt.wallet2.mobile
  * including Digital Credentials API `CREATE_CREDENTIAL` handoffs.
  */
 public sealed interface MobileWalletCredentialOffer {
+    /** Discover configurations from issuer metadata for wallet-initiated authorization. */
+    public data class Issuer(
+        public val credentialIssuer: String,
+        public val credentialConfigurationIds: List<String>,
+    ) : MobileWalletCredentialOffer {
+        init {
+            require(credentialIssuer.isNotBlank())
+            require(credentialConfigurationIds.isNotEmpty() && credentialConfigurationIds.none(String::isBlank))
+        }
+    }
     /**
      * Deep-link or QR credential offer URI (`openid-credential-offer://…`).
      *
@@ -34,7 +44,8 @@ public sealed interface MobileWalletCredentialOffer {
 /**
  * App-facing input for starting an OpenID4VCI issuance session.
  *
- * The selected [keyId] is used for DPoP, holder binding, and credential proof creation. When it is
+ * The selected [keyId] is used for OAuth/DPoP and as the default single-instance holder key.
+ * Accepted credential selections may choose different holder keys without changing the OAuth key. When it is
  * omitted, the wallet's first persisted key is selected. [did] is only required when the issuer
  * requires DID binding rather than JWK or COSE-key binding.
  *
@@ -51,3 +62,25 @@ public data class MobileWalletIssuanceRequest(
     public val keyId: String? = null,
     public val did: String? = null,
 )
+
+/** One credential instance, backed by an existing platform wallet key. */
+public data class MobileWalletHolderBinding(
+    public val keyId: String,
+    public val did: String? = null,
+)
+
+/** Accepted configuration/dataset and the holder keys for its requested instances. */
+public data class MobileWalletCredentialSelection(
+    public val credentialConfigurationId: String,
+    public val holderBindings: List<MobileWalletHolderBinding>,
+    public val credentialIdentifier: String? = null,
+)
+
+internal fun List<MobileWalletCredentialSelection>.toLibrarySelections(): List<id.walt.wallet2.handlers.WalletCredentialSelection> =
+    map { selection ->
+        id.walt.wallet2.handlers.WalletCredentialSelection(
+            selection.credentialConfigurationId,
+            selection.credentialIdentifier,
+            selection.holderBindings.map { id.walt.wallet2.handlers.CredentialHolderBinding(it.keyId, it.did) },
+        )
+    }

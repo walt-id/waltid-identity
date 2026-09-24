@@ -82,6 +82,59 @@ routing {
 }
 ```
 
+## Batch and multi-credential issuance
+
+The full receive endpoints default to one instance per offered configuration.
+Pass `credentials` to select configurations and `holderBindings` to request
+multiple instances:
+
+```json
+{
+  "offerUrl": "https://issuer.example/offer",
+  "credentials": [{
+    "credentialConfigurationId": "identity_credential",
+    "holderBindings": [{"keyId": "holder-1"}, {"keyId": "holder-2"}]
+  }]
+}
+```
+
+Replace the offer URL, configuration and key IDs with real values. Keys must
+already be available to the wallet. Enterprise uses `keyReference` (an attached
+KMS resource path) in each holder binding instead of OSS `keyId`.
+
+- Resolve the offer first and check `batchSize`; absence means no batch support.
+- One selection is one configuration/dataset. Different formats or datasets use
+  separate requests, sharing the access token.
+- The full handlers use token `authorizationDetails` and `scope` to determine
+  granted targets. Returned dataset identifiers are never replaced by config IDs.
+- Authorization parameters are selected automatically from metadata in both flows:
+  prefer `authorization_details` when the authorization server advertises
+  `openid_credential`; otherwise use the selected configurations' advertised scopes.
+  Missing support for both produces an error before sending the authorization/token request.
+  Multiple datasets under one configuration require dataset identifiers.
+  Isolated request-token also negotiates automatically when given `credentialIssuer`
+  and `credentialConfigurationIds`; explicit `authorizationDetails` or `scope` remain
+  available for callers constructing that protocol step themselves.
+- Authorization URL generation accepts `credentialConfigurationIds`. Supply
+  either an offer or `credentialIssuer` for wallet-initiated authorization.
+- Authorized receive requires the `credentials` selections, not a singular
+  `credentialConfigurationId`.
+- Isolated sign-proof returns `proofs.jwt` (a collection). Pass `proofs` to
+  fetch-credential. Pass `credentialIdentifier` when the token returned it;
+  `credentialConfigurationId` is still needed locally for metadata, but only
+  one selector is sent to the issuer. Multi-proof fetch also requires
+  `credentialIssuerBaseUrl` to validate the issuer's batch limit.
+- When storing an isolated response, include a holder binding for every proof.
+  Responses may reorder instances or return fewer; keys are matched from the
+  credential's holder binding, not array position.
+- Receive results carry `deferredCredentials`; isolated fetch carries
+  `deferredCredential` and `interval`. Retain the original access token and
+  holder keys for polling; copy `holderBindings` and `proofRequired` from the
+  deferred result to the poll request. No private keys are included in deferred results.
+
+Swagger includes ordered single, batch, multi-configuration, and authorization
+examples. Issuance does not implicitly generate keys or increase batch size.
+
 ## API Endpoints
 
 ### Wallet Management

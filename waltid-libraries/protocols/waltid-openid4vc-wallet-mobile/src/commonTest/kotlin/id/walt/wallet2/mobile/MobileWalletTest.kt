@@ -94,6 +94,7 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.http.Url
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.launch
@@ -125,6 +126,40 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 class MobileWalletTest {
+
+    @Test
+    fun explicitBatchKeyCreationUsesConfiguredPolicyAndCleansUpPartialFailure() = runTest {
+        for (failThird in listOf(false, true)) {
+            val keyStore = InMemoryMobileWalletKeyStore()
+            val didStore = InMemoryDidStore()
+            val policies = mutableListOf<KeyUseAuthorizationPolicy>()
+            var generated = 0
+            val wallet = MobileWallet(
+                walletId = "batch-keys", keyStore = keyStore, didStore = didStore,
+                credentialStore = InMemoryCredentialStore(),
+                generateAndPersistKey = { _, policy ->
+                    if (failThird && generated == 2) error("Third key generation failed")
+                    policies += policy
+                    CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+                        GenerateSoftwareKeyRequest(KeyId("batch-${generated++}"), KeySpec.Ec(EcCurve.P256),
+                            setOf(KeyUsage.SIGN, KeyUsage.VERIFY)),
+                    ).also { keyStore.addCrypto2Key(it) }
+                },
+            )
+            if (failThird) {
+                assertFailsWith<IllegalStateException> { wallet.createIssuanceHolderKeys(3) }
+                assertTrue(keyStore.listKeys().toList().isEmpty())
+                assertTrue(didStore.listDids().toList().isEmpty())
+            } else {
+                val created = wallet.createIssuanceHolderKeys(5, keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None)
+                assertEquals(5, created.map { it.keyId }.distinct().size)
+                assertEquals(5, didStore.listDids().toList().size)
+                assertTrue(policies.all { it == KeyUseAuthorizationPolicy.None })
+            }
+        }
+    }
+
+
 
     @Test
     fun presentationErrorCodesMatchOAuthAndOpenId4VpValues() {
@@ -1824,6 +1859,7 @@ class MobileWalletTest {
                           "issuer":"$MOCK_ISSUER",
                           "token_endpoint":"$MOCK_ISSUER/token",
                           "response_types_supported":["code"],
+                          "authorization_details_types_supported":["openid_credential"],
                           "grant_types_supported":["urn:ietf:params:oauth:grant-type:pre-authorized_code"]
                         }
                         """.trimIndent()

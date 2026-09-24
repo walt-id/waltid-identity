@@ -155,7 +155,7 @@ class WalletIssuanceHandlerAttestationChallengeTest {
           "pushed_authorization_request_endpoint":"$PAR_ENDPOINT",
           "require_pushed_authorization_requests":true,
           "challenge_endpoint":"$CHALLENGE_ENDPOINT",
-          "response_types_supported":["code"],
+          "authorization_details_types_supported":["openid_credential"],"response_types_supported":["code"],
           "code_challenge_methods_supported":["S256"],
           "token_endpoint_auth_methods_supported":["attest_jwt_client_auth"],
           "client_attestation_signing_alg_values_supported":["ES256"],

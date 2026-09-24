@@ -312,6 +312,35 @@ public class MobileWallet internal constructor(
             .also { syncDigitalCredentialRegistration() }
     }
 
+    /**
+     * Explicitly creates holder keys for a requested issuance batch using the platform key policy.
+     * Nothing calls this during preview or acceptance; the app decides when to create new keys.
+     */
+    public suspend fun createIssuanceHolderKeys(
+        count: Int,
+        keyType: MobileWalletKeyType? = null,
+        didMethod: String = "key",
+        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy? = null,
+    ): List<MobileWalletBootstrapResult> {
+        require(count >= 1) { "At least one holder key must be requested" }
+        MobileDidSupport.ensureInitialized()
+        val created = mutableListOf<MobileWalletBootstrapResult>()
+        try {
+            repeat(count) { created += createKeyAndDid(keyType ?: defaultKeyType, didMethod, keyUseAuthorizationPolicy ?: defaultKeyUseAuthorizationPolicy) }
+            return created
+        } catch (cause: Throwable) {
+            withContext(NonCancellable) {
+                for (entry in created) {
+                    try {
+                        didStore.removeDid(entry.did)
+                        keyStore.removeKey(entry.keyId)
+                    } catch (cleanupFailure: Throwable) { cause.addSuppressed(cleanupFailure) }
+                }
+            }
+            throw cause
+        }
+    }
+
     /** Checks whether a key-use authorization request is supported without creating or persisting a key. */
     public suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType = defaultKeyType,
@@ -397,16 +426,19 @@ public class MobileWallet internal constructor(
      */
     public suspend fun beginAuthorizationIssuance(
         sessionId: String,
-    ): WalletIssuanceAuthorization = issuanceSessions.beginAuthorization(sessionId)
+        credentials: List<MobileWalletCredentialSelection>? = null,
+    ): WalletIssuanceAuthorization = issuanceSessions.beginAuthorization(sessionId, credentials?.toLibrarySelections())
 
     /** Continues a pre-authorized session after review and optional transaction-code collection. */
     public suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
         transactionCode: String? = null,
+        credentials: List<MobileWalletCredentialSelection>? = null,
     ): WalletIssuanceOutcome =
         issuanceSessions.continuePreAuthorized(
             sessionId = sessionId,
             transactionCode = transactionCode?.ifBlank { null },
+            credentials = credentials?.toLibrarySelections(),
         ).alsoRefreshDigitalCredentialRegistration()
 
     /**
@@ -467,6 +499,12 @@ public class MobileWallet internal constructor(
             ?: error("No holder key is available for credential issuance")
         val selectedDid = did ?: didStore.listDids().toList().firstOrNull()?.did
         return when (offer) {
+            is MobileWalletCredentialOffer.Issuer -> WalletIssuanceSessionRequest(
+                credentialIssuer = offer.credentialIssuer,
+                credentialConfigurationIds = offer.credentialConfigurationIds,
+                keyId = selectedKeyId, did = selectedDid, clientId = clientId,
+                redirectUri = Url(redirectUri),
+            )
             is MobileWalletCredentialOffer.Uri -> WalletIssuanceSessionRequest(
                 offerUrl = Url(offer.value.trim()),
                 offerJson = null,

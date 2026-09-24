@@ -2,6 +2,8 @@
 
 package id.walt.wallet2.handlers
 
+import id.waltid.openid4vp.wallet.CredentialPresentationKey
+
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.keys.KeyUsage
@@ -1070,6 +1072,7 @@ object WalletPresentationHandler {
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             beforeCredentialsUsed = beforeCredentialsUsed,
             mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(isolatedCredentialsById),
+            credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(isolatedCredentialsById),
         )
     } ?: WalletPresentFunctionality2.walletPresentHandling(
         holderKey = requireNotNull(keyMaterial.legacyKey) {
@@ -1086,7 +1089,18 @@ object WalletPresentationHandler {
         clientIdTrustConfiguration = clientIdTrustConfiguration,
         beforeCredentialsUsed = beforeCredentialsUsed,
         mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(isolatedCredentialsById),
+            credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(isolatedCredentialsById),
     )
+
+    private fun Wallet.credentialHolderKeyResolver(
+        isolatedCredentialsById: Map<String, StoredCredential> = emptyMap(),
+    ): suspend (String, DigitalCredential) -> CredentialPresentationKey? = { credentialId, credential ->
+        val stored = isolatedCredentialsById[credentialId] ?: findCredential(credentialId)
+        if (stored?.holderKeyBinding == null) null else {
+            val material = resolveHolderKey(stored, setOf(KeyUsage.SIGN)).keyMaterial
+            CredentialPresentationKey(material.legacyKey, material.crypto2Key, credential.subject)
+        }
+    }
 
     private fun Wallet.mdocHolderKeyResolver(
         isolatedCredentialsById: Map<String, StoredCredential> = emptyMap(),
@@ -1155,6 +1169,7 @@ object WalletPresentationHandler {
                 selectCredentialsForQuery = selectCredentialsForQuery,
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                 mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(),
+            credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(),
             ).getOrElse { error ->
                 onEvent(WalletSessionEvent.presentation_failed)
                 throw error
@@ -1328,6 +1343,7 @@ object WalletPresentationHandler {
                 holderKey = crypto2Key,
                 holderDid = did,
                 mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(),
+            credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(),
             )
         } else {
             WalletPresentFunctionality2.buildVpToken(
@@ -1340,6 +1356,7 @@ object WalletPresentationHandler {
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                 holderCrypto2Key = null,
                 mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(),
+            credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(),
             )
         }
         val idToken = if (crypto2Key != null) {

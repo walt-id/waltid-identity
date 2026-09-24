@@ -118,7 +118,7 @@ class WalletIssuanceHandlerAttestationRetryTest {
           "issuer":"$ISSUER",
           "authorization_endpoint":"$ISSUER/authorize",
           "token_endpoint":"$TOKEN_ENDPOINT",
-          "response_types_supported":["code"],
+          "authorization_details_types_supported":["openid_credential"],"response_types_supported":["code"],
           "token_endpoint_auth_methods_supported":["attest_jwt_client_auth"],
           "client_attestation_signing_alg_values_supported":["ES256"],
           "client_attestation_pop_signing_alg_values_supported":["ES256"],

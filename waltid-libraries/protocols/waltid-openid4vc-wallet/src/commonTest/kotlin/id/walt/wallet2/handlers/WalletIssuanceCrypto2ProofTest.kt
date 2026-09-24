@@ -59,7 +59,7 @@ class WalletIssuanceCrypto2ProofTest {
                 keyId = "enterprise.resource.key",
             ),
             httpClient = issuerMetadataClient(),
-        ).proofJwt
+        ).proofs.jwt!!.single()
 
         assertEquals(
             "nonce",
@@ -83,7 +83,7 @@ class WalletIssuanceCrypto2ProofTest {
                 nonce = "nonce",
             ),
             httpClient = issuerMetadataClient(),
-        ).proofJwt
+        ).proofs.jwt!!.single()
 
         assertEquals(
             "nonce",
@@ -140,7 +140,7 @@ class WalletIssuanceCrypto2ProofTest {
                 codeVerifier = null,
                 credentialIssuerBaseUrl = ISSUER,
                 credentialEndpoint = Url("$ISSUER/credential"),
-                credentialConfigurationId = CONFIG_ID,
+                credentials = listOf(id.walt.wallet2.handlers.WalletCredentialSelection(CONFIG_ID)),
                 keyReference = "enterprise.resource.key",
                 httpClient = httpClient,
             ).toList()

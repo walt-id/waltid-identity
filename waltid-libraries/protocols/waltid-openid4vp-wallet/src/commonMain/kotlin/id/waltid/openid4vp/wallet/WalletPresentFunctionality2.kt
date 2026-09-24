@@ -50,6 +50,9 @@ import kotlin.time.Clock
 import id.walt.crypto2.keys.Key as Crypto2Key
 
 
+/** Signing material selected for one credential, preserving both supported crypto APIs. */
+data class CredentialPresentationKey(val legacyKey: Key?, val crypto2Key: Crypto2Key?, val did: String?)
+
 object WalletPresentFunctionality2 {
 
     private val log = KotlinLogging.logger { }
@@ -73,6 +76,7 @@ object WalletPresentFunctionality2 {
         dcApiOrigin: String? = null,
         /** Required for mdocs; resolves the exact credential-bound MSO DeviceKey. */
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        credentialHolderKeyResolver: (suspend (String, DigitalCredential) -> CredentialPresentationKey?)? = null,
     ): String {
         val vpTokenMapContents = mutableMapOf<String, JsonArray>()
         // OID4VP 1.0 Appendix A: DC API holder binding is to the platform-asserted origin.
@@ -84,43 +88,47 @@ object WalletPresentFunctionality2 {
                 for (matchResult in matchedCredsWithClaimsList) {
                     val digitalCredential = (matchResult.credential as RawDcqlCredential).originalCredential as DigitalCredential
 
+                    val selected = credentialHolderKeyResolver?.invoke(matchResult.credential.id, digitalCredential)
+                    val selectedCrypto2Key = selected?.crypto2Key ?: holderCrypto2Key.takeIf { selected == null }
+                    val selectedLegacyKey = selected?.legacyKey ?: holderKey.takeIf { selected == null }
+                    val selectedDid = selected?.did ?: holderDid
                     val resolvedFormat = WalletPresentationFormatRegistry.resolve(digitalCredential.format)
                     val presentationStringOrObject: JsonElement = when {
                         resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.JWT_VC_JSON ->
-                            holderCrypto2Key?.let {
+                            selectedCrypto2Key?.let {
                                 W3CPresenter.presentW3C(
                                     digitalCredential,
                                     matchResult,
                                     authorizationRequest,
                                     it,
-                                    holderDid ?: throw IllegalArgumentException("Missing DID for presentation"),
+                                    selectedDid ?: throw IllegalArgumentException("Missing DID for presentation"),
                                     holderBindingAudience,
                                 )
                             } ?: W3CPresenter.presentW3C(
                                 digitalCredential,
                                 matchResult,
                                 authorizationRequest,
-                                requireNotNull(holderKey),
-                                holderDid ?: throw IllegalArgumentException("Missing DID for presentation"),
+                                requireNotNull(selectedLegacyKey),
+                                selectedDid ?: throw IllegalArgumentException("Missing DID for presentation"),
                                 holderBindingAudience,
                             )
 
                         resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.DC_SD_JWT ->
-                            holderCrypto2Key?.let {
+                            selectedCrypto2Key?.let {
                                 SdJwtVcPresenter.presentSdJwtVc(
                                     digitalCredential,
                                     matchResult,
                                     authorizationRequest,
                                     it,
-                                    holderDid,
+                                    selectedDid,
                                     holderBindingAudience,
                                 )
                             } ?: SdJwtVcPresenter.presentSdJwtVc(
                                 digitalCredential,
                                 matchResult,
                                 authorizationRequest,
-                                requireNotNull(holderKey),
-                                holderDid,
+                                requireNotNull(selectedLegacyKey),
+                                selectedDid,
                                 holderBindingAudience,
                             )
 
@@ -469,6 +477,7 @@ object WalletPresentFunctionality2 {
         holderCrypto2Key: Crypto2Key?,
         dcApiOrigin: String? = null,
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        credentialHolderKeyResolver: (suspend (String, DigitalCredential) -> CredentialPresentationKey?)? = null,
     ): String {
         val verifierJwkThumbprint = ResponseEncryption.resolveCrypto2(authorizationRequest)?.thumbprint()
         return generateVpTokenForRequest(
@@ -481,6 +490,7 @@ object WalletPresentFunctionality2 {
             holderCrypto2Key = holderCrypto2Key,
             dcApiOrigin = dcApiOrigin,
             mdocHolderKeyResolver = mdocHolderKeyResolver,
+            credentialHolderKeyResolver = credentialHolderKeyResolver,
         )
     }
 
@@ -492,6 +502,7 @@ object WalletPresentFunctionality2 {
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
         dcApiOrigin: String? = null,
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        credentialHolderKeyResolver: (suspend (String, DigitalCredential) -> CredentialPresentationKey?)? = null,
     ): String {
         val verifierJwkThumbprint = ResponseEncryption.resolveCrypto2(authorizationRequest)?.thumbprint()
         return generateVpTokenForRequest(
@@ -504,6 +515,7 @@ object WalletPresentFunctionality2 {
             holderCrypto2Key = holderKey,
             dcApiOrigin = dcApiOrigin,
             mdocHolderKeyResolver = mdocHolderKeyResolver,
+            credentialHolderKeyResolver = credentialHolderKeyResolver,
         )
     }
 
@@ -561,6 +573,7 @@ object WalletPresentFunctionality2 {
         selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>>,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        credentialHolderKeyResolver: (suspend (String, DigitalCredential) -> CredentialPresentationKey?)? = null,
     ): Result<DcApiCredentialResponse> = runCatching {
         val authorizationRequest = request.authorizationRequest
         validateRequestTransactionData(
@@ -579,6 +592,7 @@ object WalletPresentFunctionality2 {
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             dcApiOrigin = request.origin,
             mdocHolderKeyResolver = mdocHolderKeyResolver,
+            credentialHolderKeyResolver = credentialHolderKeyResolver,
         )
         val idToken = buildIdToken(
             authorizationRequest = authorizationRequest,
@@ -812,6 +826,7 @@ object WalletPresentFunctionality2 {
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        credentialHolderKeyResolver: (suspend (String, DigitalCredential) -> CredentialPresentationKey?)? = null,
     ): Result<WalletPresentResult> = walletPresentHandling(
         holderKey = holderKey,
         holderDid = holderDid,
@@ -827,6 +842,7 @@ object WalletPresentFunctionality2 {
         clientIdTrustConfiguration = ClientIdTrustConfiguration(),
         beforeCredentialsUsed = beforeCredentialsUsed,
         mdocHolderKeyResolver = mdocHolderKeyResolver,
+            credentialHolderKeyResolver = credentialHolderKeyResolver,
     )
 
     @Deprecated("Use the Crypto2Key overload")
@@ -846,6 +862,7 @@ object WalletPresentFunctionality2 {
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        credentialHolderKeyResolver: (suspend (String, DigitalCredential) -> CredentialPresentationKey?)? = null,
     ): Result<WalletPresentResult> = walletPresentHandlingWithKey(
         holderKey,
         holderDid,
@@ -861,6 +878,7 @@ object WalletPresentFunctionality2 {
         clientIdTrustConfiguration,
         beforeCredentialsUsed,
         mdocHolderKeyResolver,
+        credentialHolderKeyResolver,
     )
 
     suspend fun walletPresentHandling(
@@ -878,6 +896,7 @@ object WalletPresentFunctionality2 {
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
         beforeCredentialsUsed: suspend (Int) -> Unit = {},
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
+        credentialHolderKeyResolver: (suspend (String, DigitalCredential) -> CredentialPresentationKey?)? = null,
     ): Result<WalletPresentResult> = walletPresentHandlingWithKey(
         null,
         holderDid,
@@ -893,6 +912,7 @@ object WalletPresentFunctionality2 {
         clientIdTrustConfiguration,
         beforeCredentialsUsed,
         mdocHolderKeyResolver,
+        credentialHolderKeyResolver,
     )
 
     private suspend fun walletPresentHandlingWithKey(
@@ -918,6 +938,7 @@ object WalletPresentFunctionality2 {
         /** Invoked with the credential count before the credentials are used, for usage metering. */
         beforeCredentialsUsed: suspend (Int) -> Unit,
         mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)?,
+        credentialHolderKeyResolver: (suspend (String, DigitalCredential) -> CredentialPresentationKey?)?,
     ): Result<WalletPresentResult> {
         log.trace { "- Start of Wallet Present Handling -" }
         log.trace { "Wallet presentation will use key $holderKey, and did $holderDid" }
@@ -1019,6 +1040,7 @@ object WalletPresentFunctionality2 {
                 holderDid,
                 transactionDataTypeRegistry,
                 mdocHolderKeyResolver = mdocHolderKeyResolver,
+            credentialHolderKeyResolver = credentialHolderKeyResolver,
             )
         } ?: buildVpToken(
             authorizationRequest,
@@ -1028,6 +1050,7 @@ object WalletPresentFunctionality2 {
             transactionDataTypeRegistry,
             holderCrypto2Key = null,
             mdocHolderKeyResolver = mdocHolderKeyResolver,
+            credentialHolderKeyResolver = credentialHolderKeyResolver,
         )
         val idToken = if (holderCrypto2Key != null) {
             buildIdToken(authorizationRequest, holderCrypto2Key, holderDid)

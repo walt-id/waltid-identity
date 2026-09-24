@@ -14,6 +14,7 @@ import id.walt.wallet2.server.models.PresentationPreviewResponse
 import id.walt.wallet2.server.models.ResolveOfferDetailedResponse
 import id.walt.wallet2.server.models.toDetailedResponse
 import id.walt.wallet2.server.models.toPreviewResponse
+import id.walt.wallet2.server.openapi.Wallet2RequestExamples
 import id.walt.wallet2.server.openapi.Wallet2OpenApiDocs
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.token.TokenRequestException
@@ -598,7 +599,12 @@ object Wallet2RouteHandler {
                             "Resolves the offer, requests a token, signs proof-of-possession, " +
                                     "fetches the credential(s) and stores them. " +
                                     "Returns a stream of stored credentials as they arrive."
-                        request { pathParameter<String>("walletId"); body<ReceiveCredentialRequest>() }
+                        request { pathParameter<String>("walletId"); body<ReceiveCredentialRequest> {
+                            description = Wallet2RequestExamples.BATCH_DESCRIPTION
+                            example("01 — Single instance (default)") { value = Wallet2RequestExamples.RECEIVE_SINGLE }
+                            example("02 — Two instances, two holder keys") { value = Wallet2RequestExamples.RECEIVE_BATCH }
+                            example("03 — Multiple configurations and a batch") { value = Wallet2RequestExamples.RECEIVE_MULTIPLE }
+                        } }
                         response {
                             HttpStatusCode.OK to { body<ReceiveCredentialResult>() }
                             HttpStatusCode.BadRequest to { description = "Token request failed (e.g. wrong PIN / tx_code)" }
@@ -634,7 +640,10 @@ object Wallet2RouteHandler {
 
                     post("/request-token", {
                         summary = "Isolated: exchange pre-authorized code for access token"
-                        request { pathParameter<String>("walletId"); body<RequestTokenRequest>() }
+                        description = "Supply credentialIssuer and credentialConfigurationIds to select authorization_details or scopes automatically from metadata."
+                        request { pathParameter<String>("walletId"); body<RequestTokenRequest> {
+                            example("Automatic authorization for selected configurations") { value = Wallet2RequestExamples.REQUEST_TOKEN_AUTOMATIC }
+                        } }
                         response { HttpStatusCode.OK to { body<RequestTokenResult>() } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
@@ -664,7 +673,7 @@ object Wallet2RouteHandler {
                     }
 
                     post("/sign-proof", {
-                        summary = "Isolated: sign a proof-of-possession JWT"
+                        summary = "Isolated: sign a collection of proof-of-possession JWTs"
                         request { pathParameter<String>("walletId"); body<SignProofRequest>() }
                         response { HttpStatusCode.OK to { body<SignProofResult>() } }
                     }) {
@@ -679,9 +688,9 @@ object Wallet2RouteHandler {
                                 "stored in the wallet, removing the need to call the import endpoint afterwards. " +
                                 "Pass credentialIssuerBaseUrl when storing so issuer display metadata and labels " +
                                 "are persisted like the full receive path. " +
-                                "When the response can contain an mdoc, keyId must identify the exact wallet key " +
-                                "used to create proofJwt. " +
-                                "If the issuer returns invalid_nonce, request a fresh nonce, sign a new proof, " +
+                                "Supply holderBindings identifying the exact wallet keys used to create proofs.jwt. " +
+                                "For a single instance keyId may supply the default holder key. " +
+                                "If the issuer returns invalid_nonce, request a fresh nonce, sign the proof collection again, " +
                                 "and repeat this isolated fetch step."
                         request { pathParameter<String>("walletId"); body<FetchCredentialRequest>() }
                         response {
@@ -705,9 +714,12 @@ object Wallet2RouteHandler {
                         summary = "Auth-code grant: generate authorization redirect URL"
                         description =
                             "Resolves the offer and builds the OAuth authorization URL. " +
+                                    "Selects authorization_details or scopes automatically from issuer metadata. " +
                                     "The caller must redirect to this URL and capture the returned code. " +
                                     "The response includes continuation data for later token and credential requests."
-                        request { pathParameter<String>("walletId"); body<GenerateAuthorizationUrlRequest>() }
+                        request { pathParameter<String>("walletId"); body<GenerateAuthorizationUrlRequest> {
+                            example("Multiple configurations without an offer") { value = Wallet2RequestExamples.AUTHORIZE_WITHOUT_OFFER }
+                        } }
                         response { HttpStatusCode.OK to { body<GenerateAuthorizationUrlResult>() } }
                     }) {
                         // Wallet-aware overload: PAR is a client-authenticated endpoint, so the
@@ -776,7 +788,10 @@ object Wallet2RouteHandler {
                                     "returned by /credentials/receive/authorization-url."
                         request {
                             pathParameter<String>("walletId")
-                            body<ReceiveAuthorizedCredentialRequest>()
+                            body<ReceiveAuthorizedCredentialRequest> {
+                                description = Wallet2RequestExamples.BATCH_DESCRIPTION
+                                example("Batch after authorization") { value = Wallet2RequestExamples.RECEIVE_AUTHORIZED_BATCH }
+                            }
                         }
                         response { HttpStatusCode.OK to { body<ReceiveCredentialResult>() } }
                     }) {

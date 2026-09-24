@@ -166,10 +166,9 @@ class VciWalletConformanceTests {
         plan: VciWalletTestPlan,
         walletId: String,
         attestationAuthority: ClientAttestationTestAuthority? = null,
-        useScope: Boolean = false,
     ) {
         val httpClient = createHttpClient()
-        val adapter = startAdapterIfNeeded(httpClient, walletId, attestationAuthority, useScope)
+        val adapter = startAdapterIfNeeded(httpClient, walletId, attestationAuthority)
         val adapterBaseUrl = "http://127.0.0.1:$adapterPort"
 
         try {
@@ -192,7 +191,6 @@ class VciWalletConformanceTests {
         httpClient: HttpClient,
         walletId: String,
         attestationAuthority: ClientAttestationTestAuthority?,
-        useScope: Boolean,
     ): VciWalletConformanceAdapter? {
         val adapterAlreadyRunning = try {
             val response = httpClient.get("http://127.0.0.1:$adapterPort/health")
@@ -212,7 +210,6 @@ class VciWalletConformanceTests {
             adapterPort = adapterPort,
             walletId = walletId,
             attestationAuthority = attestationAuthority,
-            useScope = useScope,
         ).also { it.start(httpClient) }
     }
 
@@ -323,8 +320,6 @@ class VciWalletConformanceTests {
             ),
             walletId,
             attestationAuthority,
-            // The HAIP plan fixes authorization_request_type=simple.
-            useScope = true,
         )
     }
 

@@ -11,6 +11,7 @@ import id.walt.wallet2.mobile.MobileWalletEventPhase
 import id.walt.wallet2.mobile.MobileWalletEventStatus
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
+import id.walt.wallet2.mobile.MobileWalletCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletClientIdScheme
@@ -715,15 +716,20 @@ class WalletSdkBridgeTest {
             policy: KeyUseAuthorizationPolicy,
         ): KeyUseAuthorizationSupport = error("Not used by this test fake")
 
+        override suspend fun createIssuanceHolderKeys(
+            count: Int, keyType: MobileWalletKeyType?, didMethod: String, policy: KeyUseAuthorizationPolicy?,
+        ): List<MobileWalletBootstrapResult> = List(count) { bootstrap(keyType, didMethod, policy) }
+
         override suspend fun startIssuance(request: MobileWalletIssuanceRequest) =
             error("Not used by this test fake")
 
-        override suspend fun beginAuthorizationIssuance(sessionId: String): WalletIssuanceAuthorization =
+        override suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<MobileWalletCredentialSelection>?): WalletIssuanceAuthorization =
             error("Not used by this test fake")
 
         override suspend fun continuePreAuthorizedIssuance(
             sessionId: String,
             transactionCode: String?,
+            credentials: List<MobileWalletCredentialSelection>?,
         ) = error("Not used by this test fake")
 
         override suspend fun continueAuthorizationIssuance(

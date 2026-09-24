@@ -9,6 +9,7 @@ import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
+import id.walt.wallet2.mobile.MobileWalletCredentialSelection
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
@@ -74,6 +75,16 @@ public class WalletSdkBridge private constructor(
             )
         }
 
+    /** Explicitly creates platform holder keys for a batch. Never called implicitly by issuance. */
+    public suspend fun createIssuanceHolderKeys(
+        count: Int,
+        keyType: MobileWalletKeyType? = null,
+        didMethod: String = "key",
+        keyUseAuthorizationPolicy: WalletBridgeKeyUseAuthorizationPolicy? = null,
+    ): WalletBridgeResult<List<MobileWalletBootstrapResult>> = walletBridgeCall {
+        operations.createIssuanceHolderKeys(count, keyType, didMethod, keyUseAuthorizationPolicy?.toCorePolicy())
+    }
+
     /** Checks whether a key-use authorization request is supported without creating a key. */
     public suspend fun keyUseAuthorizationPreflight(
         keyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
@@ -90,15 +101,17 @@ public class WalletSdkBridge private constructor(
     /** Starts the authorization-code browser request for an accepted issuance session. */
     public suspend fun beginAuthorizationIssuance(
         sessionId: String,
+        credentials: List<MobileWalletCredentialSelection>? = null,
     ): WalletBridgeResult<WalletIssuanceAuthorization> =
-        walletBridgeCall { operations.beginAuthorizationIssuance(sessionId) }
+        walletBridgeCall { operations.beginAuthorizationIssuance(sessionId, credentials) }
 
     /** Continues one reviewed pre-authorized issuance session. */
     public suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
         transactionCode: String? = null,
+        credentials: List<MobileWalletCredentialSelection>? = null,
     ): WalletBridgeResult<WalletIssuanceOutcome> =
-        walletBridgeCall { operations.continuePreAuthorizedIssuance(sessionId, transactionCode) }
+        walletBridgeCall { operations.continuePreAuthorizedIssuance(sessionId, transactionCode, credentials) }
 
     /** Continues one authorization-code issuance session after its browser callback. */
     public suspend fun continueAuthorizationIssuance(
@@ -257,13 +270,18 @@ internal interface WalletSdkBridgeOperations {
         policy: KeyUseAuthorizationPolicy,
     ): KeyUseAuthorizationSupport
 
+    suspend fun createIssuanceHolderKeys(
+        count: Int, keyType: MobileWalletKeyType?, didMethod: String, policy: KeyUseAuthorizationPolicy?,
+    ): List<MobileWalletBootstrapResult>
+
     suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceSession
 
-    suspend fun beginAuthorizationIssuance(sessionId: String): WalletIssuanceAuthorization
+    suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<MobileWalletCredentialSelection>?): WalletIssuanceAuthorization
 
     suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
         transactionCode: String?,
+        credentials: List<MobileWalletCredentialSelection>?,
     ): WalletIssuanceOutcome
 
     suspend fun continueAuthorizationIssuance(
@@ -337,17 +355,22 @@ internal class MobileWalletSdkBridgeOperations(
         policy: KeyUseAuthorizationPolicy,
     ): KeyUseAuthorizationSupport = wallet.keyUseAuthorizationPreflight(keyType, policy)
 
+    override suspend fun createIssuanceHolderKeys(
+        count: Int, keyType: MobileWalletKeyType?, didMethod: String, policy: KeyUseAuthorizationPolicy?,
+    ): List<MobileWalletBootstrapResult> = wallet.createIssuanceHolderKeys(count, keyType, didMethod, policy)
+
     override suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceSession =
         wallet.startIssuance(request)
 
-    override suspend fun beginAuthorizationIssuance(sessionId: String): WalletIssuanceAuthorization =
-        wallet.beginAuthorizationIssuance(sessionId)
+    override suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<MobileWalletCredentialSelection>?): WalletIssuanceAuthorization =
+        wallet.beginAuthorizationIssuance(sessionId, credentials)
 
     override suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
         transactionCode: String?,
+        credentials: List<MobileWalletCredentialSelection>?,
     ): WalletIssuanceOutcome =
-        wallet.continuePreAuthorizedIssuance(sessionId, transactionCode)
+        wallet.continuePreAuthorizedIssuance(sessionId, transactionCode, credentials)
 
     override suspend fun continueAuthorizationIssuance(
         sessionId: String,

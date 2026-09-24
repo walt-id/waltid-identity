@@ -100,6 +100,60 @@ offer, open the returned browser URL, and then continue with
 the app's ordered BCP 47 language preferences; platform demos pass their
 platform locale preferences.
 
+### Explicit batches and multiple configurations
+
+Issuance requests one instance of each selected configuration by default. A batch
+is opt-in: after reviewing `session.offer.batchSize`, pass one existing holder
+key per instance at acceptance. A missing batch size means single issuance only;
+an oversized batch fails before the token is redeemed.
+
+```kotlin
+// Optional explicit key creation, using the wallet's platform key-use policy.
+// Existing keys may be selected instead. Preview never generates keys.
+val holders = wallet.createIssuanceHolderKeys(count = 2)
+val accepted = listOf(
+    MobileWalletCredentialSelection(
+        credentialConfigurationId = session.offer.credentials.first().configurationId,
+        holderBindings = holders.map { MobileWalletHolderBinding(it.keyId, it.did) },
+    )
+)
+val outcome = wallet.continuePreAuthorizedIssuance(session.id, transactionCode, accepted)
+// For authorization-code issuance instead:
+// val authorization = wallet.beginAuthorizationIssuance(session.id, accepted)
+```
+
+Add selections for other offered configurations to receive multiple datasets or
+formats. They use separate Credential Requests under the same token. Returned
+`authorization_details.credential_identifiers` are expanded automatically;
+scope-only grants use configuration IDs. Do not invent dataset identifiers.
+Both flows select authorization parameters automatically from metadata: prefer
+`authorization_details` when `openid_credential` is advertised, otherwise use the
+selected configurations' advertised scopes. Unsupported metadata fails explicitly;
+no application-level authorization-strategy switch is needed.
+
+For wallet-initiated authorization without an offer, start with
+`MobileWalletCredentialOffer.Issuer(issuerUrl, configurationIds)`; authorization
+parameter selection follows the same metadata-based rules.
+
+The session persists accepted key references and public identities across browser
+callbacks and deferred issuance. Responses are matched by holder public key,
+not array order, and may contain fewer instances than requested. Each stored
+credential retains its own key association for later presentation. The OAuth/DPoP
+key remains separate from the selected holder keys. Legacy single-key session
+records continue with their original key.
+
+Swift callers can use the same acceptance selections and explicit
+`createIssuanceHolderKeys` operation through `WalletSdkBridge`.
+Existing issuance lifecycle events remain in place; the stored event is emitted
+for each successful save, and failed outcomes retain any already stored IDs.
+
+After changing the Swift-facing API, regenerate and check its native ABI on macOS:
+
+```shell
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:updateKotlinAbi -PenableIosBuild=true
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:checkKotlinAbi :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:iosSimulatorArm64Test -PenableIosBuild=true
+```
+
 ## Presenting credentials
 
 Preview a presentation request before submission. The request information includes
