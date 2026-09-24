@@ -89,11 +89,50 @@ class KeyAttestationProofTest {
 
     @Test
     fun `expired attestation is rejected`() = runTest {
+        val now = Clock.System.now().toEpochMilliseconds() / 1000
         val wallet = walletWithProofKey().attachKeyAttestationProvider(TestProvider(newKey("attester"), payload = {
-            request -> claims(request, expiresAt = Clock.System.now().toEpochMilliseconds() / 1000 - 1)
+            request -> JsonObject(claims(request, expiresAt = now - 1) + ("iat" to JsonPrimitive(now - 600)))
         }))
         val error = assertFailsWith<IllegalArgumentException> { sign(wallet) }
         assertTrue(error.message.orEmpty().contains("not currently valid"))
+    }
+
+    @Test
+    fun `attestation type must be present and identify a key attestation`() = runTest {
+        val request = attestationRequest()
+        val attester = newKey("attester")
+        for (type in listOf(null, "JWT", "openid4vci-proof+jwt")) {
+            val error = assertFailsWith<IllegalArgumentException>("typ=$type") {
+                TestProvider(attester, jwtType = type).validatedAttestation(request)
+            }
+            assertTrue(error.message.orEmpty().contains("invalid JWT type"))
+        }
+    }
+
+    @Test
+    fun `attestation timestamps must be numeric and define a current validity interval`() = runTest {
+        val request = attestationRequest()
+        val attester = newKey("attester")
+        val now = Clock.System.now().toEpochMilliseconds() / 1000
+        val valid = claims(request)
+        val invalidClaims = listOf(
+            "missing iat" to JsonObject(valid - "iat"),
+            "missing exp" to JsonObject(valid - "exp"),
+            "string iat" to JsonObject(valid + ("iat" to JsonPrimitive(now.toString()))),
+            "string exp" to JsonObject(valid + ("exp" to JsonPrimitive((now + 300).toString()))),
+            "future iat" to JsonObject(valid + ("iat" to JsonPrimitive(now + 120))),
+            "empty interval" to JsonObject(valid + mapOf(
+                "iat" to JsonPrimitive(now + 30), "exp" to JsonPrimitive(now + 30),
+            )),
+            "reversed interval" to JsonObject(valid + mapOf(
+                "iat" to JsonPrimitive(now + 30), "exp" to JsonPrimitive(now + 15),
+            )),
+        )
+        for ((case, payload) in invalidClaims) {
+            assertFailsWith<IllegalArgumentException>(case) {
+                TestProvider(attester, payload = { payload }).validatedAttestation(request)
+            }
+        }
     }
 
     @Test
@@ -365,6 +404,7 @@ class KeyAttestationProofTest {
         private val payload: suspend (KeyAttestationRequest) -> JsonObject = { claims(it) },
         private val signingKey: Crypto2Key = verificationKey,
         private val headerJwk: kotlinx.serialization.json.JsonElement? = null,
+        private val jwtType: String? = "key-attestation+jwt",
     ) : KeyAttestationProvider {
         override suspend fun attest(request: KeyAttestationRequest): String {
             val attesterJwk = verificationKey.capabilities.publicKeyExporter!!.exportPublicKey()
@@ -374,7 +414,7 @@ class KeyAttestationProofTest {
                 key = signingKey,
                 algorithm = JwsAlgorithm.ES256,
                 protectedHeader = buildJsonObject {
-                    put("typ", "key-attestation+jwt")
+                    jwtType?.let { put("typ", it) }
                     put("jwk", headerJwk ?: Json.parseToJsonElement(attesterJwk.data.toByteArray().decodeToString()))
                 },
             )

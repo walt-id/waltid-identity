@@ -1195,7 +1195,7 @@ private extension WalletConfiguration {
     }
 }
 
-private final class KMPKeyAttestationProviderAdapter: WalletBridgeKeyAttestationProvider, @unchecked Sendable {
+final class KMPKeyAttestationProviderAdapter: WalletBridgeKeyAttestationProvider, @unchecked Sendable {
     private let provider: any KeyAttestationProvider
 
     init(provider: any KeyAttestationProvider) {
