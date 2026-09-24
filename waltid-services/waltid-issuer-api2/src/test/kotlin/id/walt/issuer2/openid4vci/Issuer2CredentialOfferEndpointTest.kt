@@ -18,6 +18,7 @@ import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.domain.CredentialProfile
+import id.walt.issuer2.repository.IssuanceSessionStorageCodec
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.issuer2Module
@@ -93,10 +94,68 @@ class Issuer2CredentialOfferEndpointTest {
     }
 
     @Test
+    fun shouldAcceptLegacyJsonAndReturnTheLegacyReceipt() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val response = client.post("/issuer2/credential-offers") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"profileId":"$OPEN_BADGE_PROFILE_ID","authMethod":"PRE_AUTHORIZED"}""")
+        }
+        assertEquals(HttpStatusCode.Created, response.status, response.bodyAsText())
+        val receipt = json.parseToJsonElement(response.bodyAsText()).jsonObject
+        assertEquals(OPEN_BADGE_PROFILE_ID, receipt["profileId"]?.jsonPrimitive?.content)
+        assertEquals(setOf("offerId", "profileId", "authMethod", "expiresAt", "credentialOffer"), receipt.keys)
+        assertTrue(receipt.getValue("expiresAt").jsonPrimitive.content.toLong() > Clock.System.now().toEpochMilliseconds())
+        assertNotNull(CredentialOfferParser.parseCredentialOfferUrl(receipt.getValue("credentialOffer").jsonPrimitive.content).credentialOfferUri)
+    }
+
+    @Test
+    fun shouldReturnTheArrayReceiptForOneOrMoreEntries() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        for (profileIds in listOf(listOf(OPEN_BADGE_PROFILE_ID), listOf(OPEN_BADGE_PROFILE_ID, IDENTITY_SD_JWT_PROFILE_ID))) {
+            val entries = profileIds.joinToString(",") { """{"profileId":"$it"}""" }
+            val response = client.post("/issuer2/credential-offers") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"credentials":[$entries],"authMethod":"PRE_AUTHORIZED","valueMode":"BY_VALUE"}""")
+            }
+            assertEquals(HttpStatusCode.Created, response.status, response.bodyAsText())
+            val receipt = json.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(setOf("offerId", "authMethod", "expiresAt", "credentialOffer"), receipt.keys)
+            val offer = assertNotNull(CredentialOfferParser.parseCredentialOfferUrl(receipt.getValue("credentialOffer").jsonPrimitive.content).credentialOffer)
+            assertEquals(profileIds.size, offer.credentialConfigurationIds.size)
+        }
+    }
+
+    @Test
+    fun shouldRejectInvalidOrConflictingContractSelectors() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val entry = """{"profileId":"$OPEN_BADGE_PROFILE_ID"}"""
+        val invalidFields = listOf(
+            "", "\"profileId\":null,", "\"profileId\":42,", "\"profileId\":\"\",",
+            "\"credentials\":null,", "\"credentials\":{},", "\"credentials\":[],",
+            """"profileId":"$OPEN_BADGE_PROFILE_ID","credentials":null,""",
+            """"profileId":null,"credentials":[$entry],""",
+            """"profileId":"$OPEN_BADGE_PROFILE_ID","credentials":[$entry],""",
+            """"credentials":[$entry],"runtimeOverrides":null,""",
+            """"credentials":[$entry],"runtimeOverrides":{},""",
+        )
+        for (fields in invalidFields) {
+            val body = """{$fields"authMethod":"PRE_AUTHORIZED"}"""
+            val response = client.post("/issuer2/credential-offers") {
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status, "$body: ${response.bodyAsText()}")
+        }
+    }
+
+    @Test
     fun bundledPortraitProfilesProduceTaggedCaptureTimestamps() {
         val serviceConfig = issuer2ConfigDir()
         val dockerConfig = serviceConfig.parent.parent.parent.resolve("docker-compose/issuer-api2/config/issuer2-profiles.conf")
-        for ((profileFile, expectedCount) in listOf(serviceConfig.resolve("issuer2-profiles.conf") to 4, dockerConfig to 3)) {
+        for ((profileFile, expectedCount) in listOf(serviceConfig.resolve("issuer2-profiles.conf") to 2, dockerConfig to 2)) {
             loadIssuer2ConfigFiles(profileFile)
             var checked = 0
             for ((profileId, profile) in ConfigManager.getConfig<Issuer2ProfilesConfig>().profiles) {
@@ -134,7 +193,7 @@ class Issuer2CredentialOfferEndpointTest {
             client.getProfile(ISO_MDL_PROFILE_ID),
             client.getProfile(ISO_PHOTO_ID_PROFILE_ID),
             client.getProfile(IDENTITY_SD_JWT_PROFILE_ID),
-            client.getProfile(TAX_ID_SD_JWT_PROFILE_ID),
+            client.getProfile(EHIC_SD_JWT_PROFILE_ID),
         )
 
         representativeProfiles.forEach { profile ->
@@ -597,7 +656,7 @@ class Issuer2CredentialOfferEndpointTest {
         )
 
         assertEquals(Instant.DISTANT_FUTURE.toEpochMilliseconds(), response.expiresAt)
-        val session = client.get("/issuer2/sessions/${response.offerId}").body<IssuanceSession>()
+        val session = client.get("/issuer2/sessions/${response.offerId}").bodyAsText().let(IssuanceSessionStorageCodec::decode)
         assertEquals(Instant.DISTANT_FUTURE, session.expiresAt)
     }
 
@@ -625,7 +684,7 @@ class Issuer2CredentialOfferEndpointTest {
             )
         )
 
-        val session = client.get("/issuer2/sessions/${response.offerId}").body<IssuanceSession>()
+        val session = client.get("/issuer2/sessions/${response.offerId}").bodyAsText().let(IssuanceSessionStorageCodec::decode)
         val issuanceRequest = session.issuanceRequests.single()
         assertEquals("Jane", issuanceRequest.credentialData["credentialSubject"]?.jsonObject?.get("givenName")?.jsonPrimitive?.content)
         assertEquals("did:example:holder", issuanceRequest.credentialData["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.content)
@@ -743,7 +802,7 @@ class Issuer2CredentialOfferEndpointTest {
     private suspend fun HttpClient.getSession(sessionId: String): IssuanceSession =
         get("/issuer2/sessions/$sessionId").also {
             assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
-        }.body()
+        }.bodyAsText().let(IssuanceSessionStorageCodec::decode)
 
     private suspend fun HttpClient.createCredentialOffer(
         request: CredentialOfferCreateRequest,
@@ -965,7 +1024,7 @@ class Issuer2CredentialOfferEndpointTest {
         const val ISO_PHOTO_ID_COMMON_NAMESPACE_ID = "org.iso.23220.1"
         const val ISO_PHOTO_ID_CONFIGURATION_ID = "org.iso.23220.photoid.1"
         const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
-        const val TAX_ID_SD_JWT_PROFILE_ID = "taxIdCredentialSdJwt"
+        const val EHIC_SD_JWT_PROFILE_ID = "ehicSdJwt"
         const val EU_AGE_VERIFICATION_PROFILE_ID = "euAgeVerificationMdoc"
         const val SCA_PAYMENT_TRANSACTION_DATA_TYPE = "urn:eudi:sca:payment:1"
         const val TX_CODE_VALUE = "123456"

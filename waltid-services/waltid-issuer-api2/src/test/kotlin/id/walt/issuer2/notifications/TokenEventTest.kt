@@ -193,10 +193,14 @@ class TokenEventTest {
                 override suspend fun createAccessTokenResponse(
                     request: AccessTokenRequest,
                     options: TokenResponseOptions,
-                ) = AccessTokenResponseResult.Success(
-                    request = request.withSession(DefaultSession(subject = session.sessionId)),
-                    response = AccessTokenResponse(accessToken = "access-token"),
-                )
+                ): AccessTokenResponseResult {
+                    val validatedRequest = request.withSession(DefaultSession(subject = session.sessionId))
+                    return AccessTokenResponseResult.Success(
+                        request = validatedRequest,
+                        response = AccessTokenResponse(accessToken = "access-token"),
+                        credentialAuthorization = options.credentialAuthorizationResolver?.invoke(validatedRequest, null),
+                    )
+                }
             }
         }
 
@@ -348,6 +352,8 @@ class TokenEventTest {
 
     private class InMemorySessionRepository(initial: List<IssuanceSession>) : IssuanceSessionRepository {
         private val sessions = initial.associateBy { it.sessionId }.toMutableMap()
+
+        override suspend fun take(sessionId: String): IssuanceSession? = sessions.remove(sessionId)
 
         override suspend fun save(session: IssuanceSession): IssuanceSession =
             session.also { sessions[it.sessionId] = it }

@@ -24,7 +24,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
                 GrantType.PreAuthorizedCode ->
                     validatePreAuthorizedCodeGrant(parameters, session, parameters.optionalAuthorizationDetails())
                 GrantType.RefreshToken ->
-                    validateRefreshTokenGrant(parameters, session)
+                    validateRefreshTokenGrant(parameters, session, parameters.optionalAuthorizationDetails())
                 else -> AccessTokenRequestResult.Failure(
                     OAuthError(
                         error = id.walt.openid4vci.errors.OAuthErrorCodes.UNSUPPORTED_GRANT_TYPE,
@@ -131,6 +131,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
     private fun validateRefreshTokenGrant(
         parameters: Map<String, List<String>>,
         session: Session,
+        authorizationDetails: List<AuthorizationDetail>,
     ): AccessTokenRequestResult {
         // RFC6749 §6 requires grant_type=refresh_token and refresh_token. Client identity can be
         // supplied by client authentication outside the request body.
@@ -157,6 +158,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             client = client,
             grantTypes = setOf(GrantType.RefreshToken.value),
             requestedScopes = requestedScopes,
+            authorizationDetails = authorizationDetails,
             requestedAudience = emptySet(),
             grantedAudience = emptySet(),
             requestForm = parameters.toMap() + ("refresh_token" to listOf(refreshToken)),

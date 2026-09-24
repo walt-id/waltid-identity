@@ -113,6 +113,14 @@ class WalletIssuanceCrypto2ProofTest {
     }
 
     @Test
+    fun `required key attestation is not silently omitted from a JWT proof`() {
+        assertFailsWith<IllegalArgumentException> {
+            supportedJwtProofAlgorithms(mapOf("jwt" to ProofType(setOf("ES256"),
+                id.walt.openid4vci.metadata.issuer.KeyAttestationsRequired())))
+        }
+    }
+
+    @Test
     fun `non-JWT proof metadata is rejected instead of sending JWT`() {
         assertFailsWith<IllegalArgumentException> {
             supportedJwtProofAlgorithms(mapOf("attestation" to ProofType(setOf("ES256"))))

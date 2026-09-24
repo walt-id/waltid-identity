@@ -5,7 +5,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
-import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.repository.IssuanceSessionStorageCodec
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferCreateRequest
@@ -76,7 +76,7 @@ class IssuanceNotificationRouteTest {
     private fun CredentialOfferCreateRequest.withRuntimeOverrides(
         runtimeOverrides: CredentialOfferRuntimeOverrides,
     ): CredentialOfferCreateRequest = copy(
-        credentials = credentials.map { it.copy(runtimeOverrides = runtimeOverrides) }
+        runtimeOverrides = runtimeOverrides
     )
 
 
@@ -93,9 +93,11 @@ class IssuanceNotificationRouteTest {
         try {
             installIssuer2WithConfigFiles()
             val client = apiClient()
+            val credentialStatus = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS.runtimeOverrides!!.credentialStatus
             val createdOffer = client.createCredentialOffer(
                 Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.withRuntimeOverrides(
                     runtimeOverrides = CredentialOfferRuntimeOverrides(
+                        credentialStatus = credentialStatus,
                         notifications = IssuanceNotifications(
                             webhook = IssuanceNotifications.WebhookNotification(
                                 url = notificationServer.webhookUrl(),
@@ -105,8 +107,14 @@ class IssuanceNotificationRouteTest {
                 )
             )
 
-            val credentialPayload = client.completePreAuthorizedJwtIssuance(createdOffer)
-            assertJwtVcJsonCredentialPayload(credentialPayload)
+            val credentialPayload = client.completePreAuthorizedJwtIssuance(createdOffer, proofCount = 2)
+            val copies = credentialPayload.getValue("credentials").jsonArray
+            assertEquals(2, copies.size)
+            copies.forEach { copy ->
+                assertJwtVcJsonCredentialPayload(buildJsonObject {
+                    put("credentials", kotlinx.serialization.json.JsonArray(listOf(copy)))
+                })
+            }
 
             val expectedEvents = listOf(
                 IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
@@ -126,10 +134,7 @@ class IssuanceNotificationRouteTest {
                     .session
             )
             assertEquals(createdOffer.offerId, tokenRequest["sessionId"]?.jsonPrimitive?.contentOrNull)
-            val tokenIssuanceRequest = assertNotNull(tokenRequest["issuanceRequests"])
-                .jsonArray
-                .single()
-                .jsonObject
+            val tokenIssuanceRequest = tokenRequest
             assertEquals(
                 "OpenBadgeCredential_jwt_vc_json",
                 tokenIssuanceRequest["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull,
@@ -140,10 +145,11 @@ class IssuanceNotificationRouteTest {
             }
             assertEquals(createdOffer.offerId, credentialSuccess.session["sessionId"]?.jsonPrimitive?.contentOrNull)
             assertEquals("SUCCESSFUL", credentialSuccess.session["status"]?.jsonPrimitive?.contentOrNull)
-            val credentialSuccessIssuanceRequest = assertNotNull(credentialSuccess.session["issuanceRequests"])
-                .jsonArray
-                .single()
-                .jsonObject
+            val credentialSuccessIssuanceRequest = credentialSuccess.session
+            assertEquals(
+                credentialStatus,
+                credentialSuccessIssuanceRequest["credentialStatus"],
+            )
             assertEquals(
                 "redacted",
                 credentialSuccessIssuanceRequest["issuerKey"]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull,
@@ -468,7 +474,7 @@ class IssuanceNotificationRouteTest {
                 },
             )
 
-            val storedSession = client.get("/issuer2/sessions/${createdOffer.offerId}").body<IssuanceSession>()
+            val storedSession = client.get("/issuer2/sessions/${createdOffer.offerId}").bodyAsText().let(IssuanceSessionStorageCodec::decode)
             assertEquals(IssuanceSessionStatus.ACTIVE, storedSession.status)
             assertEquals(false, storedSession.isClosed)
             assertNull(storedSession.failure)
@@ -650,10 +656,7 @@ class IssuanceNotificationRouteTest {
         assertEquals(createdOffer.offerId, update.target)
         assertEquals(IssuanceSessionEvent.CREDENTIAL_OFFER_RETRIEVED.value, update.event)
         assertEquals(createdOffer.offerId, update.session["sessionId"]?.jsonPrimitive?.contentOrNull)
-        val issuanceRequest = assertNotNull(update.session["issuanceRequests"])
-            .jsonArray
-            .single()
-            .jsonObject
+        val issuanceRequest = update.session
         assertEquals(
             "OpenBadgeCredential_jwt_vc_json",
             issuanceRequest["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull,
@@ -664,10 +667,42 @@ class IssuanceNotificationRouteTest {
         )
     }
 
+    @Test
+    fun sseCredentialSuccessRetainsSingleOfferShapeWithSharedBatchStatus() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS
+        val createdOffer = client.createCredentialOffer(example)
+        val wallet = Issuer2WalletFlowDriver(client)
+        val resolved = wallet.resolve(createdOffer)
+        val configurationId = resolved.offer.credentialConfigurationIds.single()
+        val token = wallet.exchangePreAuthorizedCode(resolved, null)
+        val first = wallet.buildJwtProofs(resolved.issuerMetadata, configurationId)
+        val second = wallet.buildJwtProofs(resolved.issuerMetadata, configurationId)
+
+        val update = client.readFirstSseUpdate(createdOffer.offerId) {
+            val response = client.post(resolved.issuerMetadata.credentialEndpoint) {
+                bearerAuth(token.access_token)
+                contentType(ContentType.Application.Json)
+                setBody(credentialRequest(configurationId, first.copy(jwt = first.jwt!! + second.jwt!!)))
+            }
+            assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+            assertEquals(2, response.body<JsonObject>().getValue("credentials").jsonArray.size)
+        }
+        assertEquals(IssuanceSessionEvent.CREDENTIAL_REQUEST_W3C_VC_SUCCEEDED.value, update.event)
+        assertEquals(createdOffer.offerId, update.target)
+        assertEquals("SUCCESSFUL", update.session["status"]?.jsonPrimitive?.content)
+        assertEquals(example.profileId, update.session["profileId"]?.jsonPrimitive?.content)
+        assertEquals(example.runtimeOverrides!!.credentialStatus, update.session["credentialStatus"])
+        assertNull(update.session["issuanceRequests"])
+        assertEquals("redacted", update.session["issuerKey"]?.jsonObject?.get("type")?.jsonPrimitive?.content)
+    }
+
     private suspend fun HttpClient.completePreAuthorizedJwtIssuance(
         createdOffer: CredentialOfferCreateResponse,
+        proofCount: Int = 1,
     ): JsonObject {
-        val credentialResponse = requestPreAuthorizedJwtCredential(createdOffer)
+        val credentialResponse = requestPreAuthorizedJwtCredential(createdOffer, proofCount = proofCount)
         assertEquals(HttpStatusCode.OK, credentialResponse.status, credentialResponse.bodyAsText())
         return credentialResponse.body()
     }
@@ -676,6 +711,7 @@ class IssuanceNotificationRouteTest {
         createdOffer: CredentialOfferCreateResponse,
         tamperProof: Boolean = false,
         requestId: String? = null,
+        proofCount: Int = 1,
     ): HttpResponse {
         val resolvedOffer = createdOffer.resolveOffer(this)
         val preAuthorizedCode = assertNotNull(resolvedOffer.grants?.preAuthorizedCode?.preAuthorizedCode)
@@ -703,11 +739,12 @@ class IssuanceNotificationRouteTest {
             audience = issuerMetadata.credentialIssuer,
             nonce = nonce,
             binding = ProofKeyBinding.KeyId("$holderDid#0"),
+            clientId = null,
         )
         val proofs = if (tamperProof) {
             validProofs.copy(jwt = validProofs.jwt?.map(::tamperSignature))
         } else {
-            validProofs
+            validProofs.copy(jwt = List(proofCount) { requireNotNull(validProofs.jwt).single() })
         }
 
         return post("/openid4vci/credential") {

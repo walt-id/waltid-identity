@@ -26,12 +26,7 @@ class CredentialCardArtTest {
         val art = CredentialCardDisplayData(
             id = "credential-id",
             title = "Example credential",
-            credentialType = null,
-            format = "jwt_vc_json",
             issuer = "Example issuer",
-            holderName = null,
-            validity = null,
-            portrait = null,
             logoUri = "https://issuer.example/credential.png",
             logoAltText = "Credential logo",
         ).toCardArt()
@@ -59,6 +54,10 @@ class CredentialCardArtTest {
             credentialCardLogoSource("https://issuer.example/credential.png"),
         )
         assertEquals(CredentialCardLogoSource.BundledWalt, credentialCardLogoSource("http://issuer.example/logo.png"))
+        assertEquals(
+            CredentialCardLogoSource.Metadata("https://issuer.example/logo.svg"),
+            credentialCardLogoSource("https://issuer.example/logo.svg"),
+        )
         assertEquals(CredentialCardLogoSource.BundledWalt, credentialCardLogoSource(null))
     }
 

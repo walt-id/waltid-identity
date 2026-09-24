@@ -7,6 +7,7 @@ import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.issuer2.models.CredentialOfferCreateResponse
+import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
@@ -55,8 +56,12 @@ class Issuer2WalletFlowDriver(
 ) {
     private var walletInstanceKey: Crypto2Key? = null
 
-    suspend fun resolve(createdOffer: CredentialOfferCreateResponse): ResolvedCredentialOffer {
-        val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(createdOffer.credentialOffer)
+    suspend fun resolve(createdOffer: CredentialOfferCreateResponse): ResolvedCredentialOffer = resolve(createdOffer.credentialOffer)
+
+    suspend fun resolve(createdOffer: MultiCredentialOfferCreateResponse): ResolvedCredentialOffer = resolve(createdOffer.credentialOffer)
+
+    private suspend fun resolve(credentialOffer: String): ResolvedCredentialOffer {
+        val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(credentialOffer)
         val offer = CredentialOfferResolver(client).resolveCredentialOffer(
             credentialOffer = offerRequest.credentialOffer,
             credentialOfferUri = offerRequest.credentialOfferUri,
@@ -235,10 +240,12 @@ class Issuer2WalletFlowDriver(
     suspend fun refreshAccessToken(
         resolvedOffer: ResolvedCredentialOffer,
         refreshToken: String,
+        additionalParameters: Map<String, String> = emptyMap(),
     ): TokenRequestBuilder.TokenResponse =
         TokenRequestBuilder(walletClientConfig, client).refreshAccessToken(
             tokenEndpoint = requireNotNull(resolvedOffer.authorizationServerMetadata.tokenEndpoint),
             refreshToken = refreshToken,
+            additionalParameters = additionalParameters,
             attestationHeaders = buildAttestationHeaders(resolvedOffer),
         )
 
@@ -248,11 +255,13 @@ class Issuer2WalletFlowDriver(
         credentialConfigurationId: String = resolvedOffer.offer.credentialConfigurationIds.single(),
         credentialIdentifier: String? = null,
         includeDidInProof: Boolean? = null,
+        clientId: String? = null,
     ): JsonObject {
         val proofs = buildJwtProofs(
             issuerMetadata = resolvedOffer.issuerMetadata,
             credentialConfigurationId = credentialConfigurationId,
             includeDidInProof = includeDidInProof,
+            clientId = clientId ?: proofClientId(resolvedOffer),
         )
         val response = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(accessToken)
@@ -289,6 +298,19 @@ class Issuer2WalletFlowDriver(
         val authorizationResponse = client.get(authorizationUrl)
         assertEquals(HttpStatusCode.Found, authorizationResponse.status, authorizationResponse.bodyAsText())
         return assertNotNull(authorizationResponse.headers[HttpHeaders.Location])
+    }
+
+    /**
+     * Client-bound grants send the wallet `client_id` as proof `iss`. Anonymous pre-authorized
+     * access must omit it (OpenID4VCI 1.0 Appendix F.1), matching [exchangePreAuthorizedCode].
+     */
+    private suspend fun proofClientId(resolvedOffer: ResolvedCredentialOffer): String? {
+        val preAuthorizedOnly = resolvedOffer.offer.grants?.preAuthorizedCode != null &&
+            resolvedOffer.offer.grants?.authorizationCode == null
+        val anonymous = preAuthorizedOnly &&
+            buildAttestationHeaders(resolvedOffer) == null &&
+            resolvedOffer.authorizationServerMetadata.preAuthorizedGrantAnonymousAccessSupported == true
+        return walletClientConfig.clientId.takeUnless { anonymous }
     }
 
     private suspend fun buildAttestationHeaders(
@@ -367,6 +389,7 @@ class Issuer2WalletFlowDriver(
         issuerMetadata: CredentialIssuerMetadata,
         credentialConfigurationId: String,
         includeDidInProof: Boolean? = null,
+        clientId: String? = null,
     ): Proofs {
         val nonceResponse = client.post(requireNotNull(issuerMetadata.nonceEndpoint)).body<JsonObject>()
         val proofKey = JWKKey.generate(KeyType.secp256r1)
@@ -385,6 +408,7 @@ class Issuer2WalletFlowDriver(
             audience = issuerMetadata.credentialIssuer,
             nonce = requireNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull),
             binding = holderDid?.let { ProofKeyBinding.KeyId("$it#0") } ?: ProofKeyBinding.Jwk,
+            clientId = clientId,
         )
     }
 

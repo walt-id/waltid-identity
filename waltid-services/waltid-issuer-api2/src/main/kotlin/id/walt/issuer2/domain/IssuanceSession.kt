@@ -44,7 +44,6 @@ data class IssuanceRequest(
 
 @Serializable
 data class IssuanceResult(
-    val issuedAt: Instant,
     val issuedCredentialFormat: String,
 )
 
@@ -64,11 +63,18 @@ data class IssuanceSession(
     val notifications: IssuanceNotifications? = null,
     val isClosed: Boolean = false,
     val failure: IssuanceSessionFailure? = null,
+    /** Established issuance selection; independent of any later token narrowing. */
+    val authorizedCredentialIdentifiers: List<String>? = null,
 ) {
     init {
         require(issuanceRequests.isNotEmpty()) { "issuanceRequests must not be empty" }
         require(issuanceRequests.map { it.credentialIdentifier }.distinct().size == issuanceRequests.size) {
             "credentialIdentifier values must be unique within an issuance session"
+        }
+        require(authorizedCredentialIdentifiers == null ||
+                (authorizedCredentialIdentifiers.distinct().size == authorizedCredentialIdentifiers.size &&
+                    authorizedCredentialIdentifiers.all { id -> issuanceRequests.any { it.credentialIdentifier == id } })) {
+            "authorizedCredentialIdentifiers must be unique identifiers from this session"
         }
         require(issuanceResults.keys.all { resultId ->
             issuanceRequests.any { it.credentialIdentifier == resultId }

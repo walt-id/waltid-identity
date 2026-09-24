@@ -1,11 +1,14 @@
 package id.walt.issuer2.repository
 
 import id.walt.commons.persistence.ConfiguredPersistence
+import id.walt.commons.persistence.Persistence
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceRequest
+import id.walt.issuer2.repository.fixtures.PreBatchIssuanceSession
+import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.openid4vci.offers.AuthenticationMethod
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -25,8 +28,63 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
+import kotlin.time.Duration
 
 class ConfiguredIssuanceSessionRepositoryTest {
+
+    @Test
+    fun readsPreBatchSnapshotsAndSingleKeySidecarsThroughGetListAndTake() = runTest {
+        val key = KeySerialization.serializeKeyToJson(JWKKey.generate(KeyType.secp256r1)).jsonObject
+        for (completed in listOf(false, true)) {
+            val namespace = "issuer2-legacy-${java.util.UUID.randomUUID()}"
+            val raw = ConfiguredPersistence<String>(namespace, 5.minutes, { it }, { it })
+            val sessions = SerializedSessions(raw)
+            val keys = ConfiguredPersistence<String>("$namespace-keys", 5.minutes, { it }, { it })
+            val repository = ConfiguredIssuanceSessionRepository(sessions, keys)
+            val legacy = PreBatchIssuanceSession(
+                sessionId = "old-session",
+                profileId = "saved-profile",
+                authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+                credentialConfigurationId = "saved-configuration",
+                issuerKey = key,
+                credentialData = buildJsonObject { put("given_name", "Saved snapshot") },
+                expiresAt = Instant.DISTANT_FUTURE,
+                status = if (completed) IssuanceSessionStatus.SUCCESSFUL else IssuanceSessionStatus.ACTIVE,
+                issuedCredentialFormat = "dc+sd-jwt".takeIf { completed },
+            )
+            val encoded = Json.encodeToString(PreBatchIssuanceSession.serializer(), legacy)
+            val converted = IssuanceSessionStorageCodec.decode(encoded)
+            val sidecar = assertNotNull(IssuanceSessionCrypto2Keys.migrateLegacyKey(converted.issuanceRequests.single()))
+            try {
+                raw.set(legacy.sessionId, encoded, 5.minutes)
+                keys.set(legacy.sessionId, sidecar, 5.minutes)
+                val loaded = assertNotNull(repository.get(legacy.sessionId))
+                assertEquals("saved-configuration", loaded.issuanceRequests.single().credentialIdentifier)
+                assertEquals(legacy.credentialData, loaded.issuanceRequests.single().credentialData)
+                assertEquals(legacy.issuerKey, loaded.issuanceRequests.single().issuerKey)
+                assertEquals(sidecar, loaded.issuanceRequests.single().crypto2IssuerStoredKey)
+                assertNull(loaded.authorizedCredentialIdentifiers)
+                assertEquals(if (completed) setOf("saved-configuration") else emptySet(), loaded.issuanceResults.keys)
+                assertEquals(legacy.expiresAt, loaded.expiresAt)
+                assertFalse(loaded.isClosed)
+                assertEquals(listOf(loaded), repository.list())
+                assertEquals(setOf("saved-configuration"), Json.parseToJsonElement(assertNotNull(keys[legacy.sessionId])).jsonObject.keys)
+                // A claim must also accept the legacy sidecar, without backfilling a removed session.
+                keys.set(legacy.sessionId, sidecar, 5.minutes)
+                assertEquals(loaded, repository.take(legacy.sessionId))
+                assertNull(keys[legacy.sessionId])
+                assertNull(repository.get(legacy.sessionId))
+                repository.save(loaded)
+                val stored = Json.parseToJsonElement(assertNotNull(raw[legacy.sessionId])).jsonObject
+                assertTrue("issuanceRequests" in stored)
+                assertFalse("profileId" in stored)
+                assertFalse(stored.toString().contains("issuedAt"))
+            } finally {
+                repository.remove(legacy.sessionId)
+            }
+        }
+    }
 
     @Test
     fun saveGetListAndRemoveSession() = runTest {
@@ -198,5 +256,19 @@ class ConfiguredIssuanceSessionRepositoryTest {
         ),
         expiresAt = Clock.System.now().plus(5.minutes),
     )
+
+    /** Exercises the serialized boundary even when the configured backing store is in memory. */
+    private class SerializedSessions(private val raw: Persistence<String>) : Persistence<IssuanceSession>(raw.discriminator, raw.defaultExpiration) {
+        override fun get(id: String) = raw[id]?.let(IssuanceSessionStorageCodec::decode)
+        override fun getAndRemove(id: String) = raw.getAndRemove(id)?.let(IssuanceSessionStorageCodec::decode)
+        override fun set(id: String, value: IssuanceSession) = set(id, value, null)
+        override fun set(id: String, value: IssuanceSession, ttl: Duration?) = raw.set(id, Json.encodeToString(value), ttl)
+        override fun remove(id: String) = raw.remove(id)
+        override fun contains(id: String) = id in raw
+        override fun listAllKeys() = raw.listAllKeys()
+        override fun getAll() = raw.getAll().map(IssuanceSessionStorageCodec::decode)
+        override fun listSize(id: String) = raw.listSize(id)
+        override fun listAdd(id: String, value: IssuanceSession, ttl: Duration?) = raw.listAdd(id, Json.encodeToString(value), ttl)
+    }
 
 }

@@ -18,7 +18,6 @@ kotlin {
     if (enableWalletDemoComposeWeb) {
         wasmJs {
             browser()
-            binaries.executable()
         }
     }
 
@@ -28,6 +27,9 @@ kotlin {
             implementation(identityLibs.kotlinx.datetime)
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.ktor.http)
+            implementation(identityLibs.ktor.client.core)
+            implementation(identityLibs.ktor.client.content.negotiation)
+            implementation(identityLibs.ktor.serialization.kotlinx.json)
         }
 
         if (enableMobileWallet) {
@@ -50,9 +52,12 @@ kotlin {
                 }
 
                 androidMain.dependencies {
+                    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-blockstore"))
                     implementation(identityLibs.ktor.client.android)
                     implementation(identityLibs.androidx.fragment)
                     implementation(identityLibs.androidx.biometric)
+                    implementation(identityLibs.cryptography.provider.jdk)
+                    implementation(identityLibs.bouncycastle.prov)
                 }
 
                 getByName("androidHostTest").dependencies {
@@ -76,8 +81,16 @@ kotlin {
                 }
 
                 iosMain.dependencies {
+                    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-keychain"))
                     implementation(identityLibs.ktor.client.darwin)
                 }
+            }
+        }
+
+        if (enableWalletDemoComposeWeb) {
+            getByName("wasmJsMain").dependencies {
+                implementation(identityLibs.ktor.client.js)
+                implementation("org.jetbrains.kotlinx:kotlinx-browser:0.3")
             }
         }
 

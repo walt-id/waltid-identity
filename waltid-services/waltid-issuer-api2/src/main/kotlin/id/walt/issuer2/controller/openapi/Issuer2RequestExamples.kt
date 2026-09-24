@@ -3,7 +3,8 @@ package id.walt.issuer2.controller.openapi
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferCredential
-import id.walt.issuer2.models.CredentialOfferCredentialResponse
+import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
+import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
@@ -44,7 +45,7 @@ object Issuer2RequestExamples {
     }
 
     val PROFILE_PRE_AUTHORIZED_OFFER = CredentialOfferCreateRequest(
-        credentials = listOf(CredentialOfferCredential(W3C_PROFILE_ID)),
+        profileId = W3C_PROFILE_ID,
         authMethod = AuthenticationMethod.PRE_AUTHORIZED,
     )
 
@@ -56,7 +57,52 @@ object Issuer2RequestExamples {
         valueMode = CredentialOfferValueMode.BY_VALUE,
     )
 
-    val PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER = CredentialOfferCreateRequest(
+    val PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS = PROFILE_PRE_AUTHORIZED_OFFER.copy(
+        runtimeOverrides = CredentialOfferRuntimeOverrides(
+            credentialStatus = buildJsonObject {
+                put("id", "https://status.example.com/list/1#94567")
+                put("type", "BitstringStatusListEntry")
+                put("statusPurpose", "revocation")
+                put("statusListIndex", "94567")
+                put("statusListCredential", "https://status.example.com/list/1")
+            },
+        ),
+    )
+
+    val PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_SD_JWT_STATUS = PROFILE_PRE_AUTHORIZED_OFFER.copy(
+        profileId = IDENTITY_SD_JWT_PROFILE_ID,
+        runtimeOverrides = CredentialOfferRuntimeOverrides(credentialStatus = tokenStatusEntry(94567)),
+    )
+
+    val PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_MDOC_STATUS = PROFILE_PRE_AUTHORIZED_OFFER.copy(
+        profileId = MDOC_MDL_PROFILE_ID,
+        runtimeOverrides = CredentialOfferRuntimeOverrides(credentialStatus = tokenStatusEntry(94567)),
+    )
+
+    val PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES = MultiCredentialOfferCreateRequest(
+        credentials = listOf(94567, 12345).map { index ->
+            CredentialOfferCredential(
+                profileId = IDENTITY_SD_JWT_PROFILE_ID,
+                runtimeOverrides = CredentialOfferRuntimeOverrides(credentialStatus = tokenStatusEntry(index)),
+            )
+        },
+        authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+    )
+
+    val PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES =
+        PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES.copy(
+            authMethod = AuthenticationMethod.AUTHORIZED,
+            issuerStateMode = IssuerStateMode.INCLUDE,
+        )
+
+    private fun tokenStatusEntry(index: Int) = buildJsonObject {
+        putJsonObject("status_list") {
+            put("idx", index)
+            put("uri", "https://status.example.com/list/1")
+        }
+    }
+
+    val PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER = MultiCredentialOfferCreateRequest(
         credentials = listOf(
             CredentialOfferCredential(W3C_PROFILE_ID),
             CredentialOfferCredential(MDOC_PHOTO_ID_PROFILE_ID),
@@ -93,43 +139,41 @@ object Issuer2RequestExamples {
 
     val PROFILE_PRE_AUTHORIZED_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE = PROFILE_PRE_AUTHORIZED_OFFER.copy(
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
-        credentials = listOf(
-            CredentialOfferCredential(
-                profileId = W3C_PROFILE_ID,
-                runtimeOverrides = CredentialOfferRuntimeOverrides(
-                    credentialData = buildJsonObject {
-                        putJsonObject("credentialSubject") {
-                            putJsonObject("achievement") {
-                                put("name", "Computer Science")
-                            }
-                        }
+        profileId = W3C_PROFILE_ID,
+        runtimeOverrides = CredentialOfferRuntimeOverrides(
+            credentialData = buildJsonObject {
+                putJsonObject("credentialSubject") {
+                    putJsonObject("achievement") {
+                        put("name", "Computer Science")
                     }
-                ),
-            )
+                }
+            },
         ),
     )
 
     val PROFILE_PRE_AUTHORIZED_OFFER_WITH_ISSUER_KEY_OVERRIDE = PROFILE_PRE_AUTHORIZED_OFFER.copy(
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
-        credentials = listOf(CredentialOfferCredential(W3C_PROFILE_ID, CredentialOfferRuntimeOverrides(
+        profileId = W3C_PROFILE_ID,
+        runtimeOverrides = CredentialOfferRuntimeOverrides(
             issuerKey = EXAMPLE_ISSUER_KEY,
-        ))),
+        ),
     )
 
     val PROFILE_PRE_AUTHORIZED_OFFER_WITH_SELECTIVE_DISCLOSURE_OVERRIDE = PROFILE_PRE_AUTHORIZED_OFFER.copy(
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
-        credentials = listOf(CredentialOfferCredential(W3C_PROFILE_ID, CredentialOfferRuntimeOverrides(
+        profileId = W3C_PROFILE_ID,
+        runtimeOverrides = CredentialOfferRuntimeOverrides(
             selectiveDisclosure = SDMap.generateSDMap(
                 listOf(
                     "credentialSubject.achievement.type",
                     "credentialSubject.achievement.name",
                 )
             ),
-        ))),
+        ),
     )
 
     val PROFILE_AUTHORIZED_OFFER = CredentialOfferCreateRequest(
-        credentials = listOf(CredentialOfferCredential(W3C_PROFILE_ID)),
+        profileId = W3C_PROFILE_ID,
         authMethod = AuthenticationMethod.AUTHORIZED,
     )
 
@@ -146,7 +190,7 @@ object Issuer2RequestExamples {
         valueMode = CredentialOfferValueMode.BY_VALUE,
     )
 
-    val PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_REFERENCE = CredentialOfferCreateRequest(
+    val PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_REFERENCE = MultiCredentialOfferCreateRequest(
         credentials = listOf(
             CredentialOfferCredential(EUDI_PID_SD_JWT_PROFILE_ID),
             CredentialOfferCredential(EUDI_PID_MDOC_PROFILE_ID),
@@ -156,7 +200,7 @@ object Issuer2RequestExamples {
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
     )
 
-    val PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE = CredentialOfferCreateRequest(
+    val PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE = MultiCredentialOfferCreateRequest(
         credentials = listOf(
             CredentialOfferCredential(IDENTITY_SD_JWT_PROFILE_ID),
             CredentialOfferCredential(TAX_ID_SD_JWT_PROFILE_ID),
@@ -166,7 +210,7 @@ object Issuer2RequestExamples {
         valueMode = CredentialOfferValueMode.BY_VALUE,
     )
 
-    val PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_RUNTIME_OVERRIDES = CredentialOfferCreateRequest(
+    val PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_RUNTIME_OVERRIDES = MultiCredentialOfferCreateRequest(
         credentials = listOf(
             CredentialOfferCredential(
                 profileId = W3C_PROFILE_ID,
@@ -210,75 +254,69 @@ object Issuer2RequestExamples {
         )
 
     val PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE = CredentialOfferCreateRequest(
-        credentials = listOf(CredentialOfferCredential(
-            profileId = MDOC_PHOTO_ID_PROFILE_ID,
-            runtimeOverrides = CredentialOfferRuntimeOverrides(
-                credentialData = buildJsonObject {
-                    putJsonObject("org.iso.23220.1") {
-                        put("age_over_18", true)
-                        put("issuing_country", "AT")
-                        put("given_name", "Jane")
-                        put("family_name", "Doe")
-                        put("birth_date", "2003-12-21")
-                        put("issue_date", "2025-12-13")
-                        put("issuing_authority_unicode", "walt.id Issuer")
-                        put("expiry_date", "2026-12-13")
-                    }
-                    putJsonObject("org.iso.23220.photoid.1") {
-                        put("person_id", "123456")
-                        put("administrative_number", "654321")
-                    }
-                },
-            ),
-        )),
+        profileId = MDOC_PHOTO_ID_PROFILE_ID,
+        runtimeOverrides = CredentialOfferRuntimeOverrides(
+            credentialData = buildJsonObject {
+                putJsonObject("org.iso.23220.1") {
+                    put("age_over_18", true)
+                    put("issuing_country", "AT")
+                    put("given_name", "Jane")
+                    put("family_name", "Doe")
+                    put("birth_date", "2003-12-21")
+                    put("issue_date", "2025-12-13")
+                    put("issuing_authority_unicode", "walt.id Issuer")
+                    put("expiry_date", "2026-12-13")
+                }
+                putJsonObject("org.iso.23220.photoid.1") {
+                    put("person_id", "123456")
+                    put("administrative_number", "654321")
+                }
+            },
+        ),
         authMethod = AuthenticationMethod.PRE_AUTHORIZED,
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
     )
 
     val PROFILE_PRE_AUTHORIZED_OFFER_WITH_AUTHORIZED_TRANSACTION_DATA_TYPES_OVERRIDE =
         CredentialOfferCreateRequest(
-            credentials = listOf(CredentialOfferCredential(
-                EU_AGE_VERIFICATION_PROFILE_ID,
-                CredentialOfferRuntimeOverrides(
-                    authorizedTransactionDataTypes = listOf(SCA_PAYMENT_TRANSACTION_DATA_TYPE),
-                ),
-            )),
+            profileId = EU_AGE_VERIFICATION_PROFILE_ID,
+            runtimeOverrides = CredentialOfferRuntimeOverrides(
+                authorizedTransactionDataTypes = listOf(SCA_PAYMENT_TRANSACTION_DATA_TYPE),
+            ),
             authMethod = AuthenticationMethod.PRE_AUTHORIZED,
             valueMode = CredentialOfferValueMode.BY_REFERENCE,
         )
 
     val AUTHORIZED_MDOC_MDL_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE = CredentialOfferCreateRequest(
-        credentials = listOf(CredentialOfferCredential(
-            profileId = MDOC_MDL_PROFILE_ID,
-            runtimeOverrides = CredentialOfferRuntimeOverrides(
-                credentialData = buildJsonObject {
-                    putJsonObject("org.iso.18013.5.1") {
-                        put("family_name", "Doe")
-                        put("given_name", "Jane")
-                        put("birth_date", "1986-03-22")
-                        put("issue_date", "2019-10-20")
-                        put("expiry_date", "2024-10-20")
-                        put("issuing_country", "AT")
-                        put("issuing_authority", "AT DMV")
-                        put("document_number", "123456789")
-                        put("portrait", "AQIDBAUGBwgJCgsMDQ4P")
-                        putJsonArray("driving_privileges") {
-                            addJsonObject {
-                                put("vehicle_category_code", "A")
-                                put("issue_date", "2018-08-09")
-                                put("expiry_date", "2024-10-20")
-                            }
-                            addJsonObject {
-                                put("vehicle_category_code", "B")
-                                put("issue_date", "2017-02-23")
-                                put("expiry_date", "2024-10-20")
-                            }
+        profileId = MDOC_MDL_PROFILE_ID,
+        runtimeOverrides = CredentialOfferRuntimeOverrides(
+            credentialData = buildJsonObject {
+                putJsonObject("org.iso.18013.5.1") {
+                    put("family_name", "Doe")
+                    put("given_name", "Jane")
+                    put("birth_date", "1986-03-22")
+                    put("issue_date", "2019-10-20")
+                    put("expiry_date", "2024-10-20")
+                    put("issuing_country", "AT")
+                    put("issuing_authority", "AT DMV")
+                    put("document_number", "123456789")
+                    put("portrait", "AQIDBAUGBwgJCgsMDQ4P")
+                    putJsonArray("driving_privileges") {
+                        addJsonObject {
+                            put("vehicle_category_code", "A")
+                            put("issue_date", "2018-08-09")
+                            put("expiry_date", "2024-10-20")
                         }
-                        put("un_distinguishing_sign", "AT")
+                        addJsonObject {
+                            put("vehicle_category_code", "B")
+                            put("issue_date", "2017-02-23")
+                            put("expiry_date", "2024-10-20")
+                        }
                     }
-                },
-            ),
-        )),
+                    put("un_distinguishing_sign", "AT")
+                }
+            },
+        ),
         authMethod = AuthenticationMethod.AUTHORIZED,
         issuerStateMode = IssuerStateMode.INCLUDE,
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
@@ -286,7 +324,7 @@ object Issuer2RequestExamples {
 
     val CREDENTIAL_OFFER_RESPONSE_BY_REFERENCE = CredentialOfferCreateResponse(
         offerId = EXAMPLE_OFFER_ID,
-        credentials = responseCredentials(),
+        profileId = W3C_PROFILE_ID,
         authMethod = AuthenticationMethod.AUTHORIZED,
         issuerStateMode = IssuerStateMode.INCLUDE,
         expiresAt = EXAMPLE_EXPIRES_AT,
@@ -295,7 +333,7 @@ object Issuer2RequestExamples {
 
     val CREDENTIAL_OFFER_RESPONSE_BY_VALUE = CredentialOfferCreateResponse(
         offerId = EXAMPLE_OFFER_ID,
-        credentials = responseCredentials(),
+        profileId = W3C_PROFILE_ID,
         authMethod = AuthenticationMethod.AUTHORIZED,
         issuerStateMode = IssuerStateMode.INCLUDE,
         expiresAt = EXAMPLE_EXPIRES_AT,
@@ -304,25 +342,23 @@ object Issuer2RequestExamples {
 
     val CREDENTIAL_OFFER_RESPONSE_BY_VALUE_WITH_ISSUER_STATE = CredentialOfferCreateResponse(
         offerId = EXAMPLE_OFFER_ID,
-        credentials = responseCredentials(),
+        profileId = W3C_PROFILE_ID,
         authMethod = AuthenticationMethod.AUTHORIZED,
         issuerStateMode = IssuerStateMode.INCLUDE,
         expiresAt = EXAMPLE_EXPIRES_AT,
         credentialOffer = byValueAuthorizationOfferUrl(),
     )
 
-    val MULTI_CREDENTIAL_OFFER_RESPONSE_BY_REFERENCE = CredentialOfferCreateResponse(
+    val MULTI_CREDENTIAL_OFFER_RESPONSE_BY_REFERENCE = MultiCredentialOfferCreateResponse(
         offerId = EXAMPLE_OFFER_ID,
-        credentials = multiFormatResponseCredentials(),
         authMethod = AuthenticationMethod.AUTHORIZED,
         issuerStateMode = IssuerStateMode.INCLUDE,
         expiresAt = EXAMPLE_EXPIRES_AT,
         credentialOffer = byReferenceOfferUrl(),
     )
 
-    val MULTI_CREDENTIAL_OFFER_RESPONSE_BY_VALUE = CredentialOfferCreateResponse(
+    val MULTI_CREDENTIAL_OFFER_RESPONSE_BY_VALUE = MultiCredentialOfferCreateResponse(
         offerId = EXAMPLE_OFFER_ID,
-        credentials = multiDatasetResponseCredentials(),
         authMethod = AuthenticationMethod.AUTHORIZED,
         issuerStateMode = IssuerStateMode.INCLUDE,
         expiresAt = EXAMPLE_EXPIRES_AT,
@@ -331,7 +367,7 @@ object Issuer2RequestExamples {
 
     val PRE_AUTHORIZED_CREDENTIAL_OFFER_RESPONSE_WITH_GENERATED_TX_CODE = CredentialOfferCreateResponse(
         offerId = EXAMPLE_OFFER_ID,
-        credentials = responseCredentials(),
+        profileId = W3C_PROFILE_ID,
         authMethod = AuthenticationMethod.PRE_AUTHORIZED,
         expiresAt = EXAMPLE_EXPIRES_AT,
         txCodeValue = "483921",
@@ -340,7 +376,7 @@ object Issuer2RequestExamples {
 
     val PRE_AUTHORIZED_CREDENTIAL_OFFER_RESPONSE_WITH_PROVIDED_TX_CODE = CredentialOfferCreateResponse(
         offerId = EXAMPLE_OFFER_ID,
-        credentials = responseCredentials(),
+        profileId = W3C_PROFILE_ID,
         authMethod = AuthenticationMethod.PRE_AUTHORIZED,
         expiresAt = EXAMPLE_EXPIRES_AT,
         txCodeValue = PROVIDED_TX_CODE_VALUE,
@@ -381,20 +417,6 @@ object Issuer2RequestExamples {
             }
         }
     }
-
-    private fun responseCredentials() = listOf(
-        CredentialOfferCredentialResponse(W3C_PROFILE_ID, W3C_CREDENTIAL_CONFIGURATION_ID)
-    )
-
-    private fun multiFormatResponseCredentials() = listOf(
-        CredentialOfferCredentialResponse(EUDI_PID_SD_JWT_PROFILE_ID, EUDI_PID_SD_JWT_CONFIGURATION_ID),
-        CredentialOfferCredentialResponse(EUDI_PID_MDOC_PROFILE_ID, EUDI_PID_MDOC_CONFIGURATION_ID),
-    )
-
-    private fun multiDatasetResponseCredentials() = listOf(
-        CredentialOfferCredentialResponse(IDENTITY_SD_JWT_PROFILE_ID, IDENTITY_SD_JWT_CONFIGURATION_ID),
-        CredentialOfferCredentialResponse(TAX_ID_SD_JWT_PROFILE_ID, TAX_ID_SD_JWT_CONFIGURATION_ID),
-    )
 
     private fun byReferenceOfferUrl(): String =
         CredentialOfferRequest(

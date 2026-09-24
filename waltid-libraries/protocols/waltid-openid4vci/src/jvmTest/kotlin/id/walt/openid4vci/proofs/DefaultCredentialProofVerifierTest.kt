@@ -131,12 +131,64 @@ class DefaultCredentialProofVerifierTest {
         )
     }
 
+    @Test
+    fun `iss is optional for client-bound grants but must match the client_id when present`() = runTest {
+        val holderKey = JWKKey.generate(KeyType.secp256r1)
+
+        // OpenID4VCI 1.0 Appendix F.1: iss is OPTIONAL, so an omitted iss is accepted.
+        verifier.verify(
+            credentialRequest = credentialRequest(createProof(holderKey, issuer = null)),
+            credentialConfiguration = credentialConfiguration(),
+            context = context(),
+        )
+
+        // A matching iss is accepted.
+        verifier.verify(
+            credentialRequest = credentialRequest(createProof(holderKey, issuer = "client")),
+            credentialConfiguration = credentialConfiguration(),
+            context = context(),
+        )
+
+        // A present but mismatched iss is rejected.
+        val mismatchedIss = assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(
+                credentialRequest = credentialRequest(createProof(holderKey, issuer = "other-client")),
+                credentialConfiguration = credentialConfiguration(),
+                context = context(),
+            )
+        }
+        assertEquals(CredentialErrorCodes.INVALID_PROOF, mismatchedIss.errorCode)
+    }
+
+    @Test
+    fun `anonymous pre-authorized access forbids iss and accepts its absence`() = runTest {
+        val holderKey = JWKKey.generate(KeyType.secp256r1)
+        val anonymous = context(anonymousPreAuthorizedAccess = true).copy(clientId = null)
+
+        verifier.verify(
+            credentialRequest = credentialRequest(createProof(holderKey, issuer = null)),
+            credentialConfiguration = credentialConfiguration(),
+            context = anonymous,
+        )
+
+        val presentIss = assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(
+                credentialRequest = credentialRequest(createProof(holderKey, issuer = "client")),
+                credentialConfiguration = credentialConfiguration(),
+                context = anonymous,
+            )
+        }
+        assertEquals(CredentialErrorCodes.INVALID_PROOF, presentIss.errorCode)
+    }
+
     private suspend fun createProof(
         key: JWKKey,
         audience: String = CREDENTIAL_ISSUER,
         nonce: String? = "nonce-1",
+        issuer: String? = "client",
     ): String = key.signJws(
         plaintext = buildJsonObject {
+            issuer?.let { put(JwtPayloadClaims.ISSUER, it) }
             put(JwtPayloadClaims.AUDIENCE, audience)
             put(JwtPayloadClaims.ISSUED_AT, NOW.epochSeconds)
             nonce?.let { put("nonce", it) }
@@ -174,9 +226,11 @@ class DefaultCredentialProofVerifierTest {
 
     private fun context(
         nonceService: CredentialNonceService? = null,
+        anonymousPreAuthorizedAccess: Boolean = false,
     ) = CredentialProofValidationContext(
         credentialIssuer = CREDENTIAL_ISSUER,
         clientId = "client",
+        anonymousPreAuthorizedAccess = anonymousPreAuthorizedAccess,
         nonceValidation = nonceService?.let {
             CredentialNonceValidationContext(
                 service = it,

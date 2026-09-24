@@ -3,7 +3,10 @@ package id.walt.issuer2.repository
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.commons.persistence.Persistence
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.crypto2.serialization.StoredKeyCodec
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -14,7 +17,7 @@ class ConfiguredIssuanceSessionRepository(
         "issuer2_issuance_sessions",
         defaultExpiration = 5.minutes,
         encoding = { Json.encodeToString(IssuanceSession.serializer(), it) },
-        decoding = { Json.decodeFromString(IssuanceSession.serializer(), it) },
+        decoding = IssuanceSessionStorageCodec::decode,
     ),
     private val crypto2Keys: Persistence<String> = ConfiguredPersistence(
         "issuer2_issuance_session_crypto2_keys",
@@ -66,11 +69,18 @@ class ConfiguredIssuanceSessionRepository(
     private suspend fun attachCrypto2Key(session: IssuanceSession, backfill: Boolean): IssuanceSession {
         val persisted = crypto2Keys[session.sessionId]
         if (persisted != null) {
-            val storedKeys = Json.decodeFromString<Map<String, String>>(persisted)
+            val objectValue = Json.parseToJsonElement(persisted).jsonObject
+            val legacySidecar = objectValue.values.any { it !is JsonPrimitive || !it.isString }
+            val storedKeys = if (legacySidecar) {
+                StoredKeyCodec.decodeFromString(persisted)
+                mapOf(session.issuanceRequests.single().credentialIdentifier to persisted)
+            } else {
+                Json.decodeFromString<Map<String, String>>(persisted)
+            }
             val attached = IssuanceSessionCrypto2Keys.attachStoredKeys(session, storedKeys)
             if (backfill) {
                 val normalizedKeys = IssuanceSessionCrypto2Keys.migrateLegacyKeys(attached)
-                if (normalizedKeys != storedKeys) {
+                if (legacySidecar || normalizedKeys != storedKeys) {
                     persistSidecars(session.sessionId, normalizedKeys, ttlUntil(session.expiresAt))
                 }
             }

@@ -4,6 +4,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.WaltConfig
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
+import id.walt.commons.web.plugins.configureStatusPages
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.issuer2.config.AuthenticationServiceConfig
@@ -11,6 +12,9 @@ import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.config.registerIssuer2ConfigDecoders
+import id.walt.issuer2.application.Issuer2Module
+import id.walt.issuer2.configurePlugins
+import id.walt.issuer2.controller.Issuer2RouteSurface
 import id.walt.issuer2.issuer2Module
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
 import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
@@ -32,10 +36,13 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.readRawBytes
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import io.ktor.http.contentType
 import io.ktor.http.getSplitValues
 import io.ktor.serialization.kotlinx.json.json
@@ -43,6 +50,7 @@ import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -74,6 +82,43 @@ class Issuer2MetadataEndpointTest {
         configFiles.forEach { (id, _) -> System.clearProperty("config.file.$id") }
         ConfigManager.preclear()
         FeatureManager.preclear()
+    }
+
+    @Test
+    fun unknownVctTypesReturnNotFoundThroughBothMetadataUrls() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        listOf("/.well-known/vct/missing-type", "$OPENID4VCI_PREFIX/missing-type").forEach { path ->
+            assertEquals(HttpStatusCode.NotFound, client.get(path).status, path)
+        }
+    }
+
+    @Test
+    fun restrictedIssuerDoesNotTreatProtocolPathsAsVctTypes() = testApplication {
+        installIssuer2WithConfigFiles(Issuer2RouteSurface.preAuthorizedCodeOnly)
+        val client = apiClient()
+        val disabledPaths = listOf(
+            "authorize", "credential-offer?id=any-session", "par", "token", "nonce", "credential",
+            "external_login", "external_login/request", "external", "external/oauth/callback", "%61uthorize",
+        )
+        // Collect all responses before asserting so a failure does not hide a second route collision.
+        val statuses = disabledPaths.associateWith { client.get("$OPENID4VCI_PREFIX/$it").status }
+        assertEquals(disabledPaths.associateWith { HttpStatusCode.NotFound }, statuses)
+        assertEquals(HttpStatusCode.NotFound, client.post("$OPENID4VCI_PREFIX/par").status)
+        (disabledPaths.take(6) + listOf("jwks", "external_login", "external")).forEach { name ->
+            assertEquals(HttpStatusCode.NotFound, client.get("/.well-known/vct/$name").status, name)
+        }
+        assertEquals(HttpStatusCode.OK, client.get("$OPENID4VCI_PREFIX/jwks").status)
+        val metadata = client.get("/.well-known/openid-credential-issuer/openid4vci").body<CredentialIssuerMetadata>()
+        assertSelfHostedSdJwtVcTypeMetadata(client, metadata)
+    }
+
+    @Test
+    fun fullIssuerStillEvaluatesAuthorizationRequests() = testApplication {
+        installIssuer2WithConfigFiles()
+        val response = apiClient().get("$OPENID4VCI_PREFIX/authorize")
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertTrue(response.bodyAsText().contains("client_id"), "Expected validation of the missing OAuth client_id")
     }
 
     @Test
@@ -162,7 +207,9 @@ class Issuer2MetadataEndpointTest {
         assertCredentialEncryptionMetadata(credentialIssuerMetadata)
         assertConfiguredCredentialScenariosAreAdvertised(credentialIssuerMetadata)
         assertSdJwtCatalogConfigurations(credentialIssuerMetadata)
+        assertCredentialCardDisplayMetadata(credentialIssuerMetadata)
         assertSelfHostedSdJwtVcTypeMetadata(client, credentialIssuerMetadata)
+        assertCredentialCardArtIsServed(client)
     }
 
     @Test
@@ -232,6 +279,47 @@ class Issuer2MetadataEndpointTest {
         assertEquals(HttpStatusCode.NotFound, client.get(NESTED_JWT_VC_ISSUER_METADATA_PATH).status)
     }
 
+    private fun assertCredentialCardDisplayMetadata(
+        credentialIssuerMetadata: CredentialIssuerMetadata,
+    ) {
+        val expectedPrefix = "$ISSUER_AUTHORITY_BASE_URL/static/credential-cards/"
+        credentialIssuerMetadata.credentialConfigurationsSupported.forEach { (configurationId, configuration) ->
+            val display = assertNotNull(
+                configuration.credentialMetadata?.display?.firstOrNull(),
+                "Expected display metadata for $configurationId",
+            )
+            assertTrue(display.name.isNotBlank(), "Expected display name for $configurationId")
+            val backgroundUri = assertNotNull(
+                display.backgroundImage?.uri,
+                "Expected background_image for $configurationId",
+            )
+            assertTrue(
+                backgroundUri.startsWith(expectedPrefix) && backgroundUri.endsWith(".png"),
+                "Expected rewritten card art URI for $configurationId, got $backgroundUri",
+            )
+            val logoUri = assertNotNull(display.logo?.uri, "Expected logo for $configurationId")
+            assertEquals("$expectedPrefix$WALTID_MARK_FILE", logoUri)
+        }
+        val sdJwtPidDisplay = credentialIssuerMetadata.credentialConfigurationsSupported
+            .getValue("urn:eudi:pid:1")
+            .credentialMetadata
+            ?.display
+            ?.first()
+        assertEquals(
+            "$expectedPrefix$PID_SD_JWT_CARD_ART_FILE",
+            sdJwtPidDisplay?.backgroundImage?.uri,
+            "SD-JWT PID must use format-correct card art",
+        )
+    }
+
+    private suspend fun assertCredentialCardArtIsServed(client: HttpClient) {
+        listOf(PID_CARD_ART_FILE, PID_SD_JWT_CARD_ART_FILE, WALTID_MARK_FILE).forEach { fileName ->
+            val response = client.get("/static/credential-cards/$fileName")
+            assertEquals(HttpStatusCode.OK, response.status, "Expected $fileName to be served")
+            assertTrue(response.readRawBytes().isNotEmpty(), "Expected $fileName to have content")
+        }
+    }
+
     private fun assertConfiguredCredentialScenariosAreAdvertised(
         credentialIssuerMetadata: CredentialIssuerMetadata,
     ) {
@@ -280,12 +368,15 @@ class Issuer2MetadataEndpointTest {
             )
             val publishedVct = assertNotNull(configuration.vct)
 
-            val vctTypeMetadataRaw = client.get("/.well-known/vct/$credentialConfigurationId")
-            assertEquals(HttpStatusCode.OK, vctTypeMetadataRaw.status)
-            val vctTypeMetadata = vctTypeMetadataRaw.body<SdJwtVcTypeMetadataDraft04>()
-            assertEquals(publishedVct, vctTypeMetadata.vct)
-            assertEquals(credentialConfigurationId, vctTypeMetadata.name)
-            assertEquals("$credentialConfigurationId Verifiable Credential", vctTypeMetadata.description)
+            // The in-memory test server uses port 80; exercise the published URL's path on that server.
+            listOf("/.well-known/vct/$credentialConfigurationId", Url(publishedVct).encodedPath).forEach { metadataUrl ->
+                val vctTypeMetadataRaw = client.get(metadataUrl)
+                assertEquals(HttpStatusCode.OK, vctTypeMetadataRaw.status, metadataUrl)
+                val vctTypeMetadata = vctTypeMetadataRaw.body<SdJwtVcTypeMetadataDraft04>()
+                assertEquals(publishedVct, vctTypeMetadata.vct)
+                assertEquals(credentialConfigurationId, vctTypeMetadata.name)
+                assertEquals("$credentialConfigurationId Verifiable Credential", vctTypeMetadata.description)
+            }
         }
     }
 
@@ -385,15 +476,22 @@ class Issuer2MetadataEndpointTest {
         )
     }
 
-    private fun ApplicationTestBuilder.installIssuer2WithConfigFiles() {
+    private fun ApplicationTestBuilder.installIssuer2WithConfigFiles(surfaces: Set<Issuer2RouteSurface>? = null) {
         loadIssuer2ConfigFiles()
         application {
             install(ServerContentNegotiation) {
                 json(json)
             }
+            configureStatusPages()
             runBlocking { issuer2AuthenticationPluginAmendment() }
             AuthenticationServiceModule.run { enable() }
-            issuer2Module(withPlugins = true)
+            if (surfaces == null) {
+                issuer2Module(withPlugins = true)
+            } else {
+                configurePlugins()
+                val module = Issuer2Module.load()
+                routing { module.openId4VciController.register(this, surfaces) }
+            }
         }
     }
 
@@ -443,23 +541,23 @@ class Issuer2MetadataEndpointTest {
         const val JWT_VC_ISSUER_METADATA_PATH = "/.well-known/jwt-vc-issuer/openid4vci"
         const val NESTED_JWT_VC_ISSUER_METADATA_PATH = "$OPENID4VCI_PREFIX/.well-known/jwt-vc-issuer"
         const val OPEN_BADGE_CONFIG_ID = "OpenBadgeCredential_jwt_vc_json"
+        const val PID_CARD_ART_FILE = "pid-mdoc.png"
+        const val PID_SD_JWT_CARD_ART_FILE = "pid-sd-jwt.png"
+        const val WALTID_MARK_FILE = "waltid-mark.png"
         const val SD_JWT_INTERNAL_CONFIG_ID = "identity_credential"
         val INTERNAL_SD_JWT_VCT: String get() = "$ISSUER_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
 
         val MDOC_CATALOG_CONFIG_IDS = listOf(
             "org.iso.18013.5.1.mDL" to "org.iso.18013.5.1.mDL",
-            "org.iso.18013.5.1.mDL.aamva" to "org.iso.18013.5.1.mDL",
             "org.iso.23220.photoid.1" to "org.iso.23220.photoid.1",
             "eu.europa.ec.eudi.pid.1" to "eu.europa.ec.eudi.pid.1",
             "eu.europa.ec.av.1" to "eu.europa.ec.av.1",
-            "at.gv.id-austria.2023.iso" to "at.gv.id-austria.2023.iso",
-            "com.google.wallet.idcard.1" to "com.google.wallet.idcard.1",
+            "sca_payment_card_mso_mdoc" to "eu.europa.ec.eudi.sca.payment_card.1",
+            "emvco_dpc_mso_mdoc" to "org.emvco.dpc.1",
         )
 
         val SD_JWT_CATALOG_CONFIG_IDS = listOf(
-            "asit.tax-id-credential",
             "urn:eu.europa.ec.eudi:cor:1",
-            "urn:eu.europa.ec.eudi:por:1",
             "urn:eudi:ehic:1",
             "urn:eudi:pid:1",
             SD_JWT_INTERNAL_CONFIG_ID,

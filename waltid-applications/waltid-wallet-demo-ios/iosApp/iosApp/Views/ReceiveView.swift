@@ -4,6 +4,7 @@ import WalletSDK
 
 struct ReceiveView: View {
     @ObservedObject var viewModel: WalletViewModel
+    let onOpenSettings: () -> Void
     @Environment(\.openURL) private var openURL
     @Environment(\.walletDemoBranding) private var branding
 
@@ -17,7 +18,8 @@ struct ReceiveView: View {
                 }
             }
             .navigationTitle("Receive")
-            .walletSettingsToolbar(viewModel: viewModel)
+            .walletSettingsToolbar(onOpenSettings: onOpenSettings)
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
         }
         .navigationViewStyle(.stack)
@@ -31,6 +33,8 @@ struct ReceiveView: View {
     private var entryContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
+
                 ScannableUrlEditor(
                     title: "Receive",
                     label: "Credential offer URL",
@@ -48,8 +52,6 @@ struct ReceiveView: View {
                 .tint(branding.primary)
                 .disabled(!viewModel.receiveActionEnabled)
                 .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
-
-                WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
 
                 deferredCredentials
             }

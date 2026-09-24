@@ -2,8 +2,10 @@
 
 package id.walt.wallet2.mobile
 
-import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.KeyId
+import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
+import kotlin.uuid.Uuid
 import id.walt.did.dids.Crypto2DidService
 import app.cash.sqldelight.db.SqlDriver
 import id.walt.wallet2.data.WalletCredentialStore
@@ -12,25 +14,25 @@ import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
-import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
 import id.walt.wallet2.persistence.keys.WalletKeyRequirements
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 import id.walt.wallet2.persistence.stores.SqlDelightIssuanceSessionStore
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
+import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
+import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlin.uuid.Uuid
 
 /**
  * Configuration for creating a [MobileWallet].
  *
  * @property walletId Stable wallet identifier used for database naming and persisted wallet state.
- * @property defaultKeyType Key type used by [MobileWallet.bootstrap] when no key type override is supplied.
  * @property defaultKeyUseAuthorizationPolicy Authorization policy used for newly created keys.
  * The policy never changes an existing persisted key.
  * @property keyUseAuthorizationPrompt Prompt text used for protected signing operations.
@@ -50,7 +52,6 @@ import kotlin.uuid.Uuid
  */
 public data class MobileWalletConfig(
     public val walletId: String = "default",
-    public val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     public val attestationConfig: WalletAttestationConfig? = null,
     public val persistence: MobileWalletPersistence = MobileWalletPersistence(),
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
@@ -63,6 +64,8 @@ public data class MobileWalletConfig(
     public val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
     public val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
     public val keyUseAuthorizationPrompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(),
+    /** Signing identity lifecycle and opt-in recovery integrations. */
+    public val signingIdentity: id.walt.wallet2.mobile.identity.SigningIdentityConfiguration = id.walt.wallet2.mobile.identity.SigningIdentityConfiguration(),
 )
 
 /**
@@ -141,6 +144,13 @@ public expect class MobileWalletFactory {
 
     /**
      * Creates a mobile wallet with explicit verifier client-ID trust configuration.
+     *
+     * Pin X.509 trust anchors on [ClientIdTrustConfiguration.x509TrustAnchors] to allow OpenID4VP
+     * `x509_san_dns` and `x509_hash` clients. An empty list fails those prefixes closed.
+     * `decentralized_identifier` clients still authenticate through DID resolution.
+     *
+     * Consuming apps pin their own CAs. walt.id Verifier2's `verifier-service.conf` publishes a demo
+     * `x5c` for `x509_san_dns:verifier.example.com` that wallets can copy as a starting PEM.
      */
     public suspend fun create(
         config: MobileWalletConfig,
@@ -154,6 +164,9 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
     clientIdTrustConfiguration: ClientIdTrustConfiguration,
     managedDatabaseKeyProvider: DatabaseEncryptionKeyProvider,
     platformKeyProvider: PlatformManagedKeyProvider,
+    proximityTransportFactory: BleProximityTransportFactory,
+    proximityNfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
+    proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     openEncryptedDriver: (
         databaseName: String,
         encryptionKey: DatabaseEncryptionKey,
@@ -161,6 +174,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
         walletId: String,
     ) -> SqlDriver,
     deleteDatabase: (databaseName: String) -> Unit,
+    registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
 ): MobileWallet {
     val databaseName = "wallet_${config.walletId}"
     val databaseKeyProvider = when (val databaseKey = config.persistence.databaseKey) {
@@ -180,6 +194,10 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
         clientIdTrustConfiguration = clientIdTrustConfiguration,
         db = db,
         keyProvider = platformKeyProvider,
+        registrationProjection = registrationProjection,
+        proximityTransportFactory = proximityTransportFactory,
+        proximityNfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
+        proximityWifiAwareTransportFactory = proximityWifiAwareTransportFactory,
         deleteLocalPersistence = {
             runCatching { driver.close() }
             deleteDatabase(databaseName)
@@ -193,24 +211,39 @@ internal fun createSqlDelightMobileWallet(
     clientIdTrustConfiguration: ClientIdTrustConfiguration,
     db: WalletPersistenceDatabase,
     keyProvider: PlatformManagedKeyProvider,
+    proximityTransportFactory: BleProximityTransportFactory? = null,
+    proximityNfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
+    proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     didService: Crypto2DidService = Crypto2DidService,
     deleteLocalPersistence: suspend () -> Unit,
+    registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
 ): MobileWallet {
     val queries = db.walletPersistenceQueries
-    val keyStore = SqlDelightKeyStore(keyProvider, queries)
+    val keyStore = SqlDelightKeyStore(keyProvider, queries, config.walletId)
     val credentialStore = config.persistence.credentialStore ?: SqlDelightCredentialStore(queries)
-    val didStore = config.persistence.didStore ?: SqlDelightDidStore(queries)
+    val didStore = config.persistence.didStore?.let { delegate ->
+        object : WalletDidStore by delegate {
+            override suspend fun getDefaultDid(): String? =
+                queries.selectActiveIdentity(config.walletId).executeAsOneOrNull()?.did
+        }
+    } ?: SqlDelightDidStore(queries, config.walletId)
     val issuanceSessionStore = SqlDelightIssuanceSessionStore(queries)
     return MobileWallet(
         walletId = config.walletId,
+        createSigningIdentityManager = { onActive ->
+            id.walt.wallet2.mobile.identity.SigningIdentityManager(
+                config.walletId, config.signingIdentity, config.defaultKeyUseAuthorizationPolicy, config.keyUseAuthorizationPrompt,
+                keyStore, didStore, keyProvider, queries, didService, onActive,
+            )
+        },
         keyStore = keyStore,
         didStore = didStore,
         credentialStore = credentialStore,
         issuanceSessionStore = issuanceSessionStore,
-        generateAndPersistKey = { keyType, policy ->
+        generateIssuanceHolderKey = { keyType, policy ->
             keyStore.generateKey(
                 WalletKeyCreationRequest(
-                    id = KeyId("wallet_key_${Uuid.random()}"),
+                    id = KeyId("wallet_issuance_key_${Uuid.random()}"),
                     requirements = WalletKeyRequirements(
                         spec = keyType.toKeySpec(),
                         usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
@@ -220,6 +253,7 @@ internal fun createSqlDelightMobileWallet(
                 )
             )
         },
+        issuanceDidService = didService,
         runKeyUseAuthorizationPreflight = { keyType, policy ->
             keyStore.preflight(
                 WalletKeyRequirements(
@@ -229,8 +263,6 @@ internal fun createSqlDelightMobileWallet(
                 )
             )
         },
-        didService = didService,
-        defaultKeyType = config.defaultKeyType,
         defaultKeyUseAuthorizationPolicy = config.defaultKeyUseAuthorizationPolicy,
         attestationConfig = config.attestationConfig,
         preferredLocales = config.preferredLocales,
@@ -239,8 +271,12 @@ internal fun createSqlDelightMobileWallet(
         credentialIssuerMetadataTrustResolver = config.credentialIssuerMetadataTrustResolver,
         onEvent = config.onEvent,
         credentialRegistry = config.credentialRegistry,
+        registrationProjection = registrationProjection,
         onDigitalCredentialRegistryChanged = config.onDigitalCredentialRegistryChanged,
         readerTrustEvaluator = config.readerTrustEvaluator,
+        proximityTransportFactory = proximityTransportFactory,
+        proximityNfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
+        proximityWifiAwareTransportFactory = proximityWifiAwareTransportFactory,
         deleteLocalPersistence = deleteLocalPersistence,
     )
 }

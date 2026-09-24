@@ -317,6 +317,7 @@ class Wallet2ExtendedIntegrationTest {
         val credentialConfigId = "test_pid"
         val configuration = CredentialConfiguration(
             format = VciCredentialFormat.SD_JWT_VC,
+            scope = credentialConfigId,
             vct = "eu.europa.ec.eudi.pid.1",
             cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
             proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))
@@ -481,7 +482,7 @@ class Wallet2ExtendedIntegrationTest {
                             put("issuing_country", "DE")
                         }),
                         selectiveDisclosure = null,
-                        proofValidationContext = proofSupport.validationContext(request)
+                        proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization])
                     )
                     if (credentialResponse !is CredentialResponseResult.Success) {
                         val failure = credentialResponse as CredentialResponseResult.Failure
@@ -638,7 +639,7 @@ class Wallet2ExtendedIntegrationTest {
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
                         .body<SignProofResult>()
                 }
-                assertNotNull(signResult.proofJwt)
+                assertEquals(1, signResult.proofs.jwt?.size)
 
                 // -- Isolated step 5: Fetch credential --
                 val fetchResult = testAndReturn("Isolated: fetch-credential") {
@@ -649,7 +650,7 @@ class Wallet2ExtendedIntegrationTest {
                                 credentialEndpoint = Url("$issuerBase/credential"),
                                 accessToken = tokenResult.accessToken,
                                 credentialConfigurationId = credentialConfigId,
-                                proofJwt = signResult.proofJwt
+                                proofs = signResult.proofs
                             )
                         )
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
@@ -671,7 +672,8 @@ class Wallet2ExtendedIntegrationTest {
                                 credentialEndpoint = Url("$issuerBase/credential"),
                                 accessToken = tokenResult.accessToken,
                                 credentialConfigurationId = credentialConfigId,
-                                proofJwt = signResult.proofJwt,
+                                proofs = signResult.proofs,
+                                keyId = keyInfo.keyId,
                                 storeInWallet = true,
                                 credentialIssuerBaseUrl = issuerBase,
                             )

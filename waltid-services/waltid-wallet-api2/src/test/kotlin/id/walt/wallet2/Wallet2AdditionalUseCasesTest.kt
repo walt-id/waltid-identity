@@ -466,7 +466,7 @@ class Wallet2AdditionalUseCasesTest {
                         ); put("issuing_country", "AT")
                         }),
                         selectiveDisclosure = null,
-                        proofValidationContext = proofSupport.validationContext(request)
+                        proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization])
                     )
                     if (credResp !is CredentialResponseResult.Success) {
                         val failure = credResp as CredentialResponseResult.Failure
@@ -487,7 +487,7 @@ class Wallet2AdditionalUseCasesTest {
                     ConfigManager.preloadConfig(
                         "verifier-service",
                         OSSVerifier2ServiceConfig(
-                            clientId = "test-verifier-pres",
+                            clientId = null,
                             clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Test Verifier"),
                             urlPrefix = "$walletBase/verification-session",
                             urlHost = "openid4vp://authorize"
@@ -812,7 +812,7 @@ class Wallet2AdditionalUseCasesTest {
                         ); put("issuing_country", "AT")
                         }),
                         selectiveDisclosure = null,
-                        proofValidationContext = proofSupport.validationContext(request)
+                        proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization])
                     )
                     if (credResp !is CredentialResponseResult.Success) {
                         val failure = credResp as CredentialResponseResult.Failure

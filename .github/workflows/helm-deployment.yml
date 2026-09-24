@@ -36,6 +36,8 @@ jobs:
           args: create namespace ${{ inputs.namespace }}
 
       - name: Update domains and image name in helm-values.json
+        env:
+          WALLET2_AUTH_SIGNING_KEY: ${{ secrets.WALLET2_AUTH_SIGNING_KEY }}
         run: |
           IMAGE_NAME="${{ inputs.version }}"
           NAMESPACE="${{ inputs.namespace }}"
@@ -54,12 +56,22 @@ jobs:
 
           sed -i 's#"authConf": .*#"authConf": ${{ secrets.WALLET_AUTH_SECRET }}#g' helm-values.json
 
+          if [ -z "$WALLET2_AUTH_SIGNING_KEY" ]; then
+            echo "::error::WALLET2_AUTH_SIGNING_KEY is not set. Add it to the repository secrets as a walt.id key JSON, e.g. {\"type\":\"jwk\",\"jwk\":{...}}."
+            echo "Deploy aborted: WALLET2_AUTH_SIGNING_KEY is not set." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          jq --arg key "$WALLET2_AUTH_SIGNING_KEY" \
+            '.["wallet-api2"].configFiles["auth.conf"] |= gsub("__DEFAULT_WALLET2_AUTH_SIGNING_KEY__"; $key)' \
+            helm-values.json > helm-values.patched.json
+          mv helm-values.patched.json helm-values.json
+
           # Update domain names in the file
           sed -i "s/issuer\.portal\.test\.waltid\.cloud/issuer.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
           sed -i "s/issuer2\.portal\.test\.waltid\.cloud/issuer2.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
           sed -i "s/verifier\.portal\.test\.waltid\.cloud/verifier.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
           sed -i "s/verifier2\.portal\.test\.waltid\.cloud/verifier2.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
-          sed -i "s/wallet-api2\.test\.waltid\.cloud/wallet-api2.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
+          sed -i "s/wallet2\.test\.waltid\.cloud/wallet2.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
           sed -i "s/wallet\.test\.waltid\.cloud/wallet.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
           sed -i "s/portal2\.test\.waltid\.cloud/portal2.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
           sed -i "s/portal\.test\.waltid\.cloud/portal.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
@@ -67,9 +79,45 @@ jobs:
 
           # Update image name in helm-values.json
           sed -i "s|\"latest\"|\"${IMAGE_NAME}\"|g" helm-values.json
+      - uses: azure/setup-kubectl@v4
       - uses: azure/setup-helm@v5.0.0
       - name: Create kubeconfig file
         run: echo "${{ secrets[inputs.kubeconfig_secret] }}" | base64 --decode > ${{ github.workspace }}/kubeconfig
+      - name: Create portal2 PID secret
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig
+          PORTAL2_PID_ENV: ${{ secrets.PORTAL2_PID_ENV }}
+        run: |
+          if [ -z "$PORTAL2_PID_ENV" ]; then
+            echo "::error::PORTAL2_PID_ENV is not set. Add PORTAL2_PID_ENV in your repository secrets."
+            echo "Deploy aborted: PORTAL2_PID_ENV is not set." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          ENV_FILE="$RUNNER_TEMP/portal2-pid.env"
+          printf '%s\n' "$PORTAL2_PID_ENV" > "$ENV_FILE"
+
+          present=$(awk -F= '/^[A-Za-z_][A-Za-z0-9_]*=/ { print $1 }' "$ENV_FILE")
+          missing=()
+          for name in \
+            NUXT_PID_GERMAN_KEY_JWK NUXT_PID_GERMAN_X5C NUXT_PID_GERMAN_CLIENT_ID \
+            NUXT_PID_GERMAN_VERIFIER_INFO NUXT_PID_FRANCE_KEY_JWK NUXT_PID_FRANCE_X5C \
+            NUXT_PID_FRANCE_CLIENT_ID NUXT_PID_EUDI_REF_KEY_JWK NUXT_PID_EUDI_REF_X5C \
+            NUXT_PID_EUDI_REF_CLIENT_ID; do
+            grep -qxF "$name" <<< "$present" || missing+=("$name")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            rm -f "$ENV_FILE"
+            echo "::error::PORTAL2_PID_ENV is missing: ${missing[*]}"
+            echo "Deploy aborted: PORTAL2_PID_ENV is missing ${missing[*]}." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          kubectl create secret generic portal2-pid-secret \
+            --namespace ${{ inputs.namespace }} \
+            --from-env-file="$ENV_FILE" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          rm -f "$ENV_FILE"
       - name: Helm Dependency Build
         run: |
           helm dependency build ./helm-charts/waltid
@@ -91,8 +139,9 @@ jobs:
           echo "| Issuer2 | https://issuer2.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
           echo "| Verifier | https://verifier.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
           echo "| Verifier2 | https://verifier2.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
-          echo "| Wallet API2 | https://wallet-api2.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
           echo "| Wallet | https://wallet.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
+          echo "| Wallet (Compose web) | https://wallet2.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
+          echo "| Wallet API2 (same host as above) | https://wallet2.${VERSION}.waltid.cloud/swagger |" >> $GITHUB_STEP_SUMMARY
           echo "| Wallet Dev | https://wallet-dev.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
           echo "| Portal | https://portal.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
           echo "| Portal2 | https://portal2.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY

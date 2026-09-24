@@ -34,6 +34,8 @@ import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.token.TokenResponseOptions
+import id.walt.openid4vci.responses.token.InvalidTokenCredentialAuthorization
+import id.walt.openid4vci.responses.token.withAuthorizationDetails
 import id.walt.openid4vci.responses.token.withOptions
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseBody
@@ -438,9 +440,17 @@ class DefaultOAuth2Provider(
                 continue
             }
 
-            return when (val result = handler.handleTokenEndpointRequest(request)) {
+            val result = try {
+                handler.handleTokenEndpointRequest(request, options)
+            } catch (error: InvalidTokenCredentialAuthorization) {
+                return AccessTokenResponseResult.Failure(error.request, OAuthError(OAuthErrorCodes.INVALID_REQUEST, error.message))
+            }
+            return when (result) {
                 is AccessTokenResponseResult.Success -> result.copy(
-                    response = result.response.withOptions(options, result.request),
+                    response = result.credentialAuthorization?.let { authorization ->
+                        if (authorization.includeInResponse) result.response.withAuthorizationDetails(authorization.authorizationDetails)
+                        else result.response
+                    } ?: result.response.withOptions(options, result.request),
                 )
                 is AccessTokenResponseResult.Failure -> result
             }
@@ -808,12 +818,12 @@ class DefaultOAuth2Provider(
         if (proofCount <= 1) return null
         val batch = context?.batchCredentialIssuance
             ?: return CredentialError(
-                CredentialErrorCodes.INVALID_PROOF,
+                CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
                 "Batch credential issuance is not enabled",
             )
         return if (proofCount > batch.batchSize) {
             CredentialError(
-                CredentialErrorCodes.INVALID_PROOF,
+                CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
                 "Credential proof count $proofCount exceeds the maximum batch size ${batch.batchSize}",
             )
         } else {

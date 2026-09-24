@@ -30,6 +30,30 @@ import id.walt.walletdemo.compose.ui.screens.WalletScreen
 fun WalletDemoApp(
     controller: WalletDemoController,
     branding: WalletDemoBranding = WalletDemoBranding(),
+    onStartProximityPresentation: (() -> Unit)? = null,
+    onSignOut: (() -> Unit)? = null,
+    resetWalletDescription: String? = null,
+) = WalletDemoAppHost(
+    controller = controller,
+    branding = branding,
+    onStartProximityPresentation = onStartProximityPresentation,
+    onSignOut = onSignOut,
+    resetWalletDescription = resetWalletDescription,
+)
+
+/** Wallet shell with an internal slot for transport-specific presentation journey content. */
+@Composable
+internal fun WalletDemoAppHost(
+    controller: WalletDemoController,
+    branding: WalletDemoBranding = WalletDemoBranding(),
+    onStartProximityPresentation: (() -> Unit)? = null,
+    presentationContent: (@Composable () -> Unit)? = null,
+    readerTrustSettingsContent: (@Composable () -> Unit)? = null,
+    readerTrustPolicySummary: String? = null,
+    onOpenSettings: () -> Unit = {},
+    onResetWallet: () -> Unit = { controller.resetWallet() },
+    onSignOut: (() -> Unit)? = null,
+    resetWalletDescription: String? = null,
 ) {
     val state by controller.state.collectAsState()
     PresentationContinuationEffect(
@@ -63,9 +87,6 @@ fun WalletDemoApp(
                             auth = auth,
                             isBusy = state.isBusy,
                             biometricAvailable = state.biometricUnlockAvailable,
-                            signingProtectionMode = state.signingProtectionMode,
-                            selectedSigningProtection = state.selectedSigningProtection,
-                            biometricSigningAvailability = state.biometricSigningAvailability,
                         )
                     }
                     is WalletAuthState.StorageUnavailable -> Box(
@@ -78,7 +99,18 @@ fun WalletDemoApp(
                             message = auth.message,
                         )
                     }
-                    WalletAuthState.Unlocked -> WalletScreen(controller, state)
+                    WalletAuthState.Unlocked -> WalletScreen(
+                        controller = controller,
+                        state = state,
+                        onStartProximityPresentation = onStartProximityPresentation,
+                        presentationContent = presentationContent,
+                        readerTrustSettingsContent = readerTrustSettingsContent,
+                        readerTrustPolicySummary = readerTrustPolicySummary,
+                        onOpenSettings = onOpenSettings,
+                        onResetWallet = onResetWallet,
+                        onSignOut = onSignOut,
+                        resetWalletDescription = resetWalletDescription,
+                    )
                 }
             }
         }

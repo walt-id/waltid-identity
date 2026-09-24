@@ -185,6 +185,8 @@ data class WalletIssuanceSessionRequest(
     val clientId: String = "eudiw-abca",
     val redirectUri: Url = Url("openid://"),
     val tokenRequestHeaders: Map<String, String> = emptyMap(),
+    /** Keep all credential bindings on the validated default key when a caller requires it. */
+    val allowHolderKeyOverrides: Boolean = true,
 ) : CredentialOfferSource {
     init {
         if (credentialIssuer == null) checkOfferSource() else {
@@ -682,7 +684,10 @@ class WalletIssuanceSessionService(
                 val proofs = if (proofRequired) {
                     val nonce = fetchNonce(metadata)
                     try {
-                        WalletIssuanceHandler.buildProofCollection(selected, offered.configuration, metadata.credentialIssuer, nonce)
+                        WalletIssuanceHandler.buildProofCollection(
+                            selected, offered.configuration, metadata.credentialIssuer, nonce,
+                            active.request.clientId.takeUnless { active.tokenRequestAnonymous },
+                        )
                     } catch (error: CancellationException) {
                         throw error
                     } catch (error: Exception) {
@@ -808,6 +813,7 @@ class WalletIssuanceSessionService(
         val attestationJwt = obtainAttestationJwt(active)
         val anonymous = metadata.preAuthorizedGrantAnonymousAccessSupported == true &&
             active.request.tokenRequestHeaders.isEmpty() && attestationJwt == null
+        active.tokenRequestAnonymous = anonymous
         val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthorizedCode,
@@ -841,6 +847,7 @@ class WalletIssuanceSessionService(
         val metadata = active.resolved.authorizationServerMetadata
         val tokenEndpoint = requireNotNull(metadata.tokenEndpoint) { "Authorization server has no token endpoint" }
         val attestationJwt = obtainAttestationJwt(active)
+        active.tokenRequestAnonymous = false
         val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangeAuthorizationCode(
             tokenEndpoint = tokenEndpoint,
             code = code,
@@ -892,6 +899,11 @@ class WalletIssuanceSessionService(
         }
 
     private suspend fun acceptSelections(active: ActiveSession, credentials: List<WalletCredentialSelection>?) {
+        if (!active.request.allowHolderKeyOverrides) {
+            require(credentials.orEmpty().flatMap { it.holderBindings }.all {
+                it.key == null && (it.keyId == null || it.keyId == active.keyId)
+            }) { "This issuance session requires the validated holder key for every credential" }
+        }
         active.selections = wallet.resolveCredentialSelections(credentials,
             active.resolved.offeredCredentials.map { it.credentialConfigurationId },
             active.resolved.issuerMetadata.metadata, active.keyMaterial, active.did)
@@ -1358,6 +1370,7 @@ class WalletIssuanceSessionService(
             clientId = persisted.request.clientId,
             redirectUri = Url(persisted.request.redirectUri),
             tokenRequestHeaders = persisted.request.tokenRequestHeaders,
+            allowHolderKeyOverrides = persisted.request.allowHolderKeyOverrides,
         )
         val keyMaterial = resolvePersistedKeyMaterial(persisted.request.keyId, persisted.selectedPublicJwk)
         require((persisted.authorization != null) == (persisted.codeVerifier != null)) {
@@ -1460,6 +1473,7 @@ class WalletIssuanceSessionService(
                 clientId = active.request.clientId,
                 redirectUri = active.request.redirectUri.toString(),
                 tokenRequestHeaders = active.request.tokenRequestHeaders,
+                allowHolderKeyOverrides = active.request.allowHolderKeyOverrides,
             ),
             offer = active.resolved.offer?.let { json.encodeToString(it) },
             issuerMetadata = json.encodeToString(active.resolved.issuerMetadata),
@@ -1738,6 +1752,14 @@ class WalletIssuanceSessionService(
         var expiresAtEpochMilliseconds: Long,
         var attestationChallenge: String? = null,
         var selections: List<ResolvedWalletCredentialSelection>? = null,
+        /**
+         * Whether the token request for this session used anonymous pre-authorized access.
+         * Both token-exchange paths assign this before any proof is built, and token exchange and
+         * proof building run in the same `complete()` call (no persist/restore in between), so the
+         * default only applies before a token has been obtained. Recording it here lets credential
+         * proofs omit `iss` without re-running attestation (which has side effects).
+         */
+        var tokenRequestAnonymous: Boolean = false,
     ) {
         val persistable: Boolean get() = request.key == null && selections?.all { it.selection.holderBindings.all { it.key == null } } != false
     }
@@ -1779,6 +1801,7 @@ class WalletIssuanceSessionService(
         val clientId: String,
         val redirectUri: String,
         val tokenRequestHeaders: Map<String, String>,
+        val allowHolderKeyOverrides: Boolean = true,
     )
 
     @Serializable

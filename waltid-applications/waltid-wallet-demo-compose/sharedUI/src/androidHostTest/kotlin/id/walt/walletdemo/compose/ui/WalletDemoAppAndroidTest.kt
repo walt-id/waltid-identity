@@ -11,6 +11,9 @@ class WalletDemoAppAndroidTest {
     private val scenarios = WalletDemoAppTestScenarios()
 
     @Test
+    fun keySetupGroupsChoicesAndConfirmsSelectedConfiguration() = scenarios.keySetupGroupsChoicesAndConfirmsSelectedConfiguration()
+
+    @Test
     fun pinStorageFailureStaysLockedUntilRetrySucceeds() =
         scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
 
@@ -27,12 +30,18 @@ class WalletDemoAppAndroidTest {
         scenarios.pinSetupKeepsSubmitReachableWhenScrolled()
 
     @Test
-    fun unavailableBiometricSigningIsDisabledButNoneRemainsAvailable() =
-        scenarios.unavailableBiometricSigningIsDisabledButNoneRemainsAvailable()
+    fun pinSetupDoesNotAskForSigningApproval() =
+        scenarios.pinSetupDoesNotAskForSigningApproval()
 
     @Test
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() =
         scenarios.credentialsTabShowsCompactCardsAndNavigatesToDetails()
+
+    @Test
+    fun credentialsTabWaitsForCredentialRead() = scenarios.credentialsTabWaitsForCredentialRead()
+
+    @Test
+    fun credentialsTabDoesNotShowEmptyOnLoadFailure() = scenarios.credentialsTabDoesNotShowEmptyOnLoadFailure()
 
     @Test
     fun credentialsTabShowsEmptyStateAndUpdatesAfterReceive() =
@@ -65,6 +74,10 @@ class WalletDemoAppAndroidTest {
     @Test
     fun receiveAndPresentTabsExposeQrScanActions() =
         scenarios.receiveAndPresentTabsExposeQrScanActions()
+
+    @Test
+    fun embeddedPresentationJourneyKeepsWalletChrome() =
+        scenarios.embeddedPresentationJourneyKeepsWalletChrome()
 
     @Test
     fun presentTabAllowsPreviewAndDeclineWithoutCredentials() =
@@ -123,8 +136,20 @@ class WalletDemoAppAndroidTest {
         scenarios.customBrandingTitleAppearsInTheHeader()
 
     @Test
+    fun sharingApprovalPreferenceIsConsistentAndPersistsAcrossJourneys() =
+        scenarios.sharingApprovalPreferenceIsConsistentAndPersistsAcrossJourneys()
+
+    @Test
     fun settingsReplacesHeaderLockAndShowsDidAndKey() =
         scenarios.settingsReplacesHeaderLockAndShowsDidAndKey()
+
+    @Test
+    fun technicalCopyPreservesFullValueWithoutChangingExpansion() =
+        scenarios.technicalCopyPreservesFullValueWithoutChangingExpansion()
+
+    @Test
+    fun readerTrustSettingsReviewAndPersistPublicCa() =
+        scenarios.readerTrustSettingsReviewAndPersistPublicCa()
 
     @Test
     fun lockDoesNotAutoPromptBiometrics() =

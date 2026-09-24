@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
@@ -33,7 +34,6 @@ import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
@@ -71,7 +71,7 @@ import id.walt.wallet2.handlers.WalletIssuanceSessionRecordKind
 import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
@@ -137,7 +137,7 @@ class MobileWalletTest {
             val wallet = MobileWallet(
                 walletId = "batch-keys", keyStore = keyStore, didStore = didStore,
                 credentialStore = InMemoryCredentialStore(),
-                generateAndPersistKey = { _, policy ->
+                generateIssuanceHolderKey = { _, policy ->
                     if (failThird && generated == 2) error("Third key generation failed")
                     policies += policy
                     CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
@@ -187,7 +187,6 @@ class MobileWalletTest {
         val config = MobileWalletConfig()
         val (
             walletId,
-            defaultKeyType,
             attestationConfig,
             persistence,
             onEvent,
@@ -197,7 +196,6 @@ class MobileWalletTest {
         ) = config
 
         assertEquals("default", walletId)
-        assertEquals(MobileWalletKeyType.secp256r1, defaultKeyType)
         assertEquals(null, attestationConfig)
         assertEquals(MobileWalletPersistence(), persistence)
         assertEquals(emptyList(), preferredLocales)
@@ -218,7 +216,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "unused-key", keyType = "Ed25519")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:unused", document = JsonObject(emptyMap()))),
             credentialStore = RecordingCredentialStore(),
-            generateAndPersistKey = unusedKeyGenerator(),
+
         )
 
         val failure = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
@@ -318,53 +316,6 @@ class MobileWalletTest {
     }
 
     @Test
-    fun persistedManagedKeyIsRestoredWithoutLegacyKeyAfterRestart() = runTest {
-        val runtime = CryptoRuntime(softwareProviders = defaultSoftwareKeyProviders())
-        val managedKey = runtime.generateSoftwareKey(
-            GenerateSoftwareKeyRequest(
-                id = KeyId("managed-key"),
-                spec = KeySpec.Ec(EcCurve.P256),
-                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-            ),
-        )
-        val keyStore = PreloadedKeyStore(
-            keyInfo = WalletKeyInfo(keyId = managedKey.id.value, keyType = "secp256r1"),
-            managedKey = managedKey,
-            failIfLegacyKeyRequested = true,
-        )
-        val wallet = MobileWallet(
-            walletId = "managed-key-wallet",
-            keyStore = keyStore,
-            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:managed", document = JsonObject(emptyMap()))),
-            credentialStore = RecordingCredentialStore(),
-            generateAndPersistKey = unusedKeyGenerator(),
-        )
-
-        val bootstrap = wallet.bootstrap()
-
-        assertEquals(managedKey.id.value, bootstrap.keyId)
-        assertEquals("did:key:managed", bootstrap.did)
-        assertTrue(bootstrap.publicJwk.contains("\"kty\""), bootstrap.publicJwk)
-        assertEquals(2, keyStore.managedKeyLookupCalls)
-    }
-
-    @Test
-    fun persistedDidWithMissingPlatformKeyFailsBootstrap() = runTest {
-        val keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "missing-key", keyType = "secp256r1"))
-        val wallet = MobileWallet(
-            walletId = "missing-key-wallet",
-            keyStore = keyStore,
-            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:missing", document = JsonObject(emptyMap()))),
-            credentialStore = RecordingCredentialStore(),
-            generateAndPersistKey = unusedKeyGenerator(),
-        )
-
-        val failure = assertFailsWith<IllegalArgumentException> { wallet.bootstrap() }
-
-        assertTrue("missing-key" in failure.message.orEmpty())
-    }
-
-    @Test
     fun deleteWalletRemovesEntriesFromActiveStores() = runTest {
         val keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1"))
         val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap())))
@@ -391,7 +342,7 @@ class MobileWalletTest {
             didStore = didStore,
             credentialStore = credentialStore,
             issuanceSessionStore = issuanceSessionStore,
-            generateAndPersistKey = unusedKeyGenerator(),
+
         )
 
         wallet.deleteWallet()
@@ -584,7 +535,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = unusedKeyGenerator(),
+
         )
 
         val credential = wallet.credentials().single()
@@ -612,7 +563,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = unusedKeyGenerator(),
+
         )
 
         val displayData = displayJson.parseToJsonElement(wallet.credentials().single().credentialDataJson).jsonObject
@@ -680,6 +631,57 @@ class MobileWalletTest {
     }
 
     @Test
+    fun mdocIdentityRegistrationPreservesOpaqueIdsWithoutDisplayOrClaimData() = runTest {
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "mdl-1",
+                credential = MdocsCredential(
+                    credentialData = buildJsonObject {
+                        put("org.iso.18013.5.1", buildJsonObject { put("given_name", "Ada") })
+                    },
+                    signed = null,
+                    docType = "org.iso.18013.5.1.mDL",
+                ),
+                label = "My driving licence",
+            ),
+            StoredCredential(
+                id = "pid-1",
+                credential = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2).second,
+            ),
+        )
+        suspend fun records(projection: MobileWalletRegistryProjection, walletId: String = "projection-wallet"):
+            Pair<String, List<MobileWalletCredentialRegistryRecord>> {
+            val registry = RecordingMetadataRegistry()
+            MobileWallet(
+                walletId = walletId,
+                keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+                didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+                credentialStore = credentialStore,
+                credentialRegistry = registry,
+                registrationProjection = projection,
+            ).refreshDigitalCredentialRegistration()
+            return registry.replacements.single()
+        }
+
+        val full = records(MobileWalletRegistryProjection.Full)
+        val minimal = records(MobileWalletRegistryProjection.MdocIdentity)
+        assertEquals(2, full.second.size)
+        val fullMdoc = full.second.single { it.format == MobileWalletDigitalCredentialFormat.MDOC }
+        assertTrue(fullMdoc.fields.isNotEmpty())
+        assertEquals(full.first, minimal.first)
+        assertEquals(
+            fullMdoc.copy(fields = emptyList(), displayName = "", subtitle = ""),
+            minimal.second.single(),
+        )
+        assertEquals(minimal, records(MobileWalletRegistryProjection.MdocIdentity))
+        assertFalse(minimal.second.single().registryEntryId.contains("mdl-1"))
+        assertFalse(
+            minimal.second.single().registryEntryId ==
+                records(MobileWalletRegistryProjection.MdocIdentity, "other-wallet").second.single().registryEntryId,
+        )
+    }
+
+    @Test
     fun digitalCredentialRegistryUsesStableOpaqueMetadataAndExcludesSdJwtInfrastructureClaims() = runTest {
         val registry = RecordingMetadataRegistry()
         val credentialStore = RecordingCredentialStore(
@@ -705,7 +707,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = { _, _ -> error("Registry refresh must not generate keys") },
+
             credentialRegistry = registry,
         )
 
@@ -747,7 +749,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = { _, _ -> error("Registry refresh must not generate keys") },
+
             credentialRegistry = registry,
         )
 
@@ -780,7 +782,7 @@ class MobileWalletTest {
             credentialStore = RecordingCredentialStore(
                 StoredCredential(id = "pid-1", credential = credential, label = "PID"),
             ),
-            generateAndPersistKey = { _, _ -> error("Registry refresh must not generate keys") },
+
             credentialRegistry = registry,
         )
 
@@ -834,7 +836,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = { _, _ -> error("Registry refresh must not generate keys") },
+
             credentialRegistry = registry,
         )
 
@@ -877,7 +879,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = { _, _ -> error("Registry refresh must not generate keys") },
+
             credentialRegistry = registry,
         )
 
@@ -909,7 +911,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = { _, _ -> error("Registry failure must not generate keys") },
+
             credentialRegistry = registry,
         )
 
@@ -949,7 +951,7 @@ class MobileWalletTest {
                 it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
             },
             credentialStore = credentialStore,
-            generateAndPersistKey = { _, _ -> error("Issuance must not generate keys") },
+
             credentialRegistry = registry,
             issuanceHttpClient = mockIssuer(),
         )
@@ -987,7 +989,7 @@ class MobileWalletTest {
                 it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
             },
             credentialStore = InMemoryCredentialStore(),
-            generateAndPersistKey = { _, _ -> error("Issuance must not generate keys") },
+
             issuanceHttpClient = mockIssuer(),
         )
 
@@ -1033,7 +1035,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = { _, _ -> error("Registry notification must not generate keys") },
+
             credentialRegistry = registry,
             // How many projections had been published when the host was notified, which proves the
             // notification follows the publish rather than racing it.
@@ -1070,7 +1072,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = { _, _ -> error("Registry notification must not generate keys") },
+
             credentialRegistry = registry,
             onDigitalCredentialRegistryChanged = {
                 reconciliationRequests++
@@ -1092,7 +1094,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = RecordingCredentialStore(),
-            generateAndPersistKey = { _, _ -> error("Registry refresh must not generate keys") },
+
             credentialRegistry = registry,
         )
 
@@ -1110,7 +1112,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = RecordingCredentialStore(),
-            generateAndPersistKey = { _, _ -> error("Parsing must not generate keys") },
+
         )
         val raw = DeviceRequest(
             docType = "org.iso.18013.5.1.mDL",
@@ -1142,7 +1144,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
             credentialStore = RecordingCredentialStore(),
-            generateAndPersistKey = { _, _ -> error("Reading a request must not generate keys") },
+
         )
         val deviceRequest = DeviceRequest(
             docType = "org.iso.18013.5.1.mDL",
@@ -1220,6 +1222,7 @@ class MobileWalletTest {
             WalletKeyInfo(keyId = holderKeyId, keyType = "Ed25519"),
             managedKey = holderSigner,
         )
+        val registry = RecordingMetadataRegistry()
         val wallet = MobileWallet(
             walletId = "annex-c-reader-auth-wallet",
             keyStore = holderKeyStore,
@@ -1227,13 +1230,16 @@ class MobileWalletTest {
             credentialStore = RecordingCredentialStore(
                 annexCBoundMdl(holderSigner, holderKeyStore),
             ),
-            generateAndPersistKey = { _, _ -> error("Reader-authentication preview must not generate keys") },
+            credentialRegistry = registry,
+            registrationProjection = MobileWalletRegistryProjection.MdocIdentity,
             readerTrustEvaluator = MobileWalletReaderTrustEvaluator { chain ->
                 assertEquals(1, chain.size)
                 assertContentEquals(readerCertificate, chain.single())
                 MobileWalletReaderTrust.Trusted("CN=Example")
             },
         )
+        wallet.refreshDigitalCredentialRegistration()
+        assertTrue(registry.replacements.single().second.single().fields.isEmpty())
         val parsedRequest = wallet.parseAnnexCDeviceRequest(signedRequest.encodeToBase64Url())
 
         val preview = wallet.previewAnnexCPresentation(
@@ -1242,10 +1248,12 @@ class MobileWalletTest {
                 verifiedOrigin = origin,
                 deviceRequestBase64Url = SIGNED_READER_REQUEST,
                 encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+                selectedRegistryEntryIds = listOf(registry.replacements.single().second.single().registryEntryId),
             )
         )
 
         assertEquals(MobileWalletReaderTrust.Trusted("CN=Example"), preview.readerTrust)
+        assertEquals("Ada", preview.credentialOptions.single().disclosures.single().displayValue)
         val submission = MobileWalletAnnexCSubmission(
             requestId = preview.requestId,
             verifiedOrigin = origin,
@@ -1319,7 +1327,7 @@ class MobileWalletTest {
             credentialStore = RecordingCredentialStore(
                 annexCBoundMdl(holderSigner, holderKeyStore),
             ),
-            generateAndPersistKey = { _, _ -> error("Reader-trust previews must not generate keys") },
+
         )
         val parsedRequest = wallet.parseAnnexCDeviceRequest(signedRequest.encodeToBase64Url())
 
@@ -1494,6 +1502,7 @@ class MobileWalletTest {
         // request keeps the original reader's valid signature while changing what was requested.
         assertRejected(
             signedRequest.copy(
+                version = DeviceRequest.VERSION_WITH_SIGNING,
                 deviceRequestInfo = ByteStringWrapper(
                     DeviceRequestInfo(
                         useCases = listOf(UseCase(mandatory = true, documentSets = listOf(listOf(0u)))),
@@ -1541,7 +1550,7 @@ class MobileWalletTest {
             keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "unused-key", keyType = "secp256r1")),
             didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:unused", document = JsonObject(emptyMap()))),
             credentialStore = credentialStore,
-            generateAndPersistKey = unusedKeyGenerator(),
+
         )
         val request = DeviceRequest(
             docType = docType,
@@ -1596,8 +1605,8 @@ class MobileWalletTest {
     }
 
     /**
-     * Reader authentication must be restricted to the algorithms ISO 18013-5 §9.1.3.4 permits, read from
-     * the *protected* header where they are signed over.
+     * Reader authentication must be restricted to the active profile's algorithms, read from the
+     * *protected* header where they are signed over.
      *
      * `ESP256` is the sharp case: a legitimate, fully-specified P-256 ECDSA identifier the allowlist
      * excludes, so a wallet trusting `alg` blindly would verify it. The assertion walks the cause chain
@@ -1783,7 +1792,7 @@ class MobileWalletTest {
         keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "unused-key", keyType = "Ed25519")),
         didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:unused", document = JsonObject(emptyMap()))),
         credentialStore = RecordingCredentialStore(),
-        generateAndPersistKey = unusedKeyGenerator(),
+
         clientIdTrustConfiguration = trustConfiguration,
     )
 
@@ -1791,6 +1800,7 @@ class MobileWalletTest {
         val requestObject = verifierKey.signJws(
             buildJsonObject {
                 put("client_id", "verifier2")
+                put("aud", AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE)
                 put("nonce", "nonce-123")
                 put("response_type", "vp_token")
                 put("response_mode", "direct_post")
@@ -1807,9 +1817,6 @@ class MobileWalletTest {
             parameters.append("request", requestObject)
         }.buildString()
     }
-
-    private fun unusedKeyGenerator(): suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> ManagedKeyMaterial =
-        { _, _ -> error("This test must not bootstrap a new key") }
 
     /** A pre-authorized offer carried inline, so resolving it needs no offer fetch of its own. */
     private fun preAuthorizedOfferUrl(): String = URLBuilder(CROSS_DEVICE_CREDENTIAL_OFFER_URL).apply {
@@ -1915,7 +1922,7 @@ class MobileWalletTest {
             credentialStore = RecordingCredentialStore(
                 annexCBoundMdl(holderSigner, holderKeyStore),
             ),
-            generateAndPersistKey = unusedKeyGenerator(),
+
         )
     }
 

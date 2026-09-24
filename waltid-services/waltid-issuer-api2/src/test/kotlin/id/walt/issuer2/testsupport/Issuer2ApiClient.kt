@@ -1,9 +1,12 @@
 package id.walt.issuer2.testsupport
 
+import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
+import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.domain.CredentialProfile
+import id.walt.issuer2.repository.IssuanceSessionStorageCodec
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
@@ -21,6 +24,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
 import io.ktor.http.contentType
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -38,16 +43,27 @@ suspend fun HttpClient.getProfile(profileId: String): CredentialProfile =
 suspend fun HttpClient.getSession(sessionId: String): IssuanceSession =
     get("/issuer2/sessions/$sessionId").also {
         assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
-    }.body()
+    }.bodyAsText().let(IssuanceSessionStorageCodec::decode)
 
 suspend fun HttpClient.listSessions(): List<IssuanceSession> =
     get("/issuer2/sessions").also {
         assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
-    }.body()
+    }.bodyAsText().let { Json.parseToJsonElement(it).jsonArray.map { element -> IssuanceSessionStorageCodec.decode(element.toString()) } }
 
 suspend fun HttpClient.createCredentialOffer(
     request: CredentialOfferCreateRequest,
 ): CredentialOfferCreateResponse {
+    val response = post("/issuer2/credential-offers") {
+        contentType(ContentType.Application.Json)
+        setBody(request)
+    }
+    assertEquals(HttpStatusCode.Created, response.status, response.bodyAsText())
+    return response.body()
+}
+
+suspend fun HttpClient.createCredentialOffer(
+    request: MultiCredentialOfferCreateRequest,
+): MultiCredentialOfferCreateResponse {
     val response = post("/issuer2/credential-offers") {
         contentType(ContentType.Application.Json)
         setBody(request)

@@ -23,31 +23,46 @@ class AttestationX509CertificateValidator : X509CertificateValidator {
         x509Certificate: X509Certificate
     ) {
 
-        if (x509Certificate.data.extensionKeyUsage
-                ?.keyPurposeIdList
-                ?.contains(KeyUsage.digitalSignature) != true
-        ) {
+        // RFC 5280 §4.2.1.3: KeyUsage restricts the key only when the extension is present.
+        val keyUsage = x509Certificate.data.extensionKeyUsage
+        if (keyUsage != null && KeyUsage.digitalSignature !in keyUsage.keyPurposeIdList) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
                 "Certificate does not contain client Key Usage 'digitalSignature'"
             )
         }
 
-        if (x509Certificate.data.extensionExtendedKeyUsage
-                ?.keyPurposeList
-                ?.contains(ExtendedKeyUsageExtension.KeyUsage.clientAuth) != true
+        // RFC 5280 §4.2.1.12: ExtendedKeyUsage is unrestricted when absent. When present, the
+        // listed purposes must include one this wallet uses for a verifier: TLS clientAuth, or
+        // ISO mdoc reader authentication. OpenID4VP authenticates the chain and client id; it
+        // does not require the TLS clientAuth purpose.
+        val extendedKeyUsage = x509Certificate.data.extensionExtendedKeyUsage
+        if (extendedKeyUsage != null &&
+            extendedKeyUsage.keyPurposeIdList.none { it in acceptedVerifierExtendedKeyUsageOids }
         ) {
-            //Certificate with subjectDn='CN=Verifier Signer,C=EU,O=Niscy,organizationIdentifier=LEIEU-987654321' which is used for
-            //MobileWalletIntegrationTest doesn't have extended key usage extension
-            //Set severity to WARNING, so the test works
             context.addLogEntry(
-                ValidationResult.Severity.WARNING,
-                "Certificate does not contain client auth Extended Key Usage (OID: '${ExtendedKeyUsageExtension.KeyUsage.clientAuth.id}')"
+                ValidationResult.Severity.ERROR,
+                "Certificate Extended Key Usage does not include a verifier purpose " +
+                    "(clientAuth ${ExtendedKeyUsageExtension.KeyUsage.clientAuth.id} or " +
+                    "mdoc reader authentication $mdocReaderAuthenticationEkuOid)"
             )
         }
     }
 
     companion object {
         const val id = "attestation-leaf"
+
+        /** ISO/IEC 18013-5 reader-authentication EKU. */
+        const val mdocReaderAuthenticationEkuOid = "1.0.18013.5.1.6"
+
+        /** ISO/IEC 23220-4 reader-authentication EKU. */
+        const val mdocReaderAuthentication23220EkuOid = "1.0.23220.4.1.6"
+
+        private val acceptedVerifierExtendedKeyUsageOids = setOf(
+            ExtendedKeyUsageExtension.KeyUsage.anyExtendedKeyUsage.id,
+            ExtendedKeyUsageExtension.KeyUsage.clientAuth.id,
+            mdocReaderAuthenticationEkuOid,
+            mdocReaderAuthentication23220EkuOid,
+        )
     }
 }

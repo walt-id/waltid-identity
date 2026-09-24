@@ -2,9 +2,16 @@ package id.walt.issuer2.controller.openapi
 
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
+import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
+import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
 import io.github.smiley4.ktoropenapi.config.RouteConfig
+import id.walt.issuer2.models.singleIssuanceSessionDescriptor
+import io.github.smiley4.ktoropenapi.config.descriptors.array
+import io.github.smiley4.ktoropenapi.config.descriptors.SerialTypeDescriptor
+import io.github.smiley4.ktoropenapi.config.descriptors.anyOf
+import io.github.smiley4.ktoropenapi.config.descriptors.type
 import io.ktor.http.HttpStatusCode
 
 object Issuer2ManagementRoutesDocs {
@@ -66,14 +73,37 @@ object Issuer2ManagementRoutesDocs {
         description = """
             Create a profile-derived OpenID4VCI credential offer URL and the backing issuance session.
 
-            Supports pre-authorized and authorization-code issuance flows. The offer can contain one
-            or more credential profiles and can be returned by reference or by value. Runtime overrides can
+            Choose one of the following request formats:
+
+            - Single-profile offer: send `profileId` with optional `runtimeOverrides`.
+            - Multi-credential offer: send a non-empty `credentials` array. Each entry contains a
+              `profileId` and optional `runtimeOverrides`. Select different profiles to offer different
+              credential formats, or repeat a profile with different `credentialData` overrides to offer
+              different datasets.
+
+            The batch limit is advertised as `batch_credential_issuance.batch_size` in issuer metadata.
+
+            When using `credentials`, put overrides inside each entry and omit top-level `profileId`
+            and `runtimeOverrides` entirely, rather than setting them to null. A `profileId` request
+            returns a response containing `profileId`. A `credentials` request returns the offer response
+            without profile fields or a `credentials` array, even when only one entry was supplied.
+
+            Both request formats support pre-authorized and authorization-code issuance flows, with offers
+            returned by reference or by value. Runtime overrides can
             be applied per credential for one offer only. Supported
             override fields are: issuerDid, credentialData, mapping, selectiveDisclosure,
             idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, authorizedTransactionDataTypes,
-            x5Chain, and notifications.
+            x5Chain, notifications, and credentialStatus.
             credentialData is applied as a partial object patch over the configured profile data:
             nested objects are merged, while primitive, array, and null values replace the configured value.
+            Each offered credential uses its configured `credentialStatus` for all copies issued from it.
+            When multiple proofs are supplied, those copies share the same status entry; revoking that
+            entry revokes every credential referencing it. Supply `runtimeOverrides.credentialStatus`
+            on a single-profile offer or inside each `credentials[]` item to override the profile default.
+            Different items can use different entries. The caller allocates and manages status entries;
+            OSS embeds them without allocating new entries per copy. Shared references make copies linkable.
+            Redeem different offered items through separate Credential Requests; multiple proofs request
+            copies of the selected item. Repeated issuance of an item also uses its configured status.
             Authorization-code offers include issuer_state by default. Set issuerStateMode to OMIT only
             for profile-based offers without runtime overrides. AUTHORIZED offers with runtimeOverrides and
             issuerStateMode OMIT are rejected with Bad Request.
@@ -81,7 +111,7 @@ object Issuer2ManagementRoutesDocs {
             Use -1 for no expiry.
         """.trimIndent()
         request {
-            body<CredentialOfferCreateRequest> {
+            body(anyOf(type<CredentialOfferCreateRequest>(), type<MultiCredentialOfferCreateRequest>())) {
                 example("[authorized][single][by-reference]") {
                     value = Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE
                 }
@@ -105,6 +135,21 @@ object Issuer2ManagementRoutesDocs {
                 }
                 example("[pre-authorized][single][by-reference]") {
                     value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE
+                }
+                example("[pre-authorized][single][shared status][W3C]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS
+                }
+                example("[pre-authorized][single][shared status][SD-JWT]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_SD_JWT_STATUS
+                }
+                example("[pre-authorized][single][shared status][mdoc]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_MDOC_STATUS
+                }
+                example("[pre-authorized][multiple][different statuses per item]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES
+                }
+                example("[authorized][multiple][different statuses per item]") {
+                    value = Issuer2RequestExamples.PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES
                 }
                 example("[pre-authorized][single][by-value]") {
                     value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_VALUE
@@ -150,7 +195,7 @@ object Issuer2ManagementRoutesDocs {
         response {
             HttpStatusCode.Created to {
                 description = "Credential offer created"
-                body<CredentialOfferCreateResponse> {
+                body(anyOf(type<CredentialOfferCreateResponse>(), type<MultiCredentialOfferCreateResponse>())) {
                     example("Offer response by reference") {
                         value = Issuer2RequestExamples.CREDENTIAL_OFFER_RESPONSE_BY_REFERENCE
                     }
@@ -183,7 +228,7 @@ object Issuer2ManagementRoutesDocs {
         response {
             HttpStatusCode.OK to {
                 description = "Issuance sessions"
-                body<List<IssuanceSession>>()
+                body(array(anyOf(SerialTypeDescriptor(singleIssuanceSessionDescriptor), type<IssuanceSession>())))
             }
         }
     }
@@ -197,7 +242,7 @@ object Issuer2ManagementRoutesDocs {
         response {
             HttpStatusCode.OK to {
                 description = "Issuance session"
-                body<IssuanceSession>()
+                body(anyOf(SerialTypeDescriptor(singleIssuanceSessionDescriptor), type<IssuanceSession>()))
             }
         }
     }

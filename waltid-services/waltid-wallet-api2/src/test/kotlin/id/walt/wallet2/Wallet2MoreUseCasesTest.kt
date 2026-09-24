@@ -165,7 +165,7 @@ class Wallet2MoreUseCasesTest {
         runBlocking {
             preAuthRepo.save(DefaultPreAuthorizedCodeRecord(
                 code = preAuthCode, clientId = null, txCode = null, txCodeValue = null,
-                grantedScopes = emptySet(), grantedAudience = emptySet(), session = session,
+                grantedScopes = setOf(credentialConfigId), grantedAudience = emptySet(), session = session,
                 expiresAt = Clock.System.now() + 10.minutes,
             ))
         }
@@ -174,7 +174,7 @@ class Wallet2MoreUseCasesTest {
         val deferredCredentials = java.util.concurrent.ConcurrentHashMap<String, Pair<id.walt.openid4vci.requests.credential.CredentialRequest, JsonObject>>()
         val issuerMetadata = CredentialIssuerMetadata.fromBaseUrl(
             baseUrl = issuerBase,
-            credentialConfigurationsSupported = mapOf(credentialConfigId to configuration),
+            credentialConfigurationsSupported = mapOf(credentialConfigId to configuration.copy(scope = credentialConfigId)),
             deferredCredentialEndpointPath = if (deferred) "/deferred-credential" else null
         )
         val offer = CredentialOffer.withPreAuthorizedCodeGrant(
@@ -230,7 +230,7 @@ class Wallet2MoreUseCasesTest {
                         configuration = configuration, issuerKey = issuerKey,
                         issuerId = issuerBase, issuanceInputData = testIssuanceInputData(credentialData),
                         selectiveDisclosure = selectiveDisclosure,
-                        proofValidationContext = proofSupport.validationContext(request)
+                        proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization])
                     )
                     if (credResp !is CredentialResponseResult.Success) {
                         val failure = credResp as CredentialResponseResult.Failure
@@ -251,7 +251,7 @@ class Wallet2MoreUseCasesTest {
                         configuration = configuration, issuerKey = issuerKey,
                         issuerId = issuerBase, issuanceInputData = testIssuanceInputData(data),
                         selectiveDisclosure = null,
-                        proofValidationContext = proofSupport.validationContext(request)
+                        proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization])
                     )
                     if (credResp !is CredentialResponseResult.Success) {
                         val failure = credResp as CredentialResponseResult.Failure
@@ -308,7 +308,7 @@ class Wallet2MoreUseCasesTest {
                 features = listOf(OSSWallet2FeatureCatalog, OSSVerifier2FeatureCatalog),
                 preload = {
                     ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$walletPort")))
-                    ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(clientId = "multi-format-verifier", clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Multi-format Test Verifier"), urlPrefix = "http://$host:$walletPort/verification-session", urlHost = "openid4vp://authorize"))
+                    ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(clientId = null, clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Multi-format Test Verifier"), urlPrefix = "http://$host:$walletPort/verification-session", urlHost = "openid4vp://authorize"))
                 },
                 init = { DidService.minimalInit() },
                 module = { multiFormatModule() }
@@ -463,9 +463,9 @@ class Wallet2MoreUseCasesTest {
                     }.also { assertEquals(HttpStatusCode.Created, it.status) }
                 }
 
-                // Step 1: receive credential via wallet → issuer defers → deferredTransactionIds populated
+                // Step 1: receive credential via wallet → issuer defers → deferredCredentials populated
                 val offer = CredentialOffer.withPreAuthorizedCodeGrant(issuerBase, listOf(credConfigId), preAuthCode)
-                val receiveResult = testAndReturn("Deferred: receive returns deferredTransactionIds (no immediate credential)") {
+                val receiveResult = testAndReturn("Deferred: receive returns deferredCredentials (no immediate credential)") {
                     http.post("/wallet/$walletId/credentials/receive") {
                         contentType(ContentType.Application.Json)
                         setBody(ReceiveCredentialRequest(offerJson = Json.encodeToJsonElement(offer).jsonObject))
@@ -473,9 +473,9 @@ class Wallet2MoreUseCasesTest {
                         .body<ReceiveCredentialResult>()
                 }
                 assertEquals(0, receiveResult.credentialIds.size, "Deferred: no immediate credential, expected 0 got ${receiveResult.credentialIds.size}")
-                assertTrue(receiveResult.deferredTransactionIds.isNotEmpty(), "Deferred: must have a transactionId")
+                assertTrue(receiveResult.deferredCredentials.isNotEmpty(), "Deferred: must have a transactionId")
 
-                val txId = receiveResult.deferredTransactionIds.values.first()
+                val txId = receiveResult.deferredCredentials.first().transactionId
 
                 // Step 2: get an access token for the deferred poll — exchange a second pre-auth code
                 // We call the isolated request-token endpoint with a fresh code seeded into the issuer.
@@ -689,7 +689,7 @@ class Wallet2MoreUseCasesTest {
                 features = listOf(OSSWallet2FeatureCatalog, OSSVerifier2FeatureCatalog),
                 preload = {
                     ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(publicBaseUrl = Url(walletBase)))
-                    ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(clientId = "isolated-vp-verifier", clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Isolated VP Verifier"), urlPrefix = "$walletBase/verification-session", urlHost = "openid4vp://authorize"))
+                    ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(clientId = null, clientMetadata = id.walt.verifier.openid.models.authorization.ClientMetadata(clientName = "Isolated VP Verifier"), urlPrefix = "$walletBase/verification-session", urlHost = "openid4vp://authorize"))
                 },
                 init = { DidService.minimalInit() },
                 module = { multiFormatModule() }

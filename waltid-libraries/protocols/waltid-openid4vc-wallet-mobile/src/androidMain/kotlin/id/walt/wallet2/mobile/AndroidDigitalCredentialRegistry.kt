@@ -27,8 +27,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -110,9 +108,12 @@ public class AndroidDigitalCredentialRegistry(
                             MobileWalletDigitalCredentialFormat.SD_JWT_VC,
                         ),
                         requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.SIGNED),
-                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED),
-                        supported = false,
-                        unsupportedReason = SIGNED_UNSUPPORTED_REASON,
+                        responseProtection = listOf(
+                            MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
+                            MobileWalletDigitalCredentialResponseProtection.JWE,
+                        ),
+                        supported = runtimeAvailable,
+                        unsupportedReason = unavailableReason,
                     ),
                     MobileWalletDigitalCredentialCapability(
                         protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED,
@@ -186,12 +187,13 @@ public class AndroidDigitalCredentialRegistry(
     ): MobileWalletCredentialRegistrationResult {
         val entries = records.map { it.toAndroidEntry() }
         return runCatching {
-            // Registering only the unsigned protocol makes Credential Manager ignore signed and
-            // multisigned requests rather than route them here to be rejected.
+            // Signed is always advertised. Unsigned is opt-in so Credential Manager does not route
+            // unauthenticated request objects the hosting application has not permitted. Multisigned
+            // stays off the list so JWS JSON Serialization is ignored rather than routed here to fail.
             val openId4Vp = OpenId4VpRegistry(
                 credentialEntries = entries,
                 id = registryId,
-                supportedProtocols = listOf(OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED),
+                supportedProtocols = advertisedOpenId4VpProtocols(),
             )
             // Same registry bytes, different matcher. See OPENID4VP-MATCHER.md for why AndroidX's
             // embedded matcher cannot serve a transaction data request alongside a second credential.
@@ -420,12 +422,13 @@ public class AndroidDigitalCredentialRegistry(
                 docType = type,
                 fields = fields.map { field ->
                     require(field.path.size == 2) { "mdoc registry fields require namespace and element paths" }
+                    val value = field.valueJson.registryScalar()
                     MdocField(
                         namespace = field.path[0],
                         identifier = field.path[1],
-                        fieldValue = field.valueJson.toPlatformValue(),
+                        fieldValue = value?.toPlatformValue(),
                         fieldDisplayPropertySet = setOf(
-                            VerificationFieldDisplayProperties(field.path[1], field.valueJson.displayValue())
+                            VerificationFieldDisplayProperties(field.path[1], value?.registryDisplayValue())
                         ),
                     )
                 },
@@ -436,11 +439,12 @@ public class AndroidDigitalCredentialRegistry(
             MobileWalletDigitalCredentialFormat.SD_JWT_VC -> SdJwtEntry(
                 verifiableCredentialType = type,
                 claims = fields.map { field ->
+                    val value = field.valueJson.registryScalar()
                     SdJwtClaim(
                         path = field.path,
-                        value = field.valueJson.toPlatformValue(),
+                        value = value?.toPlatformValue(),
                         fieldDisplayPropertySet = setOf(
-                            VerificationFieldDisplayProperties(field.path.last(), field.valueJson.displayValue())
+                            VerificationFieldDisplayProperties(field.path.last(), value?.registryDisplayValue())
                         ),
                         isSelectivelyDisclosable = field.selectivelyDisclosable,
                     )
@@ -472,10 +476,11 @@ public class AndroidDigitalCredentialRegistry(
                                 .groupBy { it.path[0] }
                                 .mapValues { (_, fields) ->
                                     fields.associate { field ->
-                                        val rawValue = field.valueJson.matcherValue()
+                                        val value = field.valueJson.registryScalar()
+                                        val rawValue = value?.content.orEmpty()
                                         field.path[1] to listOf(
                                             field.path[1],
-                                            field.valueJson.displayValue(),
+                                            value?.registryDisplayValue().orEmpty(),
                                             rawValue.takeIf { it.length < MAX_MATCHER_VALUE_LENGTH }.orEmpty(),
                                         )
                                     }
@@ -486,28 +491,42 @@ public class AndroidDigitalCredentialRegistry(
         )
     )
 
-    private fun String.toPlatformValue(): Any = Json.parseToJsonElement(this).toPlatformValue()
-
-    private fun JsonElement.toPlatformValue(): Any = when (this) {
-        JsonNull -> ""
-        is JsonPrimitive -> when {
-            isString -> content
-            booleanOrNull != null -> requireNotNull(booleanOrNull)
-            longOrNull != null -> requireNotNull(longOrNull)
-            doubleOrNull != null -> requireNotNull(doubleOrNull)
-            else -> content
+    // The platform can select a field by its path without knowing its exact value. Keep
+    // compound and embedded media values in wallet storage; a null matcher value cannot satisfy
+    // an exact-value query (MdocField's documented photo behavior). This policy is independent
+    // of claim names and credential formats and applies to both native registry encodings.
+    private fun String.registryScalar(): JsonPrimitive? {
+        // Registry records already contain valid JSON. Avoid constructing a potentially large
+        // tree for compound values that cannot become scalar matcher values.
+        when (firstOrNull { !it.isWhitespace() }) {
+            '[', '{' -> return null
         }
-        is JsonArray -> map { it.toPlatformValue() }
-        is JsonObject -> mapValues { it.value.toPlatformValue() }
+        val value = Json.parseToJsonElement(this) as? JsonPrimitive ?: return null
+        if (value === JsonNull) return null
+        if (value.isString) {
+            val prefix = value.content.take(128).trimStart()
+            if (prefix.startsWith("data:", ignoreCase = true) ||
+                EncodedImagePrefixes.any(prefix::startsWith)
+            ) return null
+        }
+        return value
     }
 
-    private fun String.displayValue(): String =
-        (Json.parseToJsonElement(this) as? JsonPrimitive)?.content ?: this
-
-    private fun String.matcherValue(): String = when (val value = Json.parseToJsonElement(this)) {
-        is JsonPrimitive -> value.content
-        else -> value.toString()
+    private fun JsonPrimitive.toPlatformValue(): Any = when {
+        isString -> content
+        booleanOrNull != null -> requireNotNull(booleanOrNull)
+        longOrNull != null -> requireNotNull(longOrNull)
+        doubleOrNull != null -> requireNotNull(doubleOrNull)
+        else -> content
     }
+
+    private fun JsonPrimitive.registryDisplayValue(): String =
+        content.take(MAX_FIELD_DISPLAY_LENGTH)
+
+    internal fun advertisedOpenId4VpProtocols(): List<String> = listOf(
+        OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_SIGNED,
+        OpenId4VpRegistry.PROTOCOL_OPENID4VP_1_0_UNSIGNED,
+    )
 
     private companion object {
         // Vendored, not a dependency; package-qualified so it cannot collide with another library's
@@ -520,14 +539,13 @@ public class AndroidDigitalCredentialRegistry(
         // Vendored, not a dependency. See OPENID4VP-MATCHER.md.
         internal const val OPENID4VP_MATCHER_ASSET = "id/walt/wallet2/mobile/openid4vpmatcher.wasm"
         private const val MAX_MATCHER_VALUE_LENGTH = 128
+        private const val MAX_FIELD_DISPLAY_LENGTH = 128
+        private val EncodedImagePrefixes = listOf("iVBORw0KGgo", "/9j/", "_9j_", "R0lGOD", "UklGR")
         /** Credential Manager selector icons are small; keep registry PNG payloads modest. */
         private const val REGISTRY_ICON_MAX_EDGE_PX = 128
         private const val REGISTRY_ICON_MAX_PIXELS = 2_048L * 2_048L
-        private const val SIGNED_UNSUPPORTED_REASON =
-            "The wallet accepts only the unsigned OpenID4VP Digital Credentials protocol"
         private const val MULTISIGNED_UNSUPPORTED_REASON =
-            "The wallet accepts only the unsigned OpenID4VP Digital Credentials protocol, " +
-                "and does not support JWS JSON Serialization request objects"
+            "The wallet does not support JWS JSON Serialization request objects"
     }
 }
 

@@ -20,6 +20,12 @@ public struct DemoVerifierSession {
     public let authorizationRequestUri: String
 }
 
+/// Thrown when public demo verifier2 has not deployed signed inline Request Objects.
+public struct PublicDemoSignedRequestContractUnavailable: Error, LocalizedError {
+    public let message: String
+    public var errorDescription: String? { message }
+}
+
 public struct DemoMetadataSigner {
     public let keyID: String?
     public let algorithm: String
@@ -80,9 +86,9 @@ public final class DemoBackend {
 
     private static let issuerBaseURL = URL(string: "https://issuer2.demo.walt.id")!
     public static let issuerIdentifier = "https://issuer2.demo.walt.id/openid4vci"
-    // RFC 7638 thumbprint of the public issuer2 signing key from /openid4vci/jwks.
+    // RFC 7638 thumbprint of the public issuer2 signing key from /openid4vci/jwks (verified 2026-09-15).
     // This independent pin must not be learned from the signed metadata JWT.
-    private static let issuerMetadataSigningKeyThumbprint = "zzdUH_zEnMxbcddreuhZGxGescuP-X7Aub_GnAm9IHI"
+    private static let issuerMetadataSigningKeyThumbprint = "Tq0T3ytmPJnXFBBrP2-7c_5R_eSV5T0pMtPPuWcArac"
     private static let verifierBaseURL = URL(string: "https://verifier2.demo.walt.id")!
     /// The public verifier requires this explicit client ID for signed request objects.
     public static let verifierClientID = "verifier2"
@@ -309,15 +315,61 @@ public final class DemoBackend {
                 userInfo: [NSLocalizedDescriptionKey: "Public demo verifier2 did not preserve the requested session ID"]
             )
         }
-        let requestURL = response["bootstrapAuthorizationRequestUrl"] as? String
-            ?? response["authorizationRequestUrl"] as? String
-            ?? response["fullAuthorizationRequestUrl"] as? String
-        guard let requestURL, !requestURL.isEmpty else {
+        guard let inlineRequestURL = response["fullAuthorizationRequestUrl"] as? String,
+              let inlineComponents = URLComponents(string: inlineRequestURL) else {
             throw NSError(
                 domain: "WalletE2E",
                 code: 302,
-                userInfo: [NSLocalizedDescriptionKey: "Missing authorization request URL in public demo verifier2 response: \(response)"]
+                userInfo: [NSLocalizedDescriptionKey: "Public demo verifier2 response is missing fullAuthorizationRequestUrl: \(response)"]
             )
+        }
+        guard let requestURL = response["bootstrapAuthorizationRequestUrl"] as? String,
+              let bootstrapComponents = URLComponents(string: requestURL) else {
+            throw NSError(
+                domain: "WalletE2E",
+                code: 303,
+                userInfo: [NSLocalizedDescriptionKey: "Public demo verifier2 response is missing bootstrapAuthorizationRequestUrl: \(response)"]
+            )
+        }
+
+        let inlineQuery = inlineComponents.queryItems ?? []
+        let bootstrapQuery = bootstrapComponents.queryItems ?? []
+        if bindClientIDToResponseURI {
+            let expectedResponseURI = Self.verifierBaseURL
+                .appendingPathComponent("verification-session")
+                .appendingPathComponent(sessionID)
+                .appendingPathComponent("response")
+                .absoluteString
+            let clientID = inlineQuery.first(where: { $0.name == "client_id" })?.value
+            let responseURI = inlineQuery.first(where: { $0.name == "response_uri" })?.value
+            guard clientID == "redirect_uri:\(expectedResponseURI)", responseURI == expectedResponseURI else {
+                throw NSError(
+                    domain: "WalletE2E",
+                    code: 309,
+                    userInfo: [NSLocalizedDescriptionKey: "Public demo verifier2 response-bound client_id/response_uri mismatch: \(response)"]
+                )
+            }
+            guard bootstrapQuery.contains(where: { $0.name == "request_uri" && !($0.value ?? "").isEmpty }) else {
+                throw NSError(
+                    domain: "WalletE2E",
+                    code: 310,
+                    userInfo: [NSLocalizedDescriptionKey: "Public demo verifier2 response-bound bootstrap URL is missing request_uri: \(response)"]
+                )
+            }
+        } else if signedRequest {
+            guard let inlineRequest = inlineQuery.first(where: { $0.name == "request" })?.value,
+                  !inlineRequest.isEmpty,
+                  inlineQuery.contains(where: { $0.name == "request_uri" }) == false else {
+                throw PublicDemoSignedRequestContractUnavailable(
+                    message: "Public demo verifier2 has not deployed the signed inline Request Object contract: fullAuthorizationRequestUrl must contain request and must not contain request_uri."
+                )
+            }
+            guard bootstrapQuery.contains(where: { $0.name == "request_uri" && !($0.value ?? "").isEmpty }),
+                  bootstrapQuery.contains(where: { $0.name == "request_uri_method" && $0.value == "post" }) else {
+                throw PublicDemoSignedRequestContractUnavailable(
+                    message: "Public demo verifier2 has not deployed the signed POST bootstrap contract: bootstrapAuthorizationRequestUrl must contain request_uri and request_uri_method=post."
+                )
+            }
         }
 
         return DemoVerifierSession(sessionID: sessionID, authorizationRequestUri: requestURL)

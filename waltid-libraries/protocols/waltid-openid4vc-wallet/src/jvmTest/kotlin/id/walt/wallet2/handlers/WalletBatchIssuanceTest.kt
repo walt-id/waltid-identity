@@ -22,6 +22,52 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class WalletBatchIssuanceTest {
+    @Test fun everyBatchProofUsesTheGrantClientIdentity() = runTest {
+        for (anonymous in listOf(false, true)) for (retained in listOf(false, true)) {
+            val fixture = fixture(true)
+            var proofCount = 0
+            val http = client(anonymousPreAuthorized = anonymous, credential = { body ->
+                body.proofs().forEach { proof ->
+                    val payload = Json.parseToJsonElement(CompactJws.decodeUnverified(proof).payload.decodeToString()).jsonObject
+                    assertEquals("batch-client".takeUnless { anonymous }, payload["iss"]?.jsonPrimitive?.content)
+                    proofCount++
+                }
+                batchTestResponse(body.proofs())
+            })
+            if (retained) {
+                val service = WalletIssuanceSessionService(fixture.wallet, httpClient = http)
+                val preview = service.start(WalletIssuanceSessionRequest(offerJson = offer(), clientId = "batch-client"))
+                assertIs<WalletIssuanceOutcome.Stored>(service.continuePreAuthorized(preview.id,
+                    credentials = listOf(fixture.selection(2))))
+            } else {
+                WalletIssuanceHandler.receiveCredential(fixture.wallet,
+                    ReceiveCredentialRequest(offerJson = offer(), clientId = "batch-client", credentials = listOf(fixture.selection(2))),
+                    httpClient = http)
+            }
+            assertEquals(2, proofCount)
+        }
+    }
+
+    @Test fun restrictedHolderKeyCannotBeReplacedByBatchSelectionAfterRestart() = runTest {
+        for (count in listOf(1, 2)) {
+            val fixture = fixture(true)
+            val records = MemorySessionStore()
+            val http = client(credential = { error("No credential request expected") })
+            val service = WalletIssuanceSessionService(fixture.wallet, httpClient = http, sessionStore = records)
+            val preview = service.start(WalletIssuanceSessionRequest(
+                credentialIssuer = ISSUER, credentialConfigurationIds = listOf("identity"),
+                allowHolderKeyOverrides = false))
+            val restored = WalletIssuanceSessionService(fixture.wallet, httpClient = http, sessionStore = records)
+            if (count == 1) {
+                restored.beginAuthorization(preview.id, listOf(fixture.selection(count)))
+            } else {
+                assertFailsWith<IllegalArgumentException> {
+                    restored.beginAuthorization(preview.id, listOf(fixture.selection(count)))
+                }
+            }
+        }
+    }
+
     @Test fun preAuthorizedReceiveNegotiatesFromMetadataAndHonorsIdentifiersEvenAfterScopeAuthorization() = runTest {
         for (detailsSupported in listOf(false, true)) for (returnsIdentifiers in listOf(false, true)) {
             if (detailsSupported && !returnsIdentifiers) continue
@@ -113,7 +159,13 @@ class WalletBatchIssuanceTest {
             val http = client(authorizationDetailsSupported = detailsSupported, token = { parameters ->
                 if (!authorized) assertAutomaticParameters(parameters, detailsSupported)
                 negotiatedToken(detailsSupported)
-            }, credential = { batchTestResponse(it.proofs()) })
+            }, credential = { body ->
+                body.proofs().forEach { proof ->
+                    val payload = Json.parseToJsonElement(CompactJws.decodeUnverified(proof).payload.decodeToString()).jsonObject
+                    assertEquals("eudiw-abca", payload["iss"]?.jsonPrimitive?.content)
+                }
+                batchTestResponse(body.proofs())
+            })
             val service = WalletIssuanceSessionService(fixture.wallet, httpClient = http, sessionStore = records)
             val preview = service.start(if (authorized) WalletIssuanceSessionRequest(
                 credentialIssuer = ISSUER, credentialConfigurationIds = listOf("identity"), redirectUri = Url("openid://callback"))
@@ -479,6 +531,7 @@ class WalletBatchIssuanceTest {
     private fun client(
         metadata: String = metadata(),
         authorizationDetailsSupported: Boolean = true,
+        anonymousPreAuthorized: Boolean = false,
         token: (Parameters) -> String = { TOKEN },
         par: ((Parameters) -> Unit)? = null,
         credentialStatus: HttpStatusCode = HttpStatusCode.OK,
@@ -494,6 +547,7 @@ class WalletBatchIssuanceTest {
                         """{"issuer":"$ISSUER","token_endpoint":"$ISSUER/token","authorization_endpoint":"$ISSUER/authorize",
                             ${if (authorizationDetailsSupported) "\"authorization_details_types_supported\":[\"openid_credential\"]," else ""}
                             ${if (par != null) "\"pushed_authorization_request_endpoint\":\"$ISSUER/par\",\"require_pushed_authorization_requests\":true," else ""}
+                            "pre-authorized_grant_anonymous_access_supported":$anonymousPreAuthorized,
                             "response_types_supported":["code"]}"""
                     "$ISSUER/token" -> token(parseQueryString((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()))
                     "$ISSUER/par" -> {

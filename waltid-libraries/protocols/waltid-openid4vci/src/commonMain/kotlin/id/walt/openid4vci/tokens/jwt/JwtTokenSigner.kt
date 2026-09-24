@@ -67,6 +67,7 @@ internal class JwtTokenSigner private constructor(
 
     private fun Any?.toJsonElement(): JsonElement = when (this) {
         null -> JsonNull
+        is JsonElement -> this
         is Boolean -> JsonPrimitive(this)
         is Number -> JsonPrimitive(this)
         is String -> JsonPrimitive(this)

@@ -5,6 +5,7 @@ package id.walt.walletdemo.compose.android
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.util.Base64
 import androidx.credentials.DigitalCredential
 import androidx.credentials.ExperimentalDigitalCredentialApi
@@ -35,6 +36,7 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.MobileWallet
+import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
 import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
@@ -54,6 +56,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -62,9 +65,11 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -75,6 +80,7 @@ import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 
 /**
@@ -186,7 +192,7 @@ class DigitalCredentialSharingE2ETest {
         )
     }
 
-    /** The baseline: `response_mode=dc_api`, one mdoc, no encryption. */
+    /** Clear `dc_api`: one mdoc, including its full issued portrait. */
     @Test
     fun sharesMdocThroughClearOpenId4VpDcApi() = runBlocking {
         val fixture = fixture()
@@ -195,7 +201,7 @@ class DigitalCredentialSharingE2ETest {
         // Both sides hash this origin into the mdoc session transcript. The debug signing key differs
         // per machine and per CI runner, so it is derived at runtime rather than pinned.
         val session = DemoTestBackend.createDcApiVerifierSession(
-            scenario = scenario,
+            credentialQueries = listOf(imageQuery(scenario)),
             expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
         )
 
@@ -212,6 +218,7 @@ class DigitalCredentialSharingE2ETest {
         assertVerifierAccepted(
             sessionId = session.sessionId,
             responseJson = credential.credentialJson,
+            expectedImage = true,
             presentedCredentialId = "mdl",
             requiredPolicyIds = MDOC_REQUIRED_POLICIES,
         )
@@ -229,7 +236,7 @@ class DigitalCredentialSharingE2ETest {
 
         val transactionData = DemoTestBackend.paymentAuthorizationTransactionData(credentialId = "pid")
         val session = DemoTestBackend.createDcApiVerifierSession(
-            credentialQueries = listOf(scenario.verifierCredentialQuery),
+            credentialQueries = listOf(imageQuery(scenario)),
             expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
             transactionData = listOf(transactionData),
         )
@@ -258,6 +265,15 @@ class DigitalCredentialSharingE2ETest {
                 ?.get("pid")?.jsonArray?.firstOrNull()?.jsonPrimitive?.content,
         ) { "SD-JWT response carries no presentation for query 'pid': $responseJson" }
 
+        val portraitDisclosure = presentation.substringBeforeLast('~').split('~').drop(1)
+            .map { Json.parseToJsonElement(Base64.decode(it, Base64.URL_SAFE).decodeToString()).jsonArray }
+            .single { it[1].jsonPrimitive.content == "portrait" }
+        assertArrayEquals(
+            "SD-JWT must return the image as a selective disclosure",
+            IMAGE_BYTES,
+            Base64.decode(portraitDisclosure[2].jsonPrimitive.content, Base64.DEFAULT),
+        )
+
         // OpenID4VP binds sha-256 over the base64url transaction_data entry as sent. Recomputed here so
         // that a wallet which hashed the decoded object, or a different item, fails.
         val requestedItem = requireNotNull(
@@ -281,6 +297,7 @@ class DigitalCredentialSharingE2ETest {
         assertVerifierAccepted(
             sessionId = session.sessionId,
             responseJson = credential.credentialJson,
+            expectedImage = true,
             presentedCredentialId = "pid",
             // Named explicitly because it is the policy that would silently not run if the verifier
             // stopped recognising the item.
@@ -441,11 +458,11 @@ class DigitalCredentialSharingE2ETest {
     }
 
     /**
-     * The wallet registers only `openid4vp-v1-unsigned`, and the vendored matcher honours that: a signed
-     * or multisigned request must not surface this wallet at all, because it cannot fulfill one.
+     * The wallet registers unsigned and signed compact OpenID4VP, but not multisigned. A multisigned
+     * request must not surface this wallet, because it cannot fulfill JWS JSON Serialization.
      *
-     * Each unsupported request carries the *same* OpenID4VP payload that
-     * [sharesMdocThroughClearOpenId4VpDcApi] matches successfully, re-wrapped into the structurally valid
+     * Each unsupported request carries an unsigned OpenID4VP query for the issued mDL,
+     * re-wrapped into the structurally valid
      * signed and multisigned shapes the matcher's own parsers accept (see [signedDcApiRequest] and
      * [multisignedDcApiRequest]). That is what makes this decisive rather than incidental: relabelling
      * the protocol alone would also pass simply because the payload no longer parses. Here, if protocol
@@ -457,31 +474,56 @@ class DigitalCredentialSharingE2ETest {
      * observes.
      */
     @Test
-    fun doesNotSurfaceForSignedOrMultisignedRequests() = runBlocking {
+    fun doesNotSurfaceForMultisignedRequests() = runBlocking {
         val fixture = fixture()
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
         val session = DemoTestBackend.createDcApiVerifierSession(
             scenario = scenario,
             expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
         )
-        // The payload a matchable unsigned request carries, transplanted verbatim below.
         val openId4VpPayload = requireNotNull(
             Json.parseToJsonElement(session.requestJson).jsonObject["requests"]
                 ?.jsonArray?.firstOrNull()?.jsonObject?.get("data")?.jsonObject,
         ) { "Unsigned DC API request carries no object 'data': ${session.requestJson}" }
 
-        listOf(
-            "openid4vp-v1-signed" to signedDcApiRequest(openId4VpPayload),
-            "openid4vp-v1-multisigned" to multisignedDcApiRequest(openId4VpPayload),
-        ).forEach { (protocol, request) ->
-            val requestHandle = fixture.startCredentialRequest(request)
-            fixture.awaitUnsupportedRequestEmptyState(requestHandle, protocol, MDL_DOC_TYPE)
-            val outcome = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) { requestHandle.await() }
+        val requestHandle = fixture.startCredentialRequest(multisignedDcApiRequest(openId4VpPayload))
+        fixture.awaitUnsupportedRequestEmptyState(requestHandle, "openid4vp-v1-multisigned", MDL_DOC_TYPE)
+        val outcome = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) { requestHandle.await() }
+        assertNotNull(
+            "openid4vp-v1-multisigned produced a credential: ${outcome.getOrNull()}",
+            outcome.exceptionOrNull(),
+        )
+        fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
+    }
+
+    /**
+     * Signed compact Request Objects are advertised to Credential Manager. The matcher does not verify
+     * the JAR, so a structurally valid signed wrapper of a matchable unsigned payload must surface the
+     * issued mDL. Cryptographic verification of that JAR is covered by the wallet SDK tests rather than
+     * this OS-mediated picker assertion.
+     */
+    @Test
+    fun surfacesForSignedRequests() = runBlocking {
+        val fixture = fixture()
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
+        val session = DemoTestBackend.createDcApiVerifierSession(
+            scenario = scenario,
+            expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
+        )
+        val openId4VpPayload = requireNotNull(
+            Json.parseToJsonElement(session.requestJson).jsonObject["requests"]
+                ?.jsonArray?.firstOrNull()?.jsonObject?.get("data")?.jsonObject,
+        ) { "Unsigned DC API request carries no object 'data': ${session.requestJson}" }
+
+        val requestHandle = fixture.startCredentialRequest(signedDcApiRequest(openId4VpPayload))
+        try {
             assertNotNull(
-                "$protocol produced a credential: ${outcome.getOrNull()}",
-                outcome.exceptionOrNull(),
+                "Credential Manager did not surface a signed-request candidate.\n" +
+                    pickerDiagnostic(requestHandle, MDL_DOC_TYPE, candidateSelected = false),
+                fixture.device.wait(Until.findObject(By.textContains(MDL_DOC_TYPE)), UI_ELEMENT_TIMEOUT),
             )
-            fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
+        } finally {
+            requestHandle.abandon()
         }
     }
 
@@ -497,7 +539,7 @@ class DigitalCredentialSharingE2ETest {
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
 
         val session = DemoTestBackend.createDcApiVerifierSession(
-            credentialQueries = listOf(scenario.verifierCredentialQuery),
+            credentialQueries = listOf(imageQuery(scenario)),
             expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
             encryptedResponse = true,
         )
@@ -519,6 +561,7 @@ class DigitalCredentialSharingE2ETest {
         assertVerifierAccepted(
             sessionId = session.sessionId,
             responseJson = credential.credentialJson,
+            expectedImage = true,
             presentedCredentialId = "mdl",
             requiredPolicyIds = MDOC_REQUIRED_POLICIES,
         )
@@ -612,6 +655,10 @@ class DigitalCredentialSharingE2ETest {
             REQUESTED_MDL_ELEMENTS.toSet(),
             disclosed,
         )
+        val portrait = issuerNamespaces.getValue(MDL_NAMESPACE).entries
+            .single { it.value.elementIdentifier == "portrait" }.value.elementValue
+        assertTrue("Annex C portrait must remain a CBOR byte string", portrait is CborByteString)
+        assertArrayEquals("Annex C changed the issued image", IMAGE_BYTES, (portrait as CborByteString).toByteArray())
         assertNotNull("Annex C document carries no device signature", document.deviceSigned)
     }
 
@@ -1044,6 +1091,7 @@ class DigitalCredentialSharingE2ETest {
         responseJson: String,
         presentedCredentialId: String,
         requiredPolicyIds: List<String>,
+        expectedImage: Boolean = false,
     ) {
         DemoTestBackend.submitDcApiResponse(sessionId, responseJson)
         val info = DemoTestBackend.verifierSessionInfo(sessionId)
@@ -1052,6 +1100,23 @@ class DigitalCredentialSharingE2ETest {
             "Verifier did not report the presented credential '$presentedCredentialId': $info",
             info["presented_credentials"]?.jsonObject?.get(presentedCredentialId),
         )
+        if (expectedImage) {
+            val presented = info.getValue("presented_credentials").jsonObject
+                .getValue(presentedCredentialId).jsonArray.single().jsonObject
+                .getValue("credentialData").jsonObject
+            val returnedImage = if (presentedCredentialId == "mdl") {
+                presented.getValue(MDL_NAMESPACE).jsonObject.getValue("portrait").jsonArray
+                    .map { it.jsonPrimitive.int.toByte() }.toByteArray()
+            } else {
+                Base64.decode(presented.getValue("portrait").jsonPrimitive.content, Base64.DEFAULT)
+            }
+            assertArrayEquals("Verifier received different image bytes for $presentedCredentialId", IMAGE_BYTES, returnedImage)
+            assertTrue("Image fixture must exercise the large-response path", responseJson.length > 200_000)
+            println(
+                "DC_API_IMAGE_E2E query=$presentedCredentialId imageBytes=${returnedImage.size} " +
+                    "responseChars=${responseJson.length} verifier=SUCCESSFUL exactBytes=true",
+            )
+        }
         // A skipped policy leaves the session SUCCESSFUL, so "no failures" alone would pass on a
         // verifier that checked nothing; [requiredPolicyIds] must therefore be asserted as executed.
         //
@@ -1254,6 +1319,8 @@ class DigitalCredentialSharingE2ETest {
                 ),
             )
             wallet = created.wallet
+            val identity = wallet.signingIdentity.initialize()
+            assertTrue("Could not initialize the fixture signing identity: $identity", identity is SigningIdentityOperationResult.Active)
             created.bootstrap(WalletDemoSigningProtection.None)
             demoWalletConfig().signingProtectionStore(context).save(WalletDemoSigningProtection.None)
 
@@ -1310,7 +1377,29 @@ class DigitalCredentialSharingE2ETest {
             wallet: MobileWallet,
             scenario: DemoTestBackend.CredentialScenario,
         ): List<String> {
-            val offer = DemoTestBackend.createOffer(scenario)
+            val imageOverrides = buildJsonObject {
+                put("credentialData", buildJsonObject {
+                    val portrait = JsonPrimitive(Base64.encodeToString(IMAGE_BYTES, Base64.NO_WRAP))
+                    if (scenario.format == "mso_mdoc") {
+                        put(MDL_NAMESPACE, buildJsonObject { put("portrait", portrait) })
+                    } else {
+                        put("portrait", portrait)
+                    }
+                })
+                if (scenario.format == "dc+sd-jwt") {
+                    put("selectiveDisclosure", buildJsonObject {
+                        put("fields", buildJsonObject {
+                            listOf("birth_date", "portrait").forEach { name ->
+                                put(name, buildJsonObject { put("sd", JsonPrimitive(true)) })
+                            }
+                        })
+                    })
+                }
+            }
+            val offer = DemoTestBackend.createOffer(
+                scenario,
+                runtimeOverrides = imageOverrides.takeIf { scenario.id in setOf("iso-mdl", "eudi-pid-sdjwt") },
+            )
             val session = wallet.startIssuance(
                 MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(offer.offerUrl))
             )
@@ -1345,7 +1434,34 @@ class DigitalCredentialSharingE2ETest {
         /** How the amount reads once rendered, on the prompt and on the review alike. */
         private const val SCA_AMOUNT_TEXT = "11.56"
         private const val MDL_NAMESPACE = "org.iso.18013.5.1"
-        private val REQUESTED_MDL_ELEMENTS = listOf("family_name", "given_name")
+        private val REQUESTED_MDL_ELEMENTS = listOf("family_name", "given_name", "portrait")
+
+        // Deterministic synthetic pixels: a real, poorly compressible PNG large enough to exercise
+        // Credential Manager's large response transport, with no binary fixture committed.
+        private val IMAGE_BYTES: ByteArray by lazy {
+            val random = java.util.Random(42)
+            val pixels = IntArray(256 * 256) { random.nextInt() or 0xff000000.toInt() }
+            val bitmap = Bitmap.createBitmap(pixels, 256, 256, Bitmap.Config.ARGB_8888)
+            try {
+                ByteArrayOutputStream().use { output ->
+                    check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
+                    output.toByteArray()
+                }
+            } finally {
+                bitmap.recycle()
+            }
+        }
+
+        private fun imageQuery(scenario: DemoTestBackend.CredentialScenario): JsonObject =
+            JsonObject(scenario.verifierCredentialQuery + ("claims" to buildJsonArray {
+                scenario.verifierCredentialQuery["claims"]?.jsonArray.orEmpty().forEach { add(it) }
+                add(buildJsonObject {
+                    put("path", buildJsonArray {
+                        if (scenario.format == "mso_mdoc") add(JsonPrimitive(MDL_NAMESPACE))
+                        add(JsonPrimitive("portrait"))
+                    })
+                })
+            }))
         private const val PAYMENT_AUTHORIZATION_DISPLAY_NAME = "Payment Authorization"
 
         /** Owns `CredentialSelectorActivity`, i.e. the picker window these tests drive. */

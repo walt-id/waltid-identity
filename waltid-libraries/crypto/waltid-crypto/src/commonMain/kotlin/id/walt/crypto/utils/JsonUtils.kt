@@ -29,8 +29,10 @@ object JsonUtils {
                 is CborInteger -> JsonPrimitive(this.long)
                 is CborFloat -> JsonPrimitive(this.value)
                 is CborString -> JsonPrimitive(this.value)
-                is CborByteString -> JsonArray(this.toByteArray().map { JsonPrimitive(it) })
-                is CborArray -> JsonArray(this.map { it.toJsonElement() })
+                is CborByteString -> JsonArray(JsonByteArray(this.toByteArray().copyOf()))
+                is CborArray -> integerValuesOrNull()
+                    ?.let { JsonArray(JsonLongArray(it)) }
+                    ?: JsonArray(this.map { it.toJsonElement() })
                 is CborMap -> {
                     // We must unwrap the CborElement key into a standard Kotlin String
                     val jsonEntries = this.entries.associate { (cborKey, cborValue) ->
@@ -104,6 +106,10 @@ object JsonUtils {
 
     @JsName("listToJsonElement")
     fun List<*>.toJsonElement(): JsonElement {
+        // A CborArray is itself a List, so an unqualified call on a statically CBOR-typed receiver lands here
+        // rather than in the CBOR branch above, and would convert element by element. Route it back so that a
+        // large array of numbers keeps its flyweight regardless of which overload the call site picked.
+        if (this is CborArray) return (this as Any?).toJsonElement()
         return JsonArray(map { it.toJsonElement() })
     }
 
@@ -176,4 +182,41 @@ object JsonUtils {
     fun stringToJsonPrimitive(value: String): JsonPrimitive {
         return JsonPrimitive(value)
     }
+}
+
+// Preserve the existing signed-byte JSON representation without allocating a number and its
+// decimal string for every byte of a binary value. The private snapshot also keeps
+// the resulting JsonArray immutable if the source byte string was backed by a mutable array.
+private class JsonByteArray(private val bytes: ByteArray) : AbstractList<JsonElement>() {
+    override val size: Int get() = bytes.size
+    override fun get(index: Int): JsonElement = ByteValues[bytes[index].toInt() + 128]
+
+    private companion object {
+        val ByteValues = List(256) { JsonPrimitive(it - 128) }
+    }
+}
+
+/**
+ * The same treatment for an array of whole numbers, which is what a binary claim looks like when it reaches
+ * CBOR as an array rather than a byte string.
+ *
+ * A heap dump of a verifier holding two presentations of a 230,000 element claim showed 920,667 live
+ * `JsonLiteral`, 1,066,730 `String` and 1,076,286 `byte[]` instances - two objects per element, per copy,
+ * retained for as long as the session was. Wrapping the values costs one object regardless of length; the
+ * `JsonPrimitive` for an element is created only if something actually reads that element.
+ */
+private class JsonLongArray(private val values: LongArray) : AbstractList<JsonElement>() {
+    override val size: Int get() = values.size
+    override fun get(index: Int): JsonElement = JsonPrimitive(values[index])
+}
+
+/**
+ * The values of a CBOR array if every element is an untagged integer, else null.
+ *
+ * Only allocates the result, so an array that turns out to be mixed costs one pass and nothing else.
+ */
+private fun CborArray.integerValuesOrNull(): LongArray? {
+    if (isEmpty()) return null
+    forEach { if (it !is CborInteger) return null }
+    return LongArray(size) { (this[it] as CborInteger).long }
 }

@@ -1,6 +1,7 @@
 [versions]
 # Build/compilation versions
 kotlin = "2.4.0"
+binary-compatibility-validator = "0.18.2"
 suspend-transform = "2.4.0-0.14.0"
 jspecify = "1.0.0"
 
@@ -19,9 +20,13 @@ compose-multiplatform = "1.11.1"
 compose-material3 = "1.11.0-alpha07"
 compose-material-icons = "1.7.3"
 easyqrscan = "0.7.1"
+zxing = "3.5.4"
+zxing-cpp = "3.1.1"
 compose-navigation3 = "1.1.1"
 dokka = "2.2.0"
 coil = "3.5.0"
+firebase-bom = "34.19.0"
+google-services = "4.5.0"
 
 # Plugins / Dependencies
 ktor = "3.5.0"
@@ -138,9 +143,11 @@ signum = "3.24.0"
 supreme = "0.15.0"
 
 [libraries]
+google-blockstore = { module = "com.google.android.gms:play-services-auth-blockstore", version = "16.4.0" }
 
 # Plugins
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+binary-compatibility-validator = { module = "org.jetbrains.kotlinx:binary-compatibility-validator", version.ref = "binary-compatibility-validator" }
 
 kotlin-plugin-serialization = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
 ktor-gradle-plugin = { module = "io.ktor.plugin:plugin", version.ref = "ktor" }
@@ -257,6 +264,7 @@ junit-platform-console = { group = "org.junit.platform", name = "junit-platform-
 ## AndroidX
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core-ktx" }
 androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
 androidx-fragment = { module = "androidx.fragment:fragment", version.ref = "androidx-fragment" }
 androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "androidx-biometric" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
@@ -277,9 +285,12 @@ compose-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-pre
 compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-material3" }
 compose-material-icons-core = { module = "org.jetbrains.compose.material:material-icons-core", version.ref = "compose-material-icons" }
 easyqrscan = { module = "io.github.kalinjul.easyqrscan:scanner", version.ref = "easyqrscan" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+zxing-cpp-kotlin-native = { module = "io.github.zxing-cpp:kotlin-native", version.ref = "zxing-cpp" }
 compose-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "compose-navigation3" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
+coil-svg = { module = "io.coil-kt.coil3:coil-svg", version.ref = "coil" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-ext-junit" }
 androidx-test-rules = { module = "androidx.test:rules", version.ref = "androidx-test-rules" }
@@ -291,6 +302,7 @@ androidx-credentials-registry-provider = { module = "androidx.credentials.regist
 androidx-credentials-registry-provider-play-services = { module = "androidx.credentials.registry:registry-provider-play-services", version.ref = "androidx-credentials-registry" }
 androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "androidx-credentials" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
 
 ## HTTP
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" } # should be replaced with kotlinx-io
@@ -435,3 +447,4 @@ versions = { id = "com.github.ben-manes.versions", version = "0.54.0" }
 license = { id = "com.github.jk1.dependency-license-report", version = "3.1.2" }
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
 skie = { id = "co.touchlab.skie", version.ref = "skie" }
+google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }

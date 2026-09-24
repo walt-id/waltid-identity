@@ -1,98 +1,82 @@
 import SwiftUI
-import UIKit
 import WalletDemoSharingUI
+import WalletSDK
 
 struct SettingsView: View {
     @ObservedObject var viewModel: WalletViewModel
-    @Environment(\.walletDemoBranding) private var branding
+    @Environment(\.dismiss) private var dismiss
     @State private var confirmReset = false
 
     var body: some View {
         List {
             Section("Wallet") {
-                Text(branding.appTitle)
-                    .font(.headline)
-                    .accessibilityIdentifier(WalletAccessibilityID.settingsAppTitle)
-            }
-            Section("Wallet DID") {
-                Text(viewModel.did.isEmpty ? "Not available" : viewModel.did)
-                    .font(.footnote)
-                    .textSelection(.enabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.settingsDid)
-                Button("Copy DID") {
-                    UIPasteboard.general.string = viewModel.did
+                NavigationLink {
+                    if let model = viewModel.identityScreen { WalletIdentityView(model: model) }
+                    else { List { signingProtectionSection }.navigationTitle("Signing key").navigationBarTitleDisplayMode(.inline) }
+                } label: {
+                    SettingsDestinationLabel("Signing key", systemImage: "key", summary: String(localized: "Protection and key backup"))
                 }
-                .accessibilityIdentifier(WalletAccessibilityID.settingsDidCopy)
-            }
-            Section("Wallet key") {
-                Text(viewModel.keyID.isEmpty ? "Not available" : viewModel.keyID)
-                    .font(.footnote)
-                    .textSelection(.enabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.settingsKeyId)
-                Button("Copy key ID") {
-                    UIPasteboard.general.string = viewModel.keyID
+                .accessibilityIdentifier("wallet.settingsSigningKey")
+                NavigationLink { TechnicalDetailsView(viewModel: viewModel) } label: {
+                    SettingsDestinationLabel("Technical details", systemImage: "doc.text", summary: String(localized: "DID, key ID, and public key"))
                 }
-                .accessibilityIdentifier(WalletAccessibilityID.settingsKeyIdCopy)
+                .accessibilityIdentifier("wallet.settingsTechnicalDetails")
             }
-            Section("Public JWK") {
-                Text(viewModel.publicJWK.isEmpty ? "Not available" : viewModel.publicJWK)
-                    .font(.footnote)
-                    .textSelection(.enabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.settingsPublicJwk)
-                Button("Copy public JWK") {
-                    UIPasteboard.general.string = viewModel.publicJWK
-                }
-                .accessibilityIdentifier(WalletAccessibilityID.settingsPublicJwkCopy)
-            }
-            signingProtectionSection
-            Section("Credential Sharing") {
-                Toggle(
-                    "Show Walt Wallet preview for DC API Presentation",
-                    isOn: $viewModel.showDcApiPresentationPreview
-                )
-                .accessibilityIdentifier(WalletAccessibilityID.settingsShowDcApiPreview)
-                Text("When off, Digital Credentials presentations skip the wallet review and continue from the system picker to biometrics.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .accessibilityIdentifier(WalletAccessibilityID.settingsCredentialSharing)
             Section {
-                Button("Lock") {
-                    viewModel.lock()
+                NavigationLink { NearbySettingsView(viewModel: viewModel) } label: {
+                    SettingsDestinationLabel("Nearby sharing", systemImage: "antenna.radiowaves.left.and.right", summary: viewModel.proximityTransportProfile.title)
                 }
-                .accessibilityIdentifier(WalletAccessibilityID.settingsLock)
-                Button("Reset wallet", role: .destructive) {
-                    confirmReset = true
+                .accessibilityIdentifier(WalletAccessibilityID.settingsProximityPresentation)
+                NavigationLink {
+                    List {
+                        Section {
+                            Toggle("Show wallet review", isOn: $viewModel.showDcApiPresentationPreview)
+                                .accessibilityIdentifier(WalletAccessibilityID.settingsShowDcApiPreview)
+                        } footer: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Show the wallet review after you select a credential in the system picker. Turning this off skips only the wallet review. System consent and any required signing approval still apply.")
+                                Text("Requires iOS 26 or later and a compatible app or browser. This setting controls wallet review only.")
+                            }
+                        }
+                    }
+                    .frame(maxWidth: 640)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(uiColor: .systemGroupedBackground))
+                    .navigationTitle("Digital Credentials API")
+                    .navigationBarTitleDisplayMode(.inline)
+                } label: {
+                    SettingsDestinationLabel("Digital Credentials API", systemImage: "person.text.rectangle",
+                                             summary: viewModel.showDcApiPresentationPreview ? String(localized: "Wallet review on") : String(localized: "Wallet review off"))
+                }
+                .accessibilityIdentifier("wallet.settingsDigitalCredentialsApi")
+            } header: {
+                Text("Sharing").accessibilityIdentifier(WalletAccessibilityID.settingsCredentialSharing)
+            }
+            Section {
+                Button { dismiss(); viewModel.lock() } label: { Label("Lock wallet", systemImage: "lock") }
+                    .accessibilityIdentifier(WalletAccessibilityID.settingsLock)
+                Button(role: .destructive) { confirmReset = true } label: {
+                    Label("Reset wallet", systemImage: "arrow.counterclockwise").foregroundStyle(.red)
                 }
                 .accessibilityIdentifier(WalletAccessibilityID.settingsReset)
             }
         }
+        .listStyle(.insetGrouped)
+        .frame(maxWidth: 640)
+        .frame(maxWidth: .infinity)
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Settings")
-        .confirmationDialog(
-            "Reset wallet?",
-            isPresented: $confirmReset,
-            titleVisibility: .visible
-        ) {
-            Button("Reset", role: .destructive) {
-                viewModel.resetWallet()
-            }
-            .accessibilityIdentifier(WalletAccessibilityID.settingsResetConfirm)
+        .alert("Reset wallet?", isPresented: $confirmReset) {
+            Button("Reset wallet", role: .destructive, action: viewModel.resetWallet)
+                .accessibilityIdentifier(WalletAccessibilityID.settingsResetConfirm)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This deletes the wallet DID, keys, credentials, and PIN. This cannot be undone.")
+            Text("This removes the wallet’s local keys, credentials, and wallet PIN. Saved key backups remain. Restoring a key does not restore credentials.")
         }
-        .confirmationDialog(
-            "Change signing protection?",
-            isPresented: signingProtectionConfirmationPresented,
-            titleVisibility: .visible
-        ) {
-            Button("Create new wallet", role: .destructive) {
-                viewModel.confirmSigningProtectionChange()
-            }
-            .accessibilityIdentifier(WalletAccessibilityID.signingProtectionConfirm)
-            Button("Cancel", role: .cancel) {
-                viewModel.cancelSigningProtectionChange()
-            }
+        .confirmationDialog("Change signing protection?", isPresented: signingProtectionConfirmationPresented, titleVisibility: .visible) {
+            Button("Create new wallet", role: .destructive, action: viewModel.confirmSigningProtectionChange)
+                .accessibilityIdentifier(WalletAccessibilityID.signingProtectionConfirm)
+            Button("Cancel", role: .cancel, action: viewModel.cancelSigningProtectionChange)
         } message: {
             Text("This creates a new key and DID, and removes all credentials. Credentials must be issued again.")
         }
@@ -104,7 +88,7 @@ struct SettingsView: View {
             HStack {
                 Text("Current")
                 Spacer()
-                Text(viewModel.appliedSigningProtection?.title ?? "Not available")
+                Text(viewModel.appliedSigningProtection?.title ?? "Unavailable")
             }
             Text("Changing signing protection creates a new wallet key and DID.")
                 .font(.footnote)
