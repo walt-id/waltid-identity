@@ -491,6 +491,7 @@ jobs:
         with:
           update_check: true
           job_name: ${{ inputs.conformance-report-check-name }}
+          # The shared test invocation includes IssuerConformanceTests alongside wallet/verifier.
           report_paths: '**/waltid-openid4vp-conformance-runners/build/test-results/**/*.xml'
           detailed_summary: true
           include_passed: false
@@ -500,9 +501,13 @@ jobs:
         if: always()
         env:
           CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
+          ISSUER_REQUESTED: ${{ inputs.run-issuer-conformance || inputs.run-haip-conformance }}
+          ISSUER_SETUP_OUTCOME: ${{ steps.issuer-tunnel.outcome }}
+          CONFORMANCE_TEST_OUTCOME: ${{ steps.conformance-tests.outcome }}
         run: |
+          set -euo pipefail
           {
-            echo "## Wallet and verifier conformance results"
+            echo "## OpenID conformance results"
             echo
             if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
               echo "> Soft-fail enabled (\`CONFORMANCE_ALLOW_FAILURE\` unset/true). Wallet/verifier failures are reported below but do not fail this job. Issuer strict and batch checks are independent."
@@ -553,7 +558,64 @@ jobs:
           append_role_summary vp-wallet "OpenID4VP Wallet"
           append_role_summary vci-wallet "OpenID4VCI Wallet"
 
-          echo "Published OpenID conformance summaries for verifier, OpenID4VP wallet and OpenID4VCI wallet (${found} file(s) found)."
+          {
+            echo '# OpenID4VCI Issuer Conformance Summary'
+            echo
+            if [ "$ISSUER_REQUESTED" != "true" ]; then
+              echo '_Issuer conformance was not requested._'
+            else
+              echo '- Strict issuer results: `enabled`'
+              echo '- Required executed batch coverage: `enabled`'
+              echo "- Issuer runtime setup: \`$ISSUER_SETUP_OUTCOME\`; shared test step: \`$CONFORMANCE_TEST_OUTCOME\`."
+              echo
+              echo '> CI coverage gap: `oid4vci-1_0-issuer-happy-flow-additional-requests` is excluded because its TLS probes reach the Cloudflare Quick Tunnel edge. This run does not establish TLS conformance. Local runs retain this module.'
+              echo
+              if [ -s "$ISSUER_REPORT_DIR/results.json" ]; then
+                mkdir -p "$ISSUER_DIAGNOSTICS_DIR"
+                issuer_reports=("$ISSUER_REPORT_DIR/results.json")
+                if [ -s "$ISSUER_REPORT_DIR/matrix.json" ]; then
+                  issuer_reports+=("$ISSUER_REPORT_DIR/matrix.json")
+                fi
+                # Reuse the runner's batch classification; do not duplicate its coverage policy.
+                # Publish only identifiers/statuses, never raw errors, credentials or logs.
+                jq -s '(.[1] // [] | INDEX(.variantId)) as $matrix | .[0] | map({
+                  variantId, status, planId,
+                  batchCoverage: ($matrix[.variantId].batchCoverage // "UNKNOWN"),
+                  modules: [.modules[]? | {testModule, testId, status, result, accepted}]
+                })' "${issuer_reports[@]}" > "$ISSUER_DIAGNOSTICS_DIR/results.json"
+                jq '{variants: (group_by(.status) | map({status: .[0].status, count: length})),
+                  batch_coverage: (group_by(.batchCoverage) | map({status: .[0].batchCoverage, count: length})),
+                  batch_modules: ([.[].modules[] | select(.testModule == "oid4vci-1_0-issuer-batch-issuance")]
+                    | group_by(.result) | map({result: .[0].result, count: length}))}' \
+                  "$ISSUER_DIAGNOSTICS_DIR/results.json" > "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
+                if jq -e 'length > 0' "$ISSUER_DIAGNOSTICS_DIR/results.json" >/dev/null; then
+                  echo '| Variant status | Count |'
+                  echo '|----------------|-------|'
+                  jq -r '.variants[] | "| \(.status) | \(.count) |"' "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
+                  echo
+                  echo '| Batch coverage | Count |'
+                  echo '|----------------|-------|'
+                  jq -r '.batch_coverage[] | "| \(.status) | \(.count) |"' "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
+                  echo
+                  echo '`NOT_OFFERED_BY_PINNED_SUITE` is a coverage gap, not a batch pass. `UNKNOWN` means the runner did not write a batch classification.'
+                  echo
+                  echo '| Variant | Status | Plan | Batch coverage |'
+                  echo '|---------|--------|------|----------------|'
+                  jq -r '.[] | "| \(.variantId | @html) | \(.status | @html) | \(if .planId then "[\(.planId | @html)](https://conformance.waltid.cloud/plan-detail.html?plan=\(.planId | @uri))" else "—" end) | \(.batchCoverage | @html) |"' \
+                    "$ISSUER_DIAGNOSTICS_DIR/results.json"
+                else
+                  echo '_No issuer variant results were produced. This does not establish issuer or batch coverage._'
+                fi
+                echo
+                echo 'See the `issuer-conformance-basic-haip-batch` artifact for sanitized plan/test IDs and https://conformance.waltid.cloud/logs.html for suite logs.'
+              else
+                echo '_No issuer conformance results were produced. See the setup/test outcomes above and their logs; this is not a passing result._'
+              fi
+            fi
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "Published OpenID conformance summaries for verifier, OpenID4VP wallet, OpenID4VCI wallet and issuer (${found} wallet/verifier file(s) found)."
 
       - name: Stop wallet and verifier conformance tunnels
         if: always()
@@ -577,30 +639,6 @@ jobs:
             pid=$(cat "$pid_file")
             if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then kill "$pid" 2>/dev/null || true; fi
           done
-
-      - name: Publish issuer result overview
-        if: ${{ always() && (inputs.run-issuer-conformance || inputs.run-haip-conformance) }}
-        run: |
-          echo '> CI coverage gap: `oid4vci-1_0-issuer-happy-flow-additional-requests` is excluded because its TLS probes reach the Cloudflare Quick Tunnel edge. This run does not establish TLS conformance. Local runs retain this module; strict and batch checks remain enabled.' >> "$GITHUB_STEP_SUMMARY"
-          if [ -f "$ISSUER_REPORT_DIR/results.json" ]; then
-            # Publish only identifiers and statuses, not error bodies, credentials or raw logs.
-            jq 'map({variantId, status, planId, modules: [.modules[] |
-              {testModule, testId, status, result, accepted}]})' \
-              "$ISSUER_REPORT_DIR/results.json" > "$ISSUER_DIAGNOSTICS_DIR/results.json"
-            jq '{variants: (group_by(.status) | map({status: .[0].status, count: length})),
-              batch_modules: ([.[].modules[] | select(.testModule == "oid4vci-1_0-issuer-batch-issuance")]
-                | group_by(.result) | map({result: .[0].result, count: length}))}' \
-              "$ISSUER_DIAGNOSTICS_DIR/results.json" > "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
-            {
-              echo '## Issuer conformance results'
-              echo '```json'
-              cat "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
-              echo '```'
-              echo 'See the issuer artifact for plan/test IDs and https://conformance.waltid.cloud/logs.html for suite logs.'
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo 'Issuer conformance did not produce a summary. See the failed setup/test step and diagnostic artifact.' >> "$GITHUB_STEP_SUMMARY"
-          fi
 
       - name: Upload issuer conformance results
         if: ${{ always() && (inputs.run-issuer-conformance || inputs.run-haip-conformance) }}

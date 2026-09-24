@@ -394,9 +394,19 @@ variants where batch is not offered at this suite pin. Skipped batch execution
 does not establish coverage. Suite and metadata preflight checks use `curl`/`jq`
 directly in the workflow; there is no separate Python validation layer.
 
-The job summary shows variant and batch result counts. The
+`Publish test report` includes `IssuerConformanceTests` in the same JUnit check as
+wallet/verifier tests. It reports the aggregate issuer matrix test, not a separate
+JUnit test for each suite module; the existing passed/skipped detail filters are
+unchanged. `Publish OpenID conformance summary` includes all four roles, with issuer
+variant statuses, clickable plan links and batch coverage counts taken from the
+runner's `matrix.json`. Missing results are reported explicitly, and issuer testing
+that was not requested is labelled as such. Missing batch classifications are
+`UNKNOWN`, never inferred as passed. The existing strict/batch failure policies
+are unchanged; this step only publishes their results.
+
+The
 `issuer-conformance-basic-haip-batch` artifact contains suite/Identity revision
-information and result identifiers/statuses (including plan and test IDs for
+information, batch classifications and result identifiers/statuses (including plan and test IDs for
 looking up suite logs). Error bodies, raw issuer/tunnel/test logs, JUnit output,
 rendered configuration and test keys are not uploaded in this artifact. The shared
 JUnit check includes issuer results. The issuer and tunnel are stopped on
