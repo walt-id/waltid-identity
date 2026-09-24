@@ -1,5 +1,7 @@
 package id.walt.itb
 
+import id.walt.openid4vci.errors.CredentialErrorCodes
+import id.walt.wallet2.handlers.CredentialEndpointException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
@@ -8,6 +10,17 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
 import java.time.Instant
+
+// Issuer response text is untrusted; reports retain only standardized error identifiers.
+private val credentialEndpointErrorCodes = setOf(
+    CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
+    CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
+    CredentialErrorCodes.UNKNOWN_CREDENTIAL_IDENTIFIER,
+    CredentialErrorCodes.INVALID_PROOF,
+    CredentialErrorCodes.INVALID_NONCE,
+    CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS,
+    CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED,
+)
 
 /** An owned session is recorded before its first execution attempt, so failed starts can be cleaned up. */
 data class ItbSession(val testSuite: String, val testCase: String, val session: String) {
@@ -109,6 +122,8 @@ class ItbCaseRunner(
             errorCode = when (error) {
                 is ItbWalletRejection -> error.code
                 is ItbPortalStepTimeout -> error.step.name.lowercase()
+                is CredentialEndpointException -> "credential_endpoint_http_${error.statusCode}" +
+                    (error.credentialError?.error?.takeIf(credentialEndpointErrorCodes::contains)?.let { "_$it" } ?: "")
                 else -> null
             }
             outcome = when {
