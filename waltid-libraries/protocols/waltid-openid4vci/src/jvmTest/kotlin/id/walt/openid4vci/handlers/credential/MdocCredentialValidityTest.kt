@@ -16,6 +16,8 @@ import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.mso.ValidityInfo
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultClient
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceBatch
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInput
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.proofs.VerifiedCredentialProof
@@ -47,10 +49,12 @@ class MdocCredentialValidityTest {
             "2026-09-09T00:00:00Z" to "2026-09-09T00:00:00Z",
         )
         for ((time, base) in cases) {
-            val validity = fixture.issue(time)
-            assertEquals(Instant.parse(base), validity.signed, time)
-            assertEquals(validity.signed, validity.validFrom, time)
-            assertEquals(Instant.parse(base.replace("2026", "2027")), validity.validUntil, time)
+            for (credentialCount in 1..2) {
+                val validity = fixture.issue(time, credentialCount = credentialCount)
+                assertEquals(Instant.parse(base), validity.signed, time)
+                assertEquals(validity.signed, validity.validFrom, time)
+                assertEquals(Instant.parse(base.replace("2026", "2027")), validity.validUntil, time)
+            }
         }
     }
 
@@ -81,11 +85,16 @@ class MdocCredentialValidityTest {
             subjectDn = "CN=mdoc validity test"
             validity = X509Certificate.Validity(Instant.parse(notBefore), Instant.parse("2028-01-01T00:00:00Z"))
         }
-        return Fixture(issuer, key("holder"), certificate)
+        return Fixture(issuer, listOf(key("holder-1"), key("holder-2")), certificate)
     }
 
-    private class Fixture(val issuer: Key, val holder: Key, val certificate: X509Certificate) {
-        suspend fun issue(time: String, validFrom: Instant? = null, validUntil: Instant? = null): ValidityInfo {
+    private class Fixture(val issuer: Key, val holders: List<Key>, val certificate: X509Certificate) {
+        suspend fun issue(
+            time: String,
+            validFrom: Instant? = null,
+            validUntil: Instant? = null,
+            credentialCount: Int = 1,
+        ): ValidityInfo {
             val configuration = CredentialConfiguration(CredentialFormat.MSO_MDOC, doctype = "org.example.mdoc")
             val result = MdocCredentialHandler(roundValidityToTwelveHours = true, now = { Instant.parse(time) }).sign(
                 request = DefaultCredentialRequest(
@@ -96,20 +105,32 @@ class MdocCredentialValidityTest {
                 configuration = configuration,
                 issuerKey = Crypto2CredentialSigningKey.select(issuer, configuration),
                 issuerId = "https://issuer.example",
-                credentialData = buildJsonObject { putJsonObject("org.example") { put("given_name", "Jane") } },
+                issuanceBatch = CredentialIssuanceBatch(
+                    inputs = List(credentialCount) {
+                        CredentialIssuanceInput(
+                            credentialData = buildJsonObject { putJsonObject("org.example") { put("given_name", "Jane") } },
+                        )
+                    },
+                    verifiedProofs = holders.take(credentialCount).map { holder ->
+                        VerifiedCredentialProof("jwt", "", "ES256", buildJsonObject {}, buildJsonObject {}, holder, null, null, null)
+                    },
+                ),
                 dataMapping = null, selectiveDisclosure = null, x5Chain = listOf(certificate),
                 display = null, w3cVersion = null, mDocNameSpacesDataMappingConfig = null,
-                authorizedTransactionDataTypes = null, credentialStatus = null,
+                authorizedTransactionDataTypes = null,
                 validFrom = validFrom, validUntil = validUntil,
-                verifiedProofs = listOf(
-                    VerifiedCredentialProof("jwt", "", "ES256", buildJsonObject {}, buildJsonObject {}, holder, null, null, null)
-                ),
             )
             val response = assertIs<CredentialResponseResult.Success>(result).response
-            val encoded = assertNotNull(response.credentials).single().credential.jsonPrimitive.content
-            val issued = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(encoded.base64UrlDecode())
-            assertTrue(issued.issuerAuth.verify(issuer, -7))
-            return issued.decodeMobileSecurityObject().validityInfo
+            val credentials = assertNotNull(response.credentials)
+            assertEquals(credentialCount, credentials.size)
+            val validities = credentials.map { credential ->
+                val encoded = credential.credential.jsonPrimitive.content
+                val issued = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(encoded.base64UrlDecode())
+                assertTrue(issued.issuerAuth.verify(issuer, -7))
+                issued.decodeMobileSecurityObject().validityInfo
+            }
+            assertEquals(1, validities.distinct().size)
+            return validities.first()
         }
     }
 }

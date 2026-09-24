@@ -1,16 +1,24 @@
 package id.walt.wallet2
 
 import id.walt.crypto.keys.Key
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInput
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputProvider
 import id.walt.openid4vci.proofs.CredentialNonceBinding
 import id.walt.openid4vci.proofs.CredentialNonceValidationContext
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.proofs.IssuedCredentialNonce
 import id.walt.openid4vci.proofs.JwtCredentialNonceService
 import id.walt.openid4vci.requests.credential.CredentialRequest
+import kotlinx.serialization.json.JsonObject
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenVerifier
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+
+fun testIssuanceInputData(credentialData: JsonObject): CredentialIssuanceInputProvider =
+    CredentialIssuanceInputProvider { credentialCount ->
+        List(credentialCount) { CredentialIssuanceInput(credentialData) }
+    }
 
 /** Shared proof support for the inline OpenID4VCI issuers used by wallet integration tests. */
 class TestIssuerProofSupport(

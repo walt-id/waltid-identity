@@ -3,6 +3,7 @@ package id.walt.openid4vci.requests.token
 import id.walt.openid4vci.Client
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.clientauth.AuthenticatedClient
+import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.walt.openid4vci.requests.generateRequestId
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -17,6 +18,7 @@ data class DefaultAccessTokenRequest(
     override val grantedScopes: Set<String> = emptySet(),
     override val requestedAudience: Set<String> = emptySet(),
     override val grantedAudience: Set<String> = emptySet(),
+    override val authorizationDetails: List<AuthorizationDetail> = emptyList(),
     override val requestForm: Map<String, List<String>> = emptyMap(),
     override val session: Session? = null,
     override val issClaim: String? = null,

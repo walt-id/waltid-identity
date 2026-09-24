@@ -2,6 +2,7 @@ package id.walt.openid4vci.repository.refresh
 
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.requests.token.AccessTokenRequest
+import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import kotlin.time.Instant
 
 interface RefreshTokenRecord {
@@ -14,6 +15,8 @@ interface RefreshTokenRecord {
     val grantedAudience: Set<String>
     val session: Session
     val expiresAt: Instant
+    val grantedAuthorizationDetails: List<AuthorizationDetail>?
+        get() = null
 }
 
 data class DefaultRefreshTokenRecord(
@@ -26,4 +29,5 @@ data class DefaultRefreshTokenRecord(
     override val grantedAudience: Set<String>,
     override val session: Session,
     override val expiresAt: Instant,
+    override val grantedAuthorizationDetails: List<AuthorizationDetail>? = null,
 ) : RefreshTokenRecord

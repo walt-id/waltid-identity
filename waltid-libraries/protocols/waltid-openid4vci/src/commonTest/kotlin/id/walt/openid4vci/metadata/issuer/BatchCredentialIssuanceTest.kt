@@ -1,6 +1,7 @@
 package id.walt.openid4vci.metadata.issuer
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class BatchCredentialIssuanceTest {
@@ -10,6 +11,7 @@ class BatchCredentialIssuanceTest {
         assertFailsWith<IllegalArgumentException> {
             BatchCredentialIssuance(batchSize = 1)
         }
-        BatchCredentialIssuance(batchSize = 2)
+        assertEquals(2, BatchCredentialIssuance(batchSize = 2).batchSize)
+        assertEquals(10, BatchCredentialIssuance(batchSize = 10).batchSize)
     }
 }

@@ -39,6 +39,8 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
+import id.walt.openid4vci.responses.token.TokenResponseOptions
+import id.walt.openid4vci.responses.token.TokenCredentialAuthorization
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import kotlinx.coroutines.test.runTest
@@ -495,7 +497,7 @@ class BuildProviderConfigurationTest {
 
     private class DuplicateGrantHandler : TokenEndpointHandler {
         override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean = true
-        override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): AccessTokenResponseResult =
+        override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest, options: TokenResponseOptions): AccessTokenResponseResult =
             AccessTokenResponseResult.Failure(request, OAuthError("unsupported_grant_type"))
     }
 
@@ -503,7 +505,7 @@ class BuildProviderConfigurationTest {
         override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
             request.grantTypes.contains("custom_grant")
 
-        override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): AccessTokenResponseResult =
+        override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest, options: TokenResponseOptions): AccessTokenResponseResult =
             AccessTokenResponseResult.Success(request, AccessTokenResponse(accessToken = "custom"))
     }
 
