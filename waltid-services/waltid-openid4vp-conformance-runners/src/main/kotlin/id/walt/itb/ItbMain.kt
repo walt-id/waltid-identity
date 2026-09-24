@@ -12,6 +12,7 @@ import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import io.ktor.http.Url
 import io.klogging.config.loggingConfiguration
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
 import java.nio.file.Path
@@ -79,7 +80,7 @@ private suspend fun runItb(): Int {
                 page.waitForURL("${catalogue.testBed}/app#/home")
                 itbHttpClient().use { client ->
                     val native = androidPort?.let {
-                        ItbAndroidWalletDriver.connect(it, required("ITB_ANDROID_TOKEN"), origin, pem)
+                        ItbAndroidWalletDriver.connect(it, required("ITB_ANDROID_TOKEN"), origin, pem, Dispatchers.IO)
                     }
                     try {
                         val executeWallet: suspend (ItbWalletInteraction) -> Unit = native?.let { it::execute }

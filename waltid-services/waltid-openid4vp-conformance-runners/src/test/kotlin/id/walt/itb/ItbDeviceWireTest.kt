@@ -121,7 +121,7 @@ class ItbDeviceWireTest {
                         ItbDeviceWire.write(socket, buildJsonObject { put("sequence", 2); put("success", true) })
                     }
                 }
-                ItbAndroidWalletDriver.connect(listener.localPort, token, Url("https://dev-i4mlab.aegean.gr"), "fixture").use {
+                ItbAndroidWalletDriver.connect(listener.localPort, token, Url("https://dev-i4mlab.aegean.gr"), "fixture", Dispatchers.IO).use {
                     assertFailsWith<IllegalStateException> {
                         it.execute(ItbWalletInteraction.Presentation(Url("openid4vp://?request=fixture")))
                     }
@@ -145,7 +145,7 @@ class ItbDeviceWireTest {
                         runCatching { ItbDeviceWire.read(socket) }.exceptionOrNull()
                     }
                 }
-                ItbAndroidWalletDriver.connect(listener.localPort, token, Url("https://dev-i4mlab.aegean.gr"), "fixture").use { driver ->
+                ItbAndroidWalletDriver.connect(listener.localPort, token, Url("https://dev-i4mlab.aegean.gr"), "fixture", Dispatchers.IO).use { driver ->
                     val pending = launch { driver.execute(ItbWalletInteraction.Presentation(Url("openid4vp://?request=fixture"))) }
                     received.await()
                     pending.cancelAndJoin()
