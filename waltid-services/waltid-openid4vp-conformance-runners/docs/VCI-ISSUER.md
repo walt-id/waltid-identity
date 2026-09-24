@@ -323,24 +323,37 @@ skipped when no issuer target is configured.
 ### Existing GitHub Actions CI
 
 The reusable `.github/workflows/gradle.yml` runs the combined basic VCI / HAIP /
-batch matrix in the existing `conformance` job, after wallet/verifier tests.
-The regular build enables the issuer phase through conformance eligibility; the
+batch matrix alongside wallet/verifier tests in the existing `conformance` job's
+`Run conformance tests` step, using one live Gradle `test` invocation.
+The regular build enables issuer testing through conformance eligibility; the
 existing `run-issuer-conformance` and `run-haip-conformance` inputs both select it.
 Release workflows already set those inputs. Checkout, Gradle setup and browser
 installation are shared; there is no separate issuer job.
 
-Wallet/verifier test commands and soft-fail settings are unchanged. Their JUnit
-report and conformance summaries are published before issuer-only Gradle runs can
-overwrite test output. Their tunnels are stopped after reporting, and issuer
-startup rejects an occupied port 7005 rather than terminating an unknown process.
-Issuer settings are step-scoped, and its tests run in a separate Gradle invocation.
-A wallet/verifier test failure does not skip the issuer phase when shared setup
-succeeded; either phase can still fail the shared job. Maven publication already
-waits for this job, so an issuer failure now also prevents publication.
+Issuer2 is built, configured and started before the shared test step. Its port is
+7005; verifier2 uses 7003 and the in-process VP/VCI wallets use 7015/7016 (their
+public adapters use 7006/7007). There is no wallet/issuer port collision. Startup
+rejects an occupied issuer port rather than terminating an unknown process.
 
-CI invokes the existing Gradle `test` task with `--tests
-id.walt.openid4vp.conformance.IssuerConformanceTests`, not the local wrapper and not
-a new Gradle task. It uses `conformance.waltid.cloud:443` and checks `/api/server`
+Wallet/verifier tests retain the repository's `CONFORMANCE_ALLOW_FAILURE` setting.
+`OPENID4VCI_CONFORMANCE_STRICT=true` overrides that policy only for issuer results,
+and `OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true` still requires executed batch
+coverage. One JUnit report covers all roles; issuer result artifacts remain
+separate. The live test task uses `--rerun` and disables configuration caching so
+it cannot reuse old test results or stale environment settings, while dependency
+compilation can stay up to date. Cacheless runs retain `--rerun-tasks`.
+
+If optional issuer setup fails, wallet/verifier tests can still execute and the
+job retains the setup failure. No issuer target is exported unless its setup
+succeeds. Issuer tests have a 90-minute timeout; the shared step has no new
+90-minute limit on wallet/verifier testing. Services and tunnels are stopped by
+always-run cleanup. Maven publication waits for the shared job, including issuer
+results.
+
+CI invokes the existing Gradle `test` task without an issuer-only `--tests` filter,
+so it also discovers `IssuerConformanceTests` when the prepared issuer URL is
+exported. It does not use the local wrapper or a new Gradle task. It uses
+`conformance.waltid.cloud:443` and checks `/api/server`
 for revision `db1080a`, tag `release-v5.2.3`, version `5.2.4` before starting the
 issuer. A hosted-suite upgrade requires reviewing the pin and batch exceptions;
 never bypass that check to get a green build.
@@ -364,13 +377,17 @@ diagnose, not a reason to skip authorization-code coverage.
 CI selects metadata, positive and negative modules, including batch, for both
 formats, supported grants/initiation flows, client attestation, DPoP, simple
 unsigned authorization requests, and plain/encrypted responses. Dedicated FAPI
-modules remain outside this run. Existing runner exclusions are preserved; the
-old commented jobs' additional tunnel-related exclusions are not restored. If a
-module fails because of tunnel TLS behavior, investigate it and report the
-coverage difference rather than silently excluding it.
+modules remain outside this run. Existing runner exclusions are preserved.
+The Cloudflare-backed issuer CI step additionally excludes
+`oid4vci-1_0-issuer-happy-flow-additional-requests`: its TLS probes reach the public
+Quick Tunnel edge, which accepted TLS 1.0/1.1 and a disallowed TLS 1.2 cipher in
+the CI run. The exclusion covers the entire module, not just individual TLS
+assertions, and is reported as a coverage gap in the job summary. This CI run
+does not establish TLS conformance. Local runs keep the module enabled; remove
+the CI-only exclusion when a compliant public TLS endpoint is available.
 
-`CONFORMANCE_ALLOW_FAILURE=false`, strict mode and `REQUIRE_BATCH_PASS=true` are
-explicit. The Kotlin runner enforces successful selected variants and executed
+Issuer strict mode and `REQUIRE_BATCH_PASS=true` are explicit, independent of the
+shared wallet/verifier soft-fail setting. The Kotlin runner enforces successful selected variants and executed
 batch coverage; CI also rejects missing/empty results. The configured matrix
 selects 20 variants, with 16 applicable batch variants and four encrypted-HAIP
 variants where batch is not offered at this suite pin. Skipped batch execution
@@ -381,8 +398,9 @@ The job summary shows variant and batch result counts. The
 `issuer-conformance-basic-haip-batch` artifact contains suite/Identity revision
 information and result identifiers/statuses (including plan and test IDs for
 looking up suite logs). Error bodies, raw issuer/tunnel/test logs, JUnit output,
-rendered configuration and test keys are not uploaded. The issuer and tunnel are
-stopped on completion or failure.
+rendered configuration and test keys are not uploaded in this artifact. The shared
+JUnit check includes issuer results. The issuer and tunnel are stopped on
+completion or failure.
 
 Focused checks (no live conformance):
 

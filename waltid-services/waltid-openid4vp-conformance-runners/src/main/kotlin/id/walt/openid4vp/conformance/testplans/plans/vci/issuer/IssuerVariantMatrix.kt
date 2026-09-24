@@ -358,7 +358,7 @@ data class IssuerVariantMatrixEntry(
 object IssuerVariantReportWriter {
     private val json = Json { prettyPrint = true }
 
-    fun write(reportDir: String, variants: List<IssuerVariant>, results: List<IssuerVariantRunResult>) {
+    fun write(reportDir: String, variants: List<IssuerVariant>, results: List<IssuerVariantRunResult>, strictResults: Boolean) {
         val dir = Path.of(reportDir)
         Files.createDirectories(dir)
 
@@ -383,13 +383,13 @@ object IssuerVariantReportWriter {
             dir.resolve("results.json"),
             json.encodeToString(ListSerializer(IssuerVariantRunResult.serializer()), results)
         )
-        Files.writeString(dir.resolve("summary.md"), buildSummary(results))
+        Files.writeString(dir.resolve("summary.md"), buildSummary(results, strictResults))
     }
 
-    internal fun buildSummary(results: List<IssuerVariantRunResult>): String = buildString {
+    internal fun buildSummary(results: List<IssuerVariantRunResult>, strictResults: Boolean = true): String = buildString {
         appendLine("# OpenID4VCI Issuer Matrix Summary")
         appendLine()
-        appendLine("- Soft-fail (`CONFORMANCE_ALLOW_FAILURE`): `${if (ConformanceCiFlags.allowFailure()) "enabled" else "disabled"}`")
+        appendLine("- Strict issuer results: `${if (strictResults) "enabled" else "disabled"}`")
         appendLine()
         appendLine("| Status | Count |")
         appendLine("|--------|-------|")

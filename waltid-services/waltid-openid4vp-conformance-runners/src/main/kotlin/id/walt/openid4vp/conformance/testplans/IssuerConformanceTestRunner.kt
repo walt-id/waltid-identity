@@ -111,7 +111,7 @@ class IssuerConformanceTestRunner(
                     )
                 }
             }
-            IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, discoveryResults)
+            IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, discoveryResults, variantSelection.strictResults)
             println("Wrote issuer conformance discovery artifacts to ${variantSelection.reportDir}")
             return emptyList()
         }
@@ -159,7 +159,7 @@ class IssuerConformanceTestRunner(
             issuerInterface.close()
         }
 
-        IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, results)
+        IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, results, variantSelection.strictResults)
         println("Wrote issuer conformance matrix artifacts to ${variantSelection.reportDir}")
         println(IssuerVariantReportWriter.batchCoverageSummary(results))
         results.filter { it.batchCoverage == IssuerBatchCoverageStatus.NOT_OFFERED_BY_PINNED_SUITE }.forEach {

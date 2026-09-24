@@ -319,130 +319,7 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
-      - name: Run conformance tests
-        if: ${{ !inputs.cacheless }}
-        run: ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --continue --console=plain --warning-mode=summary
-        env:
-          CI: "true"
-          PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
-          CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
-          OPENID4VCI_CONFORMANCE_STRICT: ${{ vars.CONFORMANCE_ALLOW_FAILURE == 'false' }}
-          CONFORMANCE_HOST: conformance.waltid.cloud
-          CONFORMANCE_PORT: "443"
-          CONFORMANCE_VP_WALLET_ADAPTER_URL: ${{ steps.tunnel.outputs.vp_wallet_url }}/openid4vp/authorize
-          CONFORMANCE_VCI_WALLET_ADAPTER_BASE_URL: ${{ steps.tunnel.outputs.vci_wallet_url }}
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-
-      - name: Clean and run conformance tests
-        if: ${{ inputs.cacheless }}
-        run: ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --rerun-tasks --no-daemon --continue --console=plain --warning-mode=summary
-        env:
-          CI: "true"
-          PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
-          CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
-          OPENID4VCI_CONFORMANCE_STRICT: ${{ vars.CONFORMANCE_ALLOW_FAILURE == 'false' }}
-          CONFORMANCE_HOST: conformance.waltid.cloud
-          CONFORMANCE_PORT: "443"
-          CONFORMANCE_VP_WALLET_ADAPTER_URL: ${{ steps.tunnel.outputs.vp_wallet_url }}/openid4vp/authorize
-          CONFORMANCE_VCI_WALLET_ADAPTER_BASE_URL: ${{ steps.tunnel.outputs.vci_wallet_url }}
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-
-      - name: Publish test report
-        uses: mikepenz/action-junit-report@v6
-        if: always()
-        with:
-          update_check: true
-          job_name: ${{ inputs.conformance-report-check-name }}
-          report_paths: '**/waltid-openid4vp-conformance-runners/build/test-results/**/*.xml'
-          detailed_summary: true
-          include_passed: false
-          include_skipped: false
-
-      - name: Publish OpenID conformance summary
-        if: always()
-        env:
-          CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
-        run: |
-          {
-            echo "## OpenID Conformance Results"
-            echo
-            if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
-              echo "> Soft-fail enabled (\`CONFORMANCE_ALLOW_FAILURE\` unset/true). Failed conformance tests are reported below but do not fail this job."
-            else
-              echo "> Soft-fail disabled (\`CONFORMANCE_ALLOW_FAILURE=false\`). Failed conformance tests fail this job."
-            fi
-            echo
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          append_role_summary() {
-            local role_dir="$1"
-            local title="$2"
-            local summary=""
-            local candidate
-            while IFS= read -r candidate; do
-              summary="$candidate"
-              break
-            done < <(find . -path "*/build/reports/openid-conformance/${role_dir}/summary.md" 2>/dev/null)
-
-            echo >> "$GITHUB_STEP_SUMMARY"
-            if [ -n "$summary" ] && [ -f "$summary" ]; then
-              cat "$summary" >> "$GITHUB_STEP_SUMMARY"
-              found=$((found + 1))
-            else
-              {
-                echo "# ${title} Conformance Summary"
-                echo
-                if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
-                  echo "- Soft-fail (\`CONFORMANCE_ALLOW_FAILURE\`): \`enabled\`"
-                else
-                  echo "- Soft-fail (\`CONFORMANCE_ALLOW_FAILURE\`): \`disabled\`"
-                fi
-                echo "- Total: 0"
-                echo "- Passed: 0"
-                echo "- Failed: 0"
-                echo
-                echo "| Test | Status | Suite | Log | Error |"
-                echo "|------|--------|-------|-----|-------|"
-                echo
-                echo "_No ${title} conformance results were produced (suite skipped, unavailable, or failed before writing a report)._"
-              } >> "$GITHUB_STEP_SUMMARY"
-            fi
-            echo >> "$GITHUB_STEP_SUMMARY"
-          }
-
-          found=0
-          append_role_summary vp-verifier "OpenID4VP Verifier"
-          append_role_summary vp-wallet "OpenID4VP Wallet"
-          append_role_summary vci-wallet "OpenID4VCI Wallet"
-          append_role_summary vci-issuer "OpenID4VCI Issuer"
-
-          while IFS= read -r -d '' summary; do
-            found=$((found + 1))
-            {
-              echo
-              cat "$summary"
-              echo
-            } >> "$GITHUB_STEP_SUMMARY"
-          done < <(find . \
-            -path '*/build/reports/openid4vci-issuer-matrix/summary.md' \
-            -print0 2>/dev/null)
-
-          echo "Published OpenID conformance summaries for verifier, OpenID4VP wallet, OpenID4VCI wallet, and issuer (${found} file(s) found)."
-
-      # Publish wallet/verifier reports above before issuer-only Gradle runs replace test outputs.
-      - name: Stop wallet and verifier conformance tunnels
-        if: always()
-        run: |
-          for pid_file in "$RUNNER_TEMP/lt_verifier.pid" "$RUNNER_TEMP/lt_vp_wallet.pid" "$RUNNER_TEMP/lt_vci_wallet.pid"; do
-            [ -f "$pid_file" ] || continue
-            pid=$(cat "$pid_file")
-            if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then kill "$pid" 2>/dev/null || true; fi
-          done
-
-      # Keep issuer settings scoped to this phase; wallet/verifier commands and soft-fail policy stay unchanged.
-      # Explicit outcome checks let this phase run even after a wallet/verifier test failure.
+      # Prepare the optional issuer before the shared live test invocation.
       - name: Verify hosted suite revision
         id: issuer-suite
         if: ${{ !cancelled() && (inputs.run-issuer-conformance || inputs.run-haip-conformance) && steps.conformance-gradle.outcome == 'success' && steps.conformance-browsers.outcome == 'success' }}
@@ -478,9 +355,9 @@ jobs:
           CLOUDFLARED_VERSION: "2026.7.3"
         run: |
           set -euo pipefail
-          # Wallet/verifier servers belonged to the completed test JVM. Never kill an unknown listener.
+          # Issuer2 uses 7005; wallet tests use 7015/7016 and verifier tests use 7003.
           if [ -n "$(ss -H -ltn 'sport = :7005')" ]; then
-            echo '::error::Port 7005 is still occupied after wallet/verifier tests; refusing to start Issuer2.'
+            echo '::error::Port 7005 is occupied; refusing to start Issuer2.'
             exit 1
           fi
           CLOUDFLARED="$RUNNER_TEMP/cloudflared-issuer2"
@@ -538,26 +415,43 @@ jobs:
           }
           echo "url=$TUNNEL_URL" >> "$GITHUB_OUTPUT"
 
-      - name: Run Issuer2 basic VCI and HAIP conformance including batch
-        id: issuer-tests
-        if: ${{ !cancelled() && steps.issuer-tunnel.outcome == 'success' }}
-        timeout-minutes: 90
-        run: >-
-          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test
-          -PskipLiveConformance=false
-          --tests id.walt.openid4vp.conformance.IssuerConformanceTests
-          --rerun-tasks --no-configuration-cache --no-build-cache --no-daemon --console=plain --warning-mode=summary
+      - name: Run conformance tests
+        id: conformance-tests
+        # Keep wallet/verifier testing runnable even if the optional issuer setup failed.
+        if: ${{ !cancelled() && steps.conformance-gradle.outcome == 'success' && steps.conformance-browsers.outcome == 'success' && steps.tunnel.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          if [ -n "$ISSUER_BASE_URL" ]; then
+            export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="$ISSUER_BASE_URL/openid4vci"
+            echo 'Running wallet, verifier and issuer conformance together (issuer strict + batch checks enabled).'
+          else
+            unset OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL
+            echo 'Running wallet/verifier conformance; no issuer runtime was prepared.'
+          fi
+          gradle_args=(--continue --console=plain --warning-mode=summary --no-configuration-cache -PskipLiveConformance=false)
+          if [ "$CACHELESS" = "true" ]; then
+            gradle_args+=(--rerun-tasks --no-daemon)
+          fi
+          # Rerun live tests, not every compile/dependency task in the normal cached path.
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --rerun "${gradle_args[@]}"
         env:
           CI: "true"
+          CACHELESS: ${{ inputs.cacheless }}
+          ISSUER_BASE_URL: ${{ steps.issuer-tunnel.outputs.url }}
+          PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
+          # Wallet/verifier retain the repository soft-fail policy. The issuer-specific override wins below.
+          CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
+          CONFORMANCE_HOST: conformance.waltid.cloud
+          CONFORMANCE_PORT: "443"
+          CONFORMANCE_VP_WALLET_ADAPTER_URL: ${{ steps.tunnel.outputs.vp_wallet_url }}/openid4vp/authorize
+          CONFORMANCE_VCI_WALLET_ADAPTER_BASE_URL: ${{ steps.tunnel.outputs.vci_wallet_url }}
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
           SKIP_LIVE_CONFORMANCE: "false"
-          CONFORMANCE_ALLOW_FAILURE: "false"
           OPENID4VCI_CONFORMANCE_MATRIX: all
           OPENID4VCI_CONFORMANCE_DISCOVERY_ONLY: "false"
           OPENID4VCI_CONFORMANCE_STRICT: "true"
           OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS: "true"
-          OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL: ${{ steps.issuer-tunnel.outputs.url }}/openid4vci
           OPENID4VCI_CONFORMANCE_SUITE_HOST: conformance.waltid.cloud
           OPENID4VCI_CONFORMANCE_SUITE_PORT: "443"
           OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID: identity_credential
@@ -578,19 +472,100 @@ jobs:
           OPENID4VCI_CONFORMANCE_FILTER_CREDENTIAL_ENCRYPTION: plain,encrypted
           OPENID4VCI_CONFORMANCE_MODULE_GROUPS: metadata,positive,negative
           OPENID4VCI_CONFORMANCE_MODULES: ""
-          OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES: ""
+          # CI-only: these TLS probes reach the Cloudflare Quick Tunnel edge, not Issuer2.
+          # Keep enabled locally; restore here when CI uses a compliant public TLS endpoint.
+          OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES: oid4vci-1_0-issuer-happy-flow-additional-requests
           OPENID4VCI_CONFORMANCE_STATIC_TX_CODE: "493536"
           OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION: "true"
           OPENID4VCI_CONFORMANCE_AUTH_USERNAME: jane@walt.id
           OPENID4VCI_CONFORMANCE_AUTH_PASSWORD: jane
           OPENID4VCI_CONFORMANCE_AUTH_TIMEOUT_SECONDS: "90"
+          OPENID4VCI_CONFORMANCE_TIMEOUT_MINUTES: "90"
           OPENID4VCI_CONFORMANCE_REPORT_DIR: ${{ env.ISSUER_REPORT_DIR }}
-          PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
           PLAYWRIGHT_BROWSER: chromium
           PLAYWRIGHT_HEADLESS: "true"
 
+      - name: Publish test report
+        uses: mikepenz/action-junit-report@v6
+        if: always()
+        with:
+          update_check: true
+          job_name: ${{ inputs.conformance-report-check-name }}
+          report_paths: '**/waltid-openid4vp-conformance-runners/build/test-results/**/*.xml'
+          detailed_summary: true
+          include_passed: false
+          include_skipped: false
+
+      - name: Publish OpenID conformance summary
+        if: always()
+        env:
+          CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
+        run: |
+          {
+            echo "## Wallet and verifier conformance results"
+            echo
+            if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
+              echo "> Soft-fail enabled (\`CONFORMANCE_ALLOW_FAILURE\` unset/true). Wallet/verifier failures are reported below but do not fail this job. Issuer strict and batch checks are independent."
+            else
+              echo "> Soft-fail disabled (\`CONFORMANCE_ALLOW_FAILURE=false\`). Wallet/verifier failures fail this job. Issuer strict and batch checks are independent."
+            fi
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          append_role_summary() {
+            local role_dir="$1"
+            local title="$2"
+            local summary=""
+            local candidate
+            while IFS= read -r candidate; do
+              summary="$candidate"
+              break
+            done < <(find . -path "*/build/reports/openid-conformance/${role_dir}/summary.md" 2>/dev/null)
+
+            echo >> "$GITHUB_STEP_SUMMARY"
+            if [ -n "$summary" ] && [ -f "$summary" ]; then
+              cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+              found=$((found + 1))
+            else
+              {
+                echo "# ${title} Conformance Summary"
+                echo
+                if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
+                  echo "- Soft-fail (\`CONFORMANCE_ALLOW_FAILURE\`): \`enabled\`"
+                else
+                  echo "- Soft-fail (\`CONFORMANCE_ALLOW_FAILURE\`): \`disabled\`"
+                fi
+                echo "- Total: 0"
+                echo "- Passed: 0"
+                echo "- Failed: 0"
+                echo
+                echo "| Test | Status | Suite | Log | Error |"
+                echo "|------|--------|-------|-----|-------|"
+                echo
+                echo "_No ${title} conformance results were produced (suite skipped, unavailable, or failed before writing a report)._"
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          found=0
+          append_role_summary vp-verifier "OpenID4VP Verifier"
+          append_role_summary vp-wallet "OpenID4VP Wallet"
+          append_role_summary vci-wallet "OpenID4VCI Wallet"
+
+          echo "Published OpenID conformance summaries for verifier, OpenID4VP wallet and OpenID4VCI wallet (${found} file(s) found)."
+
+      - name: Stop wallet and verifier conformance tunnels
+        if: always()
+        run: |
+          for pid_file in "$RUNNER_TEMP/lt_verifier.pid" "$RUNNER_TEMP/lt_vp_wallet.pid" "$RUNNER_TEMP/lt_vci_wallet.pid"; do
+            [ -f "$pid_file" ] || continue
+            pid=$(cat "$pid_file")
+            if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then kill "$pid" 2>/dev/null || true; fi
+          done
+
       - name: Verify issuer results were produced
-        if: ${{ !cancelled() && steps.issuer-tests.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.issuer-tunnel.outcome == 'success' && steps.conformance-tests.outcome == 'success' }}
         # Strict results and executed batch coverage are enforced by the Kotlin runner.
         run: jq -e 'type == "array" and length > 0' "$ISSUER_REPORT_DIR/results.json" >/dev/null
 
@@ -606,6 +581,7 @@ jobs:
       - name: Publish issuer result overview
         if: ${{ always() && (inputs.run-issuer-conformance || inputs.run-haip-conformance) }}
         run: |
+          echo '> CI coverage gap: `oid4vci-1_0-issuer-happy-flow-additional-requests` is excluded because its TLS probes reach the Cloudflare Quick Tunnel edge. This run does not establish TLS conformance. Local runs retain this module; strict and batch checks remain enabled.' >> "$GITHUB_STEP_SUMMARY"
           if [ -f "$ISSUER_REPORT_DIR/results.json" ]; then
             # Publish only identifiers and statuses, not error bodies, credentials or raw logs.
             jq 'map({variantId, status, planId, modules: [.modules[] |

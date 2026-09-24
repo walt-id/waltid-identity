@@ -18,6 +18,16 @@ import kotlin.test.assertTrue
 
 class IssuerVariantMatrixTest {
     @Test
+    fun summaryReportsEffectiveIssuerStrictnessRatherThanSharedWalletSoftFail() {
+        val strict = IssuerVariantReportWriter.buildSummary(emptyList(), strictResults = true)
+        val exploratory = IssuerVariantReportWriter.buildSummary(emptyList(), strictResults = false)
+        assertTrue(strict.contains("Strict issuer results: `enabled`"))
+        assertTrue(exploratory.contains("Strict issuer results: `disabled`"))
+        assertFalse(strict.contains("CONFORMANCE_ALLOW_FAILURE"))
+        assertFalse(exploratory.contains("CONFORMANCE_ALLOW_FAILURE"))
+    }
+
+    @Test
     fun summaryIncludesModuleErrorsEvenWhenVariantErrorIsNull() {
         val summary = IssuerVariantReportWriter.buildSummary(listOf(
             IssuerVariantRunResult(
