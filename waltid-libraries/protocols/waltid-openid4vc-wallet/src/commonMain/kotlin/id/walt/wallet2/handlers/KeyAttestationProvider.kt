@@ -10,6 +10,7 @@ import id.walt.openid4vci.metadata.issuer.KeyAttestationsRequired
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.encodeToString
 import kotlin.time.Clock
@@ -44,31 +45,31 @@ internal suspend fun keyAttestationForProof(
     val publicKey = requireNotNull(proofKey.capabilities.publicKeyExporter) {
         "Credential proof key cannot export public material for attestation"
     }.exportPublicKey().toPublicJwk(proofKey.spec)
-    attester.validatedAttestation(KeyAttestationRequest(credentialIssuer, publicKey, nonce, required))
-        .also { jwt ->
-            require(acceptedAlgorithms == null || CompactJws.decodeUnverified(jwt).algorithm.identifier in acceptedAlgorithms) {
-                "Issuer does not support the key-attestation algorithm"
-            }
-        }
+    attester.validatedAttestation(
+        KeyAttestationRequest(credentialIssuer, publicKey, nonce, required), acceptedAlgorithms,
+    )
 }
 
 /** Validate the provider's signed answer before embedding it in a credential proof. */
-internal suspend fun KeyAttestationProvider.validatedAttestation(request: KeyAttestationRequest): String {
+internal suspend fun KeyAttestationProvider.validatedAttestation(
+    request: KeyAttestationRequest, acceptedAlgorithms: Set<String>? = null,
+): String {
     val jwt = attest(request)
     val decoded = CompactJws.decodeUnverified(jwt)
+    require(acceptedAlgorithms == null || decoded.algorithm.identifier in acceptedAlgorithms) {
+        "Issuer does not support the key-attestation algorithm"
+    }
     require(decoded.protectedHeader["typ"]?.jsonPrimitive?.content == "key-attestation+jwt") {
         "Key attestation has an invalid JWT type"
     }
     val verified = CompactJws.verify(jwt, verificationKey, decoded.algorithm)
-    (decoded.protectedHeader["jwk"] as? JsonObject)?.let { declaredKey ->
+    decoded.protectedHeader["jwk"]?.let { headerKey ->
+        val declaredKey = headerKey as? JsonObject
+            ?: throw IllegalArgumentException("Key attestation header JWK must be an object")
         val verificationPublicKey = requireNotNull(verificationKey.capabilities.publicKeyExporter) {
             "Attester verification key cannot be compared with the JWT header"
         }.exportPublicKey().toPublicJwk(verificationKey.spec)
-        val declared = EncodedKey.Jwk(
-            BinaryData(Json.encodeToString(JsonObject.serializer(), declaredKey).encodeToByteArray()),
-            privateMaterial = false,
-        )
-        require(Jwk.sha256Thumbprint(declared) == Jwk.sha256Thumbprint(verificationPublicKey)) {
+        require(publicJwkThumbprint(declaredKey) == Jwk.sha256Thumbprint(verificationPublicKey)) {
             "Key attestation header does not identify the configured attester"
         }
     }
@@ -85,35 +86,50 @@ internal suspend fun KeyAttestationProvider.validatedAttestation(request: KeyAtt
     require(issuedAt <= now + 60 && expiresAt > now && expiresAt > issuedAt) {
         "Key attestation is not currently valid"
     }
+    val nonce = payload["nonce"]?.let { claim ->
+        require(claim is JsonPrimitive && claim.isString) { "Key attestation nonce must be a string" }
+        claim.content
+    }
     if (request.nonce != null) {
-        require(payload["nonce"]?.jsonPrimitive?.content == request.nonce) {
+        require(nonce == request.nonce) {
             "Key attestation nonce does not match the issuer nonce"
         }
     }
     val attestedKeys = payload["attested_keys"] as? JsonArray
         ?: throw IllegalArgumentException("Key attestation is missing attested_keys")
     require(attestedKeys.isNotEmpty()) { "Key attestation has no attested keys" }
-    require(attestedKeys.all { it is JsonObject && !Jwk.containsPrivateMaterial(it) }) {
-        "Key attestation must contain only public JWKs"
+    val attestedThumbprints = attestedKeys.map { element ->
+        publicJwkThumbprint(element as? JsonObject
+            ?: throw IllegalArgumentException("Key attestation must contain only public JWKs"))
     }
     val proofThumbprint = Jwk.sha256Thumbprint(request.proofKey)
-    require(attestedKeys.any { element ->
-        val jwk = element as? JsonObject ?: return@any false
-        runCatching {
-                Jwk.sha256Thumbprint(
-                    EncodedKey.Jwk(BinaryData(Json.encodeToString(JsonObject.serializer(), jwk).encodeToByteArray()), false)
-                ) == proofThumbprint
-            }.getOrDefault(false)
-    }) { "Key attestation does not contain the credential proof key" }
+    require(proofThumbprint in attestedThumbprints) { "Key attestation does not contain the credential proof key" }
     requireMatchesRequirement(payload, "key_storage", request.requirements.keyStorage)
     requireMatchesRequirement(payload, "user_authentication", request.requirements.userAuthentication)
     return jwt
 }
 
+private suspend fun publicJwkThumbprint(jwk: JsonObject): String {
+    require(!Jwk.containsPrivateMaterial(jwk)) { "Key attestation must contain only public JWKs" }
+    val encoded = EncodedKey.Jwk(
+        BinaryData(Json.encodeToString(JsonObject.serializer(), jwk).encodeToByteArray()),
+        privateMaterial = false,
+    )
+    Jwk.metadata(encoded)
+    return Jwk.sha256Thumbprint(encoded)
+}
+
 private fun requireMatchesRequirement(payload: JsonObject, claim: String, accepted: Set<String>?) {
+    val values = payload[claim]?.let { element ->
+        val array = element as? JsonArray
+            ?: throw IllegalArgumentException("Key attestation $claim must be an array of strings")
+        require(array.isNotEmpty() && array.all { it is JsonPrimitive && it.isString && it.content.isNotEmpty() }) {
+            "Key attestation $claim must be a nonempty array of strings"
+        }
+        array.map { it.jsonPrimitive.content }
+    }
     if (accepted == null) return
-    val values = payload[claim] as? JsonArray
-    require(values != null && values.any { it.jsonPrimitive.content in accepted }) {
+    require(values != null && values.any { it in accepted }) {
         "Key attestation does not meet the issuer's $claim requirement"
     }
 }
