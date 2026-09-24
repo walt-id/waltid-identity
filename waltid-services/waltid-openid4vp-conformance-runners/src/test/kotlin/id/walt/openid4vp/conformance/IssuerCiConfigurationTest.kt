@@ -52,6 +52,17 @@ class IssuerCiConfigurationTest {
     }
 
     @Test
+    fun sdJwtProfilesDoNotAddDatasetIdsThroughDataOrMapping() {
+        val profiles = fixture("issuer2-profiles-ci.conf").getConfig("profiles")
+        listOf("identityCredentialSdJwt", "identityCredentialHaipSdJwt").forEach { name ->
+            val profile = profiles.getConfig(name)
+            assertFalse(profile.getConfig("credentialData").hasPath("id"), "$name must not include a dataset ID")
+            // Mapping runs for each credential; a generated UUID makes batch datasets differ.
+            assertFalse(profile.getConfig("mapping").hasPath("id"), "$name must not map a dataset ID")
+        }
+    }
+
+    @Test
     fun signingCertificatesMatchKeysAndTheRunnerTrustAnchor() {
         val profiles = fixture("issuer2-profiles-ci.conf").getConfig("profiles")
         val factory = CertificateFactory.getInstance("X.509")
