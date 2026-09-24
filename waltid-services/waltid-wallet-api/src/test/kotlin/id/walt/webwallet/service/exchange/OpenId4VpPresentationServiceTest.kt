@@ -12,6 +12,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -206,7 +207,7 @@ class OpenId4VpPresentationServiceTest {
         )
         val requestObject = unsecuredJwt(
             AuthorizationRequest(
-                clientId = "verifier2",
+                clientId = "redirect_uri:https://verifier.example/response",
                 responseMode = OpenID4VPResponseMode.DIRECT_POST,
                 responseUri = "https://verifier.example/response",
                 nonce = "nonce-123",
@@ -275,14 +276,12 @@ class OpenId4VpPresentationServiceTest {
             ),
         )
 
-        val error = assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
+        val error = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
             runBlocking { resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$requestObject") }
         }
 
-        assertEquals(
-            "Unsigned AuthorizationRequest object (alg=none) is not allowed",
-            error.message,
-        )
+        assertEquals(ClientIdError.PreRegisteredClientNotFound("verifier2"), error.clientIdError)
+        assertEquals("invalid_client", error.errorCode)
     }
 
     @Test
@@ -484,7 +483,7 @@ class OpenId4VpPresentationServiceTest {
                 unsignedRequestObject(
                     """
                     {
-                      "client_id":"verifier2",
+                      "client_id":"redirect_uri:https://verifier.example/response",
                       "response_type":"vp_token",
                       "response_mode":"direct_post",
                       "response_uri":"https://verifier.example/response",
@@ -563,7 +562,7 @@ class OpenId4VpPresentationServiceTest {
     fun `normalized request URL preserves signed request objects fetched from request_uri`() {
         val requestObject = unsecuredJwt(
             AuthorizationRequest(
-                clientId = "verifier2",
+                clientId = "redirect_uri:https://verifier.example/response",
                 responseMode = OpenID4VPResponseMode.DIRECT_POST,
                 responseUri = "https://verifier.example/response",
                 nonce = "nonce-123",

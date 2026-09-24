@@ -7,6 +7,7 @@ import id.walt.certificate.x509.model.GeneralName
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto2.jose.CompactJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
+import id.walt.openid4vp.clientidprefix.isMissing
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
@@ -53,7 +54,7 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
 
         val x5cHeader = decodedJws.protectedHeader["x5c"] as? JsonArray
             ?: return ClientValidationResult.Failure(ClientIdError.MissingX5cHeader)
-        if (trustConfiguration.x509TrustAnchors == null) {
+        if (trustConfiguration.x509TrustAnchors.isMissing()) {
             return ClientValidationResult.Failure(ClientIdError.MissingX509TrustAnchors)
         }
 

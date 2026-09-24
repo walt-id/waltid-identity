@@ -14,6 +14,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
 import id.walt.openid4vp.clientidprefix.*
 import id.walt.openid4vp.clientidprefix.prefixes.*
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -43,6 +44,9 @@ class PrefixTests {
 
     private val authenticator = ClientIdPrefixAuthenticator
     private val validMetadataJson = """{ "vp_formats_supported": {} }"""
+    private val registeredCallback = "https://app.example.com/callback"
+    private val registeredMetadataJson =
+        """{ "vp_formats_supported": {}, "redirect_uris": ["$registeredCallback"] }"""
 
     inline fun <reified T : ClientId> parseClientIdPrefixTest(clientIdString: String): T {
         val parsed = ClientIdPrefixParser.parse(clientIdString).getOrThrow()
@@ -155,26 +159,100 @@ class PrefixTests {
     }
 
     @Test
-    fun `pre_registered metadata alone does not authenticate a request`() = runTest {
-        val context = RequestContext("my-registered-app")
+    fun `pre_registered unsigned succeeds when redirect_uris match`() = runTest {
+        val context = RequestContext(
+            clientId = "my-registered-app",
+            redirectUri = registeredCallback,
+        )
         val clientId = ClientIdPrefixParser.parse(context.clientId).getOrThrow()
-
-        // The caller provides the lookup logic
         val metadataProvider: suspend (String) -> String? = { id ->
-            if (id == "my-registered-app") validMetadataJson else null
+            if (id == "my-registered-app") registeredMetadataJson else null
         }
 
         val result = authenticator.authenticate(clientId, context, metadataProvider)
 
-        val failure = assertIs<ClientValidationResult.Failure>(result)
-        assertEquals(ClientIdError.MissingRequestObject, failure.error)
+        assertIs<ClientValidationResult.Success>(result)
+        assertEquals(listOf(registeredCallback), result.clientMetadata.redirectUris)
+    }
+
+    @Test
+    fun `pre_registered unsigned fails when redirect_uris are missing or mismatched`() = runTest {
+        val metadataProvider: suspend (String) -> String? = { id ->
+            if (id == "my-registered-app") registeredMetadataJson else null
+        }
+        val clientId = ClientIdPrefixParser.parse("my-registered-app").getOrThrow()
+
+        val missingDestination = authenticator.authenticate(
+            clientId,
+            RequestContext("my-registered-app"),
+            metadataProvider,
+        )
+        assertIs<ClientIdError.UnregisteredRedirectUri>(
+            assertIs<ClientValidationResult.Failure>(missingDestination).error,
+        )
+
+        val mismatched = authenticator.authenticate(
+            clientId,
+            RequestContext("my-registered-app", responseUri = "https://attacker.example/collect"),
+            metadataProvider,
+        )
+        assertIs<ClientIdError.UnregisteredRedirectUri>(
+            assertIs<ClientValidationResult.Failure>(mismatched).error,
+        )
 
         val compatibilityResult = assertIs<PreRegistered>(clientId)
             .authenticatePreRegistered(assertIs<PreRegistered>(clientId), metadataProvider)
-        assertEquals(
-            ClientIdError.MissingRequestObject,
+        assertIs<ClientIdError.UnregisteredRedirectUri>(
             assertIs<ClientValidationResult.Failure>(compatibilityResult).error,
         )
+    }
+
+    @Test
+    fun `pre_registered rejects in-band client_metadata`() = runTest {
+        val context = RequestContext(
+            clientId = "my-registered-app",
+            clientMetadataString = validMetadataJson,
+            responseUri = registeredCallback,
+        )
+        val clientId = ClientIdPrefixParser.parse(context.clientId).getOrThrow()
+        val metadataProvider: suspend (String) -> String? = { registeredMetadataJson }
+
+        val result = authenticator.authenticate(clientId, context, metadataProvider)
+
+        assertEquals(
+            ClientIdError.InvalidClient,
+            assertIs<ClientValidationResult.Failure>(result).error,
+        )
+    }
+
+    @Test
+    fun `url-shaped client id falls back to pre-registered when registered`() = runTest {
+        val raw = "https://verifier.example.com"
+        val parsed = ClientIdPrefixParser.parse(raw).getOrThrow()
+        assertIs<Unsupported>(parsed)
+
+        val metadataProvider: suspend (String) -> String? = { id ->
+            if (id == raw) registeredMetadataJson else null
+        }
+        val trust = ClientIdTrustConfiguration(
+            preRegisteredClients = mapOf(raw to ClientMetadata(redirectUris = listOf(registeredCallback))),
+        )
+        val success = authenticator.authenticate(
+            parsed,
+            RequestContext(raw, responseUri = registeredCallback),
+            metadataProvider,
+            trust,
+        )
+        assertIs<ClientValidationResult.Success>(success)
+
+        val unknown = authenticator.authenticate(
+            ClientIdPrefixParser.parse("https://unknown.example.com").getOrThrow(),
+            RequestContext("https://unknown.example.com", responseUri = registeredCallback),
+            metadataProvider,
+            ClientIdTrustConfiguration(),
+        )
+        val failure = assertIs<ClientValidationResult.Failure>(unknown)
+        assertIs<ClientIdError.UnsupportedPrefix>(failure.error)
     }
 
     @Test

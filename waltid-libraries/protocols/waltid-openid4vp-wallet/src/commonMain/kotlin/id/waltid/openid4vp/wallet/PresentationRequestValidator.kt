@@ -28,6 +28,14 @@ sealed interface PresentationRequestValidationResult {
     ) : PresentationRequestValidationResult
 }
 
+/** How the wallet will deliver the presentation or protocol error. */
+enum class PresentationValidationTransport {
+    /** HTTP redirect / `response_uri`. Destination binding is required before a reportable error. */
+    Http,
+    /** Digital Credentials API. Origin rules stay in [DcApiWallet]; HTTP destinations do not apply. */
+    DigitalCredentialsApi,
+}
+
 /**
  * Validates wallet capabilities and request semantics after request resolution.
  *
@@ -49,14 +57,19 @@ object PresentationRequestValidator {
         formatCapabilities: (() -> WalletPresentationFormatRegistry.RuntimeCapabilities)? = {
             WalletPresentationFormatRegistry.defaultCapabilities()
         },
+        transport: PresentationValidationTransport = PresentationValidationTransport.Http,
     ): PresentationRequestValidationResult {
         val request = resolvedRequest.authorizationRequest
-        requireUsableResponse(request)
+        if (transport == PresentationValidationTransport.Http) {
+            requireUsableResponse(request)
+        }
         fun invalid(
             code: WalletPresentFunctionality2.OID4VPErrorCode,
             message: String,
         ): PresentationRequestValidationResult.Invalid {
-            requireErrorResponseCanBeSent(resolvedRequest)
+            if (transport == PresentationValidationTransport.Http) {
+                requireErrorResponseCanBeSent(resolvedRequest)
+            }
             return PresentationRequestValidationResult.Invalid(PresentationRequestError(code, message))
         }
 
@@ -97,7 +110,7 @@ object PresentationRequestValidator {
                 .mapNotNull { credentialQuery -> WalletPresentationFormatRegistry.resolve(credentialQuery.format.id.first()) }
                 .toSet()
             val capabilities = formatCapabilities()
-            val verifierFormats = request.clientMetadata?.vpFormatsSupported
+            val verifierFormats = resolvedRequest.effectiveClientMetadata?.vpFormatsSupported
             val walletSupportsRequestedFormat = requestedFormats.any(capabilities.supportedFormats::contains)
             val verifierSupportsRequestedFormat = verifierFormats?.let {
                 WalletPresentationFormatRegistry.supportsAny(
@@ -180,17 +193,8 @@ object PresentationRequestValidator {
     fun requireErrorResponseCanBeSent(resolvedRequest: ResolvedAuthorizationRequest) {
         val request = resolvedRequest.authorizationRequest
         requireUsableResponse(request)
-        if (resolvedRequest is ResolvedAuthorizationRequest.Plain) {
-            val responseDestination = when (request.walletResponseMode()) {
-                OpenID4VPResponseMode.DIRECT_POST,
-                OpenID4VPResponseMode.DIRECT_POST_JWT,
-                -> request.responseUri
-
-                else -> request.redirectUri
-            }
-            require(responseDestination != null && request.clientId == "redirect_uri:$responseDestination") {
-                "A plain Authorization Request must bind client_id to its response destination before an error response can be sent safely"
-            }
+        require(resolvedRequest.client.responseDestinationAuthenticated) {
+            "An Authorization Request must bind its response destination before an error response can be sent safely"
         }
     }
 
