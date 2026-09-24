@@ -28,7 +28,9 @@ data class RequestContext(
 
 data class ClientIdTrustConfiguration(
     /**
-     * List of trusted X.509 certificate DERs in base64 format.
+     * Wallet-controlled X.509 trust store for `x509_hash` / `x509_san_dns` Request Objects.
+     * Null fails those prefixes closed. Callers typically wrap PEM pins and/or Trust Registry
+     * relying-party certificates in [InMemoryTrustStore].
      */
     val x509TrustAnchors: X509CertificateTrustStore? = null,
     val trustedVerifierAttestationIssuers: Set<String> = emptySet(),
@@ -37,6 +39,9 @@ data class ClientIdTrustConfiguration(
     val x509TrustStore: X509CertificateTrustStore
         get() = x509TrustAnchors ?: InMemoryTrustStore()
 }
+
+internal fun X509CertificateTrustStore?.isMissing(): Boolean =
+    this == null || (this is InMemoryTrustStore && isEmpty())
 
 /**
  * A sealed class representing all possible validation errors for clear, type-safe error handling.
@@ -82,6 +87,14 @@ sealed class ClientIdError(val message: String) {
     data object MissingX509TrustAnchors : ClientIdError("No X.509 trust anchors are configured.")
 
     /**
+     * Anchors are configured, but the presented chain does not reach one of them.
+     * Distinct from [MissingX509TrustAnchors], which means the wallet has none.
+     */
+    @Serializable
+    data object X509TrustAnchorMismatch :
+        ClientIdError("The certificate chain does not reach a configured X.509 trust anchor.")
+
+    /**
      * The `redirect_uri`'s FQDN did not match an `x509_san_dns` Client Identifier.
      *
      * Only ever raised for `redirect_uri`; see the OpenID4VP 1.0 §5.9.3 / §14.3.1 split documented in
@@ -102,6 +115,24 @@ sealed class ClientIdError(val message: String) {
 
     @Serializable
     data class PreRegisteredClientNotFound(val id: String) : ClientIdError("Pre-registered client '$id' not found.")
+
+    /**
+     * OpenID4VP 1.0 §8.5: the Wallet already has metadata for this Client Identifier and the
+     * request also carried `client_metadata`. In-band metadata must not override registration.
+     */
+    object InvalidClient : ClientIdError(
+        "client_metadata must not be present when the Wallet already has metadata for this Client Identifier.",
+    )
+
+    /**
+     * OpenID4VP 1.0 §14.3.1 / RFC 9700: the request destination is not in the registered
+     * `redirect_uris`.
+     */
+    @Serializable
+    data class UnregisteredRedirectUri(val actual: String?, val registered: List<String>) :
+        ClientIdError(
+            "Response/redirect URI '$actual' is not in the pre-registered redirect_uris $registered.",
+        )
 
     @Serializable
     data class UnsupportedPrefix(val prefix: String) : ClientIdError("Client ID prefix '$prefix' is not supported.")

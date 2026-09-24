@@ -30,6 +30,7 @@ import java.nio.file.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class OSSVerifier2Crypto2StartupTest {
     private val tempFiles = mutableListOf<Path>()
@@ -198,17 +199,33 @@ class OSSVerifier2Crypto2StartupTest {
         assertEquals("verifier2", session.authorizationRequest.clientId)
     }
 
+    @Test
+    fun `x509 client id without x5c is rejected at session creation`() = runTest {
+        loadConfig(clientId = "x509_san_dns:verifier.example.com")
+        OSSVerifier2Manager.initialize()
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            OSSVerifier2Manager.createVerificationSession(
+                CrossDeviceFlowSetup(
+                    core = GeneralFlowConfig(signedRequest = true, clientId = "x509_hash:abc"),
+                )
+            )
+        }
+        assertTrue(error.message.orEmpty().contains("x5c certificate chain is required"))
+    }
+
     private fun loadConfig(
         storedKey: String? = null,
         legacyKey: String? = null,
         includeClientId: Boolean = true,
         includeBundledOptionalFields: Boolean = false,
+        clientId: String = "verifier2",
     ): Pair<Path, String> {
         val configFile = Files.createTempFile("verifier-service", ".conf")
         tempFiles.add(configFile)
         val tripleQuotes = "\"\"\""
         val content = buildString {
-            if (includeClientId) appendLine("clientId = \"verifier2\"")
+            if (includeClientId) appendLine("clientId = \"$clientId\"")
             if (includeBundledOptionalFields) {
                 appendLine("clientMetadata: { client_name: \"Verifier2\" }")
             }

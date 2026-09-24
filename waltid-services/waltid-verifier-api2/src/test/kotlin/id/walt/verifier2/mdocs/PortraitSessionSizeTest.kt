@@ -96,7 +96,7 @@ class PortraitSessionSizeTest {
             preload = {
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(
-                        clientId = "verifier2",
+                        clientId = null,
                         urlPrefix = "http://$host:$port/verification-session",
                         urlHost = "openid4vp://authorize",
                     )
@@ -223,7 +223,7 @@ class PortraitSessionSizeTest {
             preload = {
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(
-                        clientId = "verifier2",
+                        clientId = null,
                         urlPrefix = "http://$host:$port/verification-session",
                         urlHost = "openid4vp://authorize",
                     )

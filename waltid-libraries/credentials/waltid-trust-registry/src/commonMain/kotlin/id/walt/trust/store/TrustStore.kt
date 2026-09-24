@@ -39,6 +39,7 @@ interface TrustStore {
     suspend fun findIdentitiesBySubjectDn(subjectDn: String): Flow<ServiceIdentity>
     suspend fun findIdentitiesBySkiHex(skiHex: String): Flow<ServiceIdentity>
     suspend fun findIdentitiesByIssuerAndSerial(issuerDn: String, serialNumber: String): Flow<ServiceIdentity>
+    suspend fun findIdentitiesByJwkThumbprint(sha256Thumbprint: String): Flow<ServiceIdentity>
 
     suspend fun getEntity(entityId: String): TrustedEntity?
     suspend fun listEntities(filter: EntityFilter): Flow<TrustedEntity>

@@ -1,6 +1,9 @@
 package id.walt.walletdemo.compose.logic
 
 import android.content.Context
+import dev.whyoleg.cryptography.CryptographyProvider
+import dev.whyoleg.cryptography.providers.jdk.JDK
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 
 fun createAndroidDemoPinStore(
     context: Context,
@@ -27,7 +30,12 @@ fun createAndroidDemoPinStore(
                 "Biometric unlock preference could not be persisted"
             }
         },
+        provider = androidPinCryptographyProvider,
     )
+}
+
+private val androidPinCryptographyProvider by lazy {
+    CryptographyProvider.JDK(BouncyCastleProvider())
 }
 
 private const val PREFERENCES_NAME = "walt_wallet_demo_pin_verifiers"

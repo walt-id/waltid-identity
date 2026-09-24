@@ -3,6 +3,7 @@ package id.walt.openid4vp.clientidprefix.prefixes
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateTrustStore
 import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult.Severity
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.crypto2.CryptoRuntime
@@ -61,7 +62,13 @@ internal object ClientIdCrypto2 {
                         errors.any {
                             it.validatorId == X509CertificateSignatureValidator.ID &&
                                     it.message.contains("trusted\\s+issuer\\s+certificate".toRegex(RegexOption.IGNORE_CASE))
-                        } -> ClientValidationResult.Failure(ClientIdError.MissingX509TrustAnchors)
+                        } -> ClientValidationResult.Failure(
+                            if (x509TrustAnchors.isEmptyTrustStore()) {
+                                ClientIdError.MissingX509TrustAnchors
+                            } else {
+                                ClientIdError.X509TrustAnchorMismatch
+                            }
+                        )
 
                         errors.any {
                             it.validatorId == X509CertificateSignatureValidator.ID &&
@@ -76,3 +83,6 @@ internal object ClientIdCrypto2 {
                 }
             }
 }
+
+private fun X509CertificateTrustStore.isEmptyTrustStore(): Boolean =
+    this is InMemoryTrustStore && isEmpty()

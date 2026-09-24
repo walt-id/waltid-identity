@@ -43,8 +43,25 @@ data class PreRegistered(override val rawValue: String) : ClientId {
                 ClientIdError.InvalidMetadata("Stored metadata is malformed: ${it.message}")
             )
         }
+        if (context.clientMetadata != null) {
+            return ClientValidationResult.Failure(ClientIdError.InvalidClient)
+        }
+        val registeredUris = metadata.redirectUris.orEmpty()
+        val destination = context.responseUri ?: context.redirectUri
         val requestObject = context.requestObjectJws
-            ?: return ClientValidationResult.Failure(ClientIdError.MissingRequestObject)
+        if (requestObject == null) {
+            if (registeredUris.isEmpty() || destination == null || destination !in registeredUris) {
+                return ClientValidationResult.Failure(
+                    ClientIdError.UnregisteredRedirectUri(actual = destination, registered = registeredUris),
+                )
+            }
+            return ClientValidationResult.Success(metadata)
+        }
+        if (destination != null && registeredUris.isNotEmpty() && destination !in registeredUris) {
+            return ClientValidationResult.Failure(
+                ClientIdError.UnregisteredRedirectUri(actual = destination, registered = registeredUris),
+            )
+        }
         val verificationKeys = metadata.jwks?.keys.orEmpty().filter(JsonObject::isVerificationKey)
         if (verificationKeys.isEmpty()) {
             return ClientValidationResult.Failure(
