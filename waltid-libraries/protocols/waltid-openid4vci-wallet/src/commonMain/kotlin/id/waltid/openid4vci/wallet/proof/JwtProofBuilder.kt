@@ -120,6 +120,17 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
         nonce: String?,
         binding: ProofKeyBinding,
         clientId: String?,
+    ): Proofs = buildProof(key, algorithm, audience, nonce, binding, clientId, keyAttestation = null)
+
+    /** Attach a wallet-provider key attestation to a JWT proof, after caller-side validation. */
+    suspend fun buildProof(
+        key: Crypto2Key,
+        algorithm: JwsAlgorithm,
+        audience: String,
+        nonce: String?,
+        binding: ProofKeyBinding,
+        clientId: String?,
+        keyAttestation: String?,
     ): Proofs {
         ProofBuilderUtils.validateProofParameters(audience, nonce, clientId)
         val payload = proofPayload(audience, nonce, clientId)
@@ -130,6 +141,7 @@ class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilde
                 ProofKeyBinding.Jwk -> put("jwk", key.exportPublicJwk().toJsonObject())
                 ProofKeyBinding.JwkThumbprint -> put("kid", Jwk.sha256Thumbprint(key.exportPublicJwk()))
             }
+            keyAttestation?.let { put("key_attestation", it) }
         }
         return Proofs(
             jwt = listOf(
