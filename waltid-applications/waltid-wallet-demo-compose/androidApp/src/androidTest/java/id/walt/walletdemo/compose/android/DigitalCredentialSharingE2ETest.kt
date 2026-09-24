@@ -474,7 +474,7 @@ class DigitalCredentialSharingE2ETest {
      * observes.
      */
     @Test
-    fun doesNotSurfaceForMultisignedRequests() = runBlocking {
+    fun doesNotSurfaceForMultisignedRequests(): Unit = runBlocking {
         val fixture = fixture()
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
         val session = DemoTestBackend.createDcApiVerifierSession(
@@ -493,7 +493,10 @@ class DigitalCredentialSharingE2ETest {
             "openid4vp-v1-multisigned produced a credential: ${outcome.getOrNull()}",
             outcome.exceptionOrNull(),
         )
-        fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
+        assertTrue(
+            "Credential Manager selector did not close after the unsupported request",
+            fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT),
+        )
     }
 
     /**
