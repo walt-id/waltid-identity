@@ -28,7 +28,7 @@ This is operator-assisted protocol testing, not transaction-consent UI, browser-
    | `ITB_ANDROID_TOKEN` | Same fresh token supplied to instrumentation |
    | `ITB_ANDROID_APK_SHA256` | SHA-256 of the installed test APK |
 
-   Start with `ITB_CASES=ts12_pay_01,ts12_pay_dc_api_01`; the runner includes the issuance prerequisite. Approve the phone's prompts for those synthetic test operations. Each case still has a 120-second limit.
+   Start with `ITB_CASES=ts12_pay_01,ts12_pay_dc_api_01`; the runner includes the issuance prerequisite. For the full operator-required set, select `ts12_pay_01,ts12_pay_02,ts12_pay_03,ts12_pay_dc_api_01,ts12_pay_dc_api_02,ts12_pay_dc_api_03`; the runner includes all three issuance prerequisites. Approve the authentication prompts for those synthetic test operations. Each case still has a 120-second limit. Do not set `CI=true` for this local run: CI selection rejects operator-required cases before starting a session.
 5. On completion, check both the normal ITB reports and instrumentation outcome. Remove the specific ADB forward and unset the temporary token. A normal channel close releases the fixture and deletes the disposable native key in `finally`. If the process is force-killed, normal cleanup cannot be guaranteed; clear only this disposable test application's data before reuse.
 
 The fixture binds only to device loopback and accepts the approved Aegean tenant origin. A fresh token authenticates the coordinator before key creation. Messages are size-bounded and strictly sequenced; disconnect cancels pending work and a broken channel is never retried. Keep the ADB transport restricted to the operator's machine. The token is a local test-channel credential, not an ITB organisation key.

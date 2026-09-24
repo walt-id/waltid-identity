@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       cases:
-        description: Comma-separated deployed case IDs; leave empty for all 21 cases
+        description: Comma-separated unattended case IDs; leave empty for all 15 CI cases
         type: string
         default: ''
 
@@ -54,6 +54,7 @@ jobs:
           ITB_CASES: ${{ inputs.cases }}
           ITB_REPORT_DIR: ${{ github.workspace }}/build/reports/itb-wallet
         run: |
+          # CI=true restricts the runner to the 15 unattended cases, including manual dispatches.
           if [ -z "$ITB_CASES" ]; then unset ITB_CASES; fi
           ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbWallet --max-workers=2 --console=plain
       - name: Summarize every selected case
