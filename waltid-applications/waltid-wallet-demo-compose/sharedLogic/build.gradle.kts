@@ -56,6 +56,8 @@ kotlin {
                     implementation(identityLibs.ktor.client.android)
                     implementation(identityLibs.androidx.fragment)
                     implementation(identityLibs.androidx.biometric)
+                    implementation(identityLibs.cryptography.provider.jdk)
+                    implementation(identityLibs.bouncycastle.prov)
                 }
 
                 getByName("androidHostTest").dependencies {

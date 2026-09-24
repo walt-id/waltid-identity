@@ -1,5 +1,11 @@
 # Breaking changes since 0.3.1
 
+## waltid-dcql JVM ABI (1.0.x)
+
+- `DcqlDisclosure` gained optional `location: List<JsonElement>? = null` so SD-JWT claim paths can be carried through matching and holder-policy checks.
+- Kotlin source that constructed or copied `DcqlDisclosure` with two arguments remains valid via the default parameter.
+- JVM binary consumers compiled against published `waltid-dcql-jvm` 1.0.0 must rebuild against this identity head. The descriptors for `<init>` and `copy` change from `(String, JsonElement)` to three-argument forms. There is no `@JvmOverloads` / synthetic two-arg compatibility shim.
+
 ## Configuration:
 
 #### Feature system

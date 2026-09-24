@@ -14,6 +14,7 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.dcql.models.CredentialFormat
 import id.walt.iso18013.annexc.AnnexC
@@ -276,6 +277,9 @@ object VerificationSessionCreator {
             },
         )
 
+        val registeredEncryptionJwk = clientMetadata.takePrivateEncJwk()
+            .takeIf { isPreRegisteredVerifierClientId(effectiveClientId) }
+
         val effectiveClientMetadata = (if (isEncryptedResponse) {
             val keyType = KeyType.secp256r1
 
@@ -284,52 +288,58 @@ object VerificationSessionCreator {
                 require(keyType == KeyType.secp256r1) { "HAIP profile requires P-256 keys" }
             }
 
-            crypto2EphemeralKey = crypto2Runtime.generateSoftwareKey(
-                GenerateSoftwareKeyRequest(
-                    id = KeyId("response-encryption-$sessionId"),
-                    spec = KeySpec.Ec(EcCurve.P256),
-                    usages = setOf(KeyUsage.KEY_AGREEMENT),
-                )
-            )
-            crypto2EphemeralPublicJwk = crypto2EphemeralKey.capabilities.publicKeyExporter
-                ?.exportPublicKey() as? EncodedKey.Jwk
-                ?: error("Ephemeral response key does not export a public JWK")
-            // Temporary dual-write for rolling compatibility with replicas that only understand v1 sessions.
-            val privateJwk = crypto2EphemeralKey.capabilities.privateKeyExporter
-                ?.exportPrivateKey() as? EncodedKey.Jwk
-                ?: error("Ephemeral response key does not export its private JWK")
-            val legacyJwk = JsonObject(
-                Jwk.parse(privateJwk) + mapOf(
-                    "kid" to JsonPrimitive(crypto2EphemeralKey.id.value),
-                    "alg" to JsonPrimitive("ECDH-ES"),
-                    "use" to JsonPrimitive("enc"),
-                )
-            )
-            ephemeralKey = JWKKey.importJWK(legacyJwk.toString()).getOrThrow()
-
-            // Construct JWKS
-            val publicJwk = Jwk.parse(crypto2EphemeralPublicJwk)
-            val encryptionKeyId = crypto2EphemeralKey.id.value
-            val jwks = ClientMetadata.Jwks(
-                listOf(
-                    JsonObject(
-                        publicJwk
-                            .toMutableMap().apply {
-                                set("alg", JsonPrimitive("ECDH-ES"))
-                                set("use", JsonPrimitive("enc"))
-                                set("kid", JsonPrimitive(encryptionKeyId))
-                            }
+            val encryptionJwks = if (registeredEncryptionJwk != null) {
+                importRegisteredEncryptionKey(registeredEncryptionJwk, sessionId).also { imported ->
+                    ephemeralKey = imported.legacyKey
+                    crypto2EphemeralKey = imported.crypto2Key
+                    crypto2EphemeralPublicJwk = imported.publicJwk
+                }.jwks
+            } else {
+                crypto2EphemeralKey = crypto2Runtime.generateSoftwareKey(
+                    GenerateSoftwareKeyRequest(
+                        id = KeyId("response-encryption-$sessionId"),
+                        spec = KeySpec.Ec(EcCurve.P256),
+                        usages = setOf(KeyUsage.KEY_AGREEMENT),
                     )
                 )
-            )
-            // TODO: check if jwks contains `alg` by default (should be "alg": "ECDH-ES")
+                crypto2EphemeralPublicJwk = crypto2EphemeralKey.capabilities.publicKeyExporter
+                    ?.exportPublicKey() as? EncodedKey.Jwk
+                    ?: error("Ephemeral response key does not export a public JWK")
+                // Temporary dual-write for rolling compatibility with replicas that only understand v1 sessions.
+                val privateJwk = crypto2EphemeralKey.capabilities.privateKeyExporter
+                    ?.exportPrivateKey() as? EncodedKey.Jwk
+                    ?: error("Ephemeral response key does not export its private JWK")
+                val legacyJwk = JsonObject(
+                    Jwk.parse(privateJwk) + mapOf(
+                        "kid" to JsonPrimitive(crypto2EphemeralKey.id.value),
+                        "alg" to JsonPrimitive("ECDH-ES"),
+                        "use" to JsonPrimitive("enc"),
+                    )
+                )
+                ephemeralKey = JWKKey.importJWK(legacyJwk.toString()).getOrThrow()
 
-            // Merge into clientMetadata
+                val publicJwk = Jwk.parse(crypto2EphemeralPublicJwk)
+                val encryptionKeyId = crypto2EphemeralKey.id.value
+                ClientMetadata.Jwks(
+                    listOf(
+                        JsonObject(
+                            publicJwk
+                                .toMutableMap().apply {
+                                    set("alg", JsonPrimitive("ECDH-ES"))
+                                    set("use", JsonPrimitive("enc"))
+                                    set("kid", JsonPrimitive(encryptionKeyId))
+                                }
+                        )
+                    )
+                )
+            }
+
             val baseMetadata = clientMetadata ?: ClientMetadata()
             baseMetadata.copy(
-                jwks = jwks,
+                jwks = encryptionJwks,
                 vpFormatsSupported = baseMetadata.vpFormatsSupported ?: defaultVpFormatsSupported,
-                encryptedResponseEncValuesSupported = listOf("A128GCM", "A256GCM")
+                encryptedResponseEncValuesSupported = baseMetadata.encryptedResponseEncValuesSupported
+                    ?: listOf("A128GCM", "A256GCM")
             )
         } else {
             val baseMetadata = clientMetadata ?: ClientMetadata()
@@ -472,9 +482,6 @@ object VerificationSessionCreator {
         )
         log.trace { "Constructed AuthorizationRequest: $authorizationRequest" }
 
-        val authorizationRequestUrl = authorizationRequest.toHttpUrl(URLBuilder(urlHost))
-        val bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest?.toHttpUrl(URLBuilder(urlHost))
-
         val now = Clock.System.now()
         val expiration = setup.core.expirationDate
         // Per-session first, then whatever the verifier is configured to retain for, then the historical
@@ -488,7 +495,6 @@ object VerificationSessionCreator {
 
         val signedAuthorizationRequest = if (isSignedRequest) {
             val requestSigningKey = requireNotNull(signingKey)
-
             val headers = hashMapOf<String, JsonElement>(
                 "typ" to JsonPrimitive("oauth-authz-req+jwt"),
                 "kid" to JsonPrimitive(getKid(effectiveClientId, requestSigningKey))
@@ -497,7 +503,9 @@ object VerificationSessionCreator {
 
             // OID4VP 1.0 Final §5.8: when static discovery metadata is used (no dynamic discovery),
             // aud MUST be "https://self-issued.me/v2"
-            val payloadWithAud = Json.encodeToJsonElement(authorizationRequest).jsonObject
+            val payloadWithAud = Json.encodeToJsonElement(
+                authorizationRequest.withoutPreRegisteredInBandMetadata(),
+            ).jsonObject
                 .toMutableMap()
                 .apply {
                     put("aud", JsonPrimitive("https://self-issued.me/v2"))
@@ -514,6 +522,21 @@ object VerificationSessionCreator {
                 "Signed authorization request could not be created although signedRequest=true"
             }
         }
+
+        // A signed cross-device session exposes a self-contained full URL. The bootstrap URL
+        // remains the request_uri entry point for wallets that need nonce-bound POST retrieval.
+        // DC API keeps request_uri-based authorizationRequestUrl construction.
+        val walletFacingAuthorizationRequest = authorizationRequest.withoutPreRegisteredInBandMetadata()
+        val authorizationRequestUrl = if (signedAuthorizationRequest != null && isCrossDevice) {
+            walletFacingAuthorizationRequest.copy(
+                request = signedAuthorizationRequest,
+                requestUri = null,
+                requestUriMethod = null,
+            ).toHttpUrl(URLBuilder(urlHost))
+        } else {
+            walletFacingAuthorizationRequest.toHttpUrl(URLBuilder(urlHost))
+        }
+        val bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest?.toHttpUrl(URLBuilder(urlHost))
 
         val effectiveVpPolicies = (setup.core.policies.vp_policies ?: defaultVpPolicies())
             .withMandatoryTransactionDataPolicies(transactionDataFormats)
@@ -694,8 +717,9 @@ object VerificationSessionCreator {
         }
 
     /**
-     * OpenID4VP 1.0 §5.9.3: unsigned requests without another client_id prefix use
-     * `redirect_uri:<response destination>`. That prefix cannot be signed.
+     * A provided client_id (per-session or already resolved from service config) is kept.
+     * When it is omitted, unsigned cross-device sessions use `redirect_uri:<response destination>`.
+     * That prefix cannot be signed.
      */
     private fun resolveEffectiveClientId(
         clientId: String?,
@@ -751,6 +775,52 @@ object VerificationSessionCreator {
         }
     }
 
+    private data class ImportedEncryptionKey(
+        val legacyKey: JWKKey,
+        val crypto2Key: SoftwareKey,
+        val publicJwk: EncodedKey.Jwk,
+        val jwks: ClientMetadata.Jwks,
+    )
+
+    private suspend fun importRegisteredEncryptionKey(
+        privateJwk: JsonObject,
+        sessionId: String,
+    ): ImportedEncryptionKey {
+        val encryptionKeyId = privateJwk["kid"]?.jsonPrimitive?.contentOrNull
+            ?: "response-encryption-$sessionId"
+        val normalizedPrivate = JsonObject(
+            privateJwk.toMutableMap().apply {
+                set("alg", JsonPrimitive("ECDH-ES"))
+                set("use", JsonPrimitive("enc"))
+                set("kid", JsonPrimitive(encryptionKeyId))
+            }
+        )
+        val stored = EncodedKey.Jwk(
+            data = BinaryData(Json.encodeToString(normalizedPrivate).encodeToByteArray()),
+            privateMaterial = true,
+        ).toStoredSoftwareKey(
+            id = KeyId(encryptionKeyId),
+            usages = setOf(KeyUsage.KEY_AGREEMENT),
+        )
+        val crypto2Key = crypto2Runtime.restore(stored) as SoftwareKey
+        val publicJwk = crypto2Key.capabilities.publicKeyExporter
+            ?.exportPublicKey() as? EncodedKey.Jwk
+            ?: error("Registered response key does not export a public JWK")
+        val publicMembers = JsonObject(
+            Jwk.parse(publicJwk).toMutableMap().apply {
+                set("alg", JsonPrimitive("ECDH-ES"))
+                set("use", JsonPrimitive("enc"))
+                set("kid", JsonPrimitive(encryptionKeyId))
+            }
+        )
+        return ImportedEncryptionKey(
+            legacyKey = JWKKey.importJWK(normalizedPrivate.toString()).getOrThrow(),
+            crypto2Key = crypto2Key,
+            publicJwk = publicJwk,
+            jwks = ClientMetadata.Jwks(listOf(publicMembers)),
+        )
+    }
+
     private sealed interface VerifierSigningKey {
         data class Legacy(val key: Key) : VerifierSigningKey
         data class Crypto2(
@@ -761,3 +831,10 @@ object VerificationSessionCreator {
     }
 
 }
+
+private fun ClientMetadata?.takePrivateEncJwk(): JsonObject? =
+    this?.jwks?.keys.orEmpty().firstOrNull { jwk ->
+        jwk["d"] != null &&
+            (jwk["use"]?.jsonPrimitive?.contentOrNull == "enc" ||
+                jwk["alg"]?.jsonPrimitive?.contentOrNull == "ECDH-ES")
+    }
