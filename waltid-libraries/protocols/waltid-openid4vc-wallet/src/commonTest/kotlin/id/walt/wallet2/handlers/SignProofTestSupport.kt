@@ -19,9 +19,11 @@ internal object SignProofTestSupport {
         configurationId: String = CONFIG_ID,
         proofAlgorithms: Set<String> = setOf("ES256", "EdDSA"),
         bindingMethods: Set<String> = setOf("jwk"),
+        requiresKeyAttestation: Boolean = false,
     ): HttpClient {
         val algorithmsJson = proofAlgorithms.joinToString(",") { "\"$it\"" }
         val bindingMethodsJson = bindingMethods.joinToString(",") { "\"$it\"" }
+        val attestationRequirement = if (requiresKeyAttestation) ",\"key_attestations_required\":{}" else ""
         val body = """
             {
               "credential_issuer":"$ISSUER",
@@ -31,7 +33,7 @@ internal object SignProofTestSupport {
                   "format":"jwt_vc_json",
                   "cryptographic_binding_methods_supported":[$bindingMethodsJson],
                   "proof_types_supported":{
-                    "jwt":{"proof_signing_alg_values_supported":[$algorithmsJson]}
+                    "jwt":{"proof_signing_alg_values_supported":[$algorithmsJson]$attestationRequirement}
                   }
                 }
               }
