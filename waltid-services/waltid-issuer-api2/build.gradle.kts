@@ -65,6 +65,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation(identityLibs.kotlinx.coroutines.test)
     testImplementation(identityLibs.bundles.waltid.ktortesting)
+    testImplementation(identityLibs.bundles.smiley4.schema.kenerator)
     testImplementation(project(":waltid-libraries:protocols:waltid-openid4vci-wallet"))
     testImplementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     testImplementation(identityLibs.junit.jupiter.api)

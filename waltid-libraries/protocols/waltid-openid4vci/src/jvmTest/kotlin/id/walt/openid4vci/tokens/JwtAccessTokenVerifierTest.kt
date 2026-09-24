@@ -6,7 +6,7 @@ import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenVerifier
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -28,13 +28,15 @@ class JwtAccessTokenVerifierTest {
             scopes = setOf("openid"),
         )
 
-        val token = signer.issue(claims)
+        val authorization = Json.parseToJsonElement("""[{"type":"openid_credential","credential_configuration_id":"configuration","credential_identifiers":["A","B"]}]""")
+        val token = signer.issue(claims + ("authorization_details" to authorization))
         val payload = verifier.verify(
             token = token,
             expectedIssuer = "https://issuer.example",
             expectedAudience = "https://audience.example",
         )
 
+        assertEquals(authorization, payload["authorization_details"])
         assertEquals("alice", payload["sub"]?.jsonPrimitive?.content)
         assertEquals("https://issuer.example", payload["iss"]?.jsonPrimitive?.content)
         assertNotNull(payload["exp"])

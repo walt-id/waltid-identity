@@ -9,6 +9,11 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.token.TokenResponseOptions
+import id.walt.openid4vci.responses.token.resolveTokenCredentialAuthorization
+import id.walt.openid4vci.requests.credential.CredentialAuthorization
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -24,6 +29,131 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 class ProviderRefreshTokenFlowTest {
+
+    @Test
+    fun `explicit non-credential refresh scope cannot fall back to the credential grant`() = runTest {
+        val store = InMemoryRefreshTokenRepository()
+        val refreshIssuer = TestRefreshTokenIssuer()
+        val signer = CountingTokenIssuer()
+        val provider = buildTestProvider(store, refreshIssuer, signer)
+        val options = credentialOptions()
+        val initial = executeAuthorizationCodeTokenFlow(provider, options = options, scope = "openid alpha beta")
+        val signature = refreshIssuer.signature(initial.refreshToken)
+        val originalGrant = assertNotNull(store.get(signature)).grantedAuthorizationDetails
+
+        val rejected = refresh(provider, initial.refreshToken, options = options, scope = "openid")
+        assertTrue(rejected is AccessTokenResponseResult.Failure)
+        assertEquals("invalid_request", rejected.error.error)
+        assertEquals("Token request selects no credentials", rejected.error.description)
+        assertEquals(1, signer.claims.size, "Rejected selection must not sign another access token")
+        assertTrue(assertNotNull(store.get(signature)).active, "Rejected selection must not consume the refresh token")
+        assertEquals(originalGrant, assertNotNull(store.get(signature)).grantedAuthorizationDetails)
+
+        val corrected = refresh(provider, initial.refreshToken, options = options, scope = "alpha")
+        assertTrue(corrected is AccessTokenResponseResult.Success)
+        assertEquals(listOf("A"), assertNotNull(corrected.credentialAuthorization).credentialIdentifiers)
+        assertEquals(Json.encodeToJsonElement(corrected.credentialAuthorization!!.authorizationDetails), signer.claims.last()["authorization_details"])
+        val restored = refresh(provider, assertNotNull(corrected.response.refreshToken), options = options)
+        assertTrue(restored is AccessTokenResponseResult.Success)
+        assertEquals(listOf("A", "B"), assertNotNull(restored.credentialAuthorization).credentialIdentifiers)
+    }
+
+    @Test
+    fun `refresh authorization error keeps its classification and leaves the token usable`() = runTest {
+        val store = InMemoryRefreshTokenRepository()
+        val refreshIssuer = TestRefreshTokenIssuer()
+        val signer = CountingTokenIssuer()
+        val provider = buildTestProvider(store, refreshIssuer, signer)
+        val options = credentialOptions()
+        val initial = executeAuthorizationCodeTokenFlow(provider, options = options, scope = "openid alpha")
+        val signature = refreshIssuer.signature(initial.refreshToken)
+        val original = assertNotNull(store.get(signature))
+        assertEquals(listOf("A"), assertNotNull(original.grantedAuthorizationDetails).flatMap { it.credentialIdentifiers.orEmpty() })
+
+        val rejected = refresh(provider, initial.refreshToken, options = options,
+            authorizationDetails = """[{"type":"openid_credential","credential_configuration_id":"beta"}]""")
+        assertTrue(rejected is AccessTokenResponseResult.Failure)
+        assertEquals("invalid_request", rejected.error.error)
+        assertEquals("Requested credentials exceed the authorized grant", rejected.error.description)
+        assertEquals("demo-subject", assertNotNull(rejected.request.session).subject)
+        assertEquals(1, signer.claims.size)
+        assertEquals(original, store.get(signature))
+
+        val corrected = refresh(provider, initial.refreshToken, options = options,
+            authorizationDetails = """[{"type":"openid_credential","credential_configuration_id":"alpha"}]""")
+        assertTrue(corrected is AccessTokenResponseResult.Success)
+        assertEquals(listOf("A"), assertNotNull(corrected.credentialAuthorization).credentialIdentifiers)
+        assertFalse(assertNotNull(store.get(signature)).active)
+    }
+
+    @Test
+    fun `omitted refresh selectors preserve an initial credential subset despite broader OAuth scopes`() = runTest {
+        val store = InMemoryRefreshTokenRepository()
+        val refreshIssuer = TestRefreshTokenIssuer()
+        val signer = CountingTokenIssuer()
+        val provider = buildTestProvider(store, refreshIssuer, signer)
+        val options = credentialOptions()
+        val initial = executeAuthorizationCodeTokenFlow(provider, options = options, scope = "openid alpha beta",
+            authorizationDetails = """[{"type":"openid_credential","credential_configuration_id":"alpha"}]""")
+
+        val refreshed = refresh(provider, initial.refreshToken, options = options)
+        assertTrue(refreshed is AccessTokenResponseResult.Success)
+        assertEquals(listOf("A"), assertNotNull(refreshed.credentialAuthorization).credentialIdentifiers)
+        assertEquals(Json.encodeToJsonElement(refreshed.credentialAuthorization!!.authorizationDetails), signer.claims.last()["authorization_details"])
+
+        val rejected = refresh(provider, assertNotNull(refreshed.response.refreshToken), options = options, scope = "beta")
+        assertTrue(rejected is AccessTokenResponseResult.Failure)
+        assertEquals("invalid_request", rejected.error.error)
+    }
+
+    private fun credentialOptions() = TokenResponseOptions(credentialAuthorizationResolver = { request, refreshGrant ->
+        // openid is deliberately not a credential scope.
+        resolveTokenCredentialAuthorization(
+            request,
+            listOf(CredentialAuthorization("A", "alpha"), CredentialAuthorization("B", "beta")),
+            grantConfigurationIds = setOf("alpha", "beta"),
+            tokenScopeConfigurationIds = request.grantedScopes.intersect(setOf("alpha", "beta")),
+            establishedSelection = listOf("A", "B"),
+            refreshGrant = refreshGrant,
+            includeInResponse = true,
+        )
+    })
+
+    @Test
+    fun `narrow refresh signs only operation permissions and preserves original refresh grant`() = runTest {
+        val store = InMemoryRefreshTokenRepository()
+        val refreshIssuer = TestRefreshTokenIssuer()
+        val signer = CountingTokenIssuer()
+        val provider = buildTestProvider(store, refreshIssuer, signer)
+        val candidates = listOf(CredentialAuthorization("A", "alpha"), CredentialAuthorization("B", "beta"))
+        var resolutions = 0
+        val options = TokenResponseOptions(credentialAuthorizationResolver = { request, refreshGrant ->
+            assertEquals(resolutions, signer.claims.size, "Resolve permissions before signing")
+            resolutions++
+            resolveTokenCredentialAuthorization(
+                request, candidates, setOf("alpha", "beta"),
+                request.grantedScopes.map { if (it == "openid") "alpha" else "beta" }.toSet(),
+                establishedSelection = listOf("A", "B"),
+                refreshGrant = refreshGrant,
+                includeInResponse = true,
+            )
+        })
+        val initial = executeAuthorizationCodeTokenFlow(provider, options = options)
+        val original = assertNotNull(store.get(refreshIssuer.signature(initial.refreshToken))).grantedAuthorizationDetails
+        assertEquals(listOf("A", "B"), assertNotNull(original).flatMap { it.credentialIdentifiers.orEmpty() })
+
+        val narrowed = refresh(provider, initial.refreshToken, options = options, scope = "openid") as AccessTokenResponseResult.Success
+        assertEquals(listOf("A"), assertNotNull(narrowed.credentialAuthorization).credentialIdentifiers)
+        val narrowDetails = Json.encodeToJsonElement(narrowed.credentialAuthorization!!.authorizationDetails)
+        assertEquals(narrowDetails, signer.claims[1]["authorization_details"])
+        assertEquals(narrowDetails, narrowed.response.extra["authorization_details"])
+        assertEquals(Json.encodeToJsonElement(original), signer.claims[0]["authorization_details"])
+        val rotated = assertNotNull(narrowed.response.refreshToken)
+        assertEquals(original, assertNotNull(store.get(refreshIssuer.signature(rotated))).grantedAuthorizationDetails)
+
+        val fullAgain = refresh(provider, rotated, options = options) as AccessTokenResponseResult.Success
+        assertEquals(listOf("A", "B"), assertNotNull(fullAgain.credentialAuthorization).credentialIdentifiers)
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -227,13 +357,16 @@ class ProviderRefreshTokenFlowTest {
     private suspend fun executeAuthorizationCodeTokenFlow(
         provider: OAuth2Provider,
         session: Session = DefaultSession(subject = "demo-subject"),
+        options: TokenResponseOptions = TokenResponseOptions(),
+        scope: String = "openid email",
+        authorizationDetails: String? = null,
     ): InitialTokenResult {
         val authorizeResult = provider.createAuthorizationRequest(
             mapOf(
                 "response_type" to listOf(ResponseType.CODE.value),
                 "client_id" to listOf("demo-client"),
                 "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
-                "scope" to listOf("openid email"),
+                "scope" to listOf(scope),
             ),
         )
         require(authorizeResult is AuthorizationRequestResult.Success)
@@ -242,16 +375,17 @@ class ProviderRefreshTokenFlowTest {
         require(authorizeResponse is AuthorizationResponseResult.Success)
 
         val accessResult = provider.createAccessTokenRequest(
-            mapOf(
-                "grant_type" to listOf(GrantType.AuthorizationCode.value),
-                "client_id" to listOf("demo-client"),
-                "code" to listOf(authorizeResponse.response.code),
-                "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
-            ),
+            buildMap {
+                authorizationDetails?.let { put("authorization_details", listOf(it)) }
+                put("grant_type", listOf(GrantType.AuthorizationCode.value))
+                put("client_id", listOf("demo-client"))
+                put("code", listOf(authorizeResponse.response.code))
+                put("redirect_uri", listOf("https://openid4vci.walt.id/callback"))
+            },
         )
         require(accessResult is AccessTokenRequestResult.Success)
         val accessRequest = accessResult.request.withIssuer("test-issuer")
-        val accessResponse = provider.createAccessTokenResponse(accessRequest)
+        val accessResponse = provider.createAccessTokenResponse(accessRequest, options)
         require(accessResponse is AccessTokenResponseResult.Success)
 
         val refreshToken = accessResponse.response.refreshToken
@@ -269,16 +403,21 @@ class ProviderRefreshTokenFlowTest {
         provider: OAuth2Provider,
         refreshToken: String,
         clientId: String = "demo-client",
+        options: TokenResponseOptions = TokenResponseOptions(),
+        scope: String? = null,
+        authorizationDetails: String? = null,
     ): AccessTokenResponseResult {
         val requestResult = provider.createAccessTokenRequest(
-            mapOf(
-                "grant_type" to listOf(GrantType.RefreshToken.value),
-                "client_id" to listOf(clientId),
-                "refresh_token" to listOf(refreshToken),
-            ),
+            buildMap {
+                scope?.let { put("scope", listOf(it)) }
+                authorizationDetails?.let { put("authorization_details", listOf(it)) }
+                put("grant_type", listOf(GrantType.RefreshToken.value))
+                put("client_id", listOf(clientId))
+                put("refresh_token", listOf(refreshToken))
+            },
         )
         require(requestResult is AccessTokenRequestResult.Success)
-        return provider.createAccessTokenResponse(requestResult.request.withIssuer("test-issuer"))
+        return provider.createAccessTokenResponse(requestResult.request.withIssuer("test-issuer"), options)
     }
 
     private data class InitialTokenResult(
@@ -290,8 +429,10 @@ class ProviderRefreshTokenFlowTest {
 
     private class CountingTokenIssuer : AccessTokenIssuer {
         private var counter = 0
+        val claims = mutableListOf<Map<String, Any?>>()
 
         override suspend fun issue(claims: Map<String, Any?>): String {
+            this.claims.add(claims.toMap())
             counter += 1
             return "access-${claims["client_id"]}-$counter"
         }

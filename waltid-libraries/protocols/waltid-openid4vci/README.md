@@ -275,3 +275,39 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
+
+## Batch-aware issuance API migration
+
+Callers and custom implementations must migrate to the current API. No compatibility
+overload accepting direct credential data/status arguments is provided.
+`createCredentialResponse` takes `issuanceInputData: CredentialIssuanceInputProvider`
+for both one credential and multiple proof-bound copies. Both the crypto1 key overload
+and the `Crypto2CredentialSigningKey` overload remain supported; configured format
+handlers are selected automatically.
+
+Move per-copy data/status allocation into the provider:
+
+```kotlin
+val inputs = CredentialIssuanceInputProvider { count ->
+    List(count) {
+        CredentialIssuanceInput(credentialData = savedCredentialData)
+    }
+}
+// Pass inputs as issuanceInputData to the existing key-appropriate
+// createCredentialResponse overload, along with its other required arguments.
+```
+
+The provider runs after the complete proof collection has passed validation. Return
+exactly one input per requested credential, in proof order; allocate independent
+status entries there when required. Custom format handlers receive the complete
+`CredentialIssuanceBatch` and must process all ordered instances. Do not select only
+the first proof or allocate statuses before validation. There is no separate
+single/batch mode or bridge to the legacy OpenID4VC library.
+
+Custom token handlers now accept `TokenResponseOptions`. When a
+`credentialAuthorizationResolver` is configured, call it after grant validation and
+before signing, add its `tokenClaims()` to the signed access token, and return the
+same immutable `credentialAuthorization` in `AccessTokenResponseResult.Success`.
+Refresh stores persist the initial `grantedAuthorizationDetails` and retain them
+through rotation; a narrower access token does not narrow the original refresh grant.
+The session's established selection and each token's authorization are distinct.

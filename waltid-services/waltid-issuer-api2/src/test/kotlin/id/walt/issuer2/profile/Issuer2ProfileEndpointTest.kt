@@ -393,7 +393,8 @@ class Issuer2ProfileEndpointTest {
                 profile.credentialData[expectation.sampleClaim]?.jsonPrimitive?.contentOrNull,
                 "Expected ${expectation.profileId} to expose catalog sample claim ${expectation.sampleClaim}",
             )
-            assertEquals("<uuid>", profile.mapping?.get("id")?.jsonPrimitive?.content)
+            assertNull(profile.mapping?.get("id"), "SD-JWT examples must not generate a different dataset id per credential")
+            assertFalse("id" in profile.credentialData)
             assertNotNull(profile.selectiveDisclosure?.fields)
 
             if (expectation.usesIssuerDid) {
@@ -416,7 +417,7 @@ class Issuer2ProfileEndpointTest {
         assertEquals(ISSUER_DID, profile.issuerDid)
         assertEquals("John", profile.credentialData["given_name"]?.jsonPrimitive?.content)
         assertEquals("Doe", profile.credentialData["family_name"]?.jsonPrimitive?.content)
-        assertEquals("<uuid>", profile.mapping?.get("id")?.jsonPrimitive?.content)
+        assertNull(profile.mapping?.get("id"))
         assertNotNull(profile.selectiveDisclosure?.fields)
         assertEquals(setOf("$.given_name", "$.family_name"), profile.idTokenClaimsMapping?.keys)
         assertEquals("$.given_name", profile.idTokenClaimsMapping?.get("$.given_name"))

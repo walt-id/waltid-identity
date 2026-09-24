@@ -12,6 +12,7 @@ import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenIssuer
 import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenVerifier
 import id.walt.openid4vci.tokens.refresh.RefreshTokenGenerationRequest
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -26,8 +27,10 @@ class Crypto2JwtTokenTest {
         val key = generate(KeySpec.Ec(EcCurve.P256))
         val issuer = JwtAccessTokenIssuer(key, JwsAlgorithm.ES256, "access-token-key")
         val verifier = JwtAccessTokenVerifier(key, setOf(JwsAlgorithm.ES256))
+        val authorization = Json.parseToJsonElement("""[{"type":"openid_credential","credential_configuration_id":"configuration","credential_identifiers":["A","B"]}]""")
         val token = issuer.issue(
             mapOf(
+                "authorization_details" to authorization,
                 JwtPayloadClaims.ISSUER to "https://issuer.example",
                 JwtPayloadClaims.SUBJECT to "subject",
                 JwtPayloadClaims.AUDIENCE to "client",
@@ -39,6 +42,7 @@ class Crypto2JwtTokenTest {
         assertEquals(JwsAlgorithm.ES256, decoded.algorithm)
         assertEquals("access-token-key", decoded.protectedHeader[JwtHeaderParams.KEY_ID]?.toString()?.trim('"'))
         val payload = verifier.verify(token, "https://issuer.example", "client")
+        assertEquals(authorization, payload["authorization_details"])
         assertEquals("subject", payload[JwtPayloadClaims.SUBJECT]?.toString()?.trim('"'))
     }
 

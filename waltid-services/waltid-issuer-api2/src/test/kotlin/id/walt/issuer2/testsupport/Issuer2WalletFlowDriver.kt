@@ -7,6 +7,7 @@ import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.issuer2.models.CredentialOfferCreateResponse
+import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
@@ -55,8 +56,12 @@ class Issuer2WalletFlowDriver(
 ) {
     private var walletInstanceKey: Crypto2Key? = null
 
-    suspend fun resolve(createdOffer: CredentialOfferCreateResponse): ResolvedCredentialOffer {
-        val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(createdOffer.credentialOffer)
+    suspend fun resolve(createdOffer: CredentialOfferCreateResponse): ResolvedCredentialOffer = resolve(createdOffer.credentialOffer)
+
+    suspend fun resolve(createdOffer: MultiCredentialOfferCreateResponse): ResolvedCredentialOffer = resolve(createdOffer.credentialOffer)
+
+    private suspend fun resolve(credentialOffer: String): ResolvedCredentialOffer {
+        val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(credentialOffer)
         val offer = CredentialOfferResolver(client).resolveCredentialOffer(
             credentialOffer = offerRequest.credentialOffer,
             credentialOfferUri = offerRequest.credentialOfferUri,
@@ -77,6 +82,7 @@ class Issuer2WalletFlowDriver(
     suspend fun exchangePreAuthorizedCode(
         resolvedOffer: ResolvedCredentialOffer,
         txCode: String?,
+        additionalParameters: Map<String, String> = emptyMap(),
     ): TokenRequestBuilder.TokenResponse {
         val preAuthorizedCode = requireNotNull(resolvedOffer.offer.grants?.preAuthorizedCode?.preAuthorizedCode)
         val attestationHeaders = buildAttestationHeaders(resolvedOffer)
@@ -84,6 +90,7 @@ class Issuer2WalletFlowDriver(
             tokenEndpoint = requireNotNull(resolvedOffer.authorizationServerMetadata.tokenEndpoint),
             preAuthorizedCode = preAuthorizedCode,
             txCode = txCode,
+            additionalParameters = additionalParameters,
             attestationHeaders = attestationHeaders,
             anonymous = attestationHeaders == null &&
                 resolvedOffer.authorizationServerMetadata.preAuthorizedGrantAnonymousAccessSupported == true,
@@ -233,10 +240,12 @@ class Issuer2WalletFlowDriver(
     suspend fun refreshAccessToken(
         resolvedOffer: ResolvedCredentialOffer,
         refreshToken: String,
+        additionalParameters: Map<String, String> = emptyMap(),
     ): TokenRequestBuilder.TokenResponse =
         TokenRequestBuilder(walletClientConfig, client).refreshAccessToken(
             tokenEndpoint = requireNotNull(resolvedOffer.authorizationServerMetadata.tokenEndpoint),
             refreshToken = refreshToken,
+            additionalParameters = additionalParameters,
             attestationHeaders = buildAttestationHeaders(resolvedOffer),
         )
 
@@ -244,6 +253,7 @@ class Issuer2WalletFlowDriver(
         resolvedOffer: ResolvedCredentialOffer,
         accessToken: String,
         credentialConfigurationId: String = resolvedOffer.offer.credentialConfigurationIds.single(),
+        credentialIdentifier: String? = null,
         includeDidInProof: Boolean? = null,
         clientId: String? = null,
     ): JsonObject {
@@ -257,10 +267,12 @@ class Issuer2WalletFlowDriver(
             bearerAuth(accessToken)
             contentType(ContentType.Application.Json)
             setBody(
-                credentialRequest(
+                credentialIdentifier?.let { identifier ->
+                    credentialRequestByIdentifier(identifier, proofs)
+                } ?: credentialRequest(
                     credentialConfigurationId = credentialConfigurationId,
                     proofs = proofs,
-                )
+                ),
             )
         }
         assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())

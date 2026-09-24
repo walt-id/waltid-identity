@@ -15,6 +15,8 @@ import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.sanitizeForStorage
 import id.walt.openid4vci.responses.token.AccessTokenResponse
+import id.walt.openid4vci.responses.token.TokenResponseOptions
+import id.walt.openid4vci.responses.token.TokenCredentialAuthorization
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.access.accessTokenType
@@ -41,7 +43,7 @@ class AuthorizationCodeTokenEndpoint(
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
         request.grantTypes.contains(GrantType.AuthorizationCode.value)
 
-    override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): AccessTokenResponseResult {
+    override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest, options: TokenResponseOptions): AccessTokenResponseResult {
         val unresolvedRequest = request.withSession(null)
 
         if (!canHandleTokenEndpointRequest(request)) {
@@ -120,6 +122,8 @@ class AuthorizationCodeTokenEndpoint(
                     OAuthError(OAuthErrorCodes.INVALID_REQUEST, "subject is required in session"),
                 )
 
+            val credentialAuthorization = options.credentialAuthorizationResolver?.invoke(scopedRequest, null)
+
             val claims = defaultAccessTokenClaims(
                 subject = subject,
                 issuer = scopedRequest.issClaim ?: client.id,
@@ -127,6 +131,7 @@ class AuthorizationCodeTokenEndpoint(
                 scopes = scopedRequest.grantedScopes,
                 expiresAt = expiresAt,
                 additional = buildMap {
+                    credentialAuthorization?.let { putAll(it.tokenClaims()) }
                     put("client_id", client.id)
                     session.customAttributes["issuance_session_id"]?.let {
                         put("issuance_session_id", it)
@@ -139,6 +144,7 @@ class AuthorizationCodeTokenEndpoint(
 
             val refreshToken = issueRefreshToken(
                 request = scopedRequest,
+                credentialAuthorization = credentialAuthorization,
                 accessToken = accessToken,
                 session = session,
                 subject = subject,
@@ -158,7 +164,8 @@ class AuthorizationCodeTokenEndpoint(
 
             return AccessTokenResponseResult.Success(
                 request = scopedRequest,
-                AccessTokenResponse(
+                credentialAuthorization = credentialAuthorization,
+                response = AccessTokenResponse(
                     accessToken = accessToken,
                     tokenType = scopedRequest.accessTokenType(),
                     expiresIn = expiresIn,
@@ -173,6 +180,7 @@ class AuthorizationCodeTokenEndpoint(
     }
 
     private suspend fun issueRefreshToken(
+        credentialAuthorization: TokenCredentialAuthorization?,
         request: AccessTokenRequest,
         accessToken: String,
         session: Session,
@@ -206,6 +214,7 @@ class AuthorizationCodeTokenEndpoint(
                 grantedAudience = grantedAudience,
                 session = refreshSession,
                 expiresAt = refreshTokenExpiresAt,
+                grantedAuthorizationDetails = credentialAuthorization?.authorizationDetails,
             ),
         )
 
