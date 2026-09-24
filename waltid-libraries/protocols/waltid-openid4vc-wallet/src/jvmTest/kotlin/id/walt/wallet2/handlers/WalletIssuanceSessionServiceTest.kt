@@ -1413,6 +1413,37 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
+    fun requiredKeyAttestationStopsSessionBeforeCredentialRequestWithoutProvider() = runTest {
+        var credentialRequests = 0
+        val client = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(
+                    issuerMetadata(proofRequired = true).replace(
+                        "\"proof_signing_alg_values_supported\":[\"ES256\"]",
+                        "\"proof_signing_alg_values_supported\":[\"ES256\"],\"key_attestations_required\":{}",
+                    )
+                )
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access-token","token_type":"Bearer"}""")
+                NONCE_ENDPOINT -> jsonResponse("""{"c_nonce":"endpoint-nonce"}""")
+                CREDENTIAL_ENDPOINT -> {
+                    credentialRequests++
+                    respondError(HttpStatusCode.BadRequest)
+                }
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        }
+        val service = WalletIssuanceSessionService(
+            Wallet("test", staticKey = JWKKey.generate(KeyType.secp256r1)),
+            httpClient = client,
+        )
+
+        val session = service.start(preAuthorizedRequest())
+        assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(session.id))
+        assertEquals(0, credentialRequests)
+    }
+
+    @Test
     fun dpopIsAppliedToPreAuthorizedGrantWithoutGrantAdvertisement() = runTest {
         val key = JWKKey.generate(KeyType.secp256r1)
         val client = client { request ->

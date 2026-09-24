@@ -1106,6 +1106,9 @@ class WalletIssuanceSessionService(
     ): CredentialProofRequirement {
         val proofTypes = configuration.proofTypesSupported ?: return CredentialProofRequirement(null)
         val jwt = proofTypes["jwt"] ?: error("Issuer requires an unsupported credential proof type")
+        require(jwt.keyAttestationsRequired == null || wallet.attachedKeyAttestationProvider() != null) {
+            "Issuer requires a key-attestation JWT; the configured proof path cannot supply one"
+        }
         val algorithm = active.keyMaterial
             .requireCrypto2SigningKey()
             .selectJwsAlgorithm(jwt.proofSigningAlgValuesSupported)
@@ -1137,6 +1140,15 @@ class WalletIssuanceSessionService(
             else -> error("Issuer requires a DID that is bound to the selected holder key")
         }
         val crypto2Key = active.keyMaterial.requireCrypto2SigningKey()
+        val jwtMetadata = configuration.proofTypesSupported?.get("jwt")
+        val keyAttestation = keyAttestationForProof(
+            wallet.attachedKeyAttestationProvider(),
+            jwtMetadata?.keyAttestationsRequired,
+            crypto2Key,
+            active.resolved.offer.credentialIssuer,
+            nonce,
+            jwtMetadata?.proofSigningAlgValuesSupported,
+        )
         val proofs = builder.buildProof(
             key = crypto2Key,
             algorithm = algorithm,
@@ -1144,6 +1156,7 @@ class WalletIssuanceSessionService(
             nonce = nonce,
             binding = binding,
             clientId = active.request.clientId.takeUnless { active.tokenRequestAnonymous },
+            keyAttestation = keyAttestation,
         )
         return proofs.jwt?.singleOrNull() ?: error("Credential proof builder returned no JWT")
     }
