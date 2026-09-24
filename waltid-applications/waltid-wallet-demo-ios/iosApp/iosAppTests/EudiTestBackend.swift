@@ -1,5 +1,6 @@
 import Foundation
 import TestHelpers
+import WalletSDK
 
 /// EUDI test backend helper for unit tests.
 /// Uses the shared implementation from TestHelpers framework.
@@ -113,4 +114,61 @@ actor EudiTestBackend {
         )
     }
 
+}
+
+
+/// The EUDI reference wallet's public mock provider, used only by integration tests.
+/// Its attestations do not establish hardware or certification assurance.
+/// https://github.com/eu-digital-identity-wallet/eudi-srv-wallet-provider
+struct EudiTestKeyAttestationProvider: KeyAttestationProvider {
+    let verificationPublicJWK: String
+    private static let origin = "https://wallet-provider.eudiw.dev"
+
+    static func create() async throws -> Self {
+        // Obtain the verification key from the configured HTTPS service, independently of its JWT.
+        let data = try await request(path: "/jwks")
+        let response = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let keys = response?["keys"] as? [[String: Any]], keys.count == 1 else {
+            throw ProviderError.invalidResponse
+        }
+        let key = try JSONSerialization.data(withJSONObject: keys[0], options: [.sortedKeys])
+        return Self(verificationPublicJWK: String(decoding: key, as: UTF8.self))
+    }
+
+    func attest(_ request: WalletSDK.KeyAttestationRequest) async throws -> String {
+        guard request.credentialIssuer == "https://issuer.eudiw.dev" else {
+            throw ProviderError.unsupportedIssuer
+        }
+        let key = try JSONSerialization.jsonObject(with: Data(request.proofKeyJWK.utf8))
+        var payload: [String: Any] = [
+            "jwkSet": ["keys": [key]],
+            "supportedSigningAlgorithms": ["ES256"]
+        ]
+        if let nonce = request.nonce { payload["nonce"] = nonce }
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        let data = try await Self.request(path: "/key-attestation/jwk-set", body: body)
+        let response = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let attestation = response?["keyAttestation"] as? String else {
+            throw ProviderError.invalidResponse
+        }
+        return attestation
+    }
+
+    private static func request(path: String, body: Data? = nil) async throws -> Data {
+        var request = URLRequest(url: URL(string: origin + path)!, timeoutInterval: 30)
+        if let body {
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = body
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let response = response as? HTTPURLResponse, response.statusCode == 200 else {
+            throw ProviderError.httpStatus((response as? HTTPURLResponse)?.statusCode)
+        }
+        return data
+    }
+
+    private enum ProviderError: Error {
+        case invalidResponse, unsupportedIssuer, httpStatus(Int?)
+    }
 }

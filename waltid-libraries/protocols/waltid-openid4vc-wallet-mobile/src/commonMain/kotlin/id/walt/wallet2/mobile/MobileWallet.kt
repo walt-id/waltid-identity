@@ -18,6 +18,7 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
 import id.walt.wallet2.handlers.WalletIssuanceSessionStore
+import id.walt.wallet2.handlers.KeyAttestationProvider
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyUseAuthorizationSupport
@@ -241,6 +242,15 @@ public class MobileWallet internal constructor(
         didStore = didStore,
         credentialStores = listOf(credentialStore),
     )
+
+    /**
+     * Attaches the provider used when an issuer requires key attestation in a credential proof.
+     * This runtime dependency must be reattached whenever the wallet is recreated.
+     */
+    public fun attachKeyAttestationProvider(provider: KeyAttestationProvider): MobileWallet = apply {
+        wallet.attachKeyAttestationProvider(provider)
+    }
+
     private val annexCEngine = MobileWalletAnnexCEngine(
         wallet = wallet,
         readerTrustEvaluator = readerTrustEvaluator,

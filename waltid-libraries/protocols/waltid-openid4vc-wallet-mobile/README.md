@@ -71,6 +71,14 @@ provider authentication, not consent for issuance, presentation, or another wall
 
 ## Receiving credentials
 
+When an issuer advertises `key_attestations_required`, attach an application-supplied
+`KeyAttestationProvider` using `wallet.attachKeyAttestationProvider(provider)` before
+continuing issuance. The provider receives the actual proof key, issuer nonce and
+advertised constraints. The wallet validates its signed answer before sending the proof.
+Reattach this runtime dependency after recreating a wallet; it is not persisted.
+Native Swift consumers configure `WalletConfiguration.keyAttestationProvider`.
+Issuer trust and evidence supporting the provider's claims remain separate requirements.
+
 Start an issuance session to resolve the offer and retain the exact reviewed
 session state while the application collects a separately delivered transaction
 code when the issuer requires one:
