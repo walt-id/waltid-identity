@@ -71,6 +71,9 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
             transactionCode: transactionCode
         )
         guard case let .stored(_, credentialIDs) = outcome else {
+            if case let .failed(_, failure, _) = outcome {
+                XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
+            }
             throw EnterpriseIssuanceError.unexpectedOutcome
         }
         return credentialIDs

@@ -124,7 +124,7 @@ class MobileWalletIntegrationTest {
 
     @Test
     fun receiveEudiPidSdJwtFromEudi() = runBlocking {
-        val client = MobileWalletFactory(context).create(
+        val client = createEudiWallet(
             MobileWalletConfig(defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None)
         )
         client.signingIdentity.initialize().activeIdentity()
@@ -509,7 +509,7 @@ class MobileWalletIntegrationTest {
             is WalletIssuanceOutcome.Stored -> credentialIds
             is WalletIssuanceOutcome.Deferred -> error("Expected stored credentials, got deferred outcome: $this")
             is WalletIssuanceOutcome.Cancelled -> error("Expected stored credentials, got cancelled outcome")
-            is WalletIssuanceOutcome.Failed -> error("Expected stored credentials, got failed outcome: ${error.message}")
+            is WalletIssuanceOutcome.Failed -> error("Expected stored credentials, got ${error.code}: ${error.message}")
         }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -519,6 +519,7 @@ class MobileWalletIntegrationTest {
 
     private suspend fun createEudiWallet(config: MobileWalletConfig) =
         MobileWalletFactory(context).create(config, eudiVerifierTrust)
+            .attachKeyAttestationProvider(EudiTestKeyAttestationProvider.create())
 
     private suspend fun receiveCredentialFromDemoIssuer2(scenarioId: String) {
         val scenario = demoScenario(scenarioId)
