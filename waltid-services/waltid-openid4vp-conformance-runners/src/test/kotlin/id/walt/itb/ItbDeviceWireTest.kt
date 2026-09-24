@@ -155,6 +155,19 @@ class ItbDeviceWireTest {
         }
     }
 
+    @Test
+    fun `timeout closes a channel while the peer stops reading`() = withSockets { client, server ->
+        client.sendBufferSize = 4_096
+        server.receiveBufferSize = 4_096
+        val largeFrame = buildJsonObject { put("data", "x".repeat(900_000)) }
+        assertFailsWith<TimeoutCancellationException> {
+            ItbAndroidWalletDriver.withSocketDeadline(client, 200, Dispatchers.IO) {
+                repeat(20) { ItbDeviceWire.write(client, largeFrame) }
+            }
+        }
+        assertTrue(client.isClosed)
+    }
+
     private fun ready() = buildJsonObject { put("ready", true); put("provider", "android-native-biometric") }
 
     private fun operation(sequence: Int) = buildJsonObject {

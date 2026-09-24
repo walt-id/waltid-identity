@@ -39,8 +39,11 @@ class ItbPortalBridge(
         suiteRow.locator(".mainLine").filter(Locator.FilterOptions().setHas(
             page.getByText(case.name, Page.GetByTextOptions().setExact(true)),
         )).locator("button[ngbtooltip=Run]").click()
-        page.waitForCondition { startButton().isEnabled }
-        return ItbSession(suite.id, case.id, sessionId())
+        val id = step(ItbPortalStepTimeout.Step.SESSION) {
+            page.waitForCondition { page.locator(".session-table-title-value .value").count() == 1 && sessionId().isNotBlank() }
+            sessionId()
+        }
+        return ItbSession(suite.id, case.id, id)
     }
 
     private fun startButton(): Locator = page.getByRole(
@@ -60,7 +63,10 @@ class ItbPortalBridge(
             "The portal is not showing the owned ITB session"
         }
         // Interactive execution keeps DC API instructions pending; REST background starts skip those steps.
-        step(ItbPortalStepTimeout.Step.START) { startButton().click() }
+        step(ItbPortalStepTimeout.Step.START) {
+            page.waitForCondition { startButton().isEnabled }
+            startButton().click()
+        }
         val dialog = page.locator("ngb-modal-window:not([aria-hidden=true])")
         val interaction = dialog.getByText(Pattern.compile(
             "^\\s*(VCI request|VP request|(?:TS12 payment )?Digital Credentials API presentation request)\\s*$",

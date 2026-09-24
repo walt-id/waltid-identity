@@ -1,13 +1,8 @@
 # Historical deployed ITB runner baseline — 2026-09-22
 
-This is a fixed snapshot of an earlier deployment, not the current result or a
-conformance claim. After the issuer began enforcing key attestation, the
-[strict](https://github.com/walt-id/waltid-identity/actions/runs/35982824945)
-and [conditional diagnostic](https://github.com/walt-id/waltid-identity/actions/runs/35982878596)
-runs on 24 September each passed 0/15 unattended cases. The full 21-case
-catalogue remains; six payment cases require operator authentication and run
-locally. See the [operator guide](ITB-WALLET.md) for current execution and
-qualification boundaries.
+This is a fixed snapshot of the 22 September deployment, not the current result
+or a conformance claim. See the [operator guide](ITB-WALLET.md) and
+[WAL-1423](https://linear.app/walt-new/issue/WAL-1423/itb-initial-tests) for current execution and qualification.
 
 The standalone `itbWallet` CLI completed all **21 deployed cases** on clean commit
 `7d5eb3b3d79cee35d445627cb6edd65e4943a3c1`: **11 passed and 10 failed in
@@ -106,7 +101,7 @@ The runner correctly retains `WALLET_FAILED` alongside that ITB verdict; a
 regression test covers this observed combination. These development results
 are separate from the standalone matrix above.
 
-## Historical execution and current acceptance
+## Historical execution boundary
 
 All five SD-JWT issuance cases, VP001/002/003 and all three TS12 issuance cases
 passed **in this 22 September run**. These covered the reference authorization-code/PAR flow, transaction-code
@@ -118,18 +113,22 @@ matrix: four passes and the two expected signed DC API wallet failures. Offline
 browser contracts cover exact suite selection, interactive mode, request-versus-QR
 labels, stale dialogs and session ownership. They do not replace live evidence.
 
-The live workflow uses three repository secrets (organisation API key and portal
-login) and the organisation ID variable, with no dedicated environment. It runs
-15 unattended cases on pushes to the WAL-1423 investigation branches; the six
-payment cases remain local and operator-assisted. Each report is evidence only
-for its exact revision and selected cases. Manual dispatch becomes available
-once the workflow reaches the default branch.
+This historical run did not include the later test-only key-attestation fixture.
+Its results remain attributable only to the revision and sessions listed above.
 
-The runner now has a test-only, issuer-accepted key-attestation fixture with
-explicitly synthetic profile values. This removes the execution gate for the
-deployed test cases; it does not supply truthful Wallet Provider certification
-or status evidence. Current results must be attributed to their exact run and
-reported separately from this historical baseline. The strict runner still
-needs a 15/15 hosted CI result and operator-assisted coverage of the six
-payment cases. Failures, timeouts and unexecuted cases remain non-passing;
-WAL-1423 stays open until its acceptance evidence is reviewed.
+## Earlier offline profile snapshot — 2026-09-21
+
+At main `78e6929fc360729feb45af81697405ca3cf01fa1` (the merge of
+[#2168](https://github.com/walt-id/waltid-identity/pull/2168)), seven of the
+eleven local profile checks passed. Four failed: the authorization-code proof
+omitted the expected `iss`; two CS-02 strict-profile checks accepted unsigned
+`redirect_uri` and JSON `request_uri` inputs; and CS-07 did not dispatch the
+signed DC API protocol. The passing checks covered trusted signed requests,
+independent response decryption and TS12 transaction-data binding. These were
+historical observations, not an allowlist or current branch result.
+
+The reference issuer metadata inspected that day advertised JWT/ES256 proofs,
+mandatory PAR, token authentication `none` and anonymous pre-authorized access;
+it did not then advertise wallet-instance or key-attestation requirements.
+That metadata did not establish the tenant's selected cases or full CS-01
+compliance, and later deployment behavior changed.

@@ -3,6 +3,7 @@
 package id.walt.itb
 
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.handlers.*
@@ -105,6 +106,7 @@ class ItbWalletDriver internal constructor(
         val preview = WalletPresentationHandler.previewPresentationWithTrust(
             wallet, PreviewPresentationRequest(interaction.url),
             transactionDataTypeRegistry = paymentTypes, clientIdTrustConfiguration = clientIdTrust,
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
         )
         usePreview(discard = { WalletPresentationHandler.discardPreview(wallet, preview.handle) }) {
             if (preview is PreviewPresentationResult.Invalid) throw ItbWalletRejection(preview.error.code.code)
