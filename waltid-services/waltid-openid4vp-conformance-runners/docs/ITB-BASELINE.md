@@ -1,4 +1,13 @@
-# Deployed ITB runner baseline — 2026-09-22
+# Historical deployed ITB runner baseline — 2026-09-22
+
+This is a fixed snapshot of an earlier deployment, not the current result or a
+conformance claim. After the issuer began enforcing key attestation, the
+[strict](https://github.com/walt-id/waltid-identity/actions/runs/35982824945)
+and [conditional diagnostic](https://github.com/walt-id/waltid-identity/actions/runs/35982878596)
+runs on 24 September each passed 0/15 unattended cases. The full 21-case
+catalogue remains; six payment cases require operator authentication and run
+locally. See the [operator guide](ITB-WALLET.md) for current execution and
+qualification boundaries.
 
 The standalone `itbWallet` CLI completed all **21 deployed cases** on clean commit
 `7d5eb3b3d79cee35d445627cb6edd65e4943a3c1`: **11 passed and 10 failed in
@@ -13,9 +22,9 @@ requests came from that session's dialog; REST supplied status, terminal reports
 and owned-session cleanup. This avoids the deployed DC API background-interaction
 skip and the session-list navigation races found during qualification.
 
-Production code includes the main merge of
-[#2168](https://github.com/walt-id/waltid-identity/pull/2168). Outstanding production
-fixes remain external. JVM protocol results do not qualify native delivery,
+This revision includes the main merge of
+[#2168](https://github.com/walt-id/waltid-identity/pull/2168). JVM protocol
+results do not qualify native delivery,
 consent UX or full normative EUDI/SCA assurance.
 
 ## Standalone case results
@@ -48,7 +57,7 @@ replacing failures with successful retries.
 | `ts12_pay_dc_api_02` | `WALLET_FAILED` | `UNDEFINED` | 1.0 | `28a6f651-ba07-4215-b812-600fffe1c987` |
 | `ts12_pay_dc_api_03` | `WALLET_FAILED` | `UNDEFINED` | 1.0 | `836888dd-6500-46aa-b4a6-167360377cfc` |
 
-## Confirmed dependencies and open gaps
+## Dependencies observed in this historical baseline
 
 - **WAL-896 / [#2141](https://github.com/walt-id/waltid-identity/pull/2141):**
   CS-07 and all three TS12 DC API cases reach production signed-protocol dispatch
@@ -56,28 +65,29 @@ replacing failures with successful retries.
   VP007 separately rejects verifier mdoc `deviceauth_alg_values` `[-7, -35]`:
   the baseline P-256 wallet advertises ESP256 (`-9`). The inspected #2141 head
   `04802383782ce3cf76a5d224519ad529ae290bc1` adds ES256 (`-7`) support alongside
-  ESP256. This confirms the dependency, not that its complete live matrix passes.
-  That PR also adds a `clientIdTrustConfiguration` parameter to the DC API preview
-  handler. After it merges, pass the runner's existing pinned reference CA through
-  that parameter before rerunning signed X.509 DC API cases. The current baseline
-  has no such parameter; this runner does not copy or reflectively invoke future APIs.
+  ESP256. This confirmed the dependency at that revision, not a complete live
+  matrix pass. #2141 later merged, and the runner now supplies its pinned
+  reference CA to the signed DC API preview path.
 - **Reference-issuer mdoc encoding:** VCI005 and VCI008 fail parsing the issued
   `DeviceKeyInfo.CoseKey`. Fresh captures confirmed that the issuer encodes COSE
   label `2` (`kid`) as a CBOR text string. [RFC 9052 section 7.1](https://www.rfc-editor.org/rfc/rfc9052.html#section-7.1)
   requires a byte string. Labels `-2` and `-3` (P-256 coordinates) are correctly
   encoded as 32-byte strings. This defect belongs to the reference issuer;
   changing the wallet to accept malformed COSE keys is not part of this runner.
-  No existing owning ticket was confirmed. WAL-781 concerns a different issue.
+  This was subsequently reported as [ITB #49](https://github.com/webuild-consortium/wp4-interop-test-bed/issues/49).
+  The public backend contains a correction; a fresh deployed mdoc remains
+  unverified because issuance now stops at key-attestation validation.
 - **TS12 encrypted request delivery:** the three ordinary payment requests return
   HTTP 400 requiring request-encryption keys in the wallet metadata for POST
   Request Object delivery. The baseline advertises algorithms without supplying
   a request-decryption key. This is separate from response encryption, and is not
-  established as covered by #2141. Assign the request-encryption work separately.
+  established as covered by #2141. The runner later implemented the
+  exchange-specific decryption key and signed inner-request validation; this
+  row records the earlier failure only.
 - **Proof `iss`:** [#2246](https://github.com/walt-id/waltid-identity/pull/2246)
-  remains an external fix for the historical local proof assertion. All five
-  deployed SD-JWT VCI cases passed without it; it is not a demonstrated blocker
-  for this deployed matrix. [#2222](https://github.com/walt-id/waltid-identity/pull/2222)
-  remains independent identity/recovery work.
+  addressed a separate local proof assertion. All five deployed SD-JWT VCI
+  cases in this historical run passed without it; it was not a demonstrated
+  blocker for this matrix.
 
 ## Targeted mdoc confirmation
 
@@ -96,10 +106,10 @@ The runner correctly retains `WALLET_FAILED` alongside that ITB verdict; a
 regression test covers this observed combination. These development results
 are separate from the standalone matrix above.
 
-## Execution and remaining acceptance
+## Historical execution and current acceptance
 
 All five SD-JWT issuance cases, VP001/002/003 and all three TS12 issuance cases
-passed. These cover the reference authorization-code/PAR flow, transaction-code
+passed **in this 22 September run**. These covered the reference authorization-code/PAR flow, transaction-code
 issuance and **VP002 response encryption**. The independently sourced verifier
 trust anchor is documented in [CA provenance](../src/main/resources/itb/README.md).
 
@@ -110,11 +120,12 @@ labels, stale dialogs and session ownership. They do not replace live evidence.
 
 The live workflow uses three repository secrets (organisation API key and portal
 login) and the organisation ID variable, with no dedicated environment. It runs
-all 21 cases on pushes to the WAL-1423 investigation branches; the report for
-each run is the evidence for that revision. Manual dispatch becomes available
-once the workflow reaches the default branch. See the [operator guide](ITB-WALLET.md).
+15 unattended cases on pushes to the WAL-1423 investigation branches; the six
+payment cases remain local and operator-assisted. Each report is evidence only
+for its exact revision and selected cases. Manual dispatch becomes available
+once the workflow reaches the default branch.
 
-Keep the PR draft as requested. Resolve the external wallet and issuer blockers,
-apply the DC API trust wiring once its API becomes available, and rerun against
-the actual merged revisions. Failures, timeouts and unexecuted cases must remain
-non-passing; WAL-1423 stays open until the required matrix passes.
+The current gate is an issuer-accepted wallet-provider key attestation with
+truthful WE BUILD profile claims and status. The strict runner must then pass
+15/15 in CI and all 21 with operator authentication where needed. Failures,
+timeouts and unexecuted cases remain non-passing; WAL-1423 stays open.

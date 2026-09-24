@@ -6,6 +6,11 @@ The desktop retains the portal login, organisation API key, case/session correla
 
 This is operator-assisted protocol testing, not transaction-consent UI, browser-mediated DC API delivery, formal SCA qualification or an unattended CI mode. The iOS synthetic physical fixture is separate; this live bridge currently supports Android only.
 
+The current issuer requires an accepted wallet-provider key attestation before
+issuing an SCA credential. Until that prerequisite succeeds, a payment run will
+not reach the device authentication prompt. See the
+[current evidence](ITB-BASELINE.md) before starting an operator-assisted run.
+
 ## Run
 
 1. Build and install `:waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleAndroidDeviceTest` with `-PenableAndroidBuild=true`. Record the source revision, any working-tree patch, and the test APK SHA-256. Use a physical phone with strong biometrics enrolled and a screen lock. Explicitly select its ADB serial.
