@@ -38,7 +38,7 @@ private suspend fun runItb(): Int {
     val catalogue = ItbCatalogue.initialWalletCases()
     val origin = catalogue.origin
     val directory = Path.of(System.getenv("ITB_REPORT_DIR") ?: "build/reports/itb-wallet")
-    val selected = ItbRunSelection.select(catalogue, System.getenv("ITB_CASES"))
+    val selected = ItbRunSelection.select(catalogue, System.getenv("ITB_CASES"), unattendedOnly = System.getenv("CI") == "true")
     val started = Instant.now().toString()
     val androidPort = System.getenv("ITB_ANDROID_PORT")?.toInt()?.also { require(it in 1024..65535) }
     val androidApkSha256 = androidPort?.let {
@@ -106,6 +106,12 @@ private suspend fun runItb(): Int {
 }
 
 internal object ItbRunSelection {
+    private val unattendedCases = setOf(
+        "tc_vci_001", "tc_vci_002", "tc_vci_003", "tc_vci_005", "tc_vci_006", "tc_vci_007", "tc_vci_008",
+        "tc_vp_001", "tc_vp_002", "tc_vp_003", "tc_vp_007", "tc15",
+        "ts12_issue_01", "ts12_issue_02", "ts12_issue_03",
+    )
+
     private val prerequisites = mapOf(
         "tc_vp_001" to "tc_vci_006", "tc_vp_002" to "tc_vci_006", "tc_vp_003" to "tc_vci_006",
         "tc_vp_007" to "tc_vci_008", "tc15" to "tc_vci_006",
@@ -113,12 +119,19 @@ internal object ItbRunSelection {
         "ts12_pay_dc_api_01" to "ts12_issue_01", "ts12_pay_dc_api_02" to "ts12_issue_02", "ts12_pay_dc_api_03" to "ts12_issue_03",
     )
 
-    fun select(catalogue: ItbCatalogue, selection: String?): List<Pair<ItbCatalogue.Suite, ItbCatalogue.Case>> {
+    fun select(catalogue: ItbCatalogue, selection: String?, unattendedOnly: Boolean = false): List<Pair<ItbCatalogue.Suite, ItbCatalogue.Case>> {
         val all = catalogue.suites.flatMap { suite -> suite.cases.map { suite to it } }
-        if (selection == null) return all
+        if (!unattendedOnly && selection == null) return all
+        if (unattendedOnly) require(all.map { it.second.id }.containsAll(unattendedCases)) {
+            "The unattended ITB inventory no longer matches the deployed catalogue"
+        }
+        if (selection == null) return all.filter { it.second.id in unattendedCases }
         val ids = selection.split(',').map(String::trim).toSet()
         require(ids.isNotEmpty() && ids.all { id -> all.any { it.second.id == id } }) { "Unknown or empty ITB case selection" }
         val expanded = ids + ids.mapNotNull(prerequisites::get)
+        if (unattendedOnly) require(expanded.all { it in unattendedCases }) {
+            "The selected ITB case requires operator authentication"
+        }
         return all.filter { it.second.id in expanded }
     }
 }
