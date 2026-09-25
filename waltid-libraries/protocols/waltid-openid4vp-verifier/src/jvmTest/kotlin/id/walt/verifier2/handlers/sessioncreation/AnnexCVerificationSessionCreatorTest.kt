@@ -3,7 +3,11 @@
 package id.walt.verifier2.handlers.sessioncreation
 
 import id.walt.dcql.models.CredentialFormat
+import id.walt.dcql.models.CredentialQuery
+import id.walt.dcql.models.DcqlQuery
+import id.walt.dcql.models.meta.NoMeta
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
+import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
 import kotlinx.coroutines.test.runTest
@@ -136,5 +140,36 @@ class AnnexCVerificationSessionCreatorTest {
         }
 
         assertTrue(exception.message!!.contains("requestedElements is required"))
+    }
+
+    @Test
+    fun `annex C examples keep doctype query ids without OpenID4VP precheck`() {
+        val mdl = DcApiAnnexCFlowSetup.EXTENDED_MDL_EXAMPLE
+        assertEquals("org.iso.18013.5.1.mDL", mdl.generatedDcqlQuery.credentials.single().id)
+        assertEquals("eu.europa.ec.eudi.pid.1", DcApiAnnexCFlowSetup.EXTENDED_PID_EXAMPLE.generatedDcqlQuery.credentials.single().id)
+        assertEquals(
+            "org.iso.23220.photoid.1",
+            DcApiAnnexCFlowSetup.EXTENDED_PHOTOID_EXAMPLE.generatedDcqlQuery.credentials.single().id,
+        )
+        DcApiAnnexCFlowSetup.MULTI_CREDENTIAL_EXAMPLE
+        DcApiAnnexCFlowSetup.SIGNED_MDL_EXAMPLE
+    }
+
+    @Test
+    fun `openid4vp general flow config still rejects illegal dcql identifiers`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            GeneralFlowConfig(
+                dcqlQuery = DcqlQuery(
+                    credentials = listOf(
+                        CredentialQuery(
+                            id = "eu.europa.ec.eudi.pid.1",
+                            format = CredentialFormat.MSO_MDOC,
+                            meta = NoMeta,
+                        )
+                    )
+                )
+            )
+        }
+        assertTrue(exception.message!!.contains("alphanumeric"))
     }
 }
