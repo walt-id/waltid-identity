@@ -391,7 +391,11 @@ class VciWalletConformanceTests {
                 }.also { assertEquals(HttpStatusCode.Created, it.status) }
             }
 
-            block(walletId)
+            // Counted as an E2E step so a failing plan fails this JUnit test even if the runner
+            // throws outside fail-early bookkeeping. failIfNeeded still hard-fails CI.
+            test("Run OpenID4VCI wallet plan") {
+                block(walletId)
+            }
         }
     }
 }

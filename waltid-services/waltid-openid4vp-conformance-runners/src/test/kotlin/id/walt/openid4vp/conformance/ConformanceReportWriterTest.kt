@@ -1,8 +1,8 @@
 package id.walt.openid4vp.conformance
 
 import id.walt.openid4vp.conformance.report.ConformanceCiFlags
-import id.walt.openid4vp.conformance.report.ConformanceReportFormat
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
+import id.walt.openid4vp.conformance.report.ConformanceReportFormat
 import id.walt.openid4vp.conformance.report.isAccepted
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import java.nio.file.Files
@@ -167,6 +167,23 @@ class ConformanceReportWriterTest {
                 results = results,
                 allowFailure = false,
             )
+        }
+        listOf(
+            ConformanceReportWriter.Role.VCI_WALLET,
+            ConformanceReportWriter.Role.VCI_ISSUER,
+        ).forEach { role ->
+            ConformanceReportWriter.failIfNeededFromTestPlanResults(
+                role = role,
+                results = results,
+                allowFailure = true,
+            )
+            assertFailsWith<IllegalStateException> {
+                ConformanceReportWriter.failIfNeededFromTestPlanResults(
+                    role = role,
+                    results = results,
+                    allowFailure = false,
+                )
+            }
         }
     }
 

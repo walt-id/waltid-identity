@@ -245,16 +245,19 @@ data class IssuerVariantSelection(
         /**
          * Strictness resolution:
          * 1. Certification mode always strict
-         * 2. Explicit OPENID4VCI_CONFORMANCE_STRICT wins for local runs
-         * 3. If CONFORMANCE_ALLOW_FAILURE is present (including empty CI injection), invert soft-fail
-         * 4. Otherwise default strict (preserve local issuer exploration defaults)
+         * 2. Shared CI hard-fail (`CONFORMANCE_ALLOW_FAILURE=false`) always strict, including issuer
+         * 3. Explicit OPENID4VCI_CONFORMANCE_STRICT wins for local exploration
+         * 4. Otherwise default strict
          */
-        private fun resolveStrictResults(): Boolean {
-            if (bool("OPENID4VCI_CONFORMANCE_CERTIFICATION_MODE")) return true
-            optionalBool("OPENID4VCI_CONFORMANCE_STRICT")?.let { return it }
-            if (System.getenv(ConformanceCiFlags.ALLOW_FAILURE_ENV) != null) {
-                return ConformanceCiFlags.strictResults()
-            }
+        internal fun resolveStrictResults(
+            certificationMode: Boolean = bool("OPENID4VCI_CONFORMANCE_CERTIFICATION_MODE"),
+            explicitStrict: Boolean? = optionalBool("OPENID4VCI_CONFORMANCE_STRICT"),
+            allowFailureEnvPresent: Boolean = System.getenv(ConformanceCiFlags.ALLOW_FAILURE_ENV) != null,
+            allowFailure: Boolean = ConformanceCiFlags.allowFailure(),
+        ): Boolean {
+            if (certificationMode) return true
+            if (allowFailureEnvPresent && !allowFailure) return true
+            explicitStrict?.let { return it }
             return true
         }
 
@@ -391,6 +394,9 @@ object IssuerVariantReportWriter {
         appendLine()
         appendLine("- Strict issuer results: `${if (strictResults) "enabled" else "disabled"}`")
         appendLine()
+        appendLine("<details>")
+        appendLine("<summary>OpenID4VCI Issuer results</summary>")
+        appendLine()
         appendLine("| Status | Count |")
         appendLine("|--------|-------|")
         IssuerVariantRunStatus.values().forEach { status ->
@@ -415,6 +421,8 @@ object IssuerVariantReportWriter {
                     "${errors.joinToString("; ").sanitizeMarkdownCell()} |"
             )
         }
+        appendLine()
+        appendLine("</details>")
     }
 
     internal fun batchCoverageSummary(results: List<IssuerVariantRunResult>): String =

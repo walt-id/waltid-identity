@@ -108,15 +108,16 @@ build/reports/openid-conformance/
 
 ### `CONFORMANCE_ALLOW_FAILURE`
 
-Controls soft-fail for wallet and verifier conformance roles:
+Controls soft-fail for OpenID conformance roles (OpenID4VP verifier, OpenID4VP
+wallet, OpenID4VCI wallet, and OpenID4VCI issuer):
 
 | Value | Behavior |
 |-------|----------|
 | unset / empty / `true` | Soft-fail: failed tests still appear in the job summary, but JUnit does not fail the job for those failures |
 | `false` | Hard-fail: any executed non-passing conformance result fails the job |
 
-CI sets `CONFORMANCE_ALLOW_FAILURE=false` so wallet/verifier failures fail the
-conformance job. Local runs stay soft-fail unless this variable is set.
+CI sets `CONFORMANCE_ALLOW_FAILURE=false` so failures in any of those roles fail
+the conformance job. Local runs stay soft-fail unless this variable is set.
 
 ```bash
 export CONFORMANCE_ALLOW_FAILURE=true   # soft-fail (local default when unset)
@@ -124,8 +125,9 @@ export CONFORMANCE_ALLOW_FAILURE=false  # hard-fail
 ```
 
 For the VCI issuer matrix, `OPENID4VCI_CONFORMANCE_STRICT` and
-`OPENID4VCI_CONFORMANCE_CERTIFICATION_MODE` still apply for local runs.
-When `CONFORMANCE_ALLOW_FAILURE` is present (including empty CI injection), it
-participates in strictness resolution; certification mode always remains strict.
+`OPENID4VCI_CONFORMANCE_CERTIFICATION_MODE` still apply for local exploration
+when `CONFORMANCE_ALLOW_FAILURE` is unset or true.
+When `CONFORMANCE_ALLOW_FAILURE=false`, issuer results are hard-fail even if
+`OPENID4VCI_CONFORMANCE_STRICT=false`. Certification mode always remains strict.
 Issuer reports default to `build/reports/openid-conformance/vci-issuer`
 (override with `OPENID4VCI_CONFORMANCE_REPORT_DIR`).

@@ -335,10 +335,11 @@ Issuer2 is built, configured and started before the shared test step. Its port i
 public adapters use 7006/7007). There is no wallet/issuer port collision. Startup
 rejects an occupied issuer port rather than terminating an unknown process.
 
-CI sets `CONFORMANCE_ALLOW_FAILURE=false` so wallet/verifier failures fail the
-conformance job.
-`OPENID4VCI_CONFORMANCE_STRICT=true` overrides that policy only for issuer results,
-and `OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true` still requires executed batch
+CI sets `CONFORMANCE_ALLOW_FAILURE=false` so OpenID4VP verifier/wallet,
+OpenID4VCI wallet, and OpenID4VCI issuer failures fail the conformance job.
+`OPENID4VCI_CONFORMANCE_STRICT=true` remains set so issuer results stay strict
+when the shared flag is temporarily relaxed, and
+`OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true` still requires executed batch
 coverage. One JUnit report covers all roles; issuer result artifacts remain
 separate. The live test task uses `--rerun` and disables configuration caching so
 it cannot reuse old test results or stale environment settings, while dependency
@@ -387,8 +388,10 @@ assertions, and is reported as a coverage gap in the job summary. This CI run
 does not establish TLS conformance. Local runs keep the module enabled; remove
 the CI-only exclusion when a compliant public TLS endpoint is available.
 
-Issuer strict mode and `REQUIRE_BATCH_PASS=true` are explicit, independent of the
-shared wallet/verifier soft-fail setting. The Kotlin runner enforces successful selected variants and executed
+Issuer strict mode and `REQUIRE_BATCH_PASS=true` stay explicit in CI. Shared
+`CONFORMANCE_ALLOW_FAILURE=false` also hard-fails issuer module and variant
+failures, so `OPENID4VCI_CONFORMANCE_STRICT=false` cannot keep the job green.
+The Kotlin runner enforces successful selected variants and executed
 batch coverage; CI also rejects missing/empty results. The configured matrix
 selects 20 variants, with 16 applicable batch variants and four encrypted-HAIP
 variants where batch is not offered at this suite pin. Skipped batch execution
@@ -402,8 +405,8 @@ unchanged. `Publish OpenID conformance summary` includes all four roles, with is
 variant statuses, clickable plan links and batch coverage counts taken from the
 runner's `matrix.json`. Missing results are reported explicitly, and issuer testing
 that was not requested is labelled as such. Missing batch classifications are
-`UNKNOWN`, never inferred as passed. The existing strict/batch failure policies
-are unchanged; this step only publishes their results.
+`UNKNOWN`, never inferred as passed. After publishing, CI fails the job when any
+role's published results include failures.
 
 The
 `issuer-conformance-basic-haip-batch` artifact contains suite/Identity revision
@@ -643,9 +646,10 @@ summary.md
 ```
 
 CI publishes result summaries into the GitHub Actions job summary. CI sets
-`CONFORMANCE_ALLOW_FAILURE=false` so wallet/verifier failures fail the job;
-issuer results stay independently strict. Locally you can still use
-`OPENID4VCI_CONFORMANCE_STRICT=false` for exploration.
+`CONFORMANCE_ALLOW_FAILURE=false` so OpenID4VP verifier/wallet, OpenID4VCI wallet,
+and OpenID4VCI issuer failures fail the job. Locally you can still use
+`OPENID4VCI_CONFORMANCE_STRICT=false` for exploration when the shared flag is
+unset or true.
 Result states have these meanings:
 
 - `generated`: variant was generated but not executed, usually discovery-only mode

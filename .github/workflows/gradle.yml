@@ -439,8 +439,9 @@ jobs:
           CACHELESS: ${{ inputs.cacheless }}
           ISSUER_BASE_URL: ${{ steps.issuer-tunnel.outputs.url }}
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
-          # Wallet/verifier module failures fail this job. Set CONFORMANCE_ALLOW_FAILURE=true
-          # on the workflow (or locally) only to temporarily restore soft-fail.
+          # Wallet, VCI wallet, verifier, and issuer module failures fail this job.
+          # Set CONFORMANCE_ALLOW_FAILURE=true on the workflow (or locally) only to
+          # temporarily restore soft-fail. Issuer batch coverage remains required below.
           CONFORMANCE_ALLOW_FAILURE: "false"
           CONFORMANCE_HOST: conformance.waltid.cloud
           CONFORMANCE_PORT: "443"
@@ -511,9 +512,9 @@ jobs:
             echo "## OpenID conformance results"
             echo
             if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
-              echo "> Soft-fail enabled (\`CONFORMANCE_ALLOW_FAILURE\` unset/true). Wallet/verifier failures are reported below but do not fail this job. Issuer strict and batch checks are independent."
+              echo "> Soft-fail enabled (\`CONFORMANCE_ALLOW_FAILURE\` unset/true). Failures are reported below but do not fail this job."
             else
-              echo "> Soft-fail disabled (\`CONFORMANCE_ALLOW_FAILURE=false\`). Wallet/verifier failures fail this job. Issuer strict and batch checks are independent."
+              echo "> Soft-fail disabled (\`CONFORMANCE_ALLOW_FAILURE=false\`). OpenID4VP verifier/wallet, OpenID4VCI wallet, and OpenID4VCI issuer failures fail this job. Issuer batch coverage remains required."
             fi
             echo
           } >> "$GITHUB_STEP_SUMMARY"
@@ -628,6 +629,63 @@ jobs:
 
           echo "Published OpenID conformance summaries for verifier, OpenID4VP wallet, OpenID4VCI wallet and issuer (${found} wallet/verifier file(s) found)."
 
+      - name: Fail job on published OpenID conformance failures
+        if: ${{ always() && !cancelled() }}
+        env:
+          CONFORMANCE_ALLOW_FAILURE: "false"
+          ISSUER_REQUESTED: ${{ inputs.run-issuer-conformance || inputs.run-haip-conformance }}
+          ISSUER_SETUP_OUTCOME: ${{ steps.issuer-tunnel.outcome }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
+            echo "Soft-fail enabled; published failures do not fail this job."
+            exit 0
+          fi
+
+          failed=0
+          check_role() {
+            local role_dir="$1"
+            local title="$2"
+            local summary=""
+            local candidate
+            while IFS= read -r candidate; do
+              summary="$candidate"
+              break
+            done < <(find . -path "*/build/reports/openid-conformance/${role_dir}/summary.md" 2>/dev/null)
+
+            if [ -z "$summary" ] || [ ! -f "$summary" ]; then
+              return 0
+            fi
+            local count
+            count="$(awk -F': ' '/^- Failed: / { print $2; exit }' "$summary")"
+            if [ -n "${count:-}" ] && [ "$count" -gt 0 ]; then
+              echo "::error::${title} conformance reported ${count} failed test(s). See the job summary."
+              failed=1
+            fi
+          }
+
+          check_role vp-verifier "OpenID4VP Verifier"
+          check_role vp-wallet "OpenID4VP Wallet"
+          check_role vci-wallet "OpenID4VCI Wallet"
+
+          if [ "$ISSUER_REQUESTED" = "true" ]; then
+            if [ -s "$ISSUER_REPORT_DIR/results.json" ]; then
+              if jq -e '[.[] | select(.status != "PASSED")] | length > 0' "$ISSUER_REPORT_DIR/results.json" >/dev/null; then
+                echo "::error::OpenID4VCI issuer matrix reported non-passing variants. See the job summary."
+                failed=1
+              fi
+              if jq -e '[.[].modules[]? | select(.accepted != true)] | length > 0' "$ISSUER_REPORT_DIR/results.json" >/dev/null; then
+                echo "::error::OpenID4VCI issuer matrix reported unaccepted modules. See the job summary."
+                failed=1
+              fi
+            elif [ "$ISSUER_SETUP_OUTCOME" = "success" ]; then
+              echo "::error::Issuer conformance was requested and the issuer runtime started, but no results.json was produced."
+              failed=1
+            fi
+          fi
+
+          exit "$failed"
+
       - name: Stop wallet and verifier conformance tunnels
         if: always()
         run: |
@@ -639,7 +697,8 @@ jobs:
 
       - name: Verify issuer results were produced
         if: ${{ !cancelled() && steps.issuer-tunnel.outcome == 'success' && steps.conformance-tests.outcome == 'success' }}
-        # Strict results and executed batch coverage are enforced by the Kotlin runner.
+        # Strict results, executed batch coverage, and CONFORMANCE_ALLOW_FAILURE=false
+        # are enforced by the Kotlin runner. This rejects a green test step with no issuer file.
         run: jq -e 'type == "array" and length > 0' "$ISSUER_REPORT_DIR/results.json" >/dev/null
 
       - name: Stop Issuer2 conformance services

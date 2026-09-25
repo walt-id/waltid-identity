@@ -197,7 +197,8 @@ build/reports/openid-conformance/vp-verifier/results.json
 ```
 
 The OSS Gradle workflow appends these to the GitHub Actions job summary.
-CI sets `CONFORMANCE_ALLOW_FAILURE=false` so wallet/verifier failures fail the
+CI sets `CONFORMANCE_ALLOW_FAILURE=false` so OpenID4VP verifier/wallet,
+OpenID4VCI wallet, and OpenID4VCI issuer failures fail the
 conformance job (see the module [README](../README.md#conformance_allow_failure)).
 
 ## Code Fixes Made (2026-07-08)

@@ -1,5 +1,7 @@
 package id.walt.openid4vp.conformance.testplans
 
+import id.walt.openid4vp.conformance.report.ConformanceCiFlags
+import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.http.IssuerInterface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
@@ -166,6 +168,13 @@ class IssuerConformanceTestRunner(
             println("Batch not offered by pinned suite db1080a (not batch coverage): ${it.variantId}")
         }
 
+        val testPlanResults = issuerResultsToTestPlanResults(results)
+        ConformanceReportWriter.failIfNeededFromTestPlanResults(
+            role = ConformanceReportWriter.Role.VCI_ISSUER,
+            results = testPlanResults,
+            allowFailure = ConformanceCiFlags.allowFailure(),
+        )
+
         // Ordinary runs retain capability-based skips. Batch acceptance checks raw suite outcomes.
         // Write the unmodified reports first so missing, skipped, and failed modules remain diagnosable.
         if (requireBatchPass) {
@@ -278,6 +287,35 @@ class IssuerConformanceTestRunner(
     }
 
 }
+
+internal fun issuerResultsToTestPlanResults(results: List<IssuerVariantRunResult>): List<TestPlanResult> =
+    results.flatMap { result ->
+        if (result.modules.isEmpty()) {
+            listOf(
+                TestPlanResult(
+                    testName = result.variantId,
+                    conformanceTestId = result.planId ?: result.variantId,
+                    conformanceResult = if (result.status == IssuerVariantRunStatus.PASSED) "PASSED" else result.status.name,
+                    errorMessage = result.error.takeIf { result.status != IssuerVariantRunStatus.PASSED },
+                )
+            )
+        } else {
+            result.modules.map { module ->
+                val skipped = module.accepted && (
+                    module.result.equals("SKIPPED", ignoreCase = true) ||
+                        module.status.equals("SKIPPED", ignoreCase = true)
+                )
+                TestPlanResult(
+                    testName = "${result.variantId}/${module.testModule}",
+                    conformanceTestId = module.testId ?: result.variantId,
+                    conformanceStatus = module.status ?: result.status.name,
+                    conformanceResult = module.result,
+                    errorMessage = (module.error ?: result.error).takeIf { !module.accepted },
+                    skipReason = "Suite skipped this module".takeIf { skipped },
+                )
+            }
+        }
+    }
 
 internal fun requireExecutedBatchIssuance(results: List<IssuerVariantRunResult>) {
     require(results.isNotEmpty()) { "Batch acceptance requires at least one executed variant." }
