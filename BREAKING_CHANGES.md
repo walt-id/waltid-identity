@@ -1,5 +1,11 @@
 # Breaking changes since 0.3.1
 
+## waltid-dcql identifier charset
+
+- `DcqlQuery.precheck()` now rejects credential and claim identifiers outside OpenID4VP §6.1 / §6.3 (`A-Za-z0-9_-`).
+- Claim `id` remains optional. When present, dotted or colon-separated values such as `urn:eudi:pid:1` or `address.street_address` fail precheck.
+- Callers that previously reused issuer configuration ids as DCQL query ids must sanitize them first.
+
 ## waltid-dcql JVM ABI (1.0.x)
 
 - `DcqlDisclosure` gained optional `location: List<JsonElement>? = null` so SD-JWT claim paths can be carried through matching and holder-policy checks.
