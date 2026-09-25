@@ -6,6 +6,7 @@ RUN apt-get update \
 	&& openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
 		-keyout /etc/ssl/private/nginx-selfsigned.key \
 		-out /etc/ssl/certs/nginx-selfsigned.crt \
-		-subj "/CN=localhost" \
+		-subj "/CN=localhost.emobix.co.uk" \
+		-addext "subjectAltName=DNS:localhost.emobix.co.uk,DNS:localhost" \
 	&& apt-get clean
 COPY nginx-nodocker.conf /etc/nginx/nginx.conf

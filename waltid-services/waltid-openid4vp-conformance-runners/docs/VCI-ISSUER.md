@@ -2,6 +2,107 @@
 
 This document covers setup, execution, and status of OpenID4VCI Issuer conformance tests.
 
+## Status
+
+Current per-variant, per-module results: [docs/VCI-ISSUER-RESULTS.md](VCI-ISSUER-RESULTS.md)
+(regenerate with `./export-issuer-results.py` after a run).
+
+**Not yet validated against the documented local setup.** Every run so far used the ngrok
+workaround in [Troubleshooting](#connect-timed-out-errors) because this environment's Docker
+containers can't reach the host directly (`host.docker.internal` times out) - see that section
+before assuming a config problem if you hit the same thing.
+
+### `authorization_code` / Keycloak - wired up and proven, not yet passing cleanly
+
+Local Keycloak (`waltid-enterprise-deployment/identity-providers/keycloak`) is now wired to
+issuer2 for `authorization_code` testing - see [How to reproduce](#reproducing-the-authorization_code-setup)
+below. Two real Keycloak config bugs were found and fixed there:
+
+1. Realm `sslRequired: external` forced `Secure`-flagged session cookies even when accessed over
+   plain HTTP - browsers silently drop those, causing `cookie_not_found` on every login. Fixed via
+   the Admin API (`sslRequired: none`).
+2. Keycloak's static `--hostname=keycloak.localhost` (no port) leaked into every generated URL,
+   including the login form's `action` attribute, regardless of the origin the request actually
+   came from. Fixed via a local `docker-compose.override.yml` setting `--hostname` to the ngrok
+   URL exposing Keycloak.
+
+Both fixes were proven end-to-end with a manual curl-driven OAuth simulation (GET authorize →
+correct form action → POST real credentials → real `302` to issuer2's callback with a valid
+authorization `code`) before touching the actual test run.
+
+### Latest full run: 0/12 variants pass cleanly, but for two distinct, now-separated reasons
+
+Ran `vci-client-attestation-dpop-simple-unsigned` (12 variants: SD-JWT VC + mdoc, all three
+grant/flow pairs, plain + encrypted) against suite v5.3.1. Every non-passing module's actual suite
+log was fetched and classified by failure signature, not just counted:
+
+| Cause | Modules hit | Real finding? |
+|---|---|---|
+| `Unable to fetch credential issuer metadata ... Network is unreachable` | 54 | No - this environment's free-tier ngrok tunnels are intermittently unreachable from the suite container under sustained load. Single-variant runs don't reproduce it; the full 12-variant matrix does. Not seen when running from a normal (non-sandboxed) host. |
+| `Unable to fetch SD-JWT VC Type Metadata from <baseUrl>/openid4vci/identity_credential` | 13 | **Yes.** issuer2's own metadata declares `vct: "<baseUrl>/openid4vci/identity_credential"` as a self-referencing type-metadata URL, but issuer2 doesn't serve that endpoint - confirmed directly, `curl <baseUrl>/openid4vci/identity_credential` returns `404`. Affects every SD-JWT `happy-flow`-family module once past metadata/login. mdoc variants are unaffected (no `vct`). |
+| `Unable to fetch credential offer ...` | 1 | Same network-flakiness family as the first row. |
+
+The classic `NoClassDefFoundError: id.walt.w3c.utils.CredentialDataMergeUtils` seen earlier in the
+session (a stale-build artifact, unrelated to Keycloak) did **not** reappear after issuer2 was
+restarted clean - consider that one resolved unless it recurs.
+
+### `identity_credential` type-metadata 404 - root cause and recommended fix
+
+Traced precisely rather than guessed, so whoever picks up the fix doesn't have to re-derive this:
+
+- `MetadataService.selfHostedVct()` (`waltid-issuer-api2/src/main/kotlin/id/walt/issuer2/service/openid4vci/MetadataService.kt:217-218`)
+  publishes `vct = "<baseUrl>/openid4vci/identity_credential"` (triggered by the `vct = "vctBaseUrl"`
+  sentinel in `config/credential-issuer-metadata.conf:1814-1819`).
+- The actual serving route is registered at `.well-known/vct/{type}`
+  (`OpenId4VciController.kt:118-121`, root-mounted per `Main.kt:58-62`), which resolves to
+  `<host>/.well-known/vct/identity_credential` - a **different URL** than the one published. The
+  route, service method (`getVctTypeMetadata`), and a data model (`SdJwtVcTypeMetadataDraft04`)
+  all already exist and work when hit at their actual path - they're just unreachable via the URL
+  the metadata itself advertises. It's a path mismatch, not a missing feature.
+- Masked by `Issuer2MetadataEndpointTest.kt:327`, which hits the hardcoded internal route directly
+  instead of deriving it from the published `vct` value, so it passes while production 404s.
+- **Recommended fix:** change `selfHostedVct()` to emit a URL that matches where
+  `.well-known/vct/{type}` is actually mounted, instead of the `/openid4vci`-prefixed one. One
+  string builder, no route or data-model changes - the cheapest correct fix, and it directly
+  resolves the 13-module failure class above.
+- **Optional follow-up, not blocking:** the served metadata is a bare stub (`vct`/`name`/`description`
+  only). `CredentialConfiguration.credentialMetadata` already carries `display`/`claims` for
+  `identity_credential`, and a spec-current `SdJwtVcTypeMetadataDraft13` model with
+  `display`/`claims` fields already exists but nothing populates it from the credential config.
+
+**Next real step:** apply that fix, then rerun outside this sandbox (or with a paid/stable ngrok
+tier) to get a run not confounded by the network-flakiness noise.
+
+### Reproducing the `authorization_code` setup
+
+Ngrok URLs are ephemeral (free tier) - this whole block must be redone whenever tunnels restart.
+None of this is committed (config files were reset after this session - see below); this is a
+from-scratch recipe.
+
+**Baseline values being overridden** (i.e. what's in the files today, before any of this):
+- `authentication-service.conf`: `authorizeUrl`/`accessTokenUrl` point at
+  `https://keycloak.demo.walt.id/realms/mynewrealm/protocol/openid-connect/{auth,token}`.
+- `issuer-service.conf`: `baseUrl = "http://localhost:7005"`.
+
+1. One-time: `docker compose up -d` in the Keycloak directory above (imports the `waltid` realm),
+   then via the Admin API (`admin`/`admin`) create client `issuer_api` (secret matches
+   `waltid-issuer-api2/config/authentication-service.conf`'s existing `clientSecret`, so the file
+   doesn't need to change) and user `jane@walt.id` / `jane`, and set the realm's `sslRequired` to
+   `none`. Skip if these already exist in the persisted `waltid-keycloak-data` volume.
+2. Every session:
+   - Start two ngrok tunnels (distinct `web_addr` per config to avoid the local API port clash):
+     `ngrok http 7005 ...` (issuer2) and `ngrok http 8080 ...` (Keycloak).
+   - Update the Keycloak client's `redirectUris` to `<issuer2-ngrok-url>/openid4vci/external/oauth/callback`.
+   - Create `docker-compose.override.yml` next to the Keycloak `docker-compose.yml` (untracked,
+     don't commit - it's ngrok-URL-specific) setting `--hostname=<keycloak-ngrok-url>` (this is the
+     actual fix from bug 2 above), then `docker compose up -d` to recreate.
+   - Point issuer2 at both: `authentication-service.conf`'s `authorizeUrl`/`accessTokenUrl` =
+     `<keycloak-ngrok-url>/realms/waltid/protocol/openid-connect/{auth,token}`;
+     `issuer-service.conf`'s `baseUrl` = `<issuer2-ngrok-url>`. Restart issuer2.
+   - Run with `OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL=<issuer2-ngrok-url>/openid4vci`,
+     `OPENID4VCI_CONFORMANCE_AUTH_USERNAME=jane@walt.id`,
+     `OPENID4VCI_CONFORMANCE_AUTH_PASSWORD=jane` (see Quick Start below for the full command).
+
 ## Test Plan
 
 | Profile | Test Plan | Variants |
@@ -92,7 +193,9 @@ jane@walt.id / jane
 ### 2. Configure Issuer2
 
 In `waltid-services/waltid-issuer-api2`, configure these local conformance
-defaults in the following two files.
+defaults in the following two files. `config/issuer-service.conf` in a fresh checkout may already
+have other entries (e.g. other trust roots in `trustedRootCertificatesPem`, from production/demo
+use) - add these alongside them, don't replace the file's existing content wholesale.
 
 `config/web.conf`:
 
@@ -445,6 +548,11 @@ results.json
 summary.md
 ```
 
+These are gitignored (this run only). `./export-issuer-results.py` turns them into a committable
+per-variant, per-module snapshot at [docs/VCI-ISSUER-RESULTS.md](VCI-ISSUER-RESULTS.md) - run it
+after every suite run and commit the result to keep a tracked history, same pattern as the verifier
+role's `export-verifier-results.py` / `docs/VP-VERIFIER-RESULTS.md`.
+
 CI publishes these summaries into the GitHub Actions job summary. Soft-fail is
 controlled by `CONFORMANCE_ALLOW_FAILURE` (see the module
 [README](../README.md#ci-summaries-and-soft-fail)); locally you can still use
@@ -561,6 +669,41 @@ Add `https://localhost.emobix.co.uk:9443/openid4vci/external/oauth/callback` to 
 
 ### "Connect timed out" errors
 Verify issuer2 listens on `0.0.0.0:7005`, then inspect the Nginx logs. Nginx reaches the host through `host.docker.internal`.
+
+If issuer2 is confirmed listening and Nginx still can't reach it, verify the container-to-host hop
+itself before assuming a config problem:
+
+```bash
+docker exec waltid-openid4vp-conformance-runners-nginx-1 curl -s --max-time 4 -o /dev/null -w "HTTP %{http_code}\n" http://host.docker.internal:7005/
+```
+
+`HTTP 000` here means Docker's container-to-host routing is broken in this environment (confirmed
+once: DNS resolved `host.docker.internal` correctly, but the route timed out even to the network's
+own gateway IP, and required root/iptables access this session didn't have to diagnose further -
+this may be specific to sandboxed/restricted Docker setups rather than a real machine). Verifying
+`docker network inspect <project>_default` shows the container has a valid IP is not sufficient;
+the host-reachability hop is separate from intra-network DNS.
+
+**Workaround for pre-authorized-code-only runs** (no Keycloak/browser step, so it tolerates an
+unstable exposure): expose issuer2 with a second `ngrok http 7005`, set issuer2's `baseUrl` to that
+ngrok URL, and point the wrapper at it directly instead of the local Nginx proxy:
+
+```bash
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://<your-issuer-ngrok-url>.ngrok-free.app/openid4vci"
+export OPENID4VCI_CONFORMANCE_PRESET="vci-client-attestation-dpop-simple-unsigned-preauth"
+./run-issuer-conformance-local.sh
+```
+
+This does **not** work for `authorization_code` variants - Keycloak needs a stable, pre-registered
+redirect URI, and ngrok's free-tier URL changes every run. Revert `baseUrl` to
+`https://localhost.emobix.co.uk:9443` and restart issuer2 once done; leaving the ngrok URL in place
+will break the documented local flow for the next person.
+
+Watch for ngrok-specific false failures when using this workaround: `DisallowInsecureCipher` on
+`oid4vci-1_0-issuer-happy-flow-additional-requests` (ngrok's TLS edge accepts a broader cipher
+range than a locked-down local Nginx would) and occasional `Network is unreachable` fetching
+metadata (transient ngrok connectivity, not an issuer2 defect) have both been observed and are not
+real conformance findings - they're artifacts of the workaround.
 
 ### "Unable to fetch credential issuer metadata"
 - Check issuer2's `baseUrl` is `https://localhost.emobix.co.uk:9443`

@@ -64,7 +64,6 @@ waltid-openid4vp-conformance-runners/
 | [docs/VP-VERIFIER.md](docs/VP-VERIFIER.md) | VP verifier setup, status, and troubleshooting |
 | [docs/VCI-WALLET.md](docs/VCI-WALLET.md) | VCI wallet conformance documentation |
 | [docs/VP-WALLET.md](docs/VP-WALLET.md) | VP wallet conformance documentation |
-| [TEST-PLANS-AND-PROFILES.md](TEST-PLANS-AND-PROFILES.md) | Test-plan inventory and profile reference |
 
 `./gradlew test` only executes the test task. It does not universally provision
 remote services or local conformance infrastructure. Follow the relevant
@@ -85,7 +84,7 @@ OpenID4VP verifier report:
 GitHub-hosted CI points the wallet suites at `conformance.waltid.cloud` and
 exposes the in-process adapters through Cloudflare tunnels (OpenID4VP adapter
 on port 7006, OpenID4VCI adapter on port 7007), alongside the existing verifier
-tunnel on 7003. Those wallet suites therefore run live. The OpenID4VCI issuer
+tunnel on 7004. Those wallet suites therefore run live. The OpenID4VCI issuer
 matrix still only runs when its dedicated workflow inputs and issuer URL are
 configured.
 
