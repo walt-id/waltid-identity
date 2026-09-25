@@ -414,31 +414,22 @@ between evaluations. The default revocation policy remains `NotChecked`; demo
 trust settings do not configure a CRL client. OCSP needs a separate request and
 signed-response verifier and is not implemented by this evaluator.
 
-Applications with external knowledge of an issuer's IACA role can add its exact certificate to
-`knownIacaIssuers`. After chain validation, an exact match to the direct issuer requires the reader's
-non-critical `issuerAlternativeName` extension to contain an email or URI contact. These role assertions
-neither add trust anchors nor restrict otherwise trusted issuers. A certificate name, self-signature,
-or contact extension does not establish the IACA role. Without matching role information, the
-conditional IACA requirement is not checked.
+The configured evaluator does not infer IACA roles or enforce conditional issuer-contact requirements.
+Applications requiring these checks must supply an application-owned `ProximityReaderTrustEvaluator`.
+The X.509 helper `validateMdocReaderIssuerContactExtension` checks only the reader certificate's
+non-critical `issuerAlternativeName` email/URI contact; it establishes neither issuer identity nor trust.
+Apply it only when the application's policy requires that extension, after validating the certificate path.
 
-```kotlin
-val trust = ProximityReaderTrustConfiguration(
-    trustAnchors = listOf(ProximityReaderTrustAnchor(readerCaDerBase64Url)),
-    knownIacaIssuers = listOf(ProximityKnownIacaIssuer(knownIacaDerBase64Url)),
-)
-```
-
-Migration: `knownIacaIssuers` replaces the unreleased `requiredIacaIssuerCertificateDerBase64Url`
-setting. It does not preserve that setting's issuer-pinning behavior. Applications that need to
-restrict the accepted direct issuer must enforce that separately in their reader trust evaluator.
-The X.509 content helper is now named `validateMdocReaderIssuerContactExtension`; it does not
-identify an issuer or validate its role.
+Migration: the unreleased `requiredIacaIssuerCertificateDerBase64Url` setting has been removed.
+Applications using it must move both their issuer restriction and conditional contact check into their
+reader-trust evaluator. The standalone helper was renamed from
+`validateIacaIssuedMdocReaderCertificateContact` to `validateMdocReaderIssuerContactExtension`.
 
 Configuration snapshots detach collection data while retaining provider/evaluator service
 references. Providers and revocation sources are queried at evaluation time. Persisted
 settings decoding checks structure; import checks current CA usage and RICAL material;
 session evaluation establishes current trust. `applyTo` replaces the supplied trust evaluator,
-so applications needing CRL/IACA/custom policy must configure that evaluator after applying
+so applications needing CRL or custom policy must configure that evaluator after applying
 holder-managed settings. Imports do not add network services or infer issuer roles.
 
 Wallet applications that let holders manage this policy can persist a canonical

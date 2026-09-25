@@ -3,6 +3,9 @@ package id.walt.wallet2.mobile
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.x509.CertificateDer
+import id.walt.x509.X509ValidationException
+import id.walt.x509.validateMdocReaderIssuerContactExtension
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,104 +51,47 @@ class ProximityValidatedTrustPathTest {
     }
 
     @Test
-    fun knownIacaDirectIssuerRequiresContactExtension() = runTest {
+    fun issuerContactExtensionCanBeCheckedExplicitly() = runTest {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         try {
             val fixture = ReaderCertificateProfileFixture.create(runtime)
-            val root = fixture.root.encodedDer.toByteArray().encodeToBase64Url()
-            val evaluator = ProximityConfiguredReaderTrustEvaluator(ProximityReaderTrustConfiguration(
-                trustAnchors = listOf(ProximityReaderTrustAnchor(root)),
-                knownIacaIssuers = listOf(ProximityKnownIacaIssuer(root)),
-            ))
-            suspend fun evaluate(leaf: ByteArray) = evaluator.evaluate(ProximityReaderEvidence(
-                ProximityReaderAuthenticationScope.WholeRequest,
-                certificateChainDerBase64Url = listOf(leaf.encodeToBase64Url()),
-            ))
-            assertEquals(ProximityReaderCertificatePathState.Invalid,
-                evaluate(fixture.leaf.encodedDer.toByteArray()).certificatePath)
             for (contact in listOf("contact-uri", "contact-email")) {
-                assertEquals(ProximityReaderTrustState.Trusted, evaluate(fixture.modified(contact)).state, contact)
+                validateMdocReaderIssuerContactExtension(CertificateDer(fixture.modified(contact)))
             }
-            for (contact in listOf("contact-dns", "contact-critical")) {
-                assertEquals(ProximityReaderCertificatePathState.Invalid,
-                    evaluate(fixture.modified(contact)).certificatePath, contact)
+            for (invalid in listOf(
+                fixture.leaf.encodedDer.toByteArray(), // Missing extension.
+                fixture.modified("contact-dns"),
+                fixture.modified("contact-critical"),
+                byteArrayOf(1, 2, 3), // Malformed certificate.
+            )) {
+                assertFailsWith<X509ValidationException> {
+                    validateMdocReaderIssuerContactExtension(CertificateDer(invalid))
+                }
             }
         } finally { runtime.close() }
     }
 
     @Test
-    fun iacaKnowledgeNeitherPinsIssuersNorAddsTrust() = runTest {
+    fun configuredTrustDoesNotInferIssuerRoleFromContactInformation() = runTest {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         try {
-            val known = ReaderCertificateProfileFixture.create(runtime)
+            val fixture = ReaderCertificateProfileFixture.create(runtime)
             val other = ReaderCertificateProfileFixture.create(runtime)
-            val knownRoot = known.root.encodedDer.toByteArray().encodeToBase64Url()
+            val root = fixture.root.encodedDer.toByteArray().encodeToBase64Url()
             val otherRoot = other.root.encodedDer.toByteArray().encodeToBase64Url()
-            suspend fun evaluate(anchor: String, leaf: ByteArray, issuers: List<ProximityKnownIacaIssuer>) =
+            suspend fun evaluate(anchor: String, leaf: ByteArray) =
                 ProximityConfiguredReaderTrustEvaluator(ProximityReaderTrustConfiguration(
                     trustAnchors = listOf(ProximityReaderTrustAnchor(anchor)),
-                    knownIacaIssuers = issuers,
                 )).evaluate(ProximityReaderEvidence(ProximityReaderAuthenticationScope.WholeRequest,
                     certificateChainDerBase64Url = listOf(leaf.encodeToBase64Url())))
-            val issuers = listOf(ProximityKnownIacaIssuer(knownRoot))
-            // No external role knowledge: an otherwise valid reader does not need contact information.
+            // Trusted readers do not require issuer contact information by default.
             assertEquals(ProximityReaderTrustState.Trusted,
-                evaluate(knownRoot, known.leaf.encodedDer.toByteArray(), emptyList()).state)
-            // Another trusted issuer remains eligible even without a contact extension.
-            assertEquals(ProximityReaderTrustState.Trusted,
-                evaluate(otherRoot, other.leaf.encodedDer.toByteArray(), issuers).state)
-            // Role knowledge plus a valid contact extension cannot establish trust.
-            val untrusted = evaluate(otherRoot, known.modified("contact-uri"), issuers)
-            assertEquals(ProximityReaderTrustState.ValidButUntrusted, untrusted.state)
+                evaluate(root, fixture.leaf.encodedDer.toByteArray()).state)
+            val withContact = fixture.modified("contact-uri")
+            assertEquals(ProximityReaderTrustState.Trusted, evaluate(root, withContact).state)
+            // Passing the standalone contact check does not establish certificate trust.
+            validateMdocReaderIssuerContactExtension(CertificateDer(withContact))
+            assertEquals(ProximityReaderTrustState.ValidButUntrusted, evaluate(otherRoot, withContact).state)
         } finally { runtime.close() }
-    }
-
-    @Test
-    fun iacaContactRequirementUsesDirectIssuerNotAncestor() = runTest {
-        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
-        try {
-            val root = ReaderCertificateProfileFixture.create(runtime)
-            val intermediate = ReaderCertificateProfileFixture.create(runtime, parent = root)
-            val rootDer = root.root.encodedDer.toByteArray().encodeToBase64Url()
-            val intermediateDer = intermediate.root.encodedDer.toByteArray().encodeToBase64Url()
-            val evidence = ProximityReaderEvidence(ProximityReaderAuthenticationScope.WholeRequest,
-                certificateChainDerBase64Url = listOf(
-                    intermediate.leaf.encodedDer.toByteArray().encodeToBase64Url(), intermediateDer))
-            suspend fun evaluate(issuers: List<ProximityKnownIacaIssuer>) =
-                ProximityConfiguredReaderTrustEvaluator(ProximityReaderTrustConfiguration(
-                    trustAnchors = listOf(ProximityReaderTrustAnchor(rootDer)),
-                    knownIacaIssuers = issuers,
-                )).evaluate(evidence)
-            assertEquals(ProximityReaderTrustState.Trusted,
-                evaluate(listOf(ProximityKnownIacaIssuer(rootDer))).state)
-            assertEquals(ProximityReaderCertificatePathState.Invalid,
-                evaluate(listOf(ProximityKnownIacaIssuer(rootDer), ProximityKnownIacaIssuer(intermediateDer))).certificatePath)
-        } finally { runtime.close() }
-    }
-
-    @Test
-    fun evaluatorSnapshotsKnownIacaIssuers() = runTest {
-        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
-        try {
-            val fixture = ReaderCertificateProfileFixture.create(runtime)
-            val root = fixture.root.encodedDer.toByteArray().encodeToBase64Url()
-            val issuers = mutableListOf(ProximityKnownIacaIssuer(root))
-            val evaluator = ProximityConfiguredReaderTrustEvaluator(ProximityReaderTrustConfiguration(
-                trustAnchors = listOf(ProximityReaderTrustAnchor(root)), knownIacaIssuers = issuers,
-            ))
-            issuers.clear()
-            assertEquals(1, evaluator.configuration.knownIacaIssuers.size)
-            assertEquals(ProximityReaderCertificatePathState.Invalid, evaluator.evaluate(ProximityReaderEvidence(
-                ProximityReaderAuthenticationScope.WholeRequest,
-                certificateChainDerBase64Url = listOf(fixture.leaf.encodedDer.toByteArray().encodeToBase64Url()),
-            )).certificatePath)
-        } finally { runtime.close() }
-    }
-
-    @Test
-    fun knownIacaIssuerRejectsInvalidEncodingAtConstruction() {
-        for (invalid in listOf("", "***", byteArrayOf(1, 2, 3).encodeToBase64Url())) {
-            assertFailsWith<IllegalArgumentException> { ProximityKnownIacaIssuer(invalid) }
-        }
     }
 }

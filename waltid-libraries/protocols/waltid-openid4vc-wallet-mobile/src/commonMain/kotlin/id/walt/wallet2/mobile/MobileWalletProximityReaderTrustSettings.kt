@@ -82,7 +82,7 @@ public data class ProximityReaderTrustSettings(
 
     /**
      * Applies this settings snapshot, replacing the supplied reader-trust evaluator.
-     * Install application CRL, IACA or custom policy afterward; stored settings do not compose services.
+     * Install application CRL or custom policy afterward; stored settings do not compose services.
      */
     public fun applyTo(
         configuration: ProximityConfiguration,

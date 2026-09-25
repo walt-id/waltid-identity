@@ -733,10 +733,7 @@ private extension ProximityReaderTrustConfiguration {
                     }
                 )
             },
-            revocationPolicy: revocationPolicy.toKMPPolicy(),
-            knownIacaIssuers: knownIACAIssuers.map {
-                WalletCore.ProximityKnownIacaIssuer(certificateDerBase64Url: $0.certificateDER.base64URLEncodedString())
-            }
+            revocationPolicy: revocationPolicy.toKMPPolicy()
         )
     }
 }

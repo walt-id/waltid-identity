@@ -23,7 +23,6 @@ import id.walt.mdoc.proximity.X509RicalReaderPathValidator
 import id.walt.mdoc.proximity.X509RicalSignatureValidator
 import id.walt.x509.CertificateDer
 import id.walt.x509.mdocReaderAuthenticationCommonName
-import id.walt.x509.validateMdocReaderIssuerContactExtension
 import id.walt.x509.validatedMdocReaderAuthenticationCertificatePath
 import id.walt.x509.validateMdocReaderAuthenticationCertificateProfile
 import kotlinx.coroutines.CancellationException
@@ -48,22 +47,6 @@ public data class ProximityReaderTrustAnchor(
         }
         require(displayName == null || displayName.isNotBlank())
     }
-}
-
-/**
- * Application assertion that a specific certificate belongs to an IACA, based on external knowledge.
- * This validates certificate encoding only, not the asserted role, and never adds a trust anchor.
- */
-public data class ProximityKnownIacaIssuer(
-    /** Exact issuer certificate encoded as unpadded Base64URL DER. */
-    public val certificateDerBase64Url: String,
-) {
-    internal val certificate: CertificateDer = runCatching { certificateDerBase64Url.trustCertificateDer() }
-        .getOrElse {
-            throw IllegalArgumentException(
-                "An IACA issuer must be a DER X.509 certificate encoded as unpadded Base64URL", it,
-            )
-        }
 }
 
 /** Result returned by an application-owned certificate-revocation source. */
@@ -267,12 +250,6 @@ public data class ProximityReaderTrustConfiguration(
     /** Revocation behavior for a reader chain trusted by a direct Reader CA anchor. */
     public val revocationPolicy: ProximityReaderRevocationPolicy =
         ProximityReaderRevocationPolicy.NotChecked,
-    /**
-     * Application-known IACA issuers. Only an exact match to the validated direct issuer requires
-     * the Table B.6 reader contact extension. Other trusted issuers remain eligible; an empty list
-     * means this conditional requirement is not checked. Entries neither add trust nor pin issuers.
-     */
-    public val knownIacaIssuers: List<ProximityKnownIacaIssuer> = emptyList(),
 ) {
     init {
         require(trustAnchors.isNotEmpty() || ricalProviders.isNotEmpty()) {
@@ -486,11 +463,6 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
         rical: ProximityRicalState,
         establishesTrust: Boolean,
     ): ProximityReaderTrustDecision {
-        val directIssuer = path.getOrNull(1)
-        if (ownedConfiguration.knownIacaIssuers.any { it.certificate == directIssuer } &&
-            runCatching { validateMdocReaderIssuerContactExtension(path.first()) }.isFailure) {
-            return invalidPathDecision()
-        }
         return when (val revocation = evaluateRevocation(evidence, path)) {
             is EvaluatedRevocation.Good -> ProximityReaderTrustDecision(
                 state = if (establishesTrust) ProximityReaderTrustState.Trusted
@@ -629,7 +601,6 @@ private fun String.isTrustBase64Url(): Boolean =
     isNotBlank() && !contains('=') && runCatching { decodeTrustBase64Url().isNotEmpty() }.getOrDefault(false)
 
 private fun ProximityReaderTrustConfiguration.snapshot() = copy(
-    knownIacaIssuers = knownIacaIssuers.toList(),
     trustAnchors = trustAnchors.toList(),
     ricalProviders = ricalProviders.map { provider ->
         provider.copy(

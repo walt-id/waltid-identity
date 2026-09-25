@@ -657,20 +657,6 @@ public struct ProximityRICALConfiguration: Sendable {
     }
 }
 
-/// Application assertion, based on external knowledge, that a certificate belongs to an IACA.
-/// This does not add a trust anchor. The shared evaluator parses the DER when configuration is bridged.
-public struct ProximityKnownIACAIssuer: Sendable, Equatable {
-    /// Exact issuer certificate in DER form.
-    public let certificateDER: Data
-
-    /// Creates an application assertion; this does not verify the issuer's IACA role.
-    /// - Parameter certificateDER: The application-known IACA certificate in DER form.
-    public init(certificateDER: Data) {
-        precondition(!certificateDER.isEmpty)
-        self.certificateDER = certificateDER
-    }
-}
-
 /// Swift-native immutable configuration for the shared standards reader-trust evaluator.
 public struct ProximityReaderTrustConfiguration: Sendable {
     /// Explicit application-provisioned Reader CA trust anchors.
@@ -680,21 +666,15 @@ public struct ProximityReaderTrustConfiguration: Sendable {
     /// Revocation behavior for reader chains trusted by direct Reader CA anchors.
     public let revocationPolicy: ProximityReaderRevocationPolicy
 
-    /// Application-known IACA issuers. An exact validated direct-issuer match requires the contact extension.
-    /// Other trusted issuers remain eligible. These entries neither add trust nor pin issuers.
-    public let knownIACAIssuers: [ProximityKnownIACAIssuer]
-
     /// Creates immutable application-owned reader-trust configuration.
     /// - Parameters:
     ///   - trustAnchors: Explicit Reader CA trust anchors.
     ///   - ricalProviders: Ordered RICAL provider policies.
     ///   - revocationPolicy: Revocation behavior for directly anchored reader chains.
-    ///   - knownIACAIssuers: Application assertions identifying issuers subject to the contact requirement.
     public init(
         trustAnchors: [ProximityReaderTrustAnchor] = [],
         ricalProviders: [ProximityRICALConfiguration] = [],
-        revocationPolicy: ProximityReaderRevocationPolicy = .notChecked,
-        knownIACAIssuers: [ProximityKnownIACAIssuer] = []
+        revocationPolicy: ProximityReaderRevocationPolicy = .notChecked
     ) {
         precondition(!trustAnchors.isEmpty || !ricalProviders.isEmpty)
         precondition(Set(trustAnchors.map(\.certificateDER)).count == trustAnchors.count)
@@ -702,7 +682,6 @@ public struct ProximityReaderTrustConfiguration: Sendable {
         self.trustAnchors = trustAnchors
         self.ricalProviders = ricalProviders
         self.revocationPolicy = revocationPolicy
-        self.knownIACAIssuers = knownIACAIssuers
     }
 }
 

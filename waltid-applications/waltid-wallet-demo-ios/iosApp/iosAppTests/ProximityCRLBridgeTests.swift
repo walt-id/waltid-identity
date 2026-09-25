@@ -3,29 +3,29 @@ import XCTest
 import WalletSDK
 
 final class ProximityCRLBridgeTests: XCTestCase {
-    func testMalformedRequiredIacaIssuerFailsClosedThroughSwiftBridge() async throws {
+    func testMalformedReaderCertificateFailsClosedThroughSwiftBridge() async throws {
         let evaluator = ProximityConfiguredReaderTrustEvaluator(configuration: .init(
-            trustAnchors: [.init(certificateDER: ProximityCRLFixtures.issuerWithoutCdp)],
-            requiredIACAIssuerCertificateDER: Data([0x30, 0])))
+            trustAnchors: [.init(certificateDER: ProximityCRLFixtures.issuerWithoutCdp)]))
         let result = try await evaluator.evaluate(.init(scope: .wholeRequest,
-            certificateChainDER: [ProximityCRLFixtures.profileReader]))
+            certificateChainDER: [Data([0x30, 0])]))
         XCTAssertEqual(result.certificatePath, .invalid)
     }
 
-    func testValidatedPathAndIacaContextSurviveTheRealSwiftBridge() async throws {
+    func testValidatedPathDoesNotRequireIssuerContactThroughSwiftBridge() async throws {
         let root = ProximityCRLFixtures.issuerWithoutCdp
         let anchor = ProximityReaderTrustAnchor(certificateDER: root)
         let fetcher = RecordingCRLFetcher(.available(der: ProximityCRLFixtures.good))
         let crl = try ProximityCRLRevocationEvaluator(issuerCertificatesDER: [root], scope: .validatedPath, fetcher: fetcher)
         let evaluator = ProximityConfiguredReaderTrustEvaluator(configuration: .init(
-            trustAnchors: [anchor], revocationPolicy: .check(crl), requiredIACAIssuerCertificateDER: root))
+            trustAnchors: [anchor], revocationPolicy: .check(crl)))
         let valid = try await evaluator.evaluate(.init(scope: .wholeRequest, certificateChainDER: [ProximityCRLFixtures.profileReader]))
         XCTAssertEqual(valid.state, .trusted)
         XCTAssertEqual(valid.revocation, .good)
         let missingContact = try await evaluator.evaluate(.init(scope: .wholeRequest, certificateChainDER: [ProximityCRLFixtures.profileReaderWithoutContact]))
-        XCTAssertEqual(missingContact.certificatePath, .invalid)
+        XCTAssertEqual(missingContact.state, .trusted)
+        XCTAssertEqual(missingContact.revocation, .good)
         let requests = await fetcher.requests
-        XCTAssertEqual(requests.count, 1) // No anchor CRL lookup and no lookup after profile failure.
+        XCTAssertEqual(requests.count, 2) // Reader CRL only, with or without issuer contact information.
     }
 
     func testConfiguredScopeAndFoundationTransportReachSharedVerifier() async throws {
