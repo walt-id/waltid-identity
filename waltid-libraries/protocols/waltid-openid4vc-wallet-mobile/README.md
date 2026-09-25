@@ -414,12 +414,25 @@ between evaluations. The default revocation policy remains `NotChecked`; demo
 trust settings do not configure a CRL client. OCSP needs a separate request and
 signed-response verifier and is not implemented by this evaluator.
 
-For IACA-issued readers, set `requiredIacaIssuerCertificateDerBase64Url` in the trust
-configuration to the application-identified direct issuer. The validated path must contain
-that exact direct issuer, and the reader must carry non-critical issuerAlternativeName with
-an email/URI contact. A self-signed or imported generic CA does not establish the IACA role.
-Without this context, validation covers the unconditional reader fields; do not claim the
-conditional IACA profile has been checked.
+Applications with external knowledge of an issuer's IACA role can add its exact certificate to
+`knownIacaIssuers`. After chain validation, an exact match to the direct issuer requires the reader's
+non-critical `issuerAlternativeName` extension to contain an email or URI contact. These role assertions
+neither add trust anchors nor restrict otherwise trusted issuers. A certificate name, self-signature,
+or contact extension does not establish the IACA role. Without matching role information, the
+conditional IACA requirement is not checked.
+
+```kotlin
+val trust = ProximityReaderTrustConfiguration(
+    trustAnchors = listOf(ProximityReaderTrustAnchor(readerCaDerBase64Url)),
+    knownIacaIssuers = listOf(ProximityKnownIacaIssuer(knownIacaDerBase64Url)),
+)
+```
+
+Migration: `knownIacaIssuers` replaces the unreleased `requiredIacaIssuerCertificateDerBase64Url`
+setting. It does not preserve that setting's issuer-pinning behavior. Applications that need to
+restrict the accepted direct issuer must enforce that separately in their reader trust evaluator.
+The X.509 content helper is now named `validateMdocReaderIssuerContactExtension`; it does not
+identify an issuer or validate its role.
 
 Configuration snapshots detach collection data while retaining provider/evaluator service
 references. Providers and revocation sources are queried at evaluation time. Persisted

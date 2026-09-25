@@ -450,7 +450,8 @@ final class WalletAPITests: XCTestCase {
             configuration: ProximityReaderTrustConfiguration(
                 trustAnchors: [
                     ProximityReaderTrustAnchor(certificateDER: trustAnchor)
-                ]
+                ],
+                knownIACAIssuers: [ProximityKnownIACAIssuer(certificateDER: trustAnchor)]
             )
         )
 

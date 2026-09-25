@@ -657,6 +657,20 @@ public struct ProximityRICALConfiguration: Sendable {
     }
 }
 
+/// Application assertion, based on external knowledge, that a certificate belongs to an IACA.
+/// This does not add a trust anchor. The shared evaluator parses the DER when configuration is bridged.
+public struct ProximityKnownIACAIssuer: Sendable, Equatable {
+    /// Exact issuer certificate in DER form.
+    public let certificateDER: Data
+
+    /// Creates an application assertion; this does not verify the issuer's IACA role.
+    /// - Parameter certificateDER: The application-known IACA certificate in DER form.
+    public init(certificateDER: Data) {
+        precondition(!certificateDER.isEmpty)
+        self.certificateDER = certificateDER
+    }
+}
+
 /// Swift-native immutable configuration for the shared standards reader-trust evaluator.
 public struct ProximityReaderTrustConfiguration: Sendable {
     /// Explicit application-provisioned Reader CA trust anchors.
@@ -666,21 +680,21 @@ public struct ProximityReaderTrustConfiguration: Sendable {
     /// Revocation behavior for reader chains trusted by direct Reader CA anchors.
     public let revocationPolicy: ProximityReaderRevocationPolicy
 
-    /// Application-identified IACA direct issuer; also requires the conditional reader contact extension.
-    /// This certificate supplies issuer-role context and does not add trust.
-    public let requiredIACAIssuerCertificateDER: Data?
+    /// Application-known IACA issuers. An exact validated direct-issuer match requires the contact extension.
+    /// Other trusted issuers remain eligible. These entries neither add trust nor pin issuers.
+    public let knownIACAIssuers: [ProximityKnownIACAIssuer]
 
     /// Creates immutable application-owned reader-trust configuration.
     /// - Parameters:
     ///   - trustAnchors: Explicit Reader CA trust anchors.
     ///   - ricalProviders: Ordered RICAL provider policies.
-    ///   - requiredIACAIssuerCertificateDER: Optional exact IACA direct issuer required on the validated path.
     ///   - revocationPolicy: Revocation behavior for directly anchored reader chains.
+    ///   - knownIACAIssuers: Application assertions identifying issuers subject to the contact requirement.
     public init(
         trustAnchors: [ProximityReaderTrustAnchor] = [],
         ricalProviders: [ProximityRICALConfiguration] = [],
         revocationPolicy: ProximityReaderRevocationPolicy = .notChecked,
-        requiredIACAIssuerCertificateDER: Data? = nil
+        knownIACAIssuers: [ProximityKnownIACAIssuer] = []
     ) {
         precondition(!trustAnchors.isEmpty || !ricalProviders.isEmpty)
         precondition(Set(trustAnchors.map(\.certificateDER)).count == trustAnchors.count)
@@ -688,7 +702,7 @@ public struct ProximityReaderTrustConfiguration: Sendable {
         self.trustAnchors = trustAnchors
         self.ricalProviders = ricalProviders
         self.revocationPolicy = revocationPolicy
-        self.requiredIACAIssuerCertificateDER = requiredIACAIssuerCertificateDER
+        self.knownIACAIssuers = knownIACAIssuers
     }
 }
 
