@@ -108,20 +108,18 @@ build/reports/openid-conformance/
 
 ### `CONFORMANCE_ALLOW_FAILURE`
 
-Repo/org Actions variable controlling soft-fail for all conformance roles:
+Controls soft-fail for wallet and verifier conformance roles:
 
 | Value | Behavior |
 |-------|----------|
 | unset / empty / `true` | Soft-fail: failed tests still appear in the job summary, but JUnit does not fail the job for those failures |
 | `false` | Hard-fail: any executed non-passing conformance result fails the job |
 
-While actively working on conformance, keep the variable unset or set to
-`true`. Set it to `false` when conformance must be green to merge.
-
-Local equivalent:
+CI sets `CONFORMANCE_ALLOW_FAILURE=false` so wallet/verifier failures fail the
+conformance job. Local runs stay soft-fail unless this variable is set.
 
 ```bash
-export CONFORMANCE_ALLOW_FAILURE=true   # soft-fail
+export CONFORMANCE_ALLOW_FAILURE=true   # soft-fail (local default when unset)
 export CONFORMANCE_ALLOW_FAILURE=false  # hard-fail
 ```
 

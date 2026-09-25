@@ -53,6 +53,9 @@ class ConformanceReportWriterTest {
         assertTrue(summary.contains("[log](https://conformance.example:443/log-detail.html?log=def-456)"))
         assertTrue(summary.contains("# OpenID4VP Verifier Conformance Summary"))
         assertTrue(summary.contains("| Test | Status | Suite | Log | Error |"))
+        assertTrue(summary.contains("<details>"))
+        assertTrue(summary.contains("<summary>OpenID4VP Verifier results</summary>"))
+        assertTrue(summary.contains("</details>"))
         assertFalse(summary.contains("## Failed and skipped"))
         assertFalse(summary.contains("- Fix:"))
     }
@@ -86,6 +89,8 @@ class ConformanceReportWriterTest {
                 )
                 assertTrue(summary.contains("# ${role.title} Conformance Summary"))
                 assertTrue(summary.contains("| Test | Status | Suite | Log | Error |"))
+                assertTrue(summary.contains("<details>"))
+                assertTrue(summary.contains("<summary>${role.title} results</summary>"))
                 assertTrue(summary.contains("wallet-module"))
                 assertTrue(summary.contains("Soft-fail"))
             }
@@ -218,6 +223,8 @@ class ConformanceReportWriterTest {
         assertTrue(summary.contains("negative-test-missing-nonce"))
         assertTrue(summary.contains(compact.variant!!))
         assertTrue(summary.contains("| Test | Status | Suite | Log | Error |"))
+        assertTrue(summary.contains("<details>"))
+        assertTrue(summary.contains("<summary>OpenID4VP Wallet results</summary>"))
         assertTrue(summary.contains("`skipped`"))
         assertTrue(summary.contains("`failed`"))
         assertTrue(summary.contains("audience mismatch"))

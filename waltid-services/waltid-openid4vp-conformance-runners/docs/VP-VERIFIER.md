@@ -197,8 +197,8 @@ build/reports/openid-conformance/vp-verifier/results.json
 ```
 
 The OSS Gradle workflow appends these to the GitHub Actions job summary.
-Soft-fail is controlled by the repo Actions variable `CONFORMANCE_ALLOW_FAILURE`
-(see the module [README](../README.md#ci-summaries-and-soft-fail)).
+CI sets `CONFORMANCE_ALLOW_FAILURE=false` so wallet/verifier failures fail the
+conformance job (see the module [README](../README.md#conformance_allow_failure)).
 
 ## Code Fixes Made (2026-07-08)
 

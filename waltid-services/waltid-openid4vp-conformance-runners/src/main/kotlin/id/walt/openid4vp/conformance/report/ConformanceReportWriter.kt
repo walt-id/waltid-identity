@@ -181,6 +181,9 @@ object ConformanceReportWriter {
         appendLine("- Failed: ${entries.count { !it.accepted }}")
         if (skipped > 0) appendLine("- Skipped (not applicable to this variant): $skipped")
         appendLine()
+        appendLine("<details>")
+        appendLine("<summary>${role.title} results</summary>")
+        appendLine()
         appendLine("| Test | Status | Suite | Log | Error |")
         appendLine("|------|--------|-------|-----|-------|")
         entries.forEach { entry ->
@@ -193,6 +196,8 @@ object ConformanceReportWriter {
                     "${entry.error?.sanitizeMarkdownCell() ?: ""} |"
             )
         }
+        appendLine()
+        appendLine("</details>")
     }
 
     private fun logUrl(host: String?, port: Int?, testId: String?): String? {

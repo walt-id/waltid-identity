@@ -335,7 +335,8 @@ Issuer2 is built, configured and started before the shared test step. Its port i
 public adapters use 7006/7007). There is no wallet/issuer port collision. Startup
 rejects an occupied issuer port rather than terminating an unknown process.
 
-Wallet/verifier tests retain the repository's `CONFORMANCE_ALLOW_FAILURE` setting.
+CI sets `CONFORMANCE_ALLOW_FAILURE=false` so wallet/verifier failures fail the
+conformance job.
 `OPENID4VCI_CONFORMANCE_STRICT=true` overrides that policy only for issuer results,
 and `OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true` still requires executed batch
 coverage. One JUnit report covers all roles; issuer result artifacts remain
@@ -641,10 +642,9 @@ results.json
 summary.md
 ```
 
-CI publishes result summaries into the GitHub Actions job summary. The issuer CI
-phase explicitly disables soft-fail; wallet/verifier settings are unchanged.
-Outside that phase, soft-fail is controlled by `CONFORMANCE_ALLOW_FAILURE` (see the
-module [README](../README.md#ci-summaries-and-soft-fail)); locally you can still use
+CI publishes result summaries into the GitHub Actions job summary. CI sets
+`CONFORMANCE_ALLOW_FAILURE=false` so wallet/verifier failures fail the job;
+issuer results stay independently strict. Locally you can still use
 `OPENID4VCI_CONFORMANCE_STRICT=false` for exploration.
 Result states have these meanings:
 

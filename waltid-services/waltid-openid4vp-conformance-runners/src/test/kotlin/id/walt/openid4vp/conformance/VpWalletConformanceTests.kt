@@ -5,7 +5,9 @@ import id.walt.commons.testing.E2ETest
 import id.walt.did.dids.DidService
 import id.walt.openid4vp.conformance.adapter.VpWalletConformanceAdapter
 import id.walt.openid4vp.conformance.config.ConformanceConfig
+import id.walt.openid4vp.conformance.report.ConformanceCiFlags
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
+import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
 import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.Oid4vpWalletVariantPlan
@@ -147,6 +149,7 @@ class VpWalletConformanceTests {
 
             try {
                 adapter.start(adapterHttp)
+                val results = mutableListOf<TestPlanResult>()
                 Oid4vpWalletVariantPlan.supportedByWallet2(
                     walletApiUrl = ConformanceConfig.WALLET_ADAPTER_URL,
                     conformanceHost = conformanceHost,
@@ -155,12 +158,27 @@ class VpWalletConformanceTests {
                     println("\n" + "=".repeat(80))
                     println("Running wallet plan: ${plan.name}")
                     println("=".repeat(80))
-                    runCatching {
+                    val planResults = runCatching {
                         WalletTestPlanRunner(plan, adapterHttp, conformanceHost, conformancePort).test()
-                    }.onFailure { error ->
+                    }.getOrElse { error ->
                         println("Plan ${plan.name} failed: ${error.message}")
+                        listOf(
+                            TestPlanResult(
+                                testName = plan.name,
+                                conformanceTestId = "N/A",
+                                conformanceResult = "ERROR",
+                                walletStatus = "ERROR",
+                                errorMessage = error.message,
+                            )
+                        )
                     }
+                    results += planResults
                 }
+                ConformanceReportWriter.failIfNeededFromTestPlanResults(
+                    role = ConformanceReportWriter.Role.VP_WALLET,
+                    results = results,
+                    allowFailure = ConformanceCiFlags.allowFailure(),
+                )
             } finally {
                 adapter.stop()
                 adapterHttp.close()

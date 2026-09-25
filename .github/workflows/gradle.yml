@@ -439,8 +439,9 @@ jobs:
           CACHELESS: ${{ inputs.cacheless }}
           ISSUER_BASE_URL: ${{ steps.issuer-tunnel.outputs.url }}
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
-          # Wallet/verifier retain the repository soft-fail policy. The issuer-specific override wins below.
-          CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
+          # Wallet/verifier module failures fail this job. Set CONFORMANCE_ALLOW_FAILURE=true
+          # on the workflow (or locally) only to temporarily restore soft-fail.
+          CONFORMANCE_ALLOW_FAILURE: "false"
           CONFORMANCE_HOST: conformance.waltid.cloud
           CONFORMANCE_PORT: "443"
           CONFORMANCE_VP_WALLET_ADAPTER_URL: ${{ steps.tunnel.outputs.vp_wallet_url }}/openid4vp/authorize
@@ -500,7 +501,7 @@ jobs:
       - name: Publish OpenID conformance summary
         if: always()
         env:
-          CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
+          CONFORMANCE_ALLOW_FAILURE: "false"
           ISSUER_REQUESTED: ${{ inputs.run-issuer-conformance || inputs.run-haip-conformance }}
           ISSUER_SETUP_OUTCOME: ${{ steps.issuer-tunnel.outcome }}
           CONFORMANCE_TEST_OUTCOME: ${{ steps.conformance-tests.outcome }}
@@ -544,8 +545,13 @@ jobs:
                 echo "- Passed: 0"
                 echo "- Failed: 0"
                 echo
+                echo "<details>"
+                echo "<summary>${title} results</summary>"
+                echo
                 echo "| Test | Status | Suite | Log | Error |"
                 echo "|------|--------|-------|-----|-------|"
+                echo
+                echo "</details>"
                 echo
                 echo "_No ${title} conformance results were produced (suite skipped, unavailable, or failed before writing a report)._"
               } >> "$GITHUB_STEP_SUMMARY"
@@ -589,6 +595,9 @@ jobs:
                     | group_by(.result) | map({result: .[0].result, count: length}))}' \
                   "$ISSUER_DIAGNOSTICS_DIR/results.json" > "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
                 if jq -e 'length > 0' "$ISSUER_DIAGNOSTICS_DIR/results.json" >/dev/null; then
+                  echo '<details>'
+                  echo '<summary>OpenID4VCI Issuer results</summary>'
+                  echo
                   echo '| Variant status | Count |'
                   echo '|----------------|-------|'
                   jq -r '.variants[] | "| \(.status) | \(.count) |"' "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
@@ -603,6 +612,8 @@ jobs:
                   echo '|---------|--------|------|----------------|'
                   jq -r '.[] | "| \(.variantId | @html) | \(.status | @html) | \(if .planId then "[\(.planId | @html)](https://conformance.waltid.cloud/plan-detail.html?plan=\(.planId | @uri))" else "—" end) | \(.batchCoverage | @html) |"' \
                     "$ISSUER_DIAGNOSTICS_DIR/results.json"
+                  echo
+                  echo '</details>'
                 else
                   echo '_No issuer variant results were produced. This does not establish issuer or batch coverage._'
                 fi
@@ -639,6 +650,15 @@ jobs:
             pid=$(cat "$pid_file")
             if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then kill "$pid" 2>/dev/null || true; fi
           done
+
+      - name: Upload OpenID conformance reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: openid-conformance-summaries
+          if-no-files-found: warn
+          path: |
+            **/build/reports/openid-conformance/**
 
       - name: Upload issuer conformance results
         if: ${{ always() && (inputs.run-issuer-conformance || inputs.run-haip-conformance) }}
