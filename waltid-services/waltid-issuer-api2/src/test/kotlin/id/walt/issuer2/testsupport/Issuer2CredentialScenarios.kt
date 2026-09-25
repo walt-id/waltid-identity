@@ -101,6 +101,7 @@ object Issuer2CredentialScenarios {
         mdoc("eudiPidMdoc", "eu.europa.ec.eudi.pid.1"),
         mdoc("euAgeVerificationMdoc", "eu.europa.ec.av.1"),
         mdoc("scaPaymentCardMdoc", "sca_payment_card_mso_mdoc"),
+        sdJwtVc("scaPaymentCardSdJwt", "sca_payment_card_sd_jwt"),
         mdoc("emvcoDpcMdoc", "emvco_dpc_mso_mdoc"),
         sdJwtVc("certificateOfResidenceSdJwt", "urn:eu.europa.ec.eudi:cor:1"),
         sdJwtVc("ehicSdJwt", "urn:eudi:ehic:1"),
