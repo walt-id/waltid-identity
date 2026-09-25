@@ -58,6 +58,7 @@ class CredentialProfileService(
 
     fun requireMsoDataOnlyForMdoc(credentialConfigurationId: String, msoData: MsoData?) {
         if (msoData == null || msoData.isEmpty()) return
+        msoData.requireNonBlankFields()
         val format = metadataConfig.credentialConfigurations[credentialConfigurationId]
             ?.jsonObject?.get("format")?.jsonPrimitive?.content
         require(format == CredentialFormat.MSO_MDOC.value) {

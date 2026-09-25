@@ -171,6 +171,78 @@ class Crypto2MdocIssuerTest {
     }
 
     @Test
+    fun `ISO precheck allows expectedUpdate before validFrom unless issuer policy is on`() = runTest {
+        val signed = Instant.parse("2026-09-08T12:00:00Z")
+        val validFrom = Instant.parse("2026-09-08T18:00:00Z")
+        val expectedUpdate = Instant.parse("2026-09-08T15:00:00Z")
+        val validUntil = Instant.parse("2027-09-08T18:00:00Z")
+        val issued = issueExample(
+            keyId = "policy",
+            signedAt = signed,
+            validFrom = validFrom,
+            validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
+        )
+        assertEquals(
+            expectedUpdate.epochSeconds,
+            issued.decodeMobileSecurityObject().validityInfo.expectedUpdate?.epochSeconds,
+        )
+
+        val error = runCatching {
+            issueExample(
+                keyId = "policy-on",
+                signedAt = signed,
+                validFrom = validFrom,
+                validUntil = validUntil,
+                expectedUpdate = expectedUpdate,
+                requireExpectedUpdateWithinWindow = true,
+            )
+        }.exceptionOrNull()
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(error.message!!.contains("expectedUpdate"))
+        assertTrue(error.message!!.contains("validFrom"))
+    }
+
+    @Test
+    fun `rejects mDL issue_date after validFrom`() = runTest {
+        val error = runCatching {
+            issueExample(
+                keyId = "issue-date",
+                docType = "org.iso.18013.5.1.mDL",
+                namespaces = mapOf(
+                    "org.iso.18013.5.1" to JsonObject(
+                        mapOf(
+                            "given_name" to JsonPrimitive("Jane"),
+                            "issue_date" to JsonPrimitive("2026-09-09"),
+                        )
+                    )
+                ),
+                signedAt = Instant.parse("2026-09-08T12:00:00Z"),
+                validFrom = Instant.parse("2026-09-08T12:00:00Z"),
+                validUntil = Instant.parse("2027-09-08T12:00:00Z"),
+            )
+        }.exceptionOrNull()
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(error.message!!.contains("issue_date"))
+        assertTrue(error.message!!.contains("validFrom"))
+    }
+
+    @Test
+    fun `does not coerce validFrom when signing is later`() = runTest {
+        val error = runCatching {
+            issueExample(
+                keyId = "no-coerce",
+                signedAt = Instant.parse("2026-09-08T12:00:01Z"),
+                validFrom = Instant.parse("2026-09-08T12:00:00Z"),
+                validUntil = Instant.parse("2027-09-08T12:00:00Z"),
+            )
+        }.exceptionOrNull()
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(error.message!!.contains("signed"))
+        assertTrue(error.message!!.contains("validFrom"))
+    }
+
+    @Test
     fun `crypto2 ECDH derives the same mdoc shared secret`() = runTest {
         val first = agreementKey("first")
         val second = agreementKey("second")
@@ -190,4 +262,52 @@ class Crypto2MdocIssuerTest {
             usages = setOf(KeyUsage.KEY_AGREEMENT),
         )
     )
+
+    private suspend fun issueExample(
+        keyId: String,
+        docType: String = "org.example.mdoc",
+        namespaces: Map<String, JsonObject> = mapOf(
+            "org.example" to JsonObject(mapOf("given_name" to JsonPrimitive("Jane"))),
+        ),
+        signedAt: Instant,
+        validFrom: Instant,
+        validUntil: Instant,
+        expectedUpdate: Instant? = null,
+        requireExpectedUpdateWithinWindow: Boolean = false,
+    ): IssuerSigned {
+        val issuerKey = runtime.generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId(keyId),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val holderKey = runtime.generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("$keyId-holder"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.KEY_AGREEMENT),
+            )
+        )
+        val holderCoseKey = (holderKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk).toCoseKey()
+        val certificate = X509CertificateUtil.createSelfSignedCertificate(
+            issuerKey,
+            SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER),
+        ) {
+            subjectDn = "CN=$keyId"
+        }
+        return MdocIssuer.issueUniversal(
+            issuerKey = issuerKey,
+            signatureAlgorithm = Cose.Algorithm.ES256,
+            issuerCertificate = listOf(CoseCertificate(certificate.encodedDer.toByteArray())),
+            holderKey = holderCoseKey,
+            docType = docType,
+            data = MdocIssuer.MdocUniversalIssuanceData(namespaces),
+            signedAt = signedAt,
+            validFrom = validFrom,
+            validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
+            requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
+        )
+    }
 }

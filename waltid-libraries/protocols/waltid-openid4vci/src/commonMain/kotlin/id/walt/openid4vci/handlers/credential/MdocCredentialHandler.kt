@@ -19,10 +19,13 @@ import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.sdjwt.SDMap
-import id.walt.w3c.issuance.dataFunctions
+import id.walt.w3c.issuance.IssuanceClock
+import id.walt.w3c.issuance.InstantClock
+import id.walt.w3c.issuance.dataFunctionsFor
 import id.walt.w3c.utils.CredentialDataMergeUtils.mdocNamespaceMapping
 import id.walt.w3c.utils.CredentialDataMergeUtils.mergeMdocPayloadWithMapping
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -43,6 +46,7 @@ import kotlin.time.Instant
 @OptIn(ExperimentalSerializationApi::class)
 class MdocCredentialHandler(
     private val roundValidityToTwelveHours: Boolean = false,
+    private val requireExpectedUpdateWithinWindow: Boolean = false,
     private val now: () -> Instant = { Clock.System.now() },
 ) : CredentialEndpointHandler, Crypto2CredentialEndpointHandler {
     override suspend fun sign(
@@ -78,7 +82,14 @@ class MdocCredentialHandler(
                 issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                     MdocCredentialSigner.generateMdocCredential(
                         credentialRequest = request,
-                        credentialData = mapMdocData(instance.input.credentialData, dataMapping, issuerId, display, instance.verifiedProof),
+                        credentialData = mapMdocData(
+                            instance.input.credentialData,
+                            dataMapping,
+                            issuerId,
+                            display,
+                            instance.verifiedProof,
+                            signedAt,
+                        ),
                         issuerKey = issuerKey,
                         issuerCertificate = certificateChain,
                         docType = docType,
@@ -86,6 +97,7 @@ class MdocCredentialHandler(
                         validFrom = effectiveValidFrom,
                         validUntil = effectiveValidUntil,
                         expectedUpdate = expectedUpdate,
+                        requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
                         status = instance.input.credentialStatus,
                         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
                         verifiedProof = instance.verifiedProof,
@@ -133,7 +145,14 @@ class MdocCredentialHandler(
             issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                 MdocCredentialSigner.generateMdocCredential(
                     credentialRequest = request,
-                    credentialData = mapMdocData(instance.input.credentialData, dataMapping, issuerId, display, instance.verifiedProof),
+                    credentialData = mapMdocData(
+                        instance.input.credentialData,
+                        dataMapping,
+                        issuerId,
+                        display,
+                        instance.verifiedProof,
+                        signedAt,
+                    ),
                     issuerKey = issuerKey.key,
                     signatureAlgorithm = issuerKey.requireCoseAlgorithm(),
                     issuerCertificate = certificateChain,
@@ -142,6 +161,7 @@ class MdocCredentialHandler(
                     validFrom = effectiveValidFrom,
                     validUntil = effectiveValidUntil,
                     expectedUpdate = expectedUpdate,
+                    requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
                     status = instance.input.credentialStatus,
                     mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
                     verifiedProof = instance.verifiedProof,
@@ -162,15 +182,14 @@ class MdocCredentialHandler(
         issuerId: String,
         display: List<CredentialDisplay>?,
         verifiedProof: VerifiedCredentialProof?,
+        issuedAt: Instant,
     ): JsonObject {
         if (dataMapping == null || dataMapping.isEmpty()) return credentialData
-        // Legacy top-level mappings (for example validFrom) are not mdoc namespaces.
-        // MSO validity is controlled by msoData, so only apply mappings for existing namespaces.
         val namespaceMapping = dataMapping.mdocNamespaceMapping(credentialData) ?: return credentialData
         return credentialData.mergeMdocPayloadWithMapping(
             mapping = namespaceMapping,
             context = mdocMappingContext(issuerId, display, verifiedProof?.holderDid),
-            data = dataFunctions,
+            data = dataFunctionsFor(InstantClock(issuedAt)),
         )
     }
 
@@ -197,7 +216,7 @@ class MdocCredentialHandler(
         issue: suspend (
             certificateChain: List<CoseCertificate>,
             docType: String,
-            signedAt: Instant?,
+            signedAt: Instant,
             validFrom: Instant?,
             validUntil: Instant,
             instance: CredentialIssuanceInstance,
@@ -211,11 +230,13 @@ class MdocCredentialHandler(
         }
         val issuerCertificateChain = certificates.map { CoseCertificate(it.encodedDer.toByteArray()) }
 
-        // The issuer's resolved MSO validity is authoritative over holder request parameters.
+        val issuedAt = issuanceInstant()
         val roundedValidity = if (roundValidityToTwelveHours) {
-            roundedMdocValidity(now(), certificates.first().data.validity, validFrom, validUntil)
+            roundedMdocValidity(issuedAt, certificates.first().data.validity, validFrom, validUntil)
         } else null
-        val effectiveValidUntil = roundedValidity?.validUntil ?: resolveValidUntil(validUntil)
+        val signedAt = roundedValidity?.signed ?: issuedAt
+        val effectiveValidFrom = roundedValidity?.validFrom ?: validFrom
+        val effectiveValidUntil = roundedValidity?.validUntil ?: (validUntil ?: issuedAt.plus(365.days))
         return issuanceBatch.signEach { instance ->
             val credentialData = instance.input.credentialData
             val namespaceIdentifiers = credentialData.keys
@@ -233,12 +254,12 @@ class MdocCredentialHandler(
                 }
             }
             issue(
-                issuerCertificateChain, docType, roundedValidity?.signed,
-                roundedValidity?.validFrom ?: validFrom, effectiveValidUntil, instance,
+                issuerCertificateChain, docType, signedAt,
+                effectiveValidFrom, effectiveValidUntil, instance,
             )
         }
     }
 
-    private fun resolveValidUntil(configuredValidUntil: Instant?): Instant =
-        configuredValidUntil ?: now().plus(365.days)
+    private suspend fun issuanceInstant(): Instant =
+        currentCoroutineContext()[IssuanceClock]?.clock?.now() ?: now()
 }

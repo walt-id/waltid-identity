@@ -133,6 +133,28 @@ class CredentialProfileServiceTest {
     }
 
     @Test
+    fun `rejects blank msoData fields`() {
+        val service = serviceWithProfiles(
+            profiles = mapOf(
+                "isoMdl" to profileConfig(
+                    name = "ISO mDL",
+                    credentialConfigurationId = MDOC_CONFIGURATION_ID,
+                    msoData = MsoData(validUntil = ""),
+                )
+            ),
+            metadataConfig = metadataConfig(
+                extraConfigurations = mapOf(
+                    MDOC_CONFIGURATION_ID to buildJsonObject { put("format", "mso_mdoc") }
+                )
+            ),
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            service.getProfile("isoMdl")
+        }
+    }
+
+    @Test
     fun `rejects msoData on non-mdoc profiles`() {
         val service = serviceWithProfiles(
             profiles = mapOf(

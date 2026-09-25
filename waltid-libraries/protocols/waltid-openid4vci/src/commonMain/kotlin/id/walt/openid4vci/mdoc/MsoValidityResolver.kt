@@ -1,6 +1,6 @@
 package id.walt.openid4vci.mdoc
 
-import id.walt.w3c.issuance.dataFunctions
+import id.walt.w3c.issuance.dataFunctionsFor
 import id.walt.w3c.utils.CredentialDataMergeUtils
 import id.walt.w3c.utils.CredentialDataMergeUtils.isTemplate
 import kotlinx.serialization.json.JsonElement
@@ -11,10 +11,17 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
+enum class MsoValidUntilSource {
+    EXPLICIT,
+    FALLBACK,
+    DEFAULT,
+}
+
 data class ResolvedMsoValidity(
     val validFrom: Instant?,
-    val validUntil: Instant,
+    val validUntil: Instant?,
     val expectedUpdate: Instant?,
+    val validUntilSource: MsoValidUntilSource,
 )
 
 object MsoValidityResolver {
@@ -23,28 +30,34 @@ object MsoValidityResolver {
         msoData: MsoData?,
         signed: Instant = Clock.System.now(),
         fallbackValidUntil: Instant? = null,
+        clock: Clock = Clock.System,
+        requireExpectedUpdateWithinWindow: Boolean = false,
     ): ResolvedMsoValidity {
+        msoData?.requireNonBlankFields()
+        val functions = dataFunctionsFor(clock)
         val signedTDate = signed.asTDate()
-        val validFrom = resolveInstant(msoData?.validFrom, "validFrom")?.asTDate()
-        val validUntil = (
-            resolveInstant(msoData?.validUntil, "validUntil")
-                ?: fallbackValidUntil
-                ?: signed.plus(365.days)
-            ).asTDate()
-        val expectedUpdate = resolveInstant(msoData?.expectedUpdate, "expectedUpdate")?.asTDate()
+        val validFrom = resolveInstant(msoData?.validFrom, "validFrom", functions)?.asTDate()
+        val explicitValidUntil = resolveInstant(msoData?.validUntil, "validUntil", functions)?.asTDate()
+        val (validUntil, validUntilSource) = when {
+            explicitValidUntil != null -> explicitValidUntil to MsoValidUntilSource.EXPLICIT
+            fallbackValidUntil != null -> fallbackValidUntil.asTDate() to MsoValidUntilSource.FALLBACK
+            else -> null to MsoValidUntilSource.DEFAULT
+        }
+        val expectedUpdate = resolveInstant(msoData?.expectedUpdate, "expectedUpdate", functions)?.asTDate()
+        val windowStart = validFrom ?: signedTDate
 
         if (validFrom != null && validFrom < signedTDate) {
             throw IllegalArgumentException("msoData.validFrom cannot be before the MSO signed time")
         }
-        if (validUntil <= (validFrom ?: signedTDate)) {
+        if (validUntil != null && validUntil <= windowStart) {
             throw IllegalArgumentException("msoData.validUntil must be after validFrom")
         }
-        if (expectedUpdate != null) {
-            val windowStart = validFrom ?: signedTDate
+        if (requireExpectedUpdateWithinWindow && expectedUpdate != null) {
+            val windowEnd = validUntil ?: signedTDate.plus(365.days).asTDate()
             if (expectedUpdate < windowStart) {
                 throw IllegalArgumentException("msoData.expectedUpdate cannot be before validFrom")
             }
-            if (expectedUpdate > validUntil) {
+            if (expectedUpdate > windowEnd) {
                 throw IllegalArgumentException("msoData.expectedUpdate cannot be after validUntil")
             }
         }
@@ -53,19 +66,24 @@ object MsoValidityResolver {
             validFrom = validFrom,
             validUntil = validUntil,
             expectedUpdate = expectedUpdate,
+            validUntilSource = validUntilSource,
         )
     }
 
     private fun Instant.asTDate(): Instant = Instant.fromEpochSeconds(epochSeconds)
 
-    private suspend fun resolveInstant(raw: String?, fieldName: String): Instant? {
+    private suspend fun resolveInstant(
+        raw: String?,
+        fieldName: String,
+        functions: Map<String, suspend (CredentialDataMergeUtils.FunctionCall) -> JsonElement>,
+    ): Instant? {
         if (raw.isNullOrBlank()) return null
         val primitive = JsonPrimitive(raw)
         val resolved = try {
             if (primitive.isTemplate()) {
                 CredentialDataMergeUtils.getTemplateData(
                     functionCall = raw,
-                    dataFunctions = dataFunctions,
+                    dataFunctions = functions,
                     context = emptyMap(),
                     functionHistory = mutableMapOf(),
                 )

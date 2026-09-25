@@ -36,6 +36,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
@@ -105,7 +106,7 @@ class MdocCredentialValidityTest {
             },
             dataMapping = buildJsonObject {
                 putJsonObject(namespace) {
-                    put("issue_date", "2026-09-15")
+                    put("issue_date", "2026-09-08")
                     put("expiry_date", "2027-09-15")
                     put("issuing_authority", "<issuerId>")
                     putJsonArray("administrative_number") {
@@ -113,16 +114,13 @@ class MdocCredentialValidityTest {
                         add("mapped-value")
                     }
                 }
-                put("id", "<uuid>")
-                put("issuanceDate", "<timestamp>")
-                put("expirationDate", "<timestamp-in:365d>")
             },
         )
 
         assertEquals(setOf(namespace), issued.namespaces!!.keys)
         val items = issued.namespaces!!.getValue(namespace).entries
             .associate { it.value.elementIdentifier to it.value.elementValue }
-        assertEquals("2026-09-15", assertIs<CborString>(items.getValue("issue_date")).value)
+        assertEquals("2026-09-08", assertIs<CborString>(items.getValue("issue_date")).value)
         assertEquals("2027-09-15", assertIs<CborString>(items.getValue("expiry_date")).value)
         assertEquals("https://issuer.example", assertIs<CborString>(items.getValue("issuing_authority")).value)
         val administrativeNumber = assertIs<CborArray>(items.getValue("administrative_number"))
@@ -219,9 +217,9 @@ class MdocCredentialValidityTest {
     }
 
     @Test
-    fun `non-object namespace mapping values are silently dropped to prevent signer crash`() = runTest {
+    fun `non-object namespace mapping values are rejected`() = runTest {
         val namespace = "org.iso.18013.5.1"
-        val issued = fixture().issueCredential(
+        val result = fixture().issueResult(
             credentialData = buildJsonObject {
                 putJsonObject(namespace) { put("given_name", "Jane") }
             },
@@ -229,9 +227,53 @@ class MdocCredentialValidityTest {
                 put(namespace, "not-an-object")
             },
         )
-        val items = issued.namespaces!!.getValue(namespace).entries
-            .associate { it.value.elementIdentifier to it.value.elementValue }
-        assertEquals("Jane", assertIs<CborString>(items.getValue("given_name")).value)
+        val failure = assertIs<CredentialResponseResult.Failure>(result)
+        assertTrue(failure.error.description!!.contains("must be a JSON object"))
+    }
+
+    @Test
+    fun `top-level mapping validFrom is rejected in favor of msoData`() = runTest {
+        val result = fixture().issueResult(
+            dataMapping = buildJsonObject {
+                put("validFrom", "<timestamp>")
+            },
+        )
+        val failure = assertIs<CredentialResponseResult.Failure>(result)
+        assertTrue(failure.error.description!!.contains("msoData"))
+    }
+
+    @Test
+    fun `mapped mDL issue_date after validFrom is rejected`() = runTest {
+        val namespace = "org.iso.18013.5.1"
+        val result = fixture().issueResult(
+            credentialData = buildJsonObject {
+                putJsonObject(namespace) {
+                    put("issue_date", "2019-10-20")
+                }
+            },
+            dataMapping = buildJsonObject {
+                putJsonObject(namespace) {
+                    put("issue_date", "2026-09-15")
+                }
+            },
+        )
+        val failure = assertIs<CredentialResponseResult.Failure>(result)
+        assertTrue(failure.error.description!!.contains("issue_date"))
+    }
+
+    @Test
+    fun `omitted msoData validUntil is rounded through the resolver provenance`() = runTest {
+        val now = Instant.parse("2026-09-08T19:18:10Z")
+        val resolved = id.walt.openid4vci.mdoc.MsoValidityResolver.resolve(null, signed = now)
+        assertEquals(id.walt.openid4vci.mdoc.MsoValidUntilSource.DEFAULT, resolved.validUntilSource)
+        assertNull(resolved.validUntil)
+        val validity = fixture().issue(
+            time = now.toString(),
+            validFrom = resolved.validFrom,
+            validUntil = resolved.validUntil,
+        )
+        assertEquals(Instant.parse("2026-09-08T12:00:00Z"), validity.signed)
+        assertEquals(Instant.parse("2027-09-08T12:00:00Z"), validity.validUntil)
     }
 
     @Test

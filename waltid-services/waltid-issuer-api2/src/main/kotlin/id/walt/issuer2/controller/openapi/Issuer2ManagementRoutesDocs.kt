@@ -95,10 +95,19 @@ object Issuer2ManagementRoutesDocs {
             idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, authorizedTransactionDataTypes,
             msoData, x5Chain, notifications, and credentialStatus.
             runtimeOverrides.msoData is rejected unless the profile credential configuration
-            format is mso_mdoc.
+            format is mso_mdoc. Blank or whitespace msoData.validFrom, validUntil, and
+            expectedUpdate values are rejected. Omitted override keys inherit the profile.
+            JSON null for expectedUpdate clears the profile value so the MSO omits it;
+            JSON null for validFrom or validUntil still inherits. ISO 18013-5 requires
+            signed <= validFrom < validUntil. expectedUpdate is optional and is not bounded
+            by that ISO rule unless an issuer enables the opt-in window policy (off by default).
+            Omitting msoData.validUntil uses the 365-day default, rounded to a 12-hour UTC
+            bucket when rounding is enabled. Explicit timestamps, data functions, and
+            fallbackValidUntil are kept as given.
             For mDoc profiles, put namespace value functions in mapping (including <date>,
             <date-in>, and <date-before> for ISO full-date fields such as issue_date) and MSO
-            validity functions in msoData. Top-level W3C-style mapping keys are ignored for mDoc.
+            validity functions in msoData. Top-level W3C-style mapping keys such as
+            mapping.validFrom / mapping.validUntil are rejected; use msoData instead.
             credentialData is applied as a partial object patch over the configured profile data:
             nested objects are merged, while primitive, array, and null values replace the configured value.
             Each offered credential uses its configured `credentialStatus` for all copies issued from it.
