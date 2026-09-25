@@ -61,6 +61,7 @@ class KeyAttestationProofTest {
         val claims = Json.parseToJsonElement(verified.payload.decodeToString()) as JsonObject
         assertEquals("nonce", claims["nonce"]?.jsonPrimitive?.content)
         assertEquals("key-attestation+jwt", verified.protectedHeader["typ"]?.jsonPrimitive?.content)
+        assertTrue("iss" !in claims, "OpenID4VCI does not require iss in the key attestation")
     }
 
     @Test
@@ -101,12 +102,33 @@ class KeyAttestationProofTest {
     fun `attestation type must be present and identify a key attestation`() = runTest {
         val request = attestationRequest()
         val attester = newKey("attester")
-        for (type in listOf(null, "JWT", "openid4vci-proof+jwt")) {
+        // The unhyphenated TS3 example is an acknowledged typo, not another registered type:
+        // https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/issues/605
+        for (type in listOf(null, "JWT", "openid4vci-proof+jwt", "keyattestation+jwt")) {
             val error = assertFailsWith<IllegalArgumentException>("typ=$type") {
                 TestProvider(attester, jwtType = type).validatedAttestation(request)
             }
             assertTrue(error.message.orEmpty().contains("invalid JWT type"))
         }
+    }
+
+    @Test
+    fun `OpenID4VCI accepts a proof key after the first attested key`() = runTest {
+        val request = attestationRequest()
+        val attester = newKey("attester")
+        val otherKey = newKey("other")
+        val payload = claims(request)
+        val keys = JsonArray(listOf(
+            claims(request, attestedKey = otherKey)["attested_keys"]!!.jsonArray.single(),
+            payload["attested_keys"]!!.jsonArray.single(),
+        ))
+        val provider = TestProvider(attester, payload = {
+            JsonObject(payload + ("attested_keys" to keys))
+        })
+
+        val attestation = provider.validatedAttestation(request)
+        val verified = CompactJws.verify(attestation, attester, JwsAlgorithm.ES256)
+        assertEquals(keys, Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject["attested_keys"])
     }
 
     @Test
