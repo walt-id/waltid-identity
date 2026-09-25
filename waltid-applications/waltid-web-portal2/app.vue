@@ -63,25 +63,32 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", syncViewportMode);
 });
 
-const docsUrl = computed(() =>
-  activeTab.value === "issue" ? ISSUER_DOCS_URL : VERIFIER_DOCS_URL,
-);
-
-const swaggerUrl = computed(() =>
-  activeTab.value === "issue" ? issuerBase : verifierBase,
-);
-
-const activeSession = computed(() =>
-  activeTab.value === "issue" ? issuerSession : verifierSession,
-);
-const hasResult = computed(() =>
-  activeTab.value === "issue"
-    ? !!issuerSession.result.value
-    : !!verifierSession.result.value,
-);
+const simpleProfileId = ref<string | null>(null);
+const simpleAction = ref<"issue" | "verify">("issue");
 
 const effectiveMode = computed(() =>
   isMobile.value ? "simple" : mode.value,
+);
+
+const activeAction = computed(() =>
+  effectiveMode.value === "simple" ? simpleAction.value : activeTab.value,
+);
+
+const docsUrl = computed(() =>
+  activeAction.value === "issue" ? ISSUER_DOCS_URL : VERIFIER_DOCS_URL,
+);
+
+const swaggerUrl = computed(() =>
+  activeAction.value === "issue" ? issuerBase : verifierBase,
+);
+
+const activeSession = computed(() =>
+  activeAction.value === "issue" ? issuerSession : verifierSession,
+);
+const hasResult = computed(() =>
+  activeAction.value === "issue"
+    ? !!issuerSession.result.value
+    : !!verifierSession.result.value,
 );
 </script>
 
@@ -143,28 +150,30 @@ const effectiveMode = computed(() =>
         <div
           class="flex items-center gap-1 border-b border-[--color-border] overflow-x-auto"
         >
-          <button
-            class="px-4 sm:px-5 py-3 font-semibold transition-colors relative shrink-0"
-            :class="
-              activeTab === 'issue'
-                ? 'text-[--color-accent] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[--color-accent]'
-                : 'text-[--color-text-muted] hover:text-[--color-text-secondary]'
-            "
-            @click="activeTab = 'issue'"
-          >
-            Issue
-          </button>
-          <button
-            class="px-4 sm:px-5 py-3 font-semibold transition-colors relative shrink-0"
-            :class="
-              activeTab === 'verify'
-                ? 'text-[--color-accent] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[--color-accent]'
-                : 'text-[--color-text-muted] hover:text-[--color-text-secondary]'
-            "
-            @click="activeTab = 'verify'"
-          >
-            Verify
-          </button>
+          <template v-if="effectiveMode === 'advanced'">
+            <button
+              class="px-4 sm:px-5 py-3 font-semibold transition-colors relative shrink-0"
+              :class="
+                activeTab === 'issue'
+                  ? 'text-[--color-accent] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[--color-accent]'
+                  : 'text-[--color-text-muted] hover:text-[--color-text-secondary]'
+              "
+              @click="activeTab = 'issue'"
+            >
+              Issue
+            </button>
+            <button
+              class="px-4 sm:px-5 py-3 font-semibold transition-colors relative shrink-0"
+              :class="
+                activeTab === 'verify'
+                  ? 'text-[--color-accent] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[--color-accent]'
+                  : 'text-[--color-text-muted] hover:text-[--color-text-secondary]'
+              "
+              @click="activeTab = 'verify'"
+            >
+              Verify
+            </button>
+          </template>
 
           <a
             :href="docsUrl"
@@ -203,18 +212,14 @@ const effectiveMode = computed(() =>
         </div>
 
         <div class="p-4 sm:p-5 flex-1">
-          <KeepAlive>
-            <SimpleIssueEditor
-              v-if="effectiveMode === 'simple' && activeTab === 'issue'"
-              :session="issuerSession"
-              :profiles="issuerProfiles"
-            />
-            <SimpleVerifyEditor
-              v-else-if="effectiveMode === 'simple' && activeTab === 'verify'"
-              :session="verifierSession"
-              :profiles="issuerProfiles"
-            />
-          </KeepAlive>
+          <SimplePortalEditor
+            v-if="effectiveMode === 'simple'"
+            v-model:profile-id="simpleProfileId"
+            v-model:action="simpleAction"
+            :issuer-session="issuerSession"
+            :verifier-session="verifierSession"
+            :profiles="issuerProfiles"
+          />
           <IssueEditor
             v-if="effectiveMode === 'advanced' && activeTab === 'issue'"
             v-model:json="issuerJson"
@@ -237,7 +242,10 @@ const effectiveMode = computed(() =>
       <div
         class="card w-full md:w-[340px] min-h-[280px] md:h-[440px] shrink-0 p-4 sm:p-5 flex flex-col justify-center md:sticky md:top-5 order-2"
       >
-        <IssueResult v-if="activeTab === 'issue'" :session="issuerSession" />
+        <IssueResult
+          v-if="activeAction === 'issue'"
+          :session="issuerSession"
+        />
         <VerifyResult v-else :session="verifierSession" />
       </div>
     </div>
@@ -251,7 +259,7 @@ const effectiveMode = computed(() =>
         @clear="activeSession.clear()"
       />
       <PolicyResults
-        v-if="activeTab === 'verify'"
+        v-if="activeAction === 'verify'"
         :events="verifierSession.sse.events.value"
       />
     </div>
