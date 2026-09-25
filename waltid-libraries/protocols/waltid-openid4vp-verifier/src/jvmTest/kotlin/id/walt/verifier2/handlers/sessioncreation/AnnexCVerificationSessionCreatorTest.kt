@@ -143,6 +143,27 @@ class AnnexCVerificationSessionCreatorTest {
     }
 
     @Test
+    fun shouldRejectEmptyRequestedElementsForAnnexC() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            json.decodeFromString<VerificationSessionSetup>(
+                """
+                {
+                  "flow_type": "dc_api_18013_7",
+                  "core_flow": {
+                    "requestedElements": {}
+                  },
+                  "expectedOrigins": [
+                    "https://digital-credentials.walt.id"
+                  ]
+                }
+                """.trimIndent()
+            )
+        }
+
+        assertTrue(exception.message!!.contains("requestedElements cannot be empty"))
+    }
+
+    @Test
     fun `annex C examples keep doctype query ids without OpenID4VP precheck`() {
         val mdl = DcApiAnnexCFlowSetup.EXTENDED_MDL_EXAMPLE
         assertEquals("org.iso.18013.5.1.mDL", mdl.generatedDcqlQuery.credentials.single().id)

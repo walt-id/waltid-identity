@@ -477,6 +477,10 @@ data class DcApiAnnexCFlowSetup(
         private fun buildAnnexCDcqlQuery(
             namespaceRequestedElements: AnnexCDocTypeToRequestedElements,
         ): DcqlQuery {
+            require(namespaceRequestedElements.isNotEmpty()) {
+                "requestedElements cannot be empty"
+            }
+
             val credentials = namespaceRequestedElements.entries
 
             val dcqlIndividualQueries: List<CredentialQuery> = credentials.map { (docType, requestedElements) ->
