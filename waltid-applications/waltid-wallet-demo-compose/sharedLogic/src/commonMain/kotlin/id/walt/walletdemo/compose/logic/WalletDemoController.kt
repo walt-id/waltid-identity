@@ -235,7 +235,7 @@ class WalletDemoController(
         _state.update { state ->
             if (state.auth !is WalletAuthState.Setup ||
                 state.isAuthenticating ||
-                (protection == WalletDemoSigningProtection.Biometric &&
+                (protection.requiresBiometrics &&
                     state.biometricSigningAvailability != WalletDemoSigningProtectionAvailability.Available)
             ) {
                 state
@@ -1668,7 +1668,10 @@ class WalletDemoController(
         biometricSigningAvailabilityJob?.cancel()
         biometricSigningAvailabilityJob = scope.launch(dispatcher) {
             val availability = try {
-                wallet.signingProtectionAvailability(WalletDemoSigningProtection.Biometric)
+                wallet.signingProtectionAvailability(
+                    (_state.value.session as? WalletSessionState.Ready)?.signingProtection
+                        ?.takeIf { it.requiresBiometrics } ?: WalletDemoSigningProtection.Biometric,
+                )
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Throwable) {
@@ -1695,7 +1698,7 @@ class WalletDemoController(
         val applied = (state.session as? WalletSessionState.Ready)?.signingProtection
         val availability = state.biometricSigningAvailability ?: return
         if (state.auth != WalletAuthState.Unlocked ||
-            applied != WalletDemoSigningProtection.Biometric ||
+            applied?.requiresBiometrics != true ||
             availability == WalletDemoSigningProtectionAvailability.Available
         ) {
             return

@@ -105,6 +105,29 @@ class ScaPresentationInteropTest {
     }
 
     @Test
+    fun `display-equivalent payment JSON keeps its original encoded hash input`() = runTest {
+        val fixture = fixture(mode = OpenID4VPResponseMode.DC_API)
+        val decoded = Json.parseToJsonElement(String(Base64.getUrlDecoder().decode(fixture.transaction)))
+        val pretty = Json { prettyPrint = true }.encodeToString(JsonElement.serializer(), decoded)
+        val reencoded = encode(pretty.encodeToByteArray())
+        assertEquals(decoded, Json.parseToJsonElement(pretty))
+        assertNotEquals(fixture.transaction, reencoded)
+
+        val first = verify(fixture, present(fixture, simulatedAuthentication))
+        fixture.request = fixture.request.copy(transactionData = listOf(reencoded))
+        var authorizedEntry: String? = null
+        val second = verify(fixture, present(fixture, ScaPresentationAuthorizer {
+            authorizedEntry = it.transactionData.single()
+            factors
+        }))
+
+        assertEquals(reencoded, authorizedEntry)
+        assertEquals(JsonArray(listOf(JsonPrimitive(hash(fixture.transaction)))), first["transaction_data_hashes"])
+        assertEquals(JsonArray(listOf(JsonPrimitive(hash(reencoded)))), second["transaction_data_hashes"])
+        assertNotEquals(first["transaction_data_hashes"], second["transaction_data_hashes"])
+    }
+
+    @Test
     fun `SCA without an authorizer or with denied authorization produces no signature`() = runTest {
         val fixture = fixture()
         val missing = assertFailsWith<IllegalArgumentException> { present(fixture, null) }

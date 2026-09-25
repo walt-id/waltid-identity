@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.android
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
@@ -15,6 +16,7 @@ import org.junit.Assert.assertTrue
 import java.io.ByteArrayOutputStream
 
 internal object WalletComposeE2EHelper {
+    private val walletPackage: String get() = InstrumentationRegistry.getInstrumentation().targetContext.packageName
     const val PIN = "1234"
     const val WALLET_READY_TIMEOUT = 60_000L
     const val UI_ELEMENT_TIMEOUT = 30_000L
@@ -43,6 +45,40 @@ internal object WalletComposeE2EHelper {
     fun launchAndUnlock(context: Context, device: UiDevice) {
         launch(context)
         unlock(device)
+    }
+
+    /** Uses the normal setup UI; the operator approves each native signing prompt. */
+    fun launchAndCreateScaIdentity(context: Context, device: UiDevice) {
+        val intent = requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            .putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, "required")
+        context.startActivity(intent)
+        requireNotNull(waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT)).setText(PIN)
+        requireNotNull(waitForResource(device, "wallet.pinConfirmationInput", UI_ELEMENT_TIMEOUT)).setText(PIN)
+        clickByTag(device, "wallet.pinSubmitButton")
+        requireNotNull(device.wait(Until.findObject(By.text("1 of 3 · Recovery")), UI_ELEMENT_TIMEOUT))
+        clickByTag(device, "wallet.keySetupContinue")
+        requireNotNull(device.wait(Until.findObject(By.text("Hardware required")), UI_ELEMENT_TIMEOUT)).click()
+        clickByTag(device, "wallet.keySetupContinue")
+        requireNotNull(device.wait(Until.findObject(By.text("Current biometrics only")), UI_ELEMENT_TIMEOUT)).click()
+        println("SCA_OPERATOR: approve native key setup prompts")
+        clickByTag(device, "wallet.keySetupContinue")
+        assertTrue("App key setup failed: ${foregroundWindowSnapshot(device)}",
+            waitForStatus(device, 180_000L, { it == "Wallet ready" }, listOf("Bootstrap failed")))
+    }
+
+    fun receiveThroughApp(device: UiDevice, offerUrl: String) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(offerUrl), context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, "required"))
+        setTextByTag(device, "wallet.offerInput", offerUrl)
+        clickByTag(device, "wallet.receiveButton")
+        requireNotNull(waitForResource(device, "wallet.offerAcceptButton", CREDENTIAL_OPERATION_TIMEOUT))
+        println("SCA_OPERATOR: approve native issuance prompts")
+        clickByTag(device, "wallet.offerAcceptButton")
+        assertTrue("App issuance failed: ${foregroundWindowSnapshot(device)}",
+            waitForStatus(device, 180_000L, { it.startsWith("Received") }, listOf("Receive failed")))
     }
 
     fun launchExpectingSetupAndUnlock(context: Context, device: UiDevice) {
@@ -312,7 +348,7 @@ internal object WalletComposeE2EHelper {
     }
 
     private fun findVisibleTextContaining(device: UiDevice, substring: String): UiObject2? =
-        device.findObjects(By.pkg("id.walt.walletdemo.compose"))
+        device.findObjects(By.pkg(walletPackage))
             .flatMap { it.flatten() }
             .firstOrNull { node ->
                 node.isVisibleOn(device) &&
@@ -320,14 +356,14 @@ internal object WalletComposeE2EHelper {
             }
 
     private fun findVisibleText(device: UiDevice, texts: List<String>): UiObject2? =
-        device.findObjects(By.pkg("id.walt.walletdemo.compose"))
+        device.findObjects(By.pkg(walletPackage))
             .flatMap { it.flatten() }
             .firstOrNull { node ->
                 node.isVisibleOn(device) && runCatching { node.text?.trim() in texts }.getOrDefault(false)
             }
 
     private fun findVisibleResource(device: UiDevice, tag: String): UiObject2? =
-        device.findObjects(By.pkg("id.walt.walletdemo.compose"))
+        device.findObjects(By.pkg(walletPackage))
             .flatMap { it.flatten() }
             .firstOrNull { node ->
                 node.isVisibleOn(device) && runCatching { node.resourceName == tag }.getOrDefault(false)
@@ -441,7 +477,7 @@ internal object WalletComposeE2EHelper {
     }
 
     private fun visibleUiSnapshot(device: UiDevice): String {
-        val roots = device.findObjects(By.pkg("id.walt.walletdemo.compose"))
+        val roots = device.findObjects(By.pkg(walletPackage))
         val nodes = roots
             .flatMap { it.flatten() }
             .distinctBy { node ->

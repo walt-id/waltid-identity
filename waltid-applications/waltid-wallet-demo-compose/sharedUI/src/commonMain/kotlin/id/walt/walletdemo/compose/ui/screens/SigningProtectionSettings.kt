@@ -41,46 +41,18 @@ internal fun SigningProtectionSettings(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        when (state.signingProtectionMode) {
-            WalletDemoSigningProtectionMode.Optional -> {
-                SigningProtectionChoice(
-                    protection = WalletDemoSigningProtection.Biometric,
-                    selected = state.selectedSigningProtection == WalletDemoSigningProtection.Biometric,
-                    enabled = biometricSigningAvailable && !state.isBusy,
-                    testTag = WalletUiTestTags.SigningProtectionBiometric,
-                    onSelect = { onRequestChange(WalletDemoSigningProtection.Biometric) },
-                )
-                SigningProtectionChoice(
-                    protection = WalletDemoSigningProtection.None,
-                    selected = state.selectedSigningProtection == WalletDemoSigningProtection.None,
-                    enabled = !state.isBusy,
-                    testTag = WalletUiTestTags.SigningProtectionNone,
-                    onSelect = { onRequestChange(WalletDemoSigningProtection.None) },
-                )
-            }
-            WalletDemoSigningProtectionMode.Required,
-            WalletDemoSigningProtectionMode.Disabled,
-            -> {
-                val required = state.signingProtectionMode.defaultSelection
-                SigningProtectionChoice(
-                    protection = required,
-                    selected = state.selectedSigningProtection == required,
-                    enabled = ready != null && ready.signingProtection != required &&
-                        !state.isBusy &&
-                        (required == WalletDemoSigningProtection.None || biometricSigningAvailable),
-                    testTag = if (required == WalletDemoSigningProtection.Biometric) {
-                        WalletUiTestTags.SigningProtectionBiometric
-                    } else {
-                        WalletUiTestTags.SigningProtectionNone
-                    },
-                    onSelect = { onRequestChange(required) },
-                )
-                Text(
-                    "Managed by app configuration.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        WalletDemoSigningProtection.entries.filter(state.signingProtectionMode::allows).forEach { protection ->
+            SigningProtectionChoice(
+                protection = protection,
+                selected = state.selectedSigningProtection == protection,
+                enabled = !state.isBusy && (!protection.requiresBiometrics || biometricSigningAvailable),
+                testTag = when (protection) {
+                    WalletDemoSigningProtection.None -> WalletUiTestTags.SigningProtectionNone
+                    WalletDemoSigningProtection.Biometric -> WalletUiTestTags.SigningProtectionBiometric
+                    WalletDemoSigningProtection.BiometricPerUse -> WalletUiTestTags.SigningProtectionBiometricPerUse
+                },
+                onSelect = { onRequestChange(protection) },
+            )
         }
 
         if (!biometricSigningAvailable && state.signingProtectionMode != WalletDemoSigningProtectionMode.Disabled) {
@@ -101,7 +73,7 @@ internal fun SigningProtectionSettings(
             OutlinedButton(
                 onClick = { onRequestChange(state.selectedSigningProtection) },
                 enabled = !state.isBusy && (
-                    state.selectedSigningProtection != WalletDemoSigningProtection.Biometric ||
+                    !state.selectedSigningProtection.requiresBiometrics ||
                         biometricSigningAvailable
                     ),
                 modifier = Modifier

@@ -106,7 +106,7 @@ class Android:
         options = dict(class_=f"id.walt.proximity.physical.{cls}", physicalOptIn=args.opt_in,
                        selectedDeviceId=self.serial, controllerIsLocal="true", runId=self.run_id,
                        configuration=args.configuration, fixture=FIXTURE, peerRevision=PEER_REVISION,
-                       annotation="id.walt.proximity.test.PhysicalDeviceTest")
+                       annotation="id.walt.mobile.test.PhysicalDeviceTest")
         invocation = ["am", "instrument", "-w", "-r"]
         for key, value in options.items():
             invocation += ["-e", key.removesuffix("_"), value]

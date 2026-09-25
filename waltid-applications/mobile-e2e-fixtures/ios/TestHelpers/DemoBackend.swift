@@ -80,6 +80,23 @@ public final class DemoBackend {
 
     public static let presentationScenarios = scenarios
 
+    /// Operator-assisted payment fixture; excluded from ordinary software-key scenarios.
+    public static let scaPaymentScenario = DemoCredentialScenario(
+        id: "sca-payment-sdjwt", displayName: "SCA Payment Card SD-JWT (demo)",
+        profileId: "scaPaymentCardSdJwt", credentialConfigurationId: "sca_payment_card_sd_jwt", format: "dc+sd-jwt",
+        verifierCredentialQuery: sdJwtQuery(id: "sca_payment", vct: "https://issuer2.demo.walt.id/openid4vci/sca_payment_card_sd_jwt")
+    )
+
+    /// A URL payment request using the same nested TS-12 shape as the Android demo.
+    public func createScaPaymentVerifierSession() async throws -> DemoVerifierSession {
+        try await createVerifierSession(scenario: Self.scaPaymentScenario, transactionData: [[
+            "type": "urn:eudi:sca:payment:1", "credential_ids": ["sca_payment"],
+            "transaction_data_hashes_alg": ["sha-256"],
+            "payload": ["transaction_id": "8D8AC610-566D-4EF0-9C22-186B2A5ED793",
+                        "payee": ["name": "Super Store", "id": "merchant-001"], "currency": "EUR", "amount": 11.56],
+        ]], bindClientIDToResponseURI: true)
+    }
+
     public static let transactionDataPresentationScenario = scenarios.first { $0.id == "eudi-pid-sdjwt" }!
 
     public static let persistenceScenario = scenarios.first { $0.id == "eudi-pid-mdoc" }!

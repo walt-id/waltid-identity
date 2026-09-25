@@ -15,6 +15,67 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     private let credentialOperationTimeout: TimeInterval = 90
     private let verifierPollingTimeout: TimeInterval = 30
 
+    /// Run explicitly on enrolled physical hardware with WALLET_SCA_OPERATOR=approve.
+    func testScaPaymentWithNativeAuthorization() async throws {
+        continueAfterFailure = false
+        #if targetEnvironment(simulator)
+        throw XCTSkip("SCA acceptance requires physical Secure Enclave and enrolled biometrics")
+        #else
+        guard ProcessInfo.processInfo.environment["WALLET_SCA_OPERATOR"] == "approve" else {
+            throw XCTSkip("Select the operator-assisted SCA lane explicitly")
+        }
+        let offer = try await backend.createOffer(scenario: DemoBackend.scaPaymentScenario)
+        let app = XCUIApplication()
+        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: publicDemoEnvironment().merging(["WALLET_SIGNING_PROTECTION_MODE": "required"]) { _, new in new },
+                  initializeSigningIdentity: false)
+        let next = app.buttons["wallet.keySetupContinue"]
+        XCTAssertTrue(app.staticTexts["1 of 3 · Recovery"].waitForExistence(timeout: 20))
+        next.tap() // Default: no recovery, so Secure Enclave remains eligible.
+        let storage = app.staticTexts["Secure Enclave"]
+        XCTAssertTrue(storage.waitForExistence(timeout: 10))
+        storage.tap()
+        next.tap()
+        let approval = app.staticTexts["Current biometrics only"]
+        XCTAssertTrue(approval.waitForExistence(timeout: 10))
+        approval.tap()
+        print("SCA_OPERATOR: approve iPhone key setup and issuance prompts")
+        next.tap()
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 180), "Wallet ready")
+
+        ui.tapTab(label: "Receive")
+        ui.replaceText(in: ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL"), value: offer.offerUrl)
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 90), "Review credential offer")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        ui.assertExists(identifierPrefix: "wallet.credentialCard.", timeout: 180)
+
+        let session = try await backend.createScaPaymentVerifierSession()
+        ui.tapTab(label: "Present")
+        ui.replaceText(in: ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL"), value: session.authorizationRequestUri)
+        ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview")
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Review presentation request", "Preview failed"], timeout: 60), "Review presentation request")
+        for value in ["Super Store", "11.56", "EUR"] {
+            let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch
+            for _ in 0..<8 where !text.isHittable { app.swipeDown() }
+            for _ in 0..<12 where !text.isHittable { app.swipeUp() }
+            XCTAssertTrue(text.isHittable, "Missing visible payment value: \(value)")
+        }
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "SCA payment review before native signing"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        print("SCA_OPERATOR: approve iPhone payment signing")
+        ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
+        let status = ui.waitForStatus(prefixes: ["Presentation sent", "Presentation finished", "Present failed"], timeout: 180)
+        XCTAssertNotNil(status)
+        XCTAssertFalse(status?.hasPrefix("Present failed") ?? true, status ?? "No presentation outcome")
+        try await backend.waitForVerifierSuccess(sessionID: session.sessionID, timeoutSeconds: verifierPollingTimeout)
+        print("SCA_DEVICE_E2E nativeApproved=true paymentReviewed=true verifier=SUCCESSFUL session=\(session.sessionID)")
+        #endif
+    }
+
     func testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2() async throws {
         let scenario = try publicDemoScenario()
         let offer = try await backend.createOffer(scenario: scenario)

@@ -39,6 +39,7 @@ fun MobileWalletDigitalCredentialPreview.toSharingReview(): WalletDemoSharingRev
                 WalletDemoSharingResponseProtection.None
             },
             transactionData = request.transactionData.toDemoTransactionDataGroups(),
+            requiresExplicitReview = request.transactionData.any { it.type == "urn:eudi:sca:payment:1" },
             technicalDetails = listOf(
                 WalletDemoSharingDetail("Protocol", protocol),
                 WalletDemoSharingDetail("Client ID", request.clientId),
