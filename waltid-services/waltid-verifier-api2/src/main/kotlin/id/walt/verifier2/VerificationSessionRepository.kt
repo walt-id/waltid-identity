@@ -120,9 +120,29 @@ private const val RETAINED_BYTES_PER_EVIDENCE_CHAR = 6L
 /** What an empty session costs before any credential is presented to it. */
 private const val BASE_SESSION_BYTES = 8L * 1024
 
+/**
+ * Builds the in-memory store with the limits from [config], or the documented defaults where it says nothing.
+ *
+ * Separate from the store itself so the configuration path can be tested without touching process-wide state:
+ * [Verifier2Service.defaultSessionRepository] is a lazy singleton, so an assertion on it would depend on which
+ * test ran first.
+ */
+fun inMemorySessionRepositoryFor(config: OSSVerifier2ServiceConfig?): InMemoryVerificationSessionRepository =
+    InMemoryVerificationSessionRepository(
+        maxSessions = config?.maxInMemorySessions ?: DEFAULT_MAX_IN_MEMORY_SESSIONS,
+        maxRetainedBytes = config?.maxInMemoryBytes ?: DEFAULT_MAX_IN_MEMORY_BYTES,
+    ).also {
+        // Logged because the limits are the first thing to check when sessions disappear or the heap fills, and
+        // an operator should not have to infer whether their configuration was picked up.
+        log.info {
+            "In-memory verification session store limited to ${it.maxSessions} sessions and " +
+                    "${it.maxRetainedBytes / 1024} KiB estimated retained size"
+        }
+    }
+
 class InMemoryVerificationSessionRepository(
-    private val maxSessions: Int = DEFAULT_MAX_IN_MEMORY_SESSIONS,
-    private val maxRetainedBytes: Long = DEFAULT_MAX_IN_MEMORY_BYTES,
+    val maxSessions: Int = DEFAULT_MAX_IN_MEMORY_SESSIONS,
+    val maxRetainedBytes: Long = DEFAULT_MAX_IN_MEMORY_BYTES,
 ) : VerificationSessionRepository {
 
     /**

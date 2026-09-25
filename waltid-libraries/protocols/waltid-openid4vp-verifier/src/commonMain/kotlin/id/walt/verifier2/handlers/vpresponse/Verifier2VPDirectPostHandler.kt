@@ -346,11 +346,35 @@ object Verifier2VPDirectPostHandler {
             }
             beforeRespond(true)
             call.respond(HttpStatusCode.BadRequest, errorBody)
+        } catch (e: PresentationVerificationUnavailableException) {
+            // The presentation was not rejected - the verifier could not reach something it needs.
+            // OAuth 2.0 already has the right code for this (RFC 6749 temporarily_unavailable), and
+            // 503 tells the wallet the same request is worth retrying. Reporting this as 400
+            // invalid_request, as this handler previously did for every internal failure, blames the
+            // wallet for the verifier's outage and forecloses the retry.
+            log.error(e) { "Verification unavailable, responding 503: ${e.message}" }
+            val errorBody = buildMap {
+                put("error", "temporarily_unavailable")
+                put("error_description", e.message ?: "Verification temporarily unavailable")
+                verificationSession.redirects?.errorRedirectUri?.let { put("redirect_uri", it.toString()) }
+            }
+            beforeRespond(true)
+            call.respond(HttpStatusCode.ServiceUnavailable, errorBody)
         }
     }
 
     /** Thrown by [handleDirectPost] when the verifier rejects the presentation. */
     class PresentationRejectionException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+    /**
+     * Thrown when verification could not be completed because a dependency the verifier needs was
+     * unavailable - a session store timeout, a socket failure, a status list host that cannot be
+     * reached. The presentation may be perfectly valid, so this must not be reported to the wallet
+     * as invalid_request: that is a client error the wallet cannot act on, and it makes a transient
+     * condition terminal.
+     */
+    class PresentationVerificationUnavailableException(message: String, cause: Throwable? = null) :
+        Exception(message, cause)
 
     /**
      * Sealed (= limited option) interface to represent the different forms that

@@ -1,6 +1,9 @@
 package id.walt.issuer2.controller
 
 import id.walt.issuer2.models.CredentialOfferCreateRequest
+import id.walt.issuer2.models.CredentialOfferRequestBody
+import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
+import id.walt.issuer2.models.PublicIssuanceSession
 import id.walt.issuer2.controller.openapi.Issuer2ManagementRoutesDocs
 import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.service.CredentialProfileService
@@ -48,21 +51,24 @@ class Issuer2ManagementController(
             post("credential-offers", Issuer2ManagementRoutesDocs.createCredentialOffer()) {
                 val requestId = requireNotNull(call.callId) { "Missing call ID" }
                 val request = try {
-                    call.receive<CredentialOfferCreateRequest>()
+                    call.receive<CredentialOfferRequestBody>()
                 } catch (ex: BadRequestException) {
                     val validationMessage = ex.cause?.cause?.message ?: ex.cause?.message ?: ex.message
                     throw BadRequestException("${ex.message}: $validationMessage")
                 }
-                call.respond(HttpStatusCode.Created, offerService.createCredentialOffer(request, requestId))
+                when (request) {
+                    is CredentialOfferCreateRequest -> call.respond(HttpStatusCode.Created, offerService.createCredentialOffer(request, requestId))
+                    is MultiCredentialOfferCreateRequest -> call.respond(HttpStatusCode.Created, offerService.createCredentialOffer(request, requestId))
+                }
             }
 
             get("sessions", Issuer2ManagementRoutesDocs.listSessions()) {
-                call.respond(sessionService.listSessions())
+                call.respond(sessionService.listSessions().map(::PublicIssuanceSession))
             }
 
             get("sessions/{sessionId}", Issuer2ManagementRoutesDocs.getSession()) {
                 val sessionId = requireNotNull(call.parameters["sessionId"]) { "Missing sessionId" }
-                call.respond(sessionService.getSession(sessionId))
+                call.respond(PublicIssuanceSession(sessionService.getSession(sessionId)))
             }
 
             route(Issuer2ManagementRoutesDocs.issuerEvents()) {

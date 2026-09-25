@@ -168,6 +168,30 @@ class Crypto2ClientIdAuthenticationTest {
     }
 
     @Test
+    fun `pre-registered signed request rejects a destination outside redirect_uris`() = runTest {
+        val trustedKey = JWKKey.generate(KeyType.Ed25519)
+        val clientId = PreRegistered("registered-client")
+        val metadata = ClientMetadata(
+            jwks = ClientMetadata.Jwks(listOf(trustedKey.getPublicKey().exportJWKObject())),
+            redirectUris = listOf("https://verifier.example/callback"),
+        )
+        val result = assertIs<ClientValidationResult.Failure>(
+            ClientIdPrefixAuthenticator.authenticate(
+                clientId,
+                RequestContext(
+                    clientId.rawValue,
+                    requestObjectJws = trustedKey.signJws("{}".encodeToByteArray()),
+                    responseUri = "https://attacker.example/collect",
+                ),
+                preRegisteredMetadataProvider = {
+                    Json.encodeToString(ClientMetadata.serializer(), metadata)
+                },
+            )
+        )
+        assertIs<ClientIdError.UnregisteredRedirectUri>(result.error)
+    }
+
+    @Test
     fun `pre-registered metadata without verification keys is rejected`() = runTest {
         val key = JWKKey.generate(KeyType.Ed25519)
         val clientId = PreRegistered("registered-client")

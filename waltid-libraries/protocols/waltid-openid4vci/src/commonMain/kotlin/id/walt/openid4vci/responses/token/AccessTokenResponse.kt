@@ -39,6 +39,8 @@ data class AccessTokenResponse(
 data class TokenResponseOptions(
     val authorizationDetails: List<AuthorizationDetail> = emptyList(),
     val authorizationDetailsResolver: (suspend (AccessTokenRequest) -> List<AuthorizationDetail>)? = null,
+    /** Called by grant handlers after validation and before signing or storing tokens. */
+    val credentialAuthorizationResolver: (suspend (AccessTokenRequest, List<AuthorizationDetail>?) -> TokenCredentialAuthorization)? = null,
 ) {
     suspend fun resolveAuthorizationDetails(request: AccessTokenRequest): List<AuthorizationDetail> =
         authorizationDetailsResolver?.invoke(request) ?: authorizationDetails
@@ -81,6 +83,7 @@ sealed class AccessTokenResponseResult {
     data class Success(
         val request: AccessTokenRequest,
         val response: AccessTokenResponse,
+        val credentialAuthorization: TokenCredentialAuthorization? = null,
     ) : AccessTokenResponseResult()
     data class Failure(
         val request: AccessTokenRequest,

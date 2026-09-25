@@ -62,6 +62,10 @@ dependencies {
     implementation(identityLibs.benmanes.versions)
     //implementation(identityLibs.owasp.dependencycheck)
     implementation("com.github.jk1.dependency-license-report:com.github.jk1.dependency-license-report.gradle.plugin:3.0.1")
+    implementation(identityLibs.licensee.gradle.plugin)
+    // Shadow 9.x puts plexus-xml on the plugin classpath; Licensee's Maven model builder then
+    // needs an XmlService provider visible to ServiceLoader.
+    implementation("org.apache.maven:maven-xml:4.0.0-rc-5")
 
     // Android
     implementation(identityLibs.android.gradle.plugin)

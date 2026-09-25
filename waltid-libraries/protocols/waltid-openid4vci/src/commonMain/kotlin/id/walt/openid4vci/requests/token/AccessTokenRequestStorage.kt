@@ -21,6 +21,7 @@ internal fun AccessTokenRequest.sanitizeForStorage(
         grantedScopes = grantedScopes,
         requestedAudience = requestedAudience,
         grantedAudience = grantedAudience,
+        authorizationDetails = authorizationDetails,
         requestForm = requestForm
             .filterKeys { it in allowed }
             .mapValues { (_, values) -> values.toList() },

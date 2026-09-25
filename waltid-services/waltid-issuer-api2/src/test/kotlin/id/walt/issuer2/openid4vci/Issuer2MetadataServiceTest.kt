@@ -13,7 +13,9 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationMethodConfig
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationMethod
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
+import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
+import io.ktor.server.plugins.NotFoundException
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -22,10 +24,91 @@ import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class Issuer2MetadataServiceTest {
+
+    @Test
+    fun `generated self-hosted VCTs cannot use protocol path names`() {
+        RESERVED_VCT_NAMES.forEach { name ->
+            val error = assertFailsWith<IllegalArgumentException> {
+                metadataService(metadataConfig = sdJwtMetadata(name, "vctBaseUrl"))
+            }
+            assertTrue(error.message.orEmpty().contains("Credential configuration '$name'"))
+            assertTrue(error.message.orEmpty().contains("reserved OpenID4VCI path '$name'"))
+        }
+    }
+
+    @Test
+    fun `explicit self-hosted VCTs cannot use protocol path names regardless of configuration id`() {
+        RESERVED_VCT_NAMES.forEach { name ->
+            val error = assertFailsWith<IllegalArgumentException> {
+                metadataService(metadataConfig = sdJwtMetadata("LicenseCredential", "http://localhost/openid4vci/$name"))
+            }
+            assertTrue(error.message.orEmpty().contains("Credential configuration 'LicenseCredential'"))
+            assertTrue(error.message.orEmpty().contains("reserved OpenID4VCI path '$name'"))
+        }
+    }
+
+    @Test
+    fun `reserved VCT validation accounts for URL encoding origin and protocol subpaths`() {
+        listOf(
+            "HTTP://LOCALHOST:80/openid4vci/%61uthorize?ignored=true#fragment",
+            "http://localhost/other/../openid4vci/token",
+            "http://localhost/openid4vci/external/oauth/callback",
+            "http://localhost/openid4vci/external_login/request",
+        ).forEach { vct ->
+            val error = assertFailsWith<IllegalArgumentException> {
+                metadataService(metadataConfig = sdJwtMetadata("LicenseCredential", vct))
+            }
+            assertTrue(error.message.orEmpty().contains("reserved OpenID4VCI path"), vct)
+        }
+    }
+
+    @Test
+    fun `reserved VCT validation respects an issuer base URL with a path`() {
+        assertFailsWith<IllegalArgumentException> {
+            metadataService(
+                baseUrl = "https://issuer.example/tenant/",
+                metadataConfig = sdJwtMetadata("LicenseCredential", "https://issuer.example:443/tenant/openid4vci/authorize"),
+            )
+        }
+        val otherPath = "https://issuer.example/openid4vci/authorize"
+        val service = metadataService(
+            baseUrl = "https://issuer.example/tenant/",
+            metadataConfig = sdJwtMetadata("LicenseCredential", otherPath),
+        )
+        assertEquals(otherPath, service.getCredentialConfiguration("LicenseCredential")?.vct)
+    }
+
+    @Test
+    fun `external VCTs and unrelated configuration ids may use reserved names`() {
+        listOf(
+            "https://types.example/openid4vci/authorize",
+            "http://localhost:8080/openid4vci/authorize",
+            "https://localhost/openid4vci/authorize",
+            "urn:example:authorize",
+        ).forEach { vct ->
+            val service = metadataService(metadataConfig = sdJwtMetadata("authorize", vct))
+            assertEquals(vct, service.getCredentialConfiguration("authorize")?.vct)
+        }
+        val service = metadataService(
+            metadataConfig = sdJwtMetadata("authorize", "http://localhost/openid4vci/EmployeeCredential"),
+        )
+        assertEquals("http://localhost/openid4vci/EmployeeCredential", service.getVctTypeMetadata("EmployeeCredential").vct)
+    }
+
+    @Test
+    fun `unknown and reserved metadata types are not found`() {
+        val service = metadataService(metadataConfig = sdJwtMetadata("EmployeeCredential", "vctBaseUrl"))
+        assertEquals("http://localhost/openid4vci/EmployeeCredential", service.getVctTypeMetadata("EmployeeCredential").vct)
+        (RESERVED_VCT_NAMES + "missing-type").forEach { name ->
+            assertFailsWith<NotFoundException>(name) { service.getVctTypeMetadata(name) }
+        }
+    }
 
     @Test
     fun `authorization server metadata defaults to optional PAR`() {
@@ -62,6 +145,15 @@ class Issuer2MetadataServiceTest {
         ).getCredentialIssuerMetadata()
 
         assertCredentialEncryptionMetadata(metadata)
+    }
+
+    @Test
+    fun `credential issuer metadata advertises configured batch size`() {
+        val metadata = metadataService(
+            batchCredentialIssuance = BatchCredentialIssuance(batchSize = 5),
+        ).getCredentialIssuerMetadata()
+
+        assertEquals(5, metadata.batchCredentialIssuance?.batchSize)
     }
 
     @Test
@@ -162,13 +254,16 @@ class Issuer2MetadataServiceTest {
         clientAuthenticationConfig: ClientAuthenticationConfig? = null,
         preAuthorizedGrantAnonymousAccessSupported: Boolean = false,
         credentialEncryptionKey: String? = null,
+        batchCredentialIssuance: BatchCredentialIssuance? = null,
+        metadataConfig: Issuer2MetadataConfig = Issuer2MetadataConfig(),
+        baseUrl: String = "http://localhost",
     ): MetadataService {
-        val metadataConfig = Issuer2MetadataConfig()
         val serviceConfig = Issuer2ServiceConfig(
-            baseUrl = "http://localhost",
+            baseUrl = baseUrl,
             credentialEncryptionKey = credentialEncryptionKey,
             enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
             clientAuthenticationConfig = clientAuthenticationConfig,
+            batchCredentialIssuance = batchCredentialIssuance,
         )
         return MetadataService(
             serviceConfig = serviceConfig,
@@ -181,6 +276,13 @@ class Issuer2MetadataServiceTest {
             preAuthorizedGrantAnonymousAccessSupported = preAuthorizedGrantAnonymousAccessSupported,
         )
     }
+
+    private fun sdJwtMetadata(configurationId: String, vct: String) = Issuer2MetadataConfig(
+        credentialConfigurations = mapOf(configurationId to buildJsonObject {
+            put("format", "dc+sd-jwt")
+            put("vct", vct)
+        }),
+    )
 
     private fun assertCredentialEncryptionMetadata(metadata: id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata) {
         val requestEncryption = assertNotNull(metadata.credentialRequestEncryption)
@@ -214,6 +316,10 @@ class Issuer2MetadataServiceTest {
     }
 
     private companion object {
+        val RESERVED_VCT_NAMES = listOf(
+            "authorize", "par", "token", "nonce", "credential", "credential-offer", "jwks", "external_login", "external",
+        )
+
         const val CREDENTIAL_ENCRYPTION_KEY =
             """{"type":"jwk","jwk":{"kty":"EC","d":"ZSHgIcRvbwV9s224kHUaFqkEPShCAdwXocGl_w3M42Q","crv":"P-256","kid":"issuer2-credential-encryption-key","x":"GWKpdL3jPoPJ5wKgSA-jxS2jgp-ZUDE6sIQbeB86vF0","y":"F3xAwH96_xVciV7mFQslU_eRQgP-5pSZiNf8bjMoGfo"}}"""
     }

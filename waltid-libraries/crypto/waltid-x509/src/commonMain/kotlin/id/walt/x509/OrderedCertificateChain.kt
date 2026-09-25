@@ -101,6 +101,13 @@ internal expect class PlatformX509Certificate {
     }
 }
 
+/**
+ * Checks that [this] is an end-entity certificate that may sign client authentication data.
+ *
+ * RFC 5280 §4.2.1.3: KeyUsage restricts the key only when the extension is present. A missing
+ * KeyUsage is unrestricted. When present, `digitalSignature` must be set. RFC 5280 §4.2.1.12:
+ * ExtendedKeyUsage is likewise unrestricted when absent; when present it must include clientAuth.
+ */
 fun CertificateDer.validateClientAuthenticationCertificateUsage() {
     val certificate = PlatformX509Certificate.parse(this)
     require(!certificate.isCertificateAuthority) { "Client authentication certificate must not be a CA" }

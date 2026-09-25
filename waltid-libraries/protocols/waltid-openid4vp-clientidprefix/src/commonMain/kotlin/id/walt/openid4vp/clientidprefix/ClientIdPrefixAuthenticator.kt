@@ -34,8 +34,12 @@ object ClientIdPrefixAuthenticator {
 
             // OpenIdFederation requires OpenID Federation trust chain resolution (not yet implemented)
             is OpenIdFederation -> ClientValidationResult.Failure(ClientIdError.FederationError("OpenID Federation trust chain resolution is not yet implemented"))
-            // Origin is not allowed to be accepted by the wallet
-            is Unsupported -> ClientValidationResult.Failure(ClientIdError.UnsupportedPrefix(clientId.prefix))
+            is Unsupported -> {
+                val registered = PreRegistered(clientId.rawValue).takeIf {
+                    clientId.rawValue in trustConfiguration.preRegisteredClients
+                } ?: return ClientValidationResult.Failure(ClientIdError.UnsupportedPrefix(clientId.prefix))
+                registered.authenticatePreRegistered(registered, context, preRegisteredMetadataProvider)
+            }
         }
     }
 }

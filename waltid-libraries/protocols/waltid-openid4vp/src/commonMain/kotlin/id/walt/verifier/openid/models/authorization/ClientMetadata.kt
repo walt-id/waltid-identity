@@ -53,6 +53,15 @@ data class ClientMetadata(
     val idTokenSignedResponseAlg: String? = null,
 
     /**
+     * OPTIONAL. Redirect / Response URIs registered for this client (RFC 7591 `redirect_uris`).
+     *
+     * Required on wallet-held pre-registered metadata so unsigned requests can bind to a
+     * destination without a signature (OpenID4VP 1.0 §5.9.2 / §14.3.1).
+     */
+    @SerialName("redirect_uris")
+    val redirectUris: List<String>? = null,
+
+    /**
      * OPTIONAL. Human-readable name of the client (Verifier).
      * Supports internationalization via language tags per RFC 7591.
      * Use [clientNameI18n] for language-specific values.
@@ -176,6 +185,7 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
         "encrypted_response_enc_values_supported",
         "subject_syntax_types_supported",
         "id_token_signed_response_alg",
+        "redirect_uris",
     )
 
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("ClientMetadata") {
@@ -184,6 +194,7 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
         element<List<String>?>("encrypted_response_enc_values_supported", isOptional = true)
         element<List<String>?>("subject_syntax_types_supported", isOptional = true)
         element<String?>("id_token_signed_response_alg", isOptional = true)
+        element<List<String>?>("redirect_uris", isOptional = true)
         element<String?>("client_name", isOptional = true)
         element<String?>("logo_uri", isOptional = true)
         element<String?>("tos_uri", isOptional = true)
@@ -205,6 +216,7 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
         val subjectSyntaxTypesSupported = json["subject_syntax_types_supported"]
             ?.jsonArray?.map { it.jsonPrimitive.content }
         val idTokenSignedResponseAlg = json["id_token_signed_response_alg"]?.jsonPrimitive?.content
+        val redirectUris = json["redirect_uris"]?.jsonArray?.map { it.jsonPrimitive.content }
 
         // Extract base i18n fields (without language tags)
         val clientName = (json["client_name"] as? JsonPrimitive)?.takeIf { it.isString }?.content
@@ -268,6 +280,7 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
             encryptedResponseEncValuesSupported = encryptedResponseEncValuesSupported,
             subjectSyntaxTypesSupported = subjectSyntaxTypesSupported,
             idTokenSignedResponseAlg = idTokenSignedResponseAlg,
+            redirectUris = redirectUris,
             clientName = clientName,
             clientNameI18n = clientNameI18n,
             logoUri = logoUri,
@@ -292,6 +305,9 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
             value.encryptedResponseEncValuesSupported?.let { put("encrypted_response_enc_values_supported", Json.encodeToJsonElement(it)) }
             value.subjectSyntaxTypesSupported?.let { put("subject_syntax_types_supported", Json.encodeToJsonElement(it)) }
             value.idTokenSignedResponseAlg?.let { put("id_token_signed_response_alg", it) }
+            value.redirectUris?.let { uris ->
+                put("redirect_uris", JsonArray(uris.map(::JsonPrimitive)))
+            }
 
             // Base i18n fields (without language tags)
             value.clientName?.let { put("client_name", it) }

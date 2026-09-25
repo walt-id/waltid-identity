@@ -435,7 +435,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
                         configuration = configuration,
                         issuerKey = issuerKey,
                         issuerId = issuerBase,
-                        credentialData = credentialData,
+                        issuanceInputData = testIssuanceInputData(credentialData),
                         selectiveDisclosure = selectiveDisclosure,
                         proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization])
                     )
@@ -464,7 +464,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
                     ConfigManager.preloadConfig(
                         "verifier-service",
                         OSSVerifier2ServiceConfig(
-                            clientId = "test-verifier-$tag",
+                            clientId = null,
                             clientMetadata = ClientMetadata(clientName = "Test Verifier"),
                             urlPrefix = "$walletBase/verification-session",
                             urlHost = "openid4vp://authorize"

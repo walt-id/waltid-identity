@@ -17,6 +17,7 @@ import id.walt.issuer2.config.CredentialEncryptionKeyConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.handlers.credential.MdocCredentialHandler
+import id.walt.openid4vci.handlers.credential.SdJwtVcCredentialHandler
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.OAuth2ProviderConfig
@@ -116,6 +117,7 @@ data class OpenId4VciModule(
                     tokenEndpointHandlers = TokenEndpointHandlers(),
                     credentialEndpointHandlers = CredentialEndpointHandlers().apply {
                         register(CredentialFormat.MSO_MDOC, MdocCredentialHandler(roundValidityToTwelveHours = true))
+                        register(CredentialFormat.SD_JWT_VC, SdJwtVcCredentialHandler(roundGeneratedTimeClaims = true))
                     },
 
                     accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),

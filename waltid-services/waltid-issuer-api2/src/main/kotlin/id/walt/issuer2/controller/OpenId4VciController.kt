@@ -1,5 +1,6 @@
 package id.walt.issuer2.controller
 
+import id.walt.issuer2.config.Issuer2EndpointPaths
 import id.walt.issuer2.controller.openapi.OpenId4VciRoutesDocs
 import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.notifications.IssuanceSessionEvent
@@ -94,7 +95,10 @@ class OpenId4VciController(
     fun register(route: Route, surfaces: Set<Issuer2RouteSurface> = Issuer2RouteSurface.all) {
         require(surfaces.isNotEmpty()) { "At least one issuer route surface must be registered" }
         if (Issuer2RouteSurface.METADATA in surfaces) {
-            route.get(".well-known/openid-credential-issuer/openid4vci", OpenId4VciRoutesDocs.credentialIssuerMetadata()) {
+            route.get(
+                ".well-known/openid-credential-issuer/openid4vci",
+                OpenId4VciRoutesDocs.credentialIssuerMetadata()
+            ) {
                 call.response.headers.append(HttpHeaders.Vary, HttpHeaders.Accept)
                 val signedContentType = call.requestedSignedCredentialIssuerMetadataContentType()
                 if (signedContentType == null) {
@@ -107,7 +111,10 @@ class OpenId4VciController(
                 }
             }
 
-            route.get(".well-known/oauth-authorization-server/openid4vci", OpenId4VciRoutesDocs.authorizationServerMetadata()) {
+            route.get(
+                ".well-known/oauth-authorization-server/openid4vci",
+                OpenId4VciRoutesDocs.authorizationServerMetadata()
+            ) {
                 call.respond(metadataService.getAuthorizationServerMetadata())
             }
 
@@ -119,15 +126,20 @@ class OpenId4VciController(
                 val credentialType = requireNotNull(call.parameters["type"]) { "Missing VCT type" }
                 call.respond(metadataService.getVctTypeMetadata(credentialType))
             }
+
+            route.get("openid4vci/{type}", OpenId4VciRoutesDocs.vctTypeMetadata()) {
+                val credentialType = requireNotNull(call.parameters["type"]) { "Missing VCT type" }
+                call.respond(metadataService.getVctTypeMetadata(credentialType))
+            }
         }
 
         route.route("openid4vci", { tags = listOf(OpenId4VciRoutesDocs.OPENID4VCI_TAG) }) {
-            if (Issuer2RouteSurface.METADATA in surfaces) get("jwks", OpenId4VciRoutesDocs.jwks()) {
+            if (Issuer2RouteSurface.METADATA in surfaces) get(Issuer2EndpointPaths.JWKS, OpenId4VciRoutesDocs.jwks()) {
                 call.respond(metadataService.listJwks())
             }
 
             if (Issuer2RouteSurface.CREDENTIAL_OFFER_BY_REFERENCE in surfaces)
-                get("credential-offer", OpenId4VciRoutesDocs.credentialOffer()) {
+                get(Issuer2EndpointPaths.CREDENTIAL_OFFER, OpenId4VciRoutesDocs.credentialOffer()) {
                     val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                     val sessionId = requireNotNull(call.parameters["id"]) { "Missing credential offer id" }
                     call.respond(
@@ -137,7 +149,7 @@ class OpenId4VciController(
                 }
 
             if (Issuer2RouteSurface.AUTHORIZATION_CODE in surfaces) {
-                post("par", OpenId4VciRoutesDocs.pushedAuthorizationRequest()) {
+                post(Issuer2EndpointPaths.PAR, OpenId4VciRoutesDocs.pushedAuthorizationRequest()) {
                     val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                     val parameters = try {
                         call.receiveParameters().toMap()
@@ -153,7 +165,7 @@ class OpenId4VciController(
                     call.respond(HttpStatusCode.fromValue(response.status), response.payload)
                 }
 
-                get("authorize", OpenId4VciRoutesDocs.authorize()) {
+                get(Issuer2EndpointPaths.AUTHORIZE, OpenId4VciRoutesDocs.authorize()) {
                     val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                     val response = protocolService.processAuthorizeRequest(
                         parameters = call.parameters.toMap(),
@@ -178,7 +190,8 @@ class OpenId4VciController(
                             ?: return@onCallRespond
                         val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                         protocolService.processExternalLoginInterception(
-                            externalAuthorizationRequest = call.response.headers.allValues().toMap()["Location"]?.firstOrNull(),
+                            externalAuthorizationRequest = call.response.headers.allValues()
+                                .toMap()["Location"]?.firstOrNull(),
                             authorizationRequestEnvelope = authorizationRequestEnvelope,
                             requestId = requestId,
                         )
@@ -188,11 +201,11 @@ class OpenId4VciController(
                 authenticate("auth-oauth") {
                     install(authOAuthInterceptor)
 
-                    get("external_login/{internalAuthReq}", OpenId4VciRoutesDocs.externalLogin()) {
+                    get(Issuer2EndpointPaths.EXTERNAL_LOGIN, OpenId4VciRoutesDocs.externalLogin()) {
                         // Ktor OAuth redirects to the configured external authorization server.
                     }
 
-                    get("external/oauth/callback", OpenId4VciRoutesDocs.externalOAuthCallback()) {
+                    get(Issuer2EndpointPaths.EXTERNAL_CALLBACK, OpenId4VciRoutesDocs.externalOAuthCallback()) {
                         val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                         val principal = call.principal<OAuthAccessTokenResponse.OAuth2>()
                         val idToken = principal?.extraParameters?.get("id_token")
@@ -217,7 +230,7 @@ class OpenId4VciController(
             }
 
             if (Issuer2RouteSurface.ISSUANCE in surfaces) {
-                post("token", OpenId4VciRoutesDocs.token()) {
+                post(Issuer2EndpointPaths.TOKEN, OpenId4VciRoutesDocs.token()) {
                     val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                     val parameters = try {
                         call.receiveParameters().toMap()
@@ -233,14 +246,14 @@ class OpenId4VciController(
                     call.respond(HttpStatusCode.fromValue(response.status), response.payload)
                 }
 
-                post("nonce", OpenId4VciRoutesDocs.nonce()) {
+                post(Issuer2EndpointPaths.NONCE, OpenId4VciRoutesDocs.nonce()) {
                     val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                     val response = protocolService.processNonceRequest(requestId)
                     response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
                     call.respond(HttpStatusCode.fromValue(response.status), response.payload)
                 }
 
-                post("credential", OpenId4VciRoutesDocs.credential()) {
+                post(Issuer2EndpointPaths.CREDENTIAL, OpenId4VciRoutesDocs.credential()) {
                     val requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE }
                     val authorizationHeaders = call.request.headers.getAll(HttpHeaders.Authorization).orEmpty()
                     val dpopProofHeaderValues = call.request.headers.getAll(DPoPConstants.HEADER_NAME).orEmpty()
