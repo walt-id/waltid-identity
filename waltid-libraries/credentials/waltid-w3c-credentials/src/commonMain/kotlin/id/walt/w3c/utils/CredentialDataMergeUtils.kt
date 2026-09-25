@@ -180,12 +180,36 @@ object CredentialDataMergeUtils {
 
     /**
      * Keep only mapping keys that already exist as JSON objects in [credentialData].
-     * Primitive or non-object namespace mappings are dropped so they cannot replace a
-     * namespace object before mDoc CBOR encoding.
+     * Unknown keys, primitive mappings, and top-level W3C-style validity keys are rejected
+     * with a field-specific error. Use `msoData` for MSO `validFrom` / `validUntil`.
      */
-    fun JsonObject.mdocNamespaceMapping(credentialData: JsonObject): JsonObject? =
-        JsonObject(filter { (key, value) -> credentialData[key] is JsonObject && value is JsonObject })
-            .takeIf { it.isNotEmpty() }
+    fun JsonObject.mdocNamespaceMapping(credentialData: JsonObject): JsonObject? {
+        if (isEmpty()) return null
+        forEach { (key, value) ->
+            if (key == "validFrom" || key == "validUntil" || key == "expectedUpdate") {
+                throw IllegalArgumentException(
+                    "mapping.$key is not an mdoc namespace object; set msoData.$key for MSO validity"
+                )
+            }
+            val credentialValue = credentialData[key]
+            if (credentialValue == null) {
+                throw IllegalArgumentException(
+                    "mapping.$key does not match a credentialData namespace object"
+                )
+            }
+            if (credentialValue !is JsonObject) {
+                throw IllegalArgumentException(
+                    "mapping.$key requires credentialData.$key to be a JSON object of namespace claims"
+                )
+            }
+            if (value !is JsonObject) {
+                throw IllegalArgumentException(
+                    "mapping.$key must be a JSON object of element mappings"
+                )
+            }
+        }
+        return this
+    }
 
     /**
      * Replace-merge for mDoc namespace payloads. Mapping arrays replace existing arrays

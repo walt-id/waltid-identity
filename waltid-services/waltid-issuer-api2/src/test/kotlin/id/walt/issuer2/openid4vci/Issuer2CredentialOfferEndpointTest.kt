@@ -531,6 +531,36 @@ class Issuer2CredentialOfferEndpointTest {
     }
 
     @Test
+    fun shouldRejectBlankMsoDataRuntimeOverride() = testApplication {
+        installIssuer2WithConfigFiles()
+
+        val response = apiClient().post("/issuer2/credential-offers") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """{"profileId":"$ISO_MDL_PROFILE_ID","authMethod":"PRE_AUTHORIZED","runtimeOverrides":{"msoData":{"validUntil":""}}}"""
+            )
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertTrue(response.bodyAsText().contains("validUntil"))
+    }
+
+    @Test
+    fun shouldRejectWhitespaceMsoDataRuntimeOverride() = testApplication {
+        installIssuer2WithConfigFiles()
+
+        val response = apiClient().post("/issuer2/credential-offers") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """{"profileId":"$ISO_MDL_PROFILE_ID","authMethod":"PRE_AUTHORIZED","runtimeOverrides":{"msoData":{"validFrom":"  "}}}"""
+            )
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertTrue(response.bodyAsText().contains("validFrom"))
+    }
+
+    @Test
     fun shouldCreateCredentialOffersForDocumentedModes() = testApplication {
         installIssuer2()
         val client = apiClient()

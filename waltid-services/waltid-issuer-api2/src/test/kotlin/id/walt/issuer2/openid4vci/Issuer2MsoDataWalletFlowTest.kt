@@ -58,6 +58,7 @@ class Issuer2MsoDataWalletFlowTest {
         val validity = issueIsoMdl()
         assertEquals(validity.signed.epochSeconds, validity.validFrom.epochSeconds)
         assertTrue(validity.validUntil - validity.signed in (364.days..366.days))
+        assertTwelveHourUtcBoundary(validity.validUntil)
         assertNull(validity.expectedUpdate)
     }
 
@@ -122,18 +123,22 @@ class Issuer2MsoDataWalletFlowTest {
     }
 
     @Test
-    fun mappingValidFromDoesNotChangeMsoValidity() = testApplication {
-        val validity = issueIsoMdl(
-            CredentialOfferRuntimeOverrides(
-                mapping = buildJsonObject {
-                    put("validFrom", JsonPrimitive("<timestamp-before:30d>"))
-                    put("validUntil", JsonPrimitive("<timestamp-in:10d>"))
-                }
+    fun mappingValidFromIsRejectedInFavorOfMsoData() = testApplication {
+        val error = runCatching {
+            issueIsoMdl(
+                CredentialOfferRuntimeOverrides(
+                    mapping = buildJsonObject {
+                        put("validFrom", JsonPrimitive("<timestamp-before:30d>"))
+                        put("validUntil", JsonPrimitive("<timestamp-in:10d>"))
+                    }
+                )
             )
+        }.exceptionOrNull()
+        assertNotNull(error)
+        assertTrue(
+            error.message!!.contains("msoData") || error.message!!.contains("validFrom"),
+            error.message,
         )
-        assertEquals(validity.signed.epochSeconds, validity.validFrom.epochSeconds)
-        assertTrue(validity.validUntil - validity.signed in (364.days..366.days))
-        assertNull(validity.expectedUpdate)
     }
 
     @Test
@@ -143,6 +148,18 @@ class Issuer2MsoDataWalletFlowTest {
         assertTrue(validity.validFrom - now in (-2.days..2.days))
         assertTrue(validity.validUntil - validity.validFrom in (364.days..366.days))
         assertTrue(assertNotNull(validity.expectedUpdate) - validity.validFrom in (179.days..181.days))
+    }
+
+    @Test
+    fun offerJsonNullExpectedUpdateClearsProfileValue() = testApplication {
+        val validity = issueIsoMdl(
+            runtimeOverrides = CredentialOfferRuntimeOverrides(
+                msoData = MsoData(expectedUpdateCleared = true),
+            ),
+            configureProfiles = withIsoMdlMsoData(),
+        )
+        assertNull(validity.expectedUpdate)
+        assertTrue(validity.validUntil - validity.validFrom in (364.days..366.days))
     }
 
     @Test
@@ -274,5 +291,13 @@ class Issuer2MsoDataWalletFlowTest {
             validUntil = "<timestamp-in:365d>",
             expectedUpdate = "<timestamp-in:180d>",
         )
+
+        private fun assertTwelveHourUtcBoundary(instant: kotlin.time.Instant) {
+            val text = instant.toString()
+            assertTrue(
+                text.endsWith("T00:00:00Z") || text.endsWith("T12:00:00Z"),
+                "expected 12-hour UTC bucket, got $text",
+            )
+        }
     }
 }

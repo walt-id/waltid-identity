@@ -15,22 +15,31 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class CredentialDataMergeUtilsMdocTest {
 
     @Test
-    fun `mdoc namespace mapping drops primitive and unknown keys`() {
+    fun `mdoc namespace mapping rejects primitive and unknown keys`() {
         val credentialData = buildJsonObject {
             putJsonObject("org.iso.18013.5.1") { put("given_name", "Jane") }
         }
-        val mapping = buildJsonObject {
-            put("org.iso.18013.5.1", "<uuid>")
-            put("validFrom", "<timestamp>")
+        val unknown = buildJsonObject {
             putJsonObject("org.iso.18013.5.1.unknown") { put("given_name", "<uuid>") }
         }
-        assertNull(mapping.mdocNamespaceMapping(credentialData))
+        val primitive = buildJsonObject {
+            put("org.iso.18013.5.1", "<uuid>")
+        }
+        val msoHint = buildJsonObject {
+            put("validFrom", "<timestamp>")
+        }
+        val unknownError = assertFailsWith<IllegalArgumentException> { unknown.mdocNamespaceMapping(credentialData) }
+        assertTrue(unknownError.message!!.contains("org.iso.18013.5.1.unknown"))
+        val primitiveError = assertFailsWith<IllegalArgumentException> { primitive.mdocNamespaceMapping(credentialData) }
+        assertTrue(primitiveError.message!!.contains("must be a JSON object"))
+        val msoError = assertFailsWith<IllegalArgumentException> { msoHint.mdocNamespaceMapping(credentialData) }
+        assertTrue(msoError.message!!.contains("msoData"))
     }
 
     @Test
