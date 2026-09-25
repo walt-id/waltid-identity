@@ -7,6 +7,7 @@ plugins {
     alias(identityLibs.plugins.google.services)
 }
 
+val scaAppE2eBuild = extensions.extraProperties.has("scaAppE2eBuild")
 val javaVersion = identityLibs.versions.java.library.get().toInt()
 val publicDemoTransactionDataProfilesUrl = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
 val walletSigningProtectionMode =
@@ -56,9 +57,11 @@ android {
         }
         create("preview") {
             dimension = "environment"
-            applicationId = "id.walt.wallet.compose.test"
+            applicationId = if (scaAppE2eBuild) "id.walt.wallet.compose.sca.e2e" else "id.walt.wallet.compose.test"
         }
     }
+
+    if (scaAppE2eBuild) sourceSets.getByName("androidTest").kotlin.directories.add("src/scaAppE2e/java")
 
     buildFeatures {
         buildConfig = true

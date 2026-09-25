@@ -62,4 +62,6 @@ log_android_dc_api_launcher_diagnostic
 if (( test_status != 0 )); then
   exit "$test_status"
 fi
-exit "$postflight_status"
+if (( postflight_status != 0 )); then exit "$postflight_status"; fi
+# Separate APK and SDK outputs preserve the ordinary suite's native authorization behavior.
+"$script_dir/run-android-sca-app-tests.sh"

@@ -8,7 +8,7 @@ certified wallet, or complete regulated SCA implementation.
 ## Service setup
 
 Run the matching issuer2 and verifier2 locally, or deploy them before using the
-public endpoints. See [backend setup](ts12-sca-backend.md). The required profile is:
+public endpoints. See [backend setup](https://github.com/walt-id/waltid-identity/blob/550a1c1dbdaa5a87c0d853956f2a1d89f242cb81/docs/ts12-sca-backend.md). The required profile is:
 
 - Profile: `scaPaymentCardSdJwt`
 - Credential configuration: `sca_payment_card_sd_jwt` (`dc+sd-jwt`)
@@ -107,12 +107,42 @@ added to this SD-JWT issuer profile.
 
 ## Unattended checks
 
-`ScaPresentationInteropTest` uses an explicitly simulated authorizer with real
-signatures and independent Nimbus verification. It exercises nested payload bytes,
-transaction hashes, factor combinations and rejection paths without native prompts.
-The signing-configuration and mandatory-review tests separately cover the demo
-integration. Ordinary software-key mdoc/DC API tests continue unchanged. Disabling
-authorization is not a valid native SCA success case; no production bypass is added.
+The Android DC API CI phase and both iOS demo CI lanes also run three real-app
+payment cases: approval, review cancellation and denied authentication. Each
+provisions through the normal setup and issuance UI.
+Approval checks the returned KB-JWT and executed verifier policies; negative cases
+require no credential response and no verifier success. The iOS cases use URL
+presentation; Android uses Credential Manager with ordinary previews disabled.
+
+Only authentication is simulated. A dedicated Gradle init script selects a test
+implementation at compile time and redirects every output into `build/sca-app-e2e`.
+Normal builds always compose the native authorizer. There is no runtime flag or
+public SDK option to bypass authorization. Android uses a separate application ID,
+`id.walt.wallet.compose.sca.e2e`; iOS uses an isolated simulator XCFramework.
+Publishing and production APK tasks through this init script are rejected.
+These artifacts are test fixtures and must never be distributed.
+
+Run from the Identity repository against a deployment containing the matching
+issuer profile:
+
+```bash
+.github/scripts/mobile-ci/run-android-sca-app-tests.sh
+.github/scripts/mobile-ci/run-ios-sca-app-tests.sh \
+  'platform=iOS Simulator,id=<simulator UUID>' native compose
+```
+
+Use a dedicated Android emulator with the same Google Play services/DC API
+prerequisites as the ordinary suite. Its isolated SCA app data is reset by the
+runner, and the isolated test packages are uninstalled afterwards.
+A backend without the payment profile fails the lane rather than skipping it.
+Deploy the backend slice before relying on public-demo CI acceptance. Local issuer
+and verifier deployments can qualify the app changes before that rollout, using
+local endpoint and trust configuration; record that configuration with the results.
+
+`ScaPresentationInteropTest` independently verifies real software signatures and
+nested transaction hashes with Nimbus. Ordinary mdoc/DC API tests retain the
+normal SDK composition.
+Simulated authentication proves app integration, never native factors or regulated SCA.
 
 ## iOS and evidence
 

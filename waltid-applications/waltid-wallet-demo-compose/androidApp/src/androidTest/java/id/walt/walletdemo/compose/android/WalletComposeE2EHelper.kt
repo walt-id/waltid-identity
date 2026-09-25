@@ -67,15 +67,15 @@ internal object WalletComposeE2EHelper {
             waitForStatus(device, 180_000L, { it == "Wallet ready" }, listOf("Bootstrap failed")))
     }
 
-    fun receiveThroughApp(device: UiDevice, offerUrl: String) {
+    fun receiveThroughApp(device: UiDevice, offerUrl: String, signingProtectionMode: String = "required") {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(offerUrl), context, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            .putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, "required"))
+            .putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, signingProtectionMode))
         setTextByTag(device, "wallet.offerInput", offerUrl)
         clickByTag(device, "wallet.receiveButton")
         requireNotNull(waitForResource(device, "wallet.offerAcceptButton", CREDENTIAL_OPERATION_TIMEOUT))
-        println("SCA_OPERATOR: approve native issuance prompts")
+        if (signingProtectionMode == "required") println("SCA_OPERATOR: approve native issuance prompts")
         clickByTag(device, "wallet.offerAcceptButton")
         assertTrue("App issuance failed: ${foregroundWindowSnapshot(device)}",
             waitForStatus(device, 180_000L, { it.startsWith("Received") }, listOf("Receive failed")))
