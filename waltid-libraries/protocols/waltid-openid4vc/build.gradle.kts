@@ -30,6 +30,7 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
 
             // walt.id
+            implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
             implementation(project(":waltid-libraries:crypto:waltid-cose"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))

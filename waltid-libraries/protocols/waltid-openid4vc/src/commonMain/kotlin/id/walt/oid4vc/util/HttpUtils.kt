@@ -1,5 +1,6 @@
 package id.walt.oid4vc.util
 
+import id.walt.webdatafetching.ssrf.installPrivateNetworkGuard
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -12,6 +13,10 @@ val http = HttpClient {
     engine {
         log.info { "Initializing oid4vc HTTP client with engine config: ${this::class.simpleName}" }
     }
+
+    // Fetches caller-supplied issuer/request URLs server-side (resolveCIProviderMetadata, etc.) - a potential
+    // SSRF target, so guard it the same way WebDataFetcher-backed clients are guarded.
+    installPrivateNetworkGuard()
 
     // For CI/CD OkHttp client should be used. CIO client seems to have some issues with timeouts when connecting to
     // localhost in CI/CD pipelines,
