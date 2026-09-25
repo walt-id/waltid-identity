@@ -2,6 +2,10 @@ package id.walt.wallet2.handlers
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -111,14 +115,14 @@ class PreviewSessionStoreTest {
     }
 
     @Test
-    fun discardDuringFailedRetryRemovesSessionAfterTheAttemptReleasesIt() = runTest {
+    fun discardCancelsTheActiveAttemptAndRemovesItsSession() = runTest {
         val store = store(idGenerator = { "discard-during-use" })
         val id = store.create(WALLET_A, "resolution")
         val started = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
 
         val attempt = async {
-            assertFailsWith<ExpectedFailure> {
+            assertFailsWith<kotlinx.coroutines.CancellationException> {
                 store.useRetainingOnFailure(WALLET_A, id) {
                     started.complete(Unit)
                     release.await()
@@ -154,6 +158,96 @@ class PreviewSessionStoreTest {
 
         assertEquals(listOf(id), store.activeIds())
         assertEquals("retried", store.useRetainingOnFailure(WALLET_A, id) { "retried" })
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun replacingPreparationAndRejectingWaitForCancelledPreparationCleanup() = runTest {
+        for (reject in listOf(false, true)) {
+            val store = store(idGenerator = { "preparing" })
+            val id = store.create(WALLET_A, "resolution")
+            val started = CompletableDeferred<Unit>()
+            val cleanup = CompletableDeferred<Unit>()
+            val first = async {
+                store.prepare(WALLET_A, id) {
+                    started.complete(Unit)
+                    try { awaitCancellation() } finally { withContext(NonCancellable) { cleanup.await() } }
+                }
+            }
+            started.await()
+            val replacement = async {
+                if (reject) store.consume(WALLET_A, id) else store.prepare(WALLET_A, id) { "replacement" }
+            }
+            runCurrent()
+            assertTrue(!replacement.isCompleted, "Must await cancellation cleanup before acquiring the lease")
+            cleanup.complete(Unit)
+            assertEquals(if (reject) "resolution" else "replacement", replacement.await())
+            assertTrue(first.isCancelled)
+            assertEquals(if (reject) emptyList() else listOf(id), store.activeIds())
+        }
+    }
+
+    @Test
+    fun preparationAndRejectionCannotInterruptSubmission() = runTest {
+        val store = store(idGenerator = { "signing" })
+        val id = store.create(WALLET_A, "resolution")
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val signing = async { store.useOnce(WALLET_A, id) { started.complete(Unit); release.await(); "signed" } }
+        started.await()
+        assertFailure(PreviewSessionFailureReason.IN_USE) { store.prepare(WALLET_A, id) { "must not run" } }
+        assertFailure(PreviewSessionFailureReason.IN_USE) { store.consume(WALLET_A, id) }
+        assertTrue(signing.isActive)
+        release.complete(Unit)
+        assertEquals("signed", signing.await())
+    }
+
+    @Test
+    fun preparationRetainsTheSessionAndOneShotFailureConsumesIt() = runTest {
+        val store = store(idGenerator = { "prepared" })
+        val id = store.create(WALLET_A, "resolution")
+        assertEquals("resolution", store.prepare(WALLET_A, id) { it })
+        assertEquals(listOf(id), store.activeIds())
+        assertFailsWith<ExpectedFailure> { store.useOnce(WALLET_A, id) { throw ExpectedFailure() } }
+        assertFailure(PreviewSessionFailureReason.CONSUMED) { store.consume(WALLET_A, id) }
+    }
+
+    @Test
+    fun expiryPreventsLateCompletionAndCancelsSuspendingWork() = runTest {
+        var currentTime = START
+        val store = store(now = { currentTime }, idGenerator = { "expired-in-use" })
+        val id = store.create(WALLET_A, "resolution")
+        assertFailure(PreviewSessionFailureReason.EXPIRED) {
+            store.useOnce(WALLET_A, id) { currentTime += 2.minutes; "late result" }
+        }
+        val timed = PreviewSessionStore<String>("Timed", timeToLive = kotlin.time.Duration.parse("1s"))
+        val timedId = timed.create(WALLET_A, "resolution")
+        assertFailsWith<kotlinx.coroutines.TimeoutCancellationException> {
+            timed.useOnce(WALLET_A, timedId) { kotlinx.coroutines.delay(2_000); "must not return" }
+        }
+        assertFailure(PreviewSessionFailureReason.CONSUMED) { timed.consume(WALLET_A, timedId) }
+    }
+
+    @Test
+    fun nonCancellableNativeCompletionCannotEscapeADiscardedSession() = runTest {
+        val store = store(idGenerator = { "late-native" })
+        val id = store.create(WALLET_A, "resolution")
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val attempt = async {
+            assertFailsWith<kotlinx.coroutines.CancellationException> {
+                store.useRetainingOnFailure(WALLET_A, id) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                        started.complete(Unit); release.await(); "late native result"
+                    }
+                }
+            }
+        }
+        started.await()
+        store.discard(WALLET_A, id)
+        release.complete(Unit)
+        attempt.await()
+        assertFailure(PreviewSessionFailureReason.DISCARDED) { store.consume(WALLET_A, id) }
     }
 
     @Test

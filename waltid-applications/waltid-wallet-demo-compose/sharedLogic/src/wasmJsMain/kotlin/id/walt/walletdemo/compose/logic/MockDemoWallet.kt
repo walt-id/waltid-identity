@@ -152,6 +152,7 @@ private class MockDemoWallet : DemoWallet {
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
+        paymentConsentRevision: String?,
     ): WalletDemoOperationResult =
         WalletDemoOperationResult.Success("Mock presentation sent")
 

@@ -187,6 +187,25 @@ public actor Wallet {
         try await bridge.previewPresentation(request: request)
     }
 
+    /// Resolves authenticated payment instructions for this selection without signing.
+    /// Display the returned review before passing its revision to submission. Nil means no payment review is required.
+    /// - Parameters:
+    ///   - previewHandle: Handle returned by presentation preview.
+    ///   - selectedCredentialOptions: Credentials selected for this presentation.
+    ///   - selectedDisclosureOptions: Selected disclosures, or nil for the request-matched defaults.
+    ///   - did: Optional holder DID, which must also be used for submission.
+    /// - Returns: Validated payment instructions, or nil when the selection contains no SD-JWT payment.
+    /// - Throws: A typed payment-consent error when review cannot be prepared safely.
+    public func preparePaymentConsent(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]? = nil,
+        did: String? = nil
+    ) async throws -> PaymentConsent? {
+        try await bridge.preparePaymentConsent(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
+            selectedDisclosureOptions: selectedDisclosureOptions, did: did)
+    }
+
     /// Submits a presentation with user-selected credential options.
     ///
     /// - Parameters:
@@ -198,6 +217,7 @@ public actor Wallet {
     ///     preserves the wallet core's default request-matched disclosure set.
     ///   - did: Optional wallet DID to use for presentation.
     ///   - runPolicies: Optional policy execution override for presentation.
+    ///   - paymentConsentRevision: Revision returned by payment preparation and explicitly reviewed by the user.
     /// - Returns: Presentation outcome.
     /// - Throws: ``WalletError`` when selection, signing, or verifier communication fails.
     public func submitPresentation(
@@ -205,14 +225,16 @@ public actor Wallet {
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection]? = nil,
         did: String? = nil,
-        runPolicies: Bool? = nil
+        runPolicies: Bool? = nil,
+        paymentConsentRevision: String? = nil
     ) async throws -> PresentationResult {
         try await bridge.submitPresentation(
             previewHandle: previewHandle,
             selectedCredentialOptions: selectedCredentialOptions,
             selectedDisclosureOptions: selectedDisclosureOptions,
             did: did,
-            runPolicies: runPolicies
+            runPolicies: runPolicies,
+            paymentConsentRevision: paymentConsentRevision
         )
     }
 

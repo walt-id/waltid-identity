@@ -156,11 +156,19 @@ actor MockWalletClient: WalletClient {
         )
     }
 
-    func submitPresentation(
+    func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
+    ) async throws -> PaymentConsent? { nil }
+
+    func submitPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection],
+        did: String?,
+        paymentConsentRevision: String?
     ) async throws -> PresentationResult {
         try await delayOperation()
         return .transmitted(.succeeded(verifierResponseJSON: "{}"))

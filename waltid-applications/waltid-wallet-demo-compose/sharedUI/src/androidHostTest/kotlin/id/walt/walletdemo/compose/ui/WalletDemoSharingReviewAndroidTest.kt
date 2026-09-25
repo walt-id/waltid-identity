@@ -11,6 +11,14 @@ class WalletDemoSharingReviewAndroidTest {
     private val scenarios = WalletDemoSharingReviewTestScenarios()
 
     @Test
+    fun paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements() =
+        scenarios.paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements()
+
+    @Test
+    fun unavailablePaymentInstructionsBlockSubmissionWithoutGenericFallback() =
+        scenarios.unavailablePaymentInstructionsBlockSubmissionWithoutGenericFallback()
+
+    @Test
     fun digitalCredentialReviewShowsOriginTransactionDataAndEncryption() =
         scenarios.digitalCredentialReviewShowsOriginTransactionDataAndEncryption()
 

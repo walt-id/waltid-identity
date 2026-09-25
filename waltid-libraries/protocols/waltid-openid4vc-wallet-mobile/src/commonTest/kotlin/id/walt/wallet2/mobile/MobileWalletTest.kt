@@ -157,6 +157,7 @@ class MobileWalletTest {
             onEvent,
             preferredLocales,
             transactionDataProfiles,
+            paymentCredentialIssuers,
             credentialIssuerMetadataTrustResolver,
         ) = config
 
@@ -165,6 +166,7 @@ class MobileWalletTest {
         assertEquals(MobileWalletPersistence(), persistence)
         assertEquals(emptyList(), preferredLocales)
         assertEquals(emptyList(), transactionDataProfiles)
+        assertEquals(emptyList(), paymentCredentialIssuers)
         assertEquals(null, credentialIssuerMetadataTrustResolver)
         assertSame(config.onEvent, onEvent)
         assertIs<MobileWalletDatabaseKey.Managed>(config.persistence.databaseKey)

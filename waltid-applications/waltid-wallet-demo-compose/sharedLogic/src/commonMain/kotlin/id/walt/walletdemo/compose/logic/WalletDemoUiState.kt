@@ -28,6 +28,7 @@ data class WalletDemoUiState(
     val presentationReview: WalletDemoPresentationPreviewResult? = null,
     val selectedPresentationCredentialOptions: Set<WalletDemoPresentationCredentialSelection> = emptySet(),
     val selectedPresentationDisclosureOptions: Set<WalletDemoPresentationDisclosureSelection> = emptySet(),
+    val paymentReview: WalletDemoPaymentReview = WalletDemoPaymentReview.NotRequired,
     val presentationCompleted: Boolean = false,
     val presentationNavigationResetKey: Int = 0,
     val warning: String? = null,

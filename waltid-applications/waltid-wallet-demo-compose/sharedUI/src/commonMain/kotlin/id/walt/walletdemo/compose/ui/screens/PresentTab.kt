@@ -71,6 +71,7 @@ internal fun PresentTab(
             modifier = modifier.testTag(WalletUiTestTags.PresentTabContent),
             actions = {
                 SharingActionsRow(
+                    paymentReview = state.paymentReview,
                     enabled = state.presentationReviewEnabled,
                     selectionComplete = state.presentationCredentialSelectionComplete(),
                     onSubmit = onSubmit,
@@ -80,6 +81,7 @@ internal fun PresentTab(
             },
         ) {
             SharingReviewSection(
+                paymentReview = state.paymentReview,
                 review = preview.toSharingReview(),
                 selectedCredentialOptions = state.selectedPresentationCredentialOptions,
                 selectedDisclosureOptions = state.selectedPresentationDisclosureOptions,

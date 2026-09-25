@@ -150,7 +150,7 @@ public enum CredentialDisplayNormalizer {
                 )
             }
 
-            return ClaimGroup(title: title, items: items)
+            return ClaimGroup(title: title, items: items, transactionType: item.type)
         }
     }
 

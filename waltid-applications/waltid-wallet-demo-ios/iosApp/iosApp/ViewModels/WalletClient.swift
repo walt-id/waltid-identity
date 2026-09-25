@@ -16,11 +16,18 @@ protocol WalletClient {
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
     func present(request: URL, did: String?) async throws -> PresentationResult
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
-    func submitPresentation(
+    func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
+    ) async throws -> PaymentConsent?
+    func submitPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection],
+        did: String?,
+        paymentConsentRevision: String?
     ) async throws -> PresentationResult
     func rejectPresentation(previewHandle: PresentationPreviewHandle) async throws -> PresentationResult
     func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws
@@ -82,17 +89,29 @@ final class SDKWalletClient: WalletClient {
         try await wallet().previewPresentation(request: request)
     }
 
-    func submitPresentation(
+    func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
+    ) async throws -> PaymentConsent? {
+        try await wallet().preparePaymentConsent(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
+            selectedDisclosureOptions: selectedDisclosureOptions, did: did)
+    }
+
+    func submitPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection],
+        did: String?,
+        paymentConsentRevision: String?
     ) async throws -> PresentationResult {
         try await wallet().submitPresentation(
             previewHandle: previewHandle,
             selectedCredentialOptions: selectedCredentialOptions,
             selectedDisclosureOptions: selectedDisclosureOptions,
-            did: did
+            did: did,
+            paymentConsentRevision: paymentConsentRevision
         )
     }
 

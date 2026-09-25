@@ -26,7 +26,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 
-internal enum class ScaPaymentAction { Approve, ReviewCancellation, NativeBackCancellation, DeniedAuthentication }
+internal enum class ScaPaymentAction { Approve, ReviewCancellation, NativeBackCancellation, DeniedAuthentication, MissingTranslation }
 
 /** Shared real-app payment review, transport and proof assertions for simulated and native authentication. */
 @OptIn(ExperimentalDigitalCredentialApi::class)
@@ -51,6 +51,22 @@ internal abstract class ScaPaymentE2E : DigitalCredentialSharingE2E() {
         val encodedEntry = requestClaims.getValue("transaction_data").jsonArray.single().jsonPrimitive.content
         val request = fixture.startCredentialRequest(session.requestJson)
         fixture.enterProviderReview(request, scenario.credentialConfigurationId)
+        if (action == ScaPaymentAction.MissingTranslation) {
+            val blocked = fixture.device.wait(Until.findObject(By.res("payment-consent-blocked")), UI_ELEMENT_TIMEOUT)
+            assertNotNull("Missing translation did not produce a visible consent error", blocked)
+            assertEquals("Required payment instructions are unavailable in your preferred languages.", blocked!!.text)
+            val submit = fixture.device.wait(Until.findObject(By.res(WALLET_SHARE_BUTTON_TAG)), UI_ELEMENT_TIMEOUT)
+            assertNotNull("Submission control is unavailable", submit)
+            assertFalse("Missing translation left submission enabled", submit!!.isEnabled)
+            assertFalse("Blocked review released a credential response", request.isComplete)
+            assertFalse("Blocked review opened native authorization", fixture.device.hasObject(
+                By.pkg("com.android.systemui").text("Authorize wallet signing")))
+            clickByTag(fixture.device, WalletDemoSharingReviewTestTags.CancelButton)
+            assertTrue("Blocked review returned a credential", fixture.awaitCancellationOutcome(request).isFailure)
+            assertTrue("Blocked review was accepted by verifier", DemoTestBackend.verifierSessionInfo(session.sessionId)["status"]?.jsonPrimitive?.content != "SUCCESSFUL")
+            println("SCA_APP_E2E missingTranslationVisible=true submissionDisabled=true responseReleased=false")
+            return
+        }
         listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, "merchant-001", "EUR", SCA_AMOUNT_TEXT).forEach { value ->
             assertTextContainingVisibleAfterScrolling(fixture.device, value, "Payment review is missing '$value'")
         }

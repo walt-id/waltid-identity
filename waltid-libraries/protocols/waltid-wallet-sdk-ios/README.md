@@ -527,3 +527,32 @@ iOS recovery uses ordinary Keychain or encrypted database signing.
 
 See [Identity recovery](Sources/WalletSDK/Documentation.docc/IdentityRecovery.md) and the
 [platform/configuration matrix](../waltid-openid4vc-wallet-mobile/docs/identity-recovery.md).
+
+## TS-12 payment consent
+
+Set `WalletConfiguration.paymentCredentialIssuers` to independently trusted issuer
+URLs/public JWKs. Empty configuration blocks SD-JWT payments. The shared Kotlin
+core authenticates credentials, validates metadata and resolves the review in a
+complete preferred language. The Swift facade exposes the same typed result:
+
+```swift
+let consent = try await wallet.preparePaymentConsent(
+    previewHandle: handle,
+    selectedCredentialOptions: selectedCredentials,
+    selectedDisclosureOptions: selectedDisclosures
+)
+// Render consent and its unsigned-request warning; await explicit confirmation.
+let result = try await wallet.submitPresentation(
+    previewHandle: handle,
+    selectedCredentialOptions: selectedCredentials,
+    selectedDisclosureOptions: selectedDisclosures,
+    paymentConsentRevision: consent?.revision
+)
+```
+
+A nil result means no SD-JWT TS-12 review is required. Handle
+`WalletError.paymentConsent(reason, message:)` as a blocked review; never replace
+missing issuer labels with a generic payment confirmation. Reprepare after a
+selection change, and discard abandoned previews. A failed URL submission requires
+a new preview and confirmation. The direct `present` shortcut cannot authorize
+these payments. See [supported scope and rollout](../../../docs/ts12-sca-payment-demo.md).

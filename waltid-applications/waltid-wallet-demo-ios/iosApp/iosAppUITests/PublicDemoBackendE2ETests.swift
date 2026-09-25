@@ -19,13 +19,15 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     func testScaAppApproval() async throws { try await exerciseScaApp("approve") }
     func testScaAppCancellation() async throws { try await exerciseScaApp("cancel") }
     func testScaAppDeniedAuthentication() async throws { try await exerciseScaApp("denied") }
+    func testScaAppMissingTranslation() async throws { try await exerciseScaApp("missing-translation") }
 
     /// Real app + issuer/verifier; only the isolated framework's authorizer is simulated.
     private func exerciseScaApp(_ route: String) async throws {
         continueAfterFailure = false
         let offer = try await backend.createOffer(scenario: DemoBackend.scaPaymentScenario)
         let app = XCUIApplication()
-        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        let language = route == "missing-translation" ? "fr" : "en"
+        app.launchArguments += ["-AppleLanguages", "(\(language))", "-AppleLocale", language == "fr" ? "fr_FR" : "en_US"]
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: publicDemoEnvironment().merging(["WALLET_SIGNING_PROTECTION_MODE": "disabled"]) { _, new in new })
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 90), "Wallet ready")
@@ -41,6 +43,15 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ui.replaceText(in: ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL"), value: session.authorizationRequestUri)
         ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview")
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Review presentation request", "Preview failed"], timeout: 60), "Review presentation request")
+        let submit = app.buttons["wallet.presentationSubmitButton"]
+        if route == "missing-translation" {
+            XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "payment-consent-blocked").firstMatch.waitForExistence(timeout: 30))
+            XCTAssertFalse(submit.isEnabled)
+            ui.tapButton(identifier: "wallet.presentationCancelButton", fallbackLabel: "Cancel review")
+            try await backend.verifyNoScaResponse(sessionID: session.sessionID)
+            return
+        }
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "payment-consent").firstMatch.waitForExistence(timeout: 30))
         for value in ["Super Store", "11.56", "EUR"] {
             let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch
             func visible() -> Bool { text.exists && !text.frame.isEmpty && app.frame.contains(text.frame) }
@@ -108,6 +119,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ui.replaceText(in: ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL"), value: session.authorizationRequestUri)
         ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview")
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Review presentation request", "Preview failed"], timeout: 60), "Review presentation request")
+        let payment = app.descendants(matching: .any).matching(identifier: "payment-consent").firstMatch
+        XCTAssertTrue(payment.waitForExistence(timeout: 60), app.debugDescription)
         for value in ["Super Store", "11.56", "EUR"] {
             let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch
             for _ in 0..<8 where !text.isHittable { app.swipeDown() }

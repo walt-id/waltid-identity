@@ -19,4 +19,4 @@ adb shell pm clear id.walt.wallet.compose.sca.e2e
   :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedPreviewDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=id.walt.walletdemo.compose.android.ScaPaymentAppE2ETest
 python3 "$script_dir/check-sca-app-results.py" \
-  "$identity_dir/waltid-applications/waltid-wallet-demo-compose/androidApp/build/sca-app-e2e/outputs/androidTest-results" 3
+  "$identity_dir/waltid-applications/waltid-wallet-demo-compose/androidApp/build/sca-app-e2e/outputs/androidTest-results" 4

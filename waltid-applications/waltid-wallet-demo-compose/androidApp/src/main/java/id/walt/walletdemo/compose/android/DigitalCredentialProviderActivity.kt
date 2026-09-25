@@ -31,6 +31,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import id.walt.walletdemo.compose.logic.WalletDemoPaymentConsent
+import id.walt.walletdemo.compose.logic.toDemoPaymentConsent
 
 /**
  * Credential Manager provider entry point.
@@ -41,6 +46,7 @@ import kotlinx.coroutines.launch
 class DigitalCredentialProviderActivity : FragmentActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val resultIntent = Intent()
+    private var discardReview: (suspend () -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,10 +81,15 @@ class DigitalCredentialProviderActivity : FragmentActivity() {
                     }
                 } else {
                     val preview = wallet.previewDigitalCredentialPresentation(input.request)
+                    discardReview = { wallet.discardDigitalCredentialPreview(preview.requestId) }
                     presentOrSubmit(
                         review = preview.toSharingReview(),
                         title = "Share digital credential?",
                         showPreview = showPreview,
+                        preparePaymentConsent = { selection ->
+                            wallet.prepareDigitalCredentialPaymentConsent(preview.requestId,
+                                selection.toCredentialSelections(), selection.toDisclosureSelections())?.toDemoPaymentConsent()
+                        },
                     ) { selection ->
                         submitDigitalCredential(wallet, preview, selection, input.providerRequest)
                     }
@@ -100,10 +111,11 @@ class DigitalCredentialProviderActivity : FragmentActivity() {
         review: WalletDemoSharingReview,
         title: String,
         showPreview: Boolean,
+        preparePaymentConsent: (suspend (WalletDemoSharingSelection) -> WalletDemoPaymentConsent?)? = null,
         onSubmit: (WalletDemoSharingSelection) -> Unit,
     ) {
         if (showPreview || review.request.requiresExplicitReview) {
-            showReview(review, title, onSubmit)
+            showReview(review, title, preparePaymentConsent, onSubmit)
             return
         }
         onSubmit(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
@@ -119,6 +131,7 @@ class DigitalCredentialProviderActivity : FragmentActivity() {
     private fun showReview(
         review: WalletDemoSharingReview,
         title: String,
+        preparePaymentConsent: (suspend (WalletDemoSharingSelection) -> WalletDemoPaymentConsent?)? = null,
         onSubmit: (WalletDemoSharingSelection) -> Unit,
     ) {
         setContent {
@@ -126,6 +139,7 @@ class DigitalCredentialProviderActivity : FragmentActivity() {
             WalletDemoSharingReviewSheet(
                 review = review,
                 title = title,
+                preparePaymentConsent = preparePaymentConsent,
                 enabled = !submitting,
                 onSubmit = { selection ->
                     submitting = true
@@ -152,6 +166,7 @@ class DigitalCredentialProviderActivity : FragmentActivity() {
                     requestId = preview.requestId,
                     selectedCredentialOptions = selection.toCredentialSelections(),
                     selectedDisclosureOptions = selection.toDisclosureSelections(),
+                    paymentConsentRevision = selection.paymentConsentRevision,
                 )
             }.onSuccess { response ->
                 AndroidDigitalCredentialProvider.setResponse(resultIntent, response, providerRequest)
@@ -212,6 +227,11 @@ class DigitalCredentialProviderActivity : FragmentActivity() {
     }
 
     override fun onDestroy() {
+        discardReview?.let { discard ->
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                withContext(NonCancellable) { runCatching { discard() } }
+            }
+        }
         scope.cancel()
         super.onDestroy()
     }

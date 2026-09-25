@@ -106,6 +106,7 @@ private class RecordingDemoWallet : DemoWallet {
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
+        paymentConsentRevision: String?,
     ) = error("unused")
     override suspend fun rejectPresentation(previewHandle: WalletDemoPresentationPreviewHandle) =
         error("unused")
