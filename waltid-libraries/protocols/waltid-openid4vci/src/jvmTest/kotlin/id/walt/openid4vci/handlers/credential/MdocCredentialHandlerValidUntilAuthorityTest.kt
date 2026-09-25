@@ -37,6 +37,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.time.Duration.Companion.days
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -44,7 +45,8 @@ class MdocCredentialHandlerValidUntilAuthorityTest {
 
     @Test
     fun `holder requestForm validUntil does not override configured expiry`() = runTest {
-        val now = Clock.System.now()
+        // Whole-second anchors: MSO tdates truncate, and validFrom must not drift behind signedAt.
+        val now = Instant.fromEpochSeconds(Clock.System.now().epochSeconds)
         val configuredValidUntil = now.plus(365.days)
         val expectedUpdate = now.plus(180.days)
         val holderValidUntil = now.plus(3650.days)
@@ -94,8 +96,9 @@ class MdocCredentialHandlerValidUntilAuthorityTest {
                 verifiedProofs = listOf(verifiedProof()),
             ),
             dataMapping = buildJsonObject {
-                put("validFrom", "<timestamp-before:30d>")
-                put("validUntil", "<timestamp-in:10d>")
+                // Top-level validFrom/validUntil are not MSO fields; they must go through msoData.
+                // Keep a namespace mapping so we still assert holder/requestForm cannot override MSO expiry
+                // while data-function rewrite of claim values still runs.
                 putJsonObject(DOC_TYPE) {
                     put("given_name", "<uuid>")
                 }
@@ -106,7 +109,8 @@ class MdocCredentialHandlerValidUntilAuthorityTest {
             w3cVersion = null,
             mDocNameSpacesDataMappingConfig = null,
             authorizedTransactionDataTypes = null,
-            validFrom = now,
+            // Omit validFrom so the issuer uses the issuance/sign instant (avoids signed > validFrom).
+            validFrom = null,
             validUntil = configuredValidUntil,
             expectedUpdate = expectedUpdate,
         )
