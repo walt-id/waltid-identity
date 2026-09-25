@@ -2,6 +2,7 @@ package id.walt.verifier2.mdocs
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
+import id.walt.verifier2.freePort
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.representations.X5CCertificateString
 import id.walt.credentials.representations.X5CList
@@ -183,7 +184,7 @@ class DcApiMdocVerifier2IntegrationTest {
     }
 
     @Test
-    fun test() = runRoundTrip(port = 17021, walletOrigin = origin, expectSuccess = true)
+    fun test() = runRoundTrip(walletOrigin = origin, expectSuccess = true)
 
     /**
      * The wallet asserts an origin the verifier was not configured with, so the two sides hash different
@@ -192,10 +193,11 @@ class DcApiMdocVerifier2IntegrationTest {
      */
     @Test
     fun mismatchedOriginFailsOnlyDeviceAuth() =
-        runRoundTrip(port = 17022, walletOrigin = "https://attacker.example.com", expectSuccess = false)
+        runRoundTrip(walletOrigin = "https://attacker.example.com", expectSuccess = false)
 
-    private fun runRoundTrip(port: Int, walletOrigin: String, expectSuccess: Boolean) {
+    private fun runRoundTrip(walletOrigin: String, expectSuccess: Boolean) {
         val host = "127.0.0.1"
+        val port = freePort()
 
         E2ETest(host, port, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),

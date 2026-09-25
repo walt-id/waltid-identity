@@ -2,6 +2,7 @@ package id.walt.verifier2.mdocs
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
+import id.walt.verifier2.freePort
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
 import id.walt.cose.coseCompliantCbor
@@ -88,7 +89,7 @@ class PortraitSessionSizeTest {
     @Test
     fun `a session holding a portrait presentation stays within the document limit`() {
         val host = "127.0.0.1"
-        val port = 17031
+        val port = freePort()
         val holder = runBlocking { portraitHolder() }
 
         E2ETest(host, port, true).testBlock(
@@ -214,7 +215,7 @@ class PortraitSessionSizeTest {
     @Test
     fun `measure the cost of a portrait against a minimal credential`() {
         val host = "127.0.0.1"
-        val port = 17032
+        val port = freePort()
         val minimal = runBlocking { portraitHolder(portraitBytes = 0) }
         val portrait = runBlocking { portraitHolder(portraitBytes = portraitBytes) }
 

@@ -38,7 +38,7 @@ class OSSVerifier2RequestUriPostIntegrationTest {
     @Test
     fun `request URI POST uses configured OSS service key and binds wallet nonce`() {
         val host = "127.0.0.1"
-        val port = 17032
+        val port = freePort()
         val configuredKey = KeyManager.resolveSerializedKeyBlocking(TEST_SIGNING_KEY)
 
         E2ETest(host, port, true).testBlock(
