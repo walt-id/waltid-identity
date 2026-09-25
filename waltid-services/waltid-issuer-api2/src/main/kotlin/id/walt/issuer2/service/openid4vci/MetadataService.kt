@@ -14,6 +14,7 @@ import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
+import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import id.walt.openid4vci.metadata.issuer.*
@@ -64,6 +65,25 @@ class MetadataService(
                 configuration.vct?.let { validateSelfHostedVct(configurationId, it) }
             }
         }
+
+    private val configuredTypeMetadata: Map<String, SdJwtVcTypeMetadataDraft04> = buildMap {
+        metadataConfig.sdJwtVcTypeMetadataConfiguration.forEach { (configurationId, metadata) ->
+            val configuration = requireNotNull(credentialConfigurations[configurationId]) {
+                "Type metadata references unknown credential configuration '$configurationId'"
+            }
+            require(configuration.format == CredentialFormat.SD_JWT_VC) {
+                "Type metadata requires an SD-JWT credential configuration: '$configurationId'"
+            }
+            val vct = requireNotNull(configuration.vct) { "SD-JWT configuration '$configurationId' requires a VCT" }
+            val suppliedVct = metadata.vct?.let { if (it == INTERNAL_VCT_BASE_URL) selfHostedVct(configurationId) else it }
+            require(suppliedVct == null || suppliedVct == vct) {
+                "Type metadata VCT does not match credential configuration '$configurationId'"
+            }
+            val resolved = metadata.copy(vct = vct)
+            val previous = put(vct, resolved)
+            require(previous == null || previous == resolved) { "Conflicting type metadata for VCT '$vct'" }
+        }
+    }
 
     fun getCredentialIssuerMetadata(): CredentialIssuerMetadata =
         resolveCredentialRequestEncryptionMetadata().let { credentialRequestEncryption ->
@@ -133,7 +153,7 @@ class MetadataService(
         }
             ?: throw NotFoundException("Credential type metadata not found: $credentialType")
 
-        return SdJwtVcTypeMetadataDraft04(
+        return configuredTypeMetadata[expectedVct] ?: SdJwtVcTypeMetadataDraft04(
             vct = expectedVct,
             name = credentialType,
             description = "$credentialType Verifiable Credential",

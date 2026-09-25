@@ -374,8 +374,20 @@ class Issuer2MetadataEndpointTest {
                 assertEquals(HttpStatusCode.OK, vctTypeMetadataRaw.status, metadataUrl)
                 val vctTypeMetadata = vctTypeMetadataRaw.body<SdJwtVcTypeMetadataDraft04>()
                 assertEquals(publishedVct, vctTypeMetadata.vct)
-                assertEquals(credentialConfigurationId, vctTypeMetadata.name)
-                assertEquals("$credentialConfigurationId Verifiable Credential", vctTypeMetadata.description)
+                if (credentialConfigurationId == "sca_payment_card_sd_jwt") {
+                    val configured = ConfigManager.getConfig<Issuer2MetadataConfig>()
+                        .sdJwtVcTypeMetadataConfiguration.getValue(credentialConfigurationId)
+                    assertEquals(configured.copy(vct = publishedVct), vctTypeMetadata)
+                    val document = vctTypeMetadata.toJSON()
+                    assertEquals("urn:eu:europa:ec:eudi:sua:sca", document["category"]?.jsonPrimitive?.content)
+                    val payment = document.getValue("transaction_data_types").jsonObject.getValue("urn:eudi:sca:payment:1").jsonObject
+                    assertEquals(5, payment.getValue("claims").jsonArray.size)
+                    val actions = payment.getValue("ui_labels").jsonObject.getValue("affirmative_action_label").jsonArray
+                    assertEquals(setOf("en", "de"), actions.map { it.jsonObject.getValue("lang").jsonPrimitive.content }.toSet())
+                } else {
+                    assertEquals(credentialConfigurationId, vctTypeMetadata.name)
+                    assertEquals("$credentialConfigurationId Verifiable Credential", vctTypeMetadata.description)
+                }
             }
         }
     }
@@ -393,11 +405,15 @@ class Issuer2MetadataEndpointTest {
                 setOf(SigningAlgId.Jose("ES256")),
                 configuration.credentialSigningAlgValuesSupported,
             )
-            assertEquals(JWT_PROOF_BINDING_METHODS, configuration.cryptographicBindingMethodsSupported)
+            val paymentDemo = credentialConfigurationId == "sca_payment_card_sd_jwt"
+            assertEquals(
+                if (paymentDemo) setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.DidJwk) else JWT_PROOF_BINDING_METHODS,
+                configuration.cryptographicBindingMethodsSupported,
+            )
             assertEquals(credentialConfigurationId, configuration.scope)
             assertEquals("$ISSUER_BASE_URL/$credentialConfigurationId", configuration.vct)
             assertEquals(
-                JWT_PROOF_SIGNING_ALGORITHMS,
+                if (paymentDemo) setOf("ES256") else JWT_PROOF_SIGNING_ALGORITHMS,
                 assertNotNull(configuration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
             )
         }
@@ -557,6 +573,7 @@ class Issuer2MetadataEndpointTest {
         )
 
         val SD_JWT_CATALOG_CONFIG_IDS = listOf(
+            "sca_payment_card_sd_jwt",
             "urn:eu.europa.ec.eudi:cor:1",
             "urn:eudi:ehic:1",
             "urn:eudi:pid:1",
