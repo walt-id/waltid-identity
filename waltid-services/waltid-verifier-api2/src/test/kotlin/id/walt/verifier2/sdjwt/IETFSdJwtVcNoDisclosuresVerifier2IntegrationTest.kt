@@ -2,6 +2,7 @@ package id.walt.verifier2.sdjwt
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
+import id.walt.verifier2.freePort
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.representations.X5CCertificateString
@@ -328,7 +329,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
     @Test
     fun test() {
         val host = "127.0.0.1"
-        val port = 17021
+        val port = freePort()
         Verifier2WebhookRecorder().start().use { webhook ->
         E2ETest(host, port, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
