@@ -208,7 +208,7 @@ class StatusCredentialTestServer {
                 ),
                 holderCredential = holderCredential,
                 valid = false,
-                exception = "not authorized",
+                exception = "does not match credential issuer",
             ),
         )
     }
