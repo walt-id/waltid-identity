@@ -271,9 +271,6 @@ Applications requiring IACA-specific profile checks or a restriction to a partic
 an application-owned `ProximityReaderTrustEvaluator` that validates the certificate path and applies
 that policy. Contact information alone establishes neither issuer identity nor trust.
 
-Migration: the unreleased `requiredIACAIssuerCertificateDER` setting has been removed; applications
-using it must move both the issuer restriction and conditional contact check into their evaluator.
-
 `ProximityCRLFetcher` receives a Foundation `URL` and byte limit and returns
 `ProximityCRLFetchResult.available(der:)` or `.unavailable`. The application owns timeouts,
 redirects, destination restrictions and caching. The shared verifier authenticates direct complete

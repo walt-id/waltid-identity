@@ -420,11 +420,6 @@ The X.509 helper `validateMdocReaderIssuerContactExtension` checks only the read
 non-critical `issuerAlternativeName` email/URI contact; it establishes neither issuer identity nor trust.
 Apply it only when the application's policy requires that extension, after validating the certificate path.
 
-Migration: the unreleased `requiredIacaIssuerCertificateDerBase64Url` setting has been removed.
-Applications using it must move both their issuer restriction and conditional contact check into their
-reader-trust evaluator. The standalone helper was renamed from
-`validateIacaIssuedMdocReaderCertificateContact` to `validateMdocReaderIssuerContactExtension`.
-
 Configuration snapshots detach collection data while retaining provider/evaluator service
 references. Providers and revocation sources are queried at evaluation time. Persisted
 settings decoding checks structure; import checks current CA usage and RICAL material;
