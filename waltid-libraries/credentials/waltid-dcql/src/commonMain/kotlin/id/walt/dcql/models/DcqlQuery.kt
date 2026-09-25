@@ -25,11 +25,6 @@ data class DcqlQuery(
         if (credentials.any { it.id.isEmpty() }) {
             throw IllegalArgumentException("Requested dcql query: credential has empty id")
         }
-        credentials.forEach { credential ->
-            require(isValidIdentifier(credential.id)) {
-                "Requested dcql query: credential id '${credential.id}' must consist of alphanumeric, underscore, or hyphen characters"
-            }
-        }
         if (credentials.map { it.id }.distinct().size != credentials.size) {
             throw IllegalArgumentException("Requested dcql query: credential IDs must be unique")
         }
@@ -46,11 +41,6 @@ data class DcqlQuery(
         credentials.forEach { credential ->
             val claims = credential.claims.orEmpty()
             val claimIds = claims.mapNotNull { it.id }
-            claimIds.forEach { claimId ->
-                require(isValidIdentifier(claimId)) {
-                    "Requested dcql query: claim id '$claimId' must consist of alphanumeric, underscore, or hyphen characters"
-                }
-            }
             require(claimIds.distinct().size == claimIds.size) {
                 "Requested dcql query: claim IDs must be unique"
             }
@@ -97,17 +87,6 @@ data class DcqlQuery(
                     "mso_mdoc Claims Query path elements must be strings"
                 }
             }
-    }
-
-    companion object {
-        /**
-         * OpenID4VP §6.1 / §6.3: credential and claim identifiers are non-empty
-         * strings of alphanumeric characters, `_`, or `-`.
-         */
-        val IDENTIFIER_PATTERN = Regex("^[A-Za-z0-9_-]+$")
-
-        fun isValidIdentifier(id: String): Boolean =
-            id.isNotEmpty() && IDENTIFIER_PATTERN.matches(id)
     }
 
     object DcqlQueryExamples {

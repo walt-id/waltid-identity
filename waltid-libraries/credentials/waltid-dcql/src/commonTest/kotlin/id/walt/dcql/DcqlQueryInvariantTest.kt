@@ -57,46 +57,6 @@ class DcqlQueryInvariantTest {
     }
 
     @Test
-    fun `dcql precheck rejects identifiers outside OpenID4VP character set`() {
-        val invalidCredentialId = DcqlQuery(
-            credentials = listOf(credential("urn:eudi:pid:1")),
-        )
-        assertFailsWith<IllegalArgumentException> { invalidCredentialId.precheck() }
-
-        val dottedCredentialId = DcqlQuery(
-            credentials = listOf(credential("eu.europa.ec.eudi.pid.1")),
-        )
-        assertFailsWith<IllegalArgumentException> { dottedCredentialId.precheck() }
-
-        val invalidClaimId = DcqlQuery(
-            credentials = listOf(
-                credential(
-                    "pid",
-                    claims = listOf(
-                        ClaimsQuery(id = "address.street_address", pathStrings = listOf("address", "street_address")),
-                    ),
-                ),
-            ),
-        )
-        assertFailsWith<IllegalArgumentException> { invalidClaimId.precheck() }
-    }
-
-    @Test
-    fun `dcql precheck accepts alphanumeric underscore and hyphen identifiers`() {
-        DcqlQuery(
-            credentials = listOf(
-                credential(
-                    "eudi-pid-1",
-                    claims = listOf(
-                        ClaimsQuery(id = "given_name", pathStrings = listOf("given_name")),
-                        ClaimsQuery(pathStrings = listOf("address", "street_address")),
-                    ),
-                ),
-            ),
-        ).precheck()
-    }
-
-    @Test
     fun `dcql precheck rejects empty and duplicate claim set alternatives`() {
         val query = DcqlQuery(
             credentials = listOf(
