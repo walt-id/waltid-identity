@@ -474,7 +474,7 @@ class DigitalCredentialSharingE2ETest {
      * observes.
      */
     @Test
-    fun doesNotSurfaceForMultisignedRequests() = runBlocking {
+    fun doesNotSurfaceForMultisignedRequests(): Unit = runBlocking {
         val fixture = fixture()
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
         val session = DemoTestBackend.createDcApiVerifierSession(
@@ -493,7 +493,10 @@ class DigitalCredentialSharingE2ETest {
             "openid4vp-v1-multisigned produced a credential: ${outcome.getOrNull()}",
             outcome.exceptionOrNull(),
         )
-        fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
+        assertTrue(
+            "Credential Manager selector did not close after the unsupported request",
+            fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT),
+        )
     }
 
     /**
@@ -517,11 +520,22 @@ class DigitalCredentialSharingE2ETest {
 
         val requestHandle = fixture.startCredentialRequest(signedDcApiRequest(openId4VpPayload))
         try {
+            // Credential Manager displays the registered title, not the raw docType. Stop at its
+            // disclosure sheet: this synthetic JWS tests matching, not proof acceptance or sharing.
             assertNotNull(
-                "Credential Manager did not surface a signed-request candidate.\n" +
-                    pickerDiagnostic(requestHandle, MDL_DOC_TYPE, candidateSelected = false),
-                fixture.device.wait(Until.findObject(By.textContains(MDL_DOC_TYPE)), UI_ELEMENT_TIMEOUT),
+                "Credential Manager did not surface the signed-request mDL.\n" +
+                    pickerDiagnostic(requestHandle, "Mobile Driving License", candidateSelected = false),
+                fixture.device.wait(
+                    Until.findObject(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).text("Mobile Driving License")),
+                    UI_ELEMENT_TIMEOUT,
+                ),
             )
+            for (claim in listOf("given_name", "family_name")) {
+                assertNotNull("Credential Manager did not display requested claim '$claim'",
+                    fixture.device.findCredentialManagerText(claim))
+            }
+            assertNotNull("Credential Manager did not offer to continue with the matching credential",
+                fixture.device.findEnabledCredentialManagerContinue())
         } finally {
             requestHandle.abandon()
         }
