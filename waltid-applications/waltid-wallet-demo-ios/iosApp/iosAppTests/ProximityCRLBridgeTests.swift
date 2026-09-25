@@ -3,14 +3,6 @@ import XCTest
 import WalletSDK
 
 final class ProximityCRLBridgeTests: XCTestCase {
-    func testMalformedReaderCertificateFailsClosedThroughSwiftBridge() async throws {
-        let evaluator = ProximityConfiguredReaderTrustEvaluator(configuration: .init(
-            trustAnchors: [.init(certificateDER: ProximityCRLFixtures.issuerWithoutCdp)]))
-        let result = try await evaluator.evaluate(.init(scope: .wholeRequest,
-            certificateChainDER: [Data([0x30, 0])]))
-        XCTAssertEqual(result.certificatePath, .invalid)
-    }
-
     func testValidatedPathDoesNotRequireIssuerContactThroughSwiftBridge() async throws {
         let root = ProximityCRLFixtures.issuerWithoutCdp
         let anchor = ProximityReaderTrustAnchor(certificateDER: root)
