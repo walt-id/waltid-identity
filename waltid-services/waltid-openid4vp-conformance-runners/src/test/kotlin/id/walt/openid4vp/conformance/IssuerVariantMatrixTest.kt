@@ -1,14 +1,80 @@
 package id.walt.openid4vp.conformance
 
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariant
+import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantReportWriter
+import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantRunResult
+import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantRunStatus
+import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantModuleRunResult
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantMatrix
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantSelection
+import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.Oid4vciIssuerVariantPlan
+import id.walt.openid4vp.conformance.testplans.runner.req.CredentialOfferAuthMethod
+import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IssuerVariantMatrixTest {
+    @Test
+    fun summaryReportsEffectiveIssuerStrictnessRatherThanSharedWalletSoftFail() {
+        val strict = IssuerVariantReportWriter.buildSummary(emptyList(), strictResults = true)
+        val exploratory = IssuerVariantReportWriter.buildSummary(emptyList(), strictResults = false)
+        assertTrue(strict.contains("Strict issuer results: `enabled`"))
+        assertTrue(exploratory.contains("Strict issuer results: `disabled`"))
+        assertFalse(strict.contains("CONFORMANCE_ALLOW_FAILURE"))
+        assertFalse(exploratory.contains("CONFORMANCE_ALLOW_FAILURE"))
+    }
+
+    @Test
+    fun summaryIncludesModuleErrorsEvenWhenVariantErrorIsNull() {
+        val summary = IssuerVariantReportWriter.buildSummary(listOf(
+            IssuerVariantRunResult(
+                variantId = "blocked-variant",
+                variant = JsonObject(emptyMap()),
+                status = IssuerVariantRunStatus.BLOCKED,
+                modules = listOf(
+                    IssuerVariantModuleRunResult(
+                        testModule = "missing-proof", testId = "test-123", status = "WAITING",
+                        error = "Browser navigation failed | ERR_CONNECTION_REFUSED\ncallback",
+                    ),
+                    IssuerVariantModuleRunResult(testModule = "no-error-detail", status = "WAITING"),
+                ),
+            ),
+        ))
+        assertTrue(summary.contains("missing-proof (test=test-123, status=WAITING, result=none)"))
+        assertTrue(summary.contains("Browser navigation failed \\| ERR_CONNECTION_REFUSED callback"))
+        assertTrue(summary.contains("no-error-detail (test=not created, status=WAITING, result=none)"))
+        assertTrue(summary.contains("Module did not produce an accepted result"))
+    }
+
+    @Test
+    fun walletInitiatedVariantsNeedNoOfferWhileIssuerInitiatedVariantsSelectOneProfile() {
+        for (variant in IssuerVariantMatrix.all()) {
+            val configurationId = if (variant.credentialFormat == "mdoc") "org.iso.18013.5.1.mDL" else "identity_credential"
+            val config = Oid4vciIssuerVariantPlan(
+                issuerUrl = "https://issuer.example/openid4vci",
+                credentialConfigurationId = configurationId,
+                variant = variant,
+                clientAttestationIssuer = "https://attester.example",
+                clientAttesterJwks = JsonObject(emptyMap()),
+                staticTxCode = "493536",
+            ).config
+            if (variant.authorizationCodeFlowVariant == "wallet_initiated") {
+                assertNull(config.credentialOfferAuthMethod)
+                assertNull(config.staticTxCode)
+            } else {
+                val preAuthorized = variant.grantType == "pre_authorization_code"
+                assertEquals(
+                    if (preAuthorized) CredentialOfferAuthMethod.PRE_AUTHORIZED else CredentialOfferAuthMethod.AUTHORIZED,
+                    config.credentialOfferAuthMethod,
+                )
+                assertEquals(if (variant.credentialFormat == "mdoc") "isoMdl" else "identityCredentialSdJwt", config.credentialProfileId)
+                assertEquals(if (preAuthorized) "493536" else null, config.staticTxCode)
+            }
+        }
+    }
 
     @Test
     fun generatesOnlyBaseIssuerPlanVariants() {

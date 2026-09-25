@@ -14,6 +14,7 @@ services:
       context: ./nginx
     ports:
      - "8443:8443"
+     - "8444:8444"
      - "9443:9443"
     extra_hosts:
      - "host.docker.internal:host-gateway"
@@ -29,14 +30,16 @@ services:
         max-size: "500k"
         max-file: "5"
   server:
-    # old tag: waltid/openid-conformance-suite
-    # new tag: waltid/openid-conformance-suite:release-v5.1.43
-    # latest: registry.gitlab.com/openid/conformance-suite:${IMAGE_TAG:-latest}
-    image: waltid/openid-conformance-suite:release-v5.1.43
+    # Build the exact source revision deployed at https://conformance.waltid.cloud.
+    # run-issuer-conformance-local.sh verifies the checkout and /api/server identity.
+    image: waltid/openid-conformance-suite:${CONFORMANCE_SUITE_IMAGE_TAG:-release-v5.2.3}
+    build:
+      context: ${CONFORMANCE_SUITE_SOURCE_DIR:-../../../conformance-suite}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       BASE_URL: ${BASE_URL:-https://localhost.emobix.co.uk:8443}
+      BASE_MTLS_URL: ${BASE_MTLS_URL:-https://localhost.emobix.co.uk:8444}
       MONGODB_HOST: mongodb
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       OIDC_GOOGLE_CLIENTID: ${OIDC_GOOGLE_CLIENTID:-google-client}

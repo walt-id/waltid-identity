@@ -18,6 +18,7 @@ import kotlinx.serialization.json.Json
 class IssuerInterface(private val issuerBaseUrl: String) : AutoCloseable {
 
     private val httpClient = HttpClient {
+        expectSuccess = true
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true
@@ -27,7 +28,10 @@ class IssuerInterface(private val issuerBaseUrl: String) : AutoCloseable {
         }
     }
 
-    /** Create a credential offer using the authentication method required by the variant. */
+    /**
+     * Use the original single-profile OSS management contract for either grant.
+     * The suite can still request a protocol batch with multiple proofs at /credential.
+     */
     suspend fun createCredentialOffer(
         profileId: String,
         authMethod: CredentialOfferAuthMethod,
