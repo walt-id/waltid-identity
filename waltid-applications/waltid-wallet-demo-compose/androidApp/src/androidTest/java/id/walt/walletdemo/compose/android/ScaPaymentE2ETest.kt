@@ -34,6 +34,7 @@ internal class ScaPaymentE2ETest : ScaPaymentE2E() {
         exerciseScaPayment(when (operatorRoute) {
             "approve" -> ScaPaymentAction.Approve
             "cancel" -> ScaPaymentAction.NativeBackCancellation
+            "missing-translation" -> ScaPaymentAction.MissingTranslation
             else -> error("Select the explicit physical-device SCA lane")
         })
     }
@@ -50,7 +51,7 @@ internal class ScaPaymentE2ETest : ScaPaymentE2E() {
             val context = instrumentation.targetContext
             check(context.packageName == "id.walt.wallet.compose.test") { "Use a fresh isolated preview installation" }
             operatorRoute = InstrumentationRegistry.getArguments().getString("wallet.sca").orEmpty()
-            check(operatorRoute in setOf("approve", "cancel")) { "Select the physical lane with -e wallet.sca approve|cancel" }
+            check(operatorRoute in setOf("approve", "cancel", "missing-translation")) { "Select the physical lane with -e wallet.sca approve|cancel|missing-translation" }
             val offer = DemoTestBackend.createOffer(DemoTestBackend.scaPaymentSdJwtScenario)
             val created = createAndroidDemoMobileWallet(context, demoWalletConfig())
             provisionedWallet = created.wallet

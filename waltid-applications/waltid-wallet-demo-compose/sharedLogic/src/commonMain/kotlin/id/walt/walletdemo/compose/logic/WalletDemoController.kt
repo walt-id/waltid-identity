@@ -38,6 +38,7 @@ class WalletDemoController(
     private var issuanceSession: WalletDemoIssuanceSession? = null
     private var pendingAuthorizationCallback: String? = null
     private var presentationJob: Job? = null
+    private var paymentConsentJob: Job? = null
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<WalletDemoUiState> = _state.asStateFlow()
     private var statusHideJob: Job? = null
@@ -423,6 +424,7 @@ class WalletDemoController(
     fun lock() {
         if (skipPin) return
         receiveJob?.cancel()
+        paymentConsentJob?.cancel()
         presentationJob?.cancel()
         val previous = getAndUpdateState {
             it.copy(
@@ -432,6 +434,7 @@ class WalletDemoController(
                 offerPreview = null,
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
                 presentationReview = null,
+                paymentReview = WalletDemoPaymentReview.NotRequired,
                 selectedPresentationCredentialOptions = emptySet(),
                 selectedPresentationDisclosureOptions = emptySet(),
                 presentationCompleted = false,
@@ -478,6 +481,7 @@ class WalletDemoController(
                                 state.copy(
                                     session = currentReady.copy(credentials = credentials),
                                     presentationReview = null,
+                                    paymentReview = WalletDemoPaymentReview.NotRequired,
                                     selectedPresentationCredentialOptions = emptySet(),
                                     selectedPresentationDisclosureOptions = emptySet(),
                                     presentationCompleted = false,
@@ -600,11 +604,13 @@ class WalletDemoController(
     }
 
     fun updatePresentationRequestUrl(value: String) {
+        paymentConsentJob?.cancel()
         presentationJob?.cancel()
         val previous = getAndUpdateState {
             it.copy(
                 requestDrafts = it.requestDrafts.copy(presentationRequestUrl = value),
                 presentationReview = null,
+                paymentReview = WalletDemoPaymentReview.NotRequired,
                 selectedPresentationCredentialOptions = emptySet(),
                 selectedPresentationDisclosureOptions = emptySet(),
                 presentationCompleted = false,
@@ -628,6 +634,7 @@ class WalletDemoController(
         when (WalletDeepLinkScheme.parse(url)) {
             WalletDeepLinkScheme.CredentialOffer -> {
                 receiveJob?.cancel()
+                paymentConsentJob?.cancel()
                 presentationJob?.cancel()
                 val previous = getAndUpdateState {
                     it.copy(
@@ -641,6 +648,7 @@ class WalletDemoController(
                         receiveCompleted = false,
                         receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
                         presentationReview = null,
+                        paymentReview = WalletDemoPaymentReview.NotRequired,
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
                         presentationCompleted = false,
@@ -654,6 +662,7 @@ class WalletDemoController(
             }
             WalletDeepLinkScheme.PresentationRequest -> {
                 receiveJob?.cancel()
+                paymentConsentJob?.cancel()
                 presentationJob?.cancel()
                 val previous = getAndUpdateState {
                     it.copy(
@@ -667,6 +676,7 @@ class WalletDemoController(
                         receiveCompleted = false,
                         receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
                         presentationReview = null,
+                        paymentReview = WalletDemoPaymentReview.NotRequired,
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
                         presentationCompleted = false,
@@ -702,11 +712,13 @@ class WalletDemoController(
     }
 
     fun startNewPresentationFlow() {
+        paymentConsentJob?.cancel()
         presentationJob?.cancel()
         val previous = getAndUpdateState {
             it.copy(
                 requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
                 presentationReview = null,
+                paymentReview = WalletDemoPaymentReview.NotRequired,
                 selectedPresentationCredentialOptions = emptySet(),
                 selectedPresentationDisclosureOptions = emptySet(),
                 presentationCompleted = false,
@@ -1122,6 +1134,7 @@ class WalletDemoController(
                     it.copy(
                         operation = WalletOperationState.Idle,
                         presentationReview = resolvedPreview,
+                        paymentReview = if (resolvedPreview is WalletDemoPresentationPreviewResult.Ready && resolvedPreview.preview.requiresPaymentConsent) WalletDemoPaymentReview.Loading else WalletDemoPaymentReview.NotRequired,
                         selectedPresentationCredentialOptions = when (resolvedPreview) {
                             is WalletDemoPresentationPreviewResult.Ready ->
                                 resolvedPreview.preview.defaultCredentialSelection()
@@ -1132,6 +1145,8 @@ class WalletDemoController(
                 }
                 if (!installed) {
                     wallet.discardPresentationPreview(resolvedPreview.previewHandle())
+                } else {
+                    prepareSelectedPaymentConsent()
                 }
                 preview = null
             } catch (cancellation: CancellationException) {
@@ -1211,6 +1226,7 @@ class WalletDemoController(
                 selectedPresentationDisclosureOptions = retainedDisclosures.forSelectedCredentials(nextCredentials),
             )
         }
+        prepareSelectedPaymentConsent()
     }
 
     fun togglePresentationDisclosure(selection: WalletDemoPresentationDisclosureSelection) {
@@ -1224,12 +1240,40 @@ class WalletDemoController(
                 }.forSelectedCredentials(state.selectedPresentationCredentialOptions)
             )
         }
+        prepareSelectedPaymentConsent()
+    }
+
+    private fun prepareSelectedPaymentConsent() {
+        paymentConsentJob?.cancel()
+        val current = _state.value
+        val preview = current.presentationPreview ?: return
+        if (!preview.requiresPaymentConsent) {
+            _state.update { it.copy(paymentReview = WalletDemoPaymentReview.NotRequired) }
+            return
+        }
+        _state.update { it.copy(paymentReview = WalletDemoPaymentReview.Loading) }
+        if (!current.presentationCredentialSelectionComplete()) return
+        paymentConsentJob = scope.launch(dispatcher) {
+            val review = try {
+                wallet.preparePaymentConsent(preview.previewHandle, current.selectedPresentationCredentialOptions.toList(),
+                    current.selectedPresentationDisclosureOptions.toList(), (current.session as? WalletSessionState.Ready)?.did)
+                    ?.let { WalletDemoPaymentReview.Ready(it) } ?: WalletDemoPaymentReview.NotRequired
+            } catch (cause: CancellationException) { throw cause
+            } catch (cause: Exception) { WalletDemoPaymentReview.Blocked(cause.message ?: "Payment instructions are unavailable.") }
+            currentCoroutineContext().ensureActive()
+            _state.update { latest ->
+                if (latest.presentationPreview?.previewHandle == preview.previewHandle &&
+                    latest.selectedPresentationCredentialOptions == current.selectedPresentationCredentialOptions &&
+                    latest.selectedPresentationDisclosureOptions == current.selectedPresentationDisclosureOptions)
+                    latest.copy(paymentReview = review) else latest
+            }
+        }
     }
 
     fun submitPresentation() {
         val current = _state.value
         val ready = current.session as? WalletSessionState.Ready ?: return
-        if (!current.presentationReviewEnabled) return
+        if (!current.presentationReviewEnabled || !current.paymentReview.canConfirm) return
         val requestUrl = current.requestDrafts.presentationRequestUrl.trim()
         val previewHandle = current.presentationPreview?.previewHandle ?: return
         val selectedCredentialOptions = current.selectedPresentationCredentialOptions.toList()
@@ -1260,6 +1304,7 @@ class WalletDemoController(
                     selectedCredentialOptions,
                     selectedDisclosureOptions,
                     ready.did,
+                    paymentConsentRevision = current.paymentReview.consent?.revision,
                 )
                 currentCoroutineContext().ensureActive()
                 updatePresentationIfCurrent(request, WalletOperationState.Presenting) {
@@ -1278,6 +1323,7 @@ class WalletDemoController(
                         WalletDemoTab.Present,
                     ).copy(
                         presentationReview = null,
+                        paymentReview = WalletDemoPaymentReview.NotRequired,
                         requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
@@ -1344,6 +1390,7 @@ class WalletDemoController(
                         tab = WalletDemoTab.Present,
                     ),
                     presentationReview = null,
+                    paymentReview = WalletDemoPaymentReview.NotRequired,
                     requestDrafts = current.requestDrafts.copy(presentationRequestUrl = ""),
                     selectedPresentationCredentialOptions = emptySet(),
                     selectedPresentationDisclosureOptions = emptySet(),
@@ -1352,6 +1399,7 @@ class WalletDemoController(
                 ),
             )
         ) return
+        paymentConsentJob?.cancel()
         presentationJob?.cancel()
         scope.launch(dispatcher) {
             runCatching { wallet.discardPresentationPreview(previewHandle) }
@@ -1396,6 +1444,7 @@ class WalletDemoController(
                         WalletDemoTab.Present,
                     ).copy(
                         presentationReview = null,
+                        paymentReview = WalletDemoPaymentReview.NotRequired,
                         requestDrafts = it.requestDrafts.copy(presentationRequestUrl = ""),
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
@@ -1424,6 +1473,7 @@ class WalletDemoController(
 
     private fun cancelActiveWalletWork() {
         receiveJob?.cancel()
+        paymentConsentJob?.cancel()
         presentationJob?.cancel()
         val previous = _state.value
         cancelIssuance()
@@ -1770,6 +1820,7 @@ class WalletDemoController(
         receiveCompleted = false,
         receiveNavigationResetKey = receiveNavigationResetKey + 1,
         presentationReview = null,
+        paymentReview = WalletDemoPaymentReview.NotRequired,
         selectedPresentationCredentialOptions = emptySet(),
         selectedPresentationDisclosureOptions = emptySet(),
         presentationCompleted = false,

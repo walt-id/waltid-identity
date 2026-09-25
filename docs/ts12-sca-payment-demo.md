@@ -43,10 +43,79 @@ The transaction binds the query ID (not a stored wallet credential ID):
 }
 ```
 
-Keep `amount` numeric. The generic review shows the nested payee leaves and exact
-amount/currency. SCA review remains mandatory when ordinary Credential Manager
-previews are disabled. Authoritative localized consent metadata is the separate
-WAL-1417 layer; this first demo uses the existing generic transaction renderer.
+Keep `amount` numeric. SCA review remains mandatory when ordinary Credential
+Manager previews are disabled. SD-JWT payments use the strict metadata-driven
+review below; legacy mdoc payments retain the mandatory generic transaction view.
+
+## Authoritative payment consent (WAL-1417)
+
+The deployed issuer configuration must also publish the full SD-JWT type metadata,
+including `category`, the permitted TS-12 transaction type, its built-in schema
+URN, field claims and UI labels. The checked-in service and Docker configurations
+publish matching English/German catalogues through the existing VCT endpoints.
+The mobile apps independently pin the demo issuer's public signing key. A different
+deployment must update the issuer URL, public key and VCT configuration together.
+No key from an untrusted credential header becomes a trust anchor.
+
+The shared wallet core authenticates the issuer-signed credential, validates its
+validity/disclosures, obtains `vct` from those authenticated claims and resolves
+one consent snapshot for the actual selected credentials and disclosures. Missing
+trust configuration blocks SD-JWT payments. This narrow configured-key policy is
+not a general issuer trust registry or certificate-chain qualification system.
+
+Supported scope is one payment authorizing credential plus ordinary disclosures:
+
+- Built-in `urn:eudi:sca:payment:1` schema only, with exactly `transaction_id`,
+  `payee.name`, `payee.id`, `currency`, and numeric `amount` in `payload`.
+- Exact decimal handling and ISO 4217 minor units; no floating-point rounding.
+  Unsupported currencies/shapes or extra fields block consent.
+- Inline claims/UI labels or HTTPS references. Resolution is limited to three
+  documents, 256 KiB each, three redirects per document, twelve requests total
+  and ten seconds per document. Every redirect must remain HTTPS and satisfy
+  the configured `WALLET2_PAYMENT_METADATA` URL policy.
+- Integrity references are optional; every supplied supported reference is
+  verified over the fetched bytes using the strongest supported SRI algorithm.
+  Unknown options and unsupported/malformed tokens are ignored as in W3C SRI
+  2016; a mismatch still blocks. Wallet policy additionally rejects a supplied
+  pin with no supported digest, rather than treating it as unpinned metadata.
+  Dangling references and unsupported schema/inheritance block consent.
+  A frozen reviewed snapshot is used for submission.
+- One complete language range from the host's ordered preferences, using RFC
+  4647 progressive lookup (including script and regional fallback). Exact tags
+  win, then publisher order resolves regional alternatives; labels can use
+  different tags that match that range. No unrelated-language fallback is allowed. Required
+  field labels and the affirmative action must all exist in that language.
+  Title, hint and denial label may be absent; supplied but invalid/untranslated
+  values block consent. Requiring a common language for supplied optional text
+  is a conservative wallet policy, not an extra TS-12 SHALL; fallback is tried
+  before reporting unavailable translations.
+- Claim display follows SD-JWT VC draft 16 section 4.6.2: required `locale`
+  and `label`. TS-12 UI catalogue entries separately use `lang` and `value`.
+  Unknown metadata extensions are ignored; they never substitute for required
+  fields. Transaction claim `sd` is inapplicable.
+- Claim paths are resolved against the transaction `payload` for this profile,
+  following TS-12 section 3.3.2. No automatic prefix removal is performed.
+  TS-12's informative example uses a `payload` prefix and the earlier `lang`
+  spelling; this ambiguity is recorded rather than treated as a second wire
+  contract. Providers using that representation are not qualified by this demo.
+- UI levels 1/2/3/4 mean prominent/main/details/omitted. Omitted values remain
+  validated and cryptographically bound. Ordinary disclosure review remains
+  visible. Issuer hints never replace the wallet's unsigned-request warning.
+
+URL and Android DC API flows prepare consent under the retained preview's lease.
+The UI displays the result before passing its opaque revision on confirmation.
+A changed selection, request, signing key, language, or credential invalidates it.
+Missing/stale consent blocks the whole selection before any credential is signed.
+A cancellation or failure consumes the acknowledgment: DC API retries need a new
+review; URL submissions require a new preview. Dismissal/expiry cancels in-flight
+work and suppresses late authorization results. The immediate `present` shortcut
+cannot authorize an SD-JWT payment.
+
+Persistent/offline type-metadata caching, dynamic JSON Schema evaluation,
+inherited type metadata, general action batches,
+PaSO, and Wallet2 HTTP-service consent wiring are outside this mobile-demo scope.
+See the [pinned TS-12 specification](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/ee91a294c833af5188726fd8c302c641212192aa/docs/technical-specifications/ts12-electronic-payments-SCA-implementation-with-wallet.md)
+for the source requirements; this supported subset is not a full-conformance claim.
 
 ## Wallet identity
 
@@ -99,6 +168,13 @@ proof, then requires verifier acceptance and execution of
 `dc+sd-jwt/transaction-data-hash-check`. The OpenAPI example separately demonstrates
 the encrypted response. Cancellation must produce no successful credential response.
 
+For `wallet.sca=missing-translation`, use an isolated issuer fixture that publishes
+the affirmative action only in a language absent from the other payment labels.
+Approve setup and issuance. The test requires the visible missing-language error,
+disabled submission and no response; it must never reach payment authorization.
+Restore the positive metadata after this run. Never change a shared demo deployment
+to create a negative fixture.
+
 Native factors remain possession/inherence `other`: the platform contract does
 not attest a biometric modality or a certified WSCD category. For SD-JWT the
 transaction proof is in the KB-JWT. The existing mdoc demo uses device-signed
@@ -107,9 +183,9 @@ added to this SD-JWT issuer profile.
 
 ## Unattended checks
 
-The Android DC API CI phase and both iOS demo CI lanes also run three real-app
-payment cases: approval, review cancellation and denied authentication. Each
-provisions through the normal setup and issuance UI.
+The Android DC API CI phase and both iOS demo CI lanes also run four real-app
+payment cases: approval, review cancellation, denied authentication and missing
+required translations. Each provisions through the normal setup and issuance UI.
 Approval checks the returned KB-JWT and executed verifier policies; negative cases
 require no credential response and no verifier success. The iOS cases use URL
 presentation; Android uses Credential Manager with ordinary previews disabled.
@@ -123,7 +199,7 @@ Publishing and production APK tasks through this init script are rejected.
 These artifacts are test fixtures and must never be distributed.
 
 Run from the Identity repository against a deployment containing the matching
-issuer profile:
+issuer profile and complete metadata:
 
 ```bash
 .github/scripts/mobile-ci/run-android-sca-app-tests.sh
@@ -133,15 +209,18 @@ issuer profile:
 
 Use a dedicated Android emulator with the same Google Play services/DC API
 prerequisites as the ordinary suite. Its isolated SCA app data is reset by the
-runner, and the isolated test packages are uninstalled afterwards.
+runner, and the isolated test packages are uninstalled afterwards. The negative
+language fixture restricts the wallet's preferences to French,
+which the demo metadata does not supply; production language fallback is unchanged.
 A backend without the payment profile fails the lane rather than skipping it.
 Deploy the backend slice before relying on public-demo CI acceptance. Local issuer
 and verifier deployments can qualify the app changes before that rollout, using
 local endpoint and trust configuration; record that configuration with the results.
 
 `ScaPresentationInteropTest` independently verifies real software signatures and
-nested transaction hashes with Nimbus. Ordinary mdoc/DC API tests retain the
-normal SDK composition.
+nested transaction hashes with Nimbus. Shared consent tests cover metadata trust,
+language lookup, changed selections, stale acknowledgment and cancellation during
+metadata preparation. Ordinary mdoc/DC API tests retain the normal SDK composition.
 Simulated authentication proves app integration, never native factors or regulated SCA.
 
 ## iOS and evidence
@@ -165,3 +244,19 @@ Record source revisions and distinguish local issuer/presenter tests, simulator
 UI checks, physical Android Credential Manager execution, physical iOS URL
 execution and hosted CI. A compiled operator test, a synthetic authorizer, or a
 simulator screenshot is not evidence of successful native key authorization.
+
+### Standards baseline and evidence
+
+Normative requirements govern this implementation; provider acceptance alone is
+not a conformance result. The metadata slice pins [TS-12 v1.0.1](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/ee91a294c833af5188726fd8c302c641212192aa/docs/technical-specifications/ts12-electronic-payments-SCA-implementation-with-wallet.md)
+and [SD-JWT VC draft 16 metadata](https://www.ietf.org/archive/id/draft-ietf-oauth-sd-jwt-vc-16.html#section-4).
+This does not change the OpenID4VCI/OpenID4VP credential-format version contract.
+The draft-16 metadata sections 4.3.1/4.3.4/4.6/5 correspond to TS-12's older
+section references 6.3.1/6.3.4/9/7. Claim `locale` replaced `lang` in draft 12;
+TS-12's own UI catalogue continues to require `lang`.
+
+The payload-relative claim-root choice above is an explicit interpretation of
+TS-12 section 3.3.2, not a resolved standards erratum. The bounded schema,
+no-inheritance implementation, fixed payment shape and configured issuer trust
+are product scope limits. Local service, independent provider, native-device
+and formal conformance evidence must be reported separately.

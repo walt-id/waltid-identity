@@ -2066,6 +2066,7 @@ private class FakeDemoWallet(
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
+        paymentConsentRevision: String?,
     ): WalletDemoOperationResult {
         submittedRequestUrl = presentationSources[previewHandle]
         return presentationResult

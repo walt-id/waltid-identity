@@ -222,15 +222,24 @@ public class WalletSdkBridge private constructor(
             operations.previewPresentation(requestUrl = requestUrl)
         }
 
-    /**
-     * Submits a presentation using user-selected wallet credential options.
-     */
+    /** Resolves authenticated payment instructions without signing. */
+    public suspend fun preparePaymentConsent(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+    ): WalletBridgeResult<WalletBridgePaymentConsentPreparation> = walletBridgeCall {
+        WalletBridgePaymentConsentPreparation(operations.preparePaymentConsent(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did))
+    }
+
+    /** Submits the selected credentials, acknowledging the prepared payment revision when required. */
     public suspend fun submitPresentation(
         previewHandle: MobileWalletPresentationPreviewHandle,
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
         did: String? = null,
         runPolicies: Boolean? = null,
+        paymentConsentRevision: String? = null,
     ): WalletBridgeResult<MobileWalletPresentationResult> =
         walletBridgeCall {
             operations.submitPresentation(
@@ -239,6 +248,7 @@ public class WalletSdkBridge private constructor(
                 selectedDisclosureOptions = selectedDisclosureOptions,
                 did = did,
                 runPolicies = runPolicies,
+                paymentConsentRevision = paymentConsentRevision,
             )
         }
 
@@ -363,12 +373,20 @@ internal interface WalletSdkBridgeOperations {
         requestUrl: String,
     ): MobileWalletPresentationPreviewResult
 
+    suspend fun preparePaymentConsent(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
+        did: String?,
+    ): id.walt.wallet2.consent.PreparedPaymentConsent?
+
     suspend fun submitPresentation(
         previewHandle: MobileWalletPresentationPreviewHandle,
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
         did: String?,
         runPolicies: Boolean?,
+        paymentConsentRevision: String?,
     ): MobileWalletPresentationResult
 
     suspend fun rejectPresentation(
@@ -460,12 +478,22 @@ internal class MobileWalletSdkBridgeOperations(
     ): MobileWalletPresentationPreviewResult =
         wallet.previewPresentation(requestUrl = requestUrl)
 
+    override suspend fun preparePaymentConsent(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
+        did: String?,
+    ): id.walt.wallet2.consent.PreparedPaymentConsent? = wallet.preparePaymentConsent(
+        previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did,
+    )
+
     override suspend fun submitPresentation(
         previewHandle: MobileWalletPresentationPreviewHandle,
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
         did: String?,
         runPolicies: Boolean?,
+        paymentConsentRevision: String?,
     ): MobileWalletPresentationResult =
         wallet.submitPresentation(
             previewHandle = previewHandle,
@@ -473,6 +501,7 @@ internal class MobileWalletSdkBridgeOperations(
             selectedDisclosureOptions = selectedDisclosureOptions,
             did = did,
             runPolicies = runPolicies,
+            paymentConsentRevision = paymentConsentRevision,
         )
 
     override suspend fun rejectPresentation(

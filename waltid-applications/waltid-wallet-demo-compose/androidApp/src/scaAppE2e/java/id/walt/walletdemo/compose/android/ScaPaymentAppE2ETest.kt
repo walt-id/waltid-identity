@@ -2,6 +2,10 @@
 
 package id.walt.walletdemo.compose.android
 
+import android.app.Activity
+import android.app.Application
+import android.os.Bundle
+import android.os.LocaleList
 import androidx.credentials.ExperimentalDigitalCredentialApi
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -11,6 +15,7 @@ import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.identity.SigningIdentityState
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
+import java.util.Locale
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -28,8 +33,31 @@ internal class ScaPaymentAppE2ETest : ScaPaymentE2E() {
     @Test fun approvesPayment() = exercise(ScaPaymentAction.Approve)
     @Test fun cancelsReviewWithoutReleasingProof() = exercise(ScaPaymentAction.ReviewCancellation)
     @Test fun deniedAuthenticationReleasesNoProof() = exercise(ScaPaymentAction.DeniedAuthentication)
+    @Test fun missingTranslationBlocksSubmission() = exercise(ScaPaymentAction.MissingTranslation)
 
-    private fun exercise(action: ScaPaymentAction) = runBlocking { exerciseScaPayment(action) }
+    private fun exercise(action: ScaPaymentAction) = runBlocking {
+        val application = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as Application
+        val originalLocales = LocaleList.getDefault()
+        val selectedLocales = LocaleList(Locale.forLanguageTag(if (action == ScaPaymentAction.MissingTranslation) "fr" else "en"))
+        // Keep the selected language list at activity creation; Android otherwise appends the
+        // emulator's system language, making English a valid fallback in the negative case.
+        val lifecycle = object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityPreCreated(activity: Activity, state: Bundle?) { LocaleList.setDefault(selectedLocales) }
+            override fun onActivityCreated(activity: Activity, state: Bundle?) = Unit
+            override fun onActivityStarted(activity: Activity) = Unit
+            override fun onActivityResumed(activity: Activity) = Unit
+            override fun onActivityPaused(activity: Activity) = Unit
+            override fun onActivityStopped(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, state: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        }
+        application.registerActivityLifecycleCallbacks(lifecycle)
+        LocaleList.setDefault(selectedLocales)
+        try { exerciseScaPayment(action) } finally {
+            application.unregisterActivityLifecycleCallbacks(lifecycle)
+            LocaleList.setDefault(originalLocales)
+        }
+    }
 
     companion object {
         private lateinit var provisionedWallet: MobileWallet

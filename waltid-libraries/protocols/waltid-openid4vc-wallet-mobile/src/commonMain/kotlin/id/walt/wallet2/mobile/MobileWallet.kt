@@ -2,6 +2,8 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.consent.*
+
 import id.walt.wallet2.handlers.WalletScaPresentationAuthorizer
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
@@ -217,8 +219,13 @@ public class MobileWallet internal constructor(
     /** Issuance transport override. Only tests set this; production uses the configured engine. */
     issuanceHttpClient: HttpClient? = null,
     private val scaAuthorizer: WalletScaPresentationAuthorizer? = null,
+    paymentCredentialIssuers: List<PaymentCredentialIssuer> = emptyList(),
+    paymentMetadataHttpClient: HttpClient? = null,
     createSigningIdentityManager: ((suspend () -> Unit) -> id.walt.wallet2.mobile.identity.SigningIdentityManager)? = null,
 ) {
+    private val paymentConsentPolicy = PaymentConsentPolicy(
+        PaymentConsentResolver(paymentCredentialIssuers, paymentMetadataHttpClient), preferredLocales,
+    )
     private val eventStream = MobileWalletEventStream()
     /**
      * Buffered stream of recent issuance and presentation events emitted by this wallet.
@@ -605,6 +612,24 @@ public class MobileWallet internal constructor(
         )
     }
 
+    /** Resolves payment instructions for the chosen DC API credentials without signing. */
+    public suspend fun prepareDigitalCredentialPaymentConsent(
+        requestId: String,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+    ): PreparedPaymentConsent? = WalletPresentationHandler.prepareDcApiPaymentConsent(
+        wallet, SubmitDcApiPresentationRequest(requestId,
+            selectedCredentialOptions.map { PresentationCredentialSelection(it.queryId, it.credentialId) },
+            selectedDisclosureOptions?.map { PresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }, did = did),
+        paymentConsentPolicy,
+    )
+
+    /** Cancels a retained DC API review, including an in-flight native authorization. */
+    public suspend fun discardDigitalCredentialPreview(requestId: String) {
+        WalletPresentationHandler.discardDcApiPreview(wallet, requestId)
+    }
+
     /**
      * Builds a response for a retained Digital Credentials preview. No network transport is performed.
      */
@@ -613,6 +638,7 @@ public class MobileWallet internal constructor(
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
         did: String? = null,
+        paymentConsentRevision: String? = null,
     ): MobileWalletDigitalCredentialResponse {
         require(selectedCredentialOptions.isNotEmpty()) { "At least one credential must be selected after consent" }
         val response = WalletPresentationHandler.submitDcApiPresentation(
@@ -626,10 +652,12 @@ public class MobileWallet internal constructor(
                     PresentationDisclosureSelection(it.queryId, it.credentialId, it.path)
                 },
                 did = did,
+                paymentConsentRevision = paymentConsentRevision,
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
             scaAuthorizer = scaAuthorizer,
+            paymentConsentPolicy = paymentConsentPolicy,
         )
         return response.toMobileDigitalCredentialResponse()
     }
@@ -673,7 +701,8 @@ public class MobileWallet internal constructor(
      * This immediate submission API is intended for callers that already handled
      * request review and user consent. Apps that need to display verifier details,
      * credential choices, selective disclosures, or transaction data should use
-     * [previewPresentation] followed by [submitPresentation].
+     * [previewPresentation] followed by [submitPresentation]. SD-JWT TS-12 payments additionally
+     * require [preparePaymentConsent] and explicit confirmation; this shortcut rejects them.
      *
      * @param requestUrl Authorization request URL received from the verifier.
      * @param did Optional DID override for selecting the wallet DID used in the presentation.
@@ -685,19 +714,14 @@ public class MobileWallet internal constructor(
         did: String? = null,
         runPolicies: Boolean? = null,
     ): MobileWalletPresentationResult {
-        val result = WalletPresentationHandler.presentCredentialWithTrust(
-            wallet = wallet,
-            request = PresentCredentialRequest(
-                requestUrl = Url(requestUrl.trim()),
-                did = did,
-                runPolicies = runPolicies,
-            ),
-            transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
-            clientIdTrustConfiguration = clientIdTrustConfiguration,
-            onEvent = ::emitSessionEvent,
-        )
-
-        return result.toMobilePresentationResult()
+        val preview = previewPresentation(requestUrl)
+        require(preview is MobileWalletPresentationPreviewResult.Ready) { "Cannot present an invalid request" }
+        val selected = preview.preview.credentialOptions.groupBy { it.queryId }.values.flatMap { options ->
+            (if (options.first().multiple) options else options.take(1)).map { option ->
+                MobileWalletPresentationCredentialSelection(option.queryId, option.credentialId)
+            }
+        }
+        return submitPresentation(preview.preview.previewHandle, selected, did = did, runPolicies = runPolicies)
     }
 
     /**
@@ -758,6 +782,19 @@ public class MobileWallet internal constructor(
         }
     }
 
+    /** Resolves authoritative payment instructions for the current credential/disclosure selection. */
+    public suspend fun preparePaymentConsent(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+    ): PreparedPaymentConsent? = WalletPresentationHandler.preparePaymentConsent(
+        wallet, SubmitPresentationRequest(PresentationPreviewHandle(previewHandle.value),
+            selectedCredentialOptions.map { PresentationCredentialSelection(it.queryId, it.credentialId) },
+            selectedDisclosureOptions?.map { PresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }, did = did),
+        paymentConsentPolicy,
+    )
+
     /**
      * Submits a presentation using the credential options selected by the user from [previewPresentation].
      */
@@ -767,6 +804,7 @@ public class MobileWallet internal constructor(
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
         did: String? = null,
         runPolicies: Boolean? = null,
+        paymentConsentRevision: String? = null,
     ): MobileWalletPresentationResult =
         WalletPresentationHandler.submitPresentation(
             wallet = wallet,
@@ -786,11 +824,13 @@ public class MobileWallet internal constructor(
                     )
                 },
                 did = did,
+                paymentConsentRevision = paymentConsentRevision,
                 runPolicies = runPolicies,
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
             scaAuthorizer = scaAuthorizer,
+            paymentConsentPolicy = paymentConsentPolicy,
         ).toMobilePresentationResult()
 
     /** Discards a reviewed presentation after local dismissal. */

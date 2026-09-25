@@ -24,6 +24,8 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
@@ -33,9 +35,10 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class WalletIssuanceHandlerPreviewTest {
+    private fun networkTest(block: suspend () -> Unit) = runTest { withContext(Dispatchers.Default) { block() } }
 
     @Test
-    fun credentialCountCallbackRunsBeforeBatchPersistence() = runTest {
+    fun credentialCountCallbackRunsBeforeBatchPersistence() = networkTest {
         val events = mutableListOf<String>()
         val client = HttpClient(MockEngine) {
             engine {
@@ -82,7 +85,7 @@ class WalletIssuanceHandlerPreviewTest {
     }
 
     @Test
-    fun previewsOfSameCredentialOfferUriRemainIndependentlyBound() = runTest {
+    fun previewsOfSameCredentialOfferUriRemainIndependentlyBound() = networkTest {
         var offerFetches = 0
         val tokenEndpoints = mutableListOf<String>()
         val client = HttpClient(MockEngine) {
@@ -143,7 +146,7 @@ class WalletIssuanceHandlerPreviewTest {
     }
 
     @Test
-    fun previewedOfferIsReusedForRetriesWhileDirectReceiveStillResolves() = runTest {
+    fun previewedOfferIsReusedForRetriesWhileDirectReceiveStillResolves() = networkTest {
         var offerFetches = 0
         var metadataFetches = 0
         var tokenRequests = 0
@@ -227,7 +230,7 @@ class WalletIssuanceHandlerPreviewTest {
     }
 
     @Test
-    fun signedPreviewRetainsExactMetadataResolutionAndSigner() = runTest {
+    fun signedPreviewRetainsExactMetadataResolutionAndSigner() = networkTest {
         val key = JWKKey.generate(KeyType.Ed25519)
         val compactJwt = signedIssuerMetadata().toSignedJwt(key)
         val client = HttpClient(MockEngine) {
@@ -269,7 +272,7 @@ class WalletIssuanceHandlerPreviewTest {
     }
 
     @Test
-    fun detailedOfferResolutionRetainsUnsignedMetadataWithoutTrustResolver() = runTest {
+    fun detailedOfferResolutionRetainsUnsignedMetadataWithoutTrustResolver() = networkTest {
         val client = HttpClient(MockEngine) {
             engine {
                 addHandler { request ->
@@ -295,7 +298,7 @@ class WalletIssuanceHandlerPreviewTest {
     }
 
     @Test
-    fun detailedOfferResolutionRetainsExactSignedMetadataAndSigner() = runTest {
+    fun detailedOfferResolutionRetainsExactSignedMetadataAndSigner() = networkTest {
         val key = JWKKey.generate(KeyType.Ed25519)
         val compactJwt = signedIssuerMetadata().toSignedJwt(key)
         val client = HttpClient(MockEngine) {
@@ -334,7 +337,7 @@ class WalletIssuanceHandlerPreviewTest {
     }
 
     @Test
-    fun detailedOfferResolutionRejectsUntrustedSignedMetadata() = runTest {
+    fun detailedOfferResolutionRejectsUntrustedSignedMetadata() = networkTest {
         val key = JWKKey.generate(KeyType.Ed25519)
         val compactJwt = signedIssuerMetadata().toSignedJwt(key)
         val client = HttpClient(MockEngine) {
@@ -364,7 +367,7 @@ class WalletIssuanceHandlerPreviewTest {
     }
 
     @Test
-    fun successfulIssuanceConsumesPreview() = runTest {
+    fun successfulIssuanceConsumesPreview() = networkTest {
         val client = HttpClient(MockEngine) {
             engine {
                 addHandler { request ->

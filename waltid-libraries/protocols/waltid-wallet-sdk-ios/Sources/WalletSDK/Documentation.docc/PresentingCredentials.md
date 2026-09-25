@@ -1,7 +1,7 @@
 # Presenting Credentials
 
 Use ``Wallet/previewPresentation(request:)`` and
-``Wallet/submitPresentation(previewHandle:selectedCredentialOptions:selectedDisclosureOptions:did:runPolicies:)``
+``Wallet/submitPresentation(previewHandle:selectedCredentialOptions:selectedDisclosureOptions:did:runPolicies:paymentConsentRevision:)``
 to review and answer an OpenID4VP authorization request with credentials from
 the local wallet.
 

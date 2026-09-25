@@ -39,6 +39,7 @@ data class WalletDemoPresentationPreview(
     override val transactionData: List<ClaimGroup> = emptyList(),
     val credentialOptions: List<WalletDemoPresentationCredentialOption>,
     val credentialRequirements: List<WalletDemoPresentationCredentialRequirement> = emptyList(),
+    val requiresPaymentConsent: Boolean = false,
 ) : WalletDemoPresentationRequestInfo
 
 sealed interface WalletDemoResponseEncryption {

@@ -157,6 +157,8 @@ enum class WalletDemoSharingEncryptionMechanism {
 data class WalletDemoSharingSelection(
     val credentials: Set<WalletDemoPresentationCredentialSelection> = emptySet(),
     val disclosures: Set<WalletDemoPresentationDisclosureSelection> = emptySet(),
+    /** Acknowledgment supplied only when the corresponding resolved payment has been displayed. */
+    val paymentConsentRevision: String? = null,
 )
 
 /**

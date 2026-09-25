@@ -2,6 +2,20 @@ import XCTest
 @testable import WalletSDK
 
 final class WalletAPITests: XCTestCase {
+    func testTypedPaymentFailuresRemainActionableThroughFacade() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+        bridge.error = .paymentConsent(.missingTranslation, message: "Payment instructions unavailable")
+        do {
+            _ = try await wallet.submitPresentation(previewHandle: .init(value: "preview"),
+                selectedCredentialOptions: [.init(queryID: "payment", credentialID: "card")])
+            XCTFail("Expected typed refusal")
+        } catch let error as WalletError {
+            XCTAssertEqual(error, .paymentConsent(.missingTranslation, message: "Payment instructions unavailable"))
+            XCTAssertEqual(error.localizedDescription, "Payment instructions unavailable")
+        }
+    }
+
     func testProximityStreamCompletesAtEveryTerminalStateWithoutForwardingLaterStates() async throws {
         let review = ProximityReview(reviewID: .init(value: UUID().uuidString), exchange: 1,
             documents: [.init(requestIndex: 0, documentType: "org.iso.18013.5.1.mDL", credentialOptions: [
@@ -837,9 +851,11 @@ final class WalletAPITests: XCTestCase {
             selectedCredentialOptions: [PresentationCredentialSelection(queryID: "pid", credentialID: "credential-1")],
             selectedDisclosureOptions: [PresentationDisclosureSelection(queryID: "pid", credentialID: "credential-1", path: "$.given_name")],
             did: "did:key:wallet",
-            runPolicies: false
+            runPolicies: false,
+            paymentConsentRevision: "reviewed-revision"
         )
 
+        XCTAssertEqual(bridge.submitCalls.first?.paymentConsentRevision, "reviewed-revision")
         XCTAssertEqual(bridge.submitCalls.count, 1)
         XCTAssertEqual(bridge.submitCalls.first?.previewHandle, previewHandle)
         XCTAssertEqual(bridge.submitCalls.first?.selectedCredentialOptions, [PresentationCredentialSelection(queryID: "pid", credentialID: "credential-1")])
@@ -1179,6 +1195,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         let selectedDisclosureOptions: [PresentationDisclosureSelection]?
         let did: String?
         let runPolicies: Bool?
+        let paymentConsentRevision: String?
     }
 
     struct RejectCall {
@@ -1390,12 +1407,20 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         return previewResult
     }
 
+    func preparePaymentConsent(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?
+    ) async throws -> PaymentConsent? { nil }
+
     func submitPresentation(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?,
-        runPolicies: Bool?
+        runPolicies: Bool?,
+        paymentConsentRevision: String?
     ) async throws -> PresentationResult {
         if let error {
             throw error
@@ -1407,7 +1432,8 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
                 selectedCredentialOptions: selectedCredentialOptions,
                 selectedDisclosureOptions: selectedDisclosureOptions,
                 did: did,
-                runPolicies: runPolicies
+                runPolicies: runPolicies,
+                paymentConsentRevision: paymentConsentRevision
             )
         )
         return submitResult

@@ -20,12 +20,19 @@ protocol WalletCoreBridge: Sendable {
     func deleteLocalData() async throws
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
+    func preparePaymentConsent(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?
+    ) async throws -> PaymentConsent?
     func submitPresentation(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?,
-        runPolicies: Bool?
+        runPolicies: Bool?,
+        paymentConsentRevision: String?
     ) async throws -> PresentationResult
     func rejectPresentation(
         previewHandle: PresentationPreviewHandle,
@@ -129,12 +136,20 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         throw unavailableError()
     }
 
+    func preparePaymentConsent(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?
+    ) async throws -> PaymentConsent? { throw unavailableError() }
+
     func submitPresentation(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?,
-        runPolicies: Bool?
+        runPolicies: Bool?,
+        paymentConsentRevision: String?
     ) async throws -> PresentationResult {
         throw unavailableError()
     }

@@ -292,11 +292,23 @@ internal class MobileDemoWallet(
                 )
         }
 
+    override suspend fun preparePaymentConsent(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        did: String?,
+    ): WalletDemoPaymentConsent? = mobileWallet.preparePaymentConsent(
+        MobileWalletPresentationPreviewHandle(previewHandle.value),
+        selectedCredentialOptions.map { MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId) },
+        selectedDisclosureOptions.map { MobileWalletPresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }, did,
+    )?.toDemoPaymentConsent()
+
     override suspend fun submitPresentation(
         previewHandle: WalletDemoPresentationPreviewHandle,
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
+        paymentConsentRevision: String?,
     ): WalletDemoOperationResult =
         mobileWallet.submitPresentation(
             previewHandle = MobileWalletPresentationPreviewHandle(previewHandle.value),
@@ -314,6 +326,7 @@ internal class MobileDemoWallet(
                 )
             },
             did = did,
+            paymentConsentRevision = paymentConsentRevision,
         ).toDemoOperationResult(
             successMessage = WalletDisplayText.PresentationSent,
             failureMessage = WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation,
@@ -398,6 +411,7 @@ internal fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConf
 private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentationPreview =
     WalletDemoPresentationPreview(
         previewHandle = WalletDemoPresentationPreviewHandle(previewHandle.value),
+        requiresPaymentConsent = request.transactionData.any { it.type == "urn:eudi:sca:payment:1" } && credentialOptions.any { it.format == "dc+sd-jwt" },
         verifierMetadata = request.verifierMetadata?.toDemoMetadata(),
         clientId = request.clientId,
         responseUri = request.responseUri,

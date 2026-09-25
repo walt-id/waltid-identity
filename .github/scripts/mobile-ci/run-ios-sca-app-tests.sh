@@ -33,13 +33,14 @@ for app in "$@"; do
     -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaAppApproval \
     -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaAppCancellation \
     -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaAppDeniedAuthentication \
+    -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaAppMissingTranslation \
     'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) DEBUG SCA_APP_E2E' \
     "OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=$kotlin_override" WALLET_SCA_APP_E2E=1
   xcrun xcresulttool get test-results summary --path "$output/results.xcresult" > "$output/summary.json"
   python3 - "$output/summary.json" <<'PY'
 import json, sys
 r = json.load(open(sys.argv[1]))
-assert r['passedTests'] == 3 and r['failedTests'] == 0 and r['skippedTests'] == 0, r
-print('Three unattended SCA app cases passed; authentication was simulated')
+assert r['passedTests'] == 4 and r['failedTests'] == 0 and r['skippedTests'] == 0, r
+print('Four unattended SCA app cases passed; authentication was simulated')
 PY
 done
