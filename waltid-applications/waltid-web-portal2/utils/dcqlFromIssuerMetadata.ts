@@ -31,11 +31,21 @@ export interface DcqlCredentialQuery {
   id: string;
   format: string;
   meta: Record<string, unknown>;
-  claims: Array<{ id: string; path: string[] }>;
+  claims: Array<{ path: string[] }>;
 }
+
+/** OpenID4VP §6.1: credential query ids are alphanumeric, `_`, or `-`. */
+const DCQL_IDENTIFIER = /^[A-Za-z0-9_-]+$/;
 
 function claimId(path: string[]): string {
   return path.join(".");
+}
+
+export function dcqlCredentialQueryId(configurationId: string): string {
+  const sanitized = configurationId
+    .replace(/[^A-Za-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return DCQL_IDENTIFIER.test(sanitized) ? sanitized : "credential";
 }
 
 function claimLabel(claim: IssuerCredentialClaim, path: string[]): string {
@@ -128,11 +138,10 @@ export function dcqlFromIssuerMetadata(
     throw new Error("at least one claim must be selected");
   }
   return {
-    id: configurationId,
+    id: dcqlCredentialQueryId(configurationId),
     format: configuration.format,
     meta: dcqlMetaFromIssuerMetadata(configuration),
     claims: selectedClaims.map((claim) => ({
-      id: claim.id,
       path: claim.path,
     })),
   };

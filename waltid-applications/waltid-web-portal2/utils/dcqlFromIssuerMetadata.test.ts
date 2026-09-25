@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   annexCRequestedElements,
   claimsFromIssuerMetadata,
+  dcqlCredentialQueryId,
   dcqlFromIssuerMetadata,
   isMdocConfiguration,
   isPidConfiguration,
@@ -39,12 +40,12 @@ test("builds mdoc PID DCQL from issuer metadata claims only", () => {
   assert.equal(isPidConfiguration(configuration, "eu.europa.ec.eudi.pid.1"), true);
   assert.equal(isMdocConfiguration(configuration), true);
   assert.deepEqual(query, {
-    id: "eu.europa.ec.eudi.pid.1",
+    id: "eu-europa-ec-eudi-pid-1",
     format: "mso_mdoc",
     meta: { doctype_value: "eu.europa.ec.eudi.pid.1" },
     claims: [
-      { id: "eu.europa.ec.eudi.pid.1.family_name", path: ["eu.europa.ec.eudi.pid.1", "family_name"] },
-      { id: "eu.europa.ec.eudi.pid.1.given_name", path: ["eu.europa.ec.eudi.pid.1", "given_name"] },
+      { path: ["eu.europa.ec.eudi.pid.1", "family_name"] },
+      { path: ["eu.europa.ec.eudi.pid.1", "given_name"] },
     ],
   });
   assert.deepEqual(annexCRequestedElements(configuration, claims.slice(0, 2)), {
@@ -73,9 +74,9 @@ test("builds SD-JWT identity DCQL from the published vct", () => {
     vct_values: ["https://issuer.example/openid4vci/identity_credential"],
   });
   assert.deepEqual(query.claims, [
-    { id: "given_name", path: ["given_name"] },
-    { id: "address.street_address", path: ["address", "street_address"] },
-    { id: "is_over_18", path: ["is_over_18"] },
+    { path: ["given_name"] },
+    { path: ["address", "street_address"] },
+    { path: ["is_over_18"] },
   ]);
 });
 
@@ -110,7 +111,6 @@ test("builds JWT Open Badge DCQL from credential_definition.type", () => {
     },
     claims: [
       {
-        id: "credentialSubject.achievement.name",
         path: ["credentialSubject", "achievement", "name"],
       },
     ],
@@ -130,5 +130,17 @@ test("ignores claims without a path and refuses an empty selection", () => {
   assert.throws(
     () => dcqlFromIssuerMetadata("identity_credential", configuration, []),
     /at least one claim/,
+  );
+});
+
+test("sanitizes credential query ids to OpenID4VP identifier characters", () => {
+  assert.equal(dcqlCredentialQueryId("urn:eudi:pid:1"), "urn-eudi-pid-1");
+  assert.equal(
+    dcqlCredentialQueryId("eu.europa.ec.eudi.pid.1"),
+    "eu-europa-ec-eudi-pid-1",
+  );
+  assert.equal(
+    dcqlCredentialQueryId("OpenBadgeCredential_jwt_vc_json"),
+    "OpenBadgeCredential_jwt_vc_json",
   );
 });
