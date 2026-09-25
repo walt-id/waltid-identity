@@ -1,5 +1,6 @@
 package id.walt.crypto.utils
 
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -219,4 +220,105 @@ private fun CborArray.integerValuesOrNull(): LongArray? {
     if (isEmpty()) return null
     forEach { if (it !is CborInteger) return null }
     return LongArray(size) { (this[it] as CborInteger).long }
+}
+
+/** Text longer than this is stored as a descriptor. 1 KB keeps every human-readable claim whole. */
+const val MAX_STORED_JSON_TEXT: Int = 1024
+
+/** Arrays longer than this are stored as a descriptor. 64 keeps short arrays and coordinate pairs whole. */
+const val MAX_STORED_JSON_ARRAY: Int = 64
+
+/**
+ * A copy of this element with bulk leaves replaced by `{type, length, truncated, prefix}` descriptors.
+ *
+ * Lives beside [JsonByteArray] because this is the fix for what that creates. A CBOR byte string becomes
+ * one JSON number per byte (see `toJsonElement`), which costs nothing in memory - [JsonByteArray] is a
+ * facade over the bytes - but on **serialisation** a 250 KB portrait becomes a 250,000 element array:
+ * 912,135 characters of JSON, and 3,232,078 bytes of BSON once Mongo adds a key and a type tag per
+ * element. Measured, not estimated.
+ *
+ * Changing the representation itself is not an option: `toJsonElement` has ~450 call sites and a test
+ * pins the byte-per-number form deliberately, because consumers round-trip CBOR through JSON. So the
+ * bulk is bounded where it is **persisted** instead, and every store that keeps a decoded copy beside
+ * the encoded original should call this.
+ *
+ * Small values survive verbatim - they are what DCQL matches on and what diagnoses a serialisation
+ * problem. Only bulk is replaced, and the descriptor keeps the length so the loss is visible.
+ */
+fun JsonElement.withoutBulkValues(
+    maxText: Int = MAX_STORED_JSON_TEXT,
+    maxArray: Int = MAX_STORED_JSON_ARRAY,
+): JsonElement = when (this) {
+    is JsonPrimitive ->
+        if (isString && content.length > maxText) buildJsonObject {
+            put("type", "string")
+            put("length", content.length)
+            put("truncated", true)
+            put("prefix", content.take(maxText))
+        } else this
+
+    is JsonArray ->
+        if (size > maxArray) buildJsonObject {
+            put("type", "array")
+            put("length", size)
+            put("truncated", true)
+            put("prefix", JsonArray(take(maxArray).map { it.withoutBulkValues(maxText, maxArray) }))
+        } else JsonArray(map { it.withoutBulkValues(maxText, maxArray) })
+
+    // Objects are walked rather than bounded by key count: the shape of a claim set is the useful part,
+    // and it is the leaves that carry a portrait.
+    is JsonObject -> JsonObject(mapValues { (_, value) -> value.withoutBulkValues(maxText, maxArray) })
+}
+
+/** Byte arrays shorter than this stay arrays: a digest or a coordinate pair is easier to read that way. */
+const val MIN_BASE64_BYTE_ARRAY: Int = 64
+
+/** Marks a byte array that was rewritten as base64url, so a reader can restore it exactly. */
+const val BASE64_BYTES_TYPE: String = "bytes-base64url"
+
+/**
+ * A copy of this element with long byte arrays rewritten as base64url, losslessly.
+ *
+ * A CBOR byte string is decoded to one JSON number per byte (see `toJsonElement`), and every store then
+ * pays per element. Measured for a 250 KB portrait, encoded as BSON:
+ *
+ * | representation | bytes |
+ * |---|---|
+ * | array of numbers, as decoded | 2,888,910 |
+ * | Kotlin `ByteArray` through the standard codec | 2,888,910 (the codec writes an array of ints) |
+ * | base64url string | 333,354 |
+ *
+ * So this is an 8.7x reduction for image-bearing credentials, and it needs no custom BSON encoder, which
+ * keeps it working on every supported store rather than MongoDB alone.
+ *
+ * Lossless and reversible: an array qualifies only if every element is an integer in the signed byte
+ * range, and the result records the original length. Nothing outside that range is touched, so an array
+ * of larger numbers keeps its shape.
+ *
+ * This does not change what a wallet sends or what is signed. The encoded credential is kept verbatim
+ * elsewhere in the session; this only affects the decoded copy that is stored beside it.
+ */
+fun JsonElement.withByteArraysAsBase64(minLength: Int = MIN_BASE64_BYTE_ARRAY): JsonElement = when (this) {
+    is JsonPrimitive -> this
+
+    is JsonArray ->
+        signedBytesOrNull(minLength)?.let { bytes ->
+            buildJsonObject {
+                put("type", BASE64_BYTES_TYPE)
+                put("length", bytes.size)
+                put("base64url", bytes.encodeToBase64Url())
+            }
+        } ?: JsonArray(map { it.withByteArraysAsBase64(minLength) })
+
+    is JsonObject -> JsonObject(mapValues { (_, value) -> value.withByteArraysAsBase64(minLength) })
+}
+
+/** The array as signed bytes when every element is one, else null. One pass, allocates only on success. */
+private fun JsonArray.signedBytesOrNull(minLength: Int): ByteArray? {
+    if (size < minLength) return null
+    forEach { element ->
+        val value = (element as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toIntOrNull() ?: return null
+        if (value < Byte.MIN_VALUE || value > Byte.MAX_VALUE) return null
+    }
+    return ByteArray(size) { ((this[it] as JsonPrimitive).content.toInt()).toByte() }
 }

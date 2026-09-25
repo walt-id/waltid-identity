@@ -14,6 +14,7 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
+import id.walt.verifier2.freePort
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.SessionEvent
@@ -60,7 +61,7 @@ class Verifier2WalletRejectionCallbackEventsIntegrationTest {
     @Test
     fun walletRejectionEmitsWalletErrorResponseReceived() {
         val host = "127.0.0.1"
-        val port = 17141
+        val port = freePort()
         Verifier2WebhookRecorder().start().use { webhook ->
             E2ETest(host, port, true).testBlock(
                 features = listOf(OSSVerifier2FeatureCatalog),

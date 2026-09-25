@@ -208,6 +208,7 @@ class Issuer2MetadataEndpointTest {
         assertConfiguredCredentialScenariosAreAdvertised(credentialIssuerMetadata)
         assertSdJwtCatalogConfigurations(credentialIssuerMetadata)
         assertCredentialCardDisplayMetadata(credentialIssuerMetadata)
+        assertCredentialClaimsMetadata(credentialIssuerMetadata)
         assertSelfHostedSdJwtVcTypeMetadata(client, credentialIssuerMetadata)
         assertCredentialCardArtIsServed(client)
     }
@@ -277,6 +278,40 @@ class Issuer2MetadataEndpointTest {
         assertNull(jwtVcIssuerMetadata.jwks)
 
         assertEquals(HttpStatusCode.NotFound, client.get(NESTED_JWT_VC_ISSUER_METADATA_PATH).status)
+    }
+
+    private val allowedMdocAgeOverClaims = setOf(
+        "age_over_16",
+        "age_over_18",
+        "age_over_21",
+        "age_over_65",
+    )
+
+    private fun assertCredentialClaimsMetadata(
+        credentialIssuerMetadata: CredentialIssuerMetadata,
+    ) {
+        credentialIssuerMetadata.credentialConfigurationsSupported.forEach { (configurationId, configuration) ->
+            val claims = assertNotNull(
+                configuration.credentialMetadata?.claims,
+                "Expected claims for $configurationId",
+            )
+            assertTrue(claims.isNotEmpty(), "Expected non-empty claims for $configurationId")
+            claims.forEach { claim ->
+                assertTrue(claim.path.isNotEmpty(), "Expected claim path for $configurationId")
+                assertNotNull(
+                    claim.display?.firstOrNull()?.name?.takeIf { it.isNotBlank() },
+                    "Expected claim display name for $configurationId path ${claim.path}",
+                )
+            }
+            if (configuration.format == CredentialFormat.MSO_MDOC) {
+                val ageOver = claims.mapNotNull { it.path.lastOrNull() }.filter { it.startsWith("age_over_") }
+                val unexpected = ageOver.filterNot { it in allowedMdocAgeOverClaims }
+                assertTrue(
+                    unexpected.isEmpty(),
+                    "mdoc $configurationId advertised unexpected age_over claims: $unexpected",
+                )
+            }
+        }
     }
 
     private fun assertCredentialCardDisplayMetadata(

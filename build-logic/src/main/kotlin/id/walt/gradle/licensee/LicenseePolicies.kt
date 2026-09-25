@@ -34,12 +34,18 @@ data class AllowedDependency(
 )
 
 object LicenseePolicies {
+    // Named because they repeat across the SPDX list and the URL allow-list below: BSD-3-Clause is both an
+    // SPDX identifier and the name reported for several URLs, and MIT_LICENSE_NAME is the name the POMs of
+    // eleven dependencies declare. The SPDX identifier for MIT is the separate "MIT" entry below.
+    private const val BSD_3_CLAUSE = "BSD-3-Clause"
+    private const val MIT_LICENSE_NAME = "MIT License"
+
     private val permissiveSpdxIds = listOf(
         "Apache-2.0",
         "MIT",
         "MIT-0",
         "BSD-2-Clause",
-        "BSD-3-Clause",
+        BSD_3_CLAUSE,
         "ISC",
         "0BSD",
         "CC0-1.0",
@@ -80,13 +86,13 @@ object LicenseePolicies {
         "http://www.bouncycastle.org/licence.html" to "Bouncy Castle Licence",
         "https://www.bouncycastle.org/license.html" to "Bouncy Castle Licence",
         "http://www.bouncycastle.org/license.html" to "Bouncy Castle Licence",
-        "https://mit-license.org/" to "MIT License",
-        "http://mit-license.org/" to "MIT License",
-        "https://opensource.org/license/mit" to "MIT License",
-        "https://spdx.org/licenses/MIT.txt" to "MIT License",
-        "https://raw.githubusercontent.com/korlibs/korge-korlibs/main/LICENSE" to "MIT License",
-        "https://raw.githubusercontent.com/auth0/java-jwt/master/LICENSE" to "MIT License",
-        "https://raw.githubusercontent.com/auth0/jwks-rsa-java/master/LICENSE" to "MIT License",
+        "https://mit-license.org/" to MIT_LICENSE_NAME,
+        "http://mit-license.org/" to MIT_LICENSE_NAME,
+        "https://opensource.org/license/mit" to MIT_LICENSE_NAME,
+        "https://spdx.org/licenses/MIT.txt" to MIT_LICENSE_NAME,
+        "https://raw.githubusercontent.com/korlibs/korge-korlibs/main/LICENSE" to MIT_LICENSE_NAME,
+        "https://raw.githubusercontent.com/auth0/java-jwt/master/LICENSE" to MIT_LICENSE_NAME,
+        "https://raw.githubusercontent.com/auth0/jwks-rsa-java/master/LICENSE" to MIT_LICENSE_NAME,
         "https://github.com/jimsch/COSE-JAVA/blob/master/LICENSE" to "BSD-style COSE-JAVA license",
         "https://github.com/stleary/JSON-java/blob/master/LICENSE" to "Public Domain JSON-java license",
         "http://www.creativecommons.org/publicdomain/zero/1.0/" to "CC0-1.0",
@@ -95,17 +101,17 @@ object LicenseePolicies {
         "https://www.eclipse.org/org/documents/edl-v10.php" to "Eclipse Distribution License 1.0",
         "http://www.mozilla.org/MPL/2.0/index.txt" to "MPL-2.0",
         "https://www.mozilla.org/MPL/2.0/index.txt" to "MPL-2.0",
-        "https://projectlombok.org/LICENSE" to "MIT License",
-        "https://github.com/redis/jedis/blob/master/LICENSE" to "MIT License",
-        "https://github.com/googleapis/gax-java/blob/master/LICENSE" to "BSD-3-Clause",
-        "https://github.com/googleapis/api-common-java/blob/main/LICENSE" to "BSD-3-Clause",
-        "https://opensource.org/license/BSD-3-Clause" to "BSD-3-Clause",
-        "https://asm.ow2.io/license.html" to "BSD-3-Clause",
+        "https://projectlombok.org/LICENSE" to MIT_LICENSE_NAME,
+        "https://github.com/redis/jedis/blob/master/LICENSE" to MIT_LICENSE_NAME,
+        "https://github.com/googleapis/gax-java/blob/master/LICENSE" to BSD_3_CLAUSE,
+        "https://github.com/googleapis/api-common-java/blob/main/LICENSE" to BSD_3_CLAUSE,
+        "https://opensource.org/license/BSD-3-Clause" to BSD_3_CLAUSE,
+        "https://asm.ow2.io/license.html" to BSD_3_CLAUSE,
         "http://www.sun.com/cddl/cddl.html" to "CDDL-1.0",
         "https://golang.org/LICENSE" to "BSD-style Go license",
-        "https://github.com/adraffy/ENSNormalize.java/blob/main/LICENSE" to "MIT License",
-        "https://github.com/TooTallNate/Java-WebSocket/blob/master/LICENSE" to "MIT License",
-        "https://raw.githubusercontent.com/ThreeTen/threetenbp/main/LICENSE.txt" to "BSD-3-Clause",
+        "https://github.com/adraffy/ENSNormalize.java/blob/main/LICENSE" to MIT_LICENSE_NAME,
+        "https://github.com/TooTallNate/Java-WebSocket/blob/master/LICENSE" to MIT_LICENSE_NAME,
+        "https://raw.githubusercontent.com/ThreeTen/threetenbp/main/LICENSE.txt" to BSD_3_CLAUSE,
         "https://aws.amazon.com/apache2.0" to "Apache-2.0",
         "http://apache.org/licenses/LICENSE-2.0.html" to "Apache-2.0",
         "https://apache.org/licenses/LICENSE-2.0.html" to "Apache-2.0",
