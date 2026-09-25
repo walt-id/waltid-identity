@@ -140,7 +140,8 @@ internal object DataElementSerializer : KSerializer<DataElement> {
         when (attribute.mode) {
             DEDateTimeMode.tdate -> {
                 encoder.encodeTag(TDATE.toULong())
-                encoder.encodeString(dateTime.value.toString())
+                // ISO 18013-5 / RFC 8949 tdate: whole-second UTC, no fractional seconds.
+                encoder.encodeString(Instant.fromEpochSeconds(dateTime.value.epochSeconds).toString())
             }
 
             DEDateTimeMode.time_int, DEDateTimeMode.time_float, DEDateTimeMode.time_double -> {

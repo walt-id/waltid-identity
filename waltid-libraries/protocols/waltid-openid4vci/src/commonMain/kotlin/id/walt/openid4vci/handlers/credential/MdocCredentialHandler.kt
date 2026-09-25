@@ -234,9 +234,9 @@ class MdocCredentialHandler(
         val roundedValidity = if (roundValidityToTwelveHours) {
             roundedMdocValidity(issuedAt, certificates.first().data.validity, validFrom, validUntil)
         } else null
-        val signedAt = roundedValidity?.signed ?: issuedAt
-        val effectiveValidFrom = roundedValidity?.validFrom ?: validFrom
-        val effectiveValidUntil = roundedValidity?.validUntil ?: (validUntil ?: issuedAt.plus(365.days))
+        val signedAt = (roundedValidity?.signed ?: issuedAt).asTDate()
+        val effectiveValidFrom = (roundedValidity?.validFrom ?: validFrom)?.asTDate()
+        val effectiveValidUntil = (roundedValidity?.validUntil ?: (validUntil ?: issuedAt.plus(365.days))).asTDate()
         return issuanceBatch.signEach { instance ->
             val credentialData = instance.input.credentialData
             val namespaceIdentifiers = credentialData.keys
