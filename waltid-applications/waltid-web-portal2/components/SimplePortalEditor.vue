@@ -79,9 +79,9 @@ function clearSelection() {
           Back to credentials
         </button>
 
-        <div class="md:flex md:items-start md:gap-6">
+        <div class="lg:flex lg:items-start lg:gap-6">
           <div
-            class="relative w-full overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5 md:w-[240px] md:shrink-0"
+            class="relative w-full overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5 lg:w-[240px] lg:shrink-0"
             :style="{ backgroundColor: selectedCard.backgroundColor }"
           >
             <span class="block w-full" style="aspect-ratio: 1.586" />
@@ -93,49 +93,49 @@ function clearSelection() {
             />
           </div>
 
-          <div class="mt-4 md:mt-0 md:min-w-0 md:flex-1">
-            <h2 class="text-lg font-semibold">{{ selectedCard.name }}</h2>
-            <p
-              v-if="selectedCard.description"
-              class="text-sm text-[--color-text-muted] mt-1"
-            >
-              {{ selectedCard.description }}
-            </p>
-
-            <section class="mt-4">
-              <label class="form-label">Action</label>
-              <div
-                class="inline-flex rounded-lg border border-[--color-border-strong] bg-white p-1"
+          <div class="mt-4 lg:mt-0 lg:min-w-0 lg:flex-1">
+              <h2 class="text-lg font-semibold">{{ selectedCard.name }}</h2>
+              <p
+                v-if="selectedCard.description"
+                class="text-sm text-[--color-text-muted] mt-1"
               >
-                <button
-                  type="button"
-                  class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-                  :class="
-                    action === 'issue'
-                      ? 'bg-slate-900 text-white'
-                      : 'text-[--color-text-muted] hover:text-[--color-text]'
-                  "
-                  @click="action = 'issue'"
+                {{ selectedCard.description }}
+              </p>
+
+              <section class="mt-4">
+                <label class="form-label">Action</label>
+                <div
+                  class="inline-flex rounded-lg border border-[--color-border-strong] bg-white p-1"
                 >
-                  Issue
-                </button>
-                <button
-                  type="button"
-                  class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
-                  :class="
-                    action === 'verify'
-                      ? 'bg-slate-900 text-white'
-                      : 'text-[--color-text-muted] hover:text-[--color-text]'
-                  "
-                  @click="action = 'verify'"
-                >
-                  Verify
-                </button>
-              </div>
-            </section>
+                  <button
+                    type="button"
+                    class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+                    :class="
+                      action === 'issue'
+                        ? 'bg-slate-900 text-white'
+                        : 'text-[--color-text-muted] hover:text-[--color-text]'
+                    "
+                    @click="action = 'issue'"
+                  >
+                    Issue
+                  </button>
+                  <button
+                    type="button"
+                    class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+                    :class="
+                      action === 'verify'
+                        ? 'bg-slate-900 text-white'
+                        : 'text-[--color-text-muted] hover:text-[--color-text]'
+                    "
+                    @click="action = 'verify'"
+                  >
+                    Verify
+                  </button>
+                </div>
+              </section>
+            </div>
           </div>
         </div>
-      </div>
 
       <KeepAlive>
         <SimpleIssueEditor
