@@ -418,7 +418,13 @@ class AuthorizationRequestResolverJvmTest {
 
         assertEquals(HttpMethod.Post, request.method)
         assertEquals(ContentType.Application.FormUrlEncoded, request.body.contentType)
-        assertEquals(walletMetadata, form["wallet_metadata"])
+        val sentMetadata = Json.parseToJsonElement(requireNotNull(form["wallet_metadata"])).jsonObject
+        Json.parseToJsonElement(walletMetadata).jsonObject.forEach { (name, value) ->
+            assertEquals(value, sentMetadata[name])
+        }
+        val encryptionKey = sentMetadata.getValue("jwks").jsonObject.getValue("keys").jsonArray.single().jsonObject
+        assertEquals("enc", encryptionKey.getValue("use").jsonPrimitive.content)
+        assertFalse("d" in encryptionKey)
         assertEquals(response.walletNonce, form["wallet_nonce"])
         assertFalse(response.walletNonce.isNullOrBlank())
         assertEquals("signed-request-object", response.body)

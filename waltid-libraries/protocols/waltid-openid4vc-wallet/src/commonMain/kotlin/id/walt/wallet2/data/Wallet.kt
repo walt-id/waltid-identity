@@ -10,6 +10,7 @@ import id.walt.crypto2.keys.inferKeySpec
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.wallet2.handlers.WalletIssuanceHandler
+import id.walt.wallet2.handlers.KeyAttestationProvider
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
@@ -81,6 +82,14 @@ data class Wallet(
     val defaultDidId: String? = null,
 ) {
     private var resolvedStaticCrypto2Key: Crypto2Key? = null
+    private var keyAttestationProvider: KeyAttestationProvider? = null
+
+    /** Attach a runtime wallet-provider service without persisting it in the wallet model. */
+    fun attachKeyAttestationProvider(provider: KeyAttestationProvider): Wallet = apply {
+        keyAttestationProvider = provider
+    }
+
+    fun attachedKeyAttestationProvider(): KeyAttestationProvider? = keyAttestationProvider
 
     // ---------------------------------------------------------------------------
     // Aggregate helpers

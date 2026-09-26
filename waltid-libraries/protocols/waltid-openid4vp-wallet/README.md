@@ -268,6 +268,48 @@ class WalletService(
 | mdoc | `mso_mdoc` | ✅ Supported | Builds SessionTranscript and DeviceAuth |
 | LDP VC | `ldp_vc` | ❌ Not Supported | Placeholder for future implementation |
 
+### TS12 payment authentication
+
+SD-JWT presentations bound to `urn:eudi:sca:payment:1` require an explicit
+`ScaPresentationAuthorizer` through the `buildVpToken` or combined presentation
+overloads. After the application has authenticated the request and approved the
+selected credentials, this callback authorizes the exact proof intent. Its
+methods must already have been applied to this operation or be guaranteed by the
+enforced policy of the exact signing key. This permits native authentication
+during signing without a separate prompt. Returning methods alone does not
+establish authentication; failed signing or coroutine cancellation releases no
+proof.
+
+The callback receives the fresh proof ID (`jti`), credential and key identifiers,
+signing algorithm, audience, nonce, response mode, SD-JWT hash and exact encoded
+transaction data. Bind it to the reviewed action and actual key instance; identifier
+strings alone do not establish that binding. Throw on denial, expiry, cancellation
+or insufficient evidence. A merely requested key policy or one permitting unknown
+alternative authentication routes is insufficient. Never accept factors from the
+verifier/request body. The caller owns action lifetime and the final delivery gate.
+
+The presenter adds a fresh cryptographically random `jti`, the request's
+`response_mode`, and typed `amr` containing at least two distinct categories.
+Before authentication, the selected signing key must match the credential’s `cnf.jwk`.
+Existing transaction hash and algorithm binding is preserved. The profile is defined by
+[TS12 sections 3.6 and 4.2](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/9090fe29d715d9818b0189fd60cee7f14fc5bb68/docs/technical-specifications/ts12-electronic-payments-SCA-implementation-with-wallet.md#36-presentation-response).
+Ordinary SD-JWT presentations retain their existing behavior.
+
+**Integration boundary:** entry points without an authorizer reject TS12 payment
+presentation before signing. The shared wallet's reviewed submission overloads bind
+an application authorizer to the actual resolved Crypto2 key. Persistent mobile
+wallets provide a native adapter only for generated, non-exportable hardware keys
+with a validated per-use `BiometricCurrentSet` policy. Successful signing establishes
+possession and inherence, both reported as `other`; the adapter does not infer a
+biometric modality or a certified WSCD category. Unsupported policies fail closed.
+The headless ITB runner supplies no authentication evidence.
+
+Native policy provenance requires the provider changes in external PR #2222.
+This bounded adapter does not implement action batching, timed authentication reuse,
+transaction UI requirements, or full SCA assurance. Protocol tests with simulated
+methods cannot establish real user authentication, factor independence, WSCD
+qualification, or native conformance.
+
 ### Holder Policies (Optional)
 
 You can integrate holder policies to control credential presentation:

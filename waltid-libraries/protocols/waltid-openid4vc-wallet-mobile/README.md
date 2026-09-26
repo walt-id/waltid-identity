@@ -71,6 +71,14 @@ provider authentication, not consent for issuance, presentation, or another wall
 
 ## Receiving credentials
 
+When an issuer advertises `key_attestations_required`, attach an application-supplied
+`KeyAttestationProvider` using `wallet.attachKeyAttestationProvider(provider)` before
+continuing issuance. The provider receives the actual proof key, issuer nonce and
+advertised constraints. The wallet validates its signed answer before sending the proof.
+Reattach this runtime dependency after recreating a wallet; it is not persisted.
+Native Swift consumers configure `WalletConfiguration.keyAttestationProvider`.
+Issuer trust and evidence supporting the provider's claims remain separate requirements.
+
 Start an issuance session to resolve the offer and retain the exact reviewed
 session state while the application collects a separately delivered transaction
 code when the issuer requires one:
@@ -489,6 +497,20 @@ available for detailed inspection.
 Managed signing keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `MobileWalletDatabaseKey.Provided` when an app needs enterprise/KMS ownership or recoverable database-key material. Credential and DID store overrides are independent; signing keys always remain platform-managed. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
 
 `MobileWalletConfig()` does not accept any OpenID4VP `transaction_data` profiles by default. Wallet apps must pass the profile types they understand through `transactionDataProfiles`; requests containing unknown transaction data types are rejected before the user can submit a presentation. Profile fields are preserved for app UI and display metadata.
+
+When an app enables `urn:eudi:sca:payment:1`, reviewed ordinary and Digital
+Credentials API submissions require a generated, non-exportable hardware signing
+key with the per-use `BiometricCurrentSet` policy. The SDK checks the restored
+native key's protection and policy provenance before signing. A successful native
+signature establishes possession and inherence; the proof reports both methods as
+`other`, without claiming a specific biometric modality or certified WSCD category.
+Cancellation, missing native evidence, and unsupported key policies produce no
+payment proof. This does not upgrade an existing key's policy.
+
+The application remains responsible for transaction display, informed consent and
+action lifetime. This adapter does not supply transaction UI, authentication
+batching, timed reuse, or full SCA assurance. The native provenance contract depends
+on the provider changes in [PR #2222](https://github.com/walt-id/waltid-identity/pull/2222).
 
 The examples below build `MobileWalletConfig` values. Pass the selected config
 to `MobileWalletFactory(...).create(config)` from a coroutine to create the

@@ -1,0 +1,75 @@
+name: WeBuild ITB live wallet cases
+
+on:
+  # Live runs share an external tenant and require explicit operator selection.
+  workflow_dispatch:
+    inputs:
+      cases:
+        description: Comma-separated unattended case IDs; leave empty for all 15 CI cases
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+# Keep this tenant's sessions sequential across manual runs; do not interrupt another run.
+concurrency:
+  group: itb-wallet-live
+  cancel-in-progress: false
+
+jobs:
+  wallet:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      CI: 'true'
+      KLOGGING_CONFIG_PATH: ${{ github.workspace }}/.github/ci/klogging.conf
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-read-only: true
+      - name: Prepare runner browser
+        run: >-
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers
+          -Pplaywright.browser=chromium -Pplaywright.installWithDeps=true
+          --max-workers=2 --console=plain
+      - name: Run selected deployed cases
+        env:
+          ITB_ORGANISATION_KEY: ${{ secrets.ITB_ORGANISATION_KEY }}
+          ITB_USERNAME: ${{ secrets.ITB_USERNAME }}
+          ITB_PASSWORD: ${{ secrets.ITB_PASSWORD }}
+          ITB_ORGANISATION_ID: ${{ vars.ITB_ORGANISATION_ID }}
+          ITB_BUILD_REVISION: ${{ github.sha }}
+          ITB_CASES: ${{ inputs.cases }}
+          ITB_REPORT_DIR: ${{ github.workspace }}/build/reports/itb-wallet
+        run: |
+          # CI=true restricts the runner to the 15 unattended cases, including manual dispatches.
+          if [ -z "$ITB_CASES" ]; then unset ITB_CASES; fi
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbWallet --max-workers=2 --console=plain
+      - name: Summarize every selected case
+        if: always()
+        run: |
+          if [ -f build/reports/itb-wallet/summary.md ]; then
+            cat build/reports/itb-wallet/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'ITB setup did not produce a case report; no passing result is implied.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+      - name: Preserve sanitized case outcomes
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: itb-wallet-live-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            build/reports/itb-wallet/results.json
+            build/reports/itb-wallet/junit.xml
+            build/reports/itb-wallet/summary.md

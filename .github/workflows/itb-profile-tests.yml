@@ -1,0 +1,89 @@
+name: WeBuild ITB offline profile checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/itb-profile-tests.yml'
+      - 'scripts/itb/**'
+      - 'waltid-services/waltid-openid4vp-conformance-runners/**'
+      - 'waltid-libraries/protocols/waltid-openid4vc-wallet/**'
+      - 'waltid-libraries/protocols/waltid-openid4vci-wallet/**'
+      - 'waltid-libraries/protocols/waltid-openid4vp*/**'
+      - 'waltid-libraries/crypto/**'
+      - 'waltid-libraries/credentials/**'
+      - 'waltid-libraries/sdjwt/**'
+      - 'waltid-libraries/waltid-did/**'
+      - 'build-logic/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - 'gradlew'
+  workflow_dispatch:
+    inputs:
+      enforce:
+        description: Fail the job when profile assertions fail
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: itb-profile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wallet-profile:
+    name: Offline wallet profile checks
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+      KLOGGING_CONFIG_PATH: ${{ github.workspace }}/.github/ci/klogging.conf
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Verify report collection safeguards
+        run: python3 -m unittest discover -s scripts/itb -p 'test_*.py'
+      - name: Prepare browser for offline portal contracts
+        run: >-
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers
+          -Pplaywright.browser=chromium -Pplaywright.installWithDeps=true
+          --max-workers=2 --console=plain
+      - name: Check runner orchestration and report handling
+        run: >-
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test
+          --tests 'id.walt.itb.*' -PskipLiveConformance=true
+          --max-workers=2 --console=plain
+      - name: Check offline portal contracts
+        run: >-
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbPortalTest
+          -PskipLiveConformance=true --max-workers=2 --console=plain
+      - name: Run the real wallet profile assertions
+        run: >-
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbTest
+          -PitbAllowFailures=${{ github.event_name == 'workflow_dispatch' && !inputs.enforce && 'true' || 'false' }}
+          --max-workers=2 --console=plain
+      - name: Report every result, including failures
+        if: always()
+        run: >-
+          python3 scripts/itb/report.py
+          waltid-services/waltid-openid4vp-conformance-runners/build/test-results/itbTest
+          >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve JUnit and HTML reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: itb-wallet-profile-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            waltid-services/waltid-openid4vp-conformance-runners/build/test-results/test/TEST-id.walt.itb.*.xml
+            waltid-services/waltid-openid4vp-conformance-runners/build/test-results/itbPortalTest/*.xml
+            waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/itbPortalTest/
+            waltid-services/waltid-openid4vp-conformance-runners/build/test-results/itbTest/*.xml
+            waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/itbTest/
