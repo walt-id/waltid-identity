@@ -80,6 +80,23 @@ public final class DemoBackend {
 
     public static let presentationScenarios = scenarios
 
+    /// Operator-assisted payment fixture; excluded from ordinary software-key scenarios.
+    public static let scaPaymentScenario = DemoCredentialScenario(
+        id: "sca-payment-sdjwt", displayName: "SCA Payment Card SD-JWT (demo)",
+        profileId: "scaPaymentCardSdJwt", credentialConfigurationId: "sca_payment_card_sd_jwt", format: "dc+sd-jwt",
+        verifierCredentialQuery: sdJwtQuery(id: "sca_payment", vct: "https://issuer2.demo.walt.id/openid4vci/sca_payment_card_sd_jwt")
+    )
+
+    /// A URL payment request using the same nested TS-12 shape as the Android demo.
+    public func createScaPaymentVerifierSession(transactionID: String = "8D8AC610-566D-4EF0-9C22-186B2A5ED793") async throws -> DemoVerifierSession {
+        try await createVerifierSession(scenario: Self.scaPaymentScenario, transactionData: [[
+            "type": "urn:eudi:sca:payment:1", "credential_ids": ["sca_payment"],
+            "transaction_data_hashes_alg": ["sha-256"],
+            "payload": ["transaction_id": transactionID,
+                        "payee": ["name": "Super Store", "id": "merchant-001"], "currency": "EUR", "amount": 11.56],
+        ]], bindClientIDToResponseURI: true)
+    }
+
     public static let transactionDataPresentationScenario = scenarios.first { $0.id == "eudi-pid-sdjwt" }!
 
     public static let persistenceScenario = scenarios.first { $0.id == "eudi-pid-mdoc" }!
@@ -373,6 +390,57 @@ public final class DemoBackend {
         }
 
         return DemoVerifierSession(sessionID: sessionID, authorizationRequestUri: requestURL)
+    }
+
+    public func scaSessionInfo(sessionID: String) async throws -> [String: Any] {
+        try await client.jsonRequest(url: Self.verifierBaseURL
+            .appendingPathComponent("verification-session").appendingPathComponent(sessionID).appendingPathComponent("info"),
+            retryTransientFailures: true)
+    }
+
+    /// Verify the actual proof and executed policies; aggregate SUCCESSFUL alone is insufficient.
+    public func verifyScaPayment(sessionID: String, timeoutSeconds: TimeInterval) async throws {
+        try await waitForVerifierSuccess(sessionID: sessionID, timeoutSeconds: timeoutSeconds)
+        let info = try await scaSessionInfo(sessionID: sessionID)
+        func require(_ condition: Bool, _ message: String) throws {
+            if !condition { throw NSError(domain: "WalletE2E", code: 320,
+                userInfo: [NSLocalizedDescriptionKey: message]) }
+        }
+        let policies = info["policy_results"] as? [String: Any]
+        let byQuery = policies?["vp_policies"] as? [String: [String: [String: Any]]]
+        for id in ["dc+sd-jwt/kb-jwt_signature", "dc+sd-jwt/sd_hash-check", "dc+sd-jwt/transaction-data-hash-check"] {
+            let result = byQuery?["sca_payment"]?[id]
+            try require(result?["success"] as? Bool == true &&
+                (result?["policy_executed"] as? [String: Any])?["id"] as? String == id,
+                "Required SCA policy did not execute successfully: \(id)")
+        }
+        let raw = info["presented_raw_data"] as? [String: Any]
+        let tokens = raw?["vpToken"] as? [String: [String]]
+        let proof = tokens?["sca_payment"]?.first?.split(separator: "~").last?.split(separator: ".")
+        guard let proof, proof.count == 3, let data = base64URLData(String(proof[1])),
+              let claims = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let request = info["authorizationRequest"] as? [String: Any],
+              let entries = request["transaction_data"] as? [String], !entries.isEmpty else {
+            throw NSError(domain: "WalletE2E", code: 321,
+                userInfo: [NSLocalizedDescriptionKey: "SCA evidence is missing the request or KB-JWT"])
+        }
+        let expected = entries.map { base64URLString(Data(SHA256.hash(data: Data($0.utf8)))) }
+        try require(claims["transaction_data_hashes"] as? [String] == expected, "Payment hashes differ from original encoded entries")
+        try require(claims["transaction_data_hashes_alg"] as? String == "sha-256", "Missing SHA-256 declaration")
+        try require(claims["nonce"] as? String == request["nonce"] as? String, "Payment nonce mismatch")
+        try require(claims["aud"] as? String == request["client_id"] as? String, "Payment audience mismatch")
+        try require(claims["response_mode"] as? String == "direct_post", "Unexpected payment response mode")
+        let jti = claims["jti"] as? String ?? ""
+        try require(UUID(uuidString: jti) != nil && jti.split(separator: "-").dropFirst(2).first?.first == "4", "Missing UUIDv4 proof ID")
+        try require(claims["amr"] as? [[String: String]] == [["possession": "other"], ["inherence": "other"]], "Unexpected payment authentication categories")
+    }
+
+    public func verifyNoScaResponse(sessionID: String) async throws {
+        let info = try await scaSessionInfo(sessionID: sessionID)
+        guard info["status"] as? String != "SUCCESSFUL", info["presented_raw_data"] == nil || info["presented_raw_data"] is NSNull else {
+            throw NSError(domain: "WalletE2E", code: 322,
+                userInfo: [NSLocalizedDescriptionKey: "Cancelled or blocked payment released a proof"])
+        }
     }
 
     public func waitForVerifierSuccess(sessionID: String, timeoutSeconds: TimeInterval) async throws {

@@ -378,7 +378,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ \"YES\" = \"$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED\" ]; then\n  echo \"Skipping Gradle build task invocation due to OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED environment variable set to \\\"YES\\\"\"\n  exit 0\nfi\ncd \"$SRCROOT/../../..\"\n./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:embedAndSignAppleFrameworkForXcode -PenableIosBuild=true -i\n";
+			shellScript = "if [ \"YES\" = \"$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED\" ]; then\n  echo \"Skipping Gradle build task invocation due to OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED environment variable set to \\\"YES\\\"\"\n  exit 0\nfi\ncd \"$SRCROOT/../../..\"\nif [ \"1\" = \"$WALLET_SCA_APP_E2E\" ]; then\n  ./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:embedAndSignAppleFrameworkForXcode -PenableIosBuild=true --no-configuration-cache -I .github/scripts/mobile-ci/sca-app-e2e.init.gradle\nelse\n  ./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:embedAndSignAppleFrameworkForXcode -PenableIosBuild=true -i\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

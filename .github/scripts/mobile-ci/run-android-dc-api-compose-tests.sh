@@ -19,6 +19,7 @@ set +e
 "$identity_dir/gradlew" -p "$identity_dir" \
   :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedProductionDebugAndroidTest \
   "${instrumentation_args[@]}" \
+  -Pandroid.testInstrumentationRunnerArguments.notAnnotation=id.walt.mobile.test.PhysicalDeviceTest \
   -PtransactionDataProfiles.url=https://wallet.demo.walt.id/wallet-api/transaction-data-profiles \
   --info
 test_status=$?
@@ -61,4 +62,6 @@ log_android_dc_api_launcher_diagnostic
 if (( test_status != 0 )); then
   exit "$test_status"
 fi
-exit "$postflight_status"
+if (( postflight_status != 0 )); then exit "$postflight_status"; fi
+# Separate APK and SDK outputs preserve the ordinary suite's native authorization behavior.
+"$script_dir/run-android-sca-app-tests.sh"

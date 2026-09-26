@@ -141,6 +141,23 @@ object DemoTestBackend {
         ),
     )
 
+    /** Requires an eligible native signing identity; kept outside the ordinary emulator matrix. */
+    val scaPaymentSdJwtScenario = CredentialScenario(
+        id = "sca-payment-card-sdjwt",
+        displayName = "Demo SCA Payment Card SD-JWT VC",
+        profileId = "scaPaymentCardSdJwt",
+        credentialConfigurationId = "sca_payment_card_sd_jwt",
+        format = "dc+sd-jwt",
+        verifierCredentialQuery = credentialQuery(
+            id = "sca_payment",
+            format = "dc+sd-jwt",
+            meta = buildJsonObject {
+                putJsonArray("vct_values") { add(JsonPrimitive("$ISSUER_IDENTIFIER/sca_payment_card_sd_jwt")) }
+            },
+            claimPaths = listOf("card_scheme", "card_last4", "card_holder_name").map { listOf(it) },
+        ),
+    )
+
     val presentationScenarios = scenarios
 
     val optionalBirthDatePresentationScenario = scenarios.first { it.id == "eudi-pid-sdjwt" }.copy(
@@ -554,6 +571,7 @@ object DemoTestBackend {
         credentialQueries: List<JsonObject>,
         expectedOrigins: List<String>,
         encryptedResponse: Boolean = false,
+        signedRequest: Boolean = false,
         transactionData: List<JsonObject> = emptyList(),
     ): DcApiVerifierSession {
         require(expectedOrigins.isNotEmpty()) { "DC API sessions require at least one expected origin" }
@@ -563,6 +581,7 @@ object DemoTestBackend {
             credentialQueries = credentialQueries,
             expectedOrigins = expectedOrigins,
             encryptedResponse = encryptedResponse,
+            signedRequest = signedRequest,
             transactionData = transactionData,
         )
 
@@ -583,10 +602,16 @@ object DemoTestBackend {
         credentialQueries: List<JsonObject>,
         expectedOrigins: List<String>,
         encryptedResponse: Boolean = false,
+        signedRequest: Boolean = false,
         transactionData: List<JsonObject> = emptyList(),
     ): JsonObject = buildJsonObject {
         put("flow_type", "dc_api_openid4vp")
         putJsonObject("core_flow") {
+            if (signedRequest) {
+                put("signed_request", true)
+                // Matches the certificate independently pinned by the demo wallet.
+                put("clientId", "x509_san_dns:verifier.example.com")
+            }
             putJsonObject("dcql_query") {
                 putJsonArray("credentials") {
                     credentialQueries.forEach { add(it) }

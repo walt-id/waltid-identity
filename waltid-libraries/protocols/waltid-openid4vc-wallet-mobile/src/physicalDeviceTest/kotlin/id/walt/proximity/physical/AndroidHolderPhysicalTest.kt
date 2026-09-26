@@ -3,7 +3,7 @@ package id.walt.proximity.physical
 import android.content.ComponentName
 import id.walt.mdoc.proximity.mobile.AndroidBleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.AndroidNfcHostPlatformAdapter
-import id.walt.proximity.test.PhysicalDeviceTest
+import id.walt.mobile.test.PhysicalDeviceTest
 import id.walt.wallet2.mobile.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first

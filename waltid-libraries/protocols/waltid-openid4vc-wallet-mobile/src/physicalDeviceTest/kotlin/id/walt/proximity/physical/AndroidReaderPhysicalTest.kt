@@ -3,7 +3,7 @@ package id.walt.proximity.physical
 
 import android.nfc.NfcAdapter
 import android.nfc.tech.IsoDep
-import id.walt.proximity.test.PhysicalDeviceTest
+import id.walt.mobile.test.PhysicalDeviceTest
 import id.walt.wallet2.mobile.peer.SelectCorrectedNfcReader
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.*

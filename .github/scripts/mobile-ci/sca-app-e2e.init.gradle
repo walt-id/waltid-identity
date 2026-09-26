@@ -1,0 +1,17 @@
+// Explicit test-build composition: no runtime flag or public SDK authorization bypass.
+// Every output is isolated from normal APKs/frameworks; these artifacts must never be published.
+gradle.beforeProject { p ->
+    p.layout.buildDirectory.set(p.layout.projectDirectory.dir('build/sca-app-e2e'))
+    if (p.path in [':waltid-libraries:protocols:waltid-openid4vc-wallet-mobile',
+                   ':waltid-applications:waltid-wallet-demo-compose:androidApp']) {
+        p.extensions.extraProperties.set('scaAppE2eBuild', true)
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def forbidden = graph.allTasks.find {
+        it.name.toLowerCase().contains('publish') || it.name.toLowerCase().contains('appdistribution') ||
+        (it.project.path == ':waltid-applications:waltid-wallet-demo-compose:androidApp' && it.name.contains('Production'))
+    }
+    if (forbidden != null) throw new GradleException("SCA app E2E artifacts cannot be distributed: ${forbidden.path}")
+}

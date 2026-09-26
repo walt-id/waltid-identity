@@ -32,6 +32,24 @@ class DemoTestBackendContractTest {
     }
 
     @Test
+    fun scaPaymentRequestsUseSignedRequestsAndKeepDefaultPolicies() {
+        val scenario = DemoTestBackend.scaPaymentSdJwtScenario
+        val payload = DemoTestBackend.buildDcApiVerifierSessionPayload(
+            credentialQueries = listOf(scenario.verifierCredentialQuery),
+            expectedOrigins = listOf("android:apk-key-hash:test"),
+            signedRequest = true,
+        )
+        val core = payload.getValue("core_flow").jsonObject
+        assertEquals(JsonPrimitive(true), core["signed_request"])
+        assertEquals("x509_san_dns:verifier.example.com", core["clientId"]?.jsonPrimitive?.content)
+        assertFalse("vp_policies" in core)
+        val query = core.getValue("dcql_query").jsonObject.getValue("credentials").jsonArray.single().jsonObject
+        assertEquals("sca_payment", query["id"]?.jsonPrimitive?.content)
+        assertEquals("dc+sd-jwt", query["format"]?.jsonPrimitive?.content)
+        assertEquals(3, query.getValue("claims").jsonArray.size)
+    }
+
+    @Test
     fun genericPaymentTransactionDataUsesCurrentFlatProfile() {
         val transactionData = DemoTestBackend.buildPaymentAuthorizationTransactionData("pid")
 

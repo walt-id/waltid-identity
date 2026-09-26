@@ -64,6 +64,11 @@ kotlin {
     }
 
     sourceSets {
+        commonMain {
+            // Only the isolated app-E2E init script can substitute authentication at build time.
+            kotlin.srcDir(if (project.extensions.extraProperties.has("scaAppE2eBuild"))
+                "src/scaAppE2e/kotlin" else "src/nativeSca/kotlin")
+        }
         commonMain.dependencies {
             implementation(identityLibs.whyoleg.cryptography.random)
             implementation(identityLibs.signum.indispensable)

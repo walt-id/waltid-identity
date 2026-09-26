@@ -48,8 +48,8 @@ case "$phase" in
     # potentially poisoned host snapshot.
     emulator_options="-no-snapshot -no-snapshot-save -no-window -gpu auto -noaudio -no-boot-anim -camera-back none -memory 4096 -feature GLDirectMem,HasSharedSlotsHostMemoryAllocator"
     emulator_avd_name="dc-api-api37-pixel7-google-apis"
-    report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**/*.xml"
-    artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**'
+    report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/**/outputs/androidTest-results/**/*.xml"
+    artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/sca-app-e2e/outputs/androidTest-results/**'
     emulator_api_level="37.0"
     emulator_profile="pixel_7"
     emulator_target="google_apis"
