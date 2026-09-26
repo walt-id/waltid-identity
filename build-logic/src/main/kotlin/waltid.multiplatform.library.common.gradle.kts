@@ -7,6 +7,7 @@ plugins {
 
     kotlin("multiplatform")
     kotlin("plugin.power-assert")
+    id("waltid.licensee")
 }
 
 kotlin {
