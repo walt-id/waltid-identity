@@ -1,5 +1,8 @@
 package id.walt.openid4vp.conformance
 
+import id.walt.openid4vp.conformance.report.ConformanceReportWriter
+import id.walt.openid4vp.conformance.report.isAccepted
+import id.walt.openid4vp.conformance.testplans.issuerResultsToTestPlanResults
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariant
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantReportWriter
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantRunResult
@@ -12,6 +15,7 @@ import id.walt.openid4vp.conformance.testplans.runner.req.CredentialOfferAuthMet
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -23,8 +27,89 @@ class IssuerVariantMatrixTest {
         val exploratory = IssuerVariantReportWriter.buildSummary(emptyList(), strictResults = false)
         assertTrue(strict.contains("Strict issuer results: `enabled`"))
         assertTrue(exploratory.contains("Strict issuer results: `disabled`"))
+        assertTrue(strict.contains("<details>"))
+        assertTrue(strict.contains("<summary>OpenID4VCI Issuer results</summary>"))
+        assertTrue(strict.contains("</details>"))
         assertFalse(strict.contains("CONFORMANCE_ALLOW_FAILURE"))
         assertFalse(exploratory.contains("CONFORMANCE_ALLOW_FAILURE"))
+    }
+
+    @Test
+    fun explicitStrictFalseStaysExploratory() {
+        assertFalse(
+            IssuerVariantSelection.resolveStrictResults(
+                certificationMode = false,
+                explicitStrict = false,
+            )
+        )
+    }
+
+    @Test
+    fun certificationModeIsAlwaysStrict() {
+        assertTrue(
+            IssuerVariantSelection.resolveStrictResults(
+                certificationMode = true,
+                explicitStrict = false,
+            )
+        )
+    }
+
+    @Test
+    fun issuerFailedModulesFailHardFailMapping() {
+        val mapped = issuerResultsToTestPlanResults(
+            listOf(
+                IssuerVariantRunResult(
+                    variantId = "vci-sdjwt",
+                    variant = JsonObject(emptyMap()),
+                    status = IssuerVariantRunStatus.FAILED,
+                    modules = listOf(
+                        IssuerVariantModuleRunResult(
+                            testModule = "oid4vci-1_0-issuer-happy-flow",
+                            testId = "t-1",
+                            status = "FINISHED",
+                            result = "FAILED",
+                            accepted = false,
+                            error = "nonce mismatch",
+                        ),
+                    ),
+                )
+            )
+        )
+        assertEquals(1, mapped.size)
+        assertFalse(mapped.single().isAccepted())
+        assertFailsWith<IllegalStateException> {
+            ConformanceReportWriter.failIfNeededFromTestPlanResults(
+                role = ConformanceReportWriter.Role.VCI_ISSUER,
+                results = mapped,
+            )
+        }
+    }
+
+    @Test
+    fun issuerSkippedAcceptedModulesDoNotFailHardFailMapping() {
+        val mapped = issuerResultsToTestPlanResults(
+            listOf(
+                IssuerVariantRunResult(
+                    variantId = "vci-sdjwt",
+                    variant = JsonObject(emptyMap()),
+                    status = IssuerVariantRunStatus.PASSED,
+                    modules = listOf(
+                        IssuerVariantModuleRunResult(
+                            testModule = "oid4vci-1_0-issuer-happy-flow",
+                            testId = "t-1",
+                            status = "FINISHED",
+                            result = "SKIPPED",
+                            accepted = true,
+                        ),
+                    ),
+                )
+            )
+        )
+        assertTrue(mapped.single().isAccepted())
+        ConformanceReportWriter.failIfNeededFromTestPlanResults(
+            role = ConformanceReportWriter.Role.VCI_ISSUER,
+            results = mapped,
+        )
     }
 
     @Test

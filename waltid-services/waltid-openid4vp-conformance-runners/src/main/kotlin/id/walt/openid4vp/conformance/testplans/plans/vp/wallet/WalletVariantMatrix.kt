@@ -113,10 +113,12 @@ object WalletVariantMatrix {
      *
      * `request_uri_unsigned` is included even though the suite serialises those Request Objects with a
      * bare `PlainHeader` - the observed header is exactly `{"alg":"none"}`, see
-     * `AbstractSignClaimsWithNullAlgorithm` - and so omits the `typ` that OpenID4VP 1.0 Section 5
-     * requires. The suite is the arbiter of interoperability, so Wallet2 tolerates an absent `typ` on
-     * unsigned Request Objects rather than this matrix dropping the request method; see
-     * `AuthorizationRequestResolver.requireRequestObjectType`.
+     * `AbstractSignClaimsWithNullAlgorithm` / `SerializeRequestObjectWithNullAlgorithm` - and so omits
+     * both the `typ` that OpenID4VP 1.0 Section 5 requires and the `aud` that a signed JAR would bind
+     * to this wallet. The suite is the arbiter of interoperability, so Wallet2 tolerates an absent
+     * `typ` and does not require `aud` on unsigned Request Objects rather than this matrix dropping
+     * the request method; see `AuthorizationRequestResolver.requireRequestObjectType` and
+     * `validateRequestObjectTimeClaims`.
      *
      * `request_uri_multisigned` is genuinely unreachable: the suite declares it DC-API-only (OID4VP
      * Appendix A.3.2), and this harness speaks HTTP to the wallet.

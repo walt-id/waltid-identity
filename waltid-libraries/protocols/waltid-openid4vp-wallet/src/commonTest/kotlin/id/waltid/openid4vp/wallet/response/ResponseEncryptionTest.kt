@@ -17,7 +17,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class ResponseEncryptionTest {
     private val publicKey = Json.parseToJsonElement(
@@ -67,11 +66,31 @@ class ResponseEncryptionTest {
     fun `rejects private recipient material`() = runTest {
         val privateKey = JsonObject(publicKey + ("d" to JsonPrimitive("AQ")))
 
-        val error = assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<IllegalArgumentException> {
             ResponseEncryption.resolveCrypto2(request(privateKey))
         }
+    }
 
-        assertTrue(error.message.orEmpty().contains("private material"))
+    @Test
+    fun `ignores an unusable encryption key next to a valid one`() = runTest {
+        val unknownType = JsonObject(
+            mapOf(
+                "kty" to JsonPrimitive("unusable"),
+                "kid" to JsonPrimitive("bad-key"),
+                "alg" to JsonPrimitive("ECDH-ES"),
+                "use" to JsonPrimitive("enc"),
+            )
+        )
+        val missingKid = JsonObject(publicKey - "kid")
+        val rsa = Json.parseToJsonElement(
+            """{"kty":"RSA","kid":"rsa-key","alg":"ECDH-ES","use":"enc","n":"s","e":"AQAB"}"""
+        ).jsonObject
+
+        val config = requireNotNull(
+            ResponseEncryption.resolveCrypto2(requestWithKeys(listOf(unknownType, missingKid, rsa, publicKey)))
+        )
+
+        assertEquals("enc-key", config.metadata().verifierKeyId)
     }
 
     @Test

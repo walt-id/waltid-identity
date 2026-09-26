@@ -1,6 +1,5 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
-import id.walt.openid4vp.conformance.report.ConformanceCiFlags
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.httpdata.CreateTestPlanResponse
@@ -291,24 +290,6 @@ class WalletTestPlanRunner(
 
         println("=".repeat(80))
         println()
-
-        if (testPlan.optional || ConformanceCiFlags.allowFailure()) {
-            return
-        }
-
-        // Skipped modules were never run, so they can neither be rejected nor passed.
-        val executed = results.filter { it.skipReason == null }
-        if (testPlan.expectRejection) {
-            val allRejected = executed.all { it.walletStatus == "REJECTED" || it.conformanceResult == "PASSED" }
-            check(allRejected) {
-                "Negative test plan expected all requests to be rejected by wallet, but some were accepted"
-            }
-        } else {
-            val allPassed = executed.all { it.walletStatus == "PASSED" }
-            check(allPassed) {
-                "Test plan had ${executed.count { it.walletStatus != "PASSED" }} failures"
-            }
-        }
     }
 
     /**

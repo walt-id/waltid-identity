@@ -6,7 +6,6 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
-import id.walt.openid4vp.conformance.report.ConformanceCiFlags
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
@@ -114,7 +113,6 @@ class ConformanceTestRunner(
             ConformanceReportWriter.failIfNeededFromTestPlanResults(
                 role = ConformanceReportWriter.Role.VP_VERIFIER,
                 results = results,
-                allowFailure = ConformanceCiFlags.allowFailure(),
             )
         }
     }

@@ -44,7 +44,6 @@ object ConformanceReportWriter {
         role: Role,
         entries: List<Entry>,
         reportRoot: String = DEFAULT_REPORT_ROOT,
-        allowFailure: Boolean = ConformanceCiFlags.allowFailure(),
         mergeExisting: Boolean = true,
         producer: String? = null,
     ) {
@@ -77,7 +76,7 @@ object ConformanceReportWriter {
             dir.resolve("results.json"),
             json.encodeToString(ListSerializer(Entry.serializer()), merged)
         )
-        Files.writeString(dir.resolve("summary.md"), buildSummary(role, merged, allowFailure))
+        Files.writeString(dir.resolve("summary.md"), buildSummary(role, merged))
         println("Wrote ${role.title} conformance report to $dir (${merged.size} entries)")
     }
 
@@ -91,7 +90,6 @@ object ConformanceReportWriter {
         role: Role,
         reason: String,
         reportRoot: String = DEFAULT_REPORT_ROOT,
-        allowFailure: Boolean = ConformanceCiFlags.allowFailure(),
     ) {
         if (Files.exists(reportDir(role, reportRoot).resolve("summary.md"))) return
         write(
@@ -105,7 +103,6 @@ object ConformanceReportWriter {
                 )
             ),
             reportRoot = reportRoot,
-            allowFailure = allowFailure,
             mergeExisting = false,
             producer = "suite-availability",
         )
@@ -117,7 +114,6 @@ object ConformanceReportWriter {
         conformanceHost: String? = null,
         conformancePort: Int? = null,
         reportRoot: String = DEFAULT_REPORT_ROOT,
-        allowFailure: Boolean = ConformanceCiFlags.allowFailure(),
         expectRejection: Boolean = false,
         producer: String? = null,
     ) {
@@ -140,11 +136,10 @@ object ConformanceReportWriter {
                 accepted = accepted,
             )
         }
-        write(role, entries, reportRoot, allowFailure, producer = producer)
+        write(role, entries, reportRoot, producer = producer)
     }
 
-    fun failIfNeeded(role: Role, entries: List<Entry>, allowFailure: Boolean = ConformanceCiFlags.allowFailure()) {
-        if (allowFailure) return
+    fun failIfNeeded(role: Role, entries: List<Entry>) {
         val failed = entries.count { !it.accepted }
         if (failed > 0) {
             error(
@@ -157,11 +152,8 @@ object ConformanceReportWriter {
     fun failIfNeededFromTestPlanResults(
         role: Role,
         results: List<TestPlanResult>,
-        allowFailure: Boolean = ConformanceCiFlags.allowFailure(),
         expectRejection: Boolean = false,
-        producer: String? = null,
     ) {
-        if (allowFailure) return
         val failed = results.count { !it.isAccepted(expectRejection) }
         if (failed > 0) {
             error(
@@ -171,15 +163,17 @@ object ConformanceReportWriter {
         }
     }
 
-    private fun buildSummary(role: Role, entries: List<Entry>, allowFailure: Boolean): String = buildString {
+    private fun buildSummary(role: Role, entries: List<Entry>): String = buildString {
         appendLine("# ${role.title} Conformance Summary")
         appendLine()
-        appendLine("- Soft-fail (`CONFORMANCE_ALLOW_FAILURE`): `${if (allowFailure) "enabled" else "disabled"}`")
         val skipped = entries.count { it.status == "skipped" }
         appendLine("- Total: ${entries.size}")
         appendLine("- Passed: ${entries.count { it.accepted && it.status != "skipped" }}")
         appendLine("- Failed: ${entries.count { !it.accepted }}")
         if (skipped > 0) appendLine("- Skipped (not applicable to this variant): $skipped")
+        appendLine()
+        appendLine("<details>")
+        appendLine("<summary>${role.title} results</summary>")
         appendLine()
         appendLine("| Test | Status | Suite | Log | Error |")
         appendLine("|------|--------|-------|-----|-------|")
@@ -193,6 +187,8 @@ object ConformanceReportWriter {
                     "${entry.error?.sanitizeMarkdownCell() ?: ""} |"
             )
         }
+        appendLine()
+        appendLine("</details>")
     }
 
     private fun logUrl(host: String?, port: Int?, testId: String?): String? {

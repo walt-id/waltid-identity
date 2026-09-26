@@ -187,7 +187,7 @@ https://localhost.emobix.co.uk:8443/log-detail.html?log=<test_id>
 3. **Add plain SD-JWT test** to confirm baseline SD-JWT functionality
 4. **Update documentation** with final test results
 
-## CI reports and soft-fail
+## CI reports
 
 When verifier conformance runs in CI (or locally), the runner writes:
 
@@ -197,8 +197,9 @@ build/reports/openid-conformance/vp-verifier/results.json
 ```
 
 The OSS Gradle workflow appends these to the GitHub Actions job summary.
-Soft-fail is controlled by the repo Actions variable `CONFORMANCE_ALLOW_FAILURE`
-(see the module [README](../README.md#ci-summaries-and-soft-fail)).
+Executed OpenID4VP verifier/wallet, OpenID4VCI wallet, and OpenID4VCI issuer
+failures fail the conformance job (see the module
+[README](../README.md#ci-summaries)).
 
 ## Code Fixes Made (2026-07-08)
 
