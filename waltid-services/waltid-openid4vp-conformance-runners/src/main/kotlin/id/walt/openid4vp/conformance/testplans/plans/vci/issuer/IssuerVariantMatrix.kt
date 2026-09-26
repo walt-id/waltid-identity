@@ -1,6 +1,5 @@
 package id.walt.openid4vp.conformance.testplans.plans.vci.issuer
 
-import id.walt.openid4vp.conformance.report.ConformanceCiFlags
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.runner.req.CredentialOfferAuthMethod
 import kotlinx.serialization.Serializable
@@ -243,20 +242,15 @@ data class IssuerVariantSelection(
         )
 
         /**
-         * Strictness resolution:
-         * 1. Certification mode always strict
-         * 2. Shared CI hard-fail (`CONFORMANCE_ALLOW_FAILURE=false`) always strict, including issuer
-         * 3. Explicit OPENID4VCI_CONFORMANCE_STRICT wins for local exploration
-         * 4. Otherwise default strict
+         * Certification mode is always strict. Otherwise `OPENID4VCI_CONFORMANCE_STRICT`
+         * wins when set; default is strict. Unaccepted issuer modules still fail the run
+         * via [ConformanceReportWriter.failIfNeededFromTestPlanResults] regardless of this flag.
          */
         internal fun resolveStrictResults(
             certificationMode: Boolean = bool("OPENID4VCI_CONFORMANCE_CERTIFICATION_MODE"),
             explicitStrict: Boolean? = optionalBool("OPENID4VCI_CONFORMANCE_STRICT"),
-            allowFailureEnvPresent: Boolean = System.getenv(ConformanceCiFlags.ALLOW_FAILURE_ENV) != null,
-            allowFailure: Boolean = ConformanceCiFlags.allowFailure(),
         ): Boolean {
             if (certificationMode) return true
-            if (allowFailureEnvPresent && !allowFailure) return true
             explicitStrict?.let { return it }
             return true
         }

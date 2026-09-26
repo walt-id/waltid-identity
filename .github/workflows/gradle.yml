@@ -440,9 +440,7 @@ jobs:
           ISSUER_BASE_URL: ${{ steps.issuer-tunnel.outputs.url }}
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
           # Wallet, VCI wallet, verifier, and issuer module failures fail this job.
-          # Set CONFORMANCE_ALLOW_FAILURE=true on the workflow (or locally) only to
-          # temporarily restore soft-fail. Issuer batch coverage remains required below.
-          CONFORMANCE_ALLOW_FAILURE: "false"
+          # Issuer batch coverage remains required below.
           CONFORMANCE_HOST: conformance.waltid.cloud
           CONFORMANCE_PORT: "443"
           CONFORMANCE_VP_WALLET_ADAPTER_URL: ${{ steps.tunnel.outputs.vp_wallet_url }}/openid4vp/authorize
@@ -502,7 +500,6 @@ jobs:
       - name: Publish OpenID conformance summary
         if: always()
         env:
-          CONFORMANCE_ALLOW_FAILURE: "false"
           ISSUER_REQUESTED: ${{ inputs.run-issuer-conformance || inputs.run-haip-conformance }}
           ISSUER_SETUP_OUTCOME: ${{ steps.issuer-tunnel.outcome }}
           CONFORMANCE_TEST_OUTCOME: ${{ steps.conformance-tests.outcome }}
@@ -511,11 +508,7 @@ jobs:
           {
             echo "## OpenID conformance results"
             echo
-            if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
-              echo "> Soft-fail enabled (\`CONFORMANCE_ALLOW_FAILURE\` unset/true). Failures are reported below but do not fail this job."
-            else
-              echo "> Soft-fail disabled (\`CONFORMANCE_ALLOW_FAILURE=false\`). OpenID4VP verifier/wallet, OpenID4VCI wallet, and OpenID4VCI issuer failures fail this job. Issuer batch coverage remains required."
-            fi
+            echo "> Executed OpenID4VP verifier/wallet, OpenID4VCI wallet, and OpenID4VCI issuer failures fail this job. Issuer batch coverage remains required."
             echo
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -537,11 +530,6 @@ jobs:
               {
                 echo "# ${title} Conformance Summary"
                 echo
-                if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
-                  echo "- Soft-fail (\`CONFORMANCE_ALLOW_FAILURE\`): \`enabled\`"
-                else
-                  echo "- Soft-fail (\`CONFORMANCE_ALLOW_FAILURE\`): \`disabled\`"
-                fi
                 echo "- Total: 0"
                 echo "- Passed: 0"
                 echo "- Failed: 0"
@@ -632,15 +620,10 @@ jobs:
       - name: Fail job on published OpenID conformance failures
         if: ${{ always() && !cancelled() }}
         env:
-          CONFORMANCE_ALLOW_FAILURE: "false"
           ISSUER_REQUESTED: ${{ inputs.run-issuer-conformance || inputs.run-haip-conformance }}
           ISSUER_SETUP_OUTCOME: ${{ steps.issuer-tunnel.outcome }}
         run: |
           set -euo pipefail
-          if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
-            echo "Soft-fail enabled; published failures do not fail this job."
-            exit 0
-          fi
 
           failed=0
           check_role() {
@@ -697,8 +680,8 @@ jobs:
 
       - name: Verify issuer results were produced
         if: ${{ !cancelled() && steps.issuer-tunnel.outcome == 'success' && steps.conformance-tests.outcome == 'success' }}
-        # Strict results, executed batch coverage, and CONFORMANCE_ALLOW_FAILURE=false
-        # are enforced by the Kotlin runner. This rejects a green test step with no issuer file.
+        # Strict results and executed batch coverage are enforced by the Kotlin runner.
+        # This rejects a green test step with no issuer file.
         run: jq -e 'type == "array" and length > 0' "$ISSUER_REPORT_DIR/results.json" >/dev/null
 
       - name: Stop Issuer2 conformance services

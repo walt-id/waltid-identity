@@ -35,25 +35,11 @@ class IssuerVariantMatrixTest {
     }
 
     @Test
-    fun sharedHardFailForcesIssuerStrictEvenWhenExplicitlyDisabled() {
-        assertTrue(
-            IssuerVariantSelection.resolveStrictResults(
-                certificationMode = false,
-                explicitStrict = false,
-                allowFailureEnvPresent = true,
-                allowFailure = false,
-            )
-        )
-    }
-
-    @Test
-    fun explicitStrictFalseStaysExploratoryWhenSharedSoftFailIsOn() {
+    fun explicitStrictFalseStaysExploratory() {
         assertFalse(
             IssuerVariantSelection.resolveStrictResults(
                 certificationMode = false,
                 explicitStrict = false,
-                allowFailureEnvPresent = true,
-                allowFailure = true,
             )
         )
     }
@@ -64,8 +50,6 @@ class IssuerVariantMatrixTest {
             IssuerVariantSelection.resolveStrictResults(
                 certificationMode = true,
                 explicitStrict = false,
-                allowFailureEnvPresent = true,
-                allowFailure = true,
             )
         )
     }
@@ -97,7 +81,6 @@ class IssuerVariantMatrixTest {
             ConformanceReportWriter.failIfNeededFromTestPlanResults(
                 role = ConformanceReportWriter.Role.VCI_ISSUER,
                 results = mapped,
-                allowFailure = false,
             )
         }
     }
@@ -126,7 +109,6 @@ class IssuerVariantMatrixTest {
         ConformanceReportWriter.failIfNeededFromTestPlanResults(
             role = ConformanceReportWriter.Role.VCI_ISSUER,
             results = mapped,
-            allowFailure = false,
         )
     }
 

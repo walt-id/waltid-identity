@@ -335,10 +335,10 @@ Issuer2 is built, configured and started before the shared test step. Its port i
 public adapters use 7006/7007). There is no wallet/issuer port collision. Startup
 rejects an occupied issuer port rather than terminating an unknown process.
 
-CI sets `CONFORMANCE_ALLOW_FAILURE=false` so OpenID4VP verifier/wallet,
-OpenID4VCI wallet, and OpenID4VCI issuer failures fail the conformance job.
-`OPENID4VCI_CONFORMANCE_STRICT=true` remains set so issuer results stay strict
-when the shared flag is temporarily relaxed, and
+Executed OpenID4VP verifier/wallet, OpenID4VCI wallet, and OpenID4VCI issuer
+failures fail the conformance job.
+`OPENID4VCI_CONFORMANCE_STRICT=true` remains set so issuer variant results stay
+strict, and
 `OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS=true` still requires executed batch
 coverage. One JUnit report covers all roles; issuer result artifacts remain
 separate. The live test task uses `--rerun` and disables configuration caching so
@@ -388,9 +388,9 @@ assertions, and is reported as a coverage gap in the job summary. This CI run
 does not establish TLS conformance. Local runs keep the module enabled; remove
 the CI-only exclusion when a compliant public TLS endpoint is available.
 
-Issuer strict mode and `REQUIRE_BATCH_PASS=true` stay explicit in CI. Shared
-`CONFORMANCE_ALLOW_FAILURE=false` also hard-fails issuer module and variant
-failures, so `OPENID4VCI_CONFORMANCE_STRICT=false` cannot keep the job green.
+Issuer strict mode and `REQUIRE_BATCH_PASS=true` stay explicit in CI. Unaccepted
+issuer modules and non-passing variants fail the job even when
+`OPENID4VCI_CONFORMANCE_STRICT=false`.
 The Kotlin runner enforces successful selected variants and executed
 batch coverage; CI also rejects missing/empty results. The configured matrix
 selects 20 variants, with 16 applicable batch variants and four encrypted-HAIP
@@ -645,11 +645,11 @@ results.json
 summary.md
 ```
 
-CI publishes result summaries into the GitHub Actions job summary. CI sets
-`CONFORMANCE_ALLOW_FAILURE=false` so OpenID4VP verifier/wallet, OpenID4VCI wallet,
-and OpenID4VCI issuer failures fail the job. Locally you can still use
-`OPENID4VCI_CONFORMANCE_STRICT=false` for exploration when the shared flag is
-unset or true.
+CI publishes result summaries into the GitHub Actions job summary. Executed
+OpenID4VP verifier/wallet, OpenID4VCI wallet, and OpenID4VCI issuer failures
+fail the job. Locally you can still use `OPENID4VCI_CONFORMANCE_STRICT=false`
+for exploration of variant-level strictness; unaccepted issuer modules still
+fail the run.
 Result states have these meanings:
 
 - `generated`: variant was generated but not executed, usually discovery-only mode

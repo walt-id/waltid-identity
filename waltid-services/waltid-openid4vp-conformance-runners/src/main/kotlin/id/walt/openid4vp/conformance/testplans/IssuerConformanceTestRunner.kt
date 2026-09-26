@@ -1,6 +1,5 @@
 package id.walt.openid4vp.conformance.testplans
 
-import id.walt.openid4vp.conformance.report.ConformanceCiFlags
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.http.IssuerInterface
@@ -172,7 +171,6 @@ class IssuerConformanceTestRunner(
         ConformanceReportWriter.failIfNeededFromTestPlanResults(
             role = ConformanceReportWriter.Role.VCI_ISSUER,
             results = testPlanResults,
-            allowFailure = ConformanceCiFlags.allowFailure(),
         )
 
         // Ordinary runs retain capability-based skips. Batch acceptance checks raw suite outcomes.

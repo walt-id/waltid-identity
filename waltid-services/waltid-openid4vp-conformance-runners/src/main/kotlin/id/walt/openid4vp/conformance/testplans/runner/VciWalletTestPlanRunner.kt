@@ -1,6 +1,5 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
-import id.walt.openid4vp.conformance.report.ConformanceCiFlags
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
@@ -108,7 +107,6 @@ class VciWalletTestPlanRunner(
         ConformanceReportWriter.failIfNeededFromTestPlanResults(
             role = ConformanceReportWriter.Role.VCI_WALLET,
             results = namedResults,
-            allowFailure = ConformanceCiFlags.allowFailure(),
         )
         return namedResults
     }

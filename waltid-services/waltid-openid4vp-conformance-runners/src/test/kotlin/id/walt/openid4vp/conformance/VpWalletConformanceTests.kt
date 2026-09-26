@@ -5,7 +5,6 @@ import id.walt.commons.testing.E2ETest
 import id.walt.did.dids.DidService
 import id.walt.openid4vp.conformance.adapter.VpWalletConformanceAdapter
 import id.walt.openid4vp.conformance.config.ConformanceConfig
-import id.walt.openid4vp.conformance.report.ConformanceCiFlags
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
@@ -177,7 +176,6 @@ class VpWalletConformanceTests {
                 ConformanceReportWriter.failIfNeededFromTestPlanResults(
                     role = ConformanceReportWriter.Role.VP_WALLET,
                     results = results,
-                    allowFailure = ConformanceCiFlags.allowFailure(),
                 )
             } finally {
                 adapter.stop()

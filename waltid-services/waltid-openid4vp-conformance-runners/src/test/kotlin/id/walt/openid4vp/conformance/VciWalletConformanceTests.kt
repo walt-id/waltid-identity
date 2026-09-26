@@ -392,7 +392,7 @@ class VciWalletConformanceTests {
             }
 
             // Counted as an E2E step so a failing plan fails this JUnit test even if the runner
-            // throws outside fail-early bookkeeping. failIfNeeded still hard-fails CI.
+            // throws outside fail-early bookkeeping. failIfNeeded fails on unaccepted modules.
             test("Run OpenID4VCI wallet plan") {
                 block(walletId)
             }
