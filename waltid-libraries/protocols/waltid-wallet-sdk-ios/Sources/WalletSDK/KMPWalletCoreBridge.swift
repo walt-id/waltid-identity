@@ -739,8 +739,7 @@ private extension ProximityReaderTrustConfiguration {
                     }
                 )
             },
-            revocationPolicy: revocationPolicy.toKMPPolicy(),
-            requiredIacaIssuerCertificateDerBase64Url: requiredIACAIssuerCertificateDER?.base64URLEncodedString()
+            revocationPolicy: revocationPolicy.toKMPPolicy()
         )
     }
 }

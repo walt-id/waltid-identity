@@ -266,10 +266,10 @@ actual direct or RICAL-validated path. Install it through the configured trust e
 standalone raw evidence returns indeterminate for this scope. The separately explicit
 `.readerCertificateAndIssuingAuthorities` scope retains terminal-authority status checking.
 
-Set `requiredIACAIssuerCertificateDER` when the application identifies a required IACA direct
-issuer. That exact issuer must be on the validated path and the reader must include the
-conditional non-critical email/URI issuer contact extension. Generic imported CAs do not
-supply that role. Without this context, conditional IACA validation is outside the checked scope.
+The configured evaluator does not infer IACA roles or enforce conditional issuer-contact requirements.
+Applications requiring IACA-specific profile checks or a restriction to a particular issuer must supply
+an application-owned `ProximityReaderTrustEvaluator` that validates the certificate path and applies
+that policy. Contact information alone establishes neither issuer identity nor trust.
 
 `ProximityCRLFetcher` receives a Foundation `URL` and byte limit and returns
 `ProximityCRLFetchResult.available(der:)` or `.unavailable`. The application owns timeouts,

@@ -31,7 +31,7 @@ const val MdocReaderAuthentication23220EkuOid: String = "1.0.23220.4.1.6"
  * Validates an mdoc reader-authentication leaf certificate against the ISO/IEC 18013-5 profile.
  *
  * This validates the unconditional certificate fields only. For an application-identified IACA issuer,
- * also call [validateIacaIssuedMdocReaderCertificateContact]. Call [validateMdocReaderAuthenticationCertificateChain]
+ * also call [validateMdocReaderIssuerContactExtension]. Call [validateMdocReaderAuthenticationCertificateChain]
  * to additionally establish an RFC 5280-style path to an explicit application trust anchor.
  */
 @Throws(X509ValidationException::class)
@@ -214,16 +214,17 @@ fun validatedMdocReaderAuthenticationCertificatePath(
 }
 
 /**
- * Checks Table B.6 issuer contact information for a reader whose validated direct issuer is
- * application-identified as an IACA. This content check does not identify or trust the issuer.
+ * Checks the Table B.6 issuer contact extension: non-critical, with a non-blank email or URI.
+ * This checks extension content only; it does not identify the issuer, establish its IACA role,
+ * or validate a certificate path. Callers decide whether their policy requires this extension.
  */
 @Throws(X509ValidationException::class)
-fun validateIacaIssuedMdocReaderCertificateContact(certificate: CertificateDer) {
+fun validateMdocReaderIssuerContactExtension(certificate: CertificateDer) {
     val contact = parseIsoCertificate(certificate, "reader certificate").data.extensionIssuerAltName
     requireProfile(contact != null && !contact.critical && contact.alternativeNames.any {
         it.value.isNotBlank() && (it.type == GeneralName.NameType.rfc822Name ||
             it.type == GeneralName.NameType.uniformResourceIdentifier)
-    }, "IACA-issued reader requires non-critical issuerAlternativeName with an email or URI contact")
+    }, "Reader issuer contact requires non-critical issuerAlternativeName with an email or URI contact")
 }
 
 /** Returns the common name from a reader certificate that has already passed profile validation. */

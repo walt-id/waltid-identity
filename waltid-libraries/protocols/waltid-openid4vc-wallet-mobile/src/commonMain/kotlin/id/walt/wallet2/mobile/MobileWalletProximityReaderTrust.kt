@@ -23,7 +23,6 @@ import id.walt.mdoc.proximity.X509RicalReaderPathValidator
 import id.walt.mdoc.proximity.X509RicalSignatureValidator
 import id.walt.x509.CertificateDer
 import id.walt.x509.mdocReaderAuthenticationCommonName
-import id.walt.x509.validateIacaIssuedMdocReaderCertificateContact
 import id.walt.x509.validatedMdocReaderAuthenticationCertificatePath
 import id.walt.x509.validateMdocReaderAuthenticationCertificateProfile
 import kotlinx.coroutines.CancellationException
@@ -251,13 +250,6 @@ public data class ProximityReaderTrustConfiguration(
     /** Revocation behavior for a reader chain trusted by a direct Reader CA anchor. */
     public val revocationPolicy: ProximityReaderRevocationPolicy =
         ProximityReaderRevocationPolicy.NotChecked,
-    /**
-     * Optional application-identified IACA direct issuer, encoded as unpadded Base64URL DER.
-     * When set, require that exact validated issuer and its Table B.6 reader contact extension.
-     * This requirement supplies issuer-role context, not an additional trust anchor. Invalid DER
-     * is reported as an invalid certificate path during evaluation, including through Swift.
-     */
-    public val requiredIacaIssuerCertificateDerBase64Url: String? = null,
 ) {
     init {
         require(trustAnchors.isNotEmpty() || ricalProviders.isNotEmpty()) {
@@ -471,13 +463,6 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
         rical: ProximityRicalState,
         establishesTrust: Boolean,
     ): ProximityReaderTrustDecision {
-        ownedConfiguration.requiredIacaIssuerCertificateDerBase64Url?.let { issuer ->
-            val requiredIssuer = runCatching { issuer.trustCertificateDer() }.getOrElse { return invalidPathDecision() }
-            if (path.getOrNull(1) != requiredIssuer ||
-                runCatching { validateIacaIssuedMdocReaderCertificateContact(path.first()) }.isFailure) {
-                return invalidPathDecision()
-            }
-        }
         return when (val revocation = evaluateRevocation(evidence, path)) {
             is EvaluatedRevocation.Good -> ProximityReaderTrustDecision(
                 state = if (establishesTrust) ProximityReaderTrustState.Trusted

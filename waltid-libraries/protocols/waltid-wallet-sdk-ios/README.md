@@ -302,10 +302,10 @@ actual direct or RICAL-validated path. Install it through the configured trust e
 standalone raw evidence returns indeterminate for this scope. The separately explicit
 `.readerCertificateAndIssuingAuthorities` scope retains terminal-authority status checking.
 
-Set `requiredIACAIssuerCertificateDER` when the application identifies a required IACA direct
-issuer. That exact issuer must be on the validated path and the reader must include the
-conditional non-critical email/URI issuer contact extension. Generic imported CAs do not
-supply that role. Without this context, conditional IACA validation is outside the checked scope.
+The configured evaluator does not infer IACA roles or enforce conditional issuer-contact requirements.
+Applications requiring IACA-specific profile checks or a restriction to a particular issuer must supply
+an application-owned `ProximityReaderTrustEvaluator` that validates the certificate path and applies
+that policy. Contact information alone establishes neither issuer identity nor trust.
 
 `ProximityCRLFetcher` receives a Foundation `URL` and byte limit and returns
 `ProximityCRLFetchResult.available(der:)` or `.unavailable`. The application owns timeouts,
@@ -322,7 +322,7 @@ entries. It rejects private keys, PKCS#12/PFX, unknown bundle semantics,
 duplicates, invalid or expired trust material, and files larger than 1 MiB.
 Apply one immutable snapshot to a new session with `settings.applying(to:)`;
 changes made while a session is active apply only to the next session. Applying settings
-replaces the trust evaluator; install application CRL/IACA/custom policy afterward. Decoding
+replaces the trust evaluator; install application CRL or custom policy afterward. Decoding
 stored data checks structure, not current trust. Service references remain live in a snapshot;
 collection data is detached. Demo imports do not install a CRL network client.
 

@@ -3,9 +3,13 @@ package id.walt.wallet2.mobile
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.x509.CertificateDer
+import id.walt.x509.X509ValidationException
+import id.walt.x509.validateMdocReaderIssuerContactExtension
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class ProximityValidatedTrustPathTest {
@@ -47,30 +51,47 @@ class ProximityValidatedTrustPathTest {
     }
 
     @Test
-    fun conditionalIacaContactRequiresExactConfiguredDirectIssuer() = runTest {
+    fun issuerContactExtensionCanBeCheckedExplicitly() = runTest {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         try {
             val fixture = ReaderCertificateProfileFixture.create(runtime)
-            val root = fixture.root.encodedDer.toByteArray().encodeToBase64Url()
-            suspend fun evaluate(leaf: String, requiredIssuer: String?) =
-                ProximityConfiguredReaderTrustEvaluator(ProximityReaderTrustConfiguration(
-                    trustAnchors = listOf(ProximityReaderTrustAnchor(root)),
-                    requiredIacaIssuerCertificateDerBase64Url = requiredIssuer,
-                )).evaluate(ProximityReaderEvidence(ProximityReaderAuthenticationScope.WholeRequest,
-                    certificateChainDerBase64Url = listOf(leaf)))
-            val ordinary = fixture.leaf.encodedDer.toByteArray().encodeToBase64Url()
-            assertEquals(ProximityReaderTrustState.Trusted, evaluate(ordinary, null).state)
-            assertEquals(ProximityReaderCertificatePathState.Invalid, evaluate(ordinary, "***").certificatePath)
-            assertEquals(ProximityReaderCertificatePathState.Invalid, evaluate(ordinary, root).certificatePath)
             for (contact in listOf("contact-uri", "contact-email")) {
-                val leaf = fixture.modified(contact).encodeToBase64Url()
-                assertEquals(ProximityReaderTrustState.Trusted, evaluate(leaf, root).state, contact)
-                assertEquals(ProximityReaderCertificatePathState.Invalid, evaluate(leaf, ordinary).certificatePath)
+                validateMdocReaderIssuerContactExtension(CertificateDer(fixture.modified(contact)))
             }
-            for (contact in listOf("contact-dns", "contact-critical")) {
-                assertEquals(ProximityReaderCertificatePathState.Invalid,
-                    evaluate(fixture.modified(contact).encodeToBase64Url(), root).certificatePath, contact)
+            for (invalid in listOf(
+                fixture.leaf.encodedDer.toByteArray(), // Missing extension.
+                fixture.modified("contact-dns"),
+                fixture.modified("contact-critical"),
+                byteArrayOf(1, 2, 3), // Malformed certificate.
+            )) {
+                assertFailsWith<X509ValidationException> {
+                    validateMdocReaderIssuerContactExtension(CertificateDer(invalid))
+                }
             }
+        } finally { runtime.close() }
+    }
+
+    @Test
+    fun configuredTrustDoesNotInferIssuerRoleFromContactInformation() = runTest {
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+        try {
+            val fixture = ReaderCertificateProfileFixture.create(runtime)
+            val other = ReaderCertificateProfileFixture.create(runtime)
+            val root = fixture.root.encodedDer.toByteArray().encodeToBase64Url()
+            val otherRoot = other.root.encodedDer.toByteArray().encodeToBase64Url()
+            suspend fun evaluate(anchor: String, leaf: ByteArray) =
+                ProximityConfiguredReaderTrustEvaluator(ProximityReaderTrustConfiguration(
+                    trustAnchors = listOf(ProximityReaderTrustAnchor(anchor)),
+                )).evaluate(ProximityReaderEvidence(ProximityReaderAuthenticationScope.WholeRequest,
+                    certificateChainDerBase64Url = listOf(leaf.encodeToBase64Url())))
+            // Trusted readers do not require issuer contact information by default.
+            assertEquals(ProximityReaderTrustState.Trusted,
+                evaluate(root, fixture.leaf.encodedDer.toByteArray()).state)
+            val withContact = fixture.modified("contact-uri")
+            assertEquals(ProximityReaderTrustState.Trusted, evaluate(root, withContact).state)
+            // Passing the standalone contact check does not establish certificate trust.
+            validateMdocReaderIssuerContactExtension(CertificateDer(withContact))
+            assertEquals(ProximityReaderTrustState.ValidButUntrusted, evaluate(otherRoot, withContact).state)
         } finally { runtime.close() }
     }
 }
