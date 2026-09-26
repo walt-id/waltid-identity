@@ -16,8 +16,10 @@ object CredentialDataMergeUtils {
 
     private val log = KotlinLogging.logger { }
 
-    fun JsonPrimitive.isTemplate() =
-        this.content.let { it.first() == '<' && it.last() == '>' && it.length > 2 && !it.contains(" ") }
+    fun JsonPrimitive.isTemplate(): Boolean {
+        val content = this.content
+        return content.length > 2 && content.first() == '<' && content.last() == '>' && !content.contains(' ')
+    }
 
     @JvmBlocking
     @JvmAsync
@@ -174,5 +176,103 @@ object CredentialDataMergeUtils {
             }
         }
         return vcm.toJsonObject()
+    }
+
+    /**
+     * Keep only mapping keys that already exist as JSON objects in [credentialData].
+     * Unknown keys, primitive mappings, and top-level W3C-style validity keys are rejected
+     * with a field-specific error. Use `msoData` for MSO `validFrom` / `validUntil`.
+     */
+    fun JsonObject.mdocNamespaceMapping(credentialData: JsonObject): JsonObject? {
+        if (isEmpty()) return null
+        forEach { (key, value) ->
+            if (key == "validFrom" || key == "validUntil" || key == "expectedUpdate") {
+                throw IllegalArgumentException(
+                    "mapping.$key is not an mdoc namespace object; set msoData.$key for MSO validity"
+                )
+            }
+            val credentialValue = credentialData[key]
+            if (credentialValue == null) {
+                throw IllegalArgumentException(
+                    "mapping.$key does not match a credentialData namespace object"
+                )
+            }
+            if (credentialValue !is JsonObject) {
+                throw IllegalArgumentException(
+                    "mapping.$key requires credentialData.$key to be a JSON object of namespace claims"
+                )
+            }
+            if (value !is JsonObject) {
+                throw IllegalArgumentException(
+                    "mapping.$key must be a JSON object of element mappings"
+                )
+            }
+        }
+        return this
+    }
+
+    /**
+     * Replace-merge for mDoc namespace payloads. Mapping arrays replace existing arrays
+     * and templates inside array items are evaluated. SD-JWT merge appends arrays and
+     * leaves nested templates unevaluated.
+     */
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
+    suspend fun JsonObject.mergeMdocPayloadWithMapping(
+        mapping: JsonObject,
+        context: Map<String, JsonElement>,
+        data: Map<String, suspend (FunctionCall) -> JsonElement>,
+    ): JsonObject = mergeMdocJsonObject(this, mapping, context, data, HashMap())
+
+    private suspend fun mergeMdocJsonObject(
+        credentialData: JsonObject,
+        mapping: JsonObject,
+        context: Map<String, JsonElement>,
+        data: Map<String, suspend (FunctionCall) -> JsonElement>,
+        functionHistory: MutableMap<String, JsonElement>,
+    ): JsonObject = buildJsonObject {
+        credentialData.forEach { (key, value) -> put(key, value) }
+        mapping.forEach { (key, value) ->
+            put(key, mergeMdocJsonElement(credentialData[key], value, context, data, functionHistory))
+        }
+    }
+
+    private suspend fun mergeMdocJsonArray(
+        mapping: JsonArray,
+        context: Map<String, JsonElement>,
+        data: Map<String, suspend (FunctionCall) -> JsonElement>,
+        functionHistory: MutableMap<String, JsonElement>,
+    ): JsonArray = buildJsonArray {
+        mapping.forEach { value ->
+            add(mergeMdocJsonElement(null, value, context, data, functionHistory))
+        }
+    }
+
+    private suspend fun mergeMdocJsonElement(
+        original: JsonElement?,
+        mapping: JsonElement,
+        context: Map<String, JsonElement>,
+        data: Map<String, suspend (FunctionCall) -> JsonElement>,
+        functionHistory: MutableMap<String, JsonElement>,
+    ): JsonElement = when (mapping) {
+        is JsonPrimitive -> when {
+            mapping.isString && mapping.isTemplate() -> getTemplateData(
+                functionCall = mapping.content,
+                dataFunctions = data,
+                context = context,
+                functionHistory = functionHistory,
+            )
+            else -> mapping
+        }
+        is JsonObject -> mergeMdocJsonObject(
+            credentialData = original as? JsonObject ?: JsonObject(emptyMap()),
+            mapping = mapping,
+            context = context,
+            data = data,
+            functionHistory = functionHistory,
+        )
+        is JsonArray -> mergeMdocJsonArray(mapping, context, data, functionHistory)
     }
 }

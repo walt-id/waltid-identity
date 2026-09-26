@@ -29,6 +29,9 @@ import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInput
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputProvider
+import id.walt.openid4vci.mdoc.MsoValidityResolver
+import id.walt.w3c.issuance.InstantClock
+import id.walt.w3c.issuance.IssuanceClock
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
@@ -1166,6 +1169,19 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     else -> null
                 }
             }
+            val issuedAt = Clock.System.now()
+            val resolvedMsoValidity = if (configuration.format == CredentialFormat.MSO_MDOC) {
+                MsoValidityResolver.resolve(
+                    issuanceRequest.msoData,
+                    signed = issuedAt,
+                    clock = InstantClock(issuedAt),
+                )
+            } else {
+                require(issuanceRequest.msoData == null || issuanceRequest.msoData.isEmpty()) {
+                    "msoData is only supported for mso_mdoc credentials"
+                }
+                null
+            }
 
             val proofValidationContext = CredentialProofValidationContext(
                 credentialIssuer = nonceBinding.credentialIssuer,
@@ -1187,34 +1203,42 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     )
                 }
             }
-            val credentialResponseResult = if (crypto2IssuerKey != null) {
-                oauth2Provider.createCredentialResponse(
-                    request = requestWithSession,
-                    configuration = configuration,
-                    issuerKey = Crypto2CredentialSigningKey.select(crypto2IssuerKey, configuration),
-                    issuerId = issuerId,
-                    issuanceInputData = issuanceInputData,
-                    dataMapping = issuanceRequest.mapping,
-                    selectiveDisclosure = issuanceRequest.selectiveDisclosure,
-                    x5Chain = x5Chain,
-                    mDocNameSpacesDataMappingConfig = issuanceRequest.mDocNameSpacesDataMappingConfig,
-                    authorizedTransactionDataTypes = issuanceRequest.authorizedTransactionDataTypes,
-                    proofValidationContext = proofValidationContext,
-                )
-            } else {
-                oauth2Provider.createCredentialResponse(
-                    request = requestWithSession,
-                    configuration = configuration,
-                    issuerKey = issuerKey,
-                    issuerId = issuerId,
-                    issuanceInputData = issuanceInputData,
-                    dataMapping = issuanceRequest.mapping,
-                    selectiveDisclosure = issuanceRequest.selectiveDisclosure,
-                    x5Chain = x5Chain,
-                    mDocNameSpacesDataMappingConfig = issuanceRequest.mDocNameSpacesDataMappingConfig,
-                    authorizedTransactionDataTypes = issuanceRequest.authorizedTransactionDataTypes,
-                    proofValidationContext = proofValidationContext,
-                )
+            val credentialResponseResult = withContext(IssuanceClock(issuedAt)) {
+                if (crypto2IssuerKey != null) {
+                    oauth2Provider.createCredentialResponse(
+                        request = requestWithSession,
+                        configuration = configuration,
+                        issuerKey = Crypto2CredentialSigningKey.select(crypto2IssuerKey, configuration),
+                        issuerId = issuerId,
+                        issuanceInputData = issuanceInputData,
+                        dataMapping = issuanceRequest.mapping,
+                        selectiveDisclosure = issuanceRequest.selectiveDisclosure,
+                        x5Chain = x5Chain,
+                        mDocNameSpacesDataMappingConfig = issuanceRequest.mDocNameSpacesDataMappingConfig,
+                        authorizedTransactionDataTypes = issuanceRequest.authorizedTransactionDataTypes,
+                        validFrom = resolvedMsoValidity?.validFrom,
+                        validUntil = resolvedMsoValidity?.validUntil,
+                        expectedUpdate = resolvedMsoValidity?.expectedUpdate,
+                        proofValidationContext = proofValidationContext,
+                    )
+                } else {
+                    oauth2Provider.createCredentialResponse(
+                        request = requestWithSession,
+                        configuration = configuration,
+                        issuerKey = issuerKey,
+                        issuerId = issuerId,
+                        issuanceInputData = issuanceInputData,
+                        dataMapping = issuanceRequest.mapping,
+                        selectiveDisclosure = issuanceRequest.selectiveDisclosure,
+                        x5Chain = x5Chain,
+                        mDocNameSpacesDataMappingConfig = issuanceRequest.mDocNameSpacesDataMappingConfig,
+                        authorizedTransactionDataTypes = issuanceRequest.authorizedTransactionDataTypes,
+                        validFrom = resolvedMsoValidity?.validFrom,
+                        validUntil = resolvedMsoValidity?.validUntil,
+                        expectedUpdate = resolvedMsoValidity?.expectedUpdate,
+                        proofValidationContext = proofValidationContext,
+                    )
+                }
             }
             val credentialResponse = when (val result = credentialResponseResult) {
                 is CredentialResponseResult.Success -> result.response
@@ -1571,6 +1595,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             idTokenClaimsMapping = idTokenClaimsMapping,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             authorizedTransactionDataTypes = authorizedTransactionDataTypes,
+            msoData = msoData,
             x5Chain = x5Chain,
             issuerDid = issuerDid,
             credentialStatus = credentialStatus,

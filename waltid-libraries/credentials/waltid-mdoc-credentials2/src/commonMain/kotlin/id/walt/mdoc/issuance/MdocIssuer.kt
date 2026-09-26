@@ -52,6 +52,7 @@ object MdocIssuer {
 
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
         /**
@@ -68,6 +69,7 @@ object MdocIssuer {
         keyAuthorizations: KeyAuthorization? = null,
         /** Optional signing time with reduced precision, chosen by the issuing service. */
         signedAt: Instant? = null,
+        requireExpectedUpdateWithinWindow: Boolean = false,
     ): IssuerSigned {
         return signMsoForIssuerSignedObjects(
             namespaceIssuerSignedItems = namespaceIssuerSignedItems,
@@ -76,6 +78,7 @@ object MdocIssuer {
             docType = docType,
             validFrom = validFrom,
             validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
             status = status,
             digestAlgorithm = digestAlgorithm,
             protectedHeaderX5u = protectedHeaderX5u,
@@ -83,6 +86,7 @@ object MdocIssuer {
             keyAuthorizations = keyAuthorizations,
             coseSigner = issuerKey.toCoseSigner(),
             signedAt = signedAt,
+            requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
             coseAlgorithm = requireNotNull(issuerKey.keyType.toCoseAlgorithm()) {
                 "Issuer key type has no COSE signing algorithm: ${issuerKey.keyType}"
             },
@@ -98,12 +102,14 @@ object MdocIssuer {
         docType: String,
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
         protectedHeaderX5u: String? = null,
         protectedHeaderX5t: CoseCertHash? = null,
         keyAuthorizations: KeyAuthorization? = null,
         signedAt: Instant? = null,
+        requireExpectedUpdateWithinWindow: Boolean = false,
     ): IssuerSigned = signMsoForIssuerSignedObjects(
         namespaceIssuerSignedItems = namespaceIssuerSignedItems,
         issuerCertificate = issuerCertificate,
@@ -111,6 +117,7 @@ object MdocIssuer {
         docType = docType,
         validFrom = validFrom,
         validUntil = validUntil,
+        expectedUpdate = expectedUpdate,
         status = status,
         digestAlgorithm = digestAlgorithm,
         protectedHeaderX5u = protectedHeaderX5u,
@@ -119,6 +126,7 @@ object MdocIssuer {
         coseSigner = issuerKey.toCoseSigner(signatureAlgorithm),
         coseAlgorithm = signatureAlgorithm,
         signedAt = signedAt,
+        requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
     )
 
     private suspend fun signMsoForIssuerSignedObjects(
@@ -128,6 +136,7 @@ object MdocIssuer {
         docType: String,
         validFrom: Instant?,
         validUntil: Instant,
+        expectedUpdate: Instant?,
         status: Status?,
         digestAlgorithm: String,
         protectedHeaderX5u: String?,
@@ -136,6 +145,7 @@ object MdocIssuer {
         coseSigner: CoseSigner,
         coseAlgorithm: Int,
         signedAt: Instant?,
+        requireExpectedUpdateWithinWindow: Boolean = false,
     ): IssuerSigned {
 
         val valueDigests = namespaceIssuerSignedItems.mapValues { (namespace, issuerSignedItems) ->
@@ -144,8 +154,21 @@ object MdocIssuer {
             })
         }
         val signedTimestamp = Instant.fromEpochSeconds((signedAt ?: Clock.System.now()).epochSeconds)
-        val effectiveValidFrom = if (validFrom != null && validFrom > signedTimestamp)
-            Instant.fromEpochSeconds(validFrom.epochSeconds) else signedTimestamp
+        val validityInfo = ValidityInfo(
+            signed = signedTimestamp,
+            validFrom = Instant.fromEpochSeconds((validFrom ?: signedTimestamp).epochSeconds),
+            validUntil = Instant.fromEpochSeconds(validUntil.epochSeconds),
+            expectedUpdate = expectedUpdate?.let { Instant.fromEpochSeconds(it.epochSeconds) },
+        )
+        try {
+            validityInfo.precheck()
+            if (requireExpectedUpdateWithinWindow) {
+                validityInfo.requireExpectedUpdateWithinWindow()
+            }
+            requireMdlIssueDateNotAfterValidFrom(namespaceIssuerSignedItems, validityInfo.validFrom)
+        } catch (cause: IllegalArgumentException) {
+            throw IllegalArgumentException("Could not create valid MSO for issued mdoc: ${cause.message}", cause)
+        }
 
         val mso = MobileSecurityObject(
             version = "1.0",
@@ -153,20 +176,9 @@ object MdocIssuer {
             docType = docType,
             valueDigests = valueDigests,
             deviceKeyInfo = DeviceKeyInfo(deviceKey = holderKey, keyAuthorizations = keyAuthorizations),
-            validityInfo = ValidityInfo(
-                signed = signedTimestamp,
-                validFrom = effectiveValidFrom,
-                // ISO 18013-5 MSO tdate fields must not include fractional seconds
-                validUntil = Instant.fromEpochSeconds(validUntil.epochSeconds)
-            ),
+            validityInfo = validityInfo,
             status = status
         )
-
-        try {
-            mso.precheck()
-        } catch (cause: Throwable) {
-            throw IllegalArgumentException("Could not create valid MSO for issued mdoc: ${cause.message}", cause)
-        }
 
         // The MSO is wrapped in a tagged bytestring to become the payload
         val msoBytes = coseCompliantCbor.encodeToByteArray(mso)
@@ -224,6 +236,7 @@ object MdocIssuer {
         data: MdocUniversalIssuanceData,
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
 
@@ -237,6 +250,7 @@ object MdocIssuer {
 
         /** Optional signing time with reduced precision, chosen by the issuing service. */
         signedAt: Instant? = null,
+        requireExpectedUpdateWithinWindow: Boolean = false,
         /** Custom value serialization (null returns are explicitly NOT mapped) */
         valueMappingFunction: (
             docType: String,
@@ -255,12 +269,14 @@ object MdocIssuer {
             docType = docType,
             validFrom = validFrom,
             validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
             status = status,
             digestAlgorithm = digestAlgorithm,
             protectedHeaderX5u = protectedHeaderX5u,
             protectedHeaderX5t = protectedHeaderX5t,
             keyAuthorizations = keyAuthorizations,
             signedAt = signedAt,
+            requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
         )
     }
 
@@ -273,12 +289,14 @@ object MdocIssuer {
         data: MdocUniversalIssuanceData,
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
         protectedHeaderX5u: String? = null,
         protectedHeaderX5t: CoseCertHash? = null,
         keyAuthorizations: KeyAuthorization? = null,
         signedAt: Instant? = null,
+        requireExpectedUpdateWithinWindow: Boolean = false,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -288,6 +306,7 @@ object MdocIssuer {
     ): IssuerSigned = signMsoForIssuerSignedObjects(
         namespaceIssuerSignedItems = mapUniversalData(docType, data, valueMappingFunction),
         signedAt = signedAt,
+        requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
         issuerKey = issuerKey,
         signatureAlgorithm = signatureAlgorithm,
         issuerCertificate = issuerCertificate,
@@ -295,6 +314,7 @@ object MdocIssuer {
         docType = docType,
         validFrom = validFrom,
         validUntil = validUntil,
+        expectedUpdate = expectedUpdate,
         status = status,
         digestAlgorithm = digestAlgorithm,
         protectedHeaderX5u = protectedHeaderX5u,
@@ -317,8 +337,10 @@ object MdocIssuer {
         validFrom: Instant? = null,
 
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
-        digestAlgorithm: String = "SHA-256"
+        digestAlgorithm: String = "SHA-256",
+        requireExpectedUpdateWithinWindow: Boolean = false,
     ): IssuerSigned {
         val namespaceIssuerSignedItems = typesafeData.toNamespaceIssuerSignedItems()
 
@@ -330,8 +352,10 @@ object MdocIssuer {
             docType = typesafeData.docType,
             validFrom = validFrom,
             validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
             status = status,
-            digestAlgorithm = digestAlgorithm
+            digestAlgorithm = digestAlgorithm,
+            requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
         )
     }
 
@@ -343,8 +367,10 @@ object MdocIssuer {
         typesafeData: MdocData,
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
+        requireExpectedUpdateWithinWindow: Boolean = false,
     ): IssuerSigned = signMsoForIssuerSignedObjects(
         namespaceIssuerSignedItems = typesafeData.toNamespaceIssuerSignedItems(),
         issuerKey = issuerKey,
@@ -354,8 +380,10 @@ object MdocIssuer {
         docType = typesafeData.docType,
         validFrom = validFrom,
         validUntil = validUntil,
+        expectedUpdate = expectedUpdate,
         status = status,
         digestAlgorithm = digestAlgorithm,
+        requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
     )
 
     private fun mapUniversalData(

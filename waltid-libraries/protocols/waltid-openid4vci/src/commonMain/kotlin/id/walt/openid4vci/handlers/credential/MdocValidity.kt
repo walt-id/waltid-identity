@@ -15,13 +15,16 @@ internal fun roundedMdocValidity(
     val windowSeconds = 43_200L
     val base = Instant.fromEpochSeconds(now.epochSeconds.floorDiv(windowSeconds) * windowSeconds)
     // A newly valid certificate must not appear to have signed before its validity began.
-    val signed = maxOf(base, certificateValidity.notBefore.ceilToSecond())
+    val signed = maxOf(base, certificateValidity.notBefore.ceilToSecond()).asTDate()
     return ValidityInfo(
         signed = signed,
-        validFrom = validFrom ?: signed,
-        validUntil = validUntil ?: (base + 365.days),
+        // ISO mdoc tdates are whole UTC seconds; truncate before the issuer encodes the MSO.
+        validFrom = (validFrom ?: signed).asTDate(),
+        validUntil = (validUntil ?: (base + 365.days)).asTDate(),
     )
 }
+
+internal fun Instant.asTDate(): Instant = Instant.fromEpochSeconds(epochSeconds)
 
 private fun Instant.ceilToSecond(): Instant =
     Instant.fromEpochSeconds(epochSeconds + if (nanosecondsOfSecond == 0) 0L else 1L)

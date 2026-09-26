@@ -53,11 +53,13 @@ object MdocCredentialSigner {
         docType: String,
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
         verifiedProof: VerifiedCredentialProof? = null,
         authorizedTransactionDataTypes: List<String>? = null,
         signedAt: Instant? = null,
+        requireExpectedUpdateWithinWindow: Boolean = false,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -73,10 +75,12 @@ object MdocCredentialSigner {
         docType = docType,
         validFrom = validFrom,
         validUntil = validUntil,
+        expectedUpdate = expectedUpdate,
         status = status,
         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
         verifiedProof = verifiedProof,
         authorizedTransactionDataTypes = authorizedTransactionDataTypes,
+        requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
         valueMappingFunction = valueMappingFunction,
     )
 
@@ -90,11 +94,13 @@ object MdocCredentialSigner {
         docType: String,
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
+        expectedUpdate: Instant? = null,
         status: Status? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
         verifiedProof: VerifiedCredentialProof? = null,
         authorizedTransactionDataTypes: List<String>? = null,
         signedAt: Instant? = null,
+        requireExpectedUpdateWithinWindow: Boolean = false,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -110,10 +116,12 @@ object MdocCredentialSigner {
         docType = docType,
         validFrom = validFrom,
         validUntil = validUntil,
+        expectedUpdate = expectedUpdate,
         status = status,
         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
         verifiedProof = verifiedProof,
         authorizedTransactionDataTypes = authorizedTransactionDataTypes,
+        requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
         valueMappingFunction = valueMappingFunction,
     )
 
@@ -127,10 +135,12 @@ object MdocCredentialSigner {
         docType: String,
         validFrom: Instant?,
         validUntil: Instant,
+        expectedUpdate: Instant?,
         status: Status?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
         verifiedProof: VerifiedCredentialProof?,
         authorizedTransactionDataTypes: List<String>?,
+        requireExpectedUpdateWithinWindow: Boolean,
         valueMappingFunction: (
             docType: String,
             namespace: String,
@@ -167,6 +177,7 @@ object MdocCredentialSigner {
         val issuedCredential = when (issuerSigningKey) {
             is IssuerSigningKey.Legacy -> MdocIssuer.issueUniversal(
                 signedAt = signedAt,
+                requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
                 issuerKey = issuerSigningKey.key,
                 issuerCertificate = issuerCertificate,
                 holderKey = holderKey,
@@ -174,6 +185,7 @@ object MdocCredentialSigner {
                 data = issuanceData,
                 validFrom = validFrom,
                 validUntil = validUntil,
+                expectedUpdate = expectedUpdate,
                 status = status,
                 keyAuthorizations = keyAuthorizations,
                 valueMappingFunction = effectiveValueMappingFunction,
@@ -181,6 +193,7 @@ object MdocCredentialSigner {
 
             is IssuerSigningKey.Crypto2 -> MdocIssuer.issueUniversal(
                 signedAt = signedAt,
+                requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
                 issuerKey = issuerSigningKey.key,
                 signatureAlgorithm = issuerSigningKey.algorithm,
                 issuerCertificate = issuerCertificate,
@@ -189,6 +202,7 @@ object MdocCredentialSigner {
                 data = issuanceData,
                 validFrom = validFrom,
                 validUntil = validUntil,
+                expectedUpdate = expectedUpdate,
                 status = status,
                 keyAuthorizations = keyAuthorizations,
                 valueMappingFunction = effectiveValueMappingFunction,
