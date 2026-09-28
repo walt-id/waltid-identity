@@ -22,10 +22,15 @@ import kotlin.time.Instant
  * Enforces the RFC 3339 four-digit year range for all callers, including MSO validity timestamps
  * and schema DATETIME fields. Date-only (full-date/tag-1004) encoding uses a separate path.
  *
- * Incoming MSO timestamps are validated in [MdocTDateMode.STRICT] by default: CBOR tag 0, whole seconds,
- * and a UTC `Z` offset. [parseMdocTDate] with [MdocTDateMode.LENIENT] is the explicit compatibility path
- * for credentials that used fractional seconds or a numeric offset; Instant conversion still loses that
- * original representation, so it must not be the default verification path.
+ * Incoming MSO timestamps are validated in [MdocTDateMode.STRICT] by default: a CBOR text string whose
+ * tags are exactly `[0]`, whole seconds, and a UTC `Z` offset. Nested combinations such as `1(0(tstr))`
+ * and `0(1(tstr))` are rejected. kotlinx.serialization may flatten repeated tag 0 (`0(0(tstr))`) so that
+ * encoding is indistinguishable from a single tag 0 at decode time; that is a decoder limitation, not
+ * acceptance of extra tags.
+ *
+ * [parseMdocTDate] with [MdocTDateMode.LENIENT] is the explicit compatibility path for credentials that
+ * used fractional seconds or a numeric offset; Instant conversion still loses that original
+ * representation, so it must not be the default verification path.
  */
 fun Instant.toMdocTDateString(): String =
     Instant.fromEpochSeconds(epochSeconds).toString().also {
@@ -60,8 +65,8 @@ fun parseMdocTDate(text: String, mode: MdocTDateMode = MdocTDateMode.STRICT): In
 
 /**
  * Serializes [Instant] values as CBOR tag-0 date-time strings without fractional seconds.
- * Decoding uses strict tag and lexical checks; use [parseMdocTDate] with [MdocTDateMode.LENIENT]
- * only for an explicit compatibility import path.
+ * Decoding requires a text string tagged with exactly `[0]`; use [parseMdocTDate] with
+ * [MdocTDateMode.LENIENT] only for an explicit compatibility import path.
  */
 @OptIn(ExperimentalSerializationApi::class)
 object MdocTDateInstantSerializer : KSerializer<Instant> {
@@ -82,9 +87,9 @@ object MdocTDateInstantSerializer : KSerializer<Instant> {
             val element = decoder.decodeSerializableValue(CborElement.serializer())
             val text = (element as? CborString)?.value
                 ?: throw SerializationException("MSO tdate must be a CBOR text string")
-            if (0uL !in element.tags) {
+            if (element.tags.toList() != listOf(0uL)) {
                 throw SerializationException(
-                    "MSO tdate requires CBOR tag 0, got tags=${element.tags}"
+                    "MSO tdate requires exactly CBOR tag 0, got tags=${element.tags}"
                 )
             }
             return try {

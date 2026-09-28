@@ -26,6 +26,9 @@ import id.walt.openid4vci.metadata.issuer.CredentialDisplayLogo
 import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
+import id.walt.openid4vci.mdoc.MsoData
+import id.walt.openid4vci.mdoc.MsoValidityResolver
+import id.walt.w3c.issuance.InstantClock
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborArray
@@ -214,6 +217,39 @@ class MdocCredentialValidityTest {
             ),
         )
         assertIs<CredentialResponseResult.Failure>(result)
+    }
+
+    @Test
+    fun `namespace date functions use unrounded issuedAt when MSO rounding is enabled`() = runTest {
+        val now = Instant.parse("2026-09-08T19:18:10Z")
+        val namespace = "org.iso.18013.5.1"
+        val resolved = MsoValidityResolver.resolve(
+            MsoData(validFrom = "<timestamp-in:6h>"),
+            signed = now,
+            clock = InstantClock(now),
+        )
+        assertEquals(Instant.parse("2026-09-09T01:18:10Z"), resolved.validFrom)
+        val issued = fixture().issueCredential(
+            now = now.toString(),
+            credentialData = buildJsonObject {
+                putJsonObject(namespace) {
+                    put("issue_date", "2019-10-20")
+                    put("given_name", "Jane")
+                }
+            },
+            dataMapping = buildJsonObject {
+                putJsonObject(namespace) {
+                    put("issue_date", "<date-in:6h>")
+                }
+            },
+            validFrom = resolved.validFrom,
+        )
+        val items = issued.namespaces!!.getValue(namespace).entries
+            .associate { it.value.elementIdentifier to it.value.elementValue }
+        assertEquals("2026-09-09", assertIs<CborString>(items.getValue("issue_date")).value)
+        val validity = issued.decodeMobileSecurityObject().validityInfo
+        assertEquals(Instant.parse("2026-09-08T12:00:00Z"), validity.signed)
+        assertEquals(Instant.parse("2026-09-09T01:18:10Z"), validity.validFrom)
     }
 
     @Test

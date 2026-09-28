@@ -142,6 +142,18 @@ class MdocTDateFormatTest {
         assertFailsWith<Exception> {
             coseCompliantCbor.decodeFromByteArray(
                 MdocTDateInstantSerializer,
+                coseCompliantCbor.encodeToByteArray(CborString("2026-09-03T12:00:00Z", 1uL, 0uL)),
+            )
+        }
+        assertFailsWith<Exception> {
+            coseCompliantCbor.decodeFromByteArray(
+                MdocTDateInstantSerializer,
+                coseCompliantCbor.encodeToByteArray(CborString("2026-09-03T12:00:00Z", 0uL, 1uL)),
+            )
+        }
+        assertFailsWith<Exception> {
+            coseCompliantCbor.decodeFromByteArray(
+                MdocTDateInstantSerializer,
                 coseCompliantCbor.encodeToByteArray(CborString("2026-09-03T12:00:00.000Z", 0uL)),
             )
         }
@@ -157,11 +169,98 @@ class MdocTDateFormatTest {
         )
     }
 
+    @Test
+    fun strictDecodeRejectsNestedAndRepeatedCborTags() {
+        assertEquals(Instant.parse(TDATE_TEXT), decodeTDate(cborTag(0, cborTstr(TDATE_TEXT))))
+        assertFailsWith<Exception> { decodeTDate(cborTag(1, cborTag(0, cborTstr(TDATE_TEXT)))) }
+        assertFailsWith<Exception> { decodeTDate(cborTag(0, cborTag(1, cborTstr(TDATE_TEXT)))) }
+        assertRepeatedTag0Tdate(cborTag(0, cborTag(0, cborTstr(TDATE_TEXT))))
+    }
+
+    @Test
+    fun validityInfoRejectsNestedCborTagsOnEachField() {
+        for (field in validityFields) {
+            assertFailsWith<Exception>(field) {
+                decodeValidityInfo(validityInfoBytes(field) { tstr -> cborTag(1, cborTag(0, tstr)) })
+            }
+            assertFailsWith<Exception>(field) {
+                decodeValidityInfo(validityInfoBytes(field) { tstr -> cborTag(0, cborTag(1, tstr)) })
+            }
+            assertRepeatedTag0ValidityInfo(validityInfoBytes(field) { tstr -> cborTag(0, cborTag(0, tstr)) })
+        }
+        decodeValidityInfo(validityInfoBytes())
+    }
+
+    private fun decodeTDate(bytes: ByteArray): Instant =
+        coseCompliantCbor.decodeFromByteArray(MdocTDateInstantSerializer, bytes)
+
+    private fun decodeValidityInfo(bytes: ByteArray): ValidityInfo =
+        coseCompliantCbor.decodeFromByteArray(bytes)
+
+    /**
+     * kotlinx.serialization may flatten `0(0(tstr))` to a single tag 0, so repeated tag 0 is not
+     * always distinguishable from a well-formed tdate. Reject it when the decoder preserves both tags.
+     */
+    private fun assertRepeatedTag0Tdate(bytes: ByteArray) {
+        val tags = try {
+            coseCompliantCbor.decodeFromByteArray<CborString>(bytes).tags.toList()
+        } catch (_: Exception) {
+            return
+        }
+        if (tags == listOf(0uL)) {
+            assertEquals(Instant.parse(TDATE_TEXT), decodeTDate(bytes))
+        } else {
+            assertFailsWith<Exception> { decodeTDate(bytes) }
+        }
+    }
+
+    private fun assertRepeatedTag0ValidityInfo(bytes: ByteArray) {
+        try {
+            decodeValidityInfo(bytes)
+        } catch (_: Exception) {
+            return
+        }
+    }
+
     private fun assertTDate(map: CborMap, key: String, expected: String) {
         val value = map[CborString(key)] as CborString
         assertEquals(listOf(0uL), value.tags, key)
         assertEquals(expected, value.value, key)
         assertFalse('.' in value.value, key)
         assertTrue(value.value.endsWith('Z'), key)
+    }
+
+    companion object {
+        private const val TDATE_TEXT = "2026-09-08T12:00:00Z"
+        private const val VALID_UNTIL_TEXT = "2027-09-08T12:00:00Z"
+        private val validityFields = listOf("signed", "validFrom", "validUntil", "expectedUpdate")
+
+        private fun cborTstr(text: String): ByteArray {
+            val utf8 = text.encodeToByteArray()
+            require(utf8.size < 24)
+            return byteArrayOf((0x60 + utf8.size).toByte()) + utf8
+        }
+
+        private fun cborTag(tag: Int, payload: ByteArray): ByteArray {
+            require(tag in 0..23)
+            return byteArrayOf((0xC0 + tag).toByte()) + payload
+        }
+
+        private fun validityInfoBytes(
+            nestedField: String? = null,
+            nest: (ByteArray) -> ByteArray = { cborTag(0, it) },
+        ): ByteArray {
+            fun value(name: String, text: String): ByteArray {
+                val tstr = cborTstr(text)
+                return if (name == nestedField) nest(tstr) else cborTag(0, tstr)
+            }
+            val entries = listOf(
+                cborTstr("signed") + value("signed", TDATE_TEXT),
+                cborTstr("validFrom") + value("validFrom", TDATE_TEXT),
+                cborTstr("validUntil") + value("validUntil", VALID_UNTIL_TEXT),
+                cborTstr("expectedUpdate") + value("expectedUpdate", TDATE_TEXT),
+            )
+            return byteArrayOf((0xA0 + entries.size).toByte()) + entries.reduce { acc, bytes -> acc + bytes }
+        }
     }
 }

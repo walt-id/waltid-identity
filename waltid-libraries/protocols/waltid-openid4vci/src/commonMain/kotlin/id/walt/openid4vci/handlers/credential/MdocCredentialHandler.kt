@@ -79,7 +79,7 @@ class MdocCredentialHandler(
             computeCredentialResult(
                 request = request,
                 configuration = configuration,
-                issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
+                issue = { certificateChain, docType, issuedAt, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                     MdocCredentialSigner.generateMdocCredential(
                         credentialRequest = request,
                         credentialData = mapMdocData(
@@ -88,7 +88,7 @@ class MdocCredentialHandler(
                             issuerId,
                             display,
                             instance.verifiedProof,
-                            signedAt,
+                            issuedAt,
                         ),
                         issuerKey = issuerKey,
                         issuerCertificate = certificateChain,
@@ -142,7 +142,7 @@ class MdocCredentialHandler(
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             validFrom = validFrom,
             validUntil = validUntil,
-            issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
+            issue = { certificateChain, docType, issuedAt, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                 MdocCredentialSigner.generateMdocCredential(
                     credentialRequest = request,
                     credentialData = mapMdocData(
@@ -151,7 +151,7 @@ class MdocCredentialHandler(
                         issuerId,
                         display,
                         instance.verifiedProof,
-                        signedAt,
+                        issuedAt,
                     ),
                     issuerKey = issuerKey.key,
                     signatureAlgorithm = issuerKey.requireCoseAlgorithm(),
@@ -216,6 +216,7 @@ class MdocCredentialHandler(
         issue: suspend (
             certificateChain: List<CoseCertificate>,
             docType: String,
+            issuedAt: Instant,
             signedAt: Instant,
             validFrom: Instant?,
             validUntil: Instant,
@@ -254,7 +255,7 @@ class MdocCredentialHandler(
                 }
             }
             issue(
-                issuerCertificateChain, docType, signedAt,
+                issuerCertificateChain, docType, issuedAt, signedAt,
                 effectiveValidFrom, effectiveValidUntil, instance,
             )
         }
