@@ -11,6 +11,7 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.utils.JsonObjectPathMapper
+import id.walt.openid4vci.mdoc.MsoData
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.offers.AuthenticationMethod
@@ -57,6 +58,7 @@ class CredentialOfferService(
         val resolvedCredentials = request.credentials.map { credential ->
             val profile = profileService.resolveProfile(credential.profileId)
             val overrides = credential.runtimeOverrides
+            profileService.requireMsoDataOnlyForMdoc(profile.credentialConfigurationId, overrides?.msoData)
             val issuerKey = overrides?.issuerKey ?: profile.issuerKey
             require(issuerKey.isNotEmpty()) { "issuerKey must not be empty" }
             require(issuerKey["type"] != null) { "issuerKey must contain a key type" }
@@ -82,6 +84,8 @@ class CredentialOfferService(
                     overrides?.mDocNameSpacesDataMappingConfig ?: profile.mDocNameSpacesDataMappingConfig,
                 authorizedTransactionDataTypes = overrides?.authorizedTransactionDataTypes
                     ?: profile.authorizedTransactionDataTypes,
+                msoData = (profile.msoData ?: MsoData()).merge(overrides?.msoData)
+                    .takeUnless { it.isEmpty() },
                 x5Chain = overrides?.x5Chain ?: profile.x5Chain,
                 issuerDid = overrides?.issuerDid ?: profile.issuerDid,
                 credentialStatus = overrides?.credentialStatus ?: profile.credentialStatus,

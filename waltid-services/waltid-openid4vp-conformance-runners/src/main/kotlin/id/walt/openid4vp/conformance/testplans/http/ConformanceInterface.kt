@@ -252,6 +252,10 @@ class ConformanceInterface(
      * its real outcome with "Stopping test due to alias conflict". Cancelling deliberately once a
      * module is done keeps each module's recorded result its own.
      *
+     * The same conflict happens *across jobs* when two CI runs use the same alias on the shared
+     * hosted suite. Wallet plan aliases are therefore namespaced per run; see
+     * [id.walt.openid4vp.conformance.config.ConformanceSuiteAlias].
+     *
      * Best effort - a test that already finished is simply not running any more (404).
      */
     suspend fun cancelTest(testId: String) {

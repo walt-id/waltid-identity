@@ -1,10 +1,8 @@
 package id.walt.mdoc.objects.mso
 
 import id.walt.mdoc.encoding.MdocTDateInstantSerializer
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.cbor.ValueTags
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -31,36 +29,52 @@ import kotlin.time.Instant
  * recommends that issuing authorities reduce their precision (e.g., by setting hour/minute/second values
  * consistently across all provisioned mdocs).
  */
-@OptIn(ExperimentalUnsignedTypes::class, ExperimentalSerializationApi::class)
+@OptIn(ExperimentalUnsignedTypes::class)
 @Serializable
 data class ValidityInfo(
     @SerialName("signed")
-    @ValueTags(0u) // CBOR tag 0 for standard date-time string (tdate)
     @Serializable(with = MdocTDateInstantSerializer::class)
     val signed: Instant,
 
     @SerialName("validFrom")
-    @ValueTags(0u)
     @Serializable(with = MdocTDateInstantSerializer::class)
     val validFrom: Instant,
 
     @SerialName("validUntil")
-    @ValueTags(0u)
     @Serializable(with = MdocTDateInstantSerializer::class)
     val validUntil: Instant,
 
     @SerialName("expectedUpdate")
-    @ValueTags(0u)
     @Serializable(with = MdocTDateInstantSerializer::class)
     val expectedUpdate: Instant? = null
 ) {
+    /**
+     * Inspection-time check: the MSO is currently valid. A future-valid structure can still be issued;
+     * presentation before [validFrom] fails here, not in [precheck].
+     */
     fun validate() {
         val now = Clock.System.now()
         require(validFrom <= now) { "MSO is not yet valid (becomes valid in ${validFrom - now})" }
         require(validUntil >= now) { "MSO is no longer valid (expired ${now - validFrom} ago)" }
     }
 
+    /**
+     * ISO/IEC 18013-5:2021 §9.1.2.4 structural check: `signed <= validFrom < validUntil`.
+     * [expectedUpdate] is optional and is not bounded by this ISO rule; use
+     * [requireExpectedUpdateWithinWindow] for the opt-in issuer policy.
+     */
     fun precheck() {
-        require(validUntil >= validFrom) { "validFrom cannot be lower than validUntil" }
+        require(signed <= validFrom) { "signed must be at or before validFrom" }
+        require(validFrom < validUntil) { "validUntil must be after validFrom" }
+    }
+
+    /**
+     * Opt-in issuer policy, off by default. ISO does not require [expectedUpdate] to lie in the
+     * validity window; enable this only when the product should reject an earlier planned refresh.
+     */
+    fun requireExpectedUpdateWithinWindow() {
+        val update = expectedUpdate ?: return
+        require(update >= validFrom) { "expectedUpdate cannot be before validFrom" }
+        require(update <= validUntil) { "expectedUpdate cannot be after validUntil" }
     }
 }

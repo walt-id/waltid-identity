@@ -1,6 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.plans.vp.wallet
 
 import id.walt.openid4vp.conformance.config.ConformanceConfig
+import id.walt.openid4vp.conformance.config.ConformanceSuiteAlias
 import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -83,7 +84,7 @@ class Oid4vpWalletVariantPlan(
     override val configuration: JsonObject = Json.decodeFromString(
         """
         {
-            "alias": "$name",
+            "alias": "${ConformanceSuiteAlias.unique(name)}",
             "description": "$description",
             "server": {
                 "authorization_endpoint": "$walletApiUrl"
