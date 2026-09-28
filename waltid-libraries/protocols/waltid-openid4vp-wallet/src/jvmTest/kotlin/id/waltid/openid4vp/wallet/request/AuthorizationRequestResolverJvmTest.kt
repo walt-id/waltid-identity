@@ -388,6 +388,10 @@ class AuthorizationRequestResolverJvmTest {
         ).jsonObject
 
         assertEquals(
+            AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+            metadata.getValue("issuer").jsonPrimitive.content,
+        )
+        assertEquals(
             listOf("vp_token", "vp_token id_token"),
             metadata.getValue("response_types_supported").jsonArray.map { it.jsonPrimitive.content },
         )

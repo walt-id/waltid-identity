@@ -809,6 +809,7 @@ object WalletPresentFunctionality2 {
                     requestUriMethod = requestUriMethod,
                     requestUriPostWalletMetadata = requestUriPostWalletMetadata,
                     sendWalletMetadata = true,
+                    expectedRequestObjectAudience = expectedRequestObjectAudience,
                 )
             },
         )

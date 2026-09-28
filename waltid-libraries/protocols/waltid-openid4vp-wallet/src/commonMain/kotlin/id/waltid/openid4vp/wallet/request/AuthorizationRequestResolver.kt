@@ -37,7 +37,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.longOrNull
 import kotlin.time.Clock
 
@@ -130,6 +132,7 @@ object AuthorizationRequestResolver {
         ): String = json.encodeToString(
             serializer = JsonObject.serializer(),
             value = buildJsonObject {
+                put("issuer", DEFAULT_REQUEST_OBJECT_AUDIENCE)
                 put("response_types_supported", responseTypesSupported.toJsonArray())
                 put("response_modes_supported", responseModesSupported.toJsonArray())
                 val unsupported = unsupportedClientIdPrefixes + buildSet {
@@ -183,7 +186,7 @@ object AuthorizationRequestResolver {
      * POST metadata includes a fresh public encryption key. The private key lives only for
      * this exchange; a JWE response is unwrapped before the resolver authenticates its signed JWT.
      * Caller-supplied encryption keys and request-encryption algorithms are replaced by this
-     * exchange's capabilities; other wallet metadata is retained.
+     * exchange's capabilities, and issuer is aligned with the expected audience; other metadata is retained.
      * Keeps GET/POST behavior and response conversion centralized for all wallet callers.
      */
     suspend fun fetchRequestUriWithWebDataFetcher(
@@ -192,6 +195,22 @@ object AuthorizationRequestResolver {
         requestUriMethod: RequestUriHttpMethod?,
         requestUriPostWalletMetadata: String? = null,
         sendWalletMetadata: Boolean = true,
+    ): RequestUriFetchResponse = fetchRequestUriWithWebDataFetcher(
+        webResolveAuthReq, requestUri, requestUriMethod, requestUriPostWalletMetadata,
+        sendWalletMetadata, DEFAULT_REQUEST_OBJECT_AUDIENCE,
+    )
+
+    /**
+     * Advertises the same wallet issuer that the caller requires as the Request Object audience.
+     * A caller-supplied metadata issuer is replaced so it cannot contradict audience validation.
+     */
+    suspend fun fetchRequestUriWithWebDataFetcher(
+        webResolveAuthReq: WebDataFetcher,
+        requestUri: String,
+        requestUriMethod: RequestUriHttpMethod?,
+        requestUriPostWalletMetadata: String? = null,
+        sendWalletMetadata: Boolean = true,
+        expectedRequestObjectAudience: String,
     ): RequestUriFetchResponse {
         val walletNonce = requestUriMethod
             .takeIf { it == RequestUriHttpMethod.POST }
@@ -201,7 +220,11 @@ object AuthorizationRequestResolver {
             RequestObjectEncryption.create()
         } else null
         val walletMetadata = encryption?.walletMetadata(
-            requestUriPostWalletMetadata ?: defaultRequestUriPostWalletMetadata,
+            buildJsonObject {
+                Json.parseToJsonElement(requestUriPostWalletMetadata ?: defaultRequestUriPostWalletMetadata)
+                    .jsonObject.forEach { (name, value) -> put(name, value) }
+                put("issuer", expectedRequestObjectAudience)
+            }.toString(),
         )
 
         val response = when (requestUriMethod) {
