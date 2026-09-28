@@ -6,9 +6,11 @@ import id.walt.certificate.x509.testdata.TestDataCertificates.gtsRootR4CrtPem
 import id.walt.certificate.x509.testdata.TestDataCertificates.gtsWe2CrtPem
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
+import id.walt.certificate.x509.validation.validator.X509CertificateAuthorityKeyIdValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -161,6 +163,80 @@ class X509CertificateChainValidationTest {
         }
     }
 
+    /**
+     * [X509CertificateUtil.createCertificate] always sets the AKI from the issuer key, so a mismatch can only
+     * be produced by validating against a trusted certificate that has the leaf's issuer DN but another key.
+     */
+    @Test
+    fun authorityKeyIdValidatorShouldAcceptMatchingIssuerSubjectKeyId() = runTest {
+        withCertificateTestKey(KeyType.secp256r1) { rootCaKey ->
+            val rootCaCert = createRootCa(rootCaKey)
+            withCertificateTestKey(KeyType.secp256r1) { leafKey ->
+                val leafCert = createLeaf(rootCaKey, rootCaCert, leafKey)
+
+                val result = certUtil.validateCertificateChain(listOf(leafCert), InMemoryTrustStore(listOf(rootCaCert)))
+
+                assertTrue(result.valid, "Validation log: ${result.log}")
+                assertEquals(emptyList(), result.authorityKeyIdLog(ValidationResult.Severity.ERROR))
+            }
+        }
+    }
+
+    @Test
+    fun authorityKeyIdValidatorShouldReportIssuerSubjectKeyIdMismatch() = runTest {
+        withCertificateTestKey(KeyType.secp256r1) { rootCaKey ->
+            val rootCaCert = createRootCa(rootCaKey)
+            withCertificateTestKey(KeyType.secp256r1) { leafKey ->
+                val leafCert = createLeaf(rootCaKey, rootCaCert, leafKey)
+
+                withCertificateTestKey(KeyType.secp256r1) { otherRootCaKey ->
+                    // Same subject DN as the real issuer, but a different key and therefore a different SKI.
+                    val otherRootCaCert = createRootCa(otherRootCaKey)
+                    assertEquals(rootCaCert.data.subjectDn, otherRootCaCert.data.subjectDn)
+
+                    val result = certUtil.validateCertificateChain(
+                        listOf(leafCert),
+                        InMemoryTrustStore(listOf(otherRootCaCert))
+                    )
+
+                    assertFalse(result.valid, "Validation log: ${result.log}")
+                    result.authorityKeyIdLog(ValidationResult.Severity.ERROR).also { akiLog ->
+                        assertEquals(1, akiLog.size, "Validation log: ${result.log}")
+                        assertEquals(leafCert.data.subjectDn, akiLog[0].subjectDn)
+                        assertEquals(
+                            "The certificate's authority key identifier doesn't match the subject key identifier " +
+                                    "of its issuer certificate (subjectDn='${leafCert.data.issuerDn}')",
+                            akiLog[0].message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun authorityKeyIdValidatorShouldNotReportAnythingWhenIssuerIsNotKnown() = runTest {
+        withCertificateTestKey(KeyType.secp256r1) { rootCaKey ->
+            val rootCaCert = createRootCa(rootCaKey)
+            withCertificateTestKey(KeyType.secp256r1) { leafKey ->
+                val leafCert = createLeaf(rootCaKey, rootCaCert, leafKey)
+
+                val result = certUtil.validateCertificateChain(listOf(leafCert), InMemoryTrustStore())
+
+                // The missing issuer is a trust problem reported by the signature validator, not by this one.
+                assertFalse(result.valid, "Validation log: ${result.log}")
+                assertEquals(
+                    emptyList(),
+                    result.log.filter {
+                        it.validatorId == X509CertificateAuthorityKeyIdValidator.ID
+                                && it.severity != ValidationResult.Severity.INFO
+                    }
+                )
+            }
+        }
+    }
+
+
     companion object {
 
         // Google certificates are valid till 24.09.2026
@@ -227,5 +303,23 @@ class X509CertificateChainValidationTest {
                 X509CertificateValidityValidator(clock = testClock)
             )
         }
+
+        private suspend fun createRootCa(rootCaKey: Key) =
+            X509CertificateUtil.createSelfSignedCertificate(rootCaKey) {
+                subjectDn = "CN=Root CA, OU=Walt.id"
+                extensionBasicConstraints {
+                    cA = true
+                }
+            }
+
+        private suspend fun createLeaf(rootCaKey: Key, rootCaCert: X509Certificate, leafKey: Key) =
+            X509CertificateUtil.createCertificate(rootCaKey, rootCaCert) {
+                subjectDn = "CN=Leaf, OU=Walt.id"
+                subjectPublicKey(leafKey)
+            }
+
+        private fun ValidationResult.authorityKeyIdLog(severity: ValidationResult.Severity) =
+            log.filter { it.validatorId == X509CertificateAuthorityKeyIdValidator.ID && it.severity == severity }
+
     }
 }

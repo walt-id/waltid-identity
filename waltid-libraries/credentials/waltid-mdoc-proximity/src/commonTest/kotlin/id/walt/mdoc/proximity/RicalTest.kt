@@ -17,13 +17,13 @@ import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.cbor.CborMap
 import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.encodeToByteArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 class RicalTest {
@@ -60,16 +60,28 @@ class RicalTest {
     @Test
     fun `valid RICAL evidence only establishes trust when profile policy permits it`() = runTest {
         val issuedAt = Instant.parse("2026-01-01T00:00:00Z")
-        val signed = signed(Rical("1.0", "provider", issuedAt, certificateInfos = listOf(authority), type = "reader"))
+        val signed = signed(
+            Rical(
+                "1.0",
+                "provider",
+                issuedAt,
+                certificateInfos = listOf(authority),
+                type = "reader"
+            )
+        )
+
         suspend fun evaluate(establishTrust: Boolean) = RicalReaderTrustEvaluator(
-            provider = RicalProvider { RicalProviderResult.Available(signed) },
+            provider = { RicalProviderResult.Available(signed) },
             policy = RicalPolicy(
-                "provider", setOf("reader"), listOf(ImmutableBytes.of(byteArrayOf(8))), establishTrust
+                "provider",
+                setOf("reader"),
+                listOf(ImmutableBytes.of(byteArrayOf(8))),
+                establishTrust
             ),
-            signatureValidator = RicalSignatureValidator { _, _ -> true },
-            constraintEvaluator = RicalConstraintEvaluator { _, _ -> true },
-            now = { Instant.parse("2026-01-02T00:00:00Z") },
-            pathValidator = RicalReaderPathValidator { _, _ -> RicalReaderPathResult.Valid(authority) },
+            signatureValidator = { _, _ -> true },
+            constraintEvaluator = { _, _ -> true },
+            clock = OffsetClock(Instant.parse("2026-01-02T00:00:00Z")),
+            pathValidator = { _, _ -> RicalReaderPathResult.Valid(authority) },
         ).evaluate(evidence)
 
         assertEquals(ReaderTrustState.VALID_BUT_UNTRUSTED, evaluate(false).state)
@@ -78,10 +90,12 @@ class RicalTest {
 
     @Test
     fun `signed RICAL projections cannot change authenticated payload or signer membership`() {
-        val value = signed(Rical(
-            "1.0", "provider", Instant.parse("2026-01-01T00:00:00Z"),
-            certificateInfos = listOf(authority), type = "reader",
-        ))
+        val value = signed(
+            Rical(
+                "1.0", "provider", Instant.parse("2026-01-01T00:00:00Z"),
+                certificateInfos = listOf(authority), type = "reader",
+            )
+        )
         val original = value.exactMessage
         val projection = value.payload
         (projection.value.certificateInfos as MutableList).clear()
@@ -110,19 +124,19 @@ class RicalTest {
             signatureValid: Boolean = true,
             path: RicalReaderPathResult = RicalReaderPathResult.Valid(authority),
             constraintsValid: Boolean = true,
-            now: Instant = Instant.parse("2026-01-03T00:00:00Z"),
+            clock: Clock = OffsetClock(Instant.parse("2026-01-03T00:00:00Z")),
         ) = RicalReaderTrustEvaluator(
-            provider = RicalProvider { providerResult },
+            provider =  { providerResult },
             policy = RicalPolicy(
                 "provider",
                 setOf("reader"),
                 listOf(ImmutableBytes.of(byteArrayOf(8))),
                 establishReaderTrust = true,
             ),
-            signatureValidator = RicalSignatureValidator { _, _ -> signatureValid },
-            constraintEvaluator = RicalConstraintEvaluator { _, _ -> constraintsValid },
-            now = { now },
-            pathValidator = RicalReaderPathValidator { _, _ -> path },
+            signatureValidator = { _, _ -> signatureValid },
+            constraintEvaluator = { _, _ -> constraintsValid },
+            clock = clock,
+            pathValidator = { _, _ -> path },
         ).evaluateDetailed(evidence)
 
         assertEquals(
@@ -138,21 +152,32 @@ class RicalTest {
             evaluate(RicalProviderResult.Available(signed(baseRical.copy(provider = "other")))).state,
         )
         assertEquals(RicalEvaluationState.INVALID, evaluate(signatureValid = false).state)
-        assertEquals(RicalEvaluationState.INVALID, evaluate(path = RicalReaderPathResult.Invalid).state)
+        assertEquals(
+            RicalEvaluationState.INVALID,
+            evaluate(path = RicalReaderPathResult.Invalid).state
+        )
         assertEquals(
             RicalEvaluationState.INVALID,
             evaluate(path = RicalReaderPathResult.Valid(authority.copy(name = "Not in active RICAL"))).state,
         )
-        assertEquals(RicalEvaluationState.NO_MATCHING_AUTHORITY, evaluate(constraintsValid = false).state)
+        assertEquals(
+            RicalEvaluationState.NO_MATCHING_AUTHORITY,
+            evaluate(constraintsValid = false).state
+        )
         assertEquals(
             RicalEvaluationState.INVALID,
-            evaluate(now = Instant.parse("2026-02-01T00:00:00Z")).state,
+            evaluate(clock = OffsetClock(Instant.parse("2026-02-01T00:00:00Z"))).state,
         )
         assertEquals(
             RicalEvaluationState.INVALID,
             evaluate(
                 RicalProviderResult.Available(
-                    signed(baseRical.copy(date = Instant.parse("2026-01-04T00:00:00Z"), nextUpdate = null))
+                    signed(
+                        baseRical.copy(
+                            date = Instant.parse("2026-01-04T00:00:00Z"),
+                            nextUpdate = null
+                        )
+                    )
                 )
             ).state,
         )
@@ -253,10 +278,15 @@ class RicalTest {
         val current = candidate(2u, "2026-01-02T00:00:00Z")
         assertEquals(RicalUpdateDecision.Initial, validateRicalUpdate(null, current))
         assertEquals(RicalUpdateDecision.Unchanged, validateRicalUpdate(current, current))
-        assertTrue(validateRicalUpdate(current, candidate(1u, "2026-01-01T00:00:00Z")) is RicalUpdateDecision.Stale)
+        assertTrue(
+            validateRicalUpdate(
+                current,
+                candidate(1u, "2026-01-01T00:00:00Z")
+            ) is RicalUpdateDecision.Stale
+        )
         assertTrue(
             validateRicalUpdate(current, candidate(2u, "2026-01-02T00:00:00Z", "Other"))
-                is RicalUpdateDecision.Conflict
+                    is RicalUpdateDecision.Conflict
         )
         assertEquals(
             RicalUpdateDecision.Accepted,

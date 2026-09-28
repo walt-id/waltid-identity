@@ -52,6 +52,10 @@ class MockX509Certificate(private val subjectDn: String) : X509Certificate {
     override val encodedDer: ByteString
         get() = ByteString()
 
+    override fun hashCode(): Int = TODO()
+
+    override fun equals(other: Any?): Boolean = TODO()
+
     companion object {
         fun randomSerialNumber(): ByteString {
             val byteArray = Random.nextBytes(20)

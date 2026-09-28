@@ -49,21 +49,27 @@ import kotlin.time.Instant
 
 class ProximityReaderTrustTest {
     @Test
-    fun `explicit anchor establishes trust without trusting a reader supplied root implicitly`() = runTest {
-        withCertificates { certificates ->
-            val trusted = evaluator(certificates.root).evaluate(certificates.evidence(includeRoot = false))
-            assertEquals(ProximityReaderTrustState.Trusted, trusted.state)
-            assertEquals(ProximityReaderCertificatePathState.Valid, trusted.certificatePath)
-            assertEquals(ProximityReaderRevocationState.NotChecked, trusted.revocation)
-            assertEquals("Example reader", trusted.displayName)
+    fun `explicit anchor establishes trust without trusting a reader supplied root implicitly`() =
+        runTest {
+            withCertificates { certificates ->
+                val trusted =
+                    evaluator(certificates.root).evaluate(certificates.evidence(includeRoot = false))
+                assertEquals(ProximityReaderTrustState.Trusted, trusted.state)
+                assertEquals(ProximityReaderCertificatePathState.Valid, trusted.certificatePath)
+                assertEquals(ProximityReaderRevocationState.NotChecked, trusted.revocation)
+                assertEquals("Example reader", trusted.displayName)
 
-            val otherRoot = certificates.createRoot("Different reader root")
-            val unknown = evaluator(otherRoot).evaluate(certificates.evidence(includeRoot = true))
-            assertEquals(ProximityReaderTrustState.ValidButUntrusted, unknown.state)
-            assertEquals(ProximityReaderCertificatePathState.UnknownAuthority, unknown.certificatePath)
-            assertEquals(null, unknown.displayName)
+                val otherRoot = certificates.createRoot("Different reader root")
+                val unknown =
+                    evaluator(otherRoot).evaluate(certificates.evidence(includeRoot = true))
+                assertEquals(ProximityReaderTrustState.ValidButUntrusted, unknown.state)
+                assertEquals(
+                    ProximityReaderCertificatePathState.UnknownAuthority,
+                    unknown.certificatePath
+                )
+                assertEquals(null, unknown.displayName)
+            }
         }
-    }
 
     @Test
     fun `trust policy and evidence remain owned while revocation is suspended`() = runTest {
@@ -89,14 +95,21 @@ class ProximityReaderTrustTest {
                 ),
             )
             val input = expected.toMutableList()
-            val pending = async { evaluator.evaluate(certificates.evidence().copy(certificateChainDerBase64Url = input)) }
+            val pending = async {
+                evaluator.evaluate(
+                    certificates.evidence().copy(certificateChainDerBase64Url = input)
+                )
+            }
             entered.await()
             anchors.clear()
             input.clear()
             (evaluator.configuration.trustAnchors as MutableList).clear()
             resume.complete(Unit)
             assertEquals(ProximityReaderTrustState.Trusted, pending.await().state)
-            assertEquals(ProximityReaderTrustState.Trusted, evaluator.evaluate(certificates.evidence(includeRoot = true)).state)
+            assertEquals(
+                ProximityReaderTrustState.Trusted,
+                evaluator.evaluate(certificates.evidence(includeRoot = true)).state
+            )
         }
     }
 
@@ -106,27 +119,31 @@ class ProximityReaderTrustTest {
             val decision = evaluator(certificates.reader).evaluate(certificates.evidence())
 
             assertEquals(ProximityReaderTrustState.ValidButUntrusted, decision.state)
-            assertEquals(ProximityReaderCertificatePathState.UnknownAuthority, decision.certificatePath)
+            assertEquals(
+                ProximityReaderCertificatePathState.UnknownAuthority,
+                decision.certificatePath
+            )
         }
     }
 
     @Test
-    fun `invalid reader certificate profile remains distinct from an unknown authority`() = runTest {
-        withCertificates(readerExtendedKeyUsage = null) { certificates ->
-            val decision = evaluator(certificates.root).evaluate(certificates.evidence())
+    fun `invalid reader certificate profile remains distinct from an unknown authority`() =
+        runTest {
+            withCertificates(readerExtendedKeyUsage = null) { certificates ->
+                val decision = evaluator(certificates.root).evaluate(certificates.evidence())
 
-            assertEquals(ProximityReaderTrustState.ValidButUntrusted, decision.state)
-            assertEquals(ProximityReaderCertificatePathState.Invalid, decision.certificatePath)
-            assertEquals(ProximityReaderRevocationState.NotChecked, decision.revocation)
+                assertEquals(ProximityReaderTrustState.ValidButUntrusted, decision.state)
+                assertEquals(ProximityReaderCertificatePathState.Invalid, decision.certificatePath)
+                assertEquals(ProximityReaderRevocationState.NotChecked, decision.revocation)
+            }
         }
-    }
 
     @Test
     fun `expired reader certificate fails profile validation before trust lookup`() = runTest {
         withCertificates { certificates ->
             val decision = evaluator(
                 certificates.root,
-                now = Clock.System.now() + 31.days,
+                clock = OffsetClock(-31.days),
             ).evaluate(certificates.evidence())
 
             assertEquals(ProximityReaderTrustState.ValidButUntrusted, decision.state)
@@ -136,59 +153,64 @@ class ProximityReaderTrustTest {
     }
 
     @Test
-    fun `revoked and indeterminate status fail closed without collapsing path validity`() = runTest {
-        withCertificates { certificates ->
-            val revoked = evaluator(
-                certificates.root,
-                ProximityCertificateRevocationResult.Revoked("Revoked by test source"),
-            ).evaluate(certificates.evidence())
-            assertEquals(ProximityReaderTrustState.Revoked, revoked.state)
-            assertEquals(ProximityReaderCertificatePathState.Valid, revoked.certificatePath)
-            assertEquals(ProximityReaderRevocationState.Revoked, revoked.revocation)
+    fun `revoked and indeterminate status fail closed without collapsing path validity`() =
+        runTest {
+            withCertificates { certificates ->
+                val revoked = evaluator(
+                    certificates.root,
+                    ProximityCertificateRevocationResult.Revoked("Revoked by test source"),
+                ).evaluate(certificates.evidence())
+                assertEquals(ProximityReaderTrustState.Revoked, revoked.state)
+                assertEquals(ProximityReaderCertificatePathState.Valid, revoked.certificatePath)
+                assertEquals(ProximityReaderRevocationState.Revoked, revoked.revocation)
 
-            val indeterminate = evaluator(
-                certificates.root,
-                ProximityCertificateRevocationResult.Indeterminate("Status source is offline"),
-            ).evaluate(certificates.evidence())
-            assertEquals(ProximityReaderTrustState.ValidButUntrusted, indeterminate.state)
-            assertEquals(ProximityReaderCertificatePathState.Valid, indeterminate.certificatePath)
-            assertEquals(ProximityReaderRevocationState.Indeterminate, indeterminate.revocation)
+                val indeterminate = evaluator(
+                    certificates.root,
+                    ProximityCertificateRevocationResult.Indeterminate("Status source is offline"),
+                ).evaluate(certificates.evidence())
+                assertEquals(ProximityReaderTrustState.ValidButUntrusted, indeterminate.state)
+                assertEquals(
+                    ProximityReaderCertificatePathState.Valid,
+                    indeterminate.certificatePath
+                )
+                assertEquals(ProximityReaderRevocationState.Indeterminate, indeterminate.revocation)
+            }
         }
-    }
 
     @Test
-    fun `revocation source exceptions are indeterminate and repeated evaluations are independent`() = runTest {
-        withCertificates { certificates ->
-            var calls = 0
-            val evaluator = ProximityConfiguredReaderTrustEvaluator(
-                ProximityReaderTrustConfiguration(
-                    trustAnchors = listOf(
-                        ProximityReaderTrustAnchor(
-                            certificates.root.base64Url(),
-                            "Configured reader authority",
-                        )
-                    ),
-                    revocationPolicy = ProximityReaderRevocationPolicy.Check(
-                        ProximityReaderRevocationEvaluator {
-                            calls += 1
-                            if (calls == 1) error("status source offline")
-                            ProximityCertificateRevocationResult.Good
-                        }
-                    ),
+    fun `revocation source exceptions are indeterminate and repeated evaluations are independent`() =
+        runTest {
+            withCertificates { certificates ->
+                var calls = 0
+                val evaluator = ProximityConfiguredReaderTrustEvaluator(
+                    ProximityReaderTrustConfiguration(
+                        trustAnchors = listOf(
+                            ProximityReaderTrustAnchor(
+                                certificates.root.base64Url(),
+                                "Configured reader authority",
+                            )
+                        ),
+                        revocationPolicy = ProximityReaderRevocationPolicy.Check(
+                            ProximityReaderRevocationEvaluator {
+                                calls += 1
+                                if (calls == 1) error("status source offline")
+                                ProximityCertificateRevocationResult.Good
+                            }
+                        ),
+                    )
                 )
-            )
 
-            val first = evaluator.evaluate(certificates.evidence())
-            val second = evaluator.evaluate(certificates.evidence())
+                val first = evaluator.evaluate(certificates.evidence())
+                val second = evaluator.evaluate(certificates.evidence())
 
-            assertEquals(ProximityReaderRevocationState.Indeterminate, first.revocation)
-            assertEquals(ProximityReaderTrustState.ValidButUntrusted, first.state)
-            assertEquals(ProximityReaderRevocationState.Good, second.revocation)
-            assertEquals(ProximityReaderTrustState.Trusted, second.state)
-            assertEquals("Configured reader authority", second.displayName)
-            assertEquals(2, calls)
+                assertEquals(ProximityReaderRevocationState.Indeterminate, first.revocation)
+                assertEquals(ProximityReaderTrustState.ValidButUntrusted, first.state)
+                assertEquals(ProximityReaderRevocationState.Good, second.revocation)
+                assertEquals(ProximityReaderTrustState.Trusted, second.state)
+                assertEquals("Configured reader authority", second.displayName)
+                assertEquals(2, calls)
+            }
         }
-    }
 
     @Test
     fun `RICAL provider availability and conflicts remain distinct trust facts`() = runTest {
@@ -211,11 +233,17 @@ class ProximityReaderTrustTest {
                 ).evaluate(certificates.evidence())
 
             val unavailable = evaluate(ProximityRicalProviderResult.Unavailable("offline"))
-            assertEquals(ProximityReaderCertificatePathState.UnknownAuthority, unavailable.certificatePath)
+            assertEquals(
+                ProximityReaderCertificatePathState.UnknownAuthority,
+                unavailable.certificatePath
+            )
             assertEquals(ProximityRicalState.Unavailable, unavailable.rical)
 
             val conflict = evaluate(ProximityRicalProviderResult.Conflict("two active lists"))
-            assertEquals(ProximityReaderCertificatePathState.UnknownAuthority, conflict.certificatePath)
+            assertEquals(
+                ProximityReaderCertificatePathState.UnknownAuthority,
+                conflict.certificatePath
+            )
             assertEquals(ProximityRicalState.Invalid, conflict.rical)
         }
     }
@@ -247,7 +275,10 @@ class ProximityReaderTrustTest {
             ProximityCertificateRevocationResult.Revoked("Signer revoked")
         }.evaluate(evidence)
         assertEquals(ProximityReaderTrustState.ValidButUntrusted, revokedSigner.state)
-        assertEquals(ProximityReaderCertificatePathState.UnknownAuthority, revokedSigner.certificatePath)
+        assertEquals(
+            ProximityReaderCertificatePathState.UnknownAuthority,
+            revokedSigner.certificatePath
+        )
         assertEquals(ProximityRicalState.Invalid, revokedSigner.rical)
     }
 
@@ -263,7 +294,8 @@ class ProximityReaderTrustTest {
             val reader = createReader(subCaKey, subCa, readerKey, MdocReaderAuthenticationEkuOid)
             val rootInfo = root.ricalInfo(isTrustAnchor = true, name = "Root authority")
             for (intermediateAnchor in listOf(false, true)) {
-                val subCaInfo = subCa.ricalInfo(isTrustAnchor = intermediateAnchor, name = "Bottom authority")
+                val subCaInfo =
+                    subCa.ricalInfo(isTrustAnchor = intermediateAnchor, name = "Bottom authority")
                 for (infos in listOf(listOf(rootInfo, subCaInfo), listOf(subCaInfo, rootInfo))) {
                     val rical = Rical(
                         version = "1.0",
@@ -284,8 +316,12 @@ class ProximityReaderTrustTest {
                     val valid = assertIs<RicalReaderPathResult.Valid>(result)
                     assertEquals(subCaInfo, valid.authority)
                     assertEquals(
-                        listOf(reader, subCa, root).map { ImmutableBytes.of(it.encodedDer.toByteArray()) },
-                        valid.validatedPath,
+                        listOf(
+                            reader,
+                            subCa,
+                            root
+                        ).map { it.encodedDer },
+                        valid.validatedPath.map { it.encodedDer },
                         "The lower constraint authority must not shorten the highest applicable anchor path",
                     )
                 }
@@ -410,7 +446,7 @@ class ProximityReaderTrustTest {
                         ProximityReaderTrustSettings(),
                     )
                 }.message.orEmpty(),
-                "not a valid current CA",
+                "certificate must be a CA",
             )
             val existing = ProximityReaderTrustSettings(
                 trustAnchors = listOf(
@@ -442,7 +478,7 @@ class ProximityReaderTrustTest {
             existing = ProximityReaderTrustSettings(
                 readerPolicy = ProximityReaderPolicy.RequireTrusted,
             ),
-            now = Instant.parse("2026-09-02T00:00:00Z"),
+            clock = OffsetClock(Instant.parse("2026-09-02T00:00:00Z")),
         )
 
         assertEquals(ProximityReaderTrustImportKind.TrustBundle, preview.kind)
@@ -450,24 +486,26 @@ class ProximityReaderTrustTest {
         assertTrue(preview.ricalProviders.single().establishesReaderTrust)
         assertContains(preview.policyEffect, "Only readers trusted")
 
-        assertFailsWith<IllegalArgumentException> {
-            ProximityReaderTrustSettingsCodec.prepareImport(
-                "unknown.json",
-                bundle.replaceFirst("\"version\": 1,", "\"version\": 1, \"unknown\": true,")
-                    .encodeToByteArray(),
-                ProximityReaderTrustSettings(),
-            )
-        }
         assertContains(
             assertFailsWith<IllegalArgumentException> {
                 ProximityReaderTrustSettingsCodec.prepareImport(
-                    "expired.json",
-                    bundle.encodeToByteArray(),
+                    "unknown.json",
+                    bundle.replaceFirst("\"version\": 1,", "\"version\": 1, \"unknown\": true,")
+                        .encodeToByteArray(),
                     ProximityReaderTrustSettings(),
-                    now = Instant.parse("2028-01-01T00:00:00Z"),
                 )
+            }.message.orEmpty(), "unknown key"
+        )
+        assertContains(
+            assertFailsWith<IllegalArgumentException> {
+                    ProximityReaderTrustSettingsCodec.prepareImport(
+                        "expired.json",
+                        bundle.encodeToByteArray(),
+                        ProximityReaderTrustSettings(),
+                        clock = OffsetClock(Instant.parse("2028-01-01T00:00:00Z")),
+                    )
             }.message.orEmpty(),
-            "current CA",
+            "Certificate is expired",
         )
     }
 
@@ -551,7 +589,7 @@ class ProximityReaderTrustTest {
     private fun evaluator(
         root: X509Certificate,
         revocation: ProximityCertificateRevocationResult? = null,
-        now: Instant = Clock.System.now(),
+        clock: Clock = Clock.System,
     ): ProximityConfiguredReaderTrustEvaluator = ProximityConfiguredReaderTrustEvaluator(
         ProximityReaderTrustConfiguration(
             trustAnchors = listOf(ProximityReaderTrustAnchor(root.base64Url())),
@@ -561,7 +599,7 @@ class ProximityReaderTrustTest {
                 )
             } ?: ProximityReaderRevocationPolicy.NotChecked,
         ),
-        now = { now },
+        clock = clock
     )
 
     private fun ricalEvaluator(
@@ -587,7 +625,7 @@ class ProximityReaderTrustTest {
                     )
                 )
             ),
-            now = { Instant.parse("2026-09-02T00:00:00Z") },
+            clock = OffsetClock(Instant.parse("2026-09-02T00:00:00Z")),
         )
 
     private suspend fun <T> withCertificates(
@@ -619,7 +657,10 @@ class ProximityReaderTrustTest {
             subjectDn = "CN=$commonName"
             extensionKeyUsage {
                 critical = true
-                addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign, KeyUsageExtension.KeyUsage.cRLSign)
+                addKeyUsage(
+                    KeyUsageExtension.KeyUsage.keyCertSign,
+                    KeyUsageExtension.KeyUsage.cRLSign
+                )
             }
         }
 
@@ -681,9 +722,10 @@ class ProximityReaderTrustTest {
             requireNotNull(data.extensionSubjectKeyIdentifier).keyIdentifier.toByteArray()
         ),
         isTrustAnchor = isTrustAnchor,
-        authorityKeyIdentifier = data.extensionAuthorityKeyIdentifier?.keyIdentifier?.toByteArray()?.let {
-            ImmutableBytes.of(it)
-        },
+        authorityKeyIdentifier = data.extensionAuthorityKeyIdentifier?.keyIdentifier?.toByteArray()
+            ?.let {
+                ImmutableBytes.of(it)
+            },
         name = name,
     )
 
@@ -719,8 +761,11 @@ class ProximityReaderTrustTest {
         )
 
         // Public-only test material. The corresponding private keys are intentionally not retained.
-        const val RICAL_PROVIDER_ROOT = "MIIBoDCCAUWgAwIBAgIIQAAAAAAAAAEwCgYIKoZIzj0EAwIwIzEhMB8GA1UEAwwYUklDQUwgUHJvdmlkZXIgVGVzdCBSb290MB4XDTI2MDgzMDIwNTgyMloXDTI3MDgzMDIwNTgyMlowIzEhMB8GA1UEAwwYUklDQUwgUHJvdmlkZXIgVGVzdCBSb290MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdlAtVZ6AIUdT6Dz40ocIC1beZ4jBMkBCbIYT9aYANmpUIcfrbF7p0hxAMU_e3aFcOc0gE-3ctXDS_XYJ9pVw06NjMGEwDwYDVR0TAQH_BAUwAwEB_zAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFOu5ldR964dGMxFoyzr-Wfg3SLBxMB8GA1UdIwQYMBaAFOu5ldR964dGMxFoyzr-Wfg3SLBxMAoGCCqGSM49BAMCA0kAMEYCIQDrTcqqxUk0W-nVpNdQXtIiuYkPO3fewH-jasVtnXEGuQIhAKc2LKRf3nZ93kCzVSErxvSiacBApOVD7o6F5yhBqUXC"
-        const val RICAL_READER_LEAF = "MIIBwjCCAWigAwIBAgIIQAAAAAAAAAQwCgYIKoZIzj0EAwIwGzEZMBcGA1UEAwwQUmVhZGVyIFRlc3QgUm9vdDAeFw0yNjA4MzAyMDU4MjJaFw0yNjA5MjkyMDU4MjJaMBkxFzAVBgNVBAMMDkZpeHR1cmUgUmVhZGVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0vfmnCwPggx1aO8shICyUA_M1mYt7CXaWNZyY4_uLQna7LISphQ7cjy2xoLCN9oT4Bqhewunrw7RKvH6_NVStKOBlzCBlDAdBgNVHQ4EFgQU-OVW6w6H38FtAa_Q1fKlUUn0qp4wHwYDVR0jBBgwFoAUhdjG_yjle9d7MBgoC9S57eK3_x8wDgYDVR0PAQH_BAQDAgeAMBUGA1UdJQEB_wQLMAkGByiBjF0FAQYwKwYDVR0fBCQwIjAgoB6gHIYaaHR0cHM6Ly9yZWFkZXIuZXhhbXBsZS9jcmwwCgYIKoZIzj0EAwIDSAAwRQIhAPQgGNKygRTaykDwA1SMy_yrm8y3xhIuoZnylecMEbtOAiAa_3jyEp3ZYuaXkDdegFYUySpSF_4JvCXEiVdvecyzDA"
-        const val SIGNED_RICAL = "hFkCAqIBJhghgVkB-TCCAfUwggGaoAMCAQICCEAAAAAAAAACMAoGCCqGSM49BAMCMCMxITAfBgNVBAMMGFJJQ0FMIFByb3ZpZGVyIFRlc3QgUm9vdDAeFw0yNjA4MzAyMDU4MjJaFw0yNjA5MjkyMDU4MjJaMEkxCzAJBgNVBAYTAkFUMR4wHAYDVQQKDBV3YWx0LmlkIHRlc3QgZml4dHVyZXMxGjAYBgNVBAMMEVJJQ0FMIFRlc3QgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEpzO3bwxEx36dnpKkcMefEPyAldJM4kLPoP2eUTFi89Lr69Nfwh6ho_ANzdgcbRFMCBsp4S9UbSMB0hUeOozEDaOBkTCBjjAdBgNVHQ4EFgQUO_-jL0aDjkbcm6CgIHXWrUsbngUwHwYDVR0jBBgwFoAU67mV1H3rh0YzEWjLOv5Z-DdIsHEwDgYDVR0PAQH_BAQDAgZAMCoGA1UdHwQjMCEwH6AdoBuGGWh0dHBzOi8vcmljYWwuZXhhbXBsZS9jcmwwEAYDVR0gBAkwBzAFBgMqAwQwCgYIKoZIzj0EAwIDSQAwRgIhALZ_msangnrrXhHQdoVeHngvNkDTuUQF4twPPA5i-2XWAiEA1qWFVUwCpqpiQD7N5EvpQ4DTxi02m36JHMNdJvrxK-OgWQKepmd2ZXJzaW9uYzEuMGhwcm92aWRlcm10ZXN0LXByb3ZpZGVyZGRhdGXAdDIwMjYtMDktMDFUMDA6MDA6MDBaaG5vdEFmdGVywHQyMDI3LTAxLTAxVDAwOjAwOjAwWnBjZXJ0aWZpY2F0ZUluZm9zgaVrY2VydGlmaWNhdGVZAZIwggGOMIIBNaADAgECAghAAAAAAAAAAzAKBggqhkjOPQQDAjAbMRkwFwYDVQQDDBBSZWFkZXIgVGVzdCBSb290MB4XDTI2MDgzMDIwNTgyMloXDTI3MDgzMDIwNTgyMlowGzEZMBcGA1UEAwwQUmVhZGVyIFRlc3QgUm9vdDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABNYS1aGguJw1UW2bz_u4vhWK8NodDaUpB2QWq-aO9lLKtY9wrW3684IP-gcSALoEMNlFMlXLeOSS8rXHVIm1WTKjYzBhMA8GA1UdEwEB_wQFMAMBAf8wDgYDVR0PAQH_BAQDAgEGMB0GA1UdDgQWBBSF2Mb_KOV713swGCgL1Lnt4rf_HzAfBgNVHSMEGDAWgBSF2Mb_KOV713swGCgL1Lnt4rf_HzAKBggqhkjOPQQDAgNHADBEAiAPPd02BXTI7cCZxMxA8t9FZn4axqr2vI0v4Cg6mQswzwIgOm7mE-Y634y8cEkNSwCXy1DL6Od4D6HSmV5nswEqIYdsc2VyaWFsTnVtYmVywkhAAAAAAAAAA2Nza2lUAQIDBAUGBwgJCgsMDQ4PEBESExRtaXNUcnVzdEFuY2hvcvVkbmFtZXgYRml4dHVyZSByZWFkZXIgYXV0aG9yaXR5ZHR5cGV4J29yZy5pc28uMTgwMTMuNS4xLnJlYWRlcl9hdXRoZW50aWNhdGlvblhA5kQFmKh6ysjSmnvTqcE5vCffjsF_BlaAYXFMH8QIuoCZqrd2C0k0v7QsFjJpCS8T9zJpt92-lgOre5fkOVA2rg"
+        const val RICAL_PROVIDER_ROOT =
+            "MIIBoDCCAUWgAwIBAgIIQAAAAAAAAAEwCgYIKoZIzj0EAwIwIzEhMB8GA1UEAwwYUklDQUwgUHJvdmlkZXIgVGVzdCBSb290MB4XDTI2MDgzMDIwNTgyMloXDTI3MDgzMDIwNTgyMlowIzEhMB8GA1UEAwwYUklDQUwgUHJvdmlkZXIgVGVzdCBSb290MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEdlAtVZ6AIUdT6Dz40ocIC1beZ4jBMkBCbIYT9aYANmpUIcfrbF7p0hxAMU_e3aFcOc0gE-3ctXDS_XYJ9pVw06NjMGEwDwYDVR0TAQH_BAUwAwEB_zAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFOu5ldR964dGMxFoyzr-Wfg3SLBxMB8GA1UdIwQYMBaAFOu5ldR964dGMxFoyzr-Wfg3SLBxMAoGCCqGSM49BAMCA0kAMEYCIQDrTcqqxUk0W-nVpNdQXtIiuYkPO3fewH-jasVtnXEGuQIhAKc2LKRf3nZ93kCzVSErxvSiacBApOVD7o6F5yhBqUXC"
+        const val RICAL_READER_LEAF =
+            "MIIBwjCCAWigAwIBAgIIQAAAAAAAAAQwCgYIKoZIzj0EAwIwGzEZMBcGA1UEAwwQUmVhZGVyIFRlc3QgUm9vdDAeFw0yNjA4MzAyMDU4MjJaFw0yNjA5MjkyMDU4MjJaMBkxFzAVBgNVBAMMDkZpeHR1cmUgUmVhZGVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0vfmnCwPggx1aO8shICyUA_M1mYt7CXaWNZyY4_uLQna7LISphQ7cjy2xoLCN9oT4Bqhewunrw7RKvH6_NVStKOBlzCBlDAdBgNVHQ4EFgQU-OVW6w6H38FtAa_Q1fKlUUn0qp4wHwYDVR0jBBgwFoAUhdjG_yjle9d7MBgoC9S57eK3_x8wDgYDVR0PAQH_BAQDAgeAMBUGA1UdJQEB_wQLMAkGByiBjF0FAQYwKwYDVR0fBCQwIjAgoB6gHIYaaHR0cHM6Ly9yZWFkZXIuZXhhbXBsZS9jcmwwCgYIKoZIzj0EAwIDSAAwRQIhAPQgGNKygRTaykDwA1SMy_yrm8y3xhIuoZnylecMEbtOAiAa_3jyEp3ZYuaXkDdegFYUySpSF_4JvCXEiVdvecyzDA"
+        const val SIGNED_RICAL =
+            "hFkCAqIBJhghgVkB-TCCAfUwggGaoAMCAQICCEAAAAAAAAACMAoGCCqGSM49BAMCMCMxITAfBgNVBAMMGFJJQ0FMIFByb3ZpZGVyIFRlc3QgUm9vdDAeFw0yNjA4MzAyMDU4MjJaFw0yNjA5MjkyMDU4MjJaMEkxCzAJBgNVBAYTAkFUMR4wHAYDVQQKDBV3YWx0LmlkIHRlc3QgZml4dHVyZXMxGjAYBgNVBAMMEVJJQ0FMIFRlc3QgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEpzO3bwxEx36dnpKkcMefEPyAldJM4kLPoP2eUTFi89Lr69Nfwh6ho_ANzdgcbRFMCBsp4S9UbSMB0hUeOozEDaOBkTCBjjAdBgNVHQ4EFgQUO_-jL0aDjkbcm6CgIHXWrUsbngUwHwYDVR0jBBgwFoAU67mV1H3rh0YzEWjLOv5Z-DdIsHEwDgYDVR0PAQH_BAQDAgZAMCoGA1UdHwQjMCEwH6AdoBuGGWh0dHBzOi8vcmljYWwuZXhhbXBsZS9jcmwwEAYDVR0gBAkwBzAFBgMqAwQwCgYIKoZIzj0EAwIDSQAwRgIhALZ_msangnrrXhHQdoVeHngvNkDTuUQF4twPPA5i-2XWAiEA1qWFVUwCpqpiQD7N5EvpQ4DTxi02m36JHMNdJvrxK-OgWQKepmd2ZXJzaW9uYzEuMGhwcm92aWRlcm10ZXN0LXByb3ZpZGVyZGRhdGXAdDIwMjYtMDktMDFUMDA6MDA6MDBaaG5vdEFmdGVywHQyMDI3LTAxLTAxVDAwOjAwOjAwWnBjZXJ0aWZpY2F0ZUluZm9zgaVrY2VydGlmaWNhdGVZAZIwggGOMIIBNaADAgECAghAAAAAAAAAAzAKBggqhkjOPQQDAjAbMRkwFwYDVQQDDBBSZWFkZXIgVGVzdCBSb290MB4XDTI2MDgzMDIwNTgyMloXDTI3MDgzMDIwNTgyMlowGzEZMBcGA1UEAwwQUmVhZGVyIFRlc3QgUm9vdDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABNYS1aGguJw1UW2bz_u4vhWK8NodDaUpB2QWq-aO9lLKtY9wrW3684IP-gcSALoEMNlFMlXLeOSS8rXHVIm1WTKjYzBhMA8GA1UdEwEB_wQFMAMBAf8wDgYDVR0PAQH_BAQDAgEGMB0GA1UdDgQWBBSF2Mb_KOV713swGCgL1Lnt4rf_HzAfBgNVHSMEGDAWgBSF2Mb_KOV713swGCgL1Lnt4rf_HzAKBggqhkjOPQQDAgNHADBEAiAPPd02BXTI7cCZxMxA8t9FZn4axqr2vI0v4Cg6mQswzwIgOm7mE-Y634y8cEkNSwCXy1DL6Od4D6HSmV5nswEqIYdsc2VyaWFsTnVtYmVywkhAAAAAAAAAA2Nza2lUAQIDBAUGBwgJCgsMDQ4PEBESExRtaXNUcnVzdEFuY2hvcvVkbmFtZXgYRml4dHVyZSByZWFkZXIgYXV0aG9yaXR5ZHR5cGV4J29yZy5pc28uMTgwMTMuNS4xLnJlYWRlcl9hdXRoZW50aWNhdGlvblhA5kQFmKh6ysjSmnvTqcE5vCffjsF_BlaAYXFMH8QIuoCZqrd2C0k0v7QsFjJpCS8T9zJpt92-lgOre5fkOVA2rg"
     }
 }

@@ -7,6 +7,7 @@ import id.walt.certificate.x509.bouncycastle.BouncyX509CertificateSigner
 import id.walt.certificate.x509.signum.*
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.X509CertificateChainValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateAuthorityKeyIdValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
@@ -33,6 +34,7 @@ fun X509CertificateUtilBuilder.signumImplementation() {
             listOf(
                 X509CertificateValidityValidator(),
                 X509CertificateBasicConstraintsValidator(),
+                X509CertificateAuthorityKeyIdValidator(),
                 X509CertificateSignatureValidator(signatureValidator)
             ),
             InMemoryTrustStore()
@@ -56,6 +58,7 @@ actual fun platformDefaultServices(): X509CertificateServices {
             listOf(
                 X509CertificateValidityValidator(),
                 X509CertificateBasicConstraintsValidator(),
+                X509CertificateAuthorityKeyIdValidator(),
                 X509CertificateSignatureValidator(certificateSigner)
             ),
             JavaDefaultTrustStore(certificateParser)

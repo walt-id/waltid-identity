@@ -2,9 +2,10 @@
 
 package id.walt.mdoc.proximity
 
+import id.walt.certificate.x509.X509Certificate
+import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
-import id.walt.cose.Cose
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.encoding.ExactCbor
 import id.walt.mdoc.objects.MdocVersion
@@ -12,6 +13,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.decodeFromByteArray
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 /** Informative edition-2 RICAL data retained behind an explicit provider and profile policy. */
@@ -145,7 +147,7 @@ class SignedRical private constructor(
             val payloadBytes = requireNotNull(message.payload) { "RICAL COSE_Sign1 must use an attached payload" }
             val rical = coseCompliantCbor.decodeFromByteArray<Rical>(payloadBytes)
             val protected = if (message.protected.isEmpty()) CoseHeaders()
-                else coseCompliantCbor.decodeFromByteArray(CoseHeaders.serializer(), message.protected)
+            else coseCompliantCbor.decodeFromByteArray(CoseHeaders.serializer(), message.protected)
             require(protected.algorithm in RICAL_SIGNATURE_ALGORITHMS) {
                 "RICAL protected algorithm must be ES256, ES384, ES512, or EdDSA"
             }
@@ -203,7 +205,7 @@ sealed interface RicalReaderPathResult {
     data object Revoked : RicalReaderPathResult
     data class Valid(
         val authority: RicalCertificateInfo,
-        val validatedPath: List<ImmutableBytes> = emptyList(),
+        val validatedPath: List<X509Certificate> = emptyList(),
     ) : RicalReaderPathResult
 }
 
@@ -283,7 +285,7 @@ class RicalReaderTrustEvaluator(
     private val policy: RicalPolicy,
     private val signatureValidator: RicalSignatureValidator,
     private val constraintEvaluator: RicalConstraintEvaluator,
-    private val now: () -> Instant,
+    private val clock: Clock,
     private val pathValidator: RicalReaderPathValidator,
 ) : ReaderTrustEvaluator {
     override suspend fun evaluate(evidence: ReaderAuthenticationEvidence): ReaderTrustDecision =
@@ -299,6 +301,7 @@ class RicalReaderTrustEvaluator(
                     "RICAL provider is unavailable: ${result.reason}",
                 ),
             )
+
             is RicalProviderResult.Conflict -> return RicalReaderTrustResult(
                 RicalEvaluationState.INVALID,
                 ReaderTrustDecision(
@@ -311,7 +314,7 @@ class RicalReaderTrustEvaluator(
         if (rical.provider != policy.providerId || rical.type !in policy.acceptedTypes) {
             return invalid("RICAL provider or type is not permitted")
         }
-        val current = now()
+        val current = clock.now()
         if (rical.date > current || rical.notAfter?.let { current >= it } == true) {
             return invalid("RICAL is not currently fresh")
         }
@@ -328,13 +331,15 @@ class RicalReaderTrustEvaluator(
                     "Reader authentication certificate is revoked",
                 ),
             )
+
             is RicalReaderPathResult.Valid -> rical.certificateInfos.singleOrNull { it == path.authority }
                 ?: return invalid("Reader path selected an authority outside the active RICAL")
         }
         if (!constraintEvaluator.accepts(
                 authority.trustConstraints,
                 evidence,
-            )) {
+            )
+        ) {
             return noMatchingAuthority()
         }
         val decision = if (policy.establishReaderTrust) {
