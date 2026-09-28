@@ -171,13 +171,18 @@ class EncryptedRequestObjectInteropTest {
                 }
                 respond("unchanged", headers = headersOf(HttpHeaders.ContentType, "application/oauth-authz-req+jwt"))
             }).use { client ->
-                val response = AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
-                    WebDataFetcher.wrapping(client, id = "encrypted-request-opt-out-test"),
-                    "https://verifier.example/request", method,
+                val fetcher = WebDataFetcher.wrapping(client, id = "encrypted-request-opt-out-test")
+                val legacyResponse = AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                    fetcher, "https://verifier.example/request", method,
+                    requestUriPostWalletMetadata = "not JSON", sendWalletMetadata = sendMetadata,
+                )
+                val configuredResponse = AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                    fetcher, "https://verifier.example/request", method,
                     requestUriPostWalletMetadata = "not JSON", sendWalletMetadata = sendMetadata,
                     expectedRequestObjectAudience = "https://wallet.example",
                 )
-                assertEquals("unchanged", response.body)
+                assertEquals("unchanged", legacyResponse.body)
+                assertEquals("unchanged", configuredResponse.body)
             }
         }
     }

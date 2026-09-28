@@ -502,6 +502,29 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     @Test
+    fun `legacy request uri post fetch preserves supplied issuer and defaults only when absent`() = runBlocking {
+        val defaultIssuer = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE
+        for ((metadata, expectedIssuer) in listOf(
+            null to defaultIssuer,
+            "{}" to defaultIssuer,
+            """{"issuer":"https://wallet.example"}""" to "https://wallet.example",
+        )) {
+            HttpClient(MockEngine { request ->
+                val form = parseQueryString(request.bodyText())
+                val sentMetadata = Json.parseToJsonElement(requireNotNull(form["wallet_metadata"])).jsonObject
+                assertEquals(expectedIssuer, sentMetadata.getValue("issuer").jsonPrimitive.content)
+                respond("request-object")
+            }).use { client ->
+                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                    WebDataFetcher.wrapping(client, id = "legacy-wallet-metadata-test"),
+                    "https://verifier.example/request", RequestUriHttpMethod.POST,
+                    requestUriPostWalletMetadata = metadata,
+                )
+            }
+        }
+    }
+
+    @Test
     fun `unsigned request object is rejected when policy requires signed request objects`() {
         val requestObject = unsignedJwt(
             """

@@ -186,7 +186,8 @@ object AuthorizationRequestResolver {
      * POST metadata includes a fresh public encryption key. The private key lives only for
      * this exchange; a JWE response is unwrapped before the resolver authenticates its signed JWT.
      * Caller-supplied encryption keys and request-encryption algorithms are replaced by this
-     * exchange's capabilities, and issuer is aligned with the expected audience; other metadata is retained.
+     * exchange's capabilities; other wallet metadata, including an explicit issuer, is retained.
+     * Missing issuer metadata uses [DEFAULT_REQUEST_OBJECT_AUDIENCE].
      * Keeps GET/POST behavior and response conversion centralized for all wallet callers.
      */
     suspend fun fetchRequestUriWithWebDataFetcher(
@@ -195,9 +196,9 @@ object AuthorizationRequestResolver {
         requestUriMethod: RequestUriHttpMethod?,
         requestUriPostWalletMetadata: String? = null,
         sendWalletMetadata: Boolean = true,
-    ): RequestUriFetchResponse = fetchRequestUriWithWebDataFetcher(
+    ): RequestUriFetchResponse = fetchRequestUri(
         webResolveAuthReq, requestUri, requestUriMethod, requestUriPostWalletMetadata,
-        sendWalletMetadata, DEFAULT_REQUEST_OBJECT_AUDIENCE,
+        sendWalletMetadata, audienceOverride = null,
     )
 
     /**
@@ -211,6 +212,18 @@ object AuthorizationRequestResolver {
         requestUriPostWalletMetadata: String? = null,
         sendWalletMetadata: Boolean = true,
         expectedRequestObjectAudience: String,
+    ): RequestUriFetchResponse = fetchRequestUri(
+        webResolveAuthReq, requestUri, requestUriMethod, requestUriPostWalletMetadata,
+        sendWalletMetadata, audienceOverride = expectedRequestObjectAudience,
+    )
+
+    private suspend fun fetchRequestUri(
+        webResolveAuthReq: WebDataFetcher,
+        requestUri: String,
+        requestUriMethod: RequestUriHttpMethod?,
+        requestUriPostWalletMetadata: String?,
+        sendWalletMetadata: Boolean,
+        audienceOverride: String?,
     ): RequestUriFetchResponse {
         val walletNonce = requestUriMethod
             .takeIf { it == RequestUriHttpMethod.POST }
@@ -221,9 +234,10 @@ object AuthorizationRequestResolver {
         } else null
         val walletMetadata = encryption?.walletMetadata(
             buildJsonObject {
+                put("issuer", DEFAULT_REQUEST_OBJECT_AUDIENCE)
                 Json.parseToJsonElement(requestUriPostWalletMetadata ?: defaultRequestUriPostWalletMetadata)
                     .jsonObject.forEach { (name, value) -> put(name, value) }
-                put("issuer", expectedRequestObjectAudience)
+                audienceOverride?.let { put("issuer", it) }
             }.toString(),
         )
 
