@@ -429,25 +429,19 @@ internal object WalletComposeE2EHelper {
     private fun claimTag(path: String): String =
         "wallet.claim.${path.map { if (it.isLetterOrDigit()) it else '_' }.joinToString("")}"
 
-    internal fun UiDevice.scrollDown() {
-        swipe(
-            displayWidth / 2,
-            (displayHeight * 0.72).toInt(),
-            displayWidth / 2,
-            (displayHeight * 0.36).toInt(),
-            24,
-        )
-        waitForIdle()
-    }
+    internal fun UiDevice.scrollDown() = scrollContent(towardBottom = true)
 
-    internal fun UiDevice.scrollUp() {
-        swipe(
-            displayWidth / 2,
-            (displayHeight * 0.36).toInt(),
-            displayWidth / 2,
-            (displayHeight * 0.72).toInt(),
-            24,
-        )
+    internal fun UiDevice.scrollUp() = scrollContent(towardBottom = false)
+
+    private fun UiDevice.scrollContent(towardBottom: Boolean) {
+        // Review actions are fixed below the scroll viewport, especially on compact devices.
+        val bounds = findObjects(By.pkg(walletPackage).scrollable(true)).map { it.visibleBounds }
+            .filter { it.width() > 0 && it.height() > 0 }
+            .maxByOrNull { it.width().toLong() * it.height() }
+        val x = bounds?.centerX() ?: displayWidth / 2
+        val top = bounds?.let { it.top + it.height() / 5 } ?: (displayHeight * 0.36).toInt()
+        val bottom = bounds?.let { it.bottom - it.height() / 5 } ?: (displayHeight * 0.72).toInt()
+        swipe(x, if (towardBottom) bottom else top, x, if (towardBottom) top else bottom, 24)
         waitForIdle()
     }
 

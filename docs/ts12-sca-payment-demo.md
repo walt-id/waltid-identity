@@ -40,6 +40,53 @@ SD-JWT binds hashes of the original encoded transaction entries in the KB-JWT.
 The existing mdoc flow instead uses device-signed transaction data with MSO key
 authorizations. Display normalization must not change either proof's input.
 
+## Authoritative consent (WAL-1417)
+
+The selected credential designates its SCA type metadata; verifier profile allowlists
+remain admission controls, not the authority for payment instructions. The demos
+independently pin the issuer's public key. A different deployment requires matching
+issuer URL, VCT and key configuration. Missing trust configuration blocks payment.
+
+Shared Kotlin authenticates the credential and prepares one localized consent snapshot.
+Compose Android/iOS and SwiftUI render that model before submitting its opaque revision.
+The revision binds the request, selected credentials/disclosures, signing key and locales;
+missing or changed consent blocks the whole selection before signing. Failed attempts
+require fresh review; URL submissions also require a new preview. The immediate
+presentation shortcut cannot bypass consent. Dismissal/expiry cancels in-flight work.
+
+This slice supports one SD-JWT authorizing credential plus ordinary disclosures:
+
+- Required one-off payment values, optional timestamp, payee logo/website, PISP
+  details and payment flags. Every supplied leaf needs a label; URIs remain plain text.
+  Amounts use exact decimal handling and ISO 4217 minor units, without rounding.
+- Inline claims/UI labels or HTTPS references, with at most three documents,
+  256 KiB each, three redirects each and ten seconds per document. Every redirect
+  must satisfy HTTPS and the configured `WALLET2_PAYMENT_METADATA` URL policy.
+- Supplied integrity references verified over fetched bytes using the strongest
+  supported SRI algorithm. Unknown/invalid tokens and unknown options follow SRI
+  parsing; wallet policy rejects a pin without a supported digest. Metadata is
+  frozen for the review, without persistent caching.
+- One complete language range from ordered preferences, with regional/script fallback.
+  Required field/action labels must exist. Title, hint and denial label may be absent;
+  absent hints are not shown and denial uses wallet text. Supplied invalid or untranslated
+  optional text blocks consent; that stricter language rule is wallet policy.
+- Visualisation 1/2/3/4 maps to prominent/main/details/omitted; the default is 3.
+  Omitted values remain validated and signed. Ordinary disclosure review and the
+  wallet's independent unsigned-request warning remain visible.
+
+Unknown payment fields, unsupported currencies, scheduling/recurrence, arbitrary JSON
+Schema and inherited metadata block consent. PaSO, offline metadata caching and Wallet2
+HTTP-service consent are outside this slice. Legacy mdoc retains generic mandatory review.
+
+The contract pins [TS-12 v1.0.1](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/ee91a294c833af5188726fd8c302c641212192aa/docs/technical-specifications/ts12-electronic-payments-SCA-implementation-with-wallet.md)
+and [SD-JWT VC draft 16 metadata](https://www.ietf.org/archive/id/draft-ietf-oauth-sd-jwt-vc-16.html#section-4).
+Transaction claim paths are payload-relative, following TS-12 §3.3.2; its informative
+example's `payload` prefix is not treated as another supported contract. Claim display
+uses `locale`/`label` from SD-JWT VC; TS-12 UI catalogue entries use `lang`/`value`.
+Mandatory claim presence is checked; unknown metadata extensions are ignored, and
+transaction claim `sd` is inapplicable. These choices do not claim a resolved standards
+erratum or full TS-12 conformance.
+
 ## Wallet setup
 
 Use an isolated demo installation with no recovery, hardware-backed storage and
@@ -80,7 +127,10 @@ case require the service configuration described above.
 
 For a local service deployment, this Gradle task accepts explicit
 `-Ppayment.issuerUrl=https://...` and `-Ppayment.verifierUrl=https://...` overrides.
-The app fixtures use their configured demo endpoints.
+The app fixtures use their configured demo endpoints. On WAL-1417, both service
+variants also resolve issuer metadata and confirm localized consent; the isolated
+missing-label case requires zero authorization/signing. The automatic DC-API and
+physical app cases assert issuer titles, hints, field labels and action labels.
 
 ## Physical acceptance
 

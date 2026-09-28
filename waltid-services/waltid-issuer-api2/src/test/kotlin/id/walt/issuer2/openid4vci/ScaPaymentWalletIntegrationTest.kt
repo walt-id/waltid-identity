@@ -3,6 +3,10 @@
 package id.walt.issuer2.openid4vci
 
 import id.walt.commons.config.ConfigManager
+import id.walt.crypto.keys.KeyManager
+import id.walt.issuer2.config.Issuer2MetadataConfig
+import id.walt.issuer2.config.Issuer2ProfilesConfig
+import id.walt.wallet2.consent.*
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.keys.*
@@ -55,8 +59,28 @@ class ScaPaymentWalletIntegrationTest {
     fun clearConfig() = clearIssuer2TestEnvironment()
 
     @Test
-    fun configuredPaymentCardReachesWalletAndVerifier() = testApplication {
+    fun configuredPaymentCardReachesWalletAndVerifier() = paymentFlow(missingLabel = false)
+
+    @Test
+    fun missingIssuerLabelBlocksConsentBeforeAuthorizationOrSigning() = paymentFlow(missingLabel = true)
+
+    private fun paymentFlow(missingLabel: Boolean) = testApplication {
         installIssuer2WithConfigFiles(configureServiceConfig = { it.copy(baseUrl = "https://localhost") })
+        if (missingLabel) {
+            val config = ConfigManager.getConfig<Issuer2MetadataConfig>()
+            val metadata = config.sdJwtVcTypeMetadataConfiguration.getValue("sca_payment_card_sd_jwt")
+            val parameters = requireNotNull(metadata.customParameters)
+            val types = parameters.getValue("transaction_data_types").jsonObject
+            val payment = types.getValue("urn:eudi:sca:payment:1").jsonObject
+            val catalogue = payment.getValue("ui_labels").jsonObject
+            val incompletePayment = JsonObject(payment +
+                ("ui_labels" to JsonObject(catalogue - "affirmative_action_label")))
+            val incomplete = metadata.copy(customParameters = parameters +
+                ("transaction_data_types" to JsonObject(types + ("urn:eudi:sca:payment:1" to incompletePayment))))
+            ConfigManager.loadedConfigurations["credential-issuer-metadata" to Issuer2MetadataConfig::class] =
+                config.copy(sdJwtVcTypeMetadataConfiguration = config.sdJwtVcTypeMetadataConfiguration +
+                    ("sca_payment_card_sd_jwt" to incomplete))
+        }
         ConfigManager.registerConfig("verifier-service", OSSVerifier2ServiceConfig::class)
         ConfigManager.loadedConfigurations["verifier-service" to OSSVerifier2ServiceConfig::class] = OSSVerifier2ServiceConfig(
             urlPrefix = "https://verifier.example/verification-session", urlHost = "openid4vp://authorize",
@@ -69,7 +93,10 @@ class ScaPaymentWalletIntegrationTest {
                 verifierApi()
             }
         }
-        paymentFlow(apiClient(), "https://localhost", "https://verifier.example")
+        val issuerKey = KeyManager.resolveSerializedKey(ConfigManager.getConfig<Issuer2ProfilesConfig>()
+            .profiles.getValue("scaPaymentCardSdJwt").issuerKey)
+        paymentFlow(apiClient(), "https://localhost", "https://verifier.example",
+            issuerKey.getPublicKey().exportJWK(), missingLabel)
     }
 
     @Test
@@ -83,16 +110,28 @@ class ScaPaymentWalletIntegrationTest {
             install(ClientContentNegotiation) { json(issuer2TestJson) }
             install(HttpTimeout) { requestTimeoutMillis = 30_000 }
         }.use { http ->
-            withTimeout(120_000) { paymentFlow(http, issuerBase, verifierBase) }
+            // Pin the same public verification key as the demos, independently of the received credential.
+            val issuerPublicJwk = """{"kty":"EC","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}"""
+            withTimeout(120_000) { paymentFlow(http, issuerBase, verifierBase, issuerPublicJwk) }
         }
     }
 
-    private suspend fun paymentFlow(http: HttpClient, issuerBase: String, verifierBase: String) {
+    private suspend fun paymentFlow(
+        http: HttpClient, issuerBase: String, verifierBase: String,
+        issuerPublicJwk: String, missingLabel: Boolean = false,
+    ) {
         val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
         try {
-            val holderKey = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
+            val generatedKey = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
                 KeyId("payment-holder"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
             ))
+            var signatures = 0
+            val holderKey = object : Key by generatedKey {
+                override val capabilities = generatedKey.capabilities.copy(signer = Signer { bytes, algorithm ->
+                    signatures++
+                    requireNotNull(generatedKey.capabilities.signer).sign(bytes, algorithm)
+                })
+            }
             val wallet = Wallet(
                 id = "payment-${UUID.randomUUID()}",
                 keyStores = listOf(InMemoryKeyStore().also { it.addCrypto2Key(holderKey) }),
@@ -138,14 +177,51 @@ class ScaPaymentWalletIntegrationTest {
             val submission = SubmitDcApiPresentationRequest(preview.requestId,
                 listOf(PresentationCredentialSelection("sca_payment", credential.id)))
             var authorizations = 0
-            val response = WalletPresentationHandler.submitDcApiPresentation(wallet, submission,
-                transactionDataTypeRegistry = registry,
-                scaAuthorizer = WalletScaPresentationAuthorizer { _, _ ->
-                    authorizations++
-                    ScaAuthenticationMethods.PossessionAndInherence(
-                        ScaAuthenticationMethods.Possession.OTHER, ScaAuthenticationMethods.Inherence.OTHER)
-                },
-            )
+            val authorizer = WalletScaPresentationAuthorizer { _, _ ->
+                authorizations++
+                ScaAuthenticationMethods.PossessionAndInherence(
+                    ScaAuthenticationMethods.Possession.OTHER, ScaAuthenticationMethods.Inherence.OTHER)
+            }
+            val policy = PaymentConsentPolicy(PaymentConsentResolver(listOf(PaymentCredentialIssuer(
+                "$issuerBase/openid4vci", issuerPublicJwk,
+            )), http), listOf("de-DE", "en"))
+            signatures = 0 // The issuance proof is separate from payment authorization.
+            if (missingLabel) {
+                val failure = assertFailsWith<PaymentConsentException> {
+                    WalletPresentationHandler.prepareDcApiPaymentConsent(wallet, submission, policy)
+                }
+                assertEquals(PaymentConsentFailure.INVALID_METADATA, failure.reason)
+                val blocked = assertFailsWith<PaymentConsentException> {
+                    WalletPresentationHandler.submitDcApiPresentation(wallet, submission,
+                        transactionDataTypeRegistry = registry, scaAuthorizer = authorizer, paymentConsentPolicy = policy)
+                }
+                assertEquals(PaymentConsentFailure.CONSENT_REQUIRED, blocked.reason)
+                assertEquals(0, authorizations)
+                assertEquals(0, signatures)
+                val info = http.get("$verifierBase/verification-session/${created.sessionId}/info").body<JsonObject>()
+                assertEquals(false, info.getValue("attempted").jsonPrimitive.boolean)
+                return
+            }
+            val prepared = assertNotNull(WalletPresentationHandler.prepareDcApiPaymentConsent(wallet, submission, policy))
+            val payment = prepared.payment
+            assertEquals("de", payment.locale)
+            assertEquals("Diese Zahlung bestätigen", payment.title)
+            assertEquals("Prüfen Sie Empfänger und Betrag vor der Bestätigung.", payment.securityHint)
+            assertEquals("Zahlung bestätigen", payment.affirmativeAction)
+            assertEquals("Zahlung abbrechen", payment.denialAction)
+            val fields = payment.fields.associateBy { it.path }
+            val payee = fields.getValue(listOf("payee", "name"))
+            assertEquals("Zahlungsempfänger", payee.label)
+            assertEquals("Super Store", payee.value)
+            assertEquals(PaymentFieldPlacement.PROMINENT, payee.placement)
+            assertEquals("Betrag", fields.getValue(listOf("amount")).label)
+            assertEquals("11.56", fields.getValue(listOf("amount")).value)
+            assertEquals(0, authorizations)
+            assertEquals(0, signatures)
+            val response = WalletPresentationHandler.submitDcApiPresentation(wallet,
+                submission.copy(paymentConsentRevision = prepared.revision), transactionDataTypeRegistry = registry,
+                scaAuthorizer = authorizer, paymentConsentPolicy = policy)
+            assertEquals(1, signatures)
             assertEquals(1, authorizations)
             val wire = DcApiWallet.encodeResponse(response)
             val presentation = Json.parseToJsonElement(wire).jsonObject.getValue("data").jsonObject

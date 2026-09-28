@@ -9,6 +9,8 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.wallet2.persistence.keys.*
 import io.ktor.http.URLBuilder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
@@ -16,8 +18,11 @@ import kotlin.test.*
 
 /** Fake native facts exercise the adapter and mobile pipeline, not physical authentication. */
 class NativeScaPresentationAuthorizerTest {
+    // Metadata requests use a real dispatcher; virtual time must not expire their timeout.
+    private fun test(block: suspend () -> Unit) = runTest { withContext(Dispatchers.Default) { block() } }
+
     @Test
-    fun biometricOnlyKeyUsesTheReviewedDcApiPathAndSignedProof() = runTest {
+    fun biometricOnlyKeyUsesTheReviewedDcApiPathAndSignedProof() = test {
         for (evidence in listOf(KeyAuthorizationEvidence.NATIVE_ATTRIBUTES, KeyAuthorizationEvidence.CREATION_RECORD)) {
             val fixture = fixture()
             fixture.provider.facts = fixture.provider.facts.copy(authorizationEvidence = evidence)
@@ -40,7 +45,7 @@ class NativeScaPresentationAuthorizerTest {
     }
 
     @Test
-    fun ambiguousReusableAndUnprotectedPoliciesAreRejectedBeforeSigning() = runTest {
+    fun ambiguousReusableAndUnprotectedPoliciesAreRejectedBeforeSigning() = test {
         for (policy in listOf(
             KeyUseAuthorizationPolicy.None,
             KeyUseAuthorizationPolicy.BiometricAny,
@@ -58,7 +63,7 @@ class NativeScaPresentationAuthorizerTest {
     }
 
     @Test
-    fun unknownOrUnsuitableNativeFactsCannotBecomeAuthenticationClaims() = runTest {
+    fun unknownOrUnsuitableNativeFactsCannotBecomeAuthenticationClaims() = test {
         val good = eligibleFacts()
         for (facts in listOf(
             PlatformKeyFacts(),
@@ -76,7 +81,7 @@ class NativeScaPresentationAuthorizerTest {
     }
 
     @Test
-    fun cancellationOrNativeFailureProducesNoResponseAndRetryRechecksEvidence() = runTest {
+    fun cancellationOrNativeFailureProducesNoResponseAndRetryRechecksEvidence() = test {
         val fixture = fixture()
         val preview = fixture.preview()
         fixture.signingFailure = CancellationException("Native authentication cancelled")
@@ -92,7 +97,7 @@ class NativeScaPresentationAuthorizerTest {
     }
 
     @Test
-    fun ordinaryReviewedSubmissionAlsoUsesTheNativeEvidenceGate() = runTest {
+    fun ordinaryReviewedSubmissionAlsoUsesTheNativeEvidenceGate() = test {
         val fixture = fixture()
         fixture.provider.policy = KeyUseAuthorizationPolicy.None
         val url = URLBuilder("openid4vp://authorize").apply {
@@ -104,10 +109,12 @@ class NativeScaPresentationAuthorizerTest {
             parameters["response_uri"] = "https://verifier.example/response"
         }.buildString()
         val preview = assertIs<MobileWalletPresentationPreviewResult.Ready>(fixture.wallet.previewPresentation(url)).preview
+        val selections = preview.credentialOptions.map {
+            MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+        }
+        val consent = assertNotNull(fixture.wallet.preparePaymentConsent(preview.previewHandle, selections))
         assertFailsWith<KeyUseAuthorizationException> {
-            fixture.wallet.submitPresentation(preview.previewHandle, preview.credentialOptions.map {
-                MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
-            })
+            fixture.wallet.submitPresentation(preview.previewHandle, selections, paymentConsentRevision = consent.revision)
         }
         assertEquals(0, fixture.signatures)
     }
@@ -122,10 +129,14 @@ class NativeScaPresentationAuthorizerTest {
                 dataJson = request.toString(), verifiedOrigin = "https://verifier.example",
             ),
         )
-        suspend fun submit(preview: MobileWalletDigitalCredentialPreview): MobileWalletDigitalCredentialResponse =
-            wallet.submitDigitalCredentialPresentation(preview.requestId, preview.credentialOptions.map {
+        suspend fun submit(preview: MobileWalletDigitalCredentialPreview): MobileWalletDigitalCredentialResponse {
+            val selections = preview.credentialOptions.map {
                 MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
-            })
+            }
+            val consent = assertNotNull(wallet.prepareDigitalCredentialPaymentConsent(preview.requestId, selections))
+            return wallet.submitDigitalCredentialPresentation(preview.requestId, selections,
+                paymentConsentRevision = consent.revision)
+        }
     }
 
     private suspend fun fixture(): Fixture {

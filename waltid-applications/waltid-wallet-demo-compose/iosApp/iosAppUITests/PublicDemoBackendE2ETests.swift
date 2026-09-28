@@ -83,7 +83,10 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ui.tapButton(identifier: "wallet.tab.present", fallbackLabel: "Present tab, Present")
         ui.replaceText(in: ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL"), value: session.authorizationRequestUri)
         XCTAssertEqual(ui.previewPresentation(timeout: 60), "Review presentation request", app.debugDescription)
-        for value in ["Super Store", "11.56", "EUR"] {
+        let payment = app.descendants(matching: .any).matching(identifier: "payment-consent").firstMatch
+        XCTAssertTrue(payment.waitForExistence(timeout: 60), app.debugDescription)
+        for value in ["Super Store", "11.56", "EUR", "Confirm this payment", "Payee", "Payee ID", "Currency", "Amount",
+                      "Check the payee and amount before confirming."] {
             let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch
             // Static Compose text need not expose an XCTest activation point.
             func isVisible() -> Bool {
@@ -100,6 +103,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
         print("SCA_OPERATOR: approve iPhone payment signing")
+        XCTAssertTrue(app.buttons["Confirm payment"].exists, "Missing issuer affirmative action")
+        XCTAssertTrue(app.buttons["Cancel payment"].exists, "Missing issuer denial action")
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
         let status = ui.waitForStatus(prefixes: ["Presentation sent", "Presentation finished", "Present failed"], timeout: 180)
         XCTAssertNotNil(status)

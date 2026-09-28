@@ -186,6 +186,8 @@ class WalletViewModel: ObservableObject {
     private var issuanceSession: IssuanceSession?
     private var pendingPresentationSuccessMessage: String?
     private var presentationTask: Task<Void, Never>?
+    private var paymentConsentTask: Task<Void, Never>?
+    @Published var paymentReview: PaymentReviewState = .notRequired
     private var biometricSigningAvailabilityTask: Task<Void, Never>?
     private var foregroundSequence = 0
     private var lastWarnedForegroundSequence: Int?
@@ -322,6 +324,7 @@ class WalletViewModel: ObservableObject {
 
     func resetWallet() {
         receiveTask?.cancel()
+        paymentConsentTask?.cancel()
         presentationTask?.cancel()
         cancelIssuanceIfPresent()
         discardPresentationPreviewIfPresent()
@@ -356,6 +359,7 @@ class WalletViewModel: ObservableObject {
     func lock() {
         proximityPresentation.dismiss()
         receiveTask?.cancel()
+        paymentConsentTask?.cancel()
         presentationTask?.cancel()
         cancelIssuanceIfPresent()
         discardPresentationPreviewIfPresent()
@@ -630,6 +634,10 @@ class WalletViewModel: ObservableObject {
                 hostHeader: attestationHostHeader
             ),
             transactionDataProfiles: transactionDataProfiles.profiles,
+            paymentCredentialIssuers: [WalletPaymentCredentialIssuer(
+                issuer: "https://issuer2.demo.walt.id/openid4vci",
+                publicJWKJSON: #"{"kty":"EC","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}"#
+            )],
             crossProcessAccess: Self.crossProcessAccessConfiguration(),
             defaultKeyUseAuthorizationPolicy: signingProtectionMode.defaultSelection.authorizationPolicy,
             keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(
@@ -809,6 +817,7 @@ class WalletViewModel: ObservableObject {
         switch url.scheme.flatMap(WalletDeepLinkScheme.init(rawValue:)) {
         case .credentialOffer:
             receiveTask?.cancel()
+            paymentConsentTask?.cancel()
             presentationTask?.cancel()
             cancelIssuanceIfPresent()
             discardPresentationPreviewIfPresent()
@@ -827,6 +836,7 @@ class WalletViewModel: ObservableObject {
             resetFlowStatusForIncomingURL()
         case .presentationRequest:
             receiveTask?.cancel()
+            paymentConsentTask?.cancel()
             presentationTask?.cancel()
             cancelIssuanceIfPresent()
             discardPresentationPreviewIfPresent()
@@ -869,6 +879,7 @@ class WalletViewModel: ObservableObject {
     }
 
     func startNewPresentationFlow() {
+        paymentConsentTask?.cancel()
         presentationTask?.cancel()
         discardPresentationPreviewIfPresent()
         resetInputFocus()
@@ -1233,6 +1244,7 @@ class WalletViewModel: ObservableObject {
                     selectedPresentationCredentialOptions = preview.sharingReview().defaultCredentialSelection()
                     selectedPresentationDisclosureOptions = []
                     setSuccess(WalletStatusText.reviewPresentationRequest, tab: .present)
+                    prepareSelectedPaymentConsent()
                 case .invalid:
                     selectedPresentationCredentialOptions = []
                     selectedPresentationDisclosureOptions = []
@@ -1265,11 +1277,37 @@ class WalletViewModel: ObservableObject {
     private func apply(_ selection: SharingSelection) {
         selectedPresentationCredentialOptions = selection.credentials
         selectedPresentationDisclosureOptions = selection.disclosures
+        prepareSelectedPaymentConsent()
+    }
+
+    private func prepareSelectedPaymentConsent() {
+        paymentConsentTask?.cancel()
+        guard let preview = presentationPreview else { return }
+        let credentials = selectedPresentationCredentialOptions
+        let disclosures = selectedPresentationDisclosureOptions
+        let selectedDid = did.isEmpty ? nil : did
+        paymentReview = .loading
+        guard presentationCredentialSelectionComplete else { return }
+        paymentConsentTask = Task {
+            do {
+                let consent = try await walletClient.preparePaymentConsent(previewHandle: preview.previewHandle,
+                    selectedCredentialOptions: Array(credentials), selectedDisclosureOptions: Array(disclosures), did: selectedDid)
+                try Task.checkCancellation()
+                guard presentationPreview?.previewHandle == preview.previewHandle,
+                      selectedPresentationCredentialOptions == credentials,
+                      selectedPresentationDisclosureOptions == disclosures else { return }
+                paymentReview = consent.map { .ready($0) } ?? .notRequired
+            } catch is CancellationError { return
+            } catch {
+                guard !Task.isCancelled else { return }
+                paymentReview = .blocked(error.localizedDescription)
+            }
+        }
     }
 
     func submitPresentation() {
         resetInputFocus()
-        guard !isLoading else { return }
+        guard !isLoading, paymentReview.canConfirm else { return }
         guard let previewHandle = presentationPreview?.previewHandle else { return }
         guard presentationCredentialSelectionComplete else {
             setError(WalletStatusText.failure(WalletStatusText.presentFailed, WalletStatusText.selectCredentialForEveryRequest), tab: .present)
@@ -1280,6 +1318,7 @@ class WalletViewModel: ObservableObject {
         let selectedCredentialOptions = Array(selectedPresentationCredentialOptions)
         let selectedDid = did.isEmpty ? nil : did
 
+        let consentRevision = paymentReview.consent?.revision
         setLoading(WalletStatusText.presentingCredential, tab: .present)
         presentationTask = Task {
             do {
@@ -1287,7 +1326,8 @@ class WalletViewModel: ObservableObject {
                     previewHandle: previewHandle,
                     selectedCredentialOptions: selectedCredentialOptions,
                     selectedDisclosureOptions: Array(selectedDisclosureOptions),
-                    did: selectedDid
+                    did: selectedDid,
+                    paymentConsentRevision: consentRevision
                 )
                 try Task.checkCancellation()
                 resetPresentationToEntry()
@@ -1350,6 +1390,8 @@ class WalletViewModel: ObservableObject {
     }
 
     private func resetPresentationToEntry() {
+        paymentConsentTask?.cancel()
+        paymentReview = .notRequired
         presentationReview = nil
         presentationRequestUrl = ""
         selectedPresentationCredentialOptions = []
@@ -1361,6 +1403,7 @@ class WalletViewModel: ObservableObject {
     func cancelPresentationReview() {
         resetInputFocus()
         guard !isLoading, let previewHandle = presentationReview?.previewHandle else { return }
+        paymentConsentTask?.cancel()
         presentationTask?.cancel()
         resetPresentationToEntry()
         setSuccess(WalletStatusText.presentationReviewCancelled, tab: .present)
@@ -1631,6 +1674,7 @@ class WalletViewModel: ObservableObject {
 
     private func cancelActiveWalletOperations() {
         receiveTask?.cancel()
+        paymentConsentTask?.cancel()
         presentationTask?.cancel()
         cancelIssuanceIfPresent()
         discardPresentationPreviewIfPresent()

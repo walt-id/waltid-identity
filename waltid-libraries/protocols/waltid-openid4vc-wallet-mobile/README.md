@@ -142,6 +142,35 @@ when (val encryption = preview.request.responseEncryption) {
 Response-encryption metadata describes protection of the authorization response. It
 does not establish verifier trust and does not expose verifier key material.
 
+### TS-12 payment consent
+
+Configure `MobileWalletConfig.paymentCredentialIssuers` with independently trusted
+issuer URLs and public JWKs, and set `preferredLocales`. An empty trust list blocks
+SD-JWT payments. After preview and selection, prepare the authoritative review:
+
+```kotlin
+val consent = wallet.preparePaymentConsent(
+    previewHandle = handle,
+    selectedCredentialOptions = selectedCredentials,
+    selectedDisclosureOptions = selectedDisclosures,
+)
+// Render consent.payment and its unsigned-request warning; await explicit confirmation.
+wallet.submitPresentation(
+    previewHandle = handle,
+    selectedCredentialOptions = selectedCredentials,
+    selectedDisclosureOptions = selectedDisclosures,
+    paymentConsentRevision = consent?.revision,
+)
+```
+
+A null result means no SD-JWT TS-12 payment requires review. A
+`PaymentConsentException` blocks submission; do not fall back to generic labels.
+Android DC API uses `prepareDigitalCredentialPaymentConsent` and passes the same
+revision to `submitDigitalCredentialPresentation`. Discard abandoned previews.
+After changing selections, prepare/display a new review. Reusing an acknowledgment
+after failure or cancellation is rejected. The immediate `present` API cannot
+satisfy payment consent. See [supported scope and rollout](../../../docs/ts12-sca-payment-demo.md).
+
 ### Android credential registry
 
 Android registers claim paths and scalar matching values with Credential Manager.

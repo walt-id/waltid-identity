@@ -58,6 +58,11 @@ internal class ScaPaymentE2ETest : DigitalCredentialSharingE2E() {
         listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, "merchant-001", "EUR", SCA_AMOUNT_TEXT).forEach { value ->
             assertTextContainingVisibleAfterScrolling(fixture.device, value, "Payment review is missing '$value'")
         }
+        listOf("Confirm this payment", "Payee", "Payee ID", "Currency", "Amount",
+            "Check the payee and amount before confirming.", "Confirm payment", "Cancel payment").forEach { label ->
+            WalletComposeE2EHelper.assertTextVisibleAfterScrolling(fixture.device, listOf(label),
+                "Payment review is missing issuer instruction '$label'")
+        }
         println("SCA_OPERATOR: approve the next biometric prompt after payment review")
         clickByTag(fixture.device, WALLET_SHARE_BUTTON_TAG)
         val result = withTimeout(OPERATOR_TIMEOUT) { request.await() }
