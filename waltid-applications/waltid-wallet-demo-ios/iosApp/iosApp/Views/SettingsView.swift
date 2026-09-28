@@ -95,10 +95,13 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
 
             switch viewModel.signingProtectionMode {
-            case .optional:
+            case .optional, .required:
                 signingProtectionChoice(.biometric)
-                signingProtectionChoice(.none)
-            case .required, .disabled:
+                signingProtectionChoice(.biometricPerUse)
+                if viewModel.signingProtectionMode.allows(.none) {
+                    signingProtectionChoice(.none)
+                }
+            case .disabled:
                 let managedProtection = viewModel.signingProtectionMode.defaultSelection
                 signingProtectionChoice(
                     managedProtection,
@@ -129,7 +132,7 @@ struct SettingsView: View {
                 .disabled(
                     viewModel.isChangingSigningProtection ||
                         viewModel.isLoading ||
-                        (viewModel.selectedSigningProtection == .biometric &&
+                        (viewModel.selectedSigningProtection.requiresBiometrics &&
                             !viewModel.isBiometricSigningAvailable)
                 )
                 .accessibilityIdentifier(WalletAccessibilityID.signingProtectionRetry)
@@ -158,13 +161,11 @@ struct SettingsView: View {
             enabled: !managed &&
                 !viewModel.isChangingSigningProtection &&
                 !viewModel.isLoading &&
-                (protection != .biometric || viewModel.isBiometricSigningAvailable),
+                (!protection.requiresBiometrics || viewModel.isBiometricSigningAvailable),
             action: { viewModel.requestSigningProtectionChange(protection) }
         )
         .accessibilityIdentifier(
-            protection == .biometric
-                ? WalletAccessibilityID.signingProtectionBiometric
-                : WalletAccessibilityID.signingProtectionNone
+            protection.accessibilityIdentifier
         )
     }
 
@@ -177,5 +178,15 @@ struct SettingsView: View {
                 }
             }
         )
+    }
+}
+
+private extension WalletDemoSigningProtection {
+    var accessibilityIdentifier: String {
+        switch self {
+        case .none: WalletAccessibilityID.signingProtectionNone
+        case .biometric: WalletAccessibilityID.signingProtectionBiometric
+        case .biometricPerUse: WalletAccessibilityID.signingProtectionBiometricPerUse
+        }
     }
 }

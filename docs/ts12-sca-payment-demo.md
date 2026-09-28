@@ -1,0 +1,111 @@
+# SD-JWT payment demo
+
+The demo issues a synthetic payment card and presents one nested
+`urn:eudi:sca:payment:1` transaction using the existing TS-12 proof and native
+signing support. WAL-1295 integrates the app flows; WAL-1417 adds authoritative,
+localized consent. This is not a registered banking attestation, certified wallet
+or complete regulated SCA implementation.
+
+## Service setup
+
+Run matching issuer2/verifier2 locally or deploy the [backend configuration](ts12-sca-backend.md)
+to the public services. The issuer must advertise `sca_payment_card_sd_jwt`
+(`dc+sd-jwt`), issued through profile `scaPaymentCardSdJwt`. Its public-demo VCT is
+`https://issuer2.demo.walt.id/openid4vci/sca_payment_card_sd_jwt` and its synthetic
+card claims are scheme `demo`, last four digits `4242` and holder `Jane Doe`.
+A missing deployment is a failed prerequisite, not grounds to substitute a PID.
+
+Use verifier2's **\[openid4vp-dc_api\]\[sd-jwt demo payment\]
+urn:eudi:sca:payment:1** OpenAPI example. It requests the three card claims under
+DCQL query `sca_payment`, with a signed request and encrypted response. The example
+`x509_san_dns:verifier.example.com` client uses a certificate independently pinned
+by the demo wallet; a different verifier requires matching client/trust configuration.
+
+The transaction refers to the DCQL query ID, not a stored credential ID:
+
+```json
+{
+  "type": "urn:eudi:sca:payment:1",
+  "credential_ids": ["sca_payment"],
+  "transaction_data_hashes_alg": ["sha-256"],
+  "payload": {
+    "transaction_id": "8D8AC610-566D-4EF0-9C22-186B2A5ED793",
+    "payee": { "name": "Super Store", "id": "merchant-001" },
+    "currency": "EUR",
+    "amount": 11.56
+  }
+}
+```
+
+SD-JWT binds hashes of the original encoded transaction entries in the KB-JWT.
+The existing mdoc flow instead uses device-signed transaction data with MSO key
+authorizations. Display normalization must not change either proof's input.
+
+## Wallet setup
+
+Use an isolated demo installation with no recovery, hardware-backed storage and
+**Current biometrics only**. The SDK must offer hardware-backed P-256 with
+`BiometricCurrentSet`. Approve native prompts during setup, issuance and payment.
+Reopening the wallet preserves this policy. Existing timed-biometric or unprotected
+keys cannot authorize this payment; changing the key requires explicit reprovisioning
+and credential reissuance. Enrollment changes can invalidate a current-set key.
+
+Android uses Credential Manager. Compose iOS and native SwiftUI use the existing
+OpenID4VP URL/deep-link route with a `cross_device` verifier session. Apple's mdoc-only
+Identity Document provider extensions are outside this SD-JWT route.
+
+## Coverage
+
+| Existing suite | Payment coverage | Boundary |
+| --- | --- | --- |
+| Protocol SCA tests | Exact hashes, KB-JWT claims, transport variants and authorization failures | Synthetic authorization |
+| Issuer2 integration tests | Configured issuer → wallet → verifier, exact hashes and required policies | Local services and synthetic authorization |
+| `paymentDemoTest` | Same successful scenario against public issuer2/verifier2 | Deployment acceptance; no native authentication |
+| Android DC-API suite | Payment issuance, registration, selection, mandatory review and rejection of unprotected signing | Ordinary emulator keys cannot authorize SCA |
+| Physical Android test | App setup/issuance, Credential Manager, review, native signing and verifier acceptance | Explicit operator interaction |
+| Existing iOS app suites | Corresponding physical URL-payment flow in both demos | Explicit operator interaction |
+
+The existing Linux Gradle job runs `paymentDemoTest` for `ci:mobile-dc-api` PRs
+and main and reports it through its ordinary JUnit check and `ci-gate`. The task
+never reuses cached success and fails for missing profiles or incompatible services.
+The automatic DC-API payment case also requires the deployed profile. Neither
+uses a fallback credential or a passing skip for a missing deployment.
+
+```bash
+./gradlew :waltid-services:waltid-issuer-api2:paymentDemoTest
+```
+
+For a local service deployment, this Gradle task accepts explicit
+`-Ppayment.issuerUrl=https://...` and `-Ppayment.verifierUrl=https://...` overrides.
+The app fixtures use their configured demo endpoints.
+
+## Physical acceptance
+
+The Android method `ScaPaymentE2ETest.sharesScaSdJwtWithNativeAuthorization` shares
+the existing DC-API harness. Select an enrolled physical device using `ANDROID_SERIAL`
+and a fresh preview installation (`id.walt.wallet.compose.test`):
+
+```bash
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedPreviewDebugAndroidTest \
+  -PenableAndroidBuild=true \
+  -Pandroid.testInstrumentationRunnerArguments.class=id.walt.walletdemo.compose.android.ScaPaymentE2ETest \
+  -Pandroid.testInstrumentationRunnerArguments.wallet.sca=approve
+```
+
+The test refuses existing wallet material. It checks holder binding, mandatory review
+with ordinary previews disabled, native authorization, KB-JWT claims/exact hashes
+and required verifier policies. It uses a signed request with a clear response so
+it can inspect the proof; the OpenAPI example demonstrates response encryption.
+
+Each iOS demo uses `PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization`;
+select that method on a physical iPhone with `WALLET_SCA_OPERATOR=approve` in the
+XCTest runner environment. It creates a unique wallet and exercises setup, issuance,
+review and native signing using unsigned `direct_post`, retaining the wallet warning.
+It does not qualify signed/encrypted iOS URL responses.
+
+Unattended Android lanes exclude `PhysicalDeviceTest`; unselected/simulator iOS runs
+skip the physical method. Such exclusions are not native-authentication evidence.
+The returned possession/inherence categories remain `other`, since the platform
+contract does not attest a biometric modality or certified WSCD category. Record
+source revisions and backend endpoints with physical results; live ITB and formal
+conformance remain separate evidence.

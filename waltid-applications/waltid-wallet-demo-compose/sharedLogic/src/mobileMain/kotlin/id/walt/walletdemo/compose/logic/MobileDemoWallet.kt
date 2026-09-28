@@ -343,10 +343,12 @@ internal class MobileDemoWallet(
 internal fun WalletDemoSigningProtection.toKeyUseAuthorizationPolicy(): KeyUseAuthorizationPolicy = when (this) {
     WalletDemoSigningProtection.None -> KeyUseAuthorizationPolicy.None
     WalletDemoSigningProtection.Biometric -> KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10)
+    WalletDemoSigningProtection.BiometricPerUse -> KeyUseAuthorizationPolicy.BiometricCurrentSet
 }
 
-private fun KeyUseAuthorizationPolicy.toDemoSigningProtection(): WalletDemoSigningProtection = when (this) {
+internal fun KeyUseAuthorizationPolicy.toDemoSigningProtection(): WalletDemoSigningProtection = when (this) {
     KeyUseAuthorizationPolicy.None -> WalletDemoSigningProtection.None
+    KeyUseAuthorizationPolicy.BiometricCurrentSet -> WalletDemoSigningProtection.BiometricPerUse
     is KeyUseAuthorizationPolicy.BiometricTimedReuse -> {
         check(timeoutSeconds == 10) {
             "Wallet key uses an unsupported biometric signing timeout: $timeoutSeconds seconds"
@@ -355,8 +357,7 @@ private fun KeyUseAuthorizationPolicy.toDemoSigningProtection(): WalletDemoSigni
     }
     KeyUseAuthorizationPolicy.BiometricAny,
     is KeyUseAuthorizationPolicy.DeviceCredential,
-    is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential,
-    KeyUseAuthorizationPolicy.BiometricCurrentSet -> error(
+    is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential -> error(
         "Wallet key uses an unsupported per-operation biometric signing policy",
     )
 }

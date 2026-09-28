@@ -3,13 +3,17 @@ package id.walt.walletdemo.compose.logic
 /** Signing-key authorization choices exposed by the demo wallets. */
 enum class WalletDemoSigningProtection {
     None,
-    Biometric;
+    Biometric,
+    BiometricPerUse;
+
+    val requiresBiometrics: Boolean get() = this != None
 
     companion object {
         fun parse(value: String): WalletDemoSigningProtection = when (value.trim().lowercase()) {
             "none" -> None
             "biometric" -> Biometric
-            else -> throw IllegalArgumentException("Signing protection must be none or biometric")
+            "biometricperuse" -> BiometricPerUse
+            else -> throw IllegalArgumentException("Signing protection must be none, biometric, or biometricPerUse")
         }
     }
 }
@@ -27,7 +31,7 @@ enum class WalletDemoSigningProtectionMode {
         }
 
     fun allows(protection: WalletDemoSigningProtection): Boolean = when (this) {
-        Required -> protection == WalletDemoSigningProtection.Biometric
+        Required -> protection.requiresBiometrics
         Optional -> true
         Disabled -> protection == WalletDemoSigningProtection.None
     }

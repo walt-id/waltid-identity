@@ -34,6 +34,7 @@ public enum WalletAccessibilityID {
     public static let settingsLock = identifier("settingsLock")
     public static let settingsReset = identifier("settingsReset")
     public static let settingsResetConfirm = identifier("settingsResetConfirm")
+    public static let signingProtectionBiometricPerUse = identifier("signingProtectionBiometricPerUse")
     public static let signingProtectionBiometric = identifier("signingProtectionBiometric")
     public static let signingProtectionNone = identifier("signingProtectionNone")
     public static let signingProtectionConfirm = identifier("signingProtectionConfirm")

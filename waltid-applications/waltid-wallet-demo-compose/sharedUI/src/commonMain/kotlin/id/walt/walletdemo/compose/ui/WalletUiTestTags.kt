@@ -48,6 +48,7 @@ internal object WalletUiTestTags {
     val SettingsReset = tag("settingsReset")
     val SettingsResetConfirm = tag("settingsResetConfirm")
     val SettingsSignOut = tag("settingsSignOut")
+    val SigningProtectionBiometricPerUse = tag("signingProtectionBiometricPerUse")
     val SigningProtectionBiometric = tag("signingProtectionBiometric")
     val SigningProtectionNone = tag("signingProtectionNone")
     val SigningProtectionConfirm = tag("signingProtectionConfirm")

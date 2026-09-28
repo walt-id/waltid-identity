@@ -39,6 +39,8 @@ data class WalletDemoSharingRequest(
     val readerTrust: WalletDemoReaderTrust? = null,
     val responseProtection: WalletDemoSharingResponseProtection = WalletDemoSharingResponseProtection.None,
     val transactionData: List<ClaimGroup> = emptyList(),
+    /** This authorization must be reviewed even when ordinary presentation previews are disabled. */
+    val requiresExplicitReview: Boolean = false,
     val technicalDetails: List<WalletDemoSharingDetail> = emptyList(),
 )
 

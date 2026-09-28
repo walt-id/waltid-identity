@@ -478,7 +478,7 @@ class WalletViewModel: ObservableObject {
         guard auth == .setup,
               signingProtectionMode == .optional,
               !isAuthenticating,
-              protection != .biometric || isBiometricSigningAvailable else { return }
+              !protection.requiresBiometrics || isBiometricSigningAvailable else { return }
         selectedSigningProtection = protection
         signingProtectionError = nil
     }
@@ -489,7 +489,7 @@ class WalletViewModel: ObservableObject {
 
     func requestSigningProtectionChange(_ protection: WalletDemoSigningProtection) {
         guard signingProtectionMode.allows(protection), !isChangingSigningProtection, !isLoading else { return }
-        guard protection != .biometric || isBiometricSigningAvailable else { return }
+        guard !protection.requiresBiometrics || isBiometricSigningAvailable else { return }
         if signingProtectionReprovisionTarget != nil {
             reprovisionWallet(
                 target: protection,
@@ -636,7 +636,7 @@ class WalletViewModel: ObservableObject {
                 message: "Authorize wallet signing",
                 cancelText: "Cancel"
             ),
-            signingIdentity: .init(alternativeAuthorizations: signingProtectionMode.allows(.none) ? [.none] : [],
+            signingIdentity: .init(alternativeAuthorizations: signingProtectionMode.alternativeAuthorizations,
                 keychain: .init(accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup),
                 recoveryProviders: [KeychainIdentityRecovery(namespace: "wallet-demo",
                     accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup)])
@@ -1571,7 +1571,7 @@ class WalletViewModel: ObservableObject {
     private func validateSigningProtection(_ protection: WalletDemoSigningProtection) async -> Bool {
         do {
             let availability = try await walletClient.signingProtectionAvailability(protection)
-            if protection == .biometric {
+            if protection.requiresBiometrics {
                 biometricSigningAvailability = availability
                 if availability == .available {
                     signingProtectionWarning = nil
@@ -1588,7 +1588,7 @@ class WalletViewModel: ObservableObject {
                 WalletStatusText.signingProtectionChangeFailed,
                 error
             )
-            if protection == .biometric {
+            if protection.requiresBiometrics {
                 biometricSigningAvailability = .unsupported
             }
             return false
@@ -1601,7 +1601,9 @@ class WalletViewModel: ObservableObject {
             guard let self else { return }
             let availability: WalletDemoSigningProtectionAvailability
             do {
-                availability = try await walletClient.signingProtectionAvailability(.biometric)
+                availability = try await walletClient.signingProtectionAvailability(
+                    appliedSigningProtection.flatMap { $0.requiresBiometrics ? $0 : nil } ?? .biometric
+                )
             } catch {
                 availability = .unsupported
             }
@@ -1618,7 +1620,7 @@ class WalletViewModel: ObservableObject {
         guard let warningSequence,
               lastWarnedForegroundSequence != warningSequence,
               auth == .unlocked,
-              appliedSigningProtection == .biometric,
+              appliedSigningProtection?.requiresBiometrics == true,
               let availability = biometricSigningAvailability,
               let warning = availability.warningMessage(
                   canChooseNoBiometricSigning: signingProtectionMode.allows(.none)

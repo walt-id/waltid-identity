@@ -1,6 +1,5 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
@@ -37,8 +36,7 @@ fun createIosDemoWallet(
                     walletId = config.walletId,
                     signingIdentity = id.walt.wallet2.mobile.identity.SigningIdentityConfiguration(
                         recoveryProviders = listOf(id.walt.wallet2.recovery.keychain.KeychainIdentityRecovery("wallet-demo", crossProcessAccess.keychainAccessGroup)),
-                        alternativeAuthorizations = if (config.signingProtectionMode.allows(WalletDemoSigningProtection.None))
-                        listOf(KeyUseAuthorizationPolicy.None) else emptyList(),
+                        alternativeAuthorizations = config.signingProtectionMode.alternativeAuthorizations(),
                         platform = id.walt.crypto2.keys.PlatformKeyConfiguration.IosKeychain(accessGroup = crossProcessAccess.keychainAccessGroup),
                     ),
                     attestationConfig = config.toWalletAttestationConfig(),
