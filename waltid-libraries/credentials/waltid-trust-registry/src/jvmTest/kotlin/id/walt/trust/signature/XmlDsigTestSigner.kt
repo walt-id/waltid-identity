@@ -32,6 +32,9 @@ object XmlDsigTestSigner {
     /** Ordinary PKCS#1 v1.5 RSA signature, for comparison/regression coverage. */
     const val RSA_SHA256 = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
 
+    /** ECDSA over SHA-256, as used by trust lists signed with an EC key. */
+    const val ECDSA_SHA256 = "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256"
+
     /**
      * Signs [xml] with an enveloped XMLDSig signature (exclusive C14N, whole-document reference)
      * appended as the last child of the document element, and returns the serialized result.
