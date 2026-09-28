@@ -1,6 +1,5 @@
 package id.walt.openid4vp.conformance.testplans.plans.vci.issuer
 
-import id.walt.openid4vp.conformance.report.ConformanceCiFlags
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.runner.req.CredentialOfferAuthMethod
 import kotlinx.serialization.Serializable
@@ -243,18 +242,16 @@ data class IssuerVariantSelection(
         )
 
         /**
-         * Strictness resolution:
-         * 1. Certification mode always strict
-         * 2. Explicit OPENID4VCI_CONFORMANCE_STRICT wins for local runs
-         * 3. If CONFORMANCE_ALLOW_FAILURE is present (including empty CI injection), invert soft-fail
-         * 4. Otherwise default strict (preserve local issuer exploration defaults)
+         * Certification mode is always strict. Otherwise `OPENID4VCI_CONFORMANCE_STRICT`
+         * wins when set; default is strict. Unaccepted issuer modules still fail the run
+         * via [ConformanceReportWriter.failIfNeededFromTestPlanResults] regardless of this flag.
          */
-        private fun resolveStrictResults(): Boolean {
-            if (bool("OPENID4VCI_CONFORMANCE_CERTIFICATION_MODE")) return true
-            optionalBool("OPENID4VCI_CONFORMANCE_STRICT")?.let { return it }
-            if (System.getenv(ConformanceCiFlags.ALLOW_FAILURE_ENV) != null) {
-                return ConformanceCiFlags.strictResults()
-            }
+        internal fun resolveStrictResults(
+            certificationMode: Boolean = bool("OPENID4VCI_CONFORMANCE_CERTIFICATION_MODE"),
+            explicitStrict: Boolean? = optionalBool("OPENID4VCI_CONFORMANCE_STRICT"),
+        ): Boolean {
+            if (certificationMode) return true
+            explicitStrict?.let { return it }
             return true
         }
 
@@ -387,19 +384,18 @@ object IssuerVariantReportWriter {
     }
 
     internal fun buildSummary(results: List<IssuerVariantRunResult>, strictResults: Boolean = true): String = buildString {
-        appendLine("# OpenID4VCI Issuer Matrix Summary")
+        appendLine("# ${ConformanceReportWriter.Role.VCI_ISSUER.title} Conformance Summary")
         appendLine()
         appendLine("- Strict issuer results: `${if (strictResults) "enabled" else "disabled"}`")
-        appendLine()
-        appendLine("| Status | Count |")
-        appendLine("|--------|-------|")
-        IssuerVariantRunStatus.values().forEach { status ->
-            appendLine("| `${status.name.lowercase()}` | ${results.count { it.status == status }} |")
-        }
-        appendLine()
-        appendLine(batchCoverageSummary(results))
+        appendLine("- Total: ${results.size}")
+        appendLine("- Passed: ${results.count { it.status == IssuerVariantRunStatus.PASSED }}")
+        appendLine("- Failed: ${results.count { it.status != IssuerVariantRunStatus.PASSED }}")
+        appendLine("- ${batchCoverageSummary(results)}")
         appendLine()
         appendLine("`not_offered_by_pinned_suite` means encrypted HAIP batch is absent from db1080a's plan; it is not batch coverage.")
+        appendLine()
+        appendLine("<details>")
+        appendLine("<summary>${ConformanceReportWriter.Role.VCI_ISSUER.title} results</summary>")
         appendLine()
         appendLine("| Variant | Status | Plan | Modules | Batch coverage | Error |")
         appendLine("|---------|--------|------|---------|----------------|-------|")
@@ -415,6 +411,8 @@ object IssuerVariantReportWriter {
                     "${errors.joinToString("; ").sanitizeMarkdownCell()} |"
             )
         }
+        appendLine()
+        appendLine("</details>")
     }
 
     internal fun batchCoverageSummary(results: List<IssuerVariantRunResult>): String =

@@ -528,10 +528,21 @@ object AuthorizationRequestResolver {
                     "Authorization Request Object client_id is required"
                 }
             }
-            validateCommonRequestObjectClaims(
-                payload = authReqJws.payload,
-                expectedAudience = expectedRequestObjectAudience,
-            )
+            // `aud` (and the JAR typ check above) bind a *signed* Request Object to this wallet.
+            // An `alg: none` object cannot steal another party's signature, and the conformance
+            // suite's `SerializeRequestObjectWithNullAlgorithm` emits exactly `{"alg":"none"}`
+            // with no `aud`. Requiring the default self-issued audience there rejects every
+            // `request_method=request_uri_unsigned` happy path after the request_uri fetch,
+            // so the suite waits forever for response_uri. Time claims are still checked when
+            // present.
+            if (isUnsigned) {
+                validateRequestObjectTimeClaims(authReqJws.payload)
+            } else {
+                validateCommonRequestObjectClaims(
+                    payload = authReqJws.payload,
+                    expectedAudience = expectedRequestObjectAudience,
+                )
+            }
         }
         expectedWalletNonce?.let { nonce ->
             val walletNonceClaim = authReqJws.payload["wallet_nonce"]?.jsonPrimitive?.contentOrNull
@@ -593,6 +604,10 @@ object AuthorizationRequestResolver {
             "Authorization Request Object aud must contain '$expectedAudience'"
         }
 
+        validateRequestObjectTimeClaims(payload)
+    }
+
+    private fun validateRequestObjectTimeClaims(payload: JsonObject) {
         val now = Clock.System.now().epochSeconds
         payload["exp"]?.let { element ->
             val expiration = (element as? JsonPrimitive)?.longOrNull
