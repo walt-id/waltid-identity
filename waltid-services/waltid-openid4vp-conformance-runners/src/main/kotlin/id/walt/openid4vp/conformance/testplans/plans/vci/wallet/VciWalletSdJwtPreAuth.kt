@@ -1,6 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.plans.vci.wallet
 
 import id.walt.openid4vp.conformance.config.ConformanceConfig
+import id.walt.openid4vp.conformance.config.ConformanceSuiteAlias
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
@@ -62,7 +63,7 @@ class VciWalletSdJwtPreAuth(
     override val configuration: JsonObject = Json.decodeFromString(
         """
         {
-            "alias": "vci_wallet_sdjwt_preauth",
+            "alias": "${ConformanceSuiteAlias.unique("vci_wallet_sdjwt_preauth")}",
             "description": "Wallet VCI - SD-JWT VC + DPoP + pre-authorized code",
             "server": {
                 "jwks": {
