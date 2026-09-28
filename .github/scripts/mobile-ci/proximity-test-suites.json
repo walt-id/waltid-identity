@@ -205,7 +205,8 @@
       "sources": [
         "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/KMPProximityProjectionTests.swift",
         "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/ProximityBridgeContractTests.swift",
-        "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/ProximityInputValidationTests.swift"
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/ProximityInputValidationTests.swift",
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/KMPKeyAttestationProviderTests.swift"
       ],
       "requiredTests": [
         {
@@ -267,6 +268,21 @@
           "class": "ProximityInputValidationTests",
           "name": "testStoredPolicyCannotDowngradeAProfileThatRequiresTrustedReaders",
           "oracle": "Stored settings cannot override the trusted-reader policy required by the selected profile."
+        },
+        {
+          "class": "KMPKeyAttestationProviderTests",
+          "name": "testAdapterForwardsRequestAndReturnsProviderJWT",
+          "oracle": "The Swift provider receives every issuer requirement and proof-key field, and its JWT reaches the shared caller."
+        },
+        {
+          "class": "KMPKeyAttestationProviderTests",
+          "name": "testAdapterPreservesAbsentNonceAndConstraints",
+          "oracle": "Absent issuer constraints and nonce remain absent across the Swift adapter."
+        },
+        {
+          "class": "KMPKeyAttestationProviderTests",
+          "name": "testAdapterPropagatesProviderFailure",
+          "oracle": "Provider failures reach the shared caller instead of producing an attestation."
         }
       ]
     },

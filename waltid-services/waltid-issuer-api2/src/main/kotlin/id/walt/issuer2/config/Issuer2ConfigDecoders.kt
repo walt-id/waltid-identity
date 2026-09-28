@@ -19,6 +19,7 @@ import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
 import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
 import id.walt.sdjwt.SDMap
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -30,6 +31,9 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
 fun registerIssuer2ConfigDecoders() {
+    ConfigManager.registerCustomDecoder(
+        Issuer2KotlinxConfigDecoder(SdJwtVcTypeMetadataDraft04::class, SdJwtVcTypeMetadataDraft04.serializer()),
+    )
     ConfigManager.registerCustomDecoder(
         Issuer2KotlinxConfigDecoder(
             SDMap::class,

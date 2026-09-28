@@ -21,6 +21,7 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
+import id.walt.verifier2.freePort
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
@@ -257,7 +258,7 @@ class W3CVerifier2IntegrationTest {
     @Test
     fun test() {
         val host = "127.0.0.1"
-        val port = 17031
+        val port = freePort()
         Verifier2WebhookRecorder().start().use { webhook ->
         E2ETest(host, port, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),

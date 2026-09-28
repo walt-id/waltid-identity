@@ -1,14 +1,11 @@
 <script setup lang="ts">
 import type { useIssuerSession } from "~/composables/useIssuerSession";
 import type { useProfiles } from "~/composables/useProfiles";
-import type {
-  IssuerCredentialConfiguration,
-  IssuerCredentialDisplay,
-} from "~/composables/useIssuerMetadata";
 import {
   DC_API_ISSUANCE_DOCS_URL,
   getDcApiIssuanceSupport,
 } from "~/utils/dcApiIssuance";
+import { buildProfileCards, type ProfileCard } from "~/utils/profileCards";
 
 type AuthMethod = "AUTHORIZED" | "PRE_AUTHORIZED";
 type DeliveryMethod = "qr" | "dc_api";
@@ -16,20 +13,25 @@ type DeliveryMethod = "qr" | "dc_api";
 const props = defineProps<{
   session: ReturnType<typeof useIssuerSession>;
   profiles: ReturnType<typeof useProfiles>;
+  profileId?: string | null;
+  card?: ProfileCard | null;
+  embedded?: boolean;
 }>();
 
 const config = useRuntimeConfig();
 const issuerBase = config.public.issuerBase as string;
 const issuerMetadata = useIssuerMetadata(issuerBase);
 
-const selectedProfileId = ref<string | null>(null);
+const selectedProfileId = ref<string | null>(
+  props.card?.profileId ?? props.profileId ?? null,
+);
 const authMethod = ref<AuthMethod>("PRE_AUTHORIZED");
 const deliveryMethod = ref<DeliveryMethod>("qr");
 const dcApiSupport = ref(getDcApiIssuanceSupport());
 
 onMounted(() => {
   dcApiSupport.value = getDcApiIssuanceSupport();
-  issuerMetadata.load();
+  if (!props.embedded) issuerMetadata.load();
 });
 
 watch(deliveryMethod, (method) => {
@@ -38,52 +40,37 @@ watch(deliveryMethod, (method) => {
   }
 });
 
-watch(selectedProfileId, (profileId) => {
-  if (profileId) {
-    props.profiles.loadDetail(profileId);
-  }
-});
+watch(
+  () => props.card?.profileId ?? props.profileId,
+  (profileId) => {
+    if (profileId) selectedProfileId.value = profileId;
+  },
+);
 
-interface ProfileCard {
-  profileId: string;
-  name: string;
-  credentialConfigurationId: string;
-  description?: string;
-  backgroundImageUri?: string;
-  backgroundColor: string;
-  configuration?: IssuerCredentialConfiguration;
-}
+watch(
+  selectedProfileId,
+  (profileId) => {
+    if (profileId) {
+      props.profiles.loadDetail(profileId);
+    }
+  },
+  { immediate: true },
+);
 
-function firstDisplay(
-  configuration?: IssuerCredentialConfiguration,
-): IssuerCredentialDisplay | undefined {
-  return configuration?.credential_metadata?.display?.[0];
-}
-
-const profileCards = computed<ProfileCard[]>(() =>
-  props.profiles.profiles.value.map((profile) => {
-    const credentialConfigurationId = profile.credentialConfigurationId ?? "";
-    const configuration = issuerMetadata.configurationFor(
-      credentialConfigurationId,
-    );
-    const display = firstDisplay(configuration);
-    return {
-      profileId: profile.profileId,
-      name: display?.name || profile.name || profile.profileId,
-      credentialConfigurationId,
-      description: display?.description,
-      backgroundImageUri: display?.background_image?.uri,
-      backgroundColor: display?.background_color || "#0f172a",
-      configuration,
-    };
-  }),
+const profileCards = computed(() =>
+  buildProfileCards(
+    props.profiles.profiles.value,
+    issuerMetadata.configurationFor,
+  ),
 );
 
 const selectedCard = computed(
   () =>
+    props.card ??
     profileCards.value.find(
       (card) => card.profileId === selectedProfileId.value,
-    ) ?? null,
+    ) ??
+    null,
 );
 
 const selectedProfileDetail = computed(() =>
@@ -125,87 +112,64 @@ async function submit() {
 <template>
   <div class="grid gap-5">
     <div
-      v-if="profiles.loading.value || issuerMetadata.loading.value"
+      v-if="
+        !embedded &&
+        (profiles.loading.value || issuerMetadata.loading.value)
+      "
       class="text-sm text-[--color-text-muted]"
     >
       Loading credential profiles…
     </div>
     <div
-      v-else-if="profiles.error.value || issuerMetadata.error.value"
+      v-else-if="
+        !embedded && (profiles.error.value || issuerMetadata.error.value)
+      "
       class="text-sm text-red-600"
     >
       {{ profiles.error.value || issuerMetadata.error.value }}
     </div>
 
-    <template v-else-if="!selectedCard">
-      <section>
-        <h2 class="text-lg font-semibold mb-1">Choose what to issue</h2>
-        <p class="text-sm text-[--color-text-muted] mb-3">
-          Select a credential profile. Issuance options appear after the card
-          enlarges.
-        </p>
+    <SimpleCredentialGrid
+      v-else-if="!embedded && !selectedCard"
+      :cards="profileCards"
+      @select="selectCard"
+    />
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <template v-else-if="selectedCard">
+      <template v-if="!embedded">
+        <div>
           <button
-            v-for="card in profileCards"
-            :key="card.profileId"
             type="button"
-            class="group relative w-full overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5 transition duration-150 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
-            :style="{ backgroundColor: card.backgroundColor }"
-            :aria-label="card.name"
-            @click="selectCard(card.profileId)"
+            class="text-sm font-medium text-[--color-text-muted] hover:text-[--color-text] mb-3"
+            @click="clearSelection"
+          >
+            Back to credentials
+          </button>
+
+          <div
+            class="relative w-full overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5"
+            :style="{ backgroundColor: selectedCard.backgroundColor }"
           >
             <span class="block w-full" style="aspect-ratio: 1.586" />
             <img
-              v-if="card.backgroundImageUri"
-              :src="card.backgroundImageUri"
-              :alt="card.name"
+              v-if="selectedCard.backgroundImageUri"
+              :src="selectedCard.backgroundImageUri"
+              :alt="selectedCard.name"
               class="absolute inset-0 h-full w-full object-cover"
             />
-            <span
-              v-else
-              class="absolute inset-0 flex items-end p-4 text-white font-semibold"
+          </div>
+
+          <div class="mt-4">
+            <h2 class="text-lg font-semibold">{{ selectedCard.name }}</h2>
+            <p
+              v-if="selectedCard.description"
+              class="text-sm text-[--color-text-muted] mt-1"
             >
-              {{ card.name }}
-            </span>
-          </button>
+              {{ selectedCard.description }}
+            </p>
+          </div>
         </div>
-      </section>
-    </template>
-
-    <template v-else>
-      <div>
-        <button
-          type="button"
-          class="text-sm font-medium text-[--color-text-muted] hover:text-[--color-text] mb-3"
-          @click="clearSelection"
-        >
-          Back to profiles
-        </button>
-
-        <div
-          class="relative w-full overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5"
-          :style="{ backgroundColor: selectedCard.backgroundColor }"
-        >
-          <span class="block w-full" style="aspect-ratio: 1.586" />
-          <img
-            v-if="selectedCard.backgroundImageUri"
-            :src="selectedCard.backgroundImageUri"
-            :alt="selectedCard.name"
-            class="absolute inset-0 h-full w-full object-cover"
-          />
-        </div>
-
-        <div class="mt-4">
-          <h2 class="text-lg font-semibold">{{ selectedCard.name }}</h2>
-          <p
-            v-if="selectedCard.description"
-            class="text-sm text-[--color-text-muted] mt-1"
-          >
-            {{ selectedCard.description }}
-          </p>
-        </div>
-      </div>
+      </template>
 
       <JsonViewer
         label="Credential definition"

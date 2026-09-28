@@ -10,11 +10,15 @@ import id.walt.crypto2.keys.AsymmetricCiphertext
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyDeletionResult
+import id.walt.crypto2.keys.KeyEncodingFormat
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toSpkiDer
 import id.walt.crypto2.kms.CredentialReference
 import id.walt.crypto2.providers.GenerateManagedKeyRequest
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.crypto2.serialization.BinaryData
 import io.ktor.client.HttpClient
@@ -72,6 +76,41 @@ class AzureKeyVaultKeyProviderTest {
         assertNotNull(restored.capabilities.signer)
         assertTrue("azure-production" in stored.providerData.toByteArray().decodeToString())
         assertFalse("client-secret" in stored.providerData.toByteArray().decodeToString())
+    }
+
+    @Test
+    fun `public key exporter converts stored JWK to SPKI_DER for X509`() = runTest {
+        // Azure KV persists only JWKs. X.509 cert generation requests SPKI_DER the same way software keys do.
+        val software = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val softwareKey = software.generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("software-p256"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val publicJwk = assertIs<EncodedKey.Jwk>(
+            requireNotNull(softwareKey.capabilities.publicKeyExporter).exportPublicKey(KeyEncodingFormat.JWK)
+        )
+        val expectedSpki = publicJwk.toSpkiDer(KeySpec.Ec(EcCurve.P256))
+
+        val stored = AzureKeyVaultKeyProvider.storedKeyForExisting(
+            id = KeyId("azure-x509-spki"),
+            spec = KeySpec.Ec(EcCurve.P256),
+            usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            options = options,
+            keyIdUrl = "https://vault.example/keys/ec-key/version-1",
+            publicKey = publicJwk,
+        )
+        val restored = runtime(mockClient { error("Export must not call Azure") }).restore(stored)
+        val exported = assertIs<EncodedKey.SpkiDer>(
+            requireNotNull(restored.capabilities.publicKeyExporter)
+                .exportPublicKey(KeyEncodingFormat.SPKI_DER),
+        )
+        assertContentEquals(expectedSpki.data.toByteArray(), exported.data.toByteArray())
+        assertIs<EncodedKey.Jwk>(
+            requireNotNull(restored.capabilities.publicKeyExporter).exportPublicKey(),
+        )
     }
 
     @Test

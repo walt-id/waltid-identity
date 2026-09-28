@@ -23,6 +23,9 @@ public struct WalletConfiguration: Sendable {
     /// neither requested nor accepted.
     public var issuerMetadataTrustResolver: (any IssuerMetadataTrustResolver)?
 
+    /// Runtime provider for issuers requiring key attestations in credential proofs.
+    public var keyAttestationProvider: (any KeyAttestationProvider)?
+
     /// Wallet-local persistence configuration.
     public var persistence: WalletPersistence
 
@@ -57,6 +60,7 @@ public struct WalletConfiguration: Sendable {
     ///     created wallet signing keys.
     ///   - keyUseAuthorizationPrompt: Prompt text used for protected signing operations.
     ///   - signingIdentity: Signing identity constraints and optional recovery providers.
+    ///   - keyAttestationProvider: Runtime key attester; supply it again when recreating the wallet.
     public init(
         walletID: String = "default",
         attestation: WalletAttestationConfiguration? = nil,
@@ -68,7 +72,8 @@ public struct WalletConfiguration: Sendable {
         crossProcessAccess: WalletCrossProcessAccess? = nil,
         defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .biometricCurrentSet,
         keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt = .init(),
-        signingIdentity: SigningIdentityConfiguration = .init()
+        signingIdentity: SigningIdentityConfiguration = .init(),
+        keyAttestationProvider: (any KeyAttestationProvider)? = nil
     ) {
         self.walletID = walletID
         self.signingIdentity = signingIdentity
@@ -77,6 +82,7 @@ public struct WalletConfiguration: Sendable {
         self.attestation = attestation
         self.clientIDTrustConfiguration = clientIDTrustConfiguration
         self.issuerMetadataTrustResolver = issuerMetadataTrustResolver
+        self.keyAttestationProvider = keyAttestationProvider
         self.persistence = persistence
         self.transactionDataProfiles = transactionDataProfiles
         self.preferredLocales = preferredLocales

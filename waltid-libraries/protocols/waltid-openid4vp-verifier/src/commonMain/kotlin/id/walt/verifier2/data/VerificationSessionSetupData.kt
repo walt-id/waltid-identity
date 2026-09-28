@@ -76,7 +76,8 @@ data class GeneralFlowConfig(
     init {
         require(dcqlQuery == null || requestedElements == null) { "Use either dcql_query or requestedElements, not both." }
 
-        // Verify if DCQL Query is correct
+        // OpenID4VP caller-supplied DCQL only. Annex C synthesizes an internal query from
+        // requestedElements and must not be subjected to OpenID4VP identifier rules.
         dcqlQuery?.precheck()
     }
 }
@@ -99,6 +100,16 @@ sealed interface VerificationSessionSetup {
     // e.g. notifications and policies
     val core: GeneralFlowConfig
 }
+
+/**
+ * DCQL used for session matching. OpenID4VP flows use the caller-supplied query (prechecked).
+ * Annex C uses an internal adapter built from `requestedElements`, which is not an OpenID4VP query.
+ */
+internal val VerificationSessionSetup.sessionDcqlQuery: DcqlQuery?
+    get() = when (this) {
+        is DcApiAnnexCFlowSetup -> generatedDcqlQuery
+        else -> core.dcqlQuery
+    }
 
 /**
  * Persist the effective signing key on the session setup so `request_uri_method=post`
@@ -435,7 +446,7 @@ data class DcApiAnnexCFlowSetup(
 ) : VerificationSessionSetup {
 
     @Transient
-    val generatedCore = buildAnnexCCore(
+    val generatedDcqlQuery: DcqlQuery = buildAnnexCDcqlQuery(
         requireNotNull(coreFlow.requestedElements) { "core_flow.requestedElements is required for ISO 18013-7 DC API" }
     )
 
@@ -448,11 +459,7 @@ data class DcApiAnnexCFlowSetup(
     val origin: String = expectedOrigins.single()
 
     @Transient
-    override val core: GeneralFlowConfig =
-        coreFlow.copy(
-            dcqlQuery = generatedCore.dcqlQuery,
-            requestedElements = null
-        )
+    override val core: GeneralFlowConfig = coreFlow
 
     init {
         val parsedOrigin = UrlUtils.checkDcApiOriginUrl(origin)
@@ -463,9 +470,17 @@ data class DcApiAnnexCFlowSetup(
     }
 
     companion object {
-        private fun buildAnnexCCore(
+        /**
+         * Internal matching adapter only. Doctypes are valid ISO identifiers and are used as
+         * query ids here; this must not run OpenID4VP [DcqlQuery.precheck].
+         */
+        private fun buildAnnexCDcqlQuery(
             namespaceRequestedElements: AnnexCDocTypeToRequestedElements,
-        ): GeneralFlowConfig {
+        ): DcqlQuery {
+            require(namespaceRequestedElements.isNotEmpty()) {
+                "requestedElements cannot be empty"
+            }
+
             val credentials = namespaceRequestedElements.entries
 
             val dcqlIndividualQueries: List<CredentialQuery> = credentials.map { (docType, requestedElements) ->
@@ -481,11 +496,7 @@ data class DcApiAnnexCFlowSetup(
                 )
             }
 
-            val dcqlQuery = DcqlQuery(credentials = dcqlIndividualQueries)
-
-            return GeneralFlowConfig(
-                dcqlQuery = dcqlQuery
-            )
+            return DcqlQuery(credentials = dcqlIndividualQueries)
         }
 
         val EXTENDED_MDL_EXAMPLE = DcApiAnnexCFlowSetup(

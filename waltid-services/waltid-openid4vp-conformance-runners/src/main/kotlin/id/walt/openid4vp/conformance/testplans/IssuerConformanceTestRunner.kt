@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance.testplans
 
+import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.http.IssuerInterface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
@@ -49,6 +50,8 @@ class IssuerConformanceTestRunner(
         pemFileEnvironmentVariable = "OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE",
     ),
     private val variantSelection: IssuerVariantSelection = IssuerVariantSelection.fromEnvironment(),
+    private val requireBatchPass: Boolean = System.getenv("OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS")
+        ?.toBooleanStrict() ?: false,
 ) {
     suspend fun run(): List<TestPlanResult> {
         val conformance = ConformanceInterface(conformanceHost, conformancePort)
@@ -85,6 +88,9 @@ class IssuerConformanceTestRunner(
         require(selectedVariants.isNotEmpty()) {
             "No OpenID4VCI issuer variants selected. Check OPENID4VCI_CONFORMANCE_VARIANTS and filter environment variables."
         }
+        require(!requireBatchPass || !variantSelection.discoveryOnly) {
+            "Batch acceptance requires executed modules; discovery mode cannot verify batch issuance."
+        }
 
         println("Resolved issuer credential configuration ids:")
         println("  sd-jwt-vc -> ${resolvedIds.sdJwt ?: "<not found>"}")
@@ -106,7 +112,7 @@ class IssuerConformanceTestRunner(
                     )
                 }
             }
-            IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, discoveryResults)
+            IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, discoveryResults, variantSelection.strictResults)
             println("Wrote issuer conformance discovery artifacts to ${variantSelection.reportDir}")
             return emptyList()
         }
@@ -154,8 +160,24 @@ class IssuerConformanceTestRunner(
             issuerInterface.close()
         }
 
-        IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, results)
+        IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, results, variantSelection.strictResults)
         println("Wrote issuer conformance matrix artifacts to ${variantSelection.reportDir}")
+        println(IssuerVariantReportWriter.batchCoverageSummary(results))
+        results.filter { it.batchCoverage == IssuerBatchCoverageStatus.NOT_OFFERED_BY_PINNED_SUITE }.forEach {
+            println("Batch not offered by pinned suite db1080a (not batch coverage): ${it.variantId}")
+        }
+
+        val testPlanResults = issuerResultsToTestPlanResults(results)
+        ConformanceReportWriter.failIfNeededFromTestPlanResults(
+            role = ConformanceReportWriter.Role.VCI_ISSUER,
+            results = testPlanResults,
+        )
+
+        // Ordinary runs retain capability-based skips. Batch acceptance checks raw suite outcomes.
+        // Write the unmodified reports first so missing, skipped, and failed modules remain diagnosable.
+        if (requireBatchPass) {
+            requireExecutedBatchIssuance(results)
+        }
 
         if (variantSelection.strictResults) {
             val failingResults = results.filter { it.status != IssuerVariantRunStatus.PASSED }
@@ -262,4 +284,56 @@ class IssuerConformanceTestRunner(
         return "${uri.scheme}://${uri.authority}"
     }
 
+}
+
+internal fun issuerResultsToTestPlanResults(results: List<IssuerVariantRunResult>): List<TestPlanResult> =
+    results.flatMap { result ->
+        if (result.modules.isEmpty()) {
+            listOf(
+                TestPlanResult(
+                    testName = result.variantId,
+                    conformanceTestId = result.planId ?: result.variantId,
+                    conformanceResult = if (result.status == IssuerVariantRunStatus.PASSED) "PASSED" else result.status.name,
+                    errorMessage = result.error.takeIf { result.status != IssuerVariantRunStatus.PASSED },
+                )
+            )
+        } else {
+            result.modules.map { module ->
+                val skipped = module.accepted && (
+                    module.result.equals("SKIPPED", ignoreCase = true) ||
+                        module.status.equals("SKIPPED", ignoreCase = true)
+                )
+                TestPlanResult(
+                    testName = "${result.variantId}/${module.testModule}",
+                    conformanceTestId = module.testId ?: result.variantId,
+                    conformanceStatus = module.status ?: result.status.name,
+                    conformanceResult = module.result,
+                    errorMessage = (module.error ?: result.error).takeIf { !module.accepted },
+                    skipReason = "Suite skipped this module".takeIf { skipped },
+                )
+            }
+        }
+    }
+
+internal fun requireExecutedBatchIssuance(results: List<IssuerVariantRunResult>) {
+    require(results.isNotEmpty()) { "Batch acceptance requires at least one executed variant." }
+    val missingCoverage = results.filter {
+        it.batchCoverage == IssuerBatchCoverageStatus.MISSING ||
+            it.batchCoverage == IssuerBatchCoverageStatus.NOT_PASSED
+    }
+    require(missingCoverage.isEmpty()) {
+        "Batch issuance must execute and pass for every selected variant where db1080a offers it. Missing batch coverage for: " +
+            missingCoverage.joinToString { it.variantId } +
+            ". Check results.json and suite logs; skipped, excluded, or unselected modules are not batch coverage."
+    }
+    require(results.any { it.batchCoverage == IssuerBatchCoverageStatus.PASSED }) {
+        "No batch coverage: the selected variants do not offer batch in pinned suite db1080a. " +
+            "Include basic VCI or plain HAIP variants when requiring batch acceptance."
+    }
+    val unsuccessfulVariants = results.filter { it.status != IssuerVariantRunStatus.PASSED || it.error != null }
+    require(unsuccessfulVariants.isEmpty()) {
+        "Batch acceptance also requires successful variant results. Unsuccessful variants: " +
+            unsuccessfulVariants.joinToString { "${it.variantId} (${it.status})" } +
+            ". Check summary.md and results.json."
+    }
 }

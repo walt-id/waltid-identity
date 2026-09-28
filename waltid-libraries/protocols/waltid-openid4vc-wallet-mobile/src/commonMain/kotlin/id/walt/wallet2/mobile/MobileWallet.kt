@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.handlers.WalletScaPresentationAuthorizer
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
@@ -18,6 +19,7 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
 import id.walt.wallet2.handlers.WalletIssuanceSessionStore
+import id.walt.wallet2.handlers.KeyAttestationProvider
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyUseAuthorizationSupport
@@ -214,6 +216,7 @@ public class MobileWallet internal constructor(
     private val proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     /** Issuance transport override. Only tests set this; production uses the configured engine. */
     issuanceHttpClient: HttpClient? = null,
+    private val scaAuthorizer: WalletScaPresentationAuthorizer? = null,
     createSigningIdentityManager: ((suspend () -> Unit) -> id.walt.wallet2.mobile.identity.SigningIdentityManager)? = null,
 ) {
     private val eventStream = MobileWalletEventStream()
@@ -241,6 +244,15 @@ public class MobileWallet internal constructor(
         didStore = didStore,
         credentialStores = listOf(credentialStore),
     )
+
+    /**
+     * Attaches the provider used when an issuer requires key attestation in a credential proof.
+     * This runtime dependency must be reattached whenever the wallet is recreated.
+     */
+    public fun attachKeyAttestationProvider(provider: KeyAttestationProvider): MobileWallet = apply {
+        wallet.attachKeyAttestationProvider(provider)
+    }
+
     private val annexCEngine = MobileWalletAnnexCEngine(
         wallet = wallet,
         readerTrustEvaluator = readerTrustEvaluator,
@@ -617,6 +629,7 @@ public class MobileWallet internal constructor(
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
+            scaAuthorizer = scaAuthorizer,
         )
         return response.toMobileDigitalCredentialResponse()
     }
@@ -777,6 +790,7 @@ public class MobileWallet internal constructor(
             ),
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
+            scaAuthorizer = scaAuthorizer,
         ).toMobilePresentationResult()
 
     /** Discards a reviewed presentation after local dismissal. */

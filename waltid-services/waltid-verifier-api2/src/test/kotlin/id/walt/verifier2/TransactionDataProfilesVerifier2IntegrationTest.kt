@@ -23,7 +23,7 @@ class TransactionDataProfilesVerifier2IntegrationTest {
     @Test
     fun `discovery returns seeded payment_card profile`() {
         val host = "127.0.0.1"
-        val port = 17110
+        val port = freePort()
         val paymentCard = TransactionDataProfile(
             type = "payment_card",
             displayName = "Payment Card",

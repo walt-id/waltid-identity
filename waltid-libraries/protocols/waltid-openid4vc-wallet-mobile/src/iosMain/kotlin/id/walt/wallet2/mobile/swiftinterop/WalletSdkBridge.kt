@@ -61,6 +61,11 @@ public class WalletSdkBridge private constructor(
      */
     public val events: Flow<MobileWalletEvent> = eventFlow
 
+    /** Attaches runtime key attestation support to this wallet instance. */
+    public suspend fun attachKeyAttestationProvider(
+        provider: WalletBridgeKeyAttestationProvider,
+    ): WalletBridgeResult<Unit> = walletBridgeCall { operations.attachKeyAttestationProvider(provider) }
+
     /** Reopens the selected identity or creates the configured default through the shared lifecycle. */
     public suspend fun initializeSigningIdentity(): WalletBridgeResult<SigningIdentityOperationResult> =
         walletBridgeCall { operations.signingIdentity.initialize() }
@@ -297,6 +302,9 @@ public class WalletSdkBridge private constructor(
 }
 
 internal interface WalletSdkBridgeOperations {
+    suspend fun attachKeyAttestationProvider(provider: WalletBridgeKeyAttestationProvider): Unit =
+        error("Key attestation is not implemented by this test bridge")
+
     suspend fun proximityPresentationCapabilities(
         configuration: ProximityConfiguration,
     ): ProximityCapabilities = error("Proximity presentation is not implemented by this test bridge")
@@ -375,6 +383,10 @@ internal interface WalletSdkBridgeOperations {
 internal class MobileWalletSdkBridgeOperations(
     private val wallet: MobileWallet,
 ) : WalletSdkBridgeOperations {
+    override suspend fun attachKeyAttestationProvider(provider: WalletBridgeKeyAttestationProvider) {
+        wallet.attachKeyAttestationProvider(provider.toKeyAttestationProvider())
+    }
+
     override suspend fun proximityPresentationCapabilities(
         configuration: ProximityConfiguration,
     ): ProximityCapabilities = wallet.proximityPresentationCapabilities(configuration)

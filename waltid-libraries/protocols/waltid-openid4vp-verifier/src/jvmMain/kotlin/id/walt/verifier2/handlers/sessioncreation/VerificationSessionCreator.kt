@@ -396,7 +396,7 @@ object VerificationSessionCreator {
             jsonObj.toString().encodeToByteArray().encodeToBase64Url()
         }
         val credentialQueriesById = transactionData?.let {
-            requireNotNull(setup.core.dcqlQuery) { "transaction_data requires a dcql_query" }
+            requireNotNull(setup.sessionDcqlQuery) { "transaction_data requires a dcql_query" }
                 .credentials
                 .associateBy { credentialQuery -> credentialQuery.id }
         }
@@ -448,7 +448,7 @@ object VerificationSessionCreator {
             request = null, // This would be the compact JWT string
 
             // OpenID4VP New Parameters (Section 5.1)
-            dcqlQuery = setup.core.dcqlQuery, // REQUIRED (unless 'scope' parameter represents a DCQL Query).
+            dcqlQuery = setup.sessionDcqlQuery, // REQUIRED (unless 'scope' parameter represents a DCQL Query).
             clientMetadata = effectiveClientMetadata,
 
 

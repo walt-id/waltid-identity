@@ -8,15 +8,29 @@ export interface IssuerCredentialDisplay {
   logo?: { uri?: string; alt_text?: string }
 }
 
+export interface IssuerCredentialClaimDisplay {
+  name?: string
+  locale?: string
+}
+
+export interface IssuerCredentialClaim {
+  path?: string[]
+  mandatory?: boolean
+  display?: IssuerCredentialClaimDisplay[]
+}
+
 export interface IssuerCredentialConfiguration {
   format?: string
   scope?: string
   doctype?: string
   vct?: string
-  credential_definition?: Record<string, unknown>
+  credential_definition?: {
+    type?: string[]
+    [key: string]: unknown
+  }
   credential_metadata?: {
     display?: IssuerCredentialDisplay[]
-    claims?: unknown
+    claims?: IssuerCredentialClaim[]
   }
   [key: string]: unknown
 }

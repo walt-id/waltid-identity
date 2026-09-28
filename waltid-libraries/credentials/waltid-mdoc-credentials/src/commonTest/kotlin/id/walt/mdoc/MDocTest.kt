@@ -266,13 +266,16 @@ class MDocTest {
 
     @Test
     fun testValidityInfoSerialization() {
-        val validityInfo = ValidityInfo(
-            Clock.System.now(), Clock.System.now(), Clock.System.now()
-        )
+        // ISO 18013-5 / RFC 8949 tdate: serialize truncates to whole UTC seconds.
+        val nowWithFraction = Instant.fromEpochSeconds(1_715_786_160, 123_000_000)
+        val validityInfo = ValidityInfo(nowWithFraction, nowWithFraction, nowWithFraction)
         val hex = Cbor.encodeToHexString(validityInfo.toMapElement())
         println(hex)
         val parsedValidityInfo = Cbor.decodeFromHexString<ValidityInfo>(hex)
-        assertEquals(expected = validityInfo.signed.value, actual = parsedValidityInfo.signed.value)
+        val truncated = Instant.fromEpochSeconds(nowWithFraction.epochSeconds)
+        assertEquals(expected = truncated, actual = parsedValidityInfo.signed.value)
+        assertEquals(expected = truncated, actual = parsedValidityInfo.validFrom.value)
+        assertEquals(expected = truncated, actual = parsedValidityInfo.validUntil.value)
     }
 
     @Test

@@ -208,6 +208,7 @@ class Issuer2MetadataEndpointTest {
         assertConfiguredCredentialScenariosAreAdvertised(credentialIssuerMetadata)
         assertSdJwtCatalogConfigurations(credentialIssuerMetadata)
         assertCredentialCardDisplayMetadata(credentialIssuerMetadata)
+        assertCredentialClaimsMetadata(credentialIssuerMetadata)
         assertSelfHostedSdJwtVcTypeMetadata(client, credentialIssuerMetadata)
         assertCredentialCardArtIsServed(client)
     }
@@ -277,6 +278,40 @@ class Issuer2MetadataEndpointTest {
         assertNull(jwtVcIssuerMetadata.jwks)
 
         assertEquals(HttpStatusCode.NotFound, client.get(NESTED_JWT_VC_ISSUER_METADATA_PATH).status)
+    }
+
+    private val allowedMdocAgeOverClaims = setOf(
+        "age_over_16",
+        "age_over_18",
+        "age_over_21",
+        "age_over_65",
+    )
+
+    private fun assertCredentialClaimsMetadata(
+        credentialIssuerMetadata: CredentialIssuerMetadata,
+    ) {
+        credentialIssuerMetadata.credentialConfigurationsSupported.forEach { (configurationId, configuration) ->
+            val claims = assertNotNull(
+                configuration.credentialMetadata?.claims,
+                "Expected claims for $configurationId",
+            )
+            assertTrue(claims.isNotEmpty(), "Expected non-empty claims for $configurationId")
+            claims.forEach { claim ->
+                assertTrue(claim.path.isNotEmpty(), "Expected claim path for $configurationId")
+                assertNotNull(
+                    claim.display?.firstOrNull()?.name?.takeIf { it.isNotBlank() },
+                    "Expected claim display name for $configurationId path ${claim.path}",
+                )
+            }
+            if (configuration.format == CredentialFormat.MSO_MDOC) {
+                val ageOver = claims.mapNotNull { it.path.lastOrNull() }.filter { it.startsWith("age_over_") }
+                val unexpected = ageOver.filterNot { it in allowedMdocAgeOverClaims }
+                assertTrue(
+                    unexpected.isEmpty(),
+                    "mdoc $configurationId advertised unexpected age_over claims: $unexpected",
+                )
+            }
+        }
     }
 
     private fun assertCredentialCardDisplayMetadata(
@@ -374,8 +409,20 @@ class Issuer2MetadataEndpointTest {
                 assertEquals(HttpStatusCode.OK, vctTypeMetadataRaw.status, metadataUrl)
                 val vctTypeMetadata = vctTypeMetadataRaw.body<SdJwtVcTypeMetadataDraft04>()
                 assertEquals(publishedVct, vctTypeMetadata.vct)
-                assertEquals(credentialConfigurationId, vctTypeMetadata.name)
-                assertEquals("$credentialConfigurationId Verifiable Credential", vctTypeMetadata.description)
+                if (credentialConfigurationId == "sca_payment_card_sd_jwt") {
+                    val configured = ConfigManager.getConfig<Issuer2MetadataConfig>()
+                        .sdJwtVcTypeMetadataConfiguration.getValue(credentialConfigurationId)
+                    assertEquals(configured.copy(vct = publishedVct), vctTypeMetadata)
+                    val document = vctTypeMetadata.toJSON()
+                    assertEquals("urn:eu:europa:ec:eudi:sua:sca", document["category"]?.jsonPrimitive?.content)
+                    val payment = document.getValue("transaction_data_types").jsonObject.getValue("urn:eudi:sca:payment:1").jsonObject
+                    assertEquals(5, payment.getValue("claims").jsonArray.size)
+                    val actions = payment.getValue("ui_labels").jsonObject.getValue("affirmative_action_label").jsonArray
+                    assertEquals(setOf("en", "de"), actions.map { it.jsonObject.getValue("lang").jsonPrimitive.content }.toSet())
+                } else {
+                    assertEquals(credentialConfigurationId, vctTypeMetadata.name)
+                    assertEquals("$credentialConfigurationId Verifiable Credential", vctTypeMetadata.description)
+                }
             }
         }
     }
@@ -393,11 +440,15 @@ class Issuer2MetadataEndpointTest {
                 setOf(SigningAlgId.Jose("ES256")),
                 configuration.credentialSigningAlgValuesSupported,
             )
-            assertEquals(JWT_PROOF_BINDING_METHODS, configuration.cryptographicBindingMethodsSupported)
+            val paymentDemo = credentialConfigurationId == "sca_payment_card_sd_jwt"
+            assertEquals(
+                if (paymentDemo) setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.DidJwk) else JWT_PROOF_BINDING_METHODS,
+                configuration.cryptographicBindingMethodsSupported,
+            )
             assertEquals(credentialConfigurationId, configuration.scope)
             assertEquals("$ISSUER_BASE_URL/$credentialConfigurationId", configuration.vct)
             assertEquals(
-                JWT_PROOF_SIGNING_ALGORITHMS,
+                if (paymentDemo) setOf("ES256") else JWT_PROOF_SIGNING_ALGORITHMS,
                 assertNotNull(configuration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
             )
         }
@@ -557,6 +608,7 @@ class Issuer2MetadataEndpointTest {
         )
 
         val SD_JWT_CATALOG_CONFIG_IDS = listOf(
+            "sca_payment_card_sd_jwt",
             "urn:eu.europa.ec.eudi:cor:1",
             "urn:eudi:ehic:1",
             "urn:eudi:pid:1",

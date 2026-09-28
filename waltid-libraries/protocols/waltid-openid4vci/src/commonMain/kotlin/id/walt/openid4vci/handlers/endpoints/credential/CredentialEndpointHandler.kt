@@ -38,6 +38,7 @@ fun interface CredentialEndpointHandler {
         authorizedTransactionDataTypes: List<String>?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
     ): CredentialResponseResult
 }
 
@@ -165,5 +166,6 @@ fun interface Crypto2CredentialEndpointHandler {
         authorizedTransactionDataTypes: List<String>?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
     ): CredentialResponseResult
 }

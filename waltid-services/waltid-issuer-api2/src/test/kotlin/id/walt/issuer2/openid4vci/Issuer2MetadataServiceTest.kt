@@ -1,5 +1,6 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
@@ -30,6 +31,54 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class Issuer2MetadataServiceTest {
+
+    @Test
+    fun `configured type metadata preserves extensions and resolves its associated VCT`() {
+        val extension = buildJsonObject {
+            put("urn:eudi:sca:payment:1", buildJsonObject {
+                put("schema", "urn:eudi:sca:payment:1")
+                put("claims_uri", "https://issuer.example/claims.json")
+                put("ui_labels_uri", "https://issuer.example/labels.json")
+            })
+        }
+        val configured = SdJwtVcTypeMetadataDraft04(
+            vct = "vctBaseUrl", name = "Payment demo",
+            customParameters = mapOf("transaction_data_types" to extension),
+        )
+        val config = sdJwtMetadata("payment", "vctBaseUrl").copy(
+            sdJwtVcTypeMetadataConfiguration = mapOf("payment" to configured),
+        )
+        val metadata = metadataService(metadataConfig = config).getVctTypeMetadata("payment")
+        assertEquals(configured.copy(vct = "http://localhost/openid4vci/payment"), metadata)
+        assertEquals(extension, metadata.toJSON()["transaction_data_types"])
+    }
+
+    @Test
+    fun `configured type metadata rejects unknown non SD-JWT and mismatched VCT associations`() {
+        val metadata = SdJwtVcTypeMetadataDraft04(name = "Payment")
+        val valid = sdJwtMetadata("payment", "vctBaseUrl")
+        val wrongFormat = valid.copy(credentialConfigurations = mapOf("payment" to buildJsonObject {
+            put("format", "mso_mdoc"); put("doctype", "payment")
+        }))
+        for (invalid in listOf(
+            valid.copy(sdJwtVcTypeMetadataConfiguration = mapOf("missing" to metadata)),
+            wrongFormat.copy(sdJwtVcTypeMetadataConfiguration = mapOf("payment" to metadata)),
+            valid.copy(sdJwtVcTypeMetadataConfiguration = mapOf("payment" to metadata.copy(vct = "https://different.example/type"))),
+        )) assertFailsWith<IllegalArgumentException> { metadataService(metadataConfig = invalid) }
+    }
+
+    @Test
+    fun `two configurations cannot publish conflicting documents at one VCT`() {
+        val vct = "http://localhost/openid4vci/shared"
+        val config = sdJwtMetadata("one", vct).copy(
+            credentialConfigurations = sdJwtMetadata("one", vct).credentialConfigurations + sdJwtMetadata("two", vct).credentialConfigurations,
+            sdJwtVcTypeMetadataConfiguration = mapOf(
+                "one" to SdJwtVcTypeMetadataDraft04(name = "One"),
+                "two" to SdJwtVcTypeMetadataDraft04(name = "Two"),
+            ),
+        )
+        assertFailsWith<IllegalArgumentException> { metadataService(metadataConfig = config) }
+    }
 
     @Test
     fun `generated self-hosted VCTs cannot use protocol path names`() {

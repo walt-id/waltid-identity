@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.handlers
 
+import id.waltid.openid4vp.wallet.presentation.ScaPresentationAuthorizer
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Mutex
 import kotlin.time.TimeSource
@@ -1014,6 +1015,20 @@ object WalletPresentationHandler {
         request: SubmitPresentationRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
+    ): WalletPresentResult = submitPresentation(
+        wallet = wallet,
+        request = request,
+        onEvent = onEvent,
+        transactionDataTypeRegistry = transactionDataTypeRegistry,
+        scaAuthorizer = null,
+    )
+
+    suspend fun submitPresentation(
+        wallet: Wallet,
+        request: SubmitPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        scaAuthorizer: WalletScaPresentationAuthorizer?,
     ): WalletPresentResult {
         request.selectedCredentialOptions.requireValidPresentationCredentialSelection()
         val preview = consumePreviewedAuthorizationRequest(wallet, request.previewHandle) { cached ->
@@ -1068,6 +1083,7 @@ object WalletPresentationHandler {
             },
             runPolicies = request.runPolicies,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
+            scaAuthorizer = scaAuthorizer,
         )
 
         return result.emitPresentationOutcome(onEvent)
@@ -1173,6 +1189,7 @@ object WalletPresentationHandler {
         expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        scaAuthorizer: WalletScaPresentationAuthorizer? = null,
     ): Result<WalletPresentResult> = memoizedSelection(selectCredentialsForQuery).let { selectOnce ->
         keyMaterial.crypto2Key?.let { crypto2Key ->
         WalletPresentFunctionality2.walletPresentHandling(
@@ -1189,6 +1206,9 @@ object WalletPresentationHandler {
             mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(isolatedCredentialsById),
             expectedRequestObjectAudience = expectedRequestObjectAudience,
             unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+            scaAuthorizer = scaAuthorizer?.let { authorizer ->
+                ScaPresentationAuthorizer { authorizer.authorize(crypto2Key, it) }
+            },
         )
     } ?: WalletPresentFunctionality2.walletPresentHandling(
         holderKey = requireNotNull(keyMaterial.legacyKey) {
@@ -1227,6 +1247,20 @@ object WalletPresentationHandler {
         request: SubmitDcApiPresentationRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
+    ): DcApiCredentialResponse = submitDcApiPresentation(
+        wallet = wallet,
+        request = request,
+        onEvent = onEvent,
+        transactionDataTypeRegistry = transactionDataTypeRegistry,
+        scaAuthorizer = null,
+    )
+
+    suspend fun submitDcApiPresentation(
+        wallet: Wallet,
+        request: SubmitDcApiPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        scaAuthorizer: WalletScaPresentationAuthorizer?,
     ): DcApiCredentialResponse {
         request.selectedCredentialOptions.requireValidPresentationCredentialSelection()
         return previewedDcApiRequests.useRetainingOnFailure(wallet.id, request.requestId) { previewedRequest ->
@@ -1278,6 +1312,9 @@ object WalletPresentationHandler {
                 selectCredentialsForQuery = selectCredentialsForQuery,
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                 mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(),
+                scaAuthorizer = scaAuthorizer?.let { authorizer ->
+                    ScaPresentationAuthorizer { authorizer.authorize(holderKey, it) }
+                },
             ).getOrElse { error ->
                 onEvent(WalletSessionEvent.presentation_failed)
                 throw error

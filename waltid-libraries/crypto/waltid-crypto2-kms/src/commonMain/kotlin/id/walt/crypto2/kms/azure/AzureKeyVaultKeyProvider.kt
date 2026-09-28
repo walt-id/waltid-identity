@@ -17,6 +17,7 @@ import id.walt.crypto2.keys.Encryptor
 import id.walt.crypto2.keys.KeyCapabilities
 import id.walt.crypto2.keys.KeyDeleter
 import id.walt.crypto2.keys.KeyDeletionResult
+import id.walt.crypto2.keys.KeyEncodingFormat
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
@@ -26,6 +27,8 @@ import id.walt.crypto2.keys.PublicKeyExporter
 import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.keys.Verifier
+import id.walt.crypto2.keys.toPublicJwk
+import id.walt.crypto2.keys.toSpkiDer
 import id.walt.crypto2.kms.KmsProviderException
 import id.walt.crypto2.kms.digest
 import id.walt.crypto2.kms.executeJson
@@ -160,7 +163,21 @@ class AzureKeyVaultKeyProvider(
                 Decryptor { ciphertext, associatedData -> decrypt(ciphertext, associatedData) }
             },
             deleter = KeyDeleter { delete() },
-            publicKeyExporter = PublicKeyExporter { requireNotNull(storedKey.publicKey) },
+            // Azure Key Vault only returns JWKs, but X.509 (and other callers) request SPKI_DER.
+            // Convert with the shared EncodedKey helpers the same way software keys do.
+            publicKeyExporter = object : PublicKeyExporter {
+                override suspend fun exportPublicKey(): EncodedKey =
+                    requireNotNull(storedKey.publicKey)
+
+                override suspend fun exportPublicKey(format: KeyEncodingFormat): EncodedKey {
+                    val material = requireNotNull(storedKey.publicKey)
+                    return when (format) {
+                        KeyEncodingFormat.JWK -> material.toPublicJwk(storedKey.spec)
+                        KeyEncodingFormat.SPKI_DER -> material.toSpkiDer(storedKey.spec)
+                        KeyEncodingFormat.PKCS8_DER -> error("PKCS8 is a private key format")
+                    }
+                }
+            },
             signatureAlgorithms = advertisedSignatureAlgorithms,
             encryptionAlgorithms = advertisedEncryptionAlgorithms,
             supportsSignatureAlgorithm = { it in advertisedSignatureAlgorithms },
