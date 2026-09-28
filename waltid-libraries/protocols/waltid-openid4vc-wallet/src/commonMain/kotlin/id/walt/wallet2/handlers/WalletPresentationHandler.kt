@@ -1972,6 +1972,7 @@ object WalletPresentationHandler {
                     webResolveAuthReq = fetcher,
                     requestUri = requestUri,
                     requestUriMethod = requestUriMethod,
+                    expectedRequestObjectAudience = expectedRequestObjectAudience,
                     requestUriPostWalletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
                         WalletPresentationFormatRegistry.buildVpFormatsSupported(capabilities()),
                         clientIdTrustConfiguration,
