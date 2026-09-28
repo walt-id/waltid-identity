@@ -124,6 +124,27 @@ class XmlDsigValidatorTest {
     }
 
     /**
+     * An ECDSA SignatureMethod URI (`xmldsig-more#ecdsa-*`) also contains "dsa", so the key selector
+     * used to take it for DSA, reject the EC certificate, and fail with "cannot find validation key" -
+     * the same symptom as the RSASSA-PSS case above, for every ECDSA-signed trust list.
+     */
+    @Test
+    fun `validate ECDSA signature from an EC certificate`() {
+        val chain = TestCertificates.createChain("ECDSA Trust List Signer")
+        val signedXml = XmlDsigTestSigner.signEnveloped(
+            xml = sampleTl,
+            certificate = chain.leaf,
+            privateKey = chain.leafKeyPair.private,
+            signatureMethodUri = XmlDsigTestSigner.ECDSA_SHA256
+        )
+
+        val result = XmlDsigValidator.validate(signedXml)
+
+        assertEquals(AuthenticityState.INTEGRITY_VERIFIED, result.state, "Details: ${result.details}")
+        assertEquals(chain.leaf, result.signerCertificate)
+    }
+
+    /**
      * Integration test that validates the real EU LoTL signature.
      * Requires network access - enable by setting RUN_NETWORK_TESTS=true
      */
