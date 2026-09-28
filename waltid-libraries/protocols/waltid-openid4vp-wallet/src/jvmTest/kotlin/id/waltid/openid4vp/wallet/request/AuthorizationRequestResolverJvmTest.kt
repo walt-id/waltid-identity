@@ -224,10 +224,77 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     @Test
+    fun `unsigned request object does not require aud`() = runBlocking {
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "redirect_uri:https://verifier.example/callback")
+            parameters.append("request_uri", "https://verifier.example/request")
+        }.build()
+        val payload = """{"client_id":"redirect_uri:https://verifier.example/callback","nonce":"n","response_type":"vp_token","response_mode":"direct_post","response_uri":"https://verifier.example/callback"}"""
+        val b64 = { value: String ->
+            Base64.getUrlEncoder().withoutPadding().encodeToString(value.encodeToByteArray())
+        }
+        val unsignedWithoutAud = "${b64("""{"alg":"none"}""")}.${b64(payload)}."
+
+        val resolved = AuthorizationRequestResolver.resolve(
+            requestUrl = requestUrl,
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        ) { _, _ ->
+            AuthorizationRequestResolver.RequestUriFetchResponse(
+                status = io.ktor.http.HttpStatusCode.OK,
+                contentType = ContentType("application", "oauth-authz-req+jwt"),
+                body = unsignedWithoutAud,
+            )
+        }
+
+        assertEquals(
+            "redirect_uri:https://verifier.example/callback",
+            resolved.authorizationRequest.clientId,
+        )
+        assertEquals("https://verifier.example/callback", resolved.authorizationRequest.responseUri)
+    }
+
+    @Test
+    fun `signed request object still requires aud`() = runBlocking {
+        val trustedKey = JWKKey.generate(KeyType.Ed25519)
+        val requestObject = trustedKey.signJws(
+            buildJsonObject {
+                put("client_id", "verifier2")
+                put("nonce", "nonce-123")
+            }.toString().encodeToByteArray(),
+            mapOf(
+                "typ" to JsonPrimitive("oauth-authz-req+jwt"),
+                "kid" to JsonPrimitive(trustedKey.getKeyId()),
+            ),
+        )
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
+            parameters.append("request", requestObject)
+        }.build()
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = requestUrl,
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+                fetchRequestUri = { _, _ -> error("request_uri fetch should not be called") },
+                trustConfiguration = ClientIdTrustConfiguration(
+                    preRegisteredClients = mapOf(
+                        "verifier2" to ClientMetadata(
+                            jwks = ClientMetadata.Jwks(listOf(trustedKey.getPublicKey().exportJWKObject())),
+                        )
+                    ),
+                ),
+            )
+        }
+        assertTrue(
+            "aud must contain" in (error.message ?: ""),
+            "signed Request Objects still require aud, was: ${error.message}",
+        )
+    }
+
+    @Test
     fun `request object audience and temporal claims are enforced`() = runBlocking {
         val now = Clock.System.now().epochSeconds
         val cases = listOf(
-            "wrong audience" to "{\"client_id\":\"verifier2\",\"nonce\":\"n\",\"aud\":\"https://other.example\"}",
             "expired" to "{\"client_id\":\"verifier2\",\"nonce\":\"n\",\"aud\":\"https://self-issued.me/v2\",\"exp\":${now - 3600}}",
             "future nbf" to "{\"client_id\":\"verifier2\",\"nonce\":\"n\",\"aud\":\"https://self-issued.me/v2\",\"nbf\":${now + 3600}}",
             "malformed exp" to "{\"client_id\":\"verifier2\",\"nonce\":\"n\",\"aud\":\"https://self-issued.me/v2\",\"exp\":\"soon\"}",
