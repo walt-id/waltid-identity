@@ -27,9 +27,15 @@ class IssuerVariantMatrixTest {
         val exploratory = IssuerVariantReportWriter.buildSummary(emptyList(), strictResults = false)
         assertTrue(strict.contains("Strict issuer results: `enabled`"))
         assertTrue(exploratory.contains("Strict issuer results: `disabled`"))
+        assertTrue(strict.contains("# OpenID4VCI Issuer Conformance Summary"))
+        assertTrue(strict.contains("- Total: 0"))
+        assertTrue(strict.contains("- Passed: 0"))
+        assertTrue(strict.contains("- Failed: 0"))
         assertTrue(strict.contains("<details>"))
         assertTrue(strict.contains("<summary>OpenID4VCI Issuer results</summary>"))
         assertTrue(strict.contains("</details>"))
+        assertTrue(strict.indexOf("- Total: 0") < strict.indexOf("<details>"))
+        assertTrue(strict.indexOf("Batch issuance coverage:") < strict.indexOf("<details>"))
         assertFalse(strict.contains("CONFORMANCE_ALLOW_FAILURE"))
         assertFalse(exploratory.contains("CONFORMANCE_ALLOW_FAILURE"))
     }
@@ -128,6 +134,10 @@ class IssuerVariantMatrixTest {
                 ),
             ),
         ))
+        assertTrue(summary.contains("- Total: 1"))
+        assertTrue(summary.contains("- Passed: 0"))
+        assertTrue(summary.contains("- Failed: 1"))
+        assertTrue(summary.indexOf("- Failed: 1") < summary.indexOf("<details>"))
         assertTrue(summary.contains("missing-proof (test=test-123, status=WAITING, result=none)"))
         assertTrue(summary.contains("Browser navigation failed \\| ERR_CONNECTION_REFUSED callback"))
         assertTrue(summary.contains("no-error-detail (test=not created, status=WAITING, result=none)"))

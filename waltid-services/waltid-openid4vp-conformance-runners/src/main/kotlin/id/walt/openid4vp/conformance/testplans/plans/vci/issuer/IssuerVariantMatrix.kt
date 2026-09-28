@@ -384,22 +384,18 @@ object IssuerVariantReportWriter {
     }
 
     internal fun buildSummary(results: List<IssuerVariantRunResult>, strictResults: Boolean = true): String = buildString {
-        appendLine("# OpenID4VCI Issuer Matrix Summary")
+        appendLine("# ${ConformanceReportWriter.Role.VCI_ISSUER.title} Conformance Summary")
         appendLine()
         appendLine("- Strict issuer results: `${if (strictResults) "enabled" else "disabled"}`")
-        appendLine()
-        appendLine("<details>")
-        appendLine("<summary>OpenID4VCI Issuer results</summary>")
-        appendLine()
-        appendLine("| Status | Count |")
-        appendLine("|--------|-------|")
-        IssuerVariantRunStatus.values().forEach { status ->
-            appendLine("| `${status.name.lowercase()}` | ${results.count { it.status == status }} |")
-        }
-        appendLine()
-        appendLine(batchCoverageSummary(results))
+        appendLine("- Total: ${results.size}")
+        appendLine("- Passed: ${results.count { it.status == IssuerVariantRunStatus.PASSED }}")
+        appendLine("- Failed: ${results.count { it.status != IssuerVariantRunStatus.PASSED }}")
+        appendLine("- ${batchCoverageSummary(results)}")
         appendLine()
         appendLine("`not_offered_by_pinned_suite` means encrypted HAIP batch is absent from db1080a's plan; it is not batch coverage.")
+        appendLine()
+        appendLine("<details>")
+        appendLine("<summary>${ConformanceReportWriter.Role.VCI_ISSUER.title} results</summary>")
         appendLine()
         appendLine("| Variant | Status | Plan | Modules | Batch coverage | Error |")
         appendLine("|---------|--------|------|---------|----------------|-------|")

@@ -583,32 +583,44 @@ jobs:
                   batch_modules: ([.[].modules[] | select(.testModule == "oid4vci-1_0-issuer-batch-issuance")]
                     | group_by(.result) | map({result: .[0].result, count: length}))}' \
                   "$ISSUER_DIAGNOSTICS_DIR/results.json" > "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
-                if jq -e 'length > 0' "$ISSUER_DIAGNOSTICS_DIR/results.json" >/dev/null; then
-                  echo '<details>'
-                  echo '<summary>OpenID4VCI Issuer results</summary>'
-                  echo
-                  echo '| Variant status | Count |'
-                  echo '|----------------|-------|'
-                  jq -r '.variants[] | "| \(.status) | \(.count) |"' "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
-                  echo
-                  echo '| Batch coverage | Count |'
-                  echo '|----------------|-------|'
-                  jq -r '.batch_coverage[] | "| \(.status) | \(.count) |"' "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
-                  echo
-                  echo '`NOT_OFFERED_BY_PINNED_SUITE` is a coverage gap, not a batch pass. `UNKNOWN` means the runner did not write a batch classification.'
-                  echo
-                  echo '| Variant | Status | Plan | Batch coverage |'
-                  echo '|---------|--------|------|----------------|'
+                issuer_total="$(jq 'length' "$ISSUER_DIAGNOSTICS_DIR/results.json")"
+                echo "- Total: $issuer_total"
+                echo "- Passed: $(jq '[.[] | select(.status == "PASSED")] | length' "$ISSUER_DIAGNOSTICS_DIR/results.json")"
+                echo "- Failed: $(jq '[.[] | select(.status != "PASSED")] | length' "$ISSUER_DIAGNOSTICS_DIR/results.json")"
+                jq -r '.batch_coverage[] | "- Batch coverage \(.status): \(.count)"' "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
+                echo
+                echo '`NOT_OFFERED_BY_PINNED_SUITE` is a coverage gap, not a batch pass. `UNKNOWN` means the runner did not write a batch classification.'
+                echo
+                echo '<details>'
+                echo '<summary>OpenID4VCI Issuer results</summary>'
+                echo
+                echo '| Variant | Status | Plan | Batch coverage |'
+                echo '|---------|--------|------|----------------|'
+                if [ "$issuer_total" -gt 0 ]; then
                   jq -r '.[] | "| \(.variantId | @html) | \(.status | @html) | \(if .planId then "[\(.planId | @html)](https://conformance.waltid.cloud/plan-detail.html?plan=\(.planId | @uri))" else "—" end) | \(.batchCoverage | @html) |"' \
                     "$ISSUER_DIAGNOSTICS_DIR/results.json"
-                  echo
-                  echo '</details>'
-                else
-                  echo '_No issuer variant results were produced. This does not establish issuer or batch coverage._'
                 fi
                 echo
+                echo '</details>'
+                echo
+                if [ "$issuer_total" -eq 0 ]; then
+                  echo '_No issuer variant results were produced. This does not establish issuer or batch coverage._'
+                  echo
+                fi
                 echo 'See the `issuer-conformance-basic-haip-batch` artifact for sanitized plan/test IDs and https://conformance.waltid.cloud/logs.html for suite logs.'
               else
+                echo '- Total: 0'
+                echo '- Passed: 0'
+                echo '- Failed: 0'
+                echo
+                echo '<details>'
+                echo '<summary>OpenID4VCI Issuer results</summary>'
+                echo
+                echo '| Variant | Status | Plan | Batch coverage |'
+                echo '|---------|--------|------|----------------|'
+                echo
+                echo '</details>'
+                echo
                 echo '_No issuer conformance results were produced. See the setup/test outcomes above and their logs; this is not a passing result._'
               fi
             fi
