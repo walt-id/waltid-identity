@@ -60,6 +60,24 @@ class EncryptedRequestObjectInteropTest {
     }
 
     @Test
+    fun `configured wallet issuer matches the signed request audience for plain and encrypted responses`() = runBlocking<Unit> {
+        val audience = "https://wallet.example"
+        for (encrypted in listOf(false, true)) {
+            val resolved = exchange(expectedAudience = audience) { nonce, recipient ->
+                val signed = sign(nonce, buildJsonObject { put("aud", audience) })
+                if (encrypted) encrypt(signed, recipient) else signed
+            }
+            assertIs<ResolvedAuthorizationRequest.AuthenticatedRequestObject>(resolved)
+            assertFails {
+                exchange(expectedAudience = audience) { nonce, recipient ->
+                    val signed = sign(nonce) // The default audience must not be accepted for this wallet.
+                    if (encrypted) encrypt(signed, recipient) else signed
+                }
+            }
+        }
+    }
+
+    @Test
     fun `encryption does not bypass inner signature trust identity freshness or nonce checks`() = runBlocking<Unit> {
         val invalidClaims = listOf(
             buildJsonObject { put("wallet_nonce", "wrong") },
@@ -138,28 +156,45 @@ class EncryptedRequestObjectInteropTest {
 
     @Test
     fun `metadata opt out and GET preserve their existing fetch contract`() = runBlocking<Unit> {
-        for (method in listOf(RequestUriHttpMethod.POST, RequestUriHttpMethod.GET)) {
+        for ((method, sendMetadata) in listOf(
+            RequestUriHttpMethod.POST to false,
+            RequestUriHttpMethod.GET to false,
+            RequestUriHttpMethod.GET to true,
+            null to true,
+        )) {
             HttpClient(MockEngine { request ->
                 if (method == RequestUriHttpMethod.POST) {
                     assertNull(parseQueryString((request.body as TextContent).text)["wallet_metadata"])
+                } else {
+                    assertEquals(HttpMethod.Get, request.method)
+                    assertFalse(request.body is TextContent)
                 }
                 respond("unchanged", headers = headersOf(HttpHeaders.ContentType, "application/oauth-authz-req+jwt"))
             }).use { client ->
-                val response = AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
-                    WebDataFetcher.wrapping(client, id = "encrypted-request-opt-out-test"),
-                    "https://verifier.example/request", method, sendWalletMetadata = false,
+                val fetcher = WebDataFetcher.wrapping(client, id = "encrypted-request-opt-out-test")
+                val legacyResponse = AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                    fetcher, "https://verifier.example/request", method,
+                    requestUriPostWalletMetadata = "not JSON", sendWalletMetadata = sendMetadata,
                 )
-                assertEquals("unchanged", response.body)
+                val configuredResponse = AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                    fetcher, "https://verifier.example/request", method,
+                    requestUriPostWalletMetadata = "not JSON", sendWalletMetadata = sendMetadata,
+                    expectedRequestObjectAudience = "https://wallet.example",
+                )
+                assertEquals("unchanged", legacyResponse.body)
+                assertEquals("unchanged", configuredResponse.body)
             }
         }
     }
 
     private suspend fun exchange(
         configuration: ClientIdTrustConfiguration = trust,
+        expectedAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
         response: suspend (String, ECKey) -> String,
     ): ResolvedAuthorizationRequest = HttpClient(MockEngine { request ->
         val form = parseQueryString((request.body as TextContent).text)
         val metadata = Json.parseToJsonElement(requireNotNull(form["wallet_metadata"])).jsonObject
+        assertEquals(expectedAudience, metadata.getValue("issuer").jsonPrimitive.content)
         assertEquals("kept", metadata.getValue("custom_metadata").jsonPrimitive.content)
         assertFalse("jwks_uri" in metadata)
         assertEquals(listOf("ECDH-ES"), metadata.getValue("request_object_encryption_alg_values_supported")
@@ -173,10 +208,12 @@ class EncryptedRequestObjectInteropTest {
         respond(response(requireNotNull(form["wallet_nonce"]), ECKey.parse(publicJwk.toString())),
             headers = headersOf(HttpHeaders.ContentType, "application/oauth-authz-req+jwt"))
     }).use { client ->
-        AuthorizationRequestResolver.resolve(requestUrl, trustConfiguration = configuration, fetchRequestUri = { uri, method ->
+        AuthorizationRequestResolver.resolve(requestUrl, trustConfiguration = configuration,
+            expectedRequestObjectAudience = expectedAudience, fetchRequestUri = { uri, method ->
             AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
                 WebDataFetcher.wrapping(client, id = "encrypted-request-interop-test"), uri, method,
-                requestUriPostWalletMetadata = "{\"custom_metadata\":\"kept\",\"jwks_uri\":\"https://unused.example/keys\"}",
+                requestUriPostWalletMetadata = "{\"issuer\":\"https://stale.example\",\"custom_metadata\":\"kept\",\"jwks_uri\":\"https://unused.example/keys\"}",
+                expectedRequestObjectAudience = expectedAudience,
             )
         })
     }

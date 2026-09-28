@@ -29,6 +29,20 @@
       "lanes": ["ios-simulator", "native", "compose", "enterprise", "sdk-docs"]
     },
     {
+      "name": "shared OpenID4VP wallet change selects native integration tests",
+      "files": [
+        "waltid-libraries/protocols/waltid-openid4vp-wallet/src/commonMain/kotlin/id/waltid/openid4vp/wallet/request/AuthorizationRequestResolver.kt"
+      ],
+      "lanes": ["ios-simulator", "native"]
+    },
+    {
+      "name": "shared Wallet2 change selects native integration tests",
+      "files": [
+        "waltid-libraries/protocols/waltid-openid4vc-wallet/src/commonMain/kotlin/id/walt/wallet2/handlers/WalletPresentationHandler.kt"
+      ],
+      "lanes": ["ios-simulator", "native"]
+    },
+    {
       "name": "native demo change selects native only",
       "files": [
         "waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/ContentView.swift"
