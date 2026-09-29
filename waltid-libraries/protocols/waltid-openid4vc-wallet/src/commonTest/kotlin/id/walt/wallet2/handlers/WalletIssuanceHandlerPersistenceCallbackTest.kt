@@ -74,7 +74,7 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
 
     @Test
     fun `callback reports first credential when second persistence fails`() = runTest {
-        val holderKey = JWKKey.generate(KeyType.secp256r1)
+        val holderKey = JWKKey.generate(KeyType.Ed25519)
         val credential = batchTestCredential(holderKey)
         val store = FailingCredentialStore(failAtAttempt = 2)
         val callbacks = mutableListOf<String>()
@@ -96,7 +96,7 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
 
     @Test
     fun `callback reports nothing when persistence fails before first credential`() = runTest {
-        val holderKey = JWKKey.generate(KeyType.secp256r1)
+        val holderKey = JWKKey.generate(KeyType.Ed25519)
         val credential = batchTestCredential(holderKey)
         val store = FailingCredentialStore(failAtAttempt = 1)
         var callbacks = 0
@@ -153,12 +153,4 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
         override suspend fun removeCredential(id: String): Boolean = stored.removeAll { it.id == id }
     }
 
-    private companion object {
-        const val CREDENTIAL = """{
-            "@context":["https://www.w3.org/2018/credentials/v1"],
-            "type":["VerifiableCredential"],
-            "issuer":"did:example:issuer",
-            "credentialSubject":{"id":"did:example:holder"}
-        }"""
-    }
 }
