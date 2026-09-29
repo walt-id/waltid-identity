@@ -17,6 +17,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ResolveOfferDetailedResponse(
     val credentialIssuer: String,
+    val batchSize: Int? = null,
     val credentialConfigurationIds: List<String>,
     val grantType: String? = null,
     val preAuthorizedCode: String? = null,
@@ -89,6 +90,7 @@ fun WalletOfferResolution.toDetailedResponse(
     preferredLocales: List<String> = emptyList(),
 ): ResolveOfferDetailedResponse = ResolveOfferDetailedResponse(
     credentialIssuer = summary.credentialIssuer,
+    batchSize = summary.batchSize,
     credentialConfigurationIds = summary.credentialConfigurationIds,
     grantType = summary.grantType,
     preAuthorizedCode = summary.preAuthorizedCode,

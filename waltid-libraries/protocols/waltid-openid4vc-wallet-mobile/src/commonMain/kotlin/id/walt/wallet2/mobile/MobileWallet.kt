@@ -39,6 +39,7 @@ import id.walt.wallet2.handlers.SubmitDcApiPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceAuthorizationCallback
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.handlers.WalletDeferredCredential
 import id.walt.wallet2.handlers.WalletIssuanceSession
 import id.walt.wallet2.handlers.WalletIssuanceSessionRequest
 import id.walt.wallet2.handlers.WalletIssuanceSessionService
@@ -65,6 +66,8 @@ import id.waltid.openid4vp.wallet.DcApiWallet
 import io.ktor.client.HttpClient
 import io.ktor.http.Url
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.NonCancellable
@@ -201,6 +204,8 @@ public class MobileWallet internal constructor(
     private val runKeyUseAuthorizationPreflight: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> KeyUseAuthorizationSupport =
         { _, _ -> error("This MobileWallet does not support key-use authorization preflight") },
     private val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
+    private val generateAndPersistHolderKey: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> id.walt.crypto2.keys.Key =
+        { _, _ -> error("Holder key creation requires the persistent mobile wallet factory") },
     attestationConfig: WalletAttestationConfig? = null,
     private val preferredLocales: List<String> = emptyList(),
     private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
@@ -247,12 +252,14 @@ public class MobileWallet internal constructor(
         )
     }
 
+    private val issuanceSessionState = id.walt.wallet2.handlers.WalletIssuanceSessionState(walletId, issuanceSessionStore)
+
     private val wallet = Wallet(
         id = walletId,
         keyStores = listOf(keyStore),
         didStore = didStore,
         credentialStores = listOf(credentialStore),
-    )
+    ).attachIssuanceSessionState(issuanceSessionState)
 
     /**
      * Attaches the provider used when an issuer requires key attestation in a credential proof.
@@ -297,7 +304,7 @@ public class MobileWallet internal constructor(
         attestationAssembler = attestationAssembler,
         metadataTrustResolver = credentialIssuerMetadataTrustResolver,
         onEvent = ::emitSessionEvent,
-        sessionStore = issuanceSessionStore,
+        runtimeState = issuanceSessionState,
         httpClient = issuanceHttpClient,
     )
 
@@ -307,6 +314,47 @@ public class MobileWallet internal constructor(
     public val signingIdentity: id.walt.wallet2.mobile.identity.SigningIdentityManager
         get() = checkNotNull(signingIdentityManager) { "Identity lifecycle requires the persistent mobile wallet factory" }
 
+
+    /**
+     * Explicitly creates holder keys for a requested issuance batch using the platform key policy.
+     * Nothing calls this during preview or acceptance; the app decides when to create new keys.
+     */
+    public suspend fun createIssuanceHolderKeys(
+        count: Int,
+        keyType: MobileWalletKeyType? = null,
+        didMethod: String = "key",
+        keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy? = null,
+    ): List<MobileWalletHolderBinding> {
+        require(count >= 1) { "At least one holder key must be requested" }
+        MobileDidSupport.ensureInitialized()
+        val created = mutableListOf<MobileWalletHolderBinding>()
+        try {
+            repeat(count) {
+                currentCoroutineContext().ensureActive()
+                val key = generateAndPersistHolderKey(keyType ?: MobileWalletKeyType.secp256r1,
+                    keyUseAuthorizationPolicy ?: defaultKeyUseAuthorizationPolicy)
+                created += MobileWalletHolderBinding(key.id.value)
+                currentCoroutineContext().ensureActive()
+                val registered = Crypto2DidService.registerByKey(didMethod, key)
+                created[created.lastIndex] = MobileWalletHolderBinding(key.id.value, registered.did)
+                didStore.addDid(WalletDidEntry(registered.did, registered.didDocument.toJsonObject()))
+            }
+            currentCoroutineContext().ensureActive()
+            return created
+        } catch (cause: Throwable) {
+            withContext(NonCancellable) {
+                for (entry in created) {
+                    try {
+                        entry.did?.let { didStore.removeDid(it) }
+                    } catch (cleanupFailure: Throwable) { cause.addSuppressed(cleanupFailure) }
+                    try {
+                        keyStore.removeKey(entry.keyId)
+                    } catch (cleanupFailure: Throwable) { cause.addSuppressed(cleanupFailure) }
+                }
+            }
+            throw cause
+        }
+    }
 
     /** Checks whether a key-use authorization request is supported without creating or persisting a key. */
     public suspend fun keyUseAuthorizationPreflight(
@@ -343,16 +391,19 @@ public class MobileWallet internal constructor(
      */
     public suspend fun beginAuthorizationIssuance(
         sessionId: String,
-    ): WalletIssuanceAuthorization = issuanceSessions.beginAuthorization(sessionId)
+        credentials: List<MobileWalletCredentialSelection>? = null,
+    ): WalletIssuanceAuthorization = issuanceSessions.beginAuthorization(sessionId, credentials?.toLibrarySelections())
 
     /** Continues a pre-authorized session after review and optional transaction-code collection. */
     public suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
         transactionCode: String? = null,
+        credentials: List<MobileWalletCredentialSelection>? = null,
     ): WalletIssuanceOutcome =
         issuanceSessions.continuePreAuthorized(
             sessionId = sessionId,
             transactionCode = transactionCode?.ifBlank { null },
+            credentials = credentials?.toLibrarySelections(),
         ).alsoRefreshDigitalCredentialRegistration()
 
     /**
@@ -375,6 +426,10 @@ public class MobileWallet internal constructor(
     /** Cancels an active issuance session and discards its protocol continuation material. */
     public suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome =
         issuanceSessions.cancel(sessionId)
+
+    /** Recovers retained deferred handles after an interrupted flow or wallet recreation. */
+    public suspend fun listDeferredIssuance(): List<WalletDeferredCredential> =
+        issuanceSessions.listDeferredCredentials()
 
     /** Polls a typed deferred credential result returned by a previous issuance continuation. */
     public suspend fun resumeDeferredIssuance(
@@ -421,6 +476,12 @@ public class MobileWallet internal constructor(
         }
         val selectedDid = did ?: identity?.did ?: didStore.getDefaultDid()
         return when (offer) {
+            is MobileWalletCredentialOffer.Issuer -> WalletIssuanceSessionRequest(
+                credentialIssuer = offer.credentialIssuer,
+                credentialConfigurationIds = offer.credentialConfigurationIds,
+                keyId = selectedKeyId, did = selectedDid, clientId = clientId,
+                redirectUri = Url(redirectUri),
+            )
             is MobileWalletCredentialOffer.Uri -> WalletIssuanceSessionRequest(
                 offerUrl = Url(offer.value.trim()),
                 offerJson = null,
@@ -875,14 +936,14 @@ public class MobileWallet internal constructor(
      *
      * Proximity admission is permanently closed and active proximity cleanup is awaited first.
      * Use a newly opened wallet instance after deletion.
-     * Active issuance continuations are invalidated before the key, credential, and DID stores receive
-     * store-level remove calls. The wallet then closes and deletes the encrypted local database and deletes
+     * Issuance admission is permanently closed before the key, credential, and DID stores receive
+     * store-level remove calls. An in-progress retained transition or local save must finish first. The wallet then closes and deletes the encrypted local database and deletes
      * the configured database key.
      */
     public suspend fun deleteWallet() {
         proximityCoordinator.shutdown()
         WalletPresentationHandler.clearPreviews(wallet)
-        issuanceSessions.clearSessions()
+        issuanceSessions.closeSessions()
         keyStore.listKeys().toList().forEach { key ->
             keyStore.removeKey(key.keyId)
         }

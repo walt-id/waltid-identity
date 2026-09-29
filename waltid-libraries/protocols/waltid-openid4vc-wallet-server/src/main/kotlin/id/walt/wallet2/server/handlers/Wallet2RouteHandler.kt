@@ -14,6 +14,7 @@ import id.walt.wallet2.server.models.PresentationPreviewResponse
 import id.walt.wallet2.server.models.ResolveOfferDetailedResponse
 import id.walt.wallet2.server.models.toDetailedResponse
 import id.walt.wallet2.server.models.toPreviewResponse
+import id.walt.wallet2.server.openapi.Wallet2RequestExamples
 import id.walt.wallet2.server.openapi.Wallet2OpenApiDocs
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.token.TokenRequestException
@@ -597,10 +598,19 @@ object Wallet2RouteHandler {
                         description =
                             "Resolves the offer, requests a token, signs proof-of-possession, " +
                                     "fetches the credential(s) and stores them. " +
-                                    "Returns a stream of stored credentials as they arrive."
-                        request { pathParameter<String>("walletId"); body<ReceiveCredentialRequest>() }
+                                    "Returns stored IDs and deferred targets; a failure includes prior progress and unattempted targets."
+                        request { pathParameter<String>("walletId"); body<ReceiveCredentialRequest> {
+                            description = Wallet2RequestExamples.BATCH_DESCRIPTION
+                            example("01 — Single instance (default)") { value = Wallet2RequestExamples.RECEIVE_SINGLE }
+                            example("02 — Two instances, two holder keys") { value = Wallet2RequestExamples.RECEIVE_BATCH }
+                            example("03 — Multiple configurations and a batch") { value = Wallet2RequestExamples.RECEIVE_MULTIPLE }
+                        } }
                         response {
                             HttpStatusCode.OK to { body<ReceiveCredentialResult>() }
+                            HttpStatusCode.MultiStatus to { body<ReceiveCredentialResult>(); description = "Partial progress or retained storageOutcome; resume its handle, do not redeem the grant again" }
+                            HttpStatusCode.UnprocessableEntity to { body<ReceiveCredentialResult>() }
+                            HttpStatusCode.BadGateway to { body<ReceiveCredentialResult>() }
+                            HttpStatusCode.InternalServerError to { body<ReceiveCredentialResult>() }
                             HttpStatusCode.BadRequest to { description = "Token request failed (e.g. wrong PIN / tx_code)" }
                         }
                     }) {
@@ -612,7 +622,7 @@ object Wallet2RouteHandler {
                                 request = req,
                                 attestationAssembler = attestationAssembler,
                             )
-                            call.respond(result)
+                            call.respondIssuanceResult(result)
                         } catch (e: TokenRequestException) {
                             throw e.toWebException()
                         }
@@ -634,7 +644,10 @@ object Wallet2RouteHandler {
 
                     post("/request-token", {
                         summary = "Isolated: exchange pre-authorized code for access token"
-                        request { pathParameter<String>("walletId"); body<RequestTokenRequest>() }
+                        description = "Supply credentialIssuer and credentialConfigurationIds to select authorization_details or scopes automatically from metadata."
+                        request { pathParameter<String>("walletId"); body<RequestTokenRequest> {
+                            example("Automatic authorization for selected configurations") { value = Wallet2RequestExamples.REQUEST_TOKEN_AUTOMATIC }
+                        } }
                         response { HttpStatusCode.OK to { body<RequestTokenResult>() } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
@@ -664,7 +677,7 @@ object Wallet2RouteHandler {
                     }
 
                     post("/sign-proof", {
-                        summary = "Isolated: sign a proof-of-possession JWT"
+                        summary = "Isolated: sign a collection of proof-of-possession JWTs"
                         request { pathParameter<String>("walletId"); body<SignProofRequest>() }
                         response { HttpStatusCode.OK to { body<SignProofResult>() } }
                     }) {
@@ -676,23 +689,26 @@ object Wallet2RouteHandler {
                     post("/fetch-credential", {
                         summary = "Isolated: fetch a credential from the issuer's credential endpoint"
                         description = "When storeInWallet is true the fetched credential(s) are automatically " +
-                                "stored in the wallet, removing the need to call the import endpoint afterwards. " +
+                                "stored in the wallet. storageOutcome reports saved IDs and any retained local-save handle; " +
+                                "resume that handle through the deferred-resume route instead of repeating the issuer fetch. " +
                                 "Pass credentialIssuerBaseUrl when storing so issuer display metadata and labels " +
                                 "are persisted like the full receive path. " +
-                                "When the response can contain an mdoc, keyId must identify the exact wallet key " +
-                                "used to create proofJwt. " +
-                                "If the issuer returns invalid_nonce, request a fresh nonce, sign a new proof, " +
+                                "Supply holderBindings identifying the exact wallet keys used to create proofs.jwt. " +
+                                "For a single instance keyId may supply the default holder key. " +
+                                "If the issuer returns invalid_nonce, request a fresh nonce, sign the proof collection again, " +
                                 "and repeat this isolated fetch step."
                         request { pathParameter<String>("walletId"); body<FetchCredentialRequest>() }
                         response {
                             HttpStatusCode.OK to { body<FetchCredentialResult>() }
+                            HttpStatusCode.MultiStatus to { body<FetchCredentialResult>() }
+                            HttpStatusCode.InternalServerError to { body<FetchCredentialResult>() }
                             HttpStatusCode.BadRequest to { body<CredentialError>() }
                         }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<FetchCredentialRequest>()
                         try {
-                            call.respond(WalletIssuanceHandler.fetchCredential(wallet, req))
+                            call.respondFetchCredentialResult(WalletIssuanceHandler.fetchCredential(wallet, req))
                         } catch (error: CredentialEndpointException) {
                             if (!error.isInvalidNonce) throw error
                             call.respond(HttpStatusCode.BadRequest, requireNotNull(error.credentialError))
@@ -705,9 +721,12 @@ object Wallet2RouteHandler {
                         summary = "Auth-code grant: generate authorization redirect URL"
                         description =
                             "Resolves the offer and builds the OAuth authorization URL. " +
+                                    "Selects authorization_details or scopes automatically from issuer metadata. " +
                                     "The caller must redirect to this URL and capture the returned code. " +
                                     "The response includes continuation data for later token and credential requests."
-                        request { pathParameter<String>("walletId"); body<GenerateAuthorizationUrlRequest>() }
+                        request { pathParameter<String>("walletId"); body<GenerateAuthorizationUrlRequest> {
+                            example("Multiple configurations without an offer") { value = Wallet2RequestExamples.AUTHORIZE_WITHOUT_OFFER }
+                        } }
                         response { HttpStatusCode.OK to { body<GenerateAuthorizationUrlResult>() } }
                     }) {
                         // Wallet-aware overload: PAR is a client-authenticated endpoint, so the
@@ -747,24 +766,44 @@ object Wallet2RouteHandler {
                         }
                     }
 
+                    get("/deferred", {
+                        summary = "List wallet-scoped deferred issuance handles"
+                        request { pathParameter<String>("walletId") }
+                        response { HttpStatusCode.OK to { body<List<WalletDeferredCredential>>() } }
+                    }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@get
+                        call.respond(wallet.issuanceSessions().listDeferredCredentials())
+                    }
+                    post("/deferred/{deferredCredentialId}", {
+                        summary = "Resume retained deferred issuance"
+                        description = "Uses the opaque handle returned by full issuance. Tokens and sender-key context remain in the wallet."
+                        request { pathParameter<String>("walletId"); pathParameter<String>("deferredCredentialId") }
+                        response { HttpStatusCode.OK to { body<WalletIssuanceOutcome>() } }
+                    }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
+                        val outcome = wallet.issuanceSessions().resumeDeferred(call.parameters["deferredCredentialId"]!!)
+                        call.respond<WalletIssuanceOutcome>(outcome)
+                    }
                     post("/deferred", {
                         summary = "Poll deferred credential endpoint"
                         description =
                             "Polls the issuer's deferred credential endpoint for a previously " +
-                                    "deferred credential. Returns immediately with empty list if still pending. " +
+                                    "deferred credential. Returns a pending transaction and retry interval when issuance is not ready. " +
+                                    "A partial local save returns storageOutcome and a retained handle with HTTP 207; resume the handle instead of polling the issuer again. " +
                                     "Pass credentialIssuerBaseUrl (and optionally credentialConfigurationId) so " +
                                     "issuer display metadata and labels are stored like the full receive path. " +
                                     "When the response can contain an mdoc, keyId must identify the exact wallet " +
                                     "key used for the original credential request."
                         request { pathParameter<String>("walletId"); body<PollDeferredRequest>() }
-                        response { HttpStatusCode.OK to { body<ReceiveCredentialResult>() } }
+                        response {
+                            HttpStatusCode.OK to { body<PollDeferredResult>() }
+                            HttpStatusCode.MultiStatus to { body<PollDeferredResult>() }
+                            HttpStatusCode.InternalServerError to { body<PollDeferredResult>() }
+                        }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PollDeferredRequest>()
-                        val ids = mutableListOf<String>()
-                        WalletIssuanceHandler.pollDeferredFlow(wallet, req)
-                            .collect { ids += it.id }
-                        call.respond(ReceiveCredentialResult(credentialIds = ids))
+                        call.respondPollDeferredResult(WalletIssuanceHandler.pollDeferred(wallet, req))
                     }
                     post("/authorized", {
                         summary = "Complete the authorization-code grant"
@@ -776,14 +815,23 @@ object Wallet2RouteHandler {
                                     "returned by /credentials/receive/authorization-url."
                         request {
                             pathParameter<String>("walletId")
-                            body<ReceiveAuthorizedCredentialRequest>()
+                            body<ReceiveAuthorizedCredentialRequest> {
+                                description = Wallet2RequestExamples.BATCH_DESCRIPTION
+                                example("Batch after authorization") { value = Wallet2RequestExamples.RECEIVE_AUTHORIZED_BATCH }
+                            }
                         }
-                        response { HttpStatusCode.OK to { body<ReceiveCredentialResult>() } }
+                        response {
+                            HttpStatusCode.OK to { body<ReceiveCredentialResult>() }
+                            HttpStatusCode.MultiStatus to { body<ReceiveCredentialResult>(); description = "Partial progress or retained storageOutcome; resume its handle, do not redeem the grant again" }
+                            HttpStatusCode.UnprocessableEntity to { body<ReceiveCredentialResult>() }
+                            HttpStatusCode.BadGateway to { body<ReceiveCredentialResult>() }
+                            HttpStatusCode.InternalServerError to { body<ReceiveCredentialResult>() }
+                        }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ReceiveAuthorizedCredentialRequest>()
                         try {
-                            call.respond(
+                            call.respondIssuanceResult(
                                 WalletIssuanceHandler.receiveCredentialAuthCode(
                                     wallet = wallet,
                                     request = req,
@@ -1064,13 +1112,14 @@ object Wallet2RouteHandler {
             ?: run { respond(HttpStatusCode.BadRequest, "Missing walletId path parameter"); return null }
         // Auth enforcement: if auth is enabled, verify the account owns this wallet
         if (getAccountId != null) {
-            val accountId = getAccountId()
-            if (accountId != null) {
-                val ownedIds = resolver.getWalletIdsForAccount(accountId) ?: emptyList()
-                if (walletId !in ownedIds) {
-                    respond(HttpStatusCode.Forbidden, "Wallet '$walletId' does not belong to this account")
-                    return null
-                }
+            val accountId = getAccountId() ?: run {
+                respond(HttpStatusCode.Unauthorized, "Authentication required")
+                return null
+            }
+            val ownedIds = resolver.getWalletIdsForAccount(accountId) ?: emptyList()
+            if (walletId !in ownedIds) {
+                respond(HttpStatusCode.Forbidden, "Wallet '$walletId' does not belong to this account")
+                return null
             }
         }
         return resolver.resolveWallet(walletId)

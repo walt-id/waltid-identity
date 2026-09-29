@@ -68,6 +68,8 @@ struct ReceiveView: View {
                     preview: preview,
                     isAcceptEnabled: viewModel.acceptOfferEnabled,
                     isReviewEnabled: viewModel.offerReviewEnabled,
+                    copies: viewModel.issuanceCopyCounts,
+                    onCopiesChange: viewModel.updateIssuanceCopies,
                     txCode: viewModel.txCode,
                     onTxCodeChange: viewModel.updateTxCode,
                     onAccept: viewModel.acceptOffer,
@@ -103,7 +105,7 @@ struct ReceiveView: View {
             Text("Pending credentials")
                 .font(.subheadline.weight(.semibold))
             ForEach(viewModel.deferredCredentials, id: \.id) { credential in
-                Button("Check \(credential.credentialConfigurationID)") {
+                Button("Check \(credential.credentialConfigurationID ?? "credential")") {
                     viewModel.resumeDeferredCredential(credential)
                 }
                 .buttonStyle(.bordered)

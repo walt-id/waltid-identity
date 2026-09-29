@@ -44,6 +44,31 @@ public class SqlDelightIssuanceSessionStore(
         )
     }
 
+    /** Claims or checkpoints a continuation only when the persisted snapshot is unchanged. */
+    override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean {
+        require(replacement == null || expected.id == replacement.id) { "Cannot change a continuation record ID" }
+        return queries.transactionWithResult {
+            if (replacement == null) queries.compareAndRemoveIssuanceSessionRecord(
+                record_id = expected.id,
+                expected_session_id = expected.sessionId,
+                expected_kind = expected.kind.name,
+                expected_payload = expected.payload,
+                expected_updated_at = expected.updatedAtEpochMilliseconds,
+            ) else queries.compareAndSetIssuanceSessionRecord(
+                replacement_session_id = replacement.sessionId,
+                replacement_kind = replacement.kind.name,
+                replacement_payload = replacement.payload,
+                replacement_updated_at = replacement.updatedAtEpochMilliseconds,
+                record_id = expected.id,
+                expected_session_id = expected.sessionId,
+                expected_kind = expected.kind.name,
+                expected_payload = expected.payload,
+                expected_updated_at = expected.updatedAtEpochMilliseconds,
+            )
+            queries.issuanceSessionRecordChanges().executeAsOne() == 1L
+        }
+    }
+
     /** Removes the record identified by [id] and reports whether it existed. */
     override suspend fun remove(id: String): Boolean {
         val exists = queries.selectIssuanceSessionRecordById(id).executeAsOneOrNull() != null

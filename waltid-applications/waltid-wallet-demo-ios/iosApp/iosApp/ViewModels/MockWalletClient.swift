@@ -83,6 +83,11 @@ actor MockWalletClient: WalletClient {
         return storedCredentials
     }
 
+    func createIssuanceHolderKeys(count: Int) async throws -> [IssuanceHolderBinding] {
+        (0..<count).map { IssuanceHolderBinding(keyID: "holder-\($0)", did: "did:key:holder-\($0)") }
+    }
+    func listDeferredIssuance() async throws -> [DeferredCredential] { [] }
+
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
         try await delayOperation()
         return IssuanceSession(
@@ -105,7 +110,7 @@ actor MockWalletClient: WalletClient {
         )
     }
 
-    func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization {
+    func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
         guard issuanceGrant == .authorizationCode else {
             throw WalletError.internalFailure("Mock issuance session is not authorization-code based")
         }
@@ -118,14 +123,14 @@ actor MockWalletClient: WalletClient {
         )
     }
 
-    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome {
+    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
         try await delayOperation()
         storedCredentials = [mdocMetadata ? Self.photoIDCredential : sampleCredential]
         return .stored(sessionID: sessionID, credentialIDs: storedCredentials.map(\.id))
     }
 
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome {
-        try await continuePreAuthorizedIssuance(sessionID: sessionID, transactionCode: nil)
+        try await continuePreAuthorizedIssuance(sessionID: sessionID, transactionCode: nil, credentials: nil)
     }
 
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome { .cancelled(sessionID: sessionID) }
@@ -134,7 +139,7 @@ actor MockWalletClient: WalletClient {
         .failed(
             sessionID: "mock-session",
             error: .init(code: .invalidSession, message: "No mock deferred credential"),
-            storedCredentialIDs: []
+            storedCredentialIDs: [], deferredCredentials: []
         )
     }
 

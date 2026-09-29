@@ -132,6 +132,95 @@ offer, open the returned browser URL, and then continue with
 the app's ordered BCP 47 language preferences; platform demos pass their
 platform locale preferences.
 
+### Explicit batches and multiple configurations
+
+Issuance requests one instance of each selected configuration by default. A batch
+is opt-in: after reviewing `session.offer.batchSize`, pass one existing holder
+key per instance at acceptance. A missing batch size means single issuance only;
+an oversized batch fails before the token is redeemed.
+
+```kotlin
+// Optional explicit key creation, using the wallet's platform key-use policy.
+// Existing keys may be selected instead. Preview never generates keys.
+val holders = wallet.createIssuanceHolderKeys(count = 2)
+val accepted = listOf(
+    MobileWalletCredentialSelection(
+        credentialConfigurationId = session.offer.credentials.first().configurationId,
+        holderBindings = holders.map { MobileWalletHolderBinding(it.keyId, it.did) },
+    )
+)
+val outcome = wallet.continuePreAuthorizedIssuance(session.id, transactionCode, accepted)
+// For authorization-code issuance instead:
+// val authorization = wallet.beginAuthorizationIssuance(session.id, accepted)
+```
+
+Add selections for other offered configurations to receive multiple datasets or
+formats. They use separate Credential Requests under the same token. Returned
+`authorization_details.credential_identifiers` are expanded automatically;
+scope-only grants use configuration IDs. Do not invent dataset identifiers.
+Both flows select authorization parameters automatically from metadata: prefer
+`authorization_details` when `openid_credential` is advertised, otherwise use the
+selected configurations' advertised scopes. Unsupported metadata fails explicitly;
+no application-level authorization-strategy switch is needed.
+
+For wallet-initiated authorization without an offer, start with
+`MobileWalletCredentialOffer.Issuer(issuerUrl, configurationIds)`; authorization
+parameter selection follows the same metadata-based rules.
+
+The session persists accepted key references and public identities across browser
+callbacks and deferred issuance. Responses are matched by holder public key,
+not array order, and may contain fewer instances than requested. Each stored
+credential retains its own key association for later presentation. The OAuth/DPoP
+key remains separate from the selected holder keys.
+
+Swift callers can use the same acceptance selections and explicit
+`createIssuanceHolderKeys` operation through `WalletSdkBridge`.
+Existing issuance lifecycle events remain in place; the stored event is emitted
+for each successful save, and failed outcomes retain any already stored IDs.
+
+Retained handles honor the issuer's polling interval across restart. An early resume
+returns a deferred outcome with the remaining wait, rounded up to whole seconds,
+without sending another issuer request. A new pending response resets the deadline.
+Once the response has arrived, a local-save handle has no interval and can be resumed
+immediately; retrying storage does not contact the issuer.
+
+Wallet deletion permanently closes issuance admission on that wallet runtime. A late
+resolved offer or issuer response cannot recreate a session or save credentials after
+closure. Deletion is rejected while a retained transition or local save is active; finish
+that operation before retrying deletion. Use a newly opened wallet instance afterward.
+
+Retained grants claim their durable state before building a browser request or exchanging
+an authorization/pre-authorized code. Independent runtimes cannot consume the same state.
+An interrupted processing record reports `REMOTE_OUTCOME_UNCERTAIN` after restart and
+is preserved; cancellation, expiration cleanup and session clearing cannot remove another
+runtime's claim. Explicitly rejected transaction codes can still be corrected and retried.
+
+Retained deferred requests are checkpointed before polling. A failure with code
+`REMOTE_OUTCOME_UNCERTAIN` indicates an in-progress request or a lost response;
+restarting the wallet does not cause that request to be sent again. Keep the returned
+handle and surface the error. Issuer reconciliation is required if the response
+was lost and the original runtime cannot finish saving it.
+
+Local saves also retain an ownership claim. `STORAGE_OUTCOME_UNCERTAIN` reports an
+active or interrupted writer and includes already readable saved IDs; another
+runtime does not automatically take over. A caught storage failure or cancellation
+releases its own claim and preserves the received batch. Resuming saves only the
+remaining credentials with their original IDs and does not poll the issuer again.
+
+Immediate responses in both retained grants use the same save checkpoint. If a later
+batch fails to save, the failed outcome preserves earlier stored IDs, the stopped and
+unattempted targets, and a handle for the received batch. Resume that handle rather
+than starting the offer again. Cancellation after checkpointing leaves the batch
+available from the retained-handle list. Successful intermediate batches emit stored
+events, while completion is emitted only when the operation finishes.
+
+After changing the Swift-facing API, regenerate and check its native ABI on macOS:
+
+```shell
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:updateKotlinAbi -PenableIosBuild=true
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:checkKotlinAbi :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:iosSimulatorArm64Test -PenableIosBuild=true
+```
+
 ## Presenting credentials
 
 Preview a presentation request before submission. The request information includes
@@ -659,3 +748,23 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
+
+### Interactive batch acceptance
+
+The Android `EnterpriseMobileWalletIntegrationTest` uses the coordinated Enterprise
+mobile fixture (`enterprise_fixture_base_url` instrumentation argument). Its batch
+case creates two holder keys, recreates the wallet and presents each copy separately.
+For a physical phone, forward fixture ports 33334 and 33335 over ADB and use
+`http://127.0.0.1:33335` as the fixture URL.
+
+Two additional checks require explicit instrumentation flags:
+
+- `wallet.batch.cancel=true`: run `batchSigningCancellationStoresNoCredential` and
+  cancel the second holder's biometric prompt. The result must report a crypto
+  failure with no stored copies, including after wallet recreation.
+- `wallet.batch.browser=true`: run
+  `browserAuthorizationRetainsBatchSelectionAcrossWalletRecreation`. Allow the
+  installed browser to open the test callback app if prompted. The SDK is recreated
+  before browser return; both copies must then issue and present successfully.
+  This uses the fixture’s controlled identity provider; real issuer PAR/PKCE and token routes
+  remain in use. The test-only callback Activity is absent from production artifacts.

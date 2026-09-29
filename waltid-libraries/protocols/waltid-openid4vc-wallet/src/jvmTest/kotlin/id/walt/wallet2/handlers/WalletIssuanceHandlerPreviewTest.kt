@@ -36,16 +36,19 @@ class WalletIssuanceHandlerPreviewTest {
 
     @Test
     fun credentialCountCallbackRunsBeforeBatchPersistence() = runTest {
+        val holderKey = JWKKey.generate(KeyType.secp256r1)
+        val credential = batchTestCredential(holderKey)
         val events = mutableListOf<String>()
         val client = HttpClient(MockEngine) {
             engine {
                 addHandler { request ->
                     when (request.url.toString()) {
-                        "$ISSUER/.well-known/openid-credential-issuer" -> respondJson(ISSUER_METADATA)
+                        "$ISSUER/.well-known/openid-credential-issuer" -> respondJson(ISSUER_METADATA.replace("\"credential_endpoint\"", "\"batch_credential_issuance\":{\"batch_size\":2},\"credential_endpoint\"")
+                            .replace("\"format\": \"jwt_vc_json\"", "\"format\": \"dc+sd-jwt\", \"vct\":\"identity\", \"cryptographic_binding_methods_supported\":[\"jwk\"], \"proof_types_supported\":{\"jwt\":{\"proof_signing_alg_values_supported\":[\"ES256\"]}}"))
                         "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
                         "$ISSUER/token" -> respondJson("""{"access_token":"token","token_type":"bearer"}""")
                         "$ISSUER/credential" -> respondJson(
-                            """{"credentials":[{"credential":$CREDENTIAL},{"credential":$CREDENTIAL}]}"""
+                            """{"credentials":[{"credential":${Json.encodeToString(credential)}},{"credential":${Json.encodeToString(credential)}}]}"""
                         )
                         else -> error("Unexpected request: ${request.method.value} ${request.url}")
                     }
@@ -58,13 +61,14 @@ class WalletIssuanceHandlerPreviewTest {
         val store = RecordingCredentialStore(events)
         val wallet = Wallet(
             id = "pre-persistence-callback-test",
-            staticKey = JWKKey.generate(KeyType.Ed25519),
+            staticKey = holderKey,
             credentialStores = listOf(store),
         )
 
         val result = WalletIssuanceHandler.receiveCredential(
             wallet = wallet,
             request = ReceiveCredentialRequest(
+                credentials = listOf(WalletCredentialSelection("pid", holderBindings = List(2) { CredentialHolderBinding() })),
                 offerJson = Json.parseToJsonElement(CREDENTIAL_OFFER).jsonObject,
                 txCode = "1234",
             ),
@@ -373,7 +377,7 @@ class WalletIssuanceHandlerPreviewTest {
                         "$ISSUER/.well-known/openid-credential-issuer" -> respondJson(ISSUER_METADATA)
                         "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
                         "$ISSUER/token" -> respondJson("""{"access_token":"token","token_type":"Bearer"}""")
-                        "$ISSUER/credential" -> respondJson("""{"transaction_id":"deferred-1"}""")
+                        "$ISSUER/credential" -> respondJson("""{"transaction_id":"deferred-1","interval":5}""", HttpStatusCode.Accepted)
                         else -> error("Unexpected request: ${request.method.value} ${request.url}")
                     }
                 }
@@ -387,12 +391,14 @@ class WalletIssuanceHandlerPreviewTest {
             client,
         )
 
-        WalletIssuanceHandler.receiveCredential(
+        val result = WalletIssuanceHandler.receiveCredential(
             wallet,
             ReceiveCredentialFromPreviewRequest(preview.previewHandle),
             httpClient = client,
         )
 
+        kotlin.test.assertNull(result.failure)
+        kotlin.test.assertNotNull(result.deferredCredentials.single().deferredCredentialId)
         val error = assertFailsWith<PreviewSessionException> {
             WalletIssuanceHandler.receiveCredential(
                 wallet,
@@ -433,7 +439,7 @@ class WalletIssuanceHandlerPreviewTest {
           "issuer": "$issuer",
           "authorization_endpoint": "$issuer/authorize",
           "token_endpoint": "$issuer/token",
-          "response_types_supported": ["code"]
+          "authorization_details_types_supported":["openid_credential"],"response_types_supported": ["code"]
         }
     """
 
@@ -466,6 +472,7 @@ class WalletIssuanceHandlerPreviewTest {
             {
               "credential_issuer": "$ISSUER",
               "credential_endpoint": "$ISSUER/credential",
+              "deferred_credential_endpoint": "$ISSUER/deferred",
               "display": [{ "name": "Example Issuer", "locale": "en" }],
               "credential_configurations_supported": {
                 "pid": {
@@ -482,7 +489,7 @@ class WalletIssuanceHandlerPreviewTest {
               "issuer": "$ISSUER",
               "authorization_endpoint": "$ISSUER/authorize",
               "token_endpoint": "$ISSUER/token",
-              "response_types_supported": ["code"]
+              "authorization_details_types_supported":["openid_credential"],"response_types_supported": ["code"]
             }
         """
         const val CREDENTIAL = """

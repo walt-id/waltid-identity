@@ -14,4 +14,6 @@ data class AuthorizationDetail(
     @SerialName("credential_identifiers")
     val credentialIdentifiers: List<String>? = null,
     val claims: JsonElement? = null,
+    /** Credential Issuer Identifiers associated with this authorization detail. */
+    val locations: List<String>? = null,
 )

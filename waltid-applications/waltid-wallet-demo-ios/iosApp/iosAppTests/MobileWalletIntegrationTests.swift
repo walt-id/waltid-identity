@@ -145,7 +145,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
             transactionCode: transactionCode
         )
         guard case let .stored(_, credentialIDs) = outcome else {
-            if case let .failed(_, failure, _) = outcome {
+            if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
             }
             throw MobileWalletIntegrationError.unexpectedIssuanceOutcome
@@ -362,7 +362,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertNotNil(session.offer.transactionCode, "EUDI offer should require a transaction code")
         let outcome = try await wallet.continuePreAuthorizedIssuance(sessionID: session.id, transactionCode: offer.txCode)
         guard case let .stored(_, credentialIDs) = outcome else {
-            if case let .failed(_, failure, _) = outcome {
+            if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
             }
             throw MobileWalletIntegrationError.unexpectedIssuanceOutcome
@@ -406,7 +406,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
             transactionCode: offer.txCode
         )
         guard case let .stored(_, credentialIDs) = outcome else {
-            if case let .failed(_, failure, _) = outcome {
+            if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
             }
             throw MobileWalletIntegrationError.unexpectedIssuanceOutcome

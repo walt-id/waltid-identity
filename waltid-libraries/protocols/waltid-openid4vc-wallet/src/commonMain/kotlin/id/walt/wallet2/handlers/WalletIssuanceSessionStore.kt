@@ -1,6 +1,9 @@
 package id.walt.wallet2.handlers
 
+import kotlinx.serialization.Serializable
+
 /** Kind of sensitive continuation record retained by an issuance session. */
+@Serializable
 enum class WalletIssuanceSessionRecordKind {
     ACTIVE_SESSION,
     DEFERRED_CREDENTIAL,
@@ -10,8 +13,10 @@ enum class WalletIssuanceSessionRecordKind {
  * Opaque issuance continuation stored outside the protocol engine.
  *
  * [payload] can contain authorization codes, PKCE material, access tokens, and deferred
- * transaction identifiers. Implementations must protect its confidentiality and integrity at rest.
+ * transaction identifiers and received credentials awaiting local storage. Implementations must
+ * protect its confidentiality and integrity at rest.
  */
+@Serializable
 data class WalletIssuanceSessionRecord(
     val id: String,
     val sessionId: String,
@@ -21,7 +26,8 @@ data class WalletIssuanceSessionRecord(
 )
 
 /**
- * Durable storage boundary for issuance continuations.
+ * Durable storage boundary for one wallet's issuance continuations. A store instance must be
+ * scoped to its wallet; listing or clearing it must never expose another wallet's records.
  *
  * Implementations are an authoritative security boundary and must reject records whose integrity
  * cannot be established. Mobile SDK factories provide an integrity-protected, encrypted SQLDelight
@@ -34,6 +40,14 @@ interface WalletIssuanceSessionStore {
     suspend fun list(): List<WalletIssuanceSessionRecord>
 
     suspend fun put(record: WalletIssuanceSessionRecord)
+
+    /**
+     * Atomically replaces a record only when every stored field equals [expected]. Returns false
+     * for a missing or changed record. A null replacement removes the matching record. A non-null
+     * replacement must have the same ID. Implementations must
+     * coordinate across all connections to the backing store, not just this adapter instance.
+     */
+    suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean
 
     suspend fun remove(id: String): Boolean
 }
