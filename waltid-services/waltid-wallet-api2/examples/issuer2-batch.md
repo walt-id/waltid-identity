@@ -135,8 +135,8 @@ jq -e '.credentialOffer | type == "string" and length > 0' "$EXAMPLE_DIR/receipt
 jq '{offerUrl:.credentialOffer}' "$EXAMPLE_DIR/receipt.json" > "$EXAMPLE_DIR/receive-request.json"
 curl --silent --show-error --fail-with-body "${WALLET_AUTH[@]}" \
   -H 'Content-Type: application/json' --data-binary @"$EXAMPLE_DIR/receive-request.json" \
-  "$WALLET_BASE/credentials/receive/resolve-offer" -o "$EXAMPLE_DIR/preview.json"
-jq '{credentialConfigurationIds,batchSize,grantType,txCodeRequired}' "$EXAMPLE_DIR/preview.json"
+  "$WALLET_BASE/credentials/receive/resolve-offer/batch" -o "$EXAMPLE_DIR/preview.json"
+jq '{batchSize,offer:(.offer|{credentialConfigurationIds,grantType,txCodeRequired})}' "$EXAMPLE_DIR/preview.json"
 ```
 
 If the caller already resolved the protocol offer, `{ "offerJson": { "credential_issuer":
@@ -160,7 +160,7 @@ case "$WALLET_KIND" in
 esac
 jq --slurpfile preview "$EXAMPLE_DIR/preview.json" \
   --arg field "$KEY_FIELD" --arg first "$HOLDER_1" --arg second "$HOLDER_2" \
-  '. + {credentials:[$preview[0].credentialConfigurationIds[] | {
+  '. + {credentials:[$preview[0].offer.credentialConfigurationIds[] | {
     credentialConfigurationId:., holderBindings:[{($field):$first},{($field):$second}]
   }]}' "$EXAMPLE_DIR/receive-request.json" > "$EXAMPLE_DIR/batch-request.json"
 mv "$EXAMPLE_DIR/batch-request.json" "$EXAMPLE_DIR/receive-request.json"
@@ -200,11 +200,11 @@ jq --slurpfile request "$EXAMPLE_DIR/receive-request.json" \
   --arg client "$CLIENT_ID" --arg redirect "$REDIRECT_URI" \
   '{offerUrl:$request[0].offerUrl,clientId:$client,redirectUri:$redirect,
     credentialConfigurationIds:($request[0].credentials //
-      [.credentialConfigurationIds[]|{credentialConfigurationId:.}] | map(.credentialConfigurationId))}' \
+      [.offer.credentialConfigurationIds[]|{credentialConfigurationId:.}] | map(.credentialConfigurationId))}' \
   "$EXAMPLE_DIR/preview.json" > "$EXAMPLE_DIR/authorization-request.json"
 curl --silent --show-error --fail-with-body "${WALLET_AUTH[@]}" \
   -H 'Content-Type: application/json' --data-binary @"$EXAMPLE_DIR/authorization-request.json" \
-  "$WALLET_BASE/credentials/receive/authorization-url" -o "$EXAMPLE_DIR/authorization.json"
+  "$WALLET_BASE/credentials/receive/authorization-url/batch" -o "$EXAMPLE_DIR/authorization.json"
 jq -r '.authorizationUrl' "$EXAMPLE_DIR/authorization.json"
 ```
 
@@ -219,17 +219,19 @@ jq --slurpfile request "$EXAMPLE_DIR/receive-request.json" \
   --slurpfile authorization "$EXAMPLE_DIR/authorization.json" \
   --arg code "$AUTHORIZATION_CODE" --arg client "$CLIENT_ID" --arg redirect "$REDIRECT_URI" \
   '{code:$code,codeVerifier:$authorization[0].codeVerifier,clientId:$client,redirectUri:$redirect,
-    credentialIssuer:.credentialIssuer,credentialEndpoint:.credentialEndpoint,nonceEndpoint:.nonceEndpoint,
-    credentials:($request[0].credentials // [.credentialConfigurationIds[]|{credentialConfigurationId:.}])}' \
+    credentialIssuer:.offer.credentialIssuer,credentialEndpoint:.offer.credentialEndpoint,nonceEndpoint:.offer.nonceEndpoint,
+    credentials:($request[0].credentials // [.offer.credentialConfigurationIds[]|{credentialConfigurationId:.}])}' \
   "$EXAMPLE_DIR/preview.json" > "$EXAMPLE_DIR/authorized-receive-request.json"
 curl --silent --show-error --fail-with-body "${WALLET_AUTH[@]}" \
   -H 'Content-Type: application/json' --data-binary @"$EXAMPLE_DIR/authorized-receive-request.json" \
-  "$WALLET_BASE/credentials/receive/authorized" -o "$EXAMPLE_DIR/result.json"
+  "$WALLET_BASE/credentials/receive/authorized/batch" -o "$EXAMPLE_DIR/result.json"
 jq '{credentialIds,deferredCredentials,failure,storageOutcome}' "$EXAMPLE_DIR/result.json"
 ```
 
-Both grants negotiate `authorization_details` or configuration scopes from issuer metadata.
-There is no high-level `useScope` switch. For deployments requiring DPoP end to end, use the
+Authorization-code requests require advertised `authorization_details` support or configuration scopes.
+Pre-authorized codes already authorize the offered credentials and work without either selector;
+available selectors narrow the token request. Each copy must use a distinct stored holder key.
+The batch authorization endpoint negotiates automatically; the single-configuration endpoint retains `useScope`. For deployments requiring DPoP end to end, use the
 same wallet sender key throughout authorization and set `useDpop:true` on authorized receive;
 copy-holder selections do not replace that sender key.
 

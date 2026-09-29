@@ -41,13 +41,15 @@ class WalletIssuanceStorageRecoveryTest {
         val full = kind == RequestKind.PRE_AUTHORIZED || kind == RequestKind.AUTHORIZED
         val issuer = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         val issuerUrl = "http://127.0.0.1:${issuer.address.port}"
-        val key = JWKKey.generate(KeyType.secp256r1)
-        val publicJwk = key.getPublicKey().exportJWKObject()
-        val credential = key.signJws(buildJsonObject {
-            put("iss", issuerUrl)
-            put("vct", "identity")
-            putJsonObject("cnf") { put("jwk", publicJwk) }
-        }.toString().encodeToByteArray(), mapOf("typ" to JsonPrimitive("dc+sd-jwt"))) + "~"
+        val holders = List(2) { JWKKey.generate(KeyType.secp256r1) }
+        val credentials = holders.map { key ->
+            val publicJwk = key.getPublicKey().exportJWKObject()
+            key.signJws(buildJsonObject {
+                put("iss", issuerUrl)
+                put("vct", "identity")
+                putJsonObject("cnf") { put("jwk", publicJwk) }
+            }.toString().encodeToByteArray(), mapOf("typ" to JsonPrimitive("dc+sd-jwt"))) + "~"
+        }
         val fetches = AtomicInteger()
         issuer.createContext("/") { exchange ->
             val response = when (exchange.requestURI.path) {
@@ -68,7 +70,7 @@ class WalletIssuanceStorageRecoveryTest {
                 "/credential", "/deferred" -> {
                     fetches.incrementAndGet()
                     exchange.requestBody.use { it.readBytes() }
-                    """{"credentials":[{"credential":"$credential"},{"credential":"$credential"}]}"""
+                    """{"credentials":[{"credential":"${credentials[0]}"},{"credential":"${credentials[1]}"}]}"""
                 }
                 else -> error("Unexpected issuer request ${exchange.requestURI.path}")
             }.toByteArray()
@@ -79,7 +81,8 @@ class WalletIssuanceStorageRecoveryTest {
         issuer.start()
         try {
             val keys = InMemoryKeyStore()
-            val keyId = keys.addKey(key)
+            val keyIds = holders.map { keys.addKey(it) }
+            val keyId = keyIds.first()
             val saved = InMemoryCredentialStore()
             var writes = 0
             val failingStore = object : WalletCredentialStore by saved {
@@ -104,18 +107,18 @@ class WalletIssuanceStorageRecoveryTest {
                 RequestKind.FETCH -> "$path/fetch-credential"
                 RequestKind.POLL -> "$path/deferred"
                 RequestKind.PRE_AUTHORIZED -> path
-                RequestKind.AUTHORIZED -> "$path/authorized"
+                RequestKind.AUTHORIZED -> "$path/authorized/batch"
             }) {
                 contentType(ContentType.Application.Json)
-                val selections = """[{"credentialConfigurationId":"identity","holderBindings":[{"keyId":"$keyId"},{"keyId":"$keyId"}]}]"""
+                val selections = """[{"credentialConfigurationId":"identity","holderBindings":[{"keyId":"${keyIds[0]}"},{"keyId":"${keyIds[1]}"}]}]"""
                 setBody(when (kind) {
                     RequestKind.FETCH -> """{"credentialEndpoint":"$issuerUrl/credential","accessToken":"test-token",
                       "credentialConfigurationId":"identity","credentialIdentifier":"dataset-a","storeInWallet":true,
                       "credentialIssuerBaseUrl":"$issuerUrl","proofs":{"jwt":["proof-one","proof-two"]},
-                      "holderBindings":[{"keyId":"$keyId"},{"keyId":"$keyId"}]}"""
+                      "holderBindings":[{"keyId":"${keyIds[0]}"},{"keyId":"${keyIds[1]}"}]}"""
                     RequestKind.POLL -> """{"deferredCredentialEndpoint":"$issuerUrl/deferred","accessToken":"test-token",
                       "transactionId":"transaction","proofRequired":true,
-                      "holderBindings":[{"keyId":"$keyId"},{"keyId":"$keyId"}]}"""
+                      "holderBindings":[{"keyId":"${keyIds[0]}"},{"keyId":"${keyIds[1]}"}]}"""
                     RequestKind.PRE_AUTHORIZED -> """{"credentials":$selections,"offerJson":{
                       "credential_issuer":"$issuerUrl","credential_configuration_ids":["identity"],
                       "grants":{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"pre-code"}}}}"""
@@ -125,7 +128,7 @@ class WalletIssuanceStorageRecoveryTest {
             }
             assertEquals(HttpStatusCode.MultiStatus, fetched.status, fetched.bodyAsText())
             val failed = if (full) {
-                val result = Json.decodeFromString<ReceiveCredentialResult>(fetched.bodyAsText())
+                val result = Json.decodeFromString<ReceiveCredentialsResult>(fetched.bodyAsText())
                 assertTrue(result.credentialIds.isEmpty())
                 assertTrue(result.deferredCredentials.isEmpty())
                 assertEquals(CredentialIssuanceStage.STORAGE, assertNotNull(result.failure).stage)
@@ -136,7 +139,7 @@ class WalletIssuanceStorageRecoveryTest {
                 assertEquals(1, result.credentialIds.size)
                 assertIs<WalletIssuanceOutcome.Failed>(result.storageOutcome)
             } else {
-                val result = Json.decodeFromString<FetchCredentialResult>(fetched.bodyAsText())
+                val result = Json.decodeFromString<FetchCredentialsResult>(fetched.bodyAsText())
                 assertEquals(2, result.rawCredentials.size)
                 assertIs<WalletIssuanceOutcome.Failed>(result.storageOutcome)
             }
@@ -146,7 +149,7 @@ class WalletIssuanceStorageRecoveryTest {
             assertEquals(if (kind == RequestKind.FETCH) "dataset-a" else null, handle.credentialIdentifier)
             assertEquals(if (poll) null else "identity", handle.credentialConfigurationId)
             val listed = client.get("$path/deferred")
-            assertEquals(listOf(handle), Json.decodeFromString<List<WalletDeferredCredential>>(listed.bodyAsText()))
+            assertEquals(listOf(handle), Json.decodeFromString<List<WalletIssuanceContinuation>>(listed.bodyAsText()))
             val resumed = client.post("$path/deferred/${handle.id}")
             assertEquals(HttpStatusCode.OK, resumed.status, resumed.bodyAsText())
             val stored = assertIs<WalletIssuanceOutcome.Stored>(Json.decodeFromString<WalletIssuanceOutcome>(resumed.bodyAsText()))

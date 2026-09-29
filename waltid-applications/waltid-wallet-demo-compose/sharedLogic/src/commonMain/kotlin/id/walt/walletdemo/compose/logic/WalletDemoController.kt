@@ -36,7 +36,6 @@ class WalletDemoController(
 ) {
     private var receiveJob: Job? = null
     private var issuanceSession: WalletDemoIssuanceSession? = null
-    private var preparedIssuanceSelections: List<WalletDemoCredentialSelection>? = null
     private var pendingAuthorizationCallback: String? = null
     private var presentationJob: Job? = null
     private var paymentConsentJob: Job? = null
@@ -504,8 +503,22 @@ class WalletDemoController(
     fun resetWallet(beforeDelete: suspend () -> Unit = {}) {
         cancelActiveWalletWork()
         scope.launch(dispatcher) {
-            val deleted = runCatching { beforeDelete(); wallet.deleteWallet() }
+            runCatching { beforeDelete() }.exceptionOrNull()?.let { error ->
+                setOperationError(WalletDisplayText.ResetWalletFailed, error, _state.value.selectedTab)
+                return@launch
+            }
+            val deleted = runCatching { wallet.deleteWallet() }
             deleted.exceptionOrNull()?.let { error ->
+                val message = WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, error)
+                _state.update { state ->
+                    state.copy(
+                        session = WalletSessionState.Failed(message),
+                        offerPreview = null, authorizationRequestUrl = null, deferredCredentials = emptyList(),
+                        presentationReview = null, selectedPresentationCredentialOptions = emptySet(),
+                        selectedPresentationDisclosureOptions = emptySet(),
+                        receiveCompleted = false, presentationCompleted = false,
+                    )
+                }
                 setOperationError(WalletDisplayText.ResetWalletFailed, error, _state.value.selectedTab)
                 return@launch
             }
@@ -757,7 +770,6 @@ class WalletDemoController(
                 }
                 if (installed) {
                     issuanceSession = session
-                    preparedIssuanceSelections = null
                 } else {
                     wallet.cancelIssuance(session.id)
                 }
@@ -786,36 +798,16 @@ class WalletDemoController(
         val preview = current.offerPreview ?: return
         if (!current.offerReviewEnabled || preview.offeredCredentials.none { it.configurationId == configurationId }) return
         val count = copies.coerceIn(0, (preview.batchSize ?: 1).coerceAtLeast(1))
-        if (_state.compareAndSet(current, current.copy(issuanceCopyCounts = current.issuanceCopyCounts + (configurationId to count)))) {
-            preparedIssuanceSelections = null
-        }
+        _state.compareAndSet(current, current.copy(issuanceCopyCounts = current.issuanceCopyCounts + (configurationId to count)))
     }
 
-    private suspend fun prepareIssuanceSelections(
-        current: WalletDemoUiState,
-        ready: WalletSessionState.Ready,
-        request: ReceiveRequest,
-    ): List<WalletDemoCredentialSelection> {
-        preparedIssuanceSelections?.let { return it }
-        val selected = requireNotNull(current.offerPreview).offeredCredentials.mapNotNull {
+    private fun issuanceSelections(current: WalletDemoUiState, ready: WalletSessionState.Ready): List<WalletDemoCredentialSelection> =
+        requireNotNull(current.offerPreview).offeredCredentials.mapNotNull {
             val count = current.issuanceCopyCounts[it.configurationId] ?: 1
-            if (count > 0) it.configurationId to count else null
-        }
-        require(selected.isNotEmpty()) { "Select at least one credential" }
-        val freshCount = selected.filter { it.second > 1 }.sumOf { it.second.toLong() }
-        require(freshCount <= Int.MAX_VALUE) { "Too many holder keys requested" }
-        val fresh = if (freshCount > 0) wallet.createIssuanceHolderKeys(freshCount.toInt()) else emptyList()
-        currentCoroutineContext().ensureActive()
-        if (!isCurrent(request)) throw CancellationException("Credential offer changed")
-        check(fresh.size == freshCount.toInt()) { "Holder-key creation returned an unexpected number of keys" }
-        var offset = 0
-        return selected.map { (configurationId, count) ->
-            val holders = if (count == 1) listOf(WalletDemoHolderBinding(ready.keyId, ready.did)) else {
-                fresh.subList(offset, offset + count).toList().also { offset += count }
-            }
-            WalletDemoCredentialSelection(configurationId, holders)
-        }.also { preparedIssuanceSelections = it }
-    }
+            if (count == 0) null else WalletDemoCredentialSelection(it.configurationId,
+                if (count == 1) WalletDemoCredentialHolders.Existing(listOf(WalletDemoHolderBinding(ready.keyId, ready.did)))
+                else WalletDemoCredentialHolders.NewKeys(count))
+        }.also { require(it.isNotEmpty()) { "Select at least one credential" } }
 
     fun acceptOffer() {
         val current = _state.value
@@ -833,7 +825,7 @@ class WalletDemoController(
 
         receiveJob = scope.launch(dispatcher) {
             try {
-                val selections = prepareIssuanceSelections(current, ready, request)
+                val selections = issuanceSelections(current, ready)
                 when (session.grant) {
                     WalletDemoIssuanceGrant.PreAuthorizedCode -> completeIssuanceOutcome(
                         ready, request, wallet.continuePreAuthorizedIssuance(session.id, txCode, selections),

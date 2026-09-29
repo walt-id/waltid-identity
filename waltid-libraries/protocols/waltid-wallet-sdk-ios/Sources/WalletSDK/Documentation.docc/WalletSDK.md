@@ -98,6 +98,12 @@ Provided database keys and custom stores can be combined when an app owns both
 database-key recovery and wallet-record durability.
 
 Use ``Wallet/deleteLocalData()`` to reset local data for the wallet.
+
+An active wallet or signing-identity operation rejects deletion before cleanup.
+Once cleanup starts, the wallet instance is closed even if removing a platform key
+or database file fails. Retry deletion on the same instance to finish cleanup;
+do not continue issuance or presentation through it. Successful deletion is
+idempotent. Open a new wallet only after cleanup succeeds.
 This removes wallet records, platform signing keys referenced by the wallet,
 encrypted database files and sidecars, and managed database keys. When using
 a provided database-key provider, deletion also calls

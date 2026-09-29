@@ -114,7 +114,11 @@ private class MockDemoWallet : DemoWallet {
         val configurations = listOf("MockCredential", "DefaultCardCredential").zip(offered).toMap()
         val issued = credentials.flatMap { selection ->
             val template = configurations.getValue(selection.credentialConfigurationId)
-            selection.holderBindings.mapIndexed { index, holder ->
+            val holders = when (val choice = selection.holders) {
+                is WalletDemoCredentialHolders.Existing -> choice.bindings
+                is WalletDemoCredentialHolders.NewKeys -> createIssuanceHolderKeys(choice.count)
+            }
+            holders.mapIndexed { index, holder ->
                 template.copy(id = "${template.id}-$index", subject = holder.did ?: holder.keyId)
             }
         }
@@ -130,7 +134,7 @@ private class MockDemoWallet : DemoWallet {
     override suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome =
         WalletDemoIssuanceOutcome.Cancelled
 
-    override suspend fun createIssuanceHolderKeys(count: Int) =
+    private suspend fun createIssuanceHolderKeys(count: Int) =
         List(count) { WalletDemoHolderBinding("batch-holder-$it", "did:key:batch-holder-$it") }
 
     override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> = emptyList()

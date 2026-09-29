@@ -19,23 +19,23 @@ import org.jetbrains.exposed.v1.jdbc.update
  * Payloads contain bearer tokens and must never be exposed through named-store or credential APIs.
  */
 class ExposedIssuanceSessionStore(private val scopedWalletId: String, private val db: Database) : WalletIssuanceSessionStore {
+    private val scope = ExposedWalletScope(scopedWalletId, db)
+    val walletGeneration: String get() = scope.generation
     private val table = Wallet2Tables.IssuanceSessions
 
     override suspend fun get(id: String): WalletIssuanceSessionRecord? = suspendTransaction(db) {
+        if (!scope.isCurrent()) return@suspendTransaction null
         table.selectAll().where { (table.walletId eq scopedWalletId) and (table.id eq id) }.singleOrNull()?.toRecord()
     }
 
     override suspend fun list(): List<WalletIssuanceSessionRecord> = suspendTransaction(db) {
+        if (!scope.isCurrent()) return@suspendTransaction emptyList()
         table.selectAll().where { table.walletId eq scopedWalletId }.map { it.toRecord() }
     }
 
     override suspend fun put(record: WalletIssuanceSessionRecord) {
         suspendTransaction(db) {
-            // SQLite deployments need not enable foreign-key enforcement. Keep this read in the
-            // serializable write transaction so deletion cannot leave a new orphaned continuation.
-            check(Wallet2Tables.Wallets.selectAll().where { Wallet2Tables.Wallets.id eq scopedWalletId }.any()) {
-                "Wallet no longer exists"
-            }
+            scope.requireCurrentForWrite()
             table.upsert {
                 it[table.walletId] = scopedWalletId
                 it[table.id] = record.id
@@ -50,6 +50,7 @@ class ExposedIssuanceSessionStore(private val scopedWalletId: String, private va
     override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean {
         require(replacement == null || expected.id == replacement.id) { "Cannot change a continuation record ID" }
         return suspendTransaction(db) {
+            if (!scope.lockCurrent()) return@suspendTransaction false
             val condition =
                 (table.walletId eq scopedWalletId) and (table.id eq expected.id) and
                     (table.sessionId eq expected.sessionId) and (table.kind eq expected.kind.name) and
@@ -67,6 +68,7 @@ class ExposedIssuanceSessionStore(private val scopedWalletId: String, private va
     override suspend fun remove(id: String): Boolean {
         val recordId = id
         return suspendTransaction(db) {
+            if (!scope.lockCurrent()) return@suspendTransaction false
             table.deleteWhere { (table.walletId eq scopedWalletId) and (table.id eq recordId) } > 0
         }
     }

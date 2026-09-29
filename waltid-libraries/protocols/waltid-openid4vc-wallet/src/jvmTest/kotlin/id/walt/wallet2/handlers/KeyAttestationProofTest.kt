@@ -75,9 +75,9 @@ class KeyAttestationProofTest {
                 attestationRequests += request
                 claims(request)
             }))
-        val result = WalletIssuanceHandler.signProof(
+        val result = WalletIssuanceHandler.signProofs(
             wallet = wallet,
-            request = SignProofRequest(
+            request = SignProofsRequest(
                 issuerUrl = Url(ISSUER), credentialConfigurationId = CONFIG_ID,
                 nonce = "batch-nonce", clientId = "batch-client",
                 holderBindings = listOf(CredentialHolderBinding("first-holder"), CredentialHolderBinding("second-holder")),
@@ -345,7 +345,7 @@ class KeyAttestationProofTest {
             wallet,
             ReceiveAuthorizedCredentialRequest(
                 code = "auth-code", credentialIssuer = ISSUER,
-                credentialEndpoint = Url("$ISSUER/credential"), credentials = listOf(WalletCredentialSelection(CONFIG_ID)),
+                credentialEndpoint = Url("$ISSUER/credential"), credentialConfigurationId = CONFIG_ID,
                 nonceEndpoint = Url("$ISSUER/nonce"),
             ),
             httpClient = client,
@@ -386,7 +386,7 @@ class KeyAttestationProofTest {
             wallet = wallet,
             request = SignProofRequest(issuerUrl = Url(ISSUER), credentialConfigurationId = CONFIG_ID, nonce = "nonce"),
             httpClient = issuerMetadataClient(),
-        ).proofs.jwt!!.single()
+        ).proofJwt
         assertTrue("key_attestation" !in CompactJws.decodeUnverified(proof).protectedHeader)
     }
 
@@ -394,7 +394,7 @@ class KeyAttestationProofTest {
         wallet = wallet,
         request = SignProofRequest(issuerUrl = Url(ISSUER), credentialConfigurationId = CONFIG_ID, nonce = "nonce"),
         httpClient = issuerMetadataClient(requiresKeyAttestation = true),
-    ).proofs.jwt!!.single()
+    ).proofJwt
 
     private suspend fun walletWithProofKey(key: Crypto2Key? = null): Wallet = Wallet(
         id = "wallet",

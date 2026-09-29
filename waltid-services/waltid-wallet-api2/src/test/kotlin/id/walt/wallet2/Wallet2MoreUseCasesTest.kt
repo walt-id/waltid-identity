@@ -473,9 +473,9 @@ class Wallet2MoreUseCasesTest {
                         .body<ReceiveCredentialResult>()
                 }
                 assertEquals(0, receiveResult.credentialIds.size, "Deferred: no immediate credential, expected 0 got ${receiveResult.credentialIds.size}")
-                assertEquals(1, receiveResult.deferredCredentials.size, "Deferred: must have one pending target")
+                assertEquals(setOf(credConfigId), receiveResult.deferredTransactionIds.keys, "Deferred: must retain the offered configuration")
 
-                val txId = receiveResult.deferredCredentials.single().transactionId
+                val txId = receiveResult.deferredTransactionIds.getValue(credConfigId)
 
                 // Step 2: get an access token for the deferred poll — exchange a second pre-auth code
                 // We call the isolated request-token endpoint with a fresh code seeded into the issuer.

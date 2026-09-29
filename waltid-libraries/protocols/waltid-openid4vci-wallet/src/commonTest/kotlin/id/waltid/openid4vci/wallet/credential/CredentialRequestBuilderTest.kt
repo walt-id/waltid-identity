@@ -62,6 +62,13 @@ class CredentialRequestBuilderTest {
         assertFailsWith<IllegalArgumentException> {
             CredentialRequestBuilder.authorizationScope(mixed, listOf("identity", "badge"), authorizationServer(null))
         }
+        for (issuer in listOf(withoutScopes, mixed)) {
+            assertEquals(emptyMap(), CredentialRequestBuilder.preAuthorizedTokenParameters(
+                issuer, listOf("identity", "badge"), authorizationServer(null)))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            CredentialRequestBuilder.preAuthorizedTokenParameters(metadata(), listOf("missing"), authorizationServer(null))
+        }
         assertFailsWith<IllegalArgumentException> {
             CredentialRequestBuilder.authorizationScope(metadata(), listOf("missing"), authorizationServer())
         }

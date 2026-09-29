@@ -942,7 +942,7 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun resetWalletKeepsSessionWhenDeleteFails() = runTest {
+    fun resetWalletDisablesTheSessionOnDeletionFailureAndAllowsRetry() = runTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         wallet.deleteWalletError = IllegalStateException("HTTP 500")
         val controller = unlockedControllerWith(wallet, this)
@@ -954,7 +954,7 @@ class WalletDemoControllerTest {
         assertEquals(1, wallet.deleteWalletCalls)
         assertEquals(listOf(sampleCredential), wallet.credentials)
         assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
-        assertTrue(controller.state.value.session is WalletSessionState.Ready)
+        assertTrue(controller.state.value.session is WalletSessionState.Failed)
         assertEquals(
             WalletOperationState.Failed(
                 WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, "HTTP 500"),
@@ -962,6 +962,11 @@ class WalletDemoControllerTest {
             ),
             controller.state.value.operation,
         )
+        wallet.deleteWalletError = null
+        controller.resetWallet()
+        runCurrent()
+        assertEquals(2, wallet.deleteWalletCalls)
+        assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
     }
 
     @Test
@@ -1201,7 +1206,6 @@ class WalletDemoControllerTest {
             controller.previewOffer()
             runCurrent()
             assertEquals(mapOf("ExampleCredential" to 1, "OtherCredential" to 1), controller.state.value.issuanceCopyCounts)
-            assertTrue(wallet.createdHolderKeyCounts.isEmpty())
             controller.updateIssuanceCopies("ExampleCredential", 0)
             controller.updateIssuanceCopies("OtherCredential", 0)
             assertFalse(controller.state.value.acceptOfferEnabled)
@@ -1209,21 +1213,19 @@ class WalletDemoControllerTest {
             assertEquals(3, controller.state.value.issuanceCopyCounts["ExampleCredential"])
             controller.acceptOffer()
             runCurrent()
-            assertEquals(listOf(3), wallet.createdHolderKeyCounts)
             val selection = wallet.receivedIssuanceSelections.single().single()
             assertEquals("ExampleCredential", selection.credentialConfigurationId)
-            assertEquals(List(3) { "batch-holder-$it" }, selection.holderBindings.map { it.keyId })
+            assertEquals(WalletDemoCredentialHolders.NewKeys(3), selection.holders)
             if (grant == WalletDemoIssuanceGrant.AuthorizationCode) {
                 controller.authorizationRequestOpened()
                 controller.handleDeepLink("openid://callback?code=code-1&state=state-1")
                 runCurrent()
-                assertEquals(1, wallet.createdHolderKeyCounts.size)
             }
         }
     }
 
     @Test
-    fun singleCopyUsesCurrentKeyAndRetryReusesPreparedBatchKeys() = runTest {
+    fun singleCopyUsesCurrentKeyAndRetriesForwardTheSameBatchPlan() = runTest {
         for (limit in listOf(null, 3)) {
             val wallet = FakeDemoWallet(offerResolution = offerPreview().copy(batchSize = limit),
                 preAuthorizedOutcome = WalletDemoIssuanceOutcome.Failed("Try the transaction code again"))
@@ -1234,41 +1236,15 @@ class WalletDemoControllerTest {
             val currentKey = (controller.state.value.session as WalletSessionState.Ready).keyId
             controller.acceptOffer()
             runCurrent()
-            assertEquals(listOf(currentKey), wallet.receivedIssuanceSelections.single().single().holderBindings.map { it.keyId })
-            assertTrue(wallet.createdHolderKeyCounts.isEmpty())
+            assertEquals(listOf(currentKey), (wallet.receivedIssuanceSelections.single().single().holders as WalletDemoCredentialHolders.Existing).bindings.map { it.keyId })
             controller.updateIssuanceCopies("ExampleCredential", 99)
             assertEquals(limit ?: 1, controller.state.value.issuanceCopyCounts["ExampleCredential"])
             controller.acceptOffer()
             runCurrent()
             controller.acceptOffer()
             runCurrent()
-            assertEquals(if (limit == null) emptyList() else listOf(3), wallet.createdHolderKeyCounts)
             assertEquals(wallet.receivedIssuanceSelections[1], wallet.receivedIssuanceSelections[2])
         }
-    }
-
-    @Test
-    fun cancelledHolderCreationCannotPopulateTheNextOffer() = runTest {
-        val gate = CompletableDeferred<Unit>()
-        val wallet = FakeDemoWallet(offerResolution = offerPreview().copy(batchSize = 3), holderCreationGate = gate)
-        val controller = unlockedControllerWith(wallet, this)
-        controller.updateOfferUrl("openid-credential-offer://old")
-        controller.previewOffer()
-        runCurrent()
-        controller.updateIssuanceCopies("ExampleCredential", 3)
-        controller.acceptOffer()
-        runCurrent()
-        controller.declineOffer()
-        controller.updateOfferUrl("openid-credential-offer://new")
-        controller.previewOffer()
-        runCurrent()
-        gate.complete(Unit)
-        runCurrent()
-        controller.acceptOffer()
-        runCurrent()
-        val currentKey = (controller.state.value.session as WalletSessionState.Ready).keyId
-        assertEquals(listOf(currentKey), wallet.receivedIssuanceSelections.single().single().holderBindings.map { it.keyId })
-        assertEquals(listOf(3), wallet.createdHolderKeyCounts)
     }
 
     @Test
@@ -2740,7 +2716,6 @@ private class FakeDemoWallet(
     private val deferredOutcome: WalletDemoIssuanceOutcome =
         WalletDemoIssuanceOutcome.Failed("Deferred issuance is not configured"),
     private val deferredGate: CompletableDeferred<Unit>? = null,
-    private val holderCreationGate: CompletableDeferred<Unit>? = null,
     private val startIssuanceGate: CompletableDeferred<Unit>? = null,
     private val ignoreStartIssuanceCancellation: Boolean = false,
     private val startIssuanceError: Throwable? = null,
@@ -2773,7 +2748,6 @@ private class FakeDemoWallet(
     var receivedTxCode: String? = null
     var receiveCalls = 0
     val receivedIssuanceSelections = mutableListOf<List<WalletDemoCredentialSelection>>()
-    val createdHolderKeyCounts = mutableListOf<Int>()
     var presentedRequestUrl: String? = null
     var previewedRequestUrl: String? = null
     var previewPresentationCalls = 0
@@ -2868,11 +2842,6 @@ private class FakeDemoWallet(
         return WalletDemoIssuanceOutcome.Cancelled
     }
 
-    override suspend fun createIssuanceHolderKeys(count: Int): List<WalletDemoHolderBinding> {
-        createdHolderKeyCounts += count
-        withContext(NonCancellable) { holderCreationGate?.await() }
-        return List(count) { WalletDemoHolderBinding("batch-holder-$it", "did:key:batch-holder-$it") }
-    }
 
     override suspend fun listDeferredIssuance() = pendingCredentials
 

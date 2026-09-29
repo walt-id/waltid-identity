@@ -92,17 +92,17 @@ Omitting selections requests one instance of each offered configuration. The iss
 ``IssuanceOfferPreview/batchSize`` is a maximum, not a requested count. Different
 configurations or issuer-granted datasets use separate requests; explicit holder
 bindings request copies of one target. The core matches each received credential to
-its holder key, independently of response order.
+its holder key, independently of response order. Each copy requires a distinct stored
+holder key; different IDs for the same public key are rejected before grant redemption.
 
-After review and acceptance, create keys explicitly or reuse existing wallet keys:
+After review, request new keys inside acceptance or select existing wallet keys:
 
 ```swift
 guard let configuration = session.offer.credentials.first,
       (session.offer.batchSize ?? 1) >= 2 else { return }
-let holders = try await wallet.createIssuanceHolderKeys(count: 2)
 let selections = [IssuanceCredentialSelection(
     configurationID: configuration.configurationID,
-    holderBindings: holders
+    holders: .newKeys(count: 2)
 )]
 let result = try await wallet.continuePreAuthorizedIssuance(
     sessionID: session.id,
@@ -110,6 +110,12 @@ let result = try await wallet.continuePreAuthorizedIssuance(
     credentials: selections
 )
 ```
+
+Use `.existing(bindings)` to select existing keys. Newly prepared keys are removed
+when preparation or validation fails before acceptance. Once accepted, they remain
+wallet-owned through persistence errors and uncertain issuer outcomes. Retries reuse
+the accepted bindings, including after restart; changing holders or copy counts then
+requires a new session. Preview never generates keys.
 
 For authorization-code issuance, pass the same `credentials` argument to
 ``Wallet/beginAuthorizationIssuance(sessionID:credentials:)``. The retained session

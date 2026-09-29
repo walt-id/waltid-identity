@@ -706,7 +706,7 @@ class WalletSdkBridgeTest {
             return WalletIssuanceOutcome.Cancelled(sessionId)
         }
 
-        override suspend fun listDeferredIssuance(): List<id.walt.wallet2.handlers.WalletDeferredCredential> = emptyList()
+        override suspend fun listDeferredIssuance(): List<id.walt.wallet2.handlers.WalletIssuanceContinuation> = emptyList()
 
         override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =
             error("Not used by this test fake")

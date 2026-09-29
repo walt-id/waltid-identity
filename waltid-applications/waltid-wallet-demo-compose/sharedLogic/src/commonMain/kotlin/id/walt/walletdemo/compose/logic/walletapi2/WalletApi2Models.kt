@@ -241,7 +241,6 @@ internal data class ResolveOfferDetailedResponseDto(
     val issuer: OfferIssuerMetadataDto,
     val offeredCredentials: List<OfferedCredentialMetadataDto> = emptyList(),
     val transactionCode: OfferTransactionCodeRequirementDto? = null,
-    val batchSize: Int? = null,
 )
 
 @Serializable
@@ -438,4 +437,10 @@ internal data class PollDeferredRequestDto(
     val credentialIssuerBaseUrl: String? = null,
     val credentialConfigurationId: String? = null,
     val keyId: String? = null,
+)
+
+@Serializable
+internal data class ResolveBatchOfferResponseDto(
+    val offer: ResolveOfferDetailedResponseDto,
+    val batchSize: Int? = null,
 )

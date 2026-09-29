@@ -146,6 +146,7 @@ internal fun authorizationScheme(tokenType: String?): String =
 internal data class DpopRequestContext(
     val algorithms: Set<String>,
     val keyMaterial: WalletKeyStoreEntry,
+    var nonce: String? = null,
 )
 
 /**

@@ -102,9 +102,9 @@ internal class WalletApi2Client(
         }
     }
 
-    suspend fun resolveOffer(walletId: String, offerUrl: String): ResolveOfferDetailedResponseDto =
+    suspend fun resolveOffer(walletId: String, offerUrl: String): ResolveBatchOfferResponseDto =
         request {
-            post("/wallet/$walletId/credentials/receive/resolve-offer") {
+            post("/wallet/$walletId/credentials/receive/resolve-offer/batch") {
                 jsonBody(OfferUrlRequest(offerUrl))
             }
         }.body()
@@ -138,7 +138,7 @@ internal class WalletApi2Client(
         credentialConfigurationIds: List<String>,
     ): GenerateAuthorizationUrlResultDto =
         request {
-            post("/wallet/$walletId/credentials/receive/authorization-url") {
+            post("/wallet/$walletId/credentials/receive/authorization-url/batch") {
                 jsonBody(
                     GenerateAuthorizationUrlRequestDto(
                         offerUrl = offerUrl,
@@ -154,7 +154,7 @@ internal class WalletApi2Client(
         request: ReceiveAuthorizedCredentialRequestDto,
     ): ReceiveCredentialResultDto =
         receiveResult {
-            post("/wallet/$walletId/credentials/receive/authorized") { jsonBody(request) }
+            post("/wallet/$walletId/credentials/receive/authorized/batch") { jsonBody(request) }
         }
 
     suspend fun listDeferred(walletId: String): List<DeferredCredentialHandleDto> =

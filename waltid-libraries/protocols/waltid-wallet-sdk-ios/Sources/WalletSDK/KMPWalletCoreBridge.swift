@@ -103,7 +103,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     func listDeferredIssuance() async throws -> [DeferredCredential] {
         let result = try await bridge.listDeferredIssuance()
         return swiftArray(try Self.successAnyValue(result, operation: "list deferred issuance"),
-            of: Waltid_openid4vc_walletWalletDeferredCredential.self).map { $0.toSwiftDeferredCredential() }
+            of: Waltid_openid4vc_walletWalletIssuanceContinuation.self).map { $0.toSwiftDeferredCredential() }
     }
 
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
@@ -119,14 +119,14 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
         let value = try Self.successValue(
             result,
-            as: Waltid_openid4vc_walletWalletIssuanceSession.self,
+            as: Waltid_openid4vc_walletWalletIssuanceBatchSession.self,
             operation: "start issuance"
         )
         return try value.toSwiftIssuanceSession()
     }
 
     func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
-        let result = try await bridge.beginAuthorizationIssuance(sessionId: sessionID, credentials: credentials?.map { $0.toKMPSelection() })
+        let result = try await bridge.beginAuthorizationIssuance(sessionId: sessionID, credentials: try credentials?.map { try $0.toKMPSelection() })
         let value = try Self.successValue(
             result,
             as: Waltid_openid4vc_walletWalletIssuanceAuthorization.self,
@@ -143,7 +143,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         let result = try await bridge.continuePreAuthorizedIssuance(
             sessionId: sessionID,
             transactionCode: transactionCode,
-            credentials: credentials?.map { $0.toKMPSelection() }
+            credentials: try credentials?.map { try $0.toKMPSelection() }
         )
         return try Self.issuanceOutcome(result, operation: "continue pre-authorized issuance")
     }
@@ -1046,24 +1046,24 @@ final class KMPProximityPresentationSessionBridge:
     }
 }
 
-private extension Waltid_openid4vc_walletWalletIssuanceSession {
+private extension Waltid_openid4vc_walletWalletIssuanceBatchSession {
     func toSwiftIssuanceSession() throws -> IssuanceSession {
         IssuanceSession(
             id: id,
-            offer: try offer.toSwiftIssuanceOfferPreview()
+            offer: try offer.toSwiftIssuanceOfferPreview(batchSize: batchSize?.intValue)
         )
     }
 }
 
 private extension Waltid_openid4vc_walletWalletIssuanceOfferPreview {
-    func toSwiftIssuanceOfferPreview() throws -> IssuanceOfferPreview {
+    func toSwiftIssuanceOfferPreview(batchSize: Int?) throws -> IssuanceOfferPreview {
         IssuanceOfferPreview(
             grant: grant == .authorizationCode ? .authorizationCode : .preAuthorizedCode,
             issuer: issuer.toSwiftIssuanceIssuerPreview(),
             credentials: swiftArray(credentials, of: Waltid_openid4vc_walletWalletIssuanceCredentialPreview.self)
                 .map { $0.toSwiftIssuanceCredentialPreview() },
             transactionCode: transactionCode?.toSwiftIssuanceTransactionCode(),
-            batchSize: batchSize?.intValue
+            batchSize: batchSize
         )
     }
 }
@@ -1178,7 +1178,7 @@ extension Waltid_openid4vc_walletWalletIssuanceOutcome {
                     targetFailure: value.failure?.toSwiftTargetFailure()
                 ),
                 storedCredentialIDs: swiftArray(value.storedCredentialIds, of: String.self),
-                deferredCredentials: swiftArray(value.deferredCredentials, of: Waltid_openid4vc_walletWalletDeferredCredential.self)
+                deferredCredentials: swiftArray(value.deferredCredentials, of: Waltid_openid4vc_walletWalletIssuanceContinuation.self)
                     .map { $0.toSwiftDeferredCredential() }
             )
         }
@@ -1186,14 +1186,30 @@ extension Waltid_openid4vc_walletWalletIssuanceOutcome {
 }
 
 extension IssuanceCredentialSelection {
-    func toKMPSelection() -> MobileWalletCredentialSelection {
-        MobileWalletCredentialSelection(credentialConfigurationId: configurationID,
-            holderBindings: holderBindings.map { MobileWalletHolderBinding(keyId: $0.keyID, did: $0.did) },
-            credentialIdentifier: credentialIdentifier)
+    func toKMPSelection() throws -> MobileWalletCredentialSelection {
+        let selection: any MobileWalletCredentialHolders
+        switch holders {
+        case .existing(let bindings):
+            selection = MobileWalletCredentialHoldersExisting(bindings: bindings.map { MobileWalletHolderBinding(keyId: $0.keyID, did: $0.did) })
+        case .newKeys(let count):
+            guard count > 0, let nativeCount = Int32(exactly: count) else {
+                throw WalletError.invalidInput("Holder-key count must be a positive 32-bit integer")
+            }
+            selection = MobileWalletCredentialHoldersNewKeys(count: nativeCount)
+        }
+        return MobileWalletCredentialSelection(credentialConfigurationId: configurationID,
+            holders: selection, credentialIdentifier: credentialIdentifier)
     }
 }
 
 private extension Waltid_openid4vc_walletWalletDeferredCredential {
+    func toSwiftDeferredCredential() -> DeferredCredential {
+        DeferredCredential(id: id, credentialConfigurationID: credentialConfigurationId,
+            intervalSeconds: intervalSeconds?.int64Value, credentialIdentifier: credentialIdentifier)
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceContinuation {
     func toSwiftDeferredCredential() -> DeferredCredential {
         DeferredCredential(id: id, credentialConfigurationID: credentialConfigurationId,
             intervalSeconds: intervalSeconds?.int64Value, credentialIdentifier: credentialIdentifier)

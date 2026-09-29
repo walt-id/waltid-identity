@@ -15,6 +15,12 @@ public struct IssuanceHolderBinding: Equatable, Sendable {
     }
 }
 
+/// Existing keys or an explicit number of keys prepared within session acceptance.
+public enum IssuanceCredentialHolders: Equatable, Sendable {
+    case existing([IssuanceHolderBinding])
+    case newKeys(count: Int)
+}
+
 /// An accepted credential configuration and the explicit copies requested for it.
 public struct IssuanceCredentialSelection: Equatable, Sendable {
     /// Configuration identifier from the reviewed offer.
@@ -22,17 +28,17 @@ public struct IssuanceCredentialSelection: Equatable, Sendable {
     /// Issuer-granted dataset identifier, when known; never invent a dataset identifier.
     public let credentialIdentifier: String?
     /// One entry per requested copy; the issuer's batch limit does not create copies automatically.
-    public let holderBindings: [IssuanceHolderBinding]
+    public let holders: IssuanceCredentialHolders
 
     /// Creates an explicit selection for either issuance grant.
     /// - Parameters:
     ///   - configurationID: Offered credential configuration identifier.
     ///   - credentialIdentifier: Optional identifier granted by the issuer.
-    ///   - holderBindings: Keys for the requested copies, validated against issuer capabilities by the core.
-    public init(configurationID: String, credentialIdentifier: String? = nil, holderBindings: [IssuanceHolderBinding]) {
+    ///   - holders: Existing keys or a count of new keys, validated against issuer capabilities by the core.
+    public init(configurationID: String, credentialIdentifier: String? = nil, holders: IssuanceCredentialHolders) {
         self.configurationID = configurationID
         self.credentialIdentifier = credentialIdentifier
-        self.holderBindings = holderBindings
+        self.holders = holders
     }
 }
 

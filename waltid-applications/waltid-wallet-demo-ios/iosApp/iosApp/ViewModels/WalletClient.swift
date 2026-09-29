@@ -8,7 +8,6 @@ protocol WalletClient {
         _ signingProtection: WalletDemoSigningProtection
     ) async throws -> WalletDemoSigningProtectionAvailability
     func credentials() async throws -> [Credential]
-    func createIssuanceHolderKeys(count: Int) async throws -> [IssuanceHolderBinding]
     func listDeferredIssuance() async throws -> [DeferredCredential]
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession
     func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization
@@ -76,7 +75,6 @@ final class SDKWalletClient: WalletClient {
         try await wallet().credentials()
     }
 
-    func createIssuanceHolderKeys(count: Int) async throws -> [IssuanceHolderBinding] { try await wallet().createIssuanceHolderKeys(count: count) }
     func listDeferredIssuance() async throws -> [DeferredCredential] { try await wallet().listDeferredIssuance() }
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession { try await wallet().startIssuance(request) }
     func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization { try await wallet().beginAuthorizationIssuance(sessionID: sessionID, credentials: credentials) }

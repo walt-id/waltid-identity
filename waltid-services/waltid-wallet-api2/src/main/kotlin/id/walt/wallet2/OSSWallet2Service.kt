@@ -8,6 +8,7 @@ import id.walt.commons.featureflag.FeatureManager
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
@@ -72,7 +73,7 @@ object OSSWallet2Service {
     private val namedKeyStores = ConcurrentHashMap<String, WalletKeyStore>()
     private val namedCredentialStores = ConcurrentHashMap<String, WalletCredentialStore>()
     private val namedDidStores = ConcurrentHashMap<String, WalletDidStore>()
-    private val issuanceSessionStates = ConcurrentHashMap<String, WalletIssuanceSessionState>()
+    private val issuanceSessionStates = ConcurrentHashMap<Pair<String, String?>, WalletIssuanceSessionState>()
 
     val resolver: WalletResolver = object : WalletResolver {
 
@@ -91,16 +92,26 @@ object OSSWallet2Service {
         override val didStoreFactory: StoreFactory<WalletDidStore>
             get() = OSSWallet2Service.didStoreFactory
 
-        override suspend fun resolveIssuanceSessionState(walletId: String): WalletIssuanceSessionState =
-            issuanceSessionStates.computeIfAbsent(walletId) {
-                WalletIssuanceSessionState(walletId,
-                    persistentStoreRegistry?.issuanceSessionStore(walletId) ?: InMemoryIssuanceSessionStore())
+        override suspend fun resolveWallet(walletId: String): Wallet? {
+            val registry = persistentStoreRegistry ?: return super.resolveWallet(walletId)
+            return registry.withWalletLock(walletId) { super.resolveWallet(walletId) }
+        }
+
+        override suspend fun resolveIssuanceSessionState(walletId: String): WalletIssuanceSessionState {
+            val store = persistentStoreRegistry?.issuanceSessionStore(walletId)
+            return issuanceSessionStates.computeIfAbsent(walletId to store?.walletGeneration) {
+                WalletIssuanceSessionState(walletId, store ?: InMemoryIssuanceSessionStore())
             }
+        }
+
+        override suspend fun resolveCredentialStoreForWallet(walletId: String, storeId: String): WalletCredentialStore? {
+            val registry = persistentStoreRegistry ?: return resolveCredentialStore(storeId)
+            return registry.resolveCredentialStoreForWallet(walletId, storeId)
+        }
 
         override suspend fun deleteWallet(walletId: String) {
-            resolveWallet(walletId)?.issuanceSessions()?.closeSessions()
-            walletStore.deleteWallet(walletId)
-            issuanceSessionStates.remove(walletId)
+            super.deleteWallet(walletId)
+            issuanceSessionStates.keys.removeIf { it.first == walletId }
         }
 
         override suspend fun resolveKeyStore(storeId: String): WalletKeyStore? {

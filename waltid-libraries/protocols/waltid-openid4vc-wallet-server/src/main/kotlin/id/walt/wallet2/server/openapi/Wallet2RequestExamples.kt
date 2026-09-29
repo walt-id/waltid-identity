@@ -23,7 +23,7 @@ object Wallet2RequestExamples {
     ))
     val RECEIVE_MULTIPLE = RECEIVE_BATCH.copy(credentials = RECEIVE_BATCH.credentials!! +
         WalletCredentialSelection("org.iso.23220.photoid.1", holderBindings = listOf(CredentialHolderBinding("holder-3"))))
-    val AUTHORIZE_WITHOUT_OFFER = GenerateAuthorizationUrlRequest(
+    val AUTHORIZE_WITHOUT_OFFER = GenerateBatchAuthorizationUrlRequest(
         credentialIssuer = "https://issuer.example",
         credentialConfigurationIds = listOf("identity_credential", "org.iso.23220.photoid.1"),
         redirectUri = Url("openid://callback"),
@@ -34,18 +34,18 @@ object Wallet2RequestExamples {
         credentialIssuer = "https://issuer.example",
         credentialConfigurationIds = listOf("identity_credential", "org.iso.23220.photoid.1"),
     )
-    val RECEIVE_AUTHORIZED_BATCH = ReceiveAuthorizedCredentialRequest(
+    val RECEIVE_AUTHORIZED_BATCH = ReceiveAuthorizedCredentialsRequest(
         credentials = RECEIVE_BATCH.credentials!!,
         code = "code-from-browser-callback", codeVerifier = "verifier-from-authorization-url",
         credentialIssuer = "https://issuer.example", credentialEndpoint = Url("https://issuer.example/credential"),
         redirectUri = Url("openid://callback"),
     )
     const val BATCH_DESCRIPTION = "One instance per selected configuration is the default. " +
-        "For an explicit batch, supply one holderBindings entry per instance and stay within the preview batchSize. " +
+        "For an explicit batch, supply one holderBindings entry with a distinct public key per instance, within preview batchSize. " +
         "Multiple configurations/datasets use separate requests under the same token. " +
-        "Authorization details or scopes are selected automatically from issuer metadata. " +
+        "Authorization-code requests require advertised authorization details or scopes; pre-authorized codes may be redeemed without either. " +
         "Token authorization_details are expanded into credential_identifier requests automatically. " +
-        "Use existing wallet keys; issuance never generates keys implicitly."
+        "Select stored wallet key IDs or the wallet default; inline holder keys cannot be used for storage. Issuance never generates keys implicitly."
 
 
     private val EXAMPLE_STATIC_KEY: JsonObject = buildJsonObject {

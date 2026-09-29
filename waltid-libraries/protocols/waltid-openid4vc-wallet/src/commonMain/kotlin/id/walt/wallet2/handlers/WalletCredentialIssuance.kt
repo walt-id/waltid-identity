@@ -20,7 +20,11 @@ import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-/** One requested instance. Key references are resolved by the wallet, never generated implicitly. */
+/**
+ * One requested instance. Storage-producing flows require [keyId] or the wallet's default key.
+ * Inline [key] is only supported by isolated proof operations, even when it matches a stored key.
+ * Key references are resolved by the wallet, never generated implicitly; copies require distinct public keys.
+ */
 @Serializable
 data class CredentialHolderBinding(
     val keyId: String? = null,
@@ -96,16 +100,62 @@ internal suspend fun Wallet.resolveCredentialSelections(
             ResolvedCredentialHolderBinding(material, resolveProofDid(
                 binding.did ?: defaultDid.takeIf { material.keyId == defaultKey.keyId }, material, configuration))
         }
+        bindings.requireDistinctHolderKeys()
         ResolvedWalletCredentialSelection(selection, bindings)
     }
 }
+
+/** Resolve isolated storage inputs before consuming a credential or deferred response. */
+internal suspend fun Wallet.resolveStoredCredentialBindings(
+    holders: List<CredentialHolderBinding>,
+    keyId: String?,
+    proofRequired: Boolean,
+): List<ResolvedCredentialHolderBinding> {
+    require(holders.isNotEmpty()) { "At least one holder binding is required" }
+    require(holders.none { it.key != null }) {
+        "Wallet storage requires holder keys selected by wallet key ID; inline holder keys are only supported by isolated proof operations"
+    }
+    val defaultKey = resolveKeyMaterial(keyId, setOf(KeyUsage.SIGN))
+    require(keyId == null || defaultKey != null) { "Holder key '$keyId' is unavailable" }
+    return holders.mapNotNull { binding ->
+        val material = binding.keyId?.let {
+            requireNotNull(resolveKeyMaterial(it, setOf(KeyUsage.SIGN))) { "Holder key '$it' is unavailable" }
+        } ?: defaultKey
+        if (material == null) {
+            require(!proofRequired && holders.size == 1 && binding.did == null) { "Holder keys are unavailable" }
+            null
+        } else ResolvedCredentialHolderBinding(material, binding.did)
+    }.also {
+        it.requireStoredHolderKeys()
+        it.requireDistinctHolderKeys()
+    }
+}
+
+/** A storage-producing flow must reject process-local keys before consuming authorization. */
+internal fun List<ResolvedCredentialHolderBinding>.requireStoredHolderKeys() {
+    require(all { it.material.keyReference != null }) {
+        "Wallet storage requires holder keys selected by wallet key ID; inline holder keys are only supported by isolated proof operations"
+    }
+}
+
+/** Key aliases do not create distinct copies: compare public identities, not key IDs. */
+internal suspend fun List<ResolvedCredentialHolderBinding>.requireDistinctHolderKeys() {
+    if (size > 1) require(map { it.material.publicKeyThumbprint() }.distinct().size == size) {
+        "Each credential copy requires a distinct holder key"
+    }
+}
+
+internal data class ResolvedCredentialIssuanceTarget(
+    val target: CredentialIssuanceTarget,
+    val selection: ResolvedWalletCredentialSelection,
+)
 
 internal fun grantedCredentialSelections(
     metadata: CredentialIssuerMetadata,
     selections: List<ResolvedWalletCredentialSelection>,
     authorizationDetails: List<AuthorizationDetail>?,
     scope: String?,
-): List<Pair<CredentialIssuanceTarget, ResolvedWalletCredentialSelection>> {
+): List<ResolvedCredentialIssuanceTarget> {
     val targets = CredentialRequestBuilder.resolveTargets(metadata,
         selections.map { it.selection.credentialConfigurationId }.distinct(), authorizationDetails, scope)
     return selections.flatMap { selected ->
@@ -114,13 +164,15 @@ internal fun grantedCredentialSelections(
                 (selected.selection.credentialIdentifier == null || it.credentialIdentifier == selected.selection.credentialIdentifier)
         }
         require(selected.selection.credentialIdentifier == null || matches.isNotEmpty()) { "Selected credential identifier was not granted" }
-        matches.map { it to selected }
+        matches.map { ResolvedCredentialIssuanceTarget(it, selected) }
     }.also { require(it.isNotEmpty()) { "Token grants none of the selected credentials" } }
 }
 
 /**
  * Validate the entire response before the first write. Issuers may return fewer instances or reorder
  * them. Match by cryptographic holder binding, not by array position, then persist each independently.
+ * Only proof-bound requests impose one credential per supplied key; proofless response arrays
+ * do not acquire a count limit or holder binding from the wallet's default key.
  */
 internal suspend fun Wallet.prepareIssuedCredentials(
     rawCredentials: List<String>,
@@ -132,7 +184,7 @@ internal suspend fun Wallet.prepareIssuedCredentials(
     expectedConfiguration: CredentialConfiguration? = null,
 ): List<StoredCredential> {
     require(rawCredentials.isNotEmpty()) { "Credential response contained no credentials" }
-    require(rawCredentials.size <= bindings.size.coerceAtLeast(1)) { "Issuer returned more credentials than requested" }
+    require(!proofRequired || rawCredentials.size <= bindings.size) { "Issuer returned more credentials than requested" }
     require(bindings.isNotEmpty() || !proofRequired) { "Holder keys are required for proof-bound issuance" }
     val remaining = bindings.toMutableList()
     val parsedCredentials = rawCredentials.map { CredentialParser.detectAndParse(it).second }
@@ -146,12 +198,16 @@ internal suspend fun Wallet.prepareIssuedCredentials(
         require(holderBindingKnown || parsed !is MdocsCredential) {
             "Exact issuance holder-key material is required when storing an mdoc"
         }
-        if (bindings.isEmpty()) {
-            require(parsed !is MdocsCredential) { "Exact issuance holder-key material is required when storing an mdoc" }
-            return@map StoredCredential(Uuid.random().toString(), parsed, label, Clock.System.now(), metadata)
-        }
         // A subject DID is not proof of holder binding in a proofless W3C issuance.
         val identities = parsed.holderKeyThumbprints(includeSubjectDid = proofRequired)
+        require("cnf" !in parsed.credentialData || identities.isNotEmpty()) {
+            "Issued credential contains an unsupported or invalid holder confirmation"
+        }
+        if (bindings.isEmpty()) {
+            require(parsed !is MdocsCredential) { "Exact issuance holder-key material is required when storing an mdoc" }
+            require(identities.isEmpty()) { "Issued credential is bound to an unrequested holder key" }
+            return@map StoredCredential(Uuid.random().toString(), parsed, label, Clock.System.now(), metadata)
+        }
         val match = if (identities.isEmpty()) {
             require(!proofRequired) { "Issued credential contains no verifiable holder binding" }
             remaining.first()
@@ -159,7 +215,7 @@ internal suspend fun Wallet.prepareIssuedCredentials(
             remaining.firstOrNull { it.material.publicKeyThumbprint() in identities }
                 ?: error("Issued credential is bound to an unrequested holder key")
         }
-        remaining.remove(match)
+        if (proofRequired) remaining.remove(match)
         val stored = StoredCredential(Uuid.random().toString(), parsed, label, Clock.System.now(), metadata)
         if (identities.isEmpty()) stored else withVerifiedIssuanceHolderKeyBinding(stored, match.material)
     }
