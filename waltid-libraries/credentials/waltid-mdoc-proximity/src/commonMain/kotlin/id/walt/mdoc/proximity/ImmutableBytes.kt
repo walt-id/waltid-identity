@@ -1,6 +1,7 @@
 package id.walt.mdoc.proximity
 
 /** Defensive immutable byte snapshot for transport and consent boundaries. */
+@Deprecated("Use Bytestring", ReplaceWith("kotlinx.io.bytestring.ByteString"))
 class ImmutableBytes private constructor(private val value: ByteArray) {
     val size: Int get() = value.size
 
