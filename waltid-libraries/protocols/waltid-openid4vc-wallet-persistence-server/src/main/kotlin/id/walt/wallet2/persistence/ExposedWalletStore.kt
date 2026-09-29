@@ -73,9 +73,12 @@ class ExposedWalletStore(private val db: Database) : WalletStore {
     override suspend fun saveDescriptor(descriptor: WalletDescriptor) {
         val crypto2StaticKey = staticKeyForWrite(descriptor)
         suspendTransaction(db) {
-            // Upsert wallet row
-            Wallet2Tables.Wallets.upsert {
+            // Configuration updates preserve the generation; recreation always gets a new one.
+            Wallet2Tables.Wallets.insertIgnore {
                 it[Wallet2Tables.Wallets.id] = descriptor.id
+                it[Wallet2Tables.Wallets.generation] = java.util.UUID.randomUUID().toString()
+            }
+            Wallet2Tables.Wallets.update({ Wallet2Tables.Wallets.id eq descriptor.id }) {
                 it[Wallet2Tables.Wallets.serializedStaticKey] = descriptor.serializedStaticKey
                 it[Wallet2Tables.Wallets.crypto2StaticKey] = crypto2StaticKey?.let(StoredKeyCodec::encodeToString)
                 it[Wallet2Tables.Wallets.staticDid] = descriptor.staticDid
@@ -125,6 +128,10 @@ class ExposedWalletStore(private val db: Database) : WalletStore {
 
     override suspend fun deleteWallet(walletId: String) {
         suspendTransaction(db) {
+            // Match the wallet-scoped writer lock order before touching shared-store associations.
+            Wallet2Tables.Wallets.update({ Wallet2Tables.Wallets.id eq walletId }) {
+                it[Wallet2Tables.Wallets.id] = walletId
+            }
             val keyStoreIds = Wallet2Tables.WalletKeyStores.selectAll()
                 .where { Wallet2Tables.WalletKeyStores.walletId eq walletId }
                 .map { it[Wallet2Tables.WalletKeyStores.storeId] }

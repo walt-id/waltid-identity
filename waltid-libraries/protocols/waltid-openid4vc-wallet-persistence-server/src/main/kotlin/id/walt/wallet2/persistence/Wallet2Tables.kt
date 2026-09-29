@@ -20,6 +20,8 @@ object Wallet2Tables {
     /** Wallet descriptors — configuration without live store instances. */
     object Wallets : Table("wallet2_wallets") {
         val id = varchar("id", 128)
+        // Nullable only for pre-generation rows; initialized before a wallet-scoped adapter is used.
+        val generation = varchar("generation", 36).nullable()
         val serializedStaticKey = text("static_key").nullable()
         val crypto2StaticKey = text("crypto2_static_key").nullable()
         val staticDid = varchar("static_did", 1024).nullable()

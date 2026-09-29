@@ -7,6 +7,7 @@ import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.handlers.Wallet2RouteHandler.registerWallet2Routes
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -28,11 +29,17 @@ import kotlin.test.*
 
 class WalletDeferredRoutesTest {
     @Test
-    fun deferredRoutesEnforceOwnershipAndReturnOnlyPublicContinuationData() = testApplication {
+    fun deferredRoutesEnforceOwnershipAndReturnOnlyPublicContinuationData() = exerciseDeferredRoutes(false)
+
+    @Test
+    fun walletDeletionAfterALostResponseRemovesTheContinuationWithoutRepolling() = exerciseDeferredRoutes(true)
+
+    private fun exerciseDeferredRoutes(loseResponse: Boolean) = testApplication {
         val keys = InMemoryKeyStore()
         val keyId = keys.addKey(JWKKey.generate(KeyType.secp256r1))
+        val records = InMemoryIssuanceSessionStore()
         val wallet = Wallet("owner-wallet", keyStores = listOf(keys),
-            credentialStores = listOf(InMemoryCredentialStore()), defaultKeyId = keyId)
+            credentialStores = listOf(InMemoryCredentialStore()), defaultKeyId = keyId).attachIssuanceSessionState(WalletIssuanceSessionState("owner-wallet", records))
         var polls = 0
         val issuerClient = HttpClient(MockEngine) {
             engine { addHandler { request ->
@@ -49,6 +56,7 @@ class WalletDeferredRoutesTest {
                     "/credential" -> """{"transaction_id":"private-transaction","interval":1}"""
                     "/deferred" -> {
                         polls++
+                        if (loseResponse) error("Response lost after sending")
                         assertEquals("Bearer private-access-token", request.headers[HttpHeaders.Authorization])
                         """{"transaction_id":"private-transaction","interval":7}"""
                     }
@@ -94,15 +102,27 @@ class WalletDeferredRoutesTest {
         assertEquals(0, polls)
         val listed = client.get(path) { header("X-Test-Account", "owner") }
         assertEquals(HttpStatusCode.OK, listed.status)
-        assertEquals(listOf(pending), json.decodeFromString<List<WalletDeferredCredential>>(listed.bodyAsText()))
+        assertEquals(listOf(WalletIssuanceContinuation(pending)), json.decodeFromString<List<WalletIssuanceContinuation>>(listed.bodyAsText()))
         withContext(Dispatchers.Default) { delay(1000) }
         val resumed = client.post("$path/${pending.id}") { header("X-Test-Account", "owner") }
-        assertEquals(HttpStatusCode.OK, resumed.status)
-        val outcome = assertIs<WalletIssuanceOutcome.Deferred>(json.decodeFromString<WalletIssuanceOutcome>(resumed.bodyAsText()))
-        assertEquals(pending.copy(intervalSeconds = 7), outcome.credentials.single())
-        assertEquals(1, polls)
-        val early = client.post("$path/${pending.id}") { header("X-Test-Account", "owner") }
-        assertIs<WalletIssuanceOutcome.Deferred>(json.decodeFromString<WalletIssuanceOutcome>(early.bodyAsText()))
+        if (loseResponse) {
+            val outcome = assertIs<WalletIssuanceOutcome.Failed>(json.decodeFromString<WalletIssuanceOutcome>(resumed.bodyAsText()))
+            assertEquals(WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN, outcome.error.code)
+            assertFailsWith<IllegalStateException> { sessions.clearSessions() }
+            // Re-open the wallet with a fresh runtime, preserving the durable uncertain claim.
+            wallets.saveWallet(wallet.copy().attachIssuanceSessionState(WalletIssuanceSessionState(wallet.id, records)))
+            val deleted = client.delete("/wallet/${wallet.id}") { header("X-Test-Account", "owner") }
+            assertEquals(HttpStatusCode.NoContent, deleted.status, deleted.bodyAsText())
+            assertNull(resolver.resolveWallet(wallet.id))
+            assertTrue(records.list().isEmpty())
+            assertTrue(sessions.listDeferredCredentials().isEmpty())
+        } else {
+            assertEquals(HttpStatusCode.OK, resumed.status)
+            val outcome = assertIs<WalletIssuanceOutcome.Deferred>(json.decodeFromString<WalletIssuanceOutcome>(resumed.bodyAsText()))
+            assertEquals(pending.copy(intervalSeconds = 7), outcome.credentials.single())
+            val early = client.post("$path/${pending.id}") { header("X-Test-Account", "owner") }
+            assertIs<WalletIssuanceOutcome.Deferred>(json.decodeFromString<WalletIssuanceOutcome>(early.bodyAsText()))
+        }
         assertEquals(1, polls)
         for (body in listOf(listed.bodyAsText(), resumed.bodyAsText())) {
             for (secret in listOf("private-access-token", "private-transaction", "private-code", "keyId")) {

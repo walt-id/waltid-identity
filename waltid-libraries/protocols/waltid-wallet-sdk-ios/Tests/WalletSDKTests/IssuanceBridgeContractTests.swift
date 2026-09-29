@@ -4,14 +4,23 @@ import XCTest
 @testable import WalletSDK
 
 final class IssuanceBridgeContractTests: XCTestCase {
-    func testExplicitSelectionPreservesDatasetAndEveryHolderBinding() {
+    func testExplicitSelectionPreservesDatasetAndEveryHolderBinding() throws {
         let selection = IssuanceCredentialSelection(configurationID: "identity", credentialIdentifier: "dataset-a",
-            holderBindings: [.init(keyID: "first", did: "did:key:first"), .init(keyID: "second")])
-        let core = selection.toKMPSelection()
+            holders: .existing([.init(keyID: "first", did: "did:key:first"), .init(keyID: "second")]))
+        let core = try selection.toKMPSelection()
         XCTAssertEqual(core.credentialConfigurationId, "identity")
         XCTAssertEqual(core.credentialIdentifier, "dataset-a")
-        XCTAssertEqual(core.holderBindings.map(\.keyId), ["first", "second"])
-        XCTAssertEqual(core.holderBindings.map(\.did), ["did:key:first", nil])
+        XCTAssertEqual((core.holders as! MobileWalletCredentialHoldersExisting).bindings.map(\.keyId), ["first", "second"])
+        XCTAssertEqual((core.holders as! MobileWalletCredentialHoldersExisting).bindings.map(\.did), ["did:key:first", nil])
+    }
+
+    func testGeneratedSelectionPreservesCountAndRejectsInvalidNativeCounts() throws {
+        let selection = IssuanceCredentialSelection(configurationID: "identity", holders: .newKeys(count: 2))
+        let core = try selection.toKMPSelection()
+        XCTAssertEqual((core.holders as! MobileWalletCredentialHoldersNewKeys).count, 2)
+        for count in [0, -1, Int.max] {
+            XCTAssertThrowsError(try IssuanceCredentialSelection(configurationID: "identity", holders: .newKeys(count: count)).toKMPSelection())
+        }
     }
 
     func testUncertainOutcomesRemainDistinctFromRetryableNetworkAndStorageFailures() throws {
@@ -19,8 +28,8 @@ final class IssuanceBridgeContractTests: XCTestCase {
             (.network, .network), (.storage, .storage),
             (.remoteOutcomeUncertain, .remoteOutcomeUncertain), (.storageOutcomeUncertain, .storageOutcomeUncertain),
         ]
-        let pending = Waltid_openid4vc_walletWalletDeferredCredential(credentialIdentifier: nil, id: "handle",
-            credentialConfigurationId: "identity", intervalSeconds: nil)
+        let pending = Waltid_openid4vc_walletWalletIssuanceContinuation(id: "handle",
+            credentialConfigurationId: "identity", intervalSeconds: nil, credentialIdentifier: nil)
         for (coreCode, swiftCode) in codes {
             let core = Waltid_openid4vc_walletWalletIssuanceOutcomeFailed(sessionId: "session",
                 error: .init(code: coreCode, message: "Retain this handle"), storedCredentialIds: ["stored"],
@@ -34,9 +43,23 @@ final class IssuanceBridgeContractTests: XCTestCase {
         }
     }
 
+    func testConfiguredDeferredOutcomePreservesTheReleasedReference() throws {
+        let pending = Waltid_openid4vc_walletWalletDeferredCredential(id: "pending",
+            credentialConfigurationId: "identity", intervalSeconds: .init(longLong: 7), credentialIdentifier: "dataset-a")
+        let core = Waltid_openid4vc_walletWalletIssuanceOutcomeDeferred(sessionId: "session",
+            storedCredentialIds: ["stored"], credentials: [pending])
+        guard case let .deferred(session, stored, handles) = try core.toSwiftIssuanceOutcome() else {
+            return XCTFail("Expected configured deferred issuance")
+        }
+        XCTAssertEqual(session, "session")
+        XCTAssertEqual(stored, ["stored"])
+        XCTAssertEqual(handles, [.init(id: "pending", credentialConfigurationID: "identity", intervalSeconds: 7,
+            credentialIdentifier: "dataset-a")])
+    }
+
     func testLocalStorageHandlePreservesAnUnknownConfiguration() throws {
-        let pending = Waltid_openid4vc_walletWalletDeferredCredential(credentialIdentifier: nil, id: "local-save",
-            credentialConfigurationId: nil, intervalSeconds: nil)
+        let pending = Waltid_openid4vc_walletWalletIssuanceContinuation(id: "local-save",
+            credentialConfigurationId: nil, intervalSeconds: nil, credentialIdentifier: nil)
         let core = Waltid_openid4vc_walletWalletIssuanceOutcomeFailed(sessionId: "session",
             error: .init(code: .storage, message: "Retry local storage"), storedCredentialIds: [],
             deferredCredentials: [pending], failure: nil)
@@ -52,8 +75,8 @@ final class IssuanceBridgeContractTests: XCTestCase {
         let stages: [(Waltid_openid4vc_walletCredentialIssuanceStage, IssuanceFailureStage)] = [
             (.proof, .proof), (.request, .request), (.response, .response), (.storage, .storage), (.observer, .observer),
         ]
-        let pending = Waltid_openid4vc_walletWalletDeferredCredential(credentialIdentifier: "dataset-a", id: "handle",
-            credentialConfigurationId: "identity", intervalSeconds: .init(longLong: 7))
+        let pending = Waltid_openid4vc_walletWalletIssuanceContinuation(id: "handle",
+            credentialConfigurationId: "identity", intervalSeconds: .init(longLong: 7), credentialIdentifier: "dataset-a")
         let stopped = Waltid_openid4vci_walletCredentialIssuanceTarget(credentialConfigurationId: "identity", credentialIdentifier: "dataset-b")
         let unattempted = Waltid_openid4vci_walletCredentialIssuanceTarget(credentialConfigurationId: "identity", credentialIdentifier: "dataset-c")
         for (coreStage, swiftStage) in stages {

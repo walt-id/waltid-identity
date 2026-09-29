@@ -11,7 +11,6 @@ import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
 import id.walt.walletdemo.compose.logic.WalletDemoIssuerMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
-import id.walt.walletdemo.compose.logic.WalletDemoCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoOfferedCredentialMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationContinuation
@@ -44,7 +43,7 @@ internal val walletApi2Json = Json {
     explicitNulls = false
 }
 
-internal fun ResolveOfferDetailedResponseDto.toDemoPreview(): WalletDemoOfferPreview =
+internal fun ResolveOfferDetailedResponseDto.toDemoPreview(batchSize: Int? = null): WalletDemoOfferPreview =
     WalletDemoOfferPreview(
         issuer = WalletDemoIssuerMetadata(
             credentialIssuer = issuer.credentialIssuer,
@@ -71,10 +70,6 @@ internal fun ResolveOfferDetailedResponseDto.toDemoPreview(): WalletDemoOfferPre
         batchSize = batchSize,
     )
 
-internal fun List<WalletDemoCredentialSelection>.toSelectionDtos(): List<IssuanceCredentialSelectionDto> = map { selection ->
-    IssuanceCredentialSelectionDto(selection.credentialConfigurationId, selection.holderBindings.map { HolderBindingDto(it.keyId, it.did) })
-}
-
 internal fun List<WalletDemoPresentationDisclosureSelection>.toDisclosureSelectionDtos(): List<DisclosureSelectionDto> =
     map { selection ->
         DisclosureSelectionDto(
@@ -83,14 +78,6 @@ internal fun List<WalletDemoPresentationDisclosureSelection>.toDisclosureSelecti
             path = selection.path,
         )
     }
-
-internal suspend fun replaceWalletAfterSuccessfulDelete(
-    deleteCurrent: suspend () -> Unit,
-    createReplacement: suspend () -> String,
-): String {
-    deleteCurrent()
-    return createReplacement()
-}
 
 internal fun ResolveOfferDetailedResponseDto.toDemoGrant(): WalletDemoIssuanceGrant {
     val grant = grantType.orEmpty()

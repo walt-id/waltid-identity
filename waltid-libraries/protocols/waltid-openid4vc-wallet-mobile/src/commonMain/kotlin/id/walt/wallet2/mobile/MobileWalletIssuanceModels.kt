@@ -9,21 +9,6 @@ package id.walt.wallet2.mobile
  */
 public sealed interface MobileWalletCredentialOffer {
     /**
-     * Discover configurations from issuer metadata for wallet-initiated authorization.
-     *
-     * @property credentialIssuer Non-blank credential issuer identifier used for metadata discovery.
-     * @property credentialConfigurationIds Non-empty selection of identifiers advertised in issuer metadata.
-     */
-    public data class Issuer(
-        public val credentialIssuer: String,
-        public val credentialConfigurationIds: List<String>,
-    ) : MobileWalletCredentialOffer {
-        init {
-            require(credentialIssuer.isNotBlank())
-            require(credentialConfigurationIds.isNotEmpty() && credentialConfigurationIds.none(String::isBlank))
-        }
-    }
-    /**
      * Deep-link or QR credential offer URI (`openid-credential-offer://…`).
      *
      * @property value Non-blank credential offer URI.
@@ -81,24 +66,27 @@ public data class MobileWalletHolderBinding(
     public val did: String? = null,
 )
 
+/** Holder-key choice for one accepted configuration or dataset. */
+public sealed interface MobileWalletCredentialHolders {
+    /** Uses keys already owned by the wallet; the SDK never cleans these up on an acceptance error. */
+    public data class Existing(public val bindings: List<MobileWalletHolderBinding>) : MobileWalletCredentialHolders
+
+    /** Creates distinct platform keys inside acceptance, using the wallet's configured key policy. */
+    public data class NewKeys(public val count: Int) : MobileWalletCredentialHolders
+}
+
 /**
- * Accepted configuration/dataset and the holder keys for its requested instances.
+ * Accepted configuration/dataset and its holder-key choice.
+ *
+ * New keys are prepared by the SDK, not the UI. Rejected or cancelled preparation removes them
+ * before acceptance; after acceptance they remain wallet-owned even if the issuer outcome is uncertain.
  *
  * @property credentialConfigurationId Credential configuration identifier from the reviewed offer.
- * @property holderBindings One binding per requested copy, validated against the issuer's batch limit.
+ * @property holders Existing bindings or an explicit number of new keys; never both.
  * @property credentialIdentifier Optional dataset identifier granted by the issuer; never invent one.
  */
 public data class MobileWalletCredentialSelection(
     public val credentialConfigurationId: String,
-    public val holderBindings: List<MobileWalletHolderBinding>,
+    public val holders: MobileWalletCredentialHolders,
     public val credentialIdentifier: String? = null,
 )
-
-internal fun List<MobileWalletCredentialSelection>.toLibrarySelections(): List<id.walt.wallet2.handlers.WalletCredentialSelection> =
-    map { selection ->
-        id.walt.wallet2.handlers.WalletCredentialSelection(
-            selection.credentialConfigurationId,
-            selection.credentialIdentifier,
-            selection.holderBindings.map { id.walt.wallet2.handlers.CredentialHolderBinding(it.keyId, it.did) },
-        )
-    }

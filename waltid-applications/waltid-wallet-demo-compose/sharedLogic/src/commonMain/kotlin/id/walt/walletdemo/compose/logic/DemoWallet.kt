@@ -14,7 +14,6 @@ interface DemoWallet {
     ): WalletDemoSigningProtectionAvailability
     suspend fun listCredentials(): List<WalletDemoCredential>
     suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential>
-    suspend fun createIssuanceHolderKeys(count: Int): List<WalletDemoHolderBinding>
     suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?): WalletDemoIssuanceSession
     suspend fun beginAuthorizationIssuance(
         sessionId: String,

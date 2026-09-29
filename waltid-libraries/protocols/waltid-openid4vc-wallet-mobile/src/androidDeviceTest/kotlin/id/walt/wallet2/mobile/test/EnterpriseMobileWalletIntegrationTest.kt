@@ -21,6 +21,7 @@ import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletCredentialSelection
+import id.walt.wallet2.mobile.MobileWalletCredentialHolders
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
@@ -94,14 +95,11 @@ class EnterpriseMobileWalletIntegrationTest {
         val offer = fixture.createOffer(scenario, EnterpriseMobilePlatform.ANDROID)
         val walletId = "android-enterprise-batch-${UUID.randomUUID()}"
         val wallet = createWallet(walletId, null)
-        val identity = wallet.signingIdentity.initialize().activeIdentity()
+        wallet.signingIdentity.initialize().activeIdentity()
         val session = wallet.startIssuance(MobileWalletIssuanceRequest(MobileWalletCredentialOffer.Uri(offer.offerUrl)))
-        val holders = wallet.createIssuanceHolderKeys(count = 2)
-        assertEquals(2, holders.map { it.keyId }.toSet().size)
-        assertTrue(holders.none { it.keyId == identity.keyId })
         val outcome = assertIs<WalletIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(
             sessionId = session.id,
-            credentials = listOf(MobileWalletCredentialSelection(session.offer.credentials.single().configurationId, holders)),
+            credentials = listOf(MobileWalletCredentialSelection(session.offer.credentials.single().configurationId, MobileWalletCredentialHolders.NewKeys(2))),
         ))
         assertEquals(2, outcome.credentialIds.toSet().size)
 
@@ -148,7 +146,7 @@ class EnterpriseMobileWalletIntegrationTest {
         ))
         val holders = wallet.createIssuanceHolderKeys(2)
         val authorization = wallet.beginAuthorizationIssuance(session.id,
-            listOf(MobileWalletCredentialSelection(session.offer.credentials.single().configurationId, holders)))
+            listOf(MobileWalletCredentialSelection(session.offer.credentials.single().configurationId, MobileWalletCredentialHolders.Existing(holders))))
         // Recreate the SDK before the browser callback; accepted choices must come from persisted state.
         val reopened = createWallet(walletId, null)
         reopened.signingIdentity.initialize().activeIdentity()
@@ -189,7 +187,7 @@ class EnterpriseMobileWalletIntegrationTest {
             val second = wallet.createIssuanceHolderKeys(1, keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet)
             val failed = assertIs<WalletIssuanceOutcome.Failed>(wallet.continuePreAuthorizedIssuance(
                 sessionId = session.id,
-                credentials = listOf(MobileWalletCredentialSelection(session.offer.credentials.single().configurationId, first + second)),
+                credentials = listOf(MobileWalletCredentialSelection(session.offer.credentials.single().configurationId, MobileWalletCredentialHolders.Existing(first + second))),
             ))
             assertEquals(WalletIssuanceErrorCode.CRYPTO, failed.error.code)
             assertTrue(failed.storedCredentialIds.isEmpty())

@@ -95,6 +95,8 @@ import io.ktor.http.Url
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.flow.Flow
@@ -128,6 +130,116 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 class MobileWalletTest {
+
+    @Test
+    fun deletionRejectsActiveKeyCreationWithoutClosingTheWallet() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val keys = InMemoryMobileWalletKeyStore()
+        var creations = 0
+        val wallet = MobileWallet(
+            walletId = "busy-delete", keyStore = keys, didStore = InMemoryDidStore(),
+            credentialStore = InMemoryCredentialStore(),
+            generateAndPersistHolderKey = { _, _ ->
+                started.complete(Unit)
+                release.await()
+                CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(GenerateSoftwareKeyRequest(
+                    KeyId("holder-${creations++}"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                )).also { keys.addCrypto2Key(it) }
+            },
+        )
+        val creation = async { wallet.createIssuanceHolderKeys(1) }
+        started.await()
+        assertFailsWith<IllegalStateException> { wallet.deleteWallet() }
+        assertTrue(wallet.credentials().isEmpty())
+        release.complete(Unit)
+        assertEquals(1, creation.await().size)
+        wallet.deleteWallet()
+        assertTrue(keys.listKeys().toList().isEmpty())
+        assertFailsWith<IllegalStateException> { wallet.createIssuanceHolderKeys(1) }
+        assertEquals(1, creations)
+    }
+
+    @Test
+    fun admittedDeletionSurvivesCancellationAndRunsCleanupOnce() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var cleanups = 0
+        val wallet = MobileWallet(
+            walletId = "cancel-delete", keyStore = InMemoryMobileWalletKeyStore(),
+            didStore = InMemoryDidStore(), credentialStore = InMemoryCredentialStore(),
+            deleteLocalPersistence = {
+                started.complete(Unit)
+                release.await()
+                cleanups++
+            },
+        )
+        val deletion = launch { wallet.deleteWallet() }
+        started.await()
+        deletion.cancel()
+        assertFailsWith<IllegalStateException> { wallet.credentials() }
+        release.complete(Unit)
+        deletion.join()
+        wallet.deleteWallet()
+        assertEquals(1, cleanups)
+    }
+
+    @Test
+    fun partialStoreDeletionStaysClosedAndRetryRemovesTheRemainingMaterial() = runTest {
+        val keys = InMemoryMobileWalletKeyStore()
+        keys.addCrypto2Key(CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(GenerateSoftwareKeyRequest(
+            KeyId("holder"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+        )))
+        val backingDids = InMemoryDidStore()
+        backingDids.addDid(WalletDidEntry("did:key:holder", JsonObject(emptyMap())))
+        var didRemovalAttempts = 0
+        var persistenceDeletes = 0
+        val dids = object : WalletDidStore by backingDids {
+            override suspend fun removeDid(did: String): Boolean {
+                if (++didRemovalAttempts == 1) error("DID store unavailable")
+                return backingDids.removeDid(did)
+            }
+        }
+        val wallet = MobileWallet(
+            walletId = "partial-delete", keyStore = keys, didStore = dids,
+            credentialStore = InMemoryCredentialStore(), deleteLocalPersistence = { persistenceDeletes++ },
+        )
+        assertFailsWith<IllegalStateException> { wallet.deleteWallet() }
+        assertTrue(keys.listKeys().toList().isEmpty())
+        assertEquals(1, backingDids.listDids().toList().size)
+        assertEquals(0, persistenceDeletes)
+        assertFailsWith<IllegalStateException> { wallet.credentials() }
+        wallet.deleteWallet()
+        assertTrue(backingDids.listDids().toList().isEmpty())
+        assertEquals(1, persistenceDeletes)
+    }
+
+    @Test
+    fun failedPersistenceDeletionClosesTheWalletAndRetriesWithoutReadingClosedStores() = runTest {
+        var persistenceClosed = false
+        var deletionAttempts = 0
+        val backing = InMemoryCredentialStore()
+        val credentials = object : WalletCredentialStore by backing {
+            override suspend fun listCredentials(): Flow<StoredCredential> {
+                check(!persistenceClosed) { "Database driver is closed" }
+                return backing.listCredentials()
+            }
+        }
+        val wallet = MobileWallet(
+            walletId = "delete-retry", keyStore = InMemoryMobileWalletKeyStore(),
+            didStore = InMemoryDidStore(), credentialStore = credentials,
+            deleteLocalPersistence = {
+                persistenceClosed = true
+                if (++deletionAttempts == 1) error("Database file deletion failed")
+            },
+        )
+        assertFailsWith<IllegalStateException> { wallet.deleteWallet() }
+        val closed = assertFailsWith<IllegalStateException> { wallet.credentials() }
+        assertEquals("Mobile wallet is closed", closed.message)
+        wallet.deleteWallet()
+        wallet.deleteWallet()
+        assertEquals(2, deletionAttempts)
+    }
 
     @Test
     fun cancelledBatchKeyCreationCleansUpEvenWhenProviderReturnsAfterCancellation() = runTest {

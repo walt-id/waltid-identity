@@ -55,6 +55,21 @@ import kotlin.test.assertTrue
 
 class MobileWalletFactoryTest {
     @Test
+    fun `retained signing manager cannot recreate keys after wallet deletion`() = runTest {
+        database().use { database ->
+            val provider = FakePlatformManagedKeyProvider()
+            val wallet = wallet(MobileWalletConfig(), database, provider)
+            val manager = wallet.signingIdentity
+            assertIs<SigningIdentityOperationResult.Active>(manager.initialize())
+            wallet.deleteWallet()
+            assertFailsWith<IllegalStateException> { manager.initialize() }
+            assertFailsWith<IllegalStateException> { manager.creationOptions() }
+            assertEquals(1, provider.generateCount)
+            assertTrue(database.queries.selectAll().executeAsList().isEmpty())
+        }
+    }
+
+    @Test
     fun `identity initialization persists one matched P256 DID and signs after restart`() = runTest {
         database().use { database ->
             val provider = FakePlatformManagedKeyProvider()

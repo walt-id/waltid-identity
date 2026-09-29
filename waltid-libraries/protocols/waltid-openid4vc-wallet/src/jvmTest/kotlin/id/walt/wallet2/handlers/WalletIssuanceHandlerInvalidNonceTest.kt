@@ -6,6 +6,7 @@ import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
+import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -139,7 +140,7 @@ class WalletIssuanceHandlerInvalidNonceTest {
         }
 
         val failure = try {
-            WalletIssuanceHandler.fetchCredential(fetchRequest(), client)
+            WalletIssuanceHandler.fetchCredentials(fetchRequest(), client)
             fail("Expected invalid_nonce to be propagated")
         } catch (error: CredentialEndpointException) {
             error
@@ -157,8 +158,10 @@ class WalletIssuanceHandlerInvalidNonceTest {
      */
     @Test
     fun storingFetchReportsBatchSizeBeforePersistingEachCredential() = runTest {
-        val holderKey = JWKKey.generate(KeyType.secp256r1)
-        val credential = batchTestCredential(holderKey)
+        val keys = InMemoryKeyStore()
+        val holders = List(2) { JWKKey.generate(KeyType.secp256r1) }
+        val bindings = holders.map { CredentialHolderBinding(keyId = keys.addKey(it)) }
+        val credentials = holders.map { batchTestCredential(it) }
         val client = HttpClient(MockEngine) {
             engine {
                 addHandler { request ->
@@ -166,7 +169,7 @@ class WalletIssuanceHandlerInvalidNonceTest {
                         {"credential_issuer":"https://issuer.example","credential_endpoint":"https://issuer.example/credential",
                          "batch_credential_issuance":{"batch_size":2},"credential_configurations_supported":{"identity":{"format":"dc+sd-jwt","vct":"identity"}}}
                     """.trimIndent())
-                    else respondJson("""{"credentials":[{"credential":"$credential"},{"credential":"$credential"}]}""")
+                    else respondJson("""{"credentials":[{"credential":"${credentials[0]}"},{"credential":"${credentials[1]}"}]}""")
                 }
             }
             install(ContentNegotiation) {
@@ -177,7 +180,7 @@ class WalletIssuanceHandlerInvalidNonceTest {
         val store = RecordingCredentialStore(events)
         val wallet = Wallet(
             id = "isolated-fetch-accounting",
-            staticKey = holderKey,
+            keyStores = listOf(keys),
             credentialStores = listOf(store),
         )
 
@@ -187,7 +190,7 @@ class WalletIssuanceHandlerInvalidNonceTest {
                 proofs = id.walt.openid4vci.prooftypes.Proofs(jwt = listOf("proof-1", "proof-2")),
                 credentialIssuerBaseUrl = "https://issuer.example",
                 credentialConfigurationId = "identity",
-                holderBindings = List(2) { CredentialHolderBinding(keyId = holderKey.getKeyId()) },
+                holderBindings = bindings,
             ),
             httpClient = client,
             beforeCredentialsStored = { events += "reserve:$it" },

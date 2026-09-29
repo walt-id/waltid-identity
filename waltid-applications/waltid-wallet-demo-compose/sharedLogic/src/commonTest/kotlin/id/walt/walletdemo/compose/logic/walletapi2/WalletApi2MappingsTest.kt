@@ -2,12 +2,9 @@ package id.walt.walletdemo.compose.logic.walletapi2
 
 import id.walt.walletdemo.compose.logic.WalletDeepLinkScheme
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
-import id.walt.walletdemo.compose.logic.WalletDemoCredentialSelection
-import id.walt.walletdemo.compose.logic.WalletDemoHolderBinding
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNull
@@ -65,12 +62,12 @@ class WalletApi2MappingsTest {
 
     @Test
     fun authorizedRestRequestPreservesAllBindingsWithoutASingularConfigurationField() {
-        val selections = listOf(WalletDemoCredentialSelection("pid", listOf(
-            WalletDemoHolderBinding("key-1", "did:key:one"), WalletDemoHolderBinding("key-2", "did:key:two"),
+        val selections = listOf(IssuanceCredentialSelectionDto("pid", listOf(
+            HolderBindingDto("key-1", "did:key:one"), HolderBindingDto("key-2", "did:key:two"),
         )))
         val request = ReceiveAuthorizedCredentialRequestDto(
             code = "code", credentialIssuer = "https://issuer.example", credentialEndpoint = "https://issuer.example/credential",
-            redirectUri = "openid://", credentials = selections.toSelectionDtos(),
+            redirectUri = "openid://", credentials = selections,
         )
         val json = walletApi2Json.parseToJsonElement(walletApi2Json.encodeToString(request)).jsonObject
         assertFalse("credentialConfigurationId" in json)
@@ -204,21 +201,6 @@ class WalletApi2MappingsTest {
         assertFalse("selectedDisclosureOptions" in encoded)
     }
 
-    @Test
-    fun replaceWalletAfterSuccessfulDeleteDoesNotCreateWhenDeleteFails() = runTest {
-        var created = false
-        val result = runCatching {
-            replaceWalletAfterSuccessfulDelete(
-                deleteCurrent = { error("HTTP 500") },
-                createReplacement = {
-                    created = true
-                    "wallet-2"
-                },
-            )
-        }
-        assertTrue(result.isFailure)
-        assertFalse(created)
-    }
 }
 
 class WalletDeepLinkSchemeWebTest {

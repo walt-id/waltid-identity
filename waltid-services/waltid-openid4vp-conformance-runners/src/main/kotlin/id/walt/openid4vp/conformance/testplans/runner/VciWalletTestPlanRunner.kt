@@ -24,8 +24,8 @@ import kotlinx.serialization.json.jsonObject
  * 2. Get list of test modules
  * 3. For each module:
  *    a. Start module (conformance suite calls the adapter credential-offer endpoint)
- *    b. Open the adapter's offer URL in a browser when authorization is needed
- *    c. Start issuance from the adapter page
+ *    b. Follow authorization redirects when needed
+ *    c. Start issuance through the adapter
  *    d. Adapter completes the OAuth callback and credential fetch
  *    e. Poll for result
  * 4. Collect and return results
@@ -49,7 +49,7 @@ class VciWalletTestPlanRunner(
     /**
      * Execute the test plan and return results.
      */
-    suspend fun test(): List<TestPlanResult> {
+    suspend fun test(requiredModules: Set<String> = emptySet()): List<TestPlanResult> {
         printHeader()
 
         val results = mutableListOf<TestPlanResult>()
@@ -61,14 +61,16 @@ class VciWalletTestPlanRunner(
             println("Test plan created: $testPlanId")
 
             // Get modules
-            val modules = createResponse.modules
+            val missing = requiredModules - createResponse.modules.map { it.testModule }.toSet()
+            check(missing.isEmpty()) { "Required wallet modules are absent from the pinned suite: $missing" }
+            val modules = createResponse.modules.filter { requiredModules.isEmpty() || it.testModule in requiredModules }
             println("Test modules: ${modules.size}")
             modules.forEach { println("   - ${it.testModule}") }
             println()
 
             modules.forEachIndexed { index, module ->
                 println("[${index + 1}/${modules.size}] Running: ${module.testModule}")
-                val result = runModule(testPlanId, module)
+                val result = runModule(testPlanId, module).copy(testName = "${testPlan.producerId}/${module.testModule}")
                 results.add(result)
                 println("   Status: ${result.conformanceResult}")
                 if (result.errorMessage != null) {

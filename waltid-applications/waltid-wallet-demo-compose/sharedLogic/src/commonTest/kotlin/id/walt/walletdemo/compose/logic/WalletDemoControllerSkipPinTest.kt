@@ -98,8 +98,6 @@ private class RecordingDemoWallet : DemoWallet {
         return WalletDemoIssuanceOutcome.Stored(listOf("cred-1"))
     }
     override suspend fun cancelIssuance(sessionId: String) = WalletDemoIssuanceOutcome.Cancelled
-    override suspend fun createIssuanceHolderKeys(count: Int) =
-        List(count) { WalletDemoHolderBinding("batch-holder-$it", "did:key:batch-holder-$it") }
 
     override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> = emptyList()
 
