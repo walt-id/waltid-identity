@@ -7,6 +7,11 @@ on:
         description: "release version"
         required: false
         type: string
+      checkout-refs:
+        description: "Exact commits to check out, as a JSON object of unified, identity, enterprise and enterprise_license SHAs (defaults to the branch with main fallback)"
+        required: false
+        type: string
+        default: ''
       publish:
         description: "Specifies whether to publish the artifacts (defaults to false)"
         required: false
@@ -72,6 +77,7 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
+          resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Verify CI klogging config
         run: test -f "$KLOGGING_CONFIG_PATH"
@@ -231,6 +237,7 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
+          resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Verify CI klogging config
         run: test -f "$KLOGGING_CONFIG_PATH"
@@ -727,7 +734,7 @@ jobs:
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/coverage.json
 
   # Maven publish waits for the default Gradle job and, when requested, the live
-  # conformance job. Leaving publish on the gradle job let release/fix-release upload
+  # conformance job. Leaving publish on the gradle job let release candidates upload
   # artifacts while conformance was still running or after it had failed.
   publish:
     name: publish
@@ -744,6 +751,7 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
+          resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
