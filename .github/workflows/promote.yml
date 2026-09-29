@@ -251,6 +251,8 @@ jobs:
   release:
     uses: ./.github/workflows/create-release.yml
     secrets: inherit
+    permissions:
+      contents: write
     needs: [ version, source, deploy ]
     if: ${{ !failure() && !cancelled() }}
     with:
@@ -261,6 +263,9 @@ jobs:
   testflight:
     uses: ./.github/workflows/distribute-ios-testflight.yml
     secrets: inherit
+    permissions:
+      contents: read
+      pull-requests: read
     needs: [ version, source, deploy ]
     if: ${{ !failure() && !cancelled() }}
     with:
