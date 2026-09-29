@@ -68,10 +68,18 @@ public data class MobileWalletHolderBinding(
 
 /** Holder-key choice for one accepted configuration or dataset. */
 public sealed interface MobileWalletCredentialHolders {
-    /** Uses keys already owned by the wallet; the SDK never cleans these up on an acceptance error. */
+    /**
+     * Uses keys already owned by the wallet; the SDK never cleans these up on an acceptance error.
+     *
+     * @property bindings Existing wallet keys for the requested credential instances.
+     */
     public data class Existing(public val bindings: List<MobileWalletHolderBinding>) : MobileWalletCredentialHolders
 
-    /** Creates distinct platform keys inside acceptance, using the wallet's configured key policy. */
+    /**
+     * Creates distinct platform keys inside acceptance, using the wallet's configured key policy.
+     *
+     * @property count Number of credential instances for which to create distinct holder keys.
+     */
     public data class NewKeys(public val count: Int) : MobileWalletCredentialHolders
 }
 
