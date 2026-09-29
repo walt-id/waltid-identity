@@ -17,7 +17,9 @@ public struct IssuanceHolderBinding: Equatable, Sendable {
 
 /// Existing keys or an explicit number of keys prepared within session acceptance.
 public enum IssuanceCredentialHolders: Equatable, Sendable {
+    /// Uses one existing wallet holder key per requested credential copy.
     case existing([IssuanceHolderBinding])
+    /// Prepares the requested number of new holder keys during session acceptance.
     case newKeys(count: Int)
 }
 
