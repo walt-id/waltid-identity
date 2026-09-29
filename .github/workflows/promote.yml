@@ -211,6 +211,15 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-identity-enterprise
       ref: ${{ needs.source.outputs.tag }}
+  enterprise-license-branch:
+    uses: ./.github/workflows/branch.yml
+    secrets: inherit
+    needs: [ version, source, deploy ]
+    if: ${{ !failure() && !cancelled() && endsWith(needs.version.outputs.release_version, '.0') }}
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      repository: walt-id/waltid-identity-enterprise-license
+      ref: ${{ needs.source.outputs.tag }}
   docs-branch:
     uses: ./.github/workflows/branch.yml
     secrets: inherit
