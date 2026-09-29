@@ -98,7 +98,7 @@ internal fun localizePaymentConsent(
     if (!fieldsByPath.keys.containsAll(values.keys)) consentFailure(PaymentConsentFailure.INVALID_METADATA)
     val presentFields = fields.filter { it.path in values }
     val languageSets = labels.values.map { it.keys } + presentFields.map { it.labels.keys }
-    val candidates = LocalizedMetadata.normalizedPreferences(preferredLocales).flatMap(::paymentLanguageRanges).distinct()
+    val candidates = LocalizedMetadata.normalizedPreferences(preferredLocales).flatMap { LocalizedMetadata.lookupRanges(it).toList() }.distinct()
     val locale = candidates.firstOrNull { candidate -> languageSets.all { it.matchingTag(candidate) != null } }
         ?: consentFailure(PaymentConsentFailure.MISSING_TRANSLATION)
     fun <T> Map<String, T>.localized(): T = getValue(requireNotNull(keys.matchingTag(locale)))
@@ -123,16 +123,6 @@ private fun JsonObject.claimAt(path: List<String>): JsonElement? {
         value = objectValue[part] ?: return null
     }
     return value
-}
-
-/** RFC 4647 section 3.4 lookup ranges, with no unrelated-language default. */
-private fun paymentLanguageRanges(preference: String): List<String> = buildList {
-    var range = preference.lowercase()
-    while (range.isNotEmpty()) {
-        add(range)
-        range = range.substringBeforeLast('-', "")
-        if (range.substringAfterLast('-').length == 1) range = range.substringBeforeLast('-', "")
-    }
 }
 
 // Prefer an exact tag; otherwise publisher order breaks ties between regional variants.

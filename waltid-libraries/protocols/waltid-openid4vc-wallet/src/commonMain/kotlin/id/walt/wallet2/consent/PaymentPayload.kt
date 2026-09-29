@@ -11,7 +11,6 @@ internal fun paymentValues(payload: JsonObject): Map<List<String>, String> {
     if (!payload.keys.containsAll(required)) consentFailure(PaymentConsentFailure.INVALID_PAYMENT)
     if (!PAYMENT_FIELDS.containsAll(payload.keys)) consentFailure(PaymentConsentFailure.UNSUPPORTED_PAYMENT)
     val transactionId = payload.string("transaction_id")
-    if (transactionId.codePointLength() !in 1..36) consentFailure(PaymentConsentFailure.INVALID_PAYMENT)
     val payee = payload["payee"] as? JsonObject ?: consentFailure(PaymentConsentFailure.INVALID_PAYMENT)
     if (!payee.keys.containsAll(setOf("name", "id"))) consentFailure(PaymentConsentFailure.INVALID_PAYMENT)
     if (!setOf("name", "id", "logo", "website").containsAll(payee.keys)) consentFailure(PaymentConsentFailure.UNSUPPORTED_PAYMENT)

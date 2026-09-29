@@ -1,6 +1,7 @@
 package id.walt.wallet2.consent
 
 import id.walt.crypto.utils.ShaUtils
+import id.walt.webdatafetching.config.RequestConfiguration
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -82,6 +83,35 @@ class PaymentMetadataFetchSessionTest {
                 assertFailsWith<PaymentConsentException> { session.read("https://issuer.example/vct") }
                 assertEquals(listOf("https://issuer.example/vct"), requested)
                 assertEquals(listOf("https://blocked.example/vct", "https://issuer.example/vct", "https://blocked.example/metadata"), checked)
+            }
+        } finally { client.close() }
+    }
+
+    @Test
+    fun configuredCredentialsStayOnTheOriginalOriginAcrossRedirects() = networkTest {
+        val seen = mutableListOf<Headers>()
+        val client = HttpClient(MockEngine { request ->
+            seen += request.headers
+            when (seen.size) {
+                1 -> respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, "/same-origin"))
+                2 -> respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, "https://cdn.example/metadata"))
+                else -> respond(bytes)
+            }
+        })
+        try {
+            PaymentMetadataFetchSession(client, requestConfiguration = RequestConfiguration(
+                headers = mapOf("X-Metadata-Tenant" to "payment-bank"),
+                cookies = mapOf("session" to "private"),
+                auth = RequestConfiguration.HttpAuthConfiguration.BearerAuth("private"),
+            )).use { it.read("https://issuer.example/vct") }
+            assertEquals(3, seen.size)
+            for (headers in seen.take(2)) {
+                assertEquals("payment-bank", headers["X-Metadata-Tenant"])
+                assertEquals("session=private", headers[HttpHeaders.Cookie])
+                assertEquals("Bearer private", headers[HttpHeaders.Authorization])
+            }
+            for (name in listOf("X-Metadata-Tenant", HttpHeaders.Cookie, HttpHeaders.Authorization)) {
+                assertNull(seen.last()[name])
             }
         } finally { client.close() }
     }

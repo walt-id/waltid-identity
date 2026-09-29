@@ -1,5 +1,6 @@
 package id.walt.wallet2.consent
 
+import id.walt.webdatafetching.config.RequestConfiguration
 import io.ktor.client.HttpClient
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
@@ -18,6 +19,7 @@ import kotlin.io.encoding.Base64
 /** One bounded resolution snapshot; retrieved bytes are never reused across reviews. */
 internal class PaymentMetadataFetchSession(
     httpClient: HttpClient,
+    private val requestConfiguration: RequestConfiguration? = null,
     private val requireUrlAllowed: (String) -> Unit = {},
 ) : AutoCloseable {
     private val client = httpClient.config { followRedirects = false; expectSuccess = false }
@@ -40,11 +42,19 @@ internal class PaymentMetadataFetchSession(
     }
 
     private suspend fun retrieve(originalUri: String): ByteArray {
-        var uri = checkedUrl(originalUri)
+        val origin = checkedUrl(originalUri)
+        var uri = origin
         repeat(MAX_REDIRECTS + 1) { redirects ->
             if (++requests > MAX_REQUESTS) consentFailure(PaymentConsentFailure.METADATA_UNAVAILABLE)
             var redirect: Url? = null
-            val bytes = client.prepareGet(uri) { headers.append(HttpHeaders.Accept, "application/json") }.execute { response ->
+            val bytes = client.prepareGet(uri) {
+                // Configuration belongs to the requested origin, not an arbitrary redirect target.
+                if (uri.protocol == origin.protocol && uri.host == origin.host && uri.port == origin.port) {
+                    requestConfiguration?.applyConfiguration(this)
+                }
+                method = HttpMethod.Get
+                if (!headers.contains(HttpHeaders.Accept)) headers.append(HttpHeaders.Accept, "application/json")
+            }.execute { response ->
                 if (response.status.value in setOf(301, 302, 303, 307, 308)) {
                     if (redirects == MAX_REDIRECTS) consentFailure(PaymentConsentFailure.METADATA_UNAVAILABLE)
                     val location = response.headers[HttpHeaders.Location] ?: consentFailure(PaymentConsentFailure.METADATA_UNAVAILABLE)

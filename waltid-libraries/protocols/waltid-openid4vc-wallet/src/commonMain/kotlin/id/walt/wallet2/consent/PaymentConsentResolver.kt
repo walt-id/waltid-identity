@@ -7,6 +7,7 @@ import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.JWK_ALGORITHM_METADATA_KEY
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toStoredSoftwareKey
 import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
@@ -26,19 +27,26 @@ class PaymentCredentialIssuer(
 ) {
     init {
         require(issuer.isNotBlank())
-        val jwk = Json.parseToJsonElement(publicJwkJson).jsonObject
-        require(jwk.keys.none { it in setOf("d", "p", "q", "dp", "dq", "qi", "oth", "k") }) {
-            "Payment issuer trust requires a public asymmetric verification key"
-        }
     }
+
+    internal val verificationKey = EncodedKey.Jwk(
+        data = BinaryData(publicJwkJson.encodeToByteArray()), privateMaterial = false,
+    ).toStoredSoftwareKey(
+        KeyId("payment-issuer"), setOf(KeyUsage.VERIFY),
+        metadata = mapOf(JWK_ALGORITHM_METADATA_KEY to algorithm.identifier),
+    )
 }
 
 /** Authenticates the selected attestation before following its type reference. No persistent cache. */
-class PaymentConsentResolver(
+class PaymentConsentResolver internal constructor(
     trustedIssuers: List<PaymentCredentialIssuer>,
-    httpClient: HttpClient? = null,
+    private val metadataFetcher: WebDataFetcher,
 ) {
-    private val httpClient = httpClient ?: defaultPaymentMetadataFetcher.httpClient
+    constructor(trustedIssuers: List<PaymentCredentialIssuer>, httpClient: HttpClient? = null) : this(
+        trustedIssuers,
+        httpClient?.let { WebDataFetcher.wrapping(it, WebDataFetcherId.WALLET2_PAYMENT_METADATA.name) }
+            ?: defaultPaymentMetadataFetcher,
+    )
     private val trustedIssuers = trustedIssuers.toList()
     private val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
 
@@ -53,9 +61,11 @@ class PaymentConsentResolver(
         }
         val vct = authenticated.string("vct", PaymentConsentFailure.UNTRUSTED_CREDENTIAL)
         val values = paymentValues(payload)
-        PaymentMetadataFetchSession(httpClient, requireUrlAllowed = { url ->
-            defaultPaymentMetadataFetcher.dataFetcherConfiguration.url?.requireUrlAllowed(url)
-        }).use { session ->
+        PaymentMetadataFetchSession(
+            metadataFetcher.httpClient,
+            requestConfiguration = metadataFetcher.dataFetcherConfiguration.request,
+            requireUrlAllowed = { url -> metadataFetcher.dataFetcherConfiguration.url?.requireUrlAllowed(url) },
+        ).use { session ->
             val metadata = session.read(vct, authenticated.integrity("vct#integrity")) as? JsonObject
                 ?: consentFailure(PaymentConsentFailure.INVALID_METADATA)
             if (metadata["vct"] != JsonPrimitive(vct)) consentFailure(PaymentConsentFailure.INVALID_METADATA)
@@ -98,9 +108,7 @@ class PaymentConsentResolver(
         val candidates = trustedIssuers.filter { it.issuer == issuer && decoded.protectedHeader["alg"] == JsonPrimitive(it.algorithm.identifier) }
         var verified = false
         for (candidate in candidates) {
-            val key = runtime.restore(EncodedKey.Jwk(
-                data = BinaryData(candidate.publicJwkJson.encodeToByteArray()), privateMaterial = false,
-            ).toStoredSoftwareKey(KeyId("payment-issuer"), setOf(KeyUsage.VERIFY)))
+            val key = runtime.restore(candidate.verificationKey)
             try {
                 CompactJws.verify(jwt, key, candidate.algorithm)
                 verified = true

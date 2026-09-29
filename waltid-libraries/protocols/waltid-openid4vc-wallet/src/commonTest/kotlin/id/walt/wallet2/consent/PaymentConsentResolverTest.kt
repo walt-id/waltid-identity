@@ -9,6 +9,9 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.RequestConfiguration
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -25,6 +28,45 @@ class PaymentConsentResolverTest {
             val fixture = PaymentConsentFixture.create()
             try { fixture.block() } finally { fixture.close() }
         }
+    }
+
+    @Test fun configuredRequestHeadersCookiesAndAuthReachPaymentMetadata() = test {
+        val public = issuerKey.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(issuerKey.spec)
+        val trust = listOf(PaymentCredentialIssuer(ISSUER, public.data.toByteArray().decodeToString()))
+        for (auth in listOf(
+            RequestConfiguration.HttpAuthConfiguration.BearerAuth("metadata-token"),
+            RequestConfiguration.HttpAuthConfiguration.BasicAuth("metadata-user", "metadata-password"),
+        )) {
+            val configured = WebDataFetcher.wrapping(client, "payment-config-test", WebDataFetchingConfiguration(
+                request = RequestConfiguration(
+                    headers = mapOf("X-Metadata-Tenant" to "payment-bank"),
+                    cookies = mapOf("metadata-session" to "session-value"), auth = auth,
+                ),
+            ))
+            assertEquals("Pay", PaymentConsentResolver(trust, configured).resolve(credential(), payload, listOf("en")).affirmativeAction)
+            val headers = requestHeaders.last()
+            assertEquals("payment-bank", headers["X-Metadata-Tenant"])
+            assertEquals("metadata-session=session-value", headers[HttpHeaders.Cookie])
+            val expectedAuth = when (auth) {
+                is RequestConfiguration.HttpAuthConfiguration.BearerAuth -> "Bearer metadata-token"
+                else -> "Basic " + kotlin.io.encoding.Base64.Default.encode("metadata-user:metadata-password".encodeToByteArray())
+            }
+            assertEquals(expectedAuth, headers[HttpHeaders.Authorization])
+        }
+    }
+
+    @Test fun issuerConfigurationUsesSharedPublicVerificationKeyValidation() = test {
+        val public = issuerKey.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(issuerKey.spec)
+        val jwk = Json.parseToJsonElement(public.data.toByteArray().decodeToString()).jsonObject
+        PaymentCredentialIssuer(ISSUER, jwk.toString())
+        for (invalid in listOf(
+            JsonObject(emptyMap()), JsonObject(jwk - "x"),
+            JsonObject(jwk + ("d" to jwk.getValue("x"))),
+            JsonObject(jwk + ("key_ops" to buildJsonArray { add("sign") })),
+            JsonObject(jwk + ("alg" to JsonPrimitive("ES384"))),
+            buildJsonObject { put("kty", "oct"); put("k", "AQID"); put("alg", "HS256") },
+        )) assertFailsWith<IllegalArgumentException> { PaymentCredentialIssuer(ISSUER, invalid.toString()) }
+        assertTrue(requests.isEmpty())
     }
 
     @Test fun authenticatedInlineMetadataResolvesWithNoRequiredIntegrityPin() = test {
@@ -168,10 +210,12 @@ internal class PaymentConsentFixture private constructor(val runtime: CryptoRunt
     }
     var onMetadataRequest: suspend () -> Unit = {}
     val requests = mutableListOf<String>()
+    val requestHeaders = mutableListOf<Headers>()
     val documents = mutableMapOf<String, String>()
     val client = HttpClient(MockEngine { request ->
         onMetadataRequest()
         requests += request.url.encodedPath
+        requestHeaders += request.headers
         val body = if (request.url.encodedPath == "/vct") metadata.toString() else documents.getValue(request.url.encodedPath)
         respond(body, headers = headersOf(HttpHeaders.ContentType, "application/json"))
     })

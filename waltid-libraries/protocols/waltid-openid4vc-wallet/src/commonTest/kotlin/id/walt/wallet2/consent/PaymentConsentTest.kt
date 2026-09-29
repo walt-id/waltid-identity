@@ -215,10 +215,17 @@ class PaymentConsentTest {
     }
 
     @Test
+    fun transactionIdentifiersPreserveLongReferences() {
+        val reference = "bank-reference-" + "x".repeat(64)
+        val payment = JsonObject(payload + ("transaction_id" to JsonPrimitive(reference)))
+        assertEquals(reference, paymentValues(payment)[listOf("transaction_id")])
+    }
+
+    @Test
     fun unsupportedShapesAndMalformedPaymentValuesAreDistinct() {
         for (field in payload.keys) failure(PaymentConsentFailure.INVALID_PAYMENT) { paymentValues(JsonObject(payload - field)) }
         failure(PaymentConsentFailure.INVALID_PAYMENT) { paymentValues(JsonObject(payload + ("amount" to JsonPrimitive("11.56")))) }
-        failure(PaymentConsentFailure.INVALID_PAYMENT) { paymentValues(JsonObject(payload + ("transaction_id" to JsonPrimitive("x".repeat(37))))) }
+        failure(PaymentConsentFailure.INVALID_PAYMENT) { paymentValues(JsonObject(payload + ("transaction_id" to JsonPrimitive(" ")))) }
         for (currency in listOf("eur", "ZZZ", "XXX")) failure(PaymentConsentFailure.UNSUPPORTED_PAYMENT) {
             paymentValues(JsonObject(payload + ("currency" to JsonPrimitive(currency))))
         }

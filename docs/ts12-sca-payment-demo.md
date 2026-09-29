@@ -2,8 +2,7 @@
 
 The demo issues a synthetic payment card and presents one nested
 `urn:eudi:sca:payment:1` transaction using the existing TS-12 proof and native
-signing support. WAL-1295 integrates the app flows; WAL-1417 adds authoritative,
-localized consent. This is not a registered banking attestation, certified wallet
+signing support with authoritative, localized consent. This is not a registered banking attestation, certified wallet
 or complete regulated SCA implementation.
 
 ## Service setup
@@ -40,7 +39,7 @@ SD-JWT binds hashes of the original encoded transaction entries in the KB-JWT.
 The existing mdoc flow instead uses device-signed transaction data with MSO key
 authorizations. Display normalization must not change either proof's input.
 
-## Authoritative consent (WAL-1417)
+## Authoritative consent
 
 The selected credential designates its SCA type metadata; verifier profile allowlists
 remain admission controls, not the authority for payment instructions. The demos
@@ -127,10 +126,8 @@ case require the service configuration described above.
 
 For a local service deployment, this Gradle task accepts explicit
 `-Ppayment.issuerUrl=https://...` and `-Ppayment.verifierUrl=https://...` overrides.
-The app fixtures use their configured demo endpoints. On WAL-1417, both service
-variants also resolve issuer metadata and confirm localized consent; the isolated
-missing-label case requires zero authorization/signing. The automatic DC-API and
-physical app cases assert issuer titles, hints, field labels and action labels.
+The app fixtures use their configured demo endpoints. Missing required issuer
+instructions prevent payment authorization and signing.
 
 ## Physical acceptance
 

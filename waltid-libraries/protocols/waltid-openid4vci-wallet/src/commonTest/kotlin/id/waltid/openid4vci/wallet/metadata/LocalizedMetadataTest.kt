@@ -21,6 +21,8 @@ class LocalizedMetadataTest {
 
     @Test
     fun `lookup removes extension and private-use singleton subtags together`() {
+        assertEquals(listOf("de-ch-u-co-phonebk", "de-ch-u-co", "de-ch", "de"),
+            LocalizedMetadata.lookupRanges("de-CH-u-co-phonebk").toList())
         assertEquals(
             "Swiss German",
             select(
