@@ -65,6 +65,7 @@ import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 
 /**
@@ -250,7 +251,24 @@ class VciWalletConformanceTests {
                         val result = runPlan(plan, walletId, batchHolderKeyIds = holders, clientKeyId = clientKeyId,
                             requiredModules = setOf("oid4vci-1_0-wallet-test-batch-credential-issuance")).single()
                         assertEquals("FINISHED", result.conformanceStatus)
-                        assertEquals("PASSED", result.conformanceResult, result.errorMessage)
+                        if (result.conformanceResult == "WARNING") {
+                            // Hosted tunnels omit TLS evidence headers. Keep WARNING in the report;
+                            // accept only those missing-header warnings, never a TLS-policy failure.
+                            val warnings = ConformanceInterface(conformanceHost, conformancePort).use { suite ->
+                                suite.getTestLog(result.conformanceTestId).filter { it.result == "WARNING" }
+                            }
+                            assertTrue(warnings.isNotEmpty(), "A suite WARNING requires its diagnostic evidence")
+                            val missingTlsHeaders = setOf(
+                                "EnsureIncomingTls12WithSecureCipherOrTls13" to
+                                    "TLS Protocol not found; this header should have been set by the apache proxy",
+                                "EnsureIncomingTls13" to
+                                    "TLS protocol not found; this header should have been set by the nginx proxy",
+                            )
+                            assertEquals(emptyList(), warnings.filter { (it.src to it.msg) !in missingTlsHeaders },
+                                "Batch acceptance only tolerates missing tunnel TLS headers")
+                        } else {
+                            assertEquals("PASSED", result.conformanceResult, result.errorMessage)
+                        }
                         val credentials = client.get("$walletApiUrl/wallet/$walletId/credentials")
                             .body<List<StoredCredentialMetadata>>()
                         assertEquals(2, credentials.size)
