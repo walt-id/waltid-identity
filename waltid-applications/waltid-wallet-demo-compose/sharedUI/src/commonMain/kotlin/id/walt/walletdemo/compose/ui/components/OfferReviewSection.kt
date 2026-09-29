@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -17,8 +18,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -41,6 +45,8 @@ internal fun OfferReviewSection(
     modifier: Modifier = Modifier,
     cardFirst: Boolean = false,
     showActions: Boolean = true,
+    copies: Map<String, Int> = emptyMap(),
+    onCopiesChange: ((String, Int) -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
     var issuerExpanded by rememberSaveable { mutableStateOf(false) }
@@ -96,6 +102,10 @@ internal fun OfferReviewSection(
                         issuerFallback = preview.issuer.display?.name?.trim()?.takeIf { it.isNotEmpty() }
                             ?: preview.issuer.credentialIssuer,
                     )
+                    onCopiesChange?.let {
+                        CredentialCopySelection(credential.configurationId, credential.resolvedCardTitle(),
+                            copies[credential.configurationId] ?: 1, preview.batchSize ?: 1, reviewEnabled, it)
+                    }
                 }
             } else {
             ReviewMetadataSection(
@@ -114,6 +124,10 @@ internal fun OfferReviewSection(
                             fallbackName = title,
                         ),
                     )
+                    onCopiesChange?.let {
+                        CredentialCopySelection(credential.configurationId, title,
+                            copies[credential.configurationId] ?: 1, preview.batchSize ?: 1, reviewEnabled, it)
+                    }
                 }
             }
             }
@@ -184,6 +198,35 @@ internal fun OfferReviewSection(
                 onAccept = onAccept,
                 onDecline = onDecline,
             )
+        }
+    }
+}
+
+@Composable
+private fun CredentialCopySelection(
+    configurationId: String,
+    title: String,
+    count: Int,
+    limit: Int,
+    enabled: Boolean,
+    onChange: (String, Int) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(
+            checked = count > 0,
+            onCheckedChange = { onChange(configurationId, if (it) 1 else 0) },
+            enabled = enabled,
+            modifier = Modifier.testTag("issuance-select-$configurationId").semantics { contentDescription = "Receive $title" },
+        )
+        Text("Receive $title", modifier = Modifier.weight(1f))
+    }
+    if (count > 0 && limit > 1) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Copies: $count", modifier = Modifier.weight(1f).testTag("issuance-copies-$configurationId"))
+            TextButton(onClick = { onChange(configurationId, count - 1) }, enabled = enabled && count > 1,
+                modifier = Modifier.testTag("issuance-fewer-$configurationId").semantics { contentDescription = "Fewer copies of $title" }) { Text("Fewer") }
+            TextButton(onClick = { onChange(configurationId, count + 1) }, enabled = enabled && count < limit,
+                modifier = Modifier.testTag("issuance-more-$configurationId").semantics { contentDescription = "More copies of $title" }) { Text("More") }
         }
     }
 }

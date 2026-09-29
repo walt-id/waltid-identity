@@ -65,7 +65,7 @@ class WalletIssuanceHandlerInvalidNonceTest {
             httpClient = client,
             buildProof = { nonce ->
                 proofNonces += nonce
-                "proof-for-$nonce"
+                id.walt.openid4vci.prooftypes.Proofs(jwt = listOf("proof-for-$nonce"))
             },
         )
 
@@ -105,7 +105,7 @@ class WalletIssuanceHandlerInvalidNonceTest {
                 httpClient = client,
                 buildProof = { nonce ->
                     proofNonces += nonce
-                    "proof-for-$nonce"
+                    id.walt.openid4vci.prooftypes.Proofs(jwt = listOf("proof-for-$nonce"))
                 },
             )
             fail("Expected invalid_nonce to be propagated after the retry")
@@ -157,10 +157,16 @@ class WalletIssuanceHandlerInvalidNonceTest {
      */
     @Test
     fun storingFetchReportsBatchSizeBeforePersistingEachCredential() = runTest {
+        val holderKey = JWKKey.generate(KeyType.secp256r1)
+        val credential = batchTestCredential(holderKey)
         val client = HttpClient(MockEngine) {
             engine {
-                addHandler {
-                    respondJson("""{"credentials":[{"credential":"$SD_JWT_CREDENTIAL"},{"credential":"$SD_JWT_CREDENTIAL"}]}""")
+                addHandler { request ->
+                    if (request.url.encodedPath.endsWith("openid-credential-issuer")) respondJson("""
+                        {"credential_issuer":"https://issuer.example","credential_endpoint":"https://issuer.example/credential",
+                         "batch_credential_issuance":{"batch_size":2},"credential_configurations_supported":{"identity":{"format":"dc+sd-jwt","vct":"identity"}}}
+                    """.trimIndent())
+                    else respondJson("""{"credentials":[{"credential":"$credential"},{"credential":"$credential"}]}""")
                 }
             }
             install(ContentNegotiation) {
@@ -171,13 +177,18 @@ class WalletIssuanceHandlerInvalidNonceTest {
         val store = RecordingCredentialStore(events)
         val wallet = Wallet(
             id = "isolated-fetch-accounting",
-            staticKey = JWKKey.generate(KeyType.Ed25519),
+            staticKey = holderKey,
             credentialStores = listOf(store),
         )
 
         val result = WalletIssuanceHandler.fetchCredential(
             wallet = wallet,
-            request = fetchRequest(storeInWallet = true),
+            request = fetchRequest(storeInWallet = true).copy(
+                proofs = id.walt.openid4vci.prooftypes.Proofs(jwt = listOf("proof-1", "proof-2")),
+                credentialIssuerBaseUrl = "https://issuer.example",
+                credentialConfigurationId = "identity",
+                holderBindings = List(2) { CredentialHolderBinding(keyId = holderKey.getKeyId()) },
+            ),
             httpClient = client,
             beforeCredentialsStored = { events += "reserve:$it" },
             onCredentialStored = { events += "stored" },

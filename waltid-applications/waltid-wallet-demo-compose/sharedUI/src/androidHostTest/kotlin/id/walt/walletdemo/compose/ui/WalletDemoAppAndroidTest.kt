@@ -11,6 +11,10 @@ class WalletDemoAppAndroidTest {
     private val scenarios = WalletDemoAppTestScenarios()
 
     @Test
+    fun batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit() =
+        scenarios.batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit()
+
+    @Test
     fun keySetupGroupsChoicesAndConfirmsSelectedConfiguration() = scenarios.keySetupGroupsChoicesAndConfirmsSelectedConfiguration()
 
     @Test

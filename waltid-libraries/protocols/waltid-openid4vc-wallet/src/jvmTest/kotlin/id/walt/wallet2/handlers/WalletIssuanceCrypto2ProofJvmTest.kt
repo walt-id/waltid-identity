@@ -49,7 +49,7 @@ class WalletIssuanceCrypto2ProofJvmTest {
                 nonce = "nonce",
             ),
             httpClient = issuerMetadataClient(),
-        ).proofJwt
+        ).proofs.jwt!!.single()
         val decoded = CompactJws.decodeUnverified(proof)
         val bindingJwk = assertNotNull(decoded.protectedHeader["jwk"]).jsonObject
         val verificationKey = runtime.restore(
@@ -84,7 +84,7 @@ class WalletIssuanceCrypto2ProofJvmTest {
                 clientId = "eudiw-abca",
             ),
             httpClient = issuerMetadataClient(),
-        ).proofJwt
+        ).proofs.jwt!!.single()
         val payload = Json.parseToJsonElement(
             CompactJws.decodeUnverified(proof).payload.decodeToString()
         ).jsonObject
@@ -102,7 +102,7 @@ class WalletIssuanceCrypto2ProofJvmTest {
                 nonce = "nonce",
             ),
             httpClient = issuerMetadataClient(proofAlgorithms = setOf("ES256", "EdDSA")),
-        ).proofJwt
+        ).proofs.jwt!!.single()
 
         assertEquals(JwsAlgorithm.EDDSA, CompactJws.decodeUnverified(proof).algorithm)
     }
@@ -169,7 +169,7 @@ class WalletIssuanceCrypto2ProofJvmTest {
                 proofAlgorithms = setOf("ES256", "EdDSA"),
                 bindingMethods = setOf("did:key"),
             ),
-        ).proofJwt
+        ).proofs.jwt!!.single()
 
         assertEquals(
             "$did#${did.removePrefix("did:key:")}",
@@ -191,7 +191,7 @@ class WalletIssuanceCrypto2ProofJvmTest {
                 did = did,
             ),
             httpClient = issuerMetadataClient(proofAlgorithms = setOf("ES256", "EdDSA")),
-        ).proofJwt
+        ).proofs.jwt!!.single()
 
         val header = CompactJws.decodeUnverified(proof).protectedHeader
         assertNotNull(header["jwk"], "JWK-only issuers require an inline jwk header")

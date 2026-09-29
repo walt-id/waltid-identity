@@ -7,6 +7,8 @@ struct OfferReviewView: View {
     let preview: IssuanceOfferPreview
     let isAcceptEnabled: Bool
     let isReviewEnabled: Bool
+    let copies: [String: Int]
+    let onCopiesChange: (String, Int) -> Void
     let txCode: String
     let onTxCodeChange: (String) -> Void
     let onAccept: () -> Void
@@ -50,6 +52,20 @@ struct OfferReviewView: View {
                 ) {
                     ForEach(preview.credentials, id: \.configurationID) { credential in
                         CredentialCardArtView(summary: credential.cardSummary)
+                        Toggle("Receive \(credential.name ?? credential.configurationID)", isOn: Binding(
+                            get: { (copies[credential.configurationID] ?? 1) > 0 },
+                            set: { onCopiesChange(credential.configurationID, $0 ? 1 : 0) }
+                        ))
+                        .disabled(!isReviewEnabled)
+                        .accessibilityIdentifier("issuance-select-\(credential.configurationID)")
+                        if (copies[credential.configurationID] ?? 1) > 0, let limit = preview.batchSize, limit > 1 {
+                            Stepper("Copies: \(copies[credential.configurationID] ?? 1)", value: Binding(
+                                get: { copies[credential.configurationID] ?? 1 },
+                                set: { onCopiesChange(credential.configurationID, $0) }
+                            ), in: 1...limit)
+                            .disabled(!isReviewEnabled)
+                            .accessibilityIdentifier("issuance-copies-\(credential.configurationID)")
+                        }
                     }
                 }
             }

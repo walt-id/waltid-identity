@@ -117,6 +117,7 @@ internal fun WalletScreen(
                     requestDrafts = state.requestDrafts,
                     onOfferUrlChange = controller::updateOfferUrl,
                     onTxCodeChange = controller::updateTxCode,
+                    onCopiesChange = controller::updateIssuanceCopies,
                     onPreviewOffer = controller::previewOffer,
                     onAcceptOffer = controller::acceptOffer,
                     onDeclineOffer = controller::declineOffer,

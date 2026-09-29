@@ -127,12 +127,23 @@ object Wallet2Tables {
         override val primaryKey = PrimaryKey(accountId, walletId)
     }
 
+    /** Private, wallet-scoped issuance continuations; not a user-addressable named store. */
+    object IssuanceSessions : Table("wallet2_issuance_sessions") {
+        val walletId = reference("wallet_id", Wallets.id)
+        val id = varchar("id", 128)
+        val sessionId = varchar("session_id", 128)
+        val kind = varchar("kind", 32)
+        val payload = text("payload")
+        val updatedAt = long("updated_at")
+        override val primaryKey = PrimaryKey(walletId, id)
+    }
+
     /** All tables in creation order (respects foreign key constraints). */
     val ALL = arrayOf(
         Wallets,
         KeyStores, CredentialStores, DidStores,
         WalletKeyStores, WalletCredentialStores, WalletDidStores,
         Keys, Credentials, Dids,
-        AccountWallets
+        AccountWallets, IssuanceSessions
     )
 }

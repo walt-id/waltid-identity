@@ -98,7 +98,10 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.http.Url
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.launch
@@ -130,6 +133,70 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 class MobileWalletTest {
+
+    @Test
+    fun cancelledBatchKeyCreationCleansUpEvenWhenProviderReturnsAfterCancellation() = runTest {
+        val keyStore = InMemoryMobileWalletKeyStore()
+        val didStore = InMemoryDidStore()
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+        val existing = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
+            KeyId("existing"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+        ))
+        keyStore.addCrypto2Key(existing)
+        var generated = 0
+        val wallet = MobileWallet(
+            walletId = "cancel-batch", keyStore = keyStore, didStore = didStore,
+            credentialStore = InMemoryCredentialStore(),
+            generateAndPersistHolderKey = { _, _ ->
+                runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
+                    KeyId("batch-${generated++}"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                )).also {
+                    keyStore.addCrypto2Key(it)
+                    currentCoroutineContext().cancel()
+                }
+            },
+        )
+        val operation = launch { wallet.createIssuanceHolderKeys(3) }
+        operation.join()
+        assertTrue(operation.isCancelled)
+        assertEquals(1, generated)
+        assertEquals(listOf("existing"), keyStore.listKeys().toList().map { it.keyId })
+        assertTrue(didStore.listDids().toList().isEmpty())
+    }
+
+    @Test
+    fun explicitBatchKeyCreationUsesConfiguredPolicyAndCleansUpPartialFailure() = runTest {
+        for (failThird in listOf(false, true)) {
+            val keyStore = InMemoryMobileWalletKeyStore()
+            val didStore = InMemoryDidStore()
+            val policies = mutableListOf<KeyUseAuthorizationPolicy>()
+            var generated = 0
+            val wallet = MobileWallet(
+                walletId = "batch-keys", keyStore = keyStore, didStore = didStore,
+                credentialStore = InMemoryCredentialStore(),
+                generateAndPersistHolderKey = { _, policy ->
+                    if (failThird && generated == 2) error("Third key generation failed")
+                    policies += policy
+                    CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+                        GenerateSoftwareKeyRequest(KeyId("batch-${generated++}"), KeySpec.Ec(EcCurve.P256),
+                            setOf(KeyUsage.SIGN, KeyUsage.VERIFY)),
+                    ).also { keyStore.addCrypto2Key(it) }
+                },
+            )
+            if (failThird) {
+                assertFailsWith<IllegalStateException> { wallet.createIssuanceHolderKeys(3) }
+                assertTrue(keyStore.listKeys().toList().isEmpty())
+                assertTrue(didStore.listDids().toList().isEmpty())
+            } else {
+                val created = wallet.createIssuanceHolderKeys(5, keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None)
+                assertEquals(5, created.map { it.keyId }.distinct().size)
+                assertEquals(5, didStore.listDids().toList().size)
+                assertTrue(policies.all { it == KeyUseAuthorizationPolicy.None })
+            }
+        }
+    }
+
+
 
     @Test
     fun presentationErrorCodesMatchOAuthAndOpenId4VpValues() {
@@ -361,6 +428,10 @@ class MobileWalletTest {
         assertEquals(listOf("did:key:custom"), didStore.removedDids)
         assertEquals(emptyList(), credentialStore.removedCredentialIds)
         assertTrue(issuanceSessionStore.records.isEmpty())
+        assertFailsWith<IllegalStateException> {
+            wallet.startIssuance(MobileWalletIssuanceRequest(
+                offer = MobileWalletCredentialOffer.InlineJson(preAuthorizedOfferJson())))
+        }
     }
 
     @Test
@@ -1912,7 +1983,7 @@ class MobileWalletTest {
                           "credential_configurations_supported":{
                             "$MOCK_CONFIGURATION_ID":{
                               "format":"dc+sd-jwt",
-                              "vct":"urn:eu.europa.ec.eudi:pid:1"
+                              "vct":"https://credentials.example.com/identity_credential"
                             }
                           }
                         }
@@ -1925,6 +1996,7 @@ class MobileWalletTest {
                           "issuer":"$MOCK_ISSUER",
                           "token_endpoint":"$MOCK_ISSUER/token",
                           "response_types_supported":["code"],
+                          "authorization_details_types_supported":["openid_credential"],
                           "grant_types_supported":["urn:ietf:params:oauth:grant-type:pre-authorized_code"]
                         }
                         """.trimIndent()
@@ -2200,6 +2272,12 @@ class MobileWalletTest {
         override suspend fun list(): List<WalletIssuanceSessionRecord> = records.values.toList()
         override suspend fun put(record: WalletIssuanceSessionRecord) {
             records[record.id] = record
+        }
+        override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean {
+            require(replacement == null || expected.id == replacement.id)
+            if (records[expected.id] != expected) return false
+            if (replacement == null) records.remove(expected.id) else records[expected.id] = replacement
+            return true
         }
         override suspend fun remove(id: String): Boolean = records.remove(id) != null
     }

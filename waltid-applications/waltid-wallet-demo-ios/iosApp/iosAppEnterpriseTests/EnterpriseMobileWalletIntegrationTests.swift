@@ -54,8 +54,84 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         try await fixture.waitForVerifierSuccess(sessionID: session.sessionID, timeoutSeconds: verifierPollingTimeout)
     }
 
+    func testBatchHolderBindingsPresentEachCopyAfterWalletRecreation() async throws {
+        let fixture = makeFixture()
+        let scenario = try await enterpriseScenario(fixture: fixture, scenarioID: "enterprise-mdl")
+        let offer = try await fixture.createOffer(scenario: scenario, platform: .ios)
+        let walletID = "ios-enterprise-batch-\(UUID().uuidString)"
+        let wallet = try await makeWallet(walletId: walletID, attestation: nil)
+        let identity = try await initializeSigningIdentity(wallet)
+        let session = try await wallet.startIssuance(
+            IssuanceRequest(offer: try XCTUnwrap(URL(string: offer.offerUrl)), redirectURI: URL(string: "openid://")!)
+        )
+        let holders = try await wallet.createIssuanceHolderKeys(count: 2)
+        XCTAssertEqual(Set(holders.map(\.keyID)).count, 2)
+        XCTAssertFalse(holders.contains { $0.keyID == identity.keyID })
+        let outcome = try await wallet.continuePreAuthorizedIssuance(
+            sessionID: session.id,
+            credentials: [.init(configurationID: try XCTUnwrap(session.offer.credentials.first).configurationID,
+                                holderBindings: holders)]
+        )
+        guard case let .stored(_, credentialIDs) = outcome else {
+            return XCTFail("Expected two stored credentials, got \(outcome)")
+        }
+        XCTAssertEqual(Set(credentialIDs).count, 2)
+
+        let reopened = try await makeWallet(walletId: walletID, attestation: nil)
+        _ = try await initializeSigningIdentity(reopened)
+        let stored = try await reopened.credentials()
+        XCTAssertEqual(Set(stored.map(\.id)), Set(credentialIDs))
+        for credentialID in credentialIDs {
+            let verification = try await fixture.createVerifierSession(scenario: scenario, platform: .ios)
+            let previewResult = try await reopened.previewPresentation(
+                request: try XCTUnwrap(URL(string: verification.authorizationRequestUri))
+            )
+            guard case let .ready(preview) = previewResult else {
+                return XCTFail("Expected a presentation preview")
+            }
+            let option = try XCTUnwrap(preview.credentialOptions.first { $0.credentialID == credentialID })
+            // No holder-key override: the reopened wallet must use each credential's persisted binding.
+            let result = try await reopened.submitPresentation(
+                previewHandle: preview.previewHandle, selectedCredentialOptions: [option.selection]
+            )
+            assertTransmittedSuccess(result, "Presentation failed for a stored batch copy")
+            try await fixture.waitForVerifierSuccess(sessionID: verification.sessionID, timeoutSeconds: verifierPollingTimeout)
+        }
+    }
+
     private func makeFixture() -> EnterpriseMobileFixture {
         EnterpriseMobileFixture(baseURL: fixtureBaseURL)
+    }
+
+    /// Interactive physical-device check: cancel the second holder's system signing prompt.
+    func testBatchSigningCancellationStoresNoCredential() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["WALLET_BATCH_SIGNING_CANCELLATION"] == "1",
+                          "Requires a physical device and an operator cancelling the signing prompt")
+        let fixture = makeFixture()
+        let scenario = try await enterpriseScenario(fixture: fixture, scenarioID: "enterprise-mdl")
+        let offer = try await fixture.createOffer(scenario: scenario, platform: .ios)
+        let walletID = "ios-enterprise-batch-cancel-\(UUID().uuidString)"
+        let wallet = try await makeWallet(walletId: walletID, attestation: nil)
+        _ = try await initializeSigningIdentity(wallet)
+        let session = try await wallet.startIssuance(
+            IssuanceRequest(offer: try XCTUnwrap(URL(string: offer.offerUrl)), redirectURI: URL(string: "openid://")!)
+        )
+        let first = try await wallet.createIssuanceHolderKeys(count: 1, policy: .none)
+        let second = try await wallet.createIssuanceHolderKeys(count: 1, policy: .deviceCredential(timeoutSeconds: 0))
+        let outcome = try await wallet.continuePreAuthorizedIssuance(
+            sessionID: session.id,
+            credentials: [.init(configurationID: try XCTUnwrap(session.offer.credentials.first).configurationID,
+                                holderBindings: first + second)]
+        )
+        guard case let .failed(_, failure, storedIDs, deferred) = outcome else {
+            return XCTFail("Expected a signing failure after operator cancellation, got \(outcome)")
+        }
+        XCTAssertEqual(failure.code, .crypto)
+        XCTAssertTrue(storedIDs.isEmpty)
+        XCTAssertTrue(deferred.isEmpty)
+        let reopened = try await makeWallet(walletId: walletID, attestation: nil)
+        let stored = try await reopened.credentials()
+        XCTAssertTrue(stored.isEmpty, "Cancelling one proof must not store a partial copy collection")
     }
 
     private func receiveCredential(
@@ -71,7 +147,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
             transactionCode: transactionCode
         )
         guard case let .stored(_, credentialIDs) = outcome else {
-            if case let .failed(_, failure, _) = outcome {
+            if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
             }
             throw EnterpriseIssuanceError.unexpectedOutcome

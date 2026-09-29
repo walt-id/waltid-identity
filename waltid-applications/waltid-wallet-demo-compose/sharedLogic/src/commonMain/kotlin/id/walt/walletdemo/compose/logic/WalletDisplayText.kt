@@ -99,3 +99,21 @@ internal object WalletDisplayText {
             "A key invalidated by enrollment changes cannot be used again.$alternative"
     }
 }
+
+/** Counts returned progress; a pending target may later yield several credential copies. */
+internal fun WalletDemoIssuanceOutcome.partialProgressSummary(): String? = when (this) {
+    is WalletDemoIssuanceOutcome.Deferred -> issuanceProgressSummary(storedCredentialIds.size, credentials.size)
+    is WalletDemoIssuanceOutcome.Failed -> {
+        if (storedCredentialIds.isNotEmpty() || deferredCredentials.isNotEmpty() || failedTargetCount > 0) {
+            issuanceProgressSummary(storedCredentialIds.size, deferredCredentials.size, failedTargetCount, notAttemptedTargetCount)
+        } else null
+    }
+    else -> null
+}
+
+private fun issuanceProgressSummary(saved: Int, pending: Int, failed: Int = 0, notAttempted: Int = 0): String =
+    "Saved credentials: $saved. Pending targets: $pending." +
+        if (failed > 0) " Failed targets: $failed. Not attempted: $notAttempted." else ""
+
+internal fun WalletDemoIssuanceOutcome.Failed.messageWithProgress(): String =
+    partialProgressSummary()?.let { "$message\n$it" } ?: message

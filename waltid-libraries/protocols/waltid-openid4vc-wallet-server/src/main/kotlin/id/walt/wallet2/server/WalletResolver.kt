@@ -6,6 +6,7 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.wallet2.data.*
+import id.walt.wallet2.handlers.WalletIssuanceSessionState
 import id.walt.wallet2.stores.WalletStore
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
@@ -82,7 +83,12 @@ interface WalletResolver {
      * [Wallet] by resolving each store ID via [resolveKeyStore]/[resolveCredentialStore]/[resolveDidStore].
      */
     suspend fun resolveWallet(walletId: String): Wallet? =
-        walletStore.loadWallet(walletId) ?: walletStore.loadDescriptor(walletId)?.let { assembleWallet(it) }
+        (walletStore.loadWallet(walletId) ?: walletStore.loadDescriptor(walletId)?.let { assembleWallet(it) })?.also { wallet ->
+            resolveIssuanceSessionState(walletId)?.let { wallet.attachIssuanceSessionState(it) }
+        }
+
+    /** Private state shared across requests for one wallet; includes its optional continuation store. */
+    suspend fun resolveIssuanceSessionState(walletId: String): WalletIssuanceSessionState? = null
 
     /**
      * Persists a newly created [Wallet].
@@ -114,7 +120,10 @@ interface WalletResolver {
         walletStore.saveDescriptor(descriptor)
     }
 
-    suspend fun deleteWallet(walletId: String) = walletStore.deleteWallet(walletId)
+    suspend fun deleteWallet(walletId: String) {
+        resolveWallet(walletId)?.issuanceSessions()?.closeSessions()
+        walletStore.deleteWallet(walletId)
+    }
     suspend fun listWalletIds(): Flow<String> = walletStore.listWalletIds()
     suspend fun linkWalletToAccount(accountId: String, walletId: String) =
         walletStore.linkWalletToAccount(accountId, walletId)

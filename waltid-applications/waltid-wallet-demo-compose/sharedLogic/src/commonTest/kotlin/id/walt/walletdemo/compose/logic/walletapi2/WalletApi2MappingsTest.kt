@@ -2,9 +2,16 @@ package id.walt.walletdemo.compose.logic.walletapi2
 
 import id.walt.walletdemo.compose.logic.WalletDeepLinkScheme
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialSelection
+import id.walt.walletdemo.compose.logic.WalletDemoHolderBinding
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertIs
+import kotlin.test.assertNull
+import id.walt.walletdemo.compose.logic.WalletDemoIssuanceOutcome
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -46,12 +53,107 @@ class WalletApi2MappingsTest {
             nonceEndpoint = "https://issuer.example/nonce",
             codeVerifier = "verifier",
             authorizationState = "state-1",
-            credentialConfigurationId = "UniversityDegree",
+            credentials = listOf(IssuanceCredentialSelectionDto("UniversityDegree", listOf(
+                HolderBindingDto("holder-1", "did:key:one"), HolderBindingDto("holder-2", "did:key:two"),
+            ))),
         )
         val decoded = walletApi2Json.decodeFromString<PersistedAuthorizationIssuance>(
             walletApi2Json.encodeToString(original),
         )
         assertEquals(original, decoded)
+    }
+
+    @Test
+    fun authorizedRestRequestPreservesAllBindingsWithoutASingularConfigurationField() {
+        val selections = listOf(WalletDemoCredentialSelection("pid", listOf(
+            WalletDemoHolderBinding("key-1", "did:key:one"), WalletDemoHolderBinding("key-2", "did:key:two"),
+        )))
+        val request = ReceiveAuthorizedCredentialRequestDto(
+            code = "code", credentialIssuer = "https://issuer.example", credentialEndpoint = "https://issuer.example/credential",
+            redirectUri = "openid://", credentials = selections.toSelectionDtos(),
+        )
+        val json = walletApi2Json.parseToJsonElement(walletApi2Json.encodeToString(request)).jsonObject
+        assertFalse("credentialConfigurationId" in json)
+        assertEquals(2, json.getValue("credentials").jsonArray.single().jsonObject.getValue("holderBindings").jsonArray.size)
+        assertEquals(request, walletApi2Json.decodeFromString<ReceiveAuthorizedCredentialRequestDto>(json.toString()))
+    }
+
+    @Test
+    fun repeatedDatasetResultsDoNotDependOnTheLegacyTransactionMap() {
+        val result = walletApi2Json.decodeFromString<ReceiveCredentialResultDto>("""
+            {"credentialIds":["saved"],"deferredTransactionIds":null,
+             "deferredCredentials":[
+               {"credentialConfigurationId":"pid","credentialIdentifier":"first","deferredCredentialId":"handle-1","transactionId":"tx-1","intervalSeconds":5},
+               {"credentialConfigurationId":"pid","credentialIdentifier":"second","deferredCredentialId":"handle-2","transactionId":"tx-2","intervalSeconds":7}],
+             "failure":{"target":{"credentialConfigurationId":"pid","credentialIdentifier":"third"},"stage":"REQUEST",
+               "notAttempted":[{"credentialConfigurationId":"mdl"}]}}
+        """.trimIndent())
+        assertEquals(listOf("saved"), result.credentialIds)
+        assertEquals(listOf("first", "second"), result.deferredCredentials.map { it.credentialIdentifier })
+        assertEquals(listOf("tx-1", "tx-2"), result.deferredCredentials.map { it.transactionId })
+        val outcome = assertIs<WalletDemoIssuanceOutcome.Failed>(result.toOutcome())
+        assertEquals(listOf("saved"), outcome.storedCredentialIds)
+        assertEquals(listOf("handle-1", "handle-2"), outcome.deferredCredentials.map { it.id })
+        assertEquals(listOf("first", "second"), outcome.deferredCredentials.map { it.credentialIdentifier })
+        assertTrue(outcome.offerConsumed)
+        assertEquals(1, outcome.failedTargetCount)
+        assertEquals(1, outcome.notAttemptedTargetCount)
+        assertEquals("third", result.failure?.target?.credentialIdentifier)
+        assertEquals(listOf("mdl"), result.failure?.notAttempted?.map { it.credentialConfigurationId })
+    }
+
+    @Test
+    fun fullFlowStorageRecoveryIsMergedWithIssuerDeferredTargetsWithoutDoubleCountingIds() {
+        val result = walletApi2Json.decodeFromString<ReceiveCredentialResultDto>("""
+            {"credentialIds":["earlier","saved"],
+             "deferredCredentials":[{"credentialConfigurationId":"pid","credentialIdentifier":"first",
+               "deferredCredentialId":"issuer-handle","transactionId":"tx","intervalSeconds":5}],
+             "failure":{"target":{"credentialConfigurationId":"pid","credentialIdentifier":"second"},"stage":"STORAGE"},
+             "storageOutcome":{"sessionId":"local-handle","error":{"code":"STORAGE","message":"Could not save"},
+               "storedCredentialIds":["saved"],"deferredCredentials":[
+                 {"id":"local-handle","credentialConfigurationId":"pid","credentialIdentifier":"second"}]}}
+        """)
+        val outcome = assertIs<WalletDemoIssuanceOutcome.Failed>(result.toOutcome())
+        assertEquals(listOf("earlier", "saved"), outcome.storedCredentialIds)
+        assertEquals(listOf("issuer-handle", "local-handle"), outcome.deferredCredentials.map { it.id })
+        assertEquals(listOf("first", "second"), outcome.deferredCredentials.map { it.credentialIdentifier })
+        assertNull(outcome.deferredCredentials.last().intervalSeconds)
+        assertTrue(outcome.offerConsumed)
+    }
+
+    @Test
+    fun deferredResumeWireOutcomesPreservePendingAndCommittedProgress() {
+        fun decode(json: String) = walletApi2Json.decodeFromString<DeferredIssuanceOutcomeDto>(json).toOutcome()
+        val pending = """{"id":"handle","credentialConfigurationId":"pid","credentialIdentifier":"record","intervalSeconds":9}"""
+        val deferred = assertIs<WalletDemoIssuanceOutcome.Deferred>(decode("""
+            {"type":"deferred","sessionId":"session","storedCredentialIds":["saved"],"credentials":[$pending]}
+        """))
+        assertEquals(listOf("saved"), deferred.storedCredentialIds)
+        assertEquals("handle", deferred.credentials.single().id)
+        assertEquals("record", deferred.credentials.single().credentialIdentifier)
+        assertEquals(9L, deferred.credentials.single().intervalSeconds)
+        val failed = assertIs<WalletDemoIssuanceOutcome.Failed>(decode("""
+            {"type":"failed","sessionId":"session","error":{"code":"STORAGE","message":"Could not save"},
+             "storedCredentialIds":["saved"],"deferredCredentials":[$pending],
+             "failure":{"target":{"credentialConfigurationId":"pid"},"stage":"STORAGE",
+               "notAttempted":[{"credentialConfigurationId":"mdl"},{"credentialConfigurationId":"employee"}]}}
+        """))
+        assertEquals(deferred.storedCredentialIds, failed.storedCredentialIds)
+        assertEquals(deferred.credentials, failed.deferredCredentials)
+        assertEquals("Could not save", failed.message)
+        assertEquals(1, failed.failedTargetCount)
+        assertEquals(2, failed.notAttemptedTargetCount)
+        assertEquals(listOf("saved", "new"), assertIs<WalletDemoIssuanceOutcome.Stored>(decode("""
+            {"type":"stored","sessionId":"session","credentialIds":["saved","new"]}
+        """)).credentialIds)
+        assertIs<WalletDemoIssuanceOutcome.Cancelled>(decode("""{"type":"cancelled","sessionId":"session"}"""))
+    }
+
+    @Test
+    fun localSaveHandleWithoutConfigurationKeepsTheIdentityUnknown() {
+        val handle = walletApi2Json.decodeFromString<DeferredCredentialHandleDto>("""{"id":"local-save"}""")
+        assertNull(handle.toDemoDeferred().credentialConfigurationId)
+        assertNull(handle.toDemoDeferred().credentialIdentifier)
     }
 
     @Test
