@@ -16,10 +16,34 @@ jobs:
     uses: ./.github/workflows/version.yml
     with:
       preferred: ${{ inputs.release_version }}
+  guard:
+    name: Guard against the wrong start branch
+    runs-on: ubuntu-latest
+    needs: version
+    steps:
+      - name: Require main for X.Y.0 and release/vX.Y.x for patches
+        env:
+          VERSION: ${{ needs.version.outputs.release_version }}
+          REF: ${{ github.ref_name }}
+        run: |
+          if [[ ! "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "'$VERSION' is not a plain X.Y.Z release, any branch is allowed."
+            exit 0
+          fi
+          if [ "${BASH_REMATCH[3]}" = "0" ]; then
+            expected="main"
+          else
+            expected="release/v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.x"
+          fi
+          if [ "$REF" != "$expected" ]; then
+            echo "::error::${VERSION} must be started from '${expected}', not '${REF}'."
+            exit 1
+          fi
+          echo "Starting ${VERSION} from ${REF}."
   tag:
     name: Tag release candidate
     runs-on: ubuntu-latest
-    needs: version
+    needs: [ version, guard ]
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       checkout-refs: ${{ steps.tag.outputs.checkout-refs }}
