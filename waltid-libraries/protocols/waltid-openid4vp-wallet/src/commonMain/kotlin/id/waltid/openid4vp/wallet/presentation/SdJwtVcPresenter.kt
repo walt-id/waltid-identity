@@ -9,6 +9,7 @@ import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
+import id.walt.verifier.openid.transactiondata.decodeList
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.createKeyBindingJwt
 import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import id.waltid.openid4vp.wallet.supportedPresentationAlgorithms
@@ -73,6 +74,20 @@ object SdJwtVcPresenter {
         holderBindingAudience,
     )
 
+    internal suspend fun presentSdJwtVcAuthorized(
+        digitalCredential: DigitalCredential,
+        matchResult: DcqlMatcher.DcqlMatchResult,
+        authorizationRequest: AuthorizationRequest,
+        holderKey: Key?,
+        holderDid: String?,
+        holderCrypto2Key: Crypto2Key?,
+        holderBindingAudience: String?,
+        scaAuthorizer: ScaPresentationAuthorizer?,
+    ): JsonPrimitive = presentSdJwtVcWithKey(
+        digitalCredential, matchResult, authorizationRequest, holderKey, holderDid,
+        holderCrypto2Key, holderBindingAudience, scaAuthorizer,
+    )
+
     private suspend fun presentSdJwtVcWithKey(
         digitalCredential: DigitalCredential,
         matchResult: DcqlMatcher.DcqlMatchResult,
@@ -81,6 +96,7 @@ object SdJwtVcPresenter {
         holderDid: String?,
         holderCrypto2Key: Crypto2Key?,
         holderBindingAudience: String? = null,
+        scaAuthorizer: ScaPresentationAuthorizer? = null,
     ): JsonPrimitive {
         val selectedClaimsMap = matchResult.selectedDisclosures
 
@@ -113,6 +129,13 @@ object SdJwtVcPresenter {
             transactionData = authorizationRequest.transactionData,
             credentialId = matchResult.originalQuery.id,
         )
+        val scaContext = if (decodeList(transactionData.orEmpty()).any { it.transactionData.type == TS12_PAYMENT_TYPE }) {
+            ScaKeyBindingContext(
+                credentialId = matchResult.credential.id,
+                responseMode = requireNotNull(authorizationRequest.responseMode) { "TS12 requires response_mode" },
+                authorizer = requireNotNull(scaAuthorizer) { "TS12 requires authentication evidence for this presentation" },
+            )
+        } else null
         // DC API binds the holder to the platform-asserted origin, not to client_id.
         val audience = holderBindingAudience ?: authorizationRequest.clientId
         val kbJwtString = holderCrypto2Key?.let {
@@ -124,6 +147,7 @@ object SdJwtVcPresenter {
                 it,
                 transactionData,
                 acceptedAlgorithms,
+                scaContext = scaContext,
             )
         } ?: createKeyBindingJwt(
             disclosed,
@@ -133,6 +157,7 @@ object SdJwtVcPresenter {
             requireNotNull(holderKey),
             transactionData,
             acceptedAlgorithms,
+            scaContext = scaContext,
         )
 
         // Use the disclose method from the interface, then append the KB-JWT

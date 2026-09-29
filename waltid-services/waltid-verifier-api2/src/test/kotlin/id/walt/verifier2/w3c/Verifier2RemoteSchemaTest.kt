@@ -2,6 +2,7 @@ package id.walt.verifier2.w3c
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
+import id.walt.verifier2.freePort
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.KeyManager
@@ -241,7 +242,7 @@ class Verifier2RemoteSchemaTest {
     @Test
     fun test() {
         val host = "127.0.0.1"
-        val port = 17032
+        val port = freePort()
 
         E2ETest(host, port, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),

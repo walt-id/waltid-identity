@@ -114,6 +114,10 @@ val result = WalletIssuanceHandler.receiveCredential(wallet, request) { event ->
 println("Received ${result.credentialIds.size} credential(s)")
 ```
 
+When issuer metadata requires a key attestation, attach a `KeyAttestationProvider` to the wallet before issuance. The provider receives the actual proof key's public JWK, the credential issuer, the current nonce, and any advertised storage or authentication constraints. It returns a signed `key-attestation+jwt` and exposes its public verification key. The wallet checks the signature, key binding, nonce, lifetime, and advertised constraints before placing the attestation in the JWT proof header. The provider is runtime configuration: reattach it after restoring or copying a wallet. Without a provider, a required-attestation request fails before sending the proof. The issuer must independently trust the attester; attaching a provider does not establish issuer trust or certify the key's security properties.
+
+Validation follows [OpenID4VCI 1.0 Appendix D.1](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-final.html#appendix-D.1): `typ` must be `key-attestation+jwt`, `iss` is not required, and the proof key may occur anywhere in `attested_keys`. The unhyphenated spelling in a TS3 example is an [acknowledged upstream typo](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/issues/605). This wallet-side validation does not establish full EUDI TS3 compliance, including its first-key signing rule, certificate trust, certification and status requirements.
+
 ### Presenting Credentials (OpenID4VP 1.0)
 
 ```kotlin

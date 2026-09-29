@@ -26,6 +26,7 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
+import id.walt.verifier2.freePort
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
@@ -213,14 +214,15 @@ class MsoMdocsVerifier2IntegrationTest {
     }
 
     @Test
-    fun test() = runVerifierWalletFlow(port = 17011, clientId = null)
+    fun test() = runVerifierWalletFlow(clientId = null)
 
     @Test
     fun `omitted clientId generates redirect_uri and wallet presents`() =
-        runVerifierWalletFlow(port = 17012, clientId = null)
+        runVerifierWalletFlow(clientId = null)
 
-    private fun runVerifierWalletFlow(port: Int, clientId: String?) {
+    private fun runVerifierWalletFlow(clientId: String?) {
         val host = "127.0.0.1"
+        val port = freePort()
         Verifier2WebhookRecorder().start().use { webhook ->
         E2ETest(host, port, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),

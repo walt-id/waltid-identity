@@ -103,6 +103,7 @@ test_status=0
 WALLET_SDK_BRIDGE_FIXTURES=1 xcodebuild test \
   -workspace "$root/WalletSDK.xcworkspace" -scheme WalletSDKTests \
   -destination "$destination" \
+  -only-testing:WalletSDKTests/KMPKeyAttestationProviderTests \
   -only-testing:WalletSDKTests/KMPProximityProjectionTests \
   -only-testing:WalletSDKTests/ProximityBridgeContractTests \
   -only-testing:WalletSDKTests/ProximityInputValidationTests \

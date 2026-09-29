@@ -15,6 +15,7 @@ role-specific guide rather than assuming that one setup applies to every runner.
 | OpenID4VP verifier | [docs/VP-VERIFIER.md](docs/VP-VERIFIER.md) |
 | OpenID4VCI wallet | [docs/VCI-WALLET.md](docs/VCI-WALLET.md) |
 | OpenID4VP wallet | [docs/VP-WALLET.md](docs/VP-WALLET.md) |
+| WE BUILD wallet profile checks and live execution | [docs/ITB-WALLET.md](docs/ITB-WALLET.md) |
 
 The OSS issuer2 workflow is intentionally documented only in
 [docs/VCI-ISSUER.md](docs/VCI-ISSUER.md). It covers the issuer2 configuration,
@@ -70,7 +71,7 @@ waltid-openid4vp-conformance-runners/
 remote services or local conformance infrastructure. Follow the relevant
 role-specific guide for a runnable environment and its intended command.
 
-## CI summaries and soft-fail
+## CI summaries
 
 The reusable OSS Gradle workflow
 (`.github/workflows/gradle.yml`) always publishes these role sections to the
@@ -94,6 +95,9 @@ compacted to the module suffix and variant values so the table stays readable.
 When a role did not write a report, the workflow still writes the same heading,
 totals, and table, with a note that no results were produced.
 
+Executed OpenID4VP verifier/wallet, OpenID4VCI wallet, and OpenID4VCI issuer
+failures fail the conformance job. Issuer batch coverage remains required.
+
 Artifacts (when a role actually runs):
 
 ```text
@@ -106,28 +110,9 @@ build/reports/openid-conformance/
   vp-wallet/summary.md
 ```
 
-### `CONFORMANCE_ALLOW_FAILURE`
-
-Repo/org Actions variable controlling soft-fail for all conformance roles:
-
-| Value | Behavior |
-|-------|----------|
-| unset / empty / `true` | Soft-fail: failed tests still appear in the job summary, but JUnit does not fail the job for those failures |
-| `false` | Hard-fail: any executed non-passing conformance result fails the job |
-
-While actively working on conformance, keep the variable unset or set to
-`true`. Set it to `false` when conformance must be green to merge.
-
-Local equivalent:
-
-```bash
-export CONFORMANCE_ALLOW_FAILURE=true   # soft-fail
-export CONFORMANCE_ALLOW_FAILURE=false  # hard-fail
-```
-
 For the VCI issuer matrix, `OPENID4VCI_CONFORMANCE_STRICT` and
-`OPENID4VCI_CONFORMANCE_CERTIFICATION_MODE` still apply for local runs.
-When `CONFORMANCE_ALLOW_FAILURE` is present (including empty CI injection), it
-participates in strictness resolution; certification mode always remains strict.
-Issuer reports default to `build/reports/openid-conformance/vci-issuer`
-(override with `OPENID4VCI_CONFORMANCE_REPORT_DIR`).
+`OPENID4VCI_CONFORMANCE_CERTIFICATION_MODE` still apply for local exploration
+of variant-level strictness. Unaccepted issuer modules still fail the run.
+Certification mode always remains strict. Issuer reports default to
+`build/reports/openid-conformance/vci-issuer` (override with
+`OPENID4VCI_CONFORMANCE_REPORT_DIR`).

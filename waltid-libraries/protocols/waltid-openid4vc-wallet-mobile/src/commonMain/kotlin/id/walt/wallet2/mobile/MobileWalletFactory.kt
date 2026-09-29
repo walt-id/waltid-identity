@@ -226,6 +226,7 @@ internal fun createSqlDelightMobileWallet(
     } ?: SqlDelightDidStore(queries, config.walletId)
     val issuanceSessionStore = SqlDelightIssuanceSessionStore(queries)
     return MobileWallet(
+        scaAuthorizer = NativeScaPresentationAuthorizer(keyProvider),
         walletId = config.walletId,
         createSigningIdentityManager = { onActive ->
             id.walt.wallet2.mobile.identity.SigningIdentityManager(

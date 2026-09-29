@@ -346,6 +346,47 @@ internal object WalletComposeE2EHelper {
         return null
     }
 
+    /**
+     * Waits for [tag] after a navigation or configuration change. Small landscape
+     * viewports still need scrolling, but a single scroll pass is not enough when
+     * Compose has not finished composing the restored destination.
+     */
+    fun waitForResourceAfterScrolling(
+        device: UiDevice,
+        tag: String,
+        timeoutMs: Long = UI_ELEMENT_TIMEOUT,
+    ): UiObject2? {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        var towardBottom = true
+        var stepsInDirection = 0
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                findVisibleResource(device, tag)?.let { return it }
+                device.findObject(By.res(tag))?.let { return it }
+            } catch (_: StaleObjectException) {
+                // Compose replaces the accessibility tree during rotation and recreation.
+            }
+            if (towardBottom) device.scrollDown() else device.scrollUp()
+            stepsInDirection++
+            if (stepsInDirection == 6) {
+                towardBottom = !towardBottom
+                stepsInDirection = 0
+            }
+            Thread.sleep(200)
+        }
+        return findResourceAfterScrolling(device, tag)
+    }
+
+    fun assertResourceVisibleAfterScrolling(
+        device: UiDevice,
+        tag: String,
+        message: String,
+        timeoutMs: Long = UI_ELEMENT_TIMEOUT,
+    ) {
+        if (waitForResourceAfterScrolling(device, tag, timeoutMs) != null) return
+        fail("$message. Expected $tag.\n${visibleUiSnapshot(device)}")
+    }
+
     private fun UiObject2.isVisibleOn(device: UiDevice): Boolean = runCatching {
         val bounds = visibleBounds
         bounds.width() > 0 &&

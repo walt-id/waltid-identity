@@ -595,6 +595,7 @@ class DefaultOAuth2Provider(
         authorizedTransactionDataTypes: List<String>?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
         proofValidationContext: CredentialProofValidationContext?,
     ): CredentialResponseResult {
         val verifiedProofs = when (
@@ -622,6 +623,7 @@ class DefaultOAuth2Provider(
             authorizedTransactionDataTypes = authorizedTransactionDataTypes,
             validFrom = validFrom,
             validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
         )
     }
 
@@ -640,6 +642,7 @@ class DefaultOAuth2Provider(
         authorizedTransactionDataTypes: List<String>?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
         proofValidationContext: CredentialProofValidationContext?,
     ): CredentialResponseResult {
         val verifiedProofs = when (
@@ -674,6 +677,7 @@ class DefaultOAuth2Provider(
             authorizedTransactionDataTypes = authorizedTransactionDataTypes,
             validFrom = validFrom,
             validUntil = validUntil,
+            expectedUpdate = expectedUpdate,
         )
     }
 

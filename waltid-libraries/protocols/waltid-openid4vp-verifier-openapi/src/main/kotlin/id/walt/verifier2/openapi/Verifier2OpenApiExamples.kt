@@ -502,30 +502,55 @@ object Verifier2OpenApiExamples {
         haip = false,
         openid = OpenId4VPConfig(
             transactionData = listOf(
-                buildJsonObject {
-                    put("type", "urn:eudi:sca:payment:1")
-                    put("credential_ids", JsonArray(listOf(JsonPrimitive("sca_payment_card"))))
-                    put("require_cryptographic_holder_binding", true)
-                    put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
-                    put(
-                        "payload",
-                        buildJsonObject {
-                            put("transaction_id", "8D8AC610-566D-4EF0-9C22-186B2A5ED793")
-                            put(
-                                "payee",
-                                buildJsonObject {
-                                    put("name", "Super Store")
-                                    put("id", "merchant-001")
-                                }
-                            )
-                            put("currency", "EUR")
-                            put("amount", 11.56)
-                        }
-                    )
-                }
+                scaPaymentTransactionData("sca_payment_card")
             )
         ),
     )
+
+    /** SD-JWT demo payment; the holder binds the transaction in its KB-JWT, without mdoc MSO authorizations. */
+    val openid4vpDcApiSdJwtScaPayment = DcApiAnnexDFlowSetup(
+        core = GeneralFlowConfig(
+            dcqlQuery = DcqlQuery(credentials = listOf(
+                CredentialQuery(
+                    id = "sca_payment",
+                    format = CredentialFormat.DC_SD_JWT,
+                    meta = SdJwtVcMeta(vctValues = listOf(
+                        "https://issuer2.demo.walt.id/openid4vci/sca_payment_card_sd_jwt",
+                    )),
+                    claims = listOf("card_scheme", "card_last4", "card_holder_name")
+                        .map { ClaimsQuery(pathStrings = listOf(it)) },
+                ),
+            )),
+            clientId = "x509_san_dns:verifier.example.com",
+            signedRequest = true,
+            encryptedResponse = true,
+        ),
+        expectedOrigins = listOf("https://digital-credentials.walt.id"),
+        openid = OpenId4VPConfig(transactionData = listOf(scaPaymentTransactionData("sca_payment"))),
+    )
+
+    private fun scaPaymentTransactionData(credentialQueryId: String): JsonObject =
+        buildJsonObject {
+            put("type", "urn:eudi:sca:payment:1")
+            put("credential_ids", JsonArray(listOf(JsonPrimitive(credentialQueryId))))
+            put("require_cryptographic_holder_binding", true)
+            put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
+            put(
+                "payload",
+                buildJsonObject {
+                    put("transaction_id", "8D8AC610-566D-4EF0-9C22-186B2A5ED793")
+                    put(
+                        "payee",
+                        buildJsonObject {
+                            put("name", "Super Store")
+                            put("id", "merchant-001")
+                        }
+                    )
+                    put("currency", "EUR")
+                    put("amount", 11.56)
+                }
+            )
+        }
 
     // ISO Examples
 

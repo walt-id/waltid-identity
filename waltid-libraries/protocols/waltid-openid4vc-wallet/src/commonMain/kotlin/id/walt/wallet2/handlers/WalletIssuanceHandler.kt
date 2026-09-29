@@ -15,6 +15,7 @@ import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.issuer.KeyAttestationsRequired
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.TxCode
@@ -801,7 +802,10 @@ object WalletIssuanceHandler {
         // 5. Issue each offered credential with a fresh nonce when proof is required.
         for (offeredCredential in offeredCredentials) {
             log.trace { "Issuing credential configId=${offeredCredential.credentialConfigurationId}, format=${offeredCredential.configuration.format}" }
-            val jwtProofAlgorithms = supportedJwtProofAlgorithms(offeredCredential.configuration.proofTypesSupported)
+            val jwtProofAlgorithms = supportedJwtProofAlgorithms(
+                offeredCredential.configuration.proofTypesSupported,
+                wallet.attachedKeyAttestationProvider() != null,
+            )
             val buildProof: (suspend (String?) -> String?)? =
                 if (jwtProofAlgorithms != null) {
                     { nonce ->
@@ -817,6 +821,8 @@ object WalletIssuanceHandler {
                             did = did?.takeUnless { preferJwkBinding },
                             acceptedAlgorithms = jwtProofAlgorithms,
                             clientId = request.clientId.takeUnless { anonymousPreAuthorizedCode },
+                            keyAttestationsRequired = offeredCredential.configuration.proofTypesSupported?.get("jwt")?.keyAttestationsRequired,
+                            keyAttestationProvider = wallet.attachedKeyAttestationProvider(),
                         ).jwt?.firstOrNull()
                     }
                 } else null
@@ -1160,7 +1166,10 @@ object WalletIssuanceHandler {
                 "Unknown credential configuration '${request.credentialConfigurationId}' " +
                         "for issuer '${issuerMetadata.credentialIssuer}'"
             )
-        val acceptedAlgorithms = supportedJwtProofAlgorithms(configuration.proofTypesSupported)
+        val acceptedAlgorithms = supportedJwtProofAlgorithms(
+            configuration.proofTypesSupported,
+            wallet.attachedKeyAttestationProvider() != null,
+        )
             ?: error(
                 "Credential configuration '${request.credentialConfigurationId}' " +
                         "does not advertise JWT proof types"
@@ -1174,6 +1183,8 @@ object WalletIssuanceHandler {
             did = request.did?.takeUnless { preferJwkBinding },
             acceptedAlgorithms = acceptedAlgorithms,
             clientId = request.clientId,
+            keyAttestationsRequired = configuration.proofTypesSupported?.get("jwt")?.keyAttestationsRequired,
+            keyAttestationProvider = wallet.attachedKeyAttestationProvider(),
         )
         return SignProofResult(proofJwt = proofs.jwt?.firstOrNull() ?: error("Proof signing produced no JWT"))
     }
@@ -2145,7 +2156,10 @@ object WalletIssuanceHandler {
         val proofBuilder = JwtProofBuilder()
         val credentialConfiguration = issuerMetadata.credentialConfigurationsSupported[credentialConfigurationId]
         // The proof must use an algorithm the issuer advertises for this configuration.
-        val jwtProofAlgorithms = supportedJwtProofAlgorithms(credentialConfiguration?.proofTypesSupported)
+        val jwtProofAlgorithms = supportedJwtProofAlgorithms(
+            credentialConfiguration?.proofTypesSupported,
+            wallet.attachedKeyAttestationProvider() != null,
+        )
         val credentialResponse = requestCredentialWithNonceRetry(
             request = FetchCredentialRequest(
                 credentialEndpoint = credentialEndpoint,
@@ -2167,6 +2181,8 @@ object WalletIssuanceHandler {
                     did = holderDid?.takeUnless { preferJwkBinding },
                     acceptedAlgorithms = jwtProofAlgorithms,
                     clientId = clientId,
+                    keyAttestationsRequired = credentialConfiguration?.proofTypesSupported?.get("jwt")?.keyAttestationsRequired,
+                    keyAttestationProvider = wallet.attachedKeyAttestationProvider(),
                 ).jwt?.firstOrNull()
             },
             onProofGenerated = { onEvent(WalletSessionEvent.issuance_proof_signed) },
@@ -2267,6 +2283,8 @@ object WalletIssuanceHandler {
         did: String?,
         acceptedAlgorithms: Set<String>? = null,
         clientId: String? = null,
+        keyAttestationsRequired: KeyAttestationsRequired? = null,
+        keyAttestationProvider: KeyAttestationProvider? = null,
     ): Proofs {
         val binding = did
             ?.let { ProofKeyBinding.KeyId(DidService.resolveAuthenticationMethodId(it, keyMaterial.keyId)) }
@@ -2274,6 +2292,9 @@ object WalletIssuanceHandler {
         val effectiveCrypto2Key = keyMaterial.crypto2Key
             ?: keyMaterial.legacyKey?.let { migrateLocalJwk(it) }?.let { crypto2Runtime.restore(it) }
         return effectiveCrypto2Key?.let {
+            val keyAttestation = keyAttestationForProof(
+                keyAttestationProvider, keyAttestationsRequired, it, audience, nonce, acceptedAlgorithms,
+            )
             proofBuilder.buildProof(
                 key = it,
                 algorithm = it.selectJwsAlgorithm(acceptedAlgorithms),
@@ -2281,8 +2302,12 @@ object WalletIssuanceHandler {
                 nonce = nonce,
                 binding = binding,
                 clientId = clientId,
+                keyAttestation = keyAttestation,
             )
         } ?: run {
+            require(keyAttestationsRequired == null) {
+                "A key-attested JWT proof requires a crypto2 signing key"
+            }
             val legacyKey = requireNotNull(keyMaterial.legacyKey) {
                 "Key '${keyMaterial.keyId}' has no usable signing representation"
             }
@@ -2302,12 +2327,15 @@ object WalletIssuanceHandler {
     }
 }
 
-internal fun supportedJwtProofAlgorithms(proofTypes: Map<String, ProofType>?): Set<String>? {
+internal fun supportedJwtProofAlgorithms(
+    proofTypes: Map<String, ProofType>?,
+    keyAttestationProviderAvailable: Boolean = false,
+): Set<String>? {
     if (proofTypes.isNullOrEmpty()) return null
     val jwt = requireNotNull(proofTypes["jwt"]) {
         "Issuer requires an unsupported proof type: ${proofTypes.keys}"
     }
-    require(jwt.keyAttestationsRequired == null) {
+    require(jwt.keyAttestationsRequired == null || keyAttestationProviderAvailable) {
         "Issuer requires a key-attestation JWT; the configured proof path cannot supply one"
     }
     return jwt.proofSigningAlgValuesSupported

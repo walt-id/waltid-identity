@@ -148,6 +148,7 @@ interface OAuth2Provider {
         authorizedTransactionDataTypes: List<String>? = null,
         validFrom: Instant? = null,
         validUntil: Instant? = null,
+        expectedUpdate: Instant? = null,
         proofValidationContext: CredentialProofValidationContext? = null,
     ): CredentialResponseResult
 
@@ -166,6 +167,7 @@ interface OAuth2Provider {
         authorizedTransactionDataTypes: List<String>? = null,
         validFrom: Instant? = null,
         validUntil: Instant? = null,
+        expectedUpdate: Instant? = null,
         proofValidationContext: CredentialProofValidationContext? = null,
     ): CredentialResponseResult
 

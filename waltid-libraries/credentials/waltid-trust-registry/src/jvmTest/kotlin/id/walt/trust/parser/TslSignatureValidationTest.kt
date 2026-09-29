@@ -1,10 +1,13 @@
 package id.walt.trust.parser
 
+import id.walt.trust.TestCertificates
 import id.walt.trust.model.AuthenticityState
 import id.walt.trust.model.SignatureStatus
 import id.walt.trust.parser.tsl.TslParseConfig
 import id.walt.trust.parser.tsl.TslSignatureValidationException
 import id.walt.trust.parser.tsl.TslXmlParser
+import id.walt.trust.signature.SignatureValidationConfig
+import id.walt.trust.signature.XmlDsigTestSigner
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -20,6 +23,54 @@ import java.net.http.HttpResponse
  * Network-dependent tests require RUN_NETWORK_TESTS=true environment variable.
  */
 class TslSignatureValidationTest {
+
+    /**
+     * A national list signed the way Germany's BNetzA list is (RSASSA-PSS / MGF1-SHA256, signer
+     * certificate using the id-RSASSA-PSS SPKI OID) must parse and authenticate successfully via
+     * the exact TslXmlParser entry point the trust-registry service uses, both without an
+     * explicit trusted signer (REQUIRE_VALID_SIGNATURE-equivalent) and with the signer pinned as
+     * a trusted anchor (REQUIRE_AUTHENTICATED-equivalent).
+     */
+    @Test
+    fun `parse TSL signed with RSASSA-PSS from a PSS-only certificate`() {
+        val xml = javaClass.classLoader.getResource("sample-tl.xml")?.readText()
+            ?: error("Test resource not found: sample-tl.xml")
+
+        val signer = TestCertificates.createRsaPssSelfSigned()
+        val signedXml = XmlDsigTestSigner.signEnveloped(
+            xml = xml,
+            certificate = signer.certificate,
+            privateKey = signer.keyPair.private,
+            signatureMethodUri = XmlDsigTestSigner.SHA256_RSA_MGF1
+        )
+
+        // Without a pinned trusted signer - equivalent to REQUIRE_VALID_SIGNATURE
+        val unauthenticated = TslXmlParser.parse(
+            signedXml, "rsassa-pss-tsl", config = TslParseConfig(validateSignature = true)
+        )
+        assertEquals(
+            AuthenticityState.INTEGRITY_VERIFIED, unauthenticated.source.assurance.authenticityState,
+            "Details: ${unauthenticated.signatureValidation?.details}"
+        )
+        assertEquals(1, unauthenticated.entities.size)
+
+        // With the signer pinned as a trusted anchor - equivalent to REQUIRE_AUTHENTICATED
+        val authenticated = TslXmlParser.parse(
+            signedXml, "rsassa-pss-tsl-authenticated",
+            config = TslParseConfig(
+                validateSignature = true,
+                signatureConfig = SignatureValidationConfig(
+                    requireTrustedCertificate = true,
+                    trustedAnchors = setOf(signer.certificate)
+                )
+            )
+        )
+        assertEquals(
+            AuthenticityState.AUTHENTICATED, authenticated.source.assurance.authenticityState,
+            "Details: ${authenticated.signatureValidation?.details}"
+        )
+        assertEquals(SignatureStatus.VALID, authenticated.source.assurance.signatureStatus)
+    }
 
     @Test
     @EnabledIfEnvironmentVariable(named = "RUN_NETWORK_TESTS", matches = "true")
@@ -62,7 +113,7 @@ class TslSignatureValidationTest {
     @Test
     @EnabledIfEnvironmentVariable(named = "RUN_NETWORK_TESTS", matches = "true")
     fun `parse German TSL with signature validation`() = runTest {
-        val deTslXml = fetchUrl("https://www.nrca-ds.de/st/TSL-XML.xml")
+        val deTslXml = fetchUrl("https://tl.bundesnetzagentur.de/TL-DE.xml")
 
         if (deTslXml == null) {
             println("Skipping German TSL test - could not fetch")
@@ -70,7 +121,7 @@ class TslSignatureValidationTest {
         }
 
         val config = TslParseConfig(validateSignature = true)
-        val result = TslXmlParser.parse(deTslXml, "de-tsl", "https://www.nrca-ds.de/st/TSL-XML.xml", config)
+        val result = TslXmlParser.parse(deTslXml, "de-tsl", "https://tl.bundesnetzagentur.de/TL-DE.xml", config)
 
         println("German TSL Parse Result:")
         println("  Source ID: ${result.source.sourceId}")

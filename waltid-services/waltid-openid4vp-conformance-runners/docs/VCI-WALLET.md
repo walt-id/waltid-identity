@@ -272,6 +272,10 @@ Conformance suite logs can be viewed at:
 https://localhost.emobix.co.uk:8443/log-detail.html?log=<LOG_ID>
 ```
 
+CI writes `build/reports/openid-conformance/vci-wallet/summary.md`. Executed
+OpenID4VCI wallet failures fail the conformance job (see the module
+[README](../README.md#ci-summaries)).
+
 ---
 
 ## Code Structure

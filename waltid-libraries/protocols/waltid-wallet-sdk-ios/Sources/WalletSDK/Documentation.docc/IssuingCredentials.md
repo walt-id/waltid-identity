@@ -6,6 +6,18 @@ the wallet.
 
 ## Overview
 
+### Configure Required Key Attestations
+
+When issuer metadata advertises `key_attestations_required`, supply a
+``KeyAttestationProvider`` through ``WalletConfiguration/keyAttestationProvider``
+before creating the wallet. The provider receives the selected public proof key,
+current nonce and issuer constraints. Its signed response is checked against the
+provider's independently configured verification key before being added to the proof.
+
+Supply this runtime dependency again when recreating a wallet. A missing or invalid
+required attestation fails issuance. Issuer trust and evidence supporting the
+provider's assurance claims must be established separately.
+
 ### Start and Continue an Issuance Session
 
 Pass the offer URL from a QR scan, deep link, universal link, or another app

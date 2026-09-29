@@ -68,6 +68,43 @@ class Issuer2PreAuthorizedWalletFlowTest {
     }
 
     @Test
+    fun scaSdJwtProfileIssuesDemoClaimsBoundToTheProofKey() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val flow = Issuer2WalletFlowDriver(client)
+        val scenario = Issuer2CredentialScenarios.configured.single { it.profileId == "scaPaymentCardSdJwt" }
+        val offer = client.createWalletFlowCredentialOffer(scenario = scenario, authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED, txCodeMode = Issuer2TxCodeMode.NONE)
+        val resolved = flow.resolve(offer)
+        val token = flow.exchangePreAuthorizedCode(resolved, txCode = null)
+        val proofs = flow.buildJwtProofs(resolved.issuerMetadata, scenario.credentialConfigurationId, includeDidInProof = false)
+        fun decode(encoded: String) = kotlinx.serialization.json.Json.parseToJsonElement(
+            java.util.Base64.getUrlDecoder().decode(encoded).decodeToString(),
+        )
+        val proofJwk = decode(requireNotNull(proofs.jwt).single().substringBefore('.')).jsonObject.getValue("jwk")
+        val response = client.post(resolved.issuerMetadata.credentialEndpoint) {
+            bearerAuth(token.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(credentialRequest(scenario.credentialConfigurationId, proofs))
+        }
+        assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+        val issued = response.body<JsonObject>().getValue("credentials").jsonArray.single().jsonObject.getValue("credential").jsonPrimitive.content
+        val parts = issued.split('~')
+        val claims = decode(parts.first().split('.')[1]).jsonObject
+        assertEquals(proofJwk, claims.getValue("cnf").jsonObject["jwk"])
+        assertEquals(resolved.issuerMetadata.credentialIssuer + "/sca_payment_card_sd_jwt", claims["vct"]?.jsonPrimitive?.content)
+        val disclosures = parts.drop(1).filter { it.isNotEmpty() }.map { decode(it).jsonArray }
+        assertEquals(mapOf("card_scheme" to "demo", "card_last4" to "4242", "card_holder_name" to "Jane Doe"),
+            disclosures.associate { it[1].jsonPrimitive.content to it[2].jsonPrimitive.content })
+        val digests = claims.getValue("_sd").jsonArray.map { it.jsonPrimitive.content }.toSet()
+        parts.drop(1).filter { it.isNotEmpty() }.forEach { disclosure ->
+            val digest = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
+                java.security.MessageDigest.getInstance("SHA-256").digest(disclosure.encodeToByteArray()),
+            )
+            assertTrue(digest in digests, "Issuer did not bind an issued payment-card disclosure")
+        }
+    }
+
+    @Test
     fun walletCanCompletePreAuthorizedByReferenceOfferWithoutTxCode() = testApplication {
         val scenario = Issuer2CredentialScenarios.openBadgeCredential
         installIssuer2WithConfigFiles()

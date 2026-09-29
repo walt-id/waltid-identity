@@ -80,6 +80,7 @@ kotlin {
             implementation(identityLibs.ktor.client.core)
         }
         commonTest {
+            kotlin.srcDir("src/scaTestFixtures/kotlin")
             kotlin.srcDir("../../credentials/waltid-mdoc-proximity/src/commonTestFixtures/kotlin")
             kotlin.srcDir("../../crypto/waltid-x509/src/commonTestFixtures/kotlin")
         }
@@ -139,6 +140,8 @@ kotlin {
         }
         if (enableAndroidBuild) {
             val androidDeviceTest by getting {
+                kotlin.srcDir("../../../waltid-services/waltid-openid4vp-conformance-runners/src/deviceShared/kotlin")
+                kotlin.srcDir("src/scaTestFixtures/kotlin")
                 if (enableProximityPhysicalTests) {
                     kotlin.srcDir("src/physicalDeviceTest/kotlin")
                     kotlin.srcDir("src/physicalTestFixtures/kotlin")
@@ -154,6 +157,9 @@ kotlin {
                     implementation(identityLibs.androidx.test.runner)
                     implementation(identityLibs.androidx.test.ext.junit)
                     implementation(identityLibs.ktor.client.android)
+                    implementation(identityLibs.ktor.client.content.negotiation)
+                    implementation(identityLibs.ktor.serialization.kotlinx.json)
+                    implementation(identityLibs.oshai.kotlinlogging)
                 }
             }
         }
@@ -168,6 +174,7 @@ kotlin {
                     dependsOn(iosProductionSources)
                     kotlin.srcDir("src/physicalTestFixtures/kotlin")
                     kotlin.srcDir("src/iosPhysicalFixtures/kotlin")
+                    kotlin.srcDir("src/scaTestFixtures/kotlin")
                 }
             }
             binaries.framework("physicalFixtures", listOf(NativeBuildType.RELEASE)) {

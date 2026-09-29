@@ -6,6 +6,7 @@ import id.walt.cose.*
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
+import id.walt.verifier2.freePort
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.representations.X5CCertificateString
 import id.walt.credentials.representations.X5CList
@@ -210,11 +211,11 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
     }
 
     private fun runTransactionDataTest(
-        port: Int,
         sessionSetup: VerificationSessionSetup,
         walletCredentials: List<MdocsCredential>,
     ) {
         val host = "127.0.0.1"
+        val port = freePort()
 
         E2ETest(host, port, true).testBlock(
             features = listOf(OSSVerifier2FeatureCatalog),
@@ -303,7 +304,7 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
                 transactionData = listOf(paymentTransactionDataItem(credentialId = "my_mdl", amount = "42.00"))
             )
         )
-        runTransactionDataTest(port = 17033, sessionSetup = sessionSetup, walletCredentials = listOf(credential))
+        runTransactionDataTest(sessionSetup = sessionSetup, walletCredentials = listOf(credential))
     }
 
     @Test
@@ -318,7 +319,7 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
                 transactionData = listOf(accountAccessTransactionDataItem(credentialId = "my_mdl"))
             )
         )
-        runTransactionDataTest(port = 17034, sessionSetup = sessionSetup, walletCredentials = listOf(credential))
+        runTransactionDataTest(sessionSetup = sessionSetup, walletCredentials = listOf(credential))
     }
 
     private fun paymentTransactionDataItem(credentialId: String, amount: String): JsonObject = buildJsonObject {

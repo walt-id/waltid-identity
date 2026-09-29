@@ -89,7 +89,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
                     x509TrustAnchorsPEM: [EudiTestBackend.verifierTrustAnchorPEM]
                 ),
                 transactionDataProfiles: Self.demoTransactionDataProfiles,
-                defaultKeyUseAuthorizationPolicy: .none
+                defaultKeyUseAuthorizationPolicy: .none,
+                keyAttestationProvider: try await EudiTestKeyAttestationProvider.create()
             )
         )
     }
@@ -144,6 +145,9 @@ final class MobileWalletIntegrationTests: XCTestCase {
             transactionCode: transactionCode
         )
         guard case let .stored(_, credentialIDs) = outcome else {
+            if case let .failed(_, failure, _) = outcome {
+                XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
+            }
             throw MobileWalletIntegrationError.unexpectedIssuanceOutcome
         }
         return credentialIDs
@@ -358,6 +362,9 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertNotNil(session.offer.transactionCode, "EUDI offer should require a transaction code")
         let outcome = try await wallet.continuePreAuthorizedIssuance(sessionID: session.id, transactionCode: offer.txCode)
         guard case let .stored(_, credentialIDs) = outcome else {
+            if case let .failed(_, failure, _) = outcome {
+                XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
+            }
             throw MobileWalletIntegrationError.unexpectedIssuanceOutcome
         }
 
@@ -399,6 +406,9 @@ final class MobileWalletIntegrationTests: XCTestCase {
             transactionCode: offer.txCode
         )
         guard case let .stored(_, credentialIDs) = outcome else {
+            if case let .failed(_, failure, _) = outcome {
+                XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
+            }
             throw MobileWalletIntegrationError.unexpectedIssuanceOutcome
         }
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive a credential from reviewed signed metadata")

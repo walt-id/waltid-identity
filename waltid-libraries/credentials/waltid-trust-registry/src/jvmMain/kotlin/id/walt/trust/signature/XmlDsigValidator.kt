@@ -424,11 +424,18 @@ object XmlDsigValidator {
 
             // Check if the algorithm in the signature method matches the key type
             val isRsa = algorithm.contains("rsa", ignoreCase = true)
-            val isDsa = algorithm.contains("dsa", ignoreCase = true)
+            // "ecdsa" contains "dsa", so without the exclusion every ECDSA method matched the DSA
+            // branch below, rejected the EC key and failed with "cannot find validation key".
+            val isDsa = algorithm.contains("dsa", ignoreCase = true) && !algorithm.contains("ecdsa", ignoreCase = true)
             val isEc = algorithm.contains("ecdsa", ignoreCase = true) || algorithm.contains("ec", ignoreCase = true)
 
             return when {
-                isRsa -> keyAlg.equals("RSA", ignoreCase = true)
+                // Certificates whose SubjectPublicKeyInfo uses the explicit id-RSASSA-PSS OID
+                // (rather than the generic rsaEncryption OID) report their JCA key algorithm as
+                // "RSASSA-PSS", not "RSA", even though the underlying key is a plain RSA key.
+                // Both xmldsig-more#*-rsa-MGF1 and #rsa-pss SignatureMethod URIs contain "rsa",
+                // so such keys must be accepted here too.
+                isRsa -> keyAlg.equals("RSA", ignoreCase = true) || keyAlg.equals("RSASSA-PSS", ignoreCase = true)
                 isDsa -> keyAlg.equals("DSA", ignoreCase = true)
                 isEc -> keyAlg.equals("EC", ignoreCase = true)
                 else -> true // Be permissive for unknown algorithms

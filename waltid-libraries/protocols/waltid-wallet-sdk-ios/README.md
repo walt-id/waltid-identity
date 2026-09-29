@@ -83,6 +83,13 @@ python3 waltid-libraries/protocols/waltid-wallet-sdk-ios/scripts/check-mobile-wa
 
 ## Usage Sketch
 
+Issuers that advertise `key_attestations_required` need an application-supplied
+`KeyAttestationProvider` in `WalletConfiguration.keyAttestationProvider`. It supplies
+a signed attestation for the actual proof key and issuer nonce, verified against its
+independently configured public JWK. Supply the provider again when recreating the
+wallet. This runtime integration does not establish issuer trust or substantiate
+hardware, certification or user-authentication claims.
+
 ```swift
 import WalletSDK
 

@@ -86,6 +86,7 @@ dependencies {
 
     implementation(identityLibs.kotlintest)
     testImplementation(identityLibs.kotlinx.coroutines.test)
+    testImplementation(identityLibs.ktor.client.mock)
     implementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
     implementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
 
@@ -295,3 +296,52 @@ registerWalletProfileTestTask(
     testFilter = "id.walt.openid4vp.conformance.VciWalletConformanceTests.vciWalletSdJwtVcAuthorizationCodeHaipFullTarget",
     descriptionText = "Run the HAIP full-target VCI wallet conformance profile."
 )
+
+// ITB profile checks are intentionally separate from the ordinary regression suite:
+// unresolved external product dependencies must remain failing assertions, not expected failures.
+val itbTestSourceSet = sourceSets.create("itbTest") {
+    compileClasspath += sourceSets.main.get().output
+    runtimeClasspath += output + compileClasspath
+}
+configurations[itbTestSourceSet.implementationConfigurationName].extendsFrom(
+    configurations.implementation.get(), configurations.testImplementation.get(),
+)
+configurations[itbTestSourceSet.runtimeOnlyConfigurationName].extendsFrom(
+    configurations.runtimeOnly.get(), configurations.testRuntimeOnly.get(),
+)
+dependencies {
+    add(itbTestSourceSet.implementationConfigurationName, identityLibs.bouncycastle.pkix)
+}
+tasks.register<Test>("itbTest") {
+    group = "verification"
+    description = "Check the initial WeBuild wallet protocol requirements (not hosted ITB sign-off)."
+    testClassesDirs = itbTestSourceSet.output.classesDirs
+    classpath = itbTestSourceSet.runtimeClasspath
+    useJUnitPlatform()
+    ignoreFailures = providers.gradleProperty("itbAllowFailures").map {
+        require(it == "true" || it == "false") { "itbAllowFailures must be true or false" }
+        it.toBoolean()
+    }.getOrElse(false)
+    // Fresh per-run cryptographic material and result reports, even if inputs are unchanged.
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<JavaExec>("itbWallet") {
+    group = "verification"
+    description = "Run the deployed WAL-1423 ITB cases through the production wallet and portal interaction bridge."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("id.walt.itb.ItbMainKt")
+}
+
+// Offline browser contracts are explicit so ordinary JVM tests need no installed browser.
+tasks.test {
+    useJUnitPlatform { excludeTags("itb-portal") }
+}
+registerWalletProfileTestTask(
+    taskName = "itbPortalTest",
+    testFilter = "id.walt.itb.ItbPortalBridgeBrowserTest",
+    descriptionText = "Check ITB portal orchestration against an isolated local DOM fixture."
+)
+
+// The opt-in Android fixture compiles the same wallet driver, without the JVM software-key factory.
+kotlin.sourceSets.named("main") { kotlin.srcDir("src/deviceShared/kotlin") }

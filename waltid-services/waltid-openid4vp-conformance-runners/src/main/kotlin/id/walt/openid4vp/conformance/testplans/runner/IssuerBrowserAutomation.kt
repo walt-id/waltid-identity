@@ -6,6 +6,8 @@ import com.microsoft.playwright.BrowserType
 import com.microsoft.playwright.Locator
 import com.microsoft.playwright.Page
 import com.microsoft.playwright.Playwright
+import com.microsoft.playwright.TimeoutError
+import com.microsoft.playwright.options.WaitUntilState
 import id.walt.openid4vp.conformance.testplans.httpdata.TestRunResult
 import java.net.URI
 import java.nio.file.Files
@@ -59,39 +61,72 @@ internal class IssuerConformanceBrowserAutomation(
 ) {
     fun complete(interaction: BrowserInteraction) {
         val browser = ConformanceBrowser.open()
+        val navigationEvents = ArrayDeque<String>()
+        fun recordNavigation(event: String) {
+            if (navigationEvents.size == 12) navigationEvents.removeFirst()
+            navigationEvents.addLast(event)
+        }
         try {
             val page = browser.page
-            page.setDefaultTimeout(Duration.ofSeconds(30).toMillis().toDouble())
-            page.setDefaultNavigationTimeout(Duration.ofSeconds(30).toMillis().toDouble())
+            // Only main-frame navigation is relevant; failed images must not fail a login.
+            page.onRequest { request ->
+                if (request.isNavigationRequest && request.frame() == page.mainFrame()) {
+                    recordNavigation("${request.method()} ${browserDiagnosticUrl(request.url())}")
+                }
+            }
+            page.onRequestFailed { request ->
+                if (request.isNavigationRequest && request.frame() == page.mainFrame()) {
+                    val code = Regex("(?:net::)?ERR_[A-Z0-9_]+").find(request.failure().orEmpty())?.value
+                        ?: "transport failure (no browser error code)"
+                    recordNavigation("FAILED ${request.method()} ${browserDiagnosticUrl(request.url())}: $code")
+                }
+            }
+            page.onResponse { response ->
+                val request = response.request()
+                if (request.isNavigationRequest && request.frame() == page.mainFrame()) {
+                    recordNavigation("HTTP ${response.status()} ${browserDiagnosticUrl(response.url())}")
+                }
+            }
+            val timeoutMillis = Duration.ofSeconds(config.timeoutSeconds).toMillis()
+            val timeoutAt = System.currentTimeMillis() + timeoutMillis
+            page.setDefaultTimeout(timeoutMillis.toDouble())
+            page.setDefaultNavigationTimeout(timeoutMillis.toDouble())
 
-            println("Opening conformance browser interaction via ${interaction.method}: ${interaction.url}")
-            openBrowserInteraction(page, interaction)
+            println("Opening conformance browser interaction via ${interaction.method}: ${browserDiagnosticUrl(interaction.url)}")
+            // The login DOM can be ready while unrelated page resources are still loading.
+            openBrowserInteraction(page, interaction, WaitUntilState.DOMCONTENTLOADED)
 
-            val timeoutAt = System.currentTimeMillis() + Duration.ofSeconds(config.timeoutSeconds).toMillis()
             var loginSubmitted = false
             var lastSeenUrl = page.url().orEmpty()
             var nextProgressLogAt = 0L
 
             while (System.currentTimeMillis() < timeoutAt) {
                 val now = System.currentTimeMillis()
+                val remainingMillis = (timeoutAt - now).coerceAtLeast(1).toDouble()
+                page.setDefaultTimeout(remainingMillis)
+                page.setDefaultNavigationTimeout(remainingMillis)
                 val currentUrl = page.url().orEmpty()
                 if (currentUrl.isNotBlank()) {
                     lastSeenUrl = currentUrl
                 }
 
                 if (now >= nextProgressLogAt) {
-                    println("Browser automation current URL: ${currentUrl.ifBlank { "<blank>" }}")
+                    println("Browser automation current URL: ${browserDiagnosticUrl(currentUrl)}")
                     nextProgressLogAt = now + 5_000
+                }
+
+                if (currentUrl.startsWith("chrome-error://") || currentUrl.startsWith("about:neterror")) {
+                    error("Browser navigation failed: browser displayed an error page")
                 }
 
                 if (currentUrl.isConformanceSuiteUrl()) {
                     if (!currentUrl.isConformanceSuiteCallbackUrl()) {
-                        println("Browser returned to conformance suite: $currentUrl")
+                        println("Browser returned to conformance suite: ${browserDiagnosticUrl(currentUrl)}")
                         return
                     }
 
                     if (browser.hasElement("#submission_complete")) {
-                        println("Conformance callback submission completed: $currentUrl")
+                        println("Conformance callback submission completed: ${browserDiagnosticUrl(currentUrl)}")
                         return
                     }
                 }
@@ -134,11 +169,19 @@ internal class IssuerConformanceBrowserAutomation(
                 page.waitForTimeout(250.0)
             }
 
-            val pageSnippet = runCatching { page.content().take(1000) }.getOrNull() ?: "<page source unavailable>"
             error(
                 "Timeout waiting for browser login to return to conformance suite. " +
-                    "Last URL: $lastSeenUrl ; page snippet: $pageSnippet"
+                    "Last URL: ${browserDiagnosticUrl(lastSeenUrl)}"
             )
+        } catch (ex: Exception) {
+            // Do not attach the original Playwright exception: its call log contains OAuth query values.
+            val safeMessage = Regex("https?://[^\\s\"'<>]+")
+                .replace(ex.message.orEmpty()) { browserDiagnosticUrl(it.value) }
+            val currentUrl = runCatching { browserDiagnosticUrl(browser.page.url()) }.getOrDefault("<unavailable>")
+            val diagnostic = "$safeMessage; Last browser URL: $currentUrl; " +
+                "Recent main-frame navigation: ${navigationEvents.joinToString(" -> ").ifEmpty { "<none recorded>" }}"
+            if (ex is TimeoutError) throw TimeoutError(diagnostic)
+            throw IllegalStateException(diagnostic)
         } finally {
             browser.close()
         }
@@ -176,6 +219,21 @@ internal class IssuerConformanceBrowserAutomation(
         else -> -1
     }
 }
+
+/** Keep the destination, never OAuth query/fragment values, user info, or embedded page content. */
+internal fun browserDiagnosticUrl(url: String): String = runCatching {
+    val uri = URI.create(url)
+    when (uri.scheme?.lowercase()) {
+        "http", "https" -> {
+            require(uri.host != null)
+            URI(uri.scheme, null, uri.host, uri.port, uri.path, null, null).toASCIIString() +
+                if (uri.rawQuery != null || uri.rawFragment != null) " [parameters redacted]" else ""
+        }
+        "chrome-error" -> "chrome-error://chromewebdata/"
+        "about" -> "about:${uri.schemeSpecificPart.substringBefore('?').substringBefore('#')}"
+        else -> "<non-HTTP URL>"
+    }
+}.getOrDefault("<unavailable URL>")
 
 /**
  * Playwright wrapper shared by the issuer and wallet conformance automations.
@@ -353,4 +411,3 @@ private enum class PlaywrightBrowserName {
         }
     }
 }
-
