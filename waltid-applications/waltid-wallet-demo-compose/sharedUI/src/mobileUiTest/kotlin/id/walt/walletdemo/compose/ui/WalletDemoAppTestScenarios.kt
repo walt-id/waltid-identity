@@ -3,7 +3,7 @@
 package id.walt.walletdemo.compose.ui
 
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialSelection
-import id.walt.walletdemo.compose.logic.WalletDemoHolderBinding
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialHolders
 import id.walt.walletdemo.compose.logic.WalletDemoDeferredCredential
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
@@ -530,7 +530,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag("issuance-more-ExampleCredential").performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performClick()
         waitUntil(timeoutMillis = 5_000) { wallet.receivedSelections != null }
-        assertEquals(2, wallet.receivedSelections?.single()?.holderBindings?.size)
+        assertEquals(WalletDemoCredentialHolders.NewKeys(2), wallet.receivedSelections?.single()?.holders)
         onNodeWithTag("issuance-more-ExampleCredential").assertIsNotEnabled()
         gate.complete(Unit)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.operation !is WalletOperationState.Receiving }
@@ -2082,9 +2082,6 @@ private class FakeDemoWallet(
         issuanceSources.remove(sessionId)
         return WalletDemoIssuanceOutcome.Cancelled
     }
-
-    override suspend fun createIssuanceHolderKeys(count: Int) =
-        List(count) { WalletDemoHolderBinding("batch-holder-$it", "did:key:batch-holder-$it") }
 
     override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> = emptyList()
 
