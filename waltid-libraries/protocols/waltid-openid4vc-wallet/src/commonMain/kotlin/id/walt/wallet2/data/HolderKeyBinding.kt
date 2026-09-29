@@ -2,7 +2,9 @@
 
 package id.walt.wallet2.data
 
+import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
+import id.walt.did.dids.DidService
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.jose.Jwk
@@ -72,7 +74,7 @@ enum class HolderKeyBindingOrigin {
     IMPORT,
 }
 
-/** Stable machine-readable reason why an mdoc cannot use a holder key. */
+/** Stable machine-readable reason why a credential cannot use a holder key. */
 @Serializable
 enum class HolderKeyBindingErrorCode {
     NOT_AN_MDOC,
@@ -129,30 +131,17 @@ suspend fun Wallet.resolveHolderKey(
     requiredUsages: Set<KeyUsage>,
 ): ResolvedHolderKey {
     require(requiredUsages.isNotEmpty()) { "At least one holder-key usage is required" }
-    val mdoc = credential.credential as? MdocsCredential
-        ?: throw bindingError(
-            credential,
-            HolderKeyBindingErrorCode.NOT_AN_MDOC,
-            "Credential '${credential.id}' is not an mdoc and has no MSO DeviceKey",
-        )
-    val credentialThumbprint = try {
-        mdoc.holderKeyThumbprint()
-    } catch (cause: CancellationException) {
-        throw cause
-    } catch (cause: Exception) {
-        throw bindingError(
-            credential,
-            HolderKeyBindingErrorCode.CREDENTIAL_KEY_EXTRACTION_FAILED,
-            "Could not extract the MSO DeviceKey for credential '${credential.id}'",
-            cause,
-        )
-    }
+    val credentialThumbprints = credential.credential.holderKeyThumbprints()
     val existing = credential.holderKeyBinding ?: throw bindingError(
         credential,
         HolderKeyBindingErrorCode.BINDING_MISSING,
         "Credential '${credential.id}' has no holder-key binding",
     )
-    validateBindingContract(credential, existing, credentialThumbprint)
+    validateBindingContract(credential, existing, existing.publicKeyThumbprint)
+    if (existing.publicKeyThumbprint !in credentialThumbprints) {
+        throw bindingError(credential, HolderKeyBindingErrorCode.BINDING_DOES_NOT_MATCH_CREDENTIAL,
+            "Credential does not contain the persisted holder key")
+    }
     val candidate = resolveReferencedCandidate(credential, existing.keyReference, requiredUsages)
     if (candidate.thumbprint != existing.publicKeyThumbprint) {
         throw bindingError(
@@ -178,26 +167,16 @@ suspend fun Wallet.resolveHolderKey(
     requiredUsages = requiredUsages,
 )
 
-/** Adds a verified issuance binding when [keyMaterial] is a durably resolvable mdoc presentation key. */
+/** Adds a verified issuance binding when [keyMaterial] is a durably resolvable presentation key. */
 suspend fun Wallet.withVerifiedIssuanceHolderKeyBinding(
     credential: StoredCredential,
     keyMaterial: WalletKeyStoreEntry,
     createdAt: Instant = Clock.System.now(),
 ): StoredCredential {
-    val mdoc = credential.credential as? MdocsCredential
-        ?: return credential.copy(holderKeyBinding = null)
-    val credentialThumbprint = try {
-        mdoc.holderKeyThumbprint()
-    } catch (cause: CancellationException) {
-        throw cause
-    } catch (cause: Exception) {
-        throw bindingError(
-            credential,
-            HolderKeyBindingErrorCode.CREDENTIAL_KEY_EXTRACTION_FAILED,
-            "Could not extract the MSO DeviceKey for credential '${credential.id}'",
-            cause,
-        )
-    }
+    val credentialThumbprints = credential.credential.holderKeyThumbprints()
+    if (credentialThumbprints.isEmpty()) return credential.copy(holderKeyBinding = null)
+    val usageAlternatives = if (credential.credential is MdocsCredential) MDOC_PRESENTATION_USAGE_ALTERNATIVES
+        else listOf(setOf(KeyUsage.SIGN))
     val suppliedThumbprint = try {
         keyMaterial.publicKeyThumbprint()
     } catch (cause: CancellationException) {
@@ -210,18 +189,18 @@ suspend fun Wallet.withVerifiedIssuanceHolderKeyBinding(
             cause,
         )
     }
-    if (credentialThumbprint != suppliedThumbprint) {
+    if (suppliedThumbprint !in credentialThumbprints) {
         throw bindingError(
             credential,
             HolderKeyBindingErrorCode.BINDING_DOES_NOT_MATCH_CREDENTIAL,
-            "Issued mdoc '${credential.id}' MSO DeviceKey does not match its proof-of-possession key",
+            "Issued credential '${credential.id}' holder key does not match its proof-of-possession key",
         )
     }
     val candidate = keyMaterial.keyReference?.let { reference ->
         val resolved = resolveReferencedCandidateForAnyUsage(
             credential,
             reference,
-            MDOC_PRESENTATION_USAGE_ALTERNATIVES,
+            usageAlternatives,
         )
         if (resolved.thumbprint != suppliedThumbprint) {
             throw bindingError(
@@ -235,7 +214,7 @@ suspend fun Wallet.withVerifiedIssuanceHolderKeyBinding(
         candidates = allKeyCandidates(credential)
             .filter { it.material.keyId == keyMaterial.keyId && it.thumbprint == suppliedThumbprint },
         credential = credential,
-        usageAlternatives = MDOC_PRESENTATION_USAGE_ALTERNATIVES,
+        usageAlternatives = usageAlternatives,
     )
         .let { matching ->
             when (matching.size) {
@@ -367,16 +346,10 @@ private suspend fun Wallet.resolveReferencedCandidate(
                 ?.getKeyMaterial(location.keyId, requiredUsages)
                 ?.copy(keyReference = reference)
 
-            is WalletKeyLocation.Static -> attachedStaticCrypto2Key()
-                ?.takeIf { it.id.value == location.keyId }
-                ?.let { crypto2Key ->
-                    WalletKeyStoreEntry(
-                        keyId = location.keyId,
-                        legacyKey = null,
-                        crypto2Key = crypto2Key,
-                        keyReference = reference,
-                    )
-                }
+            is WalletKeyLocation.Static -> staticKey?.takeIf { it.getKeyId() == location.keyId }?.let { legacy ->
+                WalletKeyStoreEntry(location.keyId, legacy, attachedStaticCrypto2Key(), reference)
+                    .also { it.requireUsages(credential, requiredUsages) }
+            }
         }
     } catch (cause: CancellationException) {
         throw cause
@@ -541,7 +514,8 @@ private fun WalletKeyStoreEntry.requireUsages(
     credential: StoredCredential,
     requiredUsages: Set<KeyUsage>,
 ) {
-    val supported = crypto2Key?.let { requiredUsages.all(it.usages::contains) } == true
+    val supported = crypto2Key?.let { requiredUsages.all(it.usages::contains) }
+        ?: (legacyKey != null && requiredUsages == setOf(KeyUsage.SIGN))
     if (!supported) {
         throw bindingError(
             credential,
@@ -554,9 +528,29 @@ private fun WalletKeyStoreEntry.requireUsages(
 private suspend fun MdocsCredential.holderKeyThumbprint(): PublicKeyThumbprint =
     getHolderCrypto2Key().publicKeyThumbprint()
 
-private suspend fun WalletKeyStoreEntry.publicKeyThumbprint(): PublicKeyThumbprint {
-    return requireNotNull(crypto2Key) { "Key '$keyId' is not available through crypto2" }
-        .publicKeyThumbprint()
+internal suspend fun WalletKeyStoreEntry.publicKeyThumbprint(): PublicKeyThumbprint =
+    crypto2Key?.publicKeyThumbprint()
+        ?: PublicKeyThumbprint(value = requireNotNull(legacyKey) {
+            "Key '$keyId' has no usable public representation"
+        }.getPublicKey().getThumbprint())
+
+/** Credential-bound public identities, including W3C subject DIDs. No wallet default fallback. */
+internal suspend fun DigitalCredential.holderKeyThumbprints(includeSubjectDid: Boolean = true): Set<PublicKeyThumbprint> {
+    try {
+        getHolderCrypto2Key()?.let { return setOf(it.publicKeyThumbprint()) }
+    } catch (cause: CancellationException) {
+        throw cause
+    } catch (cause: Exception) {
+        // Legacy-only curves/providers remain supported; never ignore malformed binding material.
+        val legacy = getHolderKey() ?: throw cause
+        return setOf(PublicKeyThumbprint(value = legacy.getPublicKey().getThumbprint()))
+    }
+    if (!includeSubjectDid) return emptySet()
+    val holderDid = subject?.takeIf { it.startsWith("did:") } ?: return emptySet()
+    val crypto2 = DidService.resolveToCrypto2Keys(holderDid)
+    if (crypto2.isSuccess) return crypto2.getOrThrow().map { it.publicKeyThumbprint() }.toSet()
+    return DidService.resolveToKeys(holderDid).getOrThrow()
+        .map { PublicKeyThumbprint(value = it.getPublicKey().getThumbprint()) }.toSet()
 }
 
 private suspend fun id.walt.crypto2.keys.Key.publicKeyThumbprint(): PublicKeyThumbprint {

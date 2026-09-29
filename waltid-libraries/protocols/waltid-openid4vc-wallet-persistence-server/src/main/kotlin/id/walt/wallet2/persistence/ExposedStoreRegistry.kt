@@ -9,6 +9,8 @@ import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
 import org.jetbrains.exposed.v1.jdbc.upsert
 
 class ExposedStoreRegistry(private val db: Database) {
+    fun issuanceSessionStore(walletId: String) = ExposedIssuanceSessionStore(walletId, db)
+
     suspend fun resolveKeyStore(storeId: String): ExposedKeyStore? =
         if (keyStoreExists(storeId)) ExposedKeyStore(storeId, db) else null
 

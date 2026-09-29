@@ -11,6 +11,7 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.handlers.WalletIssuanceSessionState
 import id.walt.wallet2.persistence.*
 import id.walt.wallet2.server.StoreFactory
 import id.walt.wallet2.server.WalletResolver
@@ -20,6 +21,7 @@ import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
+import id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.GenericHttpWalletAttestationProvider
 import io.ktor.http.*
@@ -70,6 +72,7 @@ object OSSWallet2Service {
     private val namedKeyStores = ConcurrentHashMap<String, WalletKeyStore>()
     private val namedCredentialStores = ConcurrentHashMap<String, WalletCredentialStore>()
     private val namedDidStores = ConcurrentHashMap<String, WalletDidStore>()
+    private val issuanceSessionStates = ConcurrentHashMap<String, WalletIssuanceSessionState>()
 
     val resolver: WalletResolver = object : WalletResolver {
 
@@ -87,6 +90,18 @@ object OSSWallet2Service {
 
         override val didStoreFactory: StoreFactory<WalletDidStore>
             get() = OSSWallet2Service.didStoreFactory
+
+        override suspend fun resolveIssuanceSessionState(walletId: String): WalletIssuanceSessionState =
+            issuanceSessionStates.computeIfAbsent(walletId) {
+                WalletIssuanceSessionState(walletId,
+                    persistentStoreRegistry?.issuanceSessionStore(walletId) ?: InMemoryIssuanceSessionStore())
+            }
+
+        override suspend fun deleteWallet(walletId: String) {
+            resolveWallet(walletId)?.issuanceSessions()?.closeSessions()
+            walletStore.deleteWallet(walletId)
+            issuanceSessionStates.remove(walletId)
+        }
 
         override suspend fun resolveKeyStore(storeId: String): WalletKeyStore? {
             val registry = persistentStoreRegistry
@@ -170,6 +185,7 @@ object OSSWallet2Service {
     }
 
     fun configurePersistence(db: Database) {
+        issuanceSessionStates.clear()
         walletStore = ExposedWalletStore(db)
         persistentStoreRegistry = ExposedStoreRegistry(db)
         keyStoreFactory = { id -> ExposedKeyStore(id, db) }
@@ -181,6 +197,7 @@ object OSSWallet2Service {
     }
 
     fun configureInMemory(store: WalletStore = InMemoryWalletStore()) {
+        issuanceSessionStates.clear()
         walletStore = store
         persistentStoreRegistry = null
         keyStoreFactory = { InMemoryKeyStore() }

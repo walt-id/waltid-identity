@@ -1,5 +1,7 @@
 package id.walt.wallet2.handlers
 
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
@@ -21,6 +23,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -71,38 +74,46 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
 
     @Test
     fun `callback reports first credential when second persistence fails`() = runTest {
+        val holderKey = JWKKey.generate(KeyType.secp256r1)
+        val credential = batchTestCredential(holderKey)
         val store = FailingCredentialStore(failAtAttempt = 2)
         val callbacks = mutableListOf<String>()
 
-        assertFailsWith<IllegalStateException> {
+        val failure = assertFailsWith<CredentialStorageException> {
             WalletIssuanceHandler.pollDeferredFlow(
-                wallet = Wallet(id = "wallet", credentialStores = listOf(store)),
-                request = deferredRequest(),
-                httpClient = credentialResponseClient(credentialCount = 2),
+                wallet = Wallet(id = "wallet", staticKey = holderKey, credentialStores = listOf(store)),
+                request = deferredRequest().copy(holderBindings = List(2) { CredentialHolderBinding(keyId = holderKey.getKeyId()) }),
+                httpClient = credentialResponseClient(credentialCount = 2, credential = credential),
                 onCredentialStored = { callbacks += it.id },
             ).toList()
         }
 
         assertEquals(1, store.stored.size)
         assertEquals(store.stored.map { it.id }, callbacks)
+        assertEquals(callbacks, failure.outcome.storedCredentialIds)
+        assertNull(failure.outcome.deferredCredentials.single().credentialConfigurationId)
     }
 
     @Test
     fun `callback reports nothing when persistence fails before first credential`() = runTest {
+        val holderKey = JWKKey.generate(KeyType.secp256r1)
+        val credential = batchTestCredential(holderKey)
         val store = FailingCredentialStore(failAtAttempt = 1)
         var callbacks = 0
 
-        assertFailsWith<IllegalStateException> {
+        val failure = assertFailsWith<CredentialStorageException> {
             WalletIssuanceHandler.pollDeferredFlow(
-                wallet = Wallet(id = "wallet", credentialStores = listOf(store)),
-                request = deferredRequest(),
-                httpClient = credentialResponseClient(credentialCount = 2),
+                wallet = Wallet(id = "wallet", staticKey = holderKey, credentialStores = listOf(store)),
+                request = deferredRequest().copy(holderBindings = List(2) { CredentialHolderBinding(keyId = holderKey.getKeyId()) }),
+                httpClient = credentialResponseClient(credentialCount = 2, credential = credential),
                 onCredentialStored = { callbacks++ },
             ).toList()
         }
 
         assertEquals(0, store.stored.size)
         assertEquals(0, callbacks)
+        assertEquals(emptyList(), failure.outcome.storedCredentialIds)
+        assertNull(failure.outcome.deferredCredentials.single().credentialConfigurationId)
     }
 
     private fun deferredRequest() = PollDeferredRequest(
@@ -111,11 +122,11 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
         transactionId = "transaction",
     )
 
-    private fun credentialResponseClient(credentialCount: Int) = HttpClient(MockEngine) {
+    private fun credentialResponseClient(credentialCount: Int, credential: String) = HttpClient(MockEngine) {
         engine {
             addHandler {
                 respond(
-                    content = """{"credentials":[${List(credentialCount) { "{\"credential\":$CREDENTIAL}" }.joinToString()}]}""",
+                    content = """{"credentials":[${List(credentialCount) { "{\"credential\":${Json.encodeToString(credential)}}" }.joinToString()}]}""",
                     status = HttpStatusCode.OK,
                     headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
                 )

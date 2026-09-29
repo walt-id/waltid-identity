@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A14440000000000000000003 /* EnterpriseMobileFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14440000000000000000004 /* EnterpriseMobileFixture.swift */; };
+		A14440000000000000000001 /* BatchIssuanceE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14440000000000000000002 /* BatchIssuanceE2ETests.swift */; };
 		B33B17EA2C2C394F001A32F7 /* ComposeWalletDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17E92C2C394F001A32F7 /* ComposeWalletDemoApp.swift */; };
 		B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17EB2C2C394F001A32F7 /* ContentView.swift */; };
 		B33B17EE2C2C3957001A32F7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B33B17ED2C2C3957001A32F7 /* Assets.xcassets */; };
@@ -68,6 +70,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A14440000000000000000004 /* EnterpriseMobileFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EnterpriseMobileFixture.swift; path = "../../../mobile-e2e-fixtures/ios/TestHelpers/EnterpriseMobileFixture.swift"; sourceTree = "<group>"; };
+		A14440000000000000000002 /* BatchIssuanceE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BatchIssuanceE2ETests.swift; path = "BatchIssuanceE2ETests.swift"; sourceTree = "<group>"; };
 		B30E22802C2D8AD700D4781C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B33B17E62C2C394F001A32F7 /* iosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B33B17E92C2C394F001A32F7 /* ComposeWalletDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeWalletDemoApp.swift; sourceTree = "<group>"; };
@@ -178,6 +182,8 @@
 		C0DE00000000000000000401 /* iosAppUITests */ = {
 			isa = PBXGroup;
 			children = (
+				A14440000000000000000002 /* BatchIssuanceE2ETests.swift */,
+				A14440000000000000000004 /* EnterpriseMobileFixture.swift */,
 				C0DE00000000000000000002 /* PublicDemoBackendE2ETests.swift */,
 				C0DE00000000000000000003 /* WalletE2EHelpers.swift */,
 				C0DE00000000000000000006 /* TestHelpers.swift */,
@@ -397,6 +403,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A14440000000000000000001 /* BatchIssuanceE2ETests.swift in Sources */,
+				A14440000000000000000003 /* EnterpriseMobileFixture.swift in Sources */,
 				C0DE00000000000000000102 /* PublicDemoBackendE2ETests.swift in Sources */,
 				C0DE00000000000000000103 /* WalletE2EHelpers.swift in Sources */,
 				C0DE00000000000000000105 /* TestHelpers.swift in Sources */,

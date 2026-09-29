@@ -138,6 +138,7 @@ class ExposedWalletStore(private val db: Database) : WalletStore {
             Wallet2Tables.WalletCredentialStores.deleteWhere { Wallet2Tables.WalletCredentialStores.walletId eq walletId }
             Wallet2Tables.WalletDidStores.deleteWhere { Wallet2Tables.WalletDidStores.walletId eq walletId }
             Wallet2Tables.AccountWallets.deleteWhere { Wallet2Tables.AccountWallets.walletId eq walletId }
+            Wallet2Tables.IssuanceSessions.deleteWhere { Wallet2Tables.IssuanceSessions.walletId eq walletId }
             Wallet2Tables.Wallets.deleteWhere { Wallet2Tables.Wallets.id eq walletId }
 
             keyStoreIds.forEach { storeId ->

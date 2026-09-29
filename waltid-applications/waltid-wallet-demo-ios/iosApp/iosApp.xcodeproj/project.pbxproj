@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A14440000000000000000003 /* TestHelpers.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A74900000000000000000010 /* TestHelpers.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
         A74900000000000000000001 /* WalletSDKKeychainRecovery in Frameworks */ = {isa = PBXBuildFile; productRef = A74900000000000000000002 /* WalletSDKKeychainRecovery */; };
         A74900000000000000000003 /* WalletIdentityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A74900000000000000000004 /* WalletIdentityView.swift */; };
@@ -54,6 +55,7 @@
 		D69044582FDAA6DB009AB1FB /* TestHelpers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; };
 		D690445A2FDAA6DB009AB1FB /* TestHelpers.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		E2E00002AAAA000100000002 /* PublicDemoBackendE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00002AAAA000000000002 /* PublicDemoBackendE2ETests.swift */; };
+		A14440000000000000000001 /* BatchIssuanceE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14440000000000000000002 /* BatchIssuanceE2ETests.swift */; };
 		E2E00003AAAA000100000003 /* WalletE2EHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */; };
 		E2E00014AAAA000100000014 /* MockWalletUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00014AAAA000000000014 /* MockWalletUITests.swift */; };
 		E2E00015AAAA000100000015 /* synthetic-portrait.jpg in Resources */ = {isa = PBXBuildFile; fileRef = E2E00005AAAA000000000005 /* synthetic-portrait.jpg */; };
@@ -100,6 +102,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		A14440000000000000000004 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (A14440000000000000000003 /* TestHelpers.framework in Embed Frameworks */,);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A74900000000000000000011 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -172,6 +183,7 @@
 		D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = TestHelpers.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D6B7A34A2FD94CC3009C69E7 /* iosAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E2E00002AAAA000000000002 /* PublicDemoBackendE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicDemoBackendE2ETests.swift; sourceTree = "<group>"; };
+		A14440000000000000000002 /* BatchIssuanceE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchIssuanceE2ETests.swift; sourceTree = "<group>"; };
 		E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletE2EHelpers.swift; sourceTree = "<group>"; };
 		E2E00004AAAA000000000004 /* iosAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E2E00005AAAA000000000005 /* synthetic-portrait.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "synthetic-portrait.jpg"; sourceTree = "<group>"; };
@@ -374,6 +386,7 @@
 			isa = PBXGroup;
 			children = (
 				E2E00002AAAA000000000002 /* PublicDemoBackendE2ETests.swift */,
+				A14440000000000000000002 /* BatchIssuanceE2ETests.swift */,
 				E2E00014AAAA000000000014 /* MockWalletUITests.swift */,
 				E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */,
 			);
@@ -408,6 +421,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 71E1000D2FDAE0000000000D /* Build configuration list for PBXNativeTarget "iosAppEnterpriseTests" */;
 			buildPhases = (
+				A14440000000000000000004 /* Embed Frameworks */,
 				71E1000A2FDAE0000000000A /* Sources */,
 				71E100072FDAE00000000007 /* Frameworks */,
 				71E100092FDAE00000000009 /* Resources */,
@@ -728,6 +742,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E2E00002AAAA000100000002 /* PublicDemoBackendE2ETests.swift in Sources */,
+				A14440000000000000000001 /* BatchIssuanceE2ETests.swift in Sources */,
 				E2E00014AAAA000100000014 /* MockWalletUITests.swift in Sources */,
 				E2E00003AAAA000100000003 /* WalletE2EHelpers.swift in Sources */,
 			);
