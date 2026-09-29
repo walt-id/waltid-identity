@@ -95,13 +95,10 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
 
             switch viewModel.signingProtectionMode {
-            case .optional, .required:
+            case .optional:
                 signingProtectionChoice(.biometric)
-                signingProtectionChoice(.biometricPerUse)
-                if viewModel.signingProtectionMode.allows(.none) {
-                    signingProtectionChoice(.none)
-                }
-            case .disabled:
+                signingProtectionChoice(.none)
+            case .required, .disabled:
                 let managedProtection = viewModel.signingProtectionMode.defaultSelection
                 signingProtectionChoice(
                     managedProtection,
@@ -165,7 +162,9 @@ struct SettingsView: View {
             action: { viewModel.requestSigningProtectionChange(protection) }
         )
         .accessibilityIdentifier(
-            protection.accessibilityIdentifier
+            protection == .biometric
+                ? WalletAccessibilityID.signingProtectionBiometric
+                : WalletAccessibilityID.signingProtectionNone
         )
     }
 
@@ -178,15 +177,5 @@ struct SettingsView: View {
                 }
             }
         )
-    }
-}
-
-private extension WalletDemoSigningProtection {
-    var accessibilityIdentifier: String {
-        switch self {
-        case .none: WalletAccessibilityID.signingProtectionNone
-        case .biometric: WalletAccessibilityID.signingProtectionBiometric
-        case .biometricPerUse: WalletAccessibilityID.signingProtectionBiometricPerUse
-        }
     }
 }

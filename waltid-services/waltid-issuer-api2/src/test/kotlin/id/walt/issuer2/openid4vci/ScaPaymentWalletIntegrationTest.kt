@@ -166,22 +166,12 @@ class ScaPaymentWalletIntegrationTest {
             assertTrue(accepted.status.isSuccess(), accepted.bodyAsText())
             val info = http.get("$verifierBase/verification-session/${created.sessionId}/info").body<JsonObject>()
             assertEquals("SUCCESSFUL", info.getValue("status").jsonPrimitive.content, info.toString())
-            val policies = mutableMapOf<String, Boolean>()
-            fun collect(value: JsonElement) {
-                when (value) {
-                    is JsonObject -> {
-                        value["policy_executed"]?.jsonObject?.get("id")?.jsonPrimitive?.content?.let {
-                            policies[it] = value.getValue("success").jsonPrimitive.boolean
-                        }
-                        value.values.forEach(::collect)
-                    }
-                    is JsonArray -> value.forEach(::collect)
-                    else -> Unit
-                }
-            }
-            collect(info.getValue("policy_results"))
+            val policies = info.getValue("policy_results").jsonObject.getValue("vp_policies").jsonObject
+                .getValue("sca_payment").jsonObject
             for (id in listOf("dc+sd-jwt/kb-jwt_signature", "dc+sd-jwt/sd_hash-check", "dc+sd-jwt/transaction-data-hash-check")) {
-                assertEquals(true, policies[id], "Required verifier policy did not pass: $id; $info")
+                val result = policies.getValue(id).jsonObject
+                assertEquals(id, result.getValue("policy_executed").jsonObject.getValue("id").jsonPrimitive.content)
+                assertTrue(result.getValue("success").jsonPrimitive.boolean, "Required verifier policy did not pass: $id; $info")
             }
         } finally {
             runtime.close()

@@ -340,6 +340,12 @@ internal class MobileDemoWallet(
     }
 }
 
+/** Additional choices are preflighted by the existing signing-identity setup on each platform. */
+internal fun WalletDemoSigningProtectionMode.alternativeAuthorizations(): List<KeyUseAuthorizationPolicy> =
+    WalletDemoSigningProtection.entries
+        .filter { it != defaultSelection && allows(it) }
+        .map { it.toKeyUseAuthorizationPolicy() }
+
 internal fun WalletDemoSigningProtection.toKeyUseAuthorizationPolicy(): KeyUseAuthorizationPolicy = when (this) {
     WalletDemoSigningProtection.None -> KeyUseAuthorizationPolicy.None
     WalletDemoSigningProtection.Biometric -> KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10)

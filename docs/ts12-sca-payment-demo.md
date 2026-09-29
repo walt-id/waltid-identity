@@ -13,7 +13,6 @@ to the public services. The issuer must advertise `sca_payment_card_sd_jwt`
 (`dc+sd-jwt`), issued through profile `scaPaymentCardSdJwt`. Its public-demo VCT is
 `https://issuer2.demo.walt.id/openid4vci/sca_payment_card_sd_jwt` and its synthetic
 card claims are scheme `demo`, last four digits `4242` and holder `Jane Doe`.
-A missing deployment is a failed prerequisite, not grounds to substitute a PID.
 
 Use verifier2's **\[openid4vp-dc_api\]\[sd-jwt demo payment\]
 urn:eudi:sca:payment:1** OpenAPI example. It requests the three card claims under
@@ -66,10 +65,9 @@ Identity Document provider extensions are outside this SD-JWT route.
 | Existing iOS app suites | Corresponding physical URL-payment flow in both demos | Explicit operator interaction |
 
 The existing Linux Gradle job runs `paymentDemoTest` for `ci:mobile-dc-api` PRs
-and main and reports it through its ordinary JUnit check and `ci-gate`. The task
-never reuses cached success and fails for missing profiles or incompatible services.
-The automatic DC-API payment case also requires the deployed profile. Neither
-uses a fallback credential or a passing skip for a missing deployment.
+and eligible main builds, reporting through its ordinary JUnit check and `ci-gate`.
+The task never reuses cached success. Both it and the automatic DC-API payment
+case require the service configuration described above.
 
 ```bash
 ./gradlew :waltid-services:waltid-issuer-api2:paymentDemoTest

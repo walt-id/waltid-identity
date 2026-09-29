@@ -181,7 +181,6 @@ tasks.register<Test>("paymentDemoTest") {
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath
     useJUnitPlatform { includeTags("live-payment") }
-    filter { includeTestsMatching("id.walt.issuer2.openid4vci.ScaPaymentWalletIntegrationTest.deployedPaymentCardReachesWalletAndVerifier") }
     for (name in listOf("payment.issuerUrl", "payment.verifierUrl")) {
         providers.gradleProperty(name).orNull?.let { systemProperty(name, it) }
     }

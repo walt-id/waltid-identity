@@ -49,13 +49,8 @@ internal object WalletComposeE2EHelper {
 
     /** Uses the normal setup UI; the operator approves each native signing prompt. */
     fun launchAndCreateScaIdentity(context: Context, device: UiDevice) {
-        val intent = requireNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
-            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            .putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, "required")
-        context.startActivity(intent)
-        requireNotNull(waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT)).setText(PIN)
-        requireNotNull(waitForResource(device, "wallet.pinConfirmationInput", UI_ELEMENT_TIMEOUT)).setText(PIN)
-        clickByTag(device, "wallet.pinSubmitButton")
+        launch(context, signingProtectionMode = "required")
+        unlock(device, initializeSigningIdentity = false)
         requireNotNull(device.wait(Until.findObject(By.text("1 of 3 · Recovery")), UI_ELEMENT_TIMEOUT))
         clickByTag(device, "wallet.keySetupContinue")
         requireNotNull(device.wait(Until.findObject(By.text("Hardware required")), UI_ELEMENT_TIMEOUT)).click()
@@ -69,9 +64,7 @@ internal object WalletComposeE2EHelper {
 
     fun receiveThroughApp(device: UiDevice, offerUrl: String) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(offerUrl), context, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            .putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, "required"))
+        sendDeepLink(context, offerUrl, signingProtectionMode = "required")
         setTextByTag(device, "wallet.offerInput", offerUrl)
         clickByTag(device, "wallet.receiveButton")
         requireNotNull(waitForResource(device, "wallet.offerAcceptButton", CREDENTIAL_OPERATION_TIMEOUT))
@@ -103,17 +96,17 @@ internal object WalletComposeE2EHelper {
         unlock(device)
     }
 
-    private fun launch(context: Context) {
+    private fun launch(context: Context, signingProtectionMode: String = "disabled") {
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             ?.apply {
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, "disabled")
+                putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, signingProtectionMode)
             }
             ?: error("Cannot resolve launch intent for ${context.packageName}")
         context.startActivity(launchIntent)
     }
 
-    fun unlock(device: UiDevice) {
+    fun unlock(device: UiDevice, initializeSigningIdentity: Boolean = true) {
         val pinInput = waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT)
             ?: throw AssertionError("PIN input not found. ${foregroundWindowSnapshot(device)}")
         pinInput.setText(PIN)
@@ -121,7 +114,7 @@ internal object WalletComposeE2EHelper {
         waitForResource(device, "wallet.pinConfirmationInput", 2_000L)?.setText(PIN)
 
         clickByTag(device, "wallet.pinSubmitButton")
-        awaitWalletReady(device)
+        if (initializeSigningIdentity) awaitWalletReady(device)
     }
 
     private fun awaitWalletReady(device: UiDevice) {
@@ -152,7 +145,7 @@ internal object WalletComposeE2EHelper {
             foregroundWindowSnapshot(device))
     }
 
-    fun sendDeepLink(context: Context, url: String) {
+    fun sendDeepLink(context: Context, url: String, signingProtectionMode: String = "disabled") {
         val intent = Intent(
             Intent.ACTION_VIEW,
             Uri.parse(url),
@@ -164,7 +157,7 @@ internal object WalletComposeE2EHelper {
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
                     Intent.FLAG_ACTIVITY_SINGLE_TOP
             )
-            putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, "disabled")
+            putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, signingProtectionMode)
         }
         context.startActivity(intent)
     }

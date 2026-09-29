@@ -5,7 +5,6 @@ package id.walt.walletdemo.compose.android
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.util.Base64
 import androidx.credentials.DigitalCredential
 import androidx.credentials.ExperimentalDigitalCredentialApi
@@ -15,28 +14,15 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
-import id.walt.cose.toCoseKey
-import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.Key
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toPublicJwk
-import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.iso18013.annexc.AnnexCRequest
 import id.walt.mobile.test.backend.DemoTestBackend
-import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.MobileWalletCredentialOffer
-import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
-import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.foregroundWindowSnapshot
+import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
 import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewTestTags
+import java.security.MessageDigest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -45,31 +31,22 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.junit.Assert.assertArrayEquals
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
-import org.junit.After
 import org.junit.Before
-import java.io.ByteArrayOutputStream
-import java.security.MessageDigest
 
 /** Shared Credential Manager transport, diagnostics and proof assertions for device E2Es. */
 @OptIn(ExperimentalDigitalCredentialApi::class)
 internal abstract class DigitalCredentialSharingE2E {
     protected abstract val wallet: MobileWallet
     protected abstract val issuedCredentialIds: Set<String>
-
 
     private val activeRequests = mutableListOf<DigitalCredentialRequestHandle>()
 
@@ -231,6 +208,7 @@ internal abstract class DigitalCredentialSharingE2E {
 
     protected suspend fun Fixture.awaitCancellationOutcome(
         request: DigitalCredentialRequestHandle,
+        candidateText: String,
     ): Result<GetCredentialResponse> {
         val completed = withTimeoutOrNull(CANCELLATION_TRANSITION_TIMEOUT) {
             while (!request.isComplete) {
@@ -238,7 +216,7 @@ internal abstract class DigitalCredentialSharingE2E {
                     fail(
                         "Credential Manager selector reappeared after provider Cancel without " +
                             "resolving the caller request.\n" +
-                            pickerDiagnostic(request, MDL_DOC_TYPE, candidateSelected = true),
+                            pickerDiagnostic(request, candidateText, candidateSelected = true),
                     )
                 }
                 delay(CLEANUP_POLL_MILLIS)
@@ -249,7 +227,7 @@ internal abstract class DigitalCredentialSharingE2E {
             fail(
                 "Provider Cancel did not resolve the caller request within " +
                     "$CANCELLATION_TRANSITION_TIMEOUT ms.\n" +
-                    pickerDiagnostic(request, MDL_DOC_TYPE, candidateSelected = true),
+                    pickerDiagnostic(request, candidateText, candidateSelected = true),
             )
         }
         return request.await()
@@ -294,7 +272,7 @@ internal abstract class DigitalCredentialSharingE2E {
         )
     }
 
-    protected suspend fun assertSharedCredentialStateUnchanged() {
+    private suspend fun assertSharedCredentialStateUnchanged() {
         val storedIds = wallet.credentials().map { it.id }.toSet()
         assertEquals(
             "Shared credential state was modified by a previous test",
@@ -303,7 +281,7 @@ internal abstract class DigitalCredentialSharingE2E {
         )
     }
 
-    protected fun assertCredentialManagerIdle(fixture: Fixture) {
+    private fun assertCredentialManagerIdle(fixture: Fixture) {
         val deadline = System.currentTimeMillis() + CLEANUP_TIMEOUT
         while (System.currentTimeMillis() < deadline) {
             if (!fixture.walletReviewVisible() &&
@@ -317,7 +295,7 @@ internal abstract class DigitalCredentialSharingE2E {
         fail("Credential Manager was not idle before the test started.\n${interactionDiagnostic(fixture)}")
     }
 
-    protected fun settleCredentialManagerInteraction(fixture: Fixture) {
+    private fun settleCredentialManagerInteraction(fixture: Fixture) {
         val deadline = System.currentTimeMillis() + CLEANUP_TIMEOUT
         while (System.currentTimeMillis() < deadline) {
             val walletReviewVisible = fixture.walletReviewVisible()
@@ -334,7 +312,7 @@ internal abstract class DigitalCredentialSharingE2E {
         fail("Credential Manager did not settle after test cleanup.\n${interactionDiagnostic(fixture)}")
     }
 
-    protected fun interactionDiagnostic(fixture: Fixture): String = """
+    private fun interactionDiagnostic(fixture: Fixture): String = """
         activeRequestCount=${DigitalCredentialTestVerifier.activeRequestCount()}
         currentPackage=${fixture.device.currentPackageName}
         selectorVisible=${fixture.device.credentialManagerWindowVisible()}
@@ -342,7 +320,7 @@ internal abstract class DigitalCredentialSharingE2E {
         foreground=${foregroundWindowSnapshot(fixture.device)}
     """.trimIndent()
 
-    protected fun DigitalCredentialRequestHandle.completedResultDescription(): String {
+    private fun DigitalCredentialRequestHandle.completedResultDescription(): String {
         val result = completedResult()
             ?: return "request is complete but its result was unavailable"
         result.exceptionOrNull()?.let { exception ->
@@ -354,7 +332,7 @@ internal abstract class DigitalCredentialSharingE2E {
     protected fun Fixture.walletReviewVisible(): Boolean =
         device.findObject(By.res(WALLET_SHARING_REVIEW_TAG)) != null
 
-    protected fun UiDevice.credentialManagerWindowVisible(): Boolean =
+    private fun UiDevice.credentialManagerWindowVisible(): Boolean =
         currentPackageName == CREDENTIAL_SELECTOR_PACKAGE ||
             findObjects(By.pkg(CREDENTIAL_SELECTOR_PACKAGE)).isNotEmpty()
 
@@ -363,18 +341,18 @@ internal abstract class DigitalCredentialSharingE2E {
             runCatching { node.text?.contains(text) == true }.getOrDefault(false)
         }
 
-    protected fun UiDevice.findCredentialManagerClose(): UiObject2? =
+    private fun UiDevice.findCredentialManagerClose(): UiObject2? =
         credentialManagerNodes().firstOrNull(::isCredentialManagerClose)
 
-    protected fun isCredentialManagerClose(node: UiObject2): Boolean =
+    private fun isCredentialManagerClose(node: UiObject2): Boolean =
         runCatching { node.isEnabled && node.text == CREDENTIAL_SELECTOR_CLOSE_LABEL }.getOrDefault(false)
 
-    protected fun UiDevice.clickCredentialManagerCandidate(candidateText: String): Boolean =
+    private fun UiDevice.clickCredentialManagerCandidate(candidateText: String): Boolean =
         clickCredentialManagerNode { node ->
             runCatching { node.text?.contains(candidateText) == true }.getOrDefault(false)
         }
 
-    protected fun UiDevice.clickCredentialManagerNode(matcher: (UiObject2) -> Boolean): Boolean {
+    private fun UiDevice.clickCredentialManagerNode(matcher: (UiObject2) -> Boolean): Boolean {
         repeat(CANDIDATE_CLICK_ATTEMPTS) {
             val clicked = runCatching {
                 val node = credentialManagerNodes().firstOrNull(matcher) ?: return@runCatching false
@@ -392,19 +370,19 @@ internal abstract class DigitalCredentialSharingE2E {
             runCatching { node.isEnabled && isCredentialManagerContinue(node) }.getOrDefault(false)
         }
 
-    protected fun UiDevice.findCredentialManagerContinue(): UiObject2? =
+    private fun UiDevice.findCredentialManagerContinue(): UiObject2? =
         credentialManagerNodes().firstOrNull(::isCredentialManagerContinue)
 
-    protected fun isCredentialManagerContinue(node: UiObject2): Boolean =
+    private fun isCredentialManagerContinue(node: UiObject2): Boolean =
         runCatching {
             node.text?.contains("continue", ignoreCase = true) == true ||
                 node.resourceName?.substringAfterLast(':') == "continue_button"
         }.getOrDefault(false)
 
-    protected fun UiDevice.credentialManagerNodes(): List<UiObject2> =
+    private fun UiDevice.credentialManagerNodes(): List<UiObject2> =
         findObjects(By.pkg(CREDENTIAL_SELECTOR_PACKAGE)).flatMap { it.flatten() }
 
-    protected fun UiObject2.flatten(): List<UiObject2> =
+    private fun UiObject2.flatten(): List<UiObject2> =
         listOf(this) + runCatching { children.flatMap { it.flatten() } }.getOrDefault(emptyList())
 
     protected fun pickerDiagnostic(
@@ -453,8 +431,7 @@ internal abstract class DigitalCredentialSharingE2E {
         responseJson: String,
         presentedCredentialId: String,
         requiredPolicyIds: List<String>,
-        expectedImage: Boolean = false,
-    ) {
+    ): JsonObject {
         DemoTestBackend.submitDcApiResponse(sessionId, responseJson)
         val info = DemoTestBackend.verifierSessionInfo(sessionId)
         assertEquals("SUCCESSFUL", info["status"]?.jsonPrimitive?.content)
@@ -462,30 +439,8 @@ internal abstract class DigitalCredentialSharingE2E {
             "Verifier did not report the presented credential '$presentedCredentialId': $info",
             info["presented_credentials"]?.jsonObject?.get(presentedCredentialId),
         )
-        if (expectedImage) {
-            val presented = info.getValue("presented_credentials").jsonObject
-                .getValue(presentedCredentialId).jsonArray.single().jsonObject
-                .getValue("credentialData").jsonObject
-            val returnedImage = if (presentedCredentialId == "mdl") {
-                presented.getValue(MDL_NAMESPACE).jsonObject.getValue("portrait").jsonArray
-                    .map { it.jsonPrimitive.int.toByte() }.toByteArray()
-            } else {
-                Base64.decode(presented.getValue("portrait").jsonPrimitive.content, Base64.DEFAULT)
-            }
-            assertArrayEquals("Verifier received different image bytes for $presentedCredentialId", IMAGE_BYTES, returnedImage)
-            assertTrue("Image fixture must exercise the large-response path", responseJson.length > 200_000)
-            println(
-                "DC_API_IMAGE_E2E query=$presentedCredentialId imageBytes=${returnedImage.size} " +
-                    "responseChars=${responseJson.length} verifier=SUCCESSFUL exactBytes=true",
-            )
-        }
         // A skipped policy leaves the session SUCCESSFUL, so "no failures" alone would pass on a
         // verifier that checked nothing; [requiredPolicyIds] must therefore be asserted as executed.
-        //
-        // mso_mdoc/issuer_auth proves the wallet relayed the issuer signature unaltered, but not that
-        // the document signer meets the ISO 18013-5 certificate profile: issuer2.demo.walt.id signs
-        // with an X.509 v1 certificate carrying neither keyUsage:digitalSignature nor
-        // EKU 1.0.18013.5.1.2, which verifier2 0.23.0 does not yet enforce.
         val policyResults = info["policy_results"] ?: error("Session info has no policy_results: $info")
         val executed = policyResults.executedPolicyIds()
         requiredPolicyIds.forEach { policyId ->
@@ -495,95 +450,8 @@ internal abstract class DigitalCredentialSharingE2E {
             "Failed policies: ${policyResults.failedPolicies()}",
             policyResults.failedPolicies().isEmpty(),
         )
+        return info
     }
-
-    /** The reader's recipient key. Annex C fixes the suite at DHKEM(P-256)/HKDF-SHA256/AES-128-GCM. */
-    protected suspend fun annexCReaderKey(): Key =
-        CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
-            GenerateSoftwareKeyRequest(
-                id = KeyId("annex-c-e2e-reader"),
-                spec = KeySpec.Ec(EcCurve.P256),
-                usages = setOf(KeyUsage.KEY_AGREEMENT),
-            )
-        )
-
-    protected suspend fun Key.publicCoseKey() =
-        requireNotNull(capabilities.publicKeyExporter) { "Reader recipient key does not export its public key" }
-            .exportPublicKey().toPublicJwk(spec).toCoseKey()
-
-    /**
-     * An alternative no registered matcher claims. `preview` is the legacy Digital Credentials protocol
-     * identifier, so it is a value a real verifier could offer rather than one invented for the test.
-     */
-    protected fun unsupportedProtocolRequestEntry(): JsonObject = buildJsonObject {
-        put("protocol", JsonPrimitive("preview"))
-        put("data", buildJsonObject { put("selector", buildJsonObject { }) })
-    }
-
-    /** One `requests[]` entry as Credential Manager routes it, by `protocol`. */
-    protected fun annexCRequestEntry(request: AnnexCRequest): JsonObject = buildJsonObject {
-        put("protocol", JsonPrimitive("org-iso-mdoc"))
-        put(
-            "data",
-            buildJsonObject {
-                put("deviceRequest", JsonPrimitive(request.deviceRequestB64))
-                put("encryptionInfo", JsonPrimitive(request.encryptionInfoB64))
-            },
-        )
-    }
-
-    /**
-     * A `openid4vp-v1-signed` DC API request carrying [payload] as the payload of a dummy compact JWS.
-     *
-     * The matcher does not verify the signature while matching: it splits `data.request` on `.` and
-     * base64url-decodes segment 1, so an unsigned `alg: none` header and a placeholder signature are
-     * enough for it to reach the very same DCQL query. Deliberately not real signing infrastructure -
-     * the point is that the payload is *matchable*, not that it is authentic.
-     */
-    protected fun signedDcApiRequest(payload: JsonObject): String {
-        val jws = listOf(
-            base64Url(buildJsonObject { put("alg", JsonPrimitive("none")) }.toString().encodeToByteArray()),
-            base64Url(payload.toString().encodeToByteArray()),
-            base64Url("dummy-signature".encodeToByteArray()),
-        ).joinToString(".")
-        return dcApiRequest("openid4vp-v1-signed", buildJsonObject { put("request", JsonPrimitive(jws)) })
-    }
-
-    /**
-     * A `openid4vp-v1-multisigned` DC API request carrying [payload] under `request.payload`.
-     *
-     * `data` is a JSON *string* holding `{"request":{"payload":"<base64url>"}}`, which is the shape the
-     * pinned matcher's `extract_multisigned_payload` accepts and the one its own unit tests use. No
-     * multisignature verification is involved in matching.
-     */
-    protected fun multisignedDcApiRequest(payload: JsonObject): String {
-        val multisigned = buildJsonObject {
-            put(
-                "request",
-                buildJsonObject { put("payload", JsonPrimitive(base64Url(payload.toString().encodeToByteArray()))) },
-            )
-        }
-        return dcApiRequest("openid4vp-v1-multisigned", JsonPrimitive(multisigned.toString()))
-    }
-
-    /** The `digital` request object Credential Manager routes, with a single `requests[]` entry. */
-    protected fun dcApiRequest(protocol: String, data: JsonElement): String = buildJsonObject {
-        put(
-            "requests",
-            buildJsonArray {
-                add(
-                    buildJsonObject {
-                        put("protocol", JsonPrimitive(protocol))
-                        put("data", data)
-                    },
-                )
-            },
-        )
-    }.toString()
-
-    /** Unpadded base64url, the only alphabet the matcher's decoder accepts. */
-    protected fun base64Url(bytes: ByteArray): String =
-        Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
 
     /** The claims of an SD-JWT VC presentation's key binding JWT, which is its final `~` segment. */
     protected fun keyBindingJwtClaims(presentation: String): JsonObject {
@@ -613,7 +481,7 @@ internal abstract class DigitalCredentialSharingE2E {
     }
 
     /** Collects every `success == false` leaf so a failure names the policy, not just `false`. */
-    protected fun JsonElement.failedPolicies(): List<String> = buildList {
+    private fun JsonElement.failedPolicies(): List<String> = buildList {
         fun walk(element: JsonElement, path: String) {
             when (element) {
                 is JsonObject -> {
@@ -633,7 +501,7 @@ internal abstract class DigitalCredentialSharingE2E {
         walk(this@failedPolicies, "")
     }
 
-    protected fun JsonElement.executedPolicyIds(): Set<String> = buildSet {
+    private fun JsonElement.executedPolicyIds(): Set<String> = buildSet {
         fun walk(element: JsonElement) {
             when (element) {
                 is JsonObject -> {
@@ -649,7 +517,7 @@ internal abstract class DigitalCredentialSharingE2E {
         walk(this@executedPolicyIds)
     }
 
-    protected fun UiObject2.clickableAncestorOrSelf(): UiObject2? {
+    private fun UiObject2.clickableAncestorOrSelf(): UiObject2? {
         var node: UiObject2? = this
         while (node != null) {
             if (node.isClickable) return node
@@ -659,107 +527,19 @@ internal abstract class DigitalCredentialSharingE2E {
     }
 
     protected companion object {
-        suspend fun issueFromDemoIssuer(
-            wallet: MobileWallet,
-            scenario: DemoTestBackend.CredentialScenario,
-        ): List<String> {
-            val imageOverrides = buildJsonObject {
-                put("credentialData", buildJsonObject {
-                    val portrait = JsonPrimitive(Base64.encodeToString(IMAGE_BYTES, Base64.NO_WRAP))
-                    if (scenario.format == "mso_mdoc") {
-                        put(MDL_NAMESPACE, buildJsonObject { put("portrait", portrait) })
-                    } else {
-                        put("portrait", portrait)
-                    }
-                })
-                if (scenario.format == "dc+sd-jwt") {
-                    put("selectiveDisclosure", buildJsonObject {
-                        put("fields", buildJsonObject {
-                            listOf("birth_date", "portrait").forEach { name ->
-                                put(name, buildJsonObject { put("sd", JsonPrimitive(true)) })
-                            }
-                        })
-                    })
-                }
-            }
-            val offer = DemoTestBackend.createOffer(
-                scenario,
-                runtimeOverrides = imageOverrides.takeIf { scenario.id in setOf("iso-mdl", "eudi-pid-sdjwt") },
-            )
-            val session = wallet.startIssuance(
-                MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(offer.offerUrl))
-            )
-            return when (val outcome = wallet.continuePreAuthorizedIssuance(session.id, offer.txCode)) {
-                is WalletIssuanceOutcome.Stored -> outcome.credentialIds
-                is WalletIssuanceOutcome.Deferred -> error(
-                    "Live issuer unexpectedly deferred ${scenario.id}: " +
-                        "stored=${outcome.storedCredentialIds}, deferred=${outcome.credentials}",
-                )
-                is WalletIssuanceOutcome.Failed -> error(
-                    "Live issuer failed ${scenario.id}: ${outcome.error.code}: ${outcome.error.message}",
-                )
-                is WalletIssuanceOutcome.Cancelled -> error(
-                    "Live issuer unexpectedly cancelled ${scenario.id} for session ${outcome.sessionId}",
-                )
-            }
-        }
-
-        fun hasGooglePlayServices(context: Context): Boolean =
-            runCatching { context.packageManager.getPackageInfo("com.google.android.gms", 0) }.isSuccess
-
-        const val MDL_DOC_TYPE = "org.iso.18013.5.1.mDL"
-        const val EUDI_PID_SD_JWT_VCT = "https://issuer2.demo.walt.id/openid4vci/urn:eudi:pid:1"
-        const val SCA_DOC_TYPE = "eu.europa.ec.eudi.sca.payment_card.1"
-        const val SCA_CREDENTIAL_QUERY_ID = "sca_payment_card"
-        const val AGE_DOC_TYPE = "eu.europa.ec.av.1"
-        const val AGE_CREDENTIAL_QUERY_ID = "proof_of_age"
-
-        /** How the review labels `age_over_18`, which it humanizes rather than showing verbatim. */
-        const val AGE_DISCLOSURE_LABEL = "Age over 18"
-
         /** How the amount reads once rendered, on the prompt and on the review alike. */
         const val SCA_AMOUNT_TEXT = "11.56"
-        const val MDL_NAMESPACE = "org.iso.18013.5.1"
-        val REQUESTED_MDL_ELEMENTS = listOf("family_name", "given_name", "portrait")
-
-        // Deterministic synthetic pixels: a real, poorly compressible PNG large enough to exercise
-        // Credential Manager's large response transport, with no binary fixture committed.
-        val IMAGE_BYTES: ByteArray by lazy {
-            val random = java.util.Random(42)
-            val pixels = IntArray(256 * 256) { random.nextInt() or 0xff000000.toInt() }
-            val bitmap = Bitmap.createBitmap(pixels, 256, 256, Bitmap.Config.ARGB_8888)
-            try {
-                ByteArrayOutputStream().use { output ->
-                    check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
-                    output.toByteArray()
-                }
-            } finally {
-                bitmap.recycle()
-            }
-        }
-
-        fun imageQuery(scenario: DemoTestBackend.CredentialScenario): JsonObject =
-            JsonObject(scenario.verifierCredentialQuery + ("claims" to buildJsonArray {
-                scenario.verifierCredentialQuery["claims"]?.jsonArray.orEmpty().forEach { add(it) }
-                add(buildJsonObject {
-                    put("path", buildJsonArray {
-                        if (scenario.format == "mso_mdoc") add(JsonPrimitive(MDL_NAMESPACE))
-                        add(JsonPrimitive("portrait"))
-                    })
-                })
-            }))
-        const val PAYMENT_AUTHORIZATION_DISPLAY_NAME = "Payment Authorization"
 
         /** Owns `CredentialSelectorActivity`, i.e. the picker window these tests drive. */
         const val CREDENTIAL_SELECTOR_PACKAGE = "com.google.android.gms"
 
         /** Dismisses Credential Manager's own "Your info wasn't found" state, which has no candidates. */
-        const val CREDENTIAL_SELECTOR_CLOSE_LABEL = "Close"
-        const val CANDIDATE_CLICK_ATTEMPTS = 3
-        const val CLEANUP_TIMEOUT = 10_000L
-        const val CANCELLATION_TRANSITION_TIMEOUT = 10_000L
-        const val CLEANUP_POLL_MILLIS = 200L
-        const val MAX_ACCESSIBILITY_NODES = 80
+        private const val CREDENTIAL_SELECTOR_CLOSE_LABEL = "Close"
+        private const val CANDIDATE_CLICK_ATTEMPTS = 3
+        private const val CLEANUP_TIMEOUT = 10_000L
+        private const val CANCELLATION_TRANSITION_TIMEOUT = 10_000L
+        private const val CLEANUP_POLL_MILLIS = 200L
+        private const val MAX_ACCESSIBILITY_NODES = 80
 
         /**
          * Compose test tags of the wallet's shared review, exported as Android resource IDs. The same
@@ -767,12 +547,6 @@ internal abstract class DigitalCredentialSharingE2E {
          */
         val WALLET_SHARING_REVIEW_TAG = WalletDemoSharingReviewTestTags.Review
         val WALLET_SHARE_BUTTON_TAG = WalletDemoSharingReviewTestTags.ShareButton
-
-        /**
-         * Holder binding, which for the DC API is the session-transcript check, plus issuer
-         * authenticity. Both must be asserted as executed, not merely as not failed.
-         */
-        val MDOC_REQUIRED_POLICIES = listOf("mso_mdoc/device-auth", "mso_mdoc/issuer_auth")
 
         /**
          * The SD-JWT counterpart: `kb-jwt_signature` is holder binding and `sd_hash-check` ties that

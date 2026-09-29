@@ -84,7 +84,10 @@ public final class DemoBackend {
     public static let scaPaymentScenario = DemoCredentialScenario(
         id: "sca-payment-sdjwt", displayName: "SCA Payment Card SD-JWT (demo)",
         profileId: "scaPaymentCardSdJwt", credentialConfigurationId: "sca_payment_card_sd_jwt", format: "dc+sd-jwt",
-        verifierCredentialQuery: sdJwtQuery(id: "sca_payment", vct: "https://issuer2.demo.walt.id/openid4vci/sca_payment_card_sd_jwt")
+        verifierCredentialQuery: sdJwtQuery(
+            id: "sca_payment", vct: "https://issuer2.demo.walt.id/openid4vci/sca_payment_card_sd_jwt",
+            claims: ["card_scheme", "card_last4", "card_holder_name"]
+        )
     )
 
     /// A URL payment request using the same nested TS-12 shape as the Android demo.
@@ -94,7 +97,7 @@ public final class DemoBackend {
             "transaction_data_hashes_alg": ["sha-256"],
             "payload": ["transaction_id": "8D8AC610-566D-4EF0-9C22-186B2A5ED793",
                         "payee": ["name": "Super Store", "id": "merchant-001"], "currency": "EUR", "amount": 11.56],
-        ]], bindClientIDToResponseURI: true)
+        ]])
     }
 
     public static let transactionDataPresentationScenario = scenarios.first { $0.id == "eudi-pid-sdjwt" }!
@@ -386,16 +389,9 @@ public final class DemoBackend {
         return DemoVerifierSession(sessionID: sessionID, authorizationRequestUri: requestURL)
     }
 
-    public func scaSessionInfo(sessionID: String) async throws -> [String: Any] {
-        try await client.jsonRequest(url: Self.verifierBaseURL
-            .appendingPathComponent("verification-session").appendingPathComponent(sessionID).appendingPathComponent("info"),
-            retryTransientFailures: true)
-    }
-
     /// Verify the actual proof and executed policies; aggregate SUCCESSFUL alone is insufficient.
     public func verifyScaPayment(sessionID: String, timeoutSeconds: TimeInterval) async throws {
-        try await waitForVerifierSuccess(sessionID: sessionID, timeoutSeconds: timeoutSeconds)
-        let info = try await scaSessionInfo(sessionID: sessionID)
+        let info = try await waitForVerifierSuccess(sessionID: sessionID, timeoutSeconds: timeoutSeconds)
         func require(_ condition: Bool, _ message: String) throws {
             if !condition { throw NSError(domain: "WalletE2E", code: 320,
                 userInfo: [NSLocalizedDescriptionKey: message]) }
@@ -429,7 +425,8 @@ public final class DemoBackend {
         try require(claims["amr"] as? [[String: String]] == [["possession": "other"], ["inherence": "other"]], "Unexpected payment authentication categories")
     }
 
-    public func waitForVerifierSuccess(sessionID: String, timeoutSeconds: TimeInterval) async throws {
+    @discardableResult
+    public func waitForVerifierSuccess(sessionID: String, timeoutSeconds: TimeInterval) async throws -> [String: Any] {
         let deadline = Date().addingTimeInterval(timeoutSeconds)
         var lastStatus = "UNKNOWN"
 
@@ -446,7 +443,7 @@ public final class DemoBackend {
                     lastStatus = status
                     switch status.uppercased() {
                     case "SUCCESSFUL":
-                        return
+                        return response
                     case "FAILED", "ERROR", "EXPIRED":
                         throw NSError(
                             domain: "WalletE2E",
@@ -518,14 +515,16 @@ public final class DemoBackend {
         )
     }
 
-    private static func sdJwtQuery(id: String, vct: String) -> [String: Any] {
-        [
+    private static func sdJwtQuery(id: String, vct: String, claims: [String] = []) -> [String: Any] {
+        var query: [String: Any] = [
             "id": id,
             "format": "dc+sd-jwt",
             "meta": ["vct_values": [vct]],
-            // The public demo verifier accepts vct-only SD-JWT requests; claim-path
-            // filtering here currently causes wallet presentation matching to miss.
         ]
+        if !claims.isEmpty {
+            query["claims"] = claims.map { ["path": [$0]] }
+        }
+        return query
     }
 
     private static func mdocQuery(id: String, doctype: String, namespace: String, claims: [String]) -> [String: Any] {

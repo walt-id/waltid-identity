@@ -144,7 +144,7 @@ jobs:
     uses: ./.github/workflows/gradle.yml
     secrets: inherit
     needs: [android-eligibility, conformance-eligibility, cacheless-eligibility, gradle-eligibility]
-    if: ${{ needs.gradle-eligibility.outputs.should-run == 'true' || github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'ci:mobile-dc-api') }}
+    if: ${{ needs.gradle-eligibility.outputs.should-run == 'true' }}
     with:
       enable-android-build: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
       cacheless: ${{ needs.cacheless-eligibility.outputs.should-run == 'true' }}
