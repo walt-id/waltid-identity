@@ -12,7 +12,7 @@ Those runs still emit `ci-gate` so a required check cannot stay pending;
 `gradle-build` and `macos-predicate-tests` are skipped instead. Path
 eligibility still runs so `docs/mobile-sdk-api` can start `sdk-docs`.
 
-Release and fix-release Maven publish is a separate job that waits for the
+Release candidate Maven publish is a separate job that waits for the
 Gradle job and, when requested, the live conformance job.
 
 Labels add coverage; they are not the only way to obtain it. `ci:macos` and

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to promote (must already be published by release-candidate.yml)'
+        description: 'Version to promote (must already be published and tagged by release-candidate.yml)'
         required: true
 
 concurrency:
@@ -32,41 +32,64 @@ jobs:
               ;;
           esac
           echo "Promoting $VERSION."
-  enterprise-ref:
-    name: Resolve enterprise branch ref
+  source:
+    name: Resolve release candidate tag
     runs-on: ubuntu-latest
+    needs: [ version, guard ]
     outputs:
-      ref: ${{ steps.ref.outputs.ref }}
-      license-ref: ${{ steps.ref.outputs.license-ref }}
+      tag: ${{ steps.source.outputs.tag }}
+      checkout-refs: ${{ steps.source.outputs.checkout-refs }}
+      is-latest: ${{ steps.source.outputs.is-latest }}
     steps:
-      - name: Determine ref to dispatch on
-        id: ref
+      - name: Resolve the tagged commits
+        id: source
         env:
-          REF: ${{ github.ref_name }}
-          TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+          TAG: v${{ needs.version.outputs.release_version }}
+          VERSION: ${{ needs.version.outputs.release_version }}
+          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
         run: |
-          if git ls-remote --exit-code --heads "https://${TOKEN}@github.com/walt-id/waltid-identity-enterprise.git" "$REF"; then
-            echo "Branch '$REF' found in waltid-identity-enterprise, using it."
-            echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          declare -A shas
+          for repo in waltid-identity waltid-unified-build waltid-identity-enterprise waltid-identity-enterprise-license waltid-docs waltid-enterprise-quickstart; do
+            refs="$(git ls-remote "https://${GH_TOKEN}@github.com/walt-id/${repo}.git" "refs/tags/${TAG}" "refs/tags/${TAG}^{}")"
+            if [ -z "$refs" ]; then
+              echo "::error::${TAG} not found in walt-id/${repo}. Was this version built by release-candidate.yml?"
+              exit 1
+            fi
+            # Annotated tags list the tagged commit on a trailing ^{} line.
+            shas[$repo]="$(tail -n 1 <<< "$refs" | cut -f1)"
+            echo "walt-id/${repo}: ${TAG} -> ${shas[$repo]}"
+          done
+
+          # Only move stable/latest when this is the highest release, so patching an older
+          # release line does not roll them back.
+          highest_released="$(gh release list -R walt-id/waltid-identity --exclude-drafts --exclude-pre-releases --limit 200 --json tagName --jq '.[].tagName' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/^v//' | sort -V | tail -n 1 || true)"
+          if [ "$(printf '%s\n%s\n' "$highest_released" "$VERSION" | sort -V | tail -n 1)" = "$VERSION" ]; then
+            is_latest=true
           else
-            echo "Branch '$REF' not found in waltid-identity-enterprise, using main."
-            echo "ref=main" >> "$GITHUB_OUTPUT"
+            is_latest=false
+            echo "::notice::${VERSION} is older than the released ${highest_released}; stable/latest and prod will not change."
           fi
 
-          if git ls-remote --exit-code --heads "https://${TOKEN}@github.com/walt-id/waltid-identity-enterprise-license.git" "$REF"; then
-            echo "Branch '$REF' found in waltid-identity-enterprise-license, using it."
-            echo "license-ref=$REF" >> "$GITHUB_OUTPUT"
-          else
-            echo "Branch '$REF' not found in waltid-identity-enterprise-license, using main."
-            echo "license-ref=main" >> "$GITHUB_OUTPUT"
-          fi
+          checkout_refs="$(jq -cn \
+            --arg unified "${shas[waltid-unified-build]}" \
+            --arg identity "${shas[waltid-identity]}" \
+            --arg enterprise "${shas[waltid-identity-enterprise]}" \
+            --arg enterprise_license "${shas[waltid-identity-enterprise-license]}" \
+            '{unified: $unified, identity: $identity, enterprise: $enterprise, enterprise_license: $enterprise_license}')"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "checkout-refs=${checkout_refs}" >> "$GITHUB_OUTPUT"
+          echo "is-latest=${is_latest}" >> "$GITHUB_OUTPUT"
 
   retag:
     name: Promote image tags
     runs-on: ubuntu-latest
-    needs: [ version, guard ]
+    needs: [ version, source ]
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.source.outputs.tag }}
       - name: Login to Docker Hub
         uses: docker/login-action@v4
         with:
@@ -75,6 +98,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
       - name: Point stable and latest at the verified digests
+        if: ${{ needs.source.outputs.is-latest == 'true' }}
         env:
           VERSION: ${{ needs.version.outputs.release_version }}
         run: |
@@ -129,14 +153,14 @@ jobs:
   enterprise-supply-chain:
     name: Enterprise supply chain
     runs-on: ubuntu-latest
-    needs: [ version, enterprise-ref, enterprise-image-digests ]
+    needs: [ version, source, enterprise-image-digests ]
     steps:
       - name: Dispatch enterprise-supply-chain.yml and wait
         uses: benc-uk/workflow-dispatch@v1.3.2
         with:
           workflow: enterprise-supply-chain.yml
           repo: walt-id/waltid-identity-enterprise
-          ref: ${{ needs.enterprise-ref.outputs.ref }}
+          ref: ${{ needs.source.outputs.tag }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           wait-for-completion: true
           sync-status: true
@@ -145,14 +169,15 @@ jobs:
   deploy-license:
     name: Deploy license
     runs-on: ubuntu-latest
-    needs: [ version, enterprise-ref, retag ]
+    needs: [ version, source, retag ]
+    if: ${{ needs.source.outputs.is-latest == 'true' }}
     steps:
       - name: Dispatch deploy-k8s.yml and wait
         uses: benc-uk/workflow-dispatch@v1.3.2
         with:
           workflow: deploy-k8s.yml
           repo: walt-id/waltid-identity-enterprise-license
-          ref: ${{ needs.enterprise-ref.outputs.license-ref }}
+          ref: ${{ needs.source.outputs.tag }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           wait-for-completion: true
           sync-status: true
@@ -160,9 +185,11 @@ jobs:
   deploy:
     uses: ./.github/workflows/deployment.yml
     secrets: inherit
-    needs: [ version, deploy-license ]
+    needs: [ version, source, deploy-license ]
+    if: ${{ needs.source.outputs.is-latest == 'true' }}
     with:
       version: ${{ needs.version.outputs.release_version }}
+      checkout-refs: ${{ needs.source.outputs.checkout-refs }}
       deployment: prod
       oss: identity-main
       enterprise: enterprise-main
@@ -170,138 +197,130 @@ jobs:
   branch:
     uses: ./.github/workflows/branch.yml
     secrets: inherit
-    needs: [ version, deploy ]
-    if: ${{ endsWith(needs.version.outputs.release_version, '.0') }}
+    needs: [ version, source, deploy ]
+    if: ${{ !failure() && !cancelled() && endsWith(needs.version.outputs.release_version, '.0') }}
     with:
       version: ${{ needs.version.outputs.release_version }}
+      ref: ${{ needs.source.outputs.tag }}
   enterprise-branch:
     uses: ./.github/workflows/branch.yml
     secrets: inherit
-    needs: [ version, deploy ]
-    if: ${{ endsWith(needs.version.outputs.release_version, '.0') }}
+    needs: [ version, source, deploy ]
+    if: ${{ !failure() && !cancelled() && endsWith(needs.version.outputs.release_version, '.0') }}
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-identity-enterprise
+      ref: ${{ needs.source.outputs.tag }}
+  enterprise-license-branch:
+    uses: ./.github/workflows/branch.yml
+    secrets: inherit
+    needs: [ version, source, deploy ]
+    if: ${{ !failure() && !cancelled() && endsWith(needs.version.outputs.release_version, '.0') }}
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      repository: walt-id/waltid-identity-enterprise-license
+      ref: ${{ needs.source.outputs.tag }}
   docs-branch:
     uses: ./.github/workflows/branch.yml
     secrets: inherit
-    needs: [ version, deploy ]
-    if: ${{ endsWith(needs.version.outputs.release_version, '.0') }}
+    needs: [ version, source, deploy ]
+    if: ${{ !failure() && !cancelled() && endsWith(needs.version.outputs.release_version, '.0') }}
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-docs
+      ref: ${{ needs.source.outputs.tag }}
   quickstart-branch:
     uses: ./.github/workflows/branch.yml
     secrets: inherit
-    needs: [ version, deploy ]
-    if: ${{ endsWith(needs.version.outputs.release_version, '.0') }}
+    needs: [ version, source, deploy ]
+    if: ${{ !failure() && !cancelled() && endsWith(needs.version.outputs.release_version, '.0') }}
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-enterprise-quickstart
+      ref: ${{ needs.source.outputs.tag }}
   unified-build-branch:
     uses: ./.github/workflows/branch.yml
     secrets: inherit
-    needs: [ version, deploy ]
-    if: ${{ endsWith(needs.version.outputs.release_version, '.0') }}
+    needs: [ version, source, deploy ]
+    if: ${{ !failure() && !cancelled() && endsWith(needs.version.outputs.release_version, '.0') }}
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-unified-build
-
-  tag:
-    uses: ./.github/workflows/tag.yml
-    secrets: inherit
-    needs: [ version, deploy ]
-    with:
-      version: ${{ needs.version.outputs.release_version }}
-  enterprise-tag:
-    uses: ./.github/workflows/tag.yml
-    secrets: inherit
-    needs: [ version, deploy ]
-    with:
-      version: ${{ needs.version.outputs.release_version }}
-      repository: walt-id/waltid-identity-enterprise
-  docs-tag:
-    uses: ./.github/workflows/tag.yml
-    secrets: inherit
-    needs: [ version, deploy ]
-    with:
-      version: ${{ needs.version.outputs.release_version }}
-      repository: walt-id/waltid-docs
-  quickstart-tag:
-    uses: ./.github/workflows/tag.yml
-    secrets: inherit
-    needs: [ version, deploy ]
-    with:
-      version: ${{ needs.version.outputs.release_version }}
-      repository: walt-id/waltid-enterprise-quickstart
-  unified-build-tag:
-    uses: ./.github/workflows/tag.yml
-    secrets: inherit
-    needs: [ version, deploy ]
-    with:
-      version: ${{ needs.version.outputs.release_version }}
-      repository: walt-id/waltid-unified-build
+      ref: ${{ needs.source.outputs.tag }}
 
   release:
     uses: ./.github/workflows/create-release.yml
     secrets: inherit
-    needs: [ version, tag ]
+    needs: [ version, source, deploy ]
+    if: ${{ !failure() && !cancelled() }}
     with:
       version: ${{ needs.version.outputs.release_version }}
-      tag: ${{ needs.tag.outputs.tag }}
+      tag: ${{ needs.source.outputs.tag }}
+      checkout-refs: ${{ needs.source.outputs.checkout-refs }}
+      make_latest: ${{ needs.source.outputs.is-latest == 'true' }}
   testflight:
     uses: ./.github/workflows/distribute-ios-testflight.yml
     secrets: inherit
-    needs: [ version, tag ]
+    needs: [ version, source, deploy ]
+    if: ${{ !failure() && !cancelled() }}
     with:
       version_name: ${{ needs.version.outputs.release_version }}
-      release_tag: ${{ needs.tag.outputs.tag }}
+      release_tag: ${{ needs.source.outputs.tag }}
+      checkout-refs: ${{ needs.source.outputs.checkout-refs }}
       app: both
   enterprise-release:
     name: Create Enterprise Release
     runs-on: ubuntu-latest
-    needs: [ enterprise-tag ]
+    needs: [ source, deploy ]
+    if: ${{ !failure() && !cancelled() }}
     steps:
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           repository: walt-id/waltid-identity-enterprise
-          tag_name: ${{ needs.enterprise-tag.outputs.tag }}
-          prerelease: ${{ contains(needs.enterprise-tag.outputs.tag, 'PRE-RELEASE') }}
+          tag_name: ${{ needs.source.outputs.tag }}
+          prerelease: ${{ contains(needs.source.outputs.tag, 'PRE-RELEASE') }}
+          make_latest: ${{ needs.source.outputs.is-latest }}
   docs-release:
     name: Create Docs Release
     runs-on: ubuntu-latest
-    needs: [ docs-tag ]
+    needs: [ source, deploy ]
+    if: ${{ !failure() && !cancelled() }}
     steps:
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           repository: walt-id/waltid-docs
-          tag_name: ${{ needs.docs-tag.outputs.tag }}
-          prerelease: ${{ contains(needs.docs-tag.outputs.tag, 'PRE-RELEASE') }}
+          tag_name: ${{ needs.source.outputs.tag }}
+          prerelease: ${{ contains(needs.source.outputs.tag, 'PRE-RELEASE') }}
+          make_latest: ${{ needs.source.outputs.is-latest }}
   quickstart-release:
     name: Create Quickstart Release
     runs-on: ubuntu-latest
-    needs: [ quickstart-tag ]
+    needs: [ source, deploy ]
+    if: ${{ !failure() && !cancelled() }}
     steps:
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           repository: walt-id/waltid-enterprise-quickstart
-          tag_name: ${{ needs.quickstart-tag.outputs.tag }}
-          prerelease: ${{ contains(needs.quickstart-tag.outputs.tag, 'PRE-RELEASE') }}
+          tag_name: ${{ needs.source.outputs.tag }}
+          prerelease: ${{ contains(needs.source.outputs.tag, 'PRE-RELEASE') }}
+          make_latest: ${{ needs.source.outputs.is-latest }}
   unified-build-release:
     name: Create Unified Build Release
     runs-on: ubuntu-latest
-    needs: [ unified-build-tag ]
+    needs: [ source, deploy ]
+    if: ${{ !failure() && !cancelled() }}
     steps:
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           repository: walt-id/waltid-unified-build
-          tag_name: ${{ needs.unified-build-tag.outputs.tag }}
-          prerelease: ${{ contains(needs.unified-build-tag.outputs.tag, 'PRE-RELEASE') }}
+          tag_name: ${{ needs.source.outputs.tag }}
+          prerelease: ${{ contains(needs.source.outputs.tag, 'PRE-RELEASE') }}
+          make_latest: ${{ needs.source.outputs.is-latest }}
