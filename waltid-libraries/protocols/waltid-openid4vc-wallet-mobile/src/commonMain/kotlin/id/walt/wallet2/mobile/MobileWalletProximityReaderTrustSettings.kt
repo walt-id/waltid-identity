@@ -8,7 +8,6 @@ import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.validation.X509SingleCertificateValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsIsCaValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.SignedRical
 import id.walt.mdoc.proximity.X509RicalSignatureValidator
 import kotlinx.io.bytestring.ByteString
@@ -378,7 +377,7 @@ public object ProximityReaderTrustSettingsCodec {
                 clock
             ).validate(
                 signed,
-                roots.map { ImmutableBytes.of(it.encodedDer.toByteArray()) },
+                roots.map { ByteString(it.encodedDer.toByteArray()) },
             )
             require(signatureValid) { "RICAL signature, signer profile, or signer path is invalid" }
             ricalPreviews += ProximityRicalPreview(
@@ -398,7 +397,7 @@ public object ProximityReaderTrustSettingsCodec {
                 },
                 acceptedSignerCertificatePolicyOids = provider.acceptedSignerCertificatePolicyOids,
                 establishReaderTrust = provider.establishReaderTrust,
-                signedRicalBase64Url = signed.exactMessage.copy().encodeBase64Url(),
+                signedRicalBase64Url = signed.exactMessage.toByteArray().encodeBase64Url(),
             )
         }
         return ProximityReaderTrustImportPreview(

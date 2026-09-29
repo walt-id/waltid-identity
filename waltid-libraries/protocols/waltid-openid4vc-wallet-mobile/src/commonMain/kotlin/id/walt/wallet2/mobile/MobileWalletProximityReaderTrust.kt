@@ -10,7 +10,6 @@ import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.cose.coseCompliantCbor
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocX509CertificateUtil.modocReaderAuthentication
 import id.walt.mdoc.proximity.ReaderAuthenticationEvidence
 import id.walt.mdoc.proximity.ReaderAuthenticationScope
@@ -400,7 +399,7 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
                 providerId = configuration.providerId,
                 acceptedTypes = configuration.acceptedTypes,
                 trustedProviderRootsDer = configuration.providerTrustAnchors.map {
-                    ImmutableBytes.of(it.certificateDerBase64Url.decodeTrustBase64Url())
+                    ByteString(it.certificateDerBase64Url.decodeTrustBase64Url())
                 },
                 establishReaderTrust = configuration.establishReaderTrust,
             ),
@@ -485,7 +484,7 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
                             ProximityRicalSignerEvidence(
                                 providerId = providerId,
                                 certificateChainDerBase64Url = signed.signerChainDer.map {
-                                    it.copy().encodeTrustBase64Url()
+                                    it.toByteArray().encodeTrustBase64Url()
                                 },
                             )
                         ) == ProximityCertificateRevocationResult.Good
@@ -634,7 +633,7 @@ private fun ProximityReaderEvidence.toRicalEvidence(): ReaderAuthenticationEvide
         },
         authenticationIndex = authenticationIndex,
         certificateChainDer = certificateChainDerBase64Url.map {
-            ImmutableBytes.of(it.decodeTrustBase64Url())
+            ByteString(it.decodeTrustBase64Url())
         },
     )
 

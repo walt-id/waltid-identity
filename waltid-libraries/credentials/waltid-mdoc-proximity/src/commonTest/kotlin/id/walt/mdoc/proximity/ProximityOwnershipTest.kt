@@ -2,6 +2,7 @@
 
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.crypto.MdocCryptoHelper
@@ -27,12 +28,12 @@ class ProximityOwnershipTest {
             MdocApplicationAuthorizationDetail("a", "A", "one"),
             MdocApplicationAuthorizationDetail("b", "B", "two"),
         )
-        val authorization = MdocApplicationAuthorization("profile/v1", "Review", details, ImmutableBytes.of(ByteArray(32)))
+        val authorization = MdocApplicationAuthorization("profile/v1", "Review", details, ByteString(ByteArray(32)))
         val before = authorization.consentBindingDigest()
         val documents = mutableListOf(document, document)
         val purposes = mutableMapOf("a" to 1, "b" to 2)
         val authorizations = mutableListOf(authorization, authorization)
-        val preview = MdocRequestPreview(documents, purposes, submissionBindingDigest = ImmutableBytes.of(ByteArray(32)), applicationAuthorizations = authorizations)
+        val preview = MdocRequestPreview(documents, purposes, submissionBindingDigest = ByteString(ByteArray(32)), applicationAuthorizations = authorizations)
         ids.clear(); elements.clear(); details.clear(); documents.clear(); purposes.clear(); authorizations.clear()
         clearIfMutable(preview.documents)
         clearIfMutable(document.credentialIds)
@@ -54,7 +55,7 @@ class ProximityOwnershipTest {
         val second = ElementReference("n", "b")
         val elements = mutableSetOf(first, second)
         val booleans = mutableMapOf(first to true, second to false)
-        val chain = mutableListOf(ImmutableBytes.of(byteArrayOf(1)), ImmutableBytes.of(byteArrayOf(2)))
+        val chain = mutableListOf(ByteString(byteArrayOf(1)), ByteString(byteArrayOf(2)))
         val candidate = MdocCredentialCandidate("id", "doc", chain, elements, booleans)
         val evidence = ReaderAuthenticationEvidence(ReaderAuthenticationScope.Document(0), certificateChainDer = chain)
         val result = ReaderAuthenticationResult.Valid(evidence, ReaderTrustDecision(ReaderTrustState.TRUSTED))
@@ -140,7 +141,7 @@ class ProximityOwnershipTest {
     @Test
     fun `RICAL policy owns accepted types and trusted roots`() {
         val types = mutableSetOf("reader", "other")
-        val roots = mutableListOf(ImmutableBytes.of(byteArrayOf(1)), ImmutableBytes.of(byteArrayOf(2)))
+        val roots = mutableListOf(ByteString(byteArrayOf(1)), ByteString(byteArrayOf(2)))
         val policy = RicalPolicy("provider", types, roots)
         types.clear(); roots.clear()
         (policy.acceptedTypes as? MutableSet)?.clear()

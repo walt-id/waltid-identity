@@ -2,6 +2,7 @@
 
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.certificate.x509.X509Certificate
 import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
@@ -57,18 +58,18 @@ data class Rical(
 }
 
 data class RicalCertificateInfo(
-    val certificateDer: ImmutableBytes,
-    val serialNumber: ImmutableBytes,
-    val subjectKeyIdentifier: ImmutableBytes,
+    val certificateDer: ByteString,
+    val serialNumber: ByteString,
+    val subjectKeyIdentifier: ByteString,
     val isTrustAnchor: Boolean,
-    val authorityKeyIdentifier: ImmutableBytes? = null,
+    val authorityKeyIdentifier: ByteString? = null,
     val type: String? = null,
     val trustConstraints: List<RicalTrustConstraint> = emptyList(),
     val name: String? = null,
     val issuingCountry: String? = null,
     val stateOrProvinceName: String? = null,
-    val issuerDer: ImmutableBytes? = null,
-    val subjectDer: ImmutableBytes? = null,
+    val issuerDer: ByteString? = null,
+    val subjectDer: ByteString? = null,
     val notBefore: Instant? = null,
     val notAfter: Instant? = null,
     val extensions: Map<String, CborElement> = emptyMap(),
@@ -95,7 +96,7 @@ data class RicalCertificateInfo(
 
 private fun RicalCertificateInfo.reachesTrustAnchor(all: List<RicalCertificateInfo>): Boolean {
     var current = this
-    val visited = mutableSetOf<ImmutableBytes>()
+    val visited = mutableSetOf<ByteString>()
     while (visited.add(current.subjectKeyIdentifier)) {
         if (current.isTrustAnchor) return true
         val authority = current.authorityKeyIdentifier ?: return false
@@ -117,17 +118,17 @@ data class RicalTrustConstraint(
 class SignedRical private constructor(
     encodedMessage: ByteArray,
     payload: ExactCbor<Rical>,
-    signerChainDer: List<ImmutableBytes>,
+    signerChainDer: List<ByteString>,
 ) {
-    private val messageBytes = ImmutableBytes.of(encodedMessage)
+    private val messageBytes = ByteString(encodedMessage)
     private val payloadBytes = payload.encodedCopy()
     private val signerChain = signerChainDer.toList()
-    val signerChainDer: List<ImmutableBytes> get() = signerChain.toList()
+    val signerChainDer: List<ByteString> get() = signerChain.toList()
     val payload: ExactCbor<Rical>
         get() = ExactCbor.of(coseCompliantCbor.decodeFromByteArray(payloadBytes), payloadBytes)
     val rical: Rical get() = payload.value
-    val coseSign1: CoseSign1 get() = CoseSign1.fromTagged(messageBytes.copy())
-    val exactMessage: ImmutableBytes get() = messageBytes
+    val coseSign1: CoseSign1 get() = CoseSign1.fromTagged(messageBytes.toByteArray())
+    val exactMessage: ByteString get() = messageBytes
 
     init {
         require(this.signerChainDer.isNotEmpty()) { "Signed RICAL must contain a provider certificate chain" }
@@ -158,7 +159,7 @@ class SignedRical private constructor(
             return SignedRical(
                 encodedMessage,
                 ExactCbor.of(rical, payloadBytes),
-                chain.map { ImmutableBytes.of(it.rawBytes) },
+                chain.map { ByteString(it.rawBytes) },
             )
         }
 
@@ -192,7 +193,7 @@ fun interface RicalProvider {
 }
 
 fun interface RicalSignatureValidator {
-    suspend fun validate(signed: SignedRical, trustedProviderRootsDer: List<ImmutableBytes>): Boolean
+    suspend fun validate(signed: SignedRical, trustedProviderRootsDer: List<ByteString>): Boolean
 }
 
 fun interface RicalConstraintEvaluator {
@@ -223,13 +224,13 @@ fun interface RicalReaderPathValidator {
 class RicalPolicy(
     val providerId: String,
     acceptedTypes: Set<String>,
-    trustedProviderRootsDer: List<ImmutableBytes>,
+    trustedProviderRootsDer: List<ByteString>,
     val establishReaderTrust: Boolean = false,
 ) {
     private val types = acceptedTypes.toSet()
     private val providerRoots = trustedProviderRootsDer.toList()
     val acceptedTypes: Set<String> get() = types.toSet()
-    val trustedProviderRootsDer: List<ImmutableBytes> get() = providerRoots.toList()
+    val trustedProviderRootsDer: List<ByteString> get() = providerRoots.toList()
 
     init {
         require(providerId.isNotBlank() && types.isNotEmpty() && providerRoots.isNotEmpty())

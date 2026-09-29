@@ -1,6 +1,6 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.proximity.PreparedTransport
 import id.walt.mdoc.proximity.ProximityCloseReason
 import id.walt.mdoc.proximity.ProximityConnection
@@ -45,14 +45,14 @@ internal class NfcV2HybridProximityConnection(
         data class Message(
             val bearer: Bearer,
             val ordinal: Long,
-            val bytes: ImmutableBytes,
+            val bytes: ByteString,
         ) : IncomingEvent
 
         data object BearerEnded : IncomingEvent
     }
 
     private data class AlternateSend(
-        val bytes: ImmutableBytes,
+        val bytes: ByteString,
         val completion: CompletableDeferred<Result<Unit>>,
     )
 
@@ -61,7 +61,7 @@ internal class NfcV2HybridProximityConnection(
     private val sendMutex = Mutex()
     private val incomingEvents = Channel<IncomingEvent>(Channel.BUFFERED)
     private val alternateSends = Channel<AlternateSend>(Channel.BUFFERED)
-    private val retainedIncoming = mutableListOf<ImmutableBytes>()
+    private val retainedIncoming = mutableListOf<ByteString>()
     private val childJob = SupervisorJob(sessionScope.coroutineContext[Job])
     private val scope = CoroutineScope(sessionScope.coroutineContext + childJob)
 
@@ -84,7 +84,7 @@ internal class NfcV2HybridProximityConnection(
         scope.launch { connectAlternate() }
     }
 
-    override suspend fun receive(): ImmutableBytes? {
+    override suspend fun receive(): ByteString? {
         if (!receiveMutex.tryLock()) throw ProximityException(
             ProximityError.Transport(
                 "concurrent_receive",
@@ -141,8 +141,8 @@ internal class NfcV2HybridProximityConnection(
         }
     }
 
-    override suspend fun send(message: ImmutableBytes) = sendMutex.withLock {
-        val snapshot = ImmutableBytes.of(message.copy())
+    override suspend fun send(message: ByteString) = sendMutex.withLock {
+        val snapshot = ByteString(message.toByteArray())
         lifecycleMutex.withLock {
             if (closed) throw hybridTransportFailure(
                 "nfc_v2_hybrid_closed",
@@ -288,7 +288,7 @@ internal class NfcV2HybridProximityConnection(
         try {
             while (true) {
                 val message = connection.receive() ?: break
-                incomingEvents.send(IncomingEvent.Message(bearer, ordinal, ImmutableBytes.of(message.copy())))
+                incomingEvents.send(IncomingEvent.Message(bearer, ordinal, ByteString(message.toByteArray())))
                 ordinal++
             }
             endBearer(bearer, null)

@@ -29,13 +29,13 @@ class X509RicalSignatureValidator(
 
     override suspend fun validate(
         signed: SignedRical,
-        trustedProviderRootsDer: List<ImmutableBytes>,
+        trustedProviderRootsDer: List<ByteString>,
     ): Boolean = try {
         val signerChain =
-            signed.signerChainDer.map { X509CertificateUtil.parseCertificateDerEncoded(ByteString(it.copy())) }
+            signed.signerChainDer.map { X509CertificateUtil.parseCertificateDerEncoded(ByteString(it.toByteArray())) }
         val roots = trustedProviderRootsDer.map {
             X509CertificateUtil.parseCertificateDerEncoded(
-                ByteString(it.copy())
+                ByteString(it.toByteArray())
             )
         }
         val signer = signerChain.first()
@@ -71,13 +71,13 @@ class X509RicalReaderPathValidator(clock: Clock = Clock.System) : RicalReaderPat
         rical: Rical,
     ): RicalReaderPathResult {
         val readerChain = reader.certificateChainDer.map {
-            X509CertificateUtil.parseCertificateDerEncoded(ByteString(it.copy()))
+            X509CertificateUtil.parseCertificateDerEncoded(ByteString(it.toByteArray()))
         }
         if (readerChain.isEmpty()) return RicalReaderPathResult.Invalid
         val ricalCertificates =
             rical.certificateInfos.associateWith {
                 X509CertificateUtil.parseCertificateDerEncoded(
-                    ByteString(it.certificateDer.copy())
+                    ByteString(it.certificateDer.toByteArray())
                 )
             }
         // Build to explicit anchors, then retain the highest applicable anchor. A lower

@@ -1,5 +1,6 @@
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -39,7 +40,7 @@ class ApplicationAuthorizationTest {
                 "profile:v1",
                 "Title",
                 authorization.details,
-                ImmutableBytes.of(byteArrayOf(1)),
+                ByteString(byteArrayOf(1)),
             )
         }
         assertFailsWith<IllegalArgumentException> {
@@ -70,7 +71,7 @@ class ApplicationAuthorizationTest {
 
     private fun authorization(
         value: String = "EUR 42.00",
-        resultDigest: ImmutableBytes = digest(1),
+        resultDigest: ByteString = digest(1),
     ) = MdocApplicationAuthorization(
         profileId = "org.example.authorization:v1",
         displayTitle = "Confirm example authorization",
@@ -81,5 +82,5 @@ class ApplicationAuthorizationTest {
         resultBindingDigest = resultDigest,
     )
 
-    private fun digest(value: Byte): ImmutableBytes = ImmutableBytes.of(ByteArray(32) { value })
+    private fun digest(value: Byte): ByteString = ByteString(ByteArray(32) { value })
 }

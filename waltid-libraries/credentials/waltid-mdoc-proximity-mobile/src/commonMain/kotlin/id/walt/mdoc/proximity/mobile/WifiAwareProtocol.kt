@@ -1,7 +1,7 @@
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.crypto.MdocKdf
-import id.walt.mdoc.proximity.ImmutableBytes
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -14,7 +14,7 @@ internal object WifiAwareProtocol {
     private const val SHA_256_BYTES = 32
     private const val HEX = "0123456789ABCDEF"
 
-    fun deriveServiceName(eDeviceKeyBytes: ImmutableBytes): String {
+    fun deriveServiceName(eDeviceKeyBytes: ByteString): String {
         val derived = derive(eDeviceKeyBytes, "NANService", SERVICE_BYTES)
         return try {
             buildString(SERVICE_BYTES * 2) {
@@ -29,7 +29,7 @@ internal object WifiAwareProtocol {
     }
 
     @OptIn(ExperimentalEncodingApi::class)
-    fun derivePassphrase(eDeviceKeyBytes: ImmutableBytes): String {
+    fun derivePassphrase(eDeviceKeyBytes: ByteString): String {
         val derived = derive(eDeviceKeyBytes, "NANPassphrase", DERIVED_BYTES)
         return try {
             Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(derived)
@@ -52,8 +52,8 @@ internal object WifiAwareProtocol {
         }
     }
 
-    private fun derive(input: ImmutableBytes, info: String, length: Int): ByteArray {
-        val ikm = input.copy()
+    private fun derive(input: ByteString, info: String, length: Int): ByteArray {
+        val ikm = input.toByteArray()
         return try {
             MdocKdf.deriveSha256(
                 inputKeyMaterial = ikm,
@@ -70,12 +70,12 @@ internal object WifiAwareProtocol {
 }
 
 /** Validated NAN Supported Bands bitmap. */
-internal class WifiAwareSupportedBands private constructor(private val encoded: ImmutableBytes) {
-    fun encoded(): ByteArray = encoded.copy()
+internal class WifiAwareSupportedBands private constructor(private val encoded: ByteString) {
+    fun encoded(): ByteArray = encoded.toByteArray()
 
     fun intersect(other: WifiAwareSupportedBands): WifiAwareSupportedBands {
-        val left = encoded.copy()
-        val right = other.encoded.copy()
+        val left = encoded.toByteArray()
+        val right = other.encoded.toByteArray()
         val size = minOf(left.size, right.size)
         val result = ByteArray(size) { index -> (left[index].toInt() and right[index].toInt()).toByte() }
         left.fill(0)
@@ -91,7 +91,7 @@ internal class WifiAwareSupportedBands private constructor(private val encoded: 
         fun fromBytes(value: ByteArray): WifiAwareSupportedBands {
             require(value.isNotEmpty()) { "Wi-Fi Aware supported bands must not be empty" }
             require(value.any { it != 0.toByte() }) { "Wi-Fi Aware supported bands must select at least one band" }
-            return WifiAwareSupportedBands(ImmutableBytes.of(value))
+            return WifiAwareSupportedBands(ByteString(value))
         }
     }
 }

@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
@@ -22,7 +23,6 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ReaderAuthenticationEvidence
 import id.walt.mdoc.proximity.ReaderAuthenticationScope
 import id.walt.mdoc.proximity.Rical
@@ -308,7 +308,7 @@ class ProximityReaderTrustTest {
                         ReaderAuthenticationEvidence(
                             scope = ReaderAuthenticationScope.WholeRequest,
                             certificateChainDer = listOf(reader, subCa).map {
-                                ImmutableBytes.of(it.encodedDer.toByteArray())
+                                ByteString(it.encodedDer.toByteArray())
                             },
                         ),
                         rical,
@@ -716,15 +716,15 @@ class ProximityReaderTrustTest {
         isTrustAnchor: Boolean,
         name: String,
     ): RicalCertificateInfo = RicalCertificateInfo(
-        certificateDer = ImmutableBytes.of(encodedDer.toByteArray()),
-        serialNumber = ImmutableBytes.of(data.serialNumberRaw.toByteArray()),
-        subjectKeyIdentifier = ImmutableBytes.of(
+        certificateDer = ByteString(encodedDer.toByteArray()),
+        serialNumber = ByteString(data.serialNumberRaw.toByteArray()),
+        subjectKeyIdentifier = ByteString(
             requireNotNull(data.extensionSubjectKeyIdentifier).keyIdentifier.toByteArray()
         ),
         isTrustAnchor = isTrustAnchor,
         authorityKeyIdentifier = data.extensionAuthorityKeyIdentifier?.keyIdentifier?.toByteArray()
             ?.let {
-                ImmutableBytes.of(it)
+                ByteString(it)
             },
         name = name,
     )

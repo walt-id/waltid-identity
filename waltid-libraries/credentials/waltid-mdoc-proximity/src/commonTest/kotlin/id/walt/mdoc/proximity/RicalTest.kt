@@ -5,6 +5,7 @@
 
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
 import id.walt.cose.CoseHeaders
@@ -28,15 +29,15 @@ import kotlin.time.Instant
 
 class RicalTest {
     private val authority = RicalCertificateInfo(
-        certificateDer = ImmutableBytes.of(byteArrayOf(1)),
-        serialNumber = ImmutableBytes.of(byteArrayOf(2)),
-        subjectKeyIdentifier = ImmutableBytes.of(byteArrayOf(3)),
+        certificateDer = ByteString(byteArrayOf(1)),
+        serialNumber = ByteString(byteArrayOf(2)),
+        subjectKeyIdentifier = ByteString(byteArrayOf(3)),
         isTrustAnchor = true,
         name = "Example reader authority",
     )
     private val evidence = ReaderAuthenticationEvidence(
         ReaderAuthenticationScope.WholeRequest,
-        certificateChainDer = listOf(ImmutableBytes.of(byteArrayOf(4))),
+        certificateChainDer = listOf(ByteString(byteArrayOf(4))),
     )
 
     private fun signed(rical: Rical): SignedRical {
@@ -75,7 +76,7 @@ class RicalTest {
             policy = RicalPolicy(
                 "provider",
                 setOf("reader"),
-                listOf(ImmutableBytes.of(byteArrayOf(8))),
+                listOf(ByteString(byteArrayOf(8))),
                 establishTrust
             ),
             signatureValidator = { _, _ -> true },
@@ -130,7 +131,7 @@ class RicalTest {
             policy = RicalPolicy(
                 "provider",
                 setOf("reader"),
-                listOf(ImmutableBytes.of(byteArrayOf(8))),
+                listOf(ByteString(byteArrayOf(8))),
                 establishReaderTrust = true,
             ),
             signatureValidator = { _, _ -> signatureValid },
@@ -202,7 +203,7 @@ class RicalTest {
         )
         val signed = signed(rical)
 
-        assertEquals(rical, SignedRical.decode(signed.exactMessage.copy()).rical)
+        assertEquals(rical, SignedRical.decode(signed.exactMessage.toByteArray()).rical)
         assertFailsWith<IllegalArgumentException> { SignedRical.decode(signed.coseSign1.toTagged()) }
         assertFailsWith<IllegalArgumentException> {
             SignedRical.fromCoseSign1(signed.coseSign1.copy(payload = null))
@@ -263,9 +264,9 @@ class RicalTest {
                 Instant.parse(date),
                 certificateInfos = listOf(
                     RicalCertificateInfo(
-                        certificateDer = ImmutableBytes.of(byteArrayOf(1)),
-                        serialNumber = ImmutableBytes.of(byteArrayOf(2)),
-                        subjectKeyIdentifier = ImmutableBytes.of(byteArrayOf(3)),
+                        certificateDer = ByteString(byteArrayOf(1)),
+                        serialNumber = ByteString(byteArrayOf(2)),
+                        subjectKeyIdentifier = ByteString(byteArrayOf(3)),
                         isTrustAnchor = true,
                         name = name,
                     )
