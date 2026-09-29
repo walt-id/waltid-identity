@@ -249,8 +249,6 @@ internal class MobileDemoWallet(
     override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> =
         mobileWallet.listDeferredIssuance().map { it.toDemoDeferredCredential() }
 
-    override suspend fun createIssuanceHolderKeys(count: Int): List<WalletDemoHolderBinding> =
-        mobileWallet.createIssuanceHolderKeys(count).map { WalletDemoHolderBinding(it.keyId, it.did) }
 
     override suspend fun continuePreAuthorizedIssuance(
         sessionId: String,

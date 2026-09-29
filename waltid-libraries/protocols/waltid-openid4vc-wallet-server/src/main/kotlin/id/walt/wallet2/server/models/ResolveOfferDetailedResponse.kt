@@ -17,7 +17,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ResolveOfferDetailedResponse(
     val credentialIssuer: String,
-    val batchSize: Int? = null,
     val credentialConfigurationIds: List<String>,
     val grantType: String? = null,
     val preAuthorizedCode: String? = null,
@@ -28,6 +27,13 @@ data class ResolveOfferDetailedResponse(
     val issuer: OfferIssuerMetadata,
     val offeredCredentials: List<OfferedCredentialMetadata>,
     val transactionCode: OfferTransactionCodeRequirement? = null,
+)
+
+/** Batch capability alongside the released offer details. */
+@Serializable
+data class ResolveBatchOfferResponse(
+    val offer: ResolveOfferDetailedResponse,
+    val batchSize: Int? = null,
 )
 
 /** Typed credential issuer metadata for issuance-review UIs. */
@@ -90,7 +96,6 @@ fun WalletOfferResolution.toDetailedResponse(
     preferredLocales: List<String> = emptyList(),
 ): ResolveOfferDetailedResponse = ResolveOfferDetailedResponse(
     credentialIssuer = summary.credentialIssuer,
-    batchSize = summary.batchSize,
     credentialConfigurationIds = summary.credentialConfigurationIds,
     grantType = summary.grantType,
     preAuthorizedCode = summary.preAuthorizedCode,
@@ -123,6 +128,9 @@ fun WalletOfferResolution.toDetailedResponse(
     },
     transactionCode = transactionCode?.toOfferRequirement(),
 )
+
+fun WalletOfferResolution.toBatchResponse(preferredLocales: List<String> = emptyList()): ResolveBatchOfferResponse =
+    ResolveBatchOfferResponse(toDetailedResponse(preferredLocales), resolvedIssuerMetadata.metadata.batchCredentialIssuance?.batchSize)
 
 private fun IssuerDisplay.toOfferDisplay(): OfferMetadataDisplay =
     OfferMetadataDisplay(

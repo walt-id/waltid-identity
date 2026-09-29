@@ -106,7 +106,7 @@ Replace the offer URL, configuration and key IDs with real values. Keys must
 already be available to the wallet. Enterprise uses `keyReference` (an attached
 KMS resource path) in each holder binding instead of OSS `keyId`.
 
-- Resolve the offer first and check `batchSize`; absence means no batch support.
+- Resolve the offer through `resolve-offer/batch` first and check `batchSize`; absence means no batch support.
 - One selection is one configuration/dataset. Different formats or datasets use
   separate requests, sharing the access token.
 - The full handlers use token `authorizationDetails` and `scope` to determine
@@ -181,6 +181,10 @@ KMS resource path) in each holder binding instead of OSS `keyId`.
   HTTP 207 with saved IDs and `storageOutcome`; resume its retained handle without
   sending the transaction to the issuer again. If the original isolated request omitted
   its configuration ID, the local-save handle retains a null configuration ID.
+
+`resolve-offer` retains its released offer shape. `resolve-offer/batch` returns `{ "offer": { ... }, "batchSize": 2 }`, sharing the same offer projection and adding the issuer batch limit. An absent limit permits one holder binding.
+
+The isolated `request-token` and `exchange-code` routes retain their released three-field token result. Append `/batch` to either route to receive granted `authorizationDetails` and `scope` as well. The same wallet ownership checks apply to both contracts; choose one route before redeeming the code.
 
 Swagger includes ordered single, batch, multi-configuration, and authorization
 examples. Issuance does not implicitly generate keys or increase batch size.

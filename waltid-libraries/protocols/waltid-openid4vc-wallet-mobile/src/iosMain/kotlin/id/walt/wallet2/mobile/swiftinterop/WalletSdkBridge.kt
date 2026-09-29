@@ -25,9 +25,9 @@ import id.walt.wallet2.mobile.ProximitySession
 import id.walt.wallet2.mobile.MobileWalletDigitalCredentialCapabilities
 import id.walt.wallet2.mobile.MobileWalletDigitalCredentialResponse
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
-import id.walt.wallet2.handlers.WalletDeferredCredential
+import id.walt.wallet2.handlers.WalletIssuanceContinuation
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
-import id.walt.wallet2.handlers.WalletIssuanceSession
+import id.walt.wallet2.handlers.WalletIssuanceBatchSession
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -150,7 +150,7 @@ public class WalletSdkBridge private constructor(
     /** Resolves an offer and starts its bound OpenID4VCI issuance session. */
     public suspend fun startIssuance(
         request: MobileWalletIssuanceRequest,
-    ): WalletBridgeResult<WalletIssuanceSession> =
+    ): WalletBridgeResult<WalletIssuanceBatchSession> =
         walletBridgeCall { operations.startIssuance(request) }
 
     /** Starts the authorization-code browser request for an accepted issuance session. */
@@ -182,7 +182,7 @@ public class WalletSdkBridge private constructor(
         walletBridgeCall { operations.cancelIssuance(sessionId) }
 
     /** Lists retained deferred handles without polling or exposing protocol secrets. */
-    public suspend fun listDeferredIssuance(): WalletBridgeResult<List<WalletDeferredCredential>> =
+    public suspend fun listDeferredIssuance(): WalletBridgeResult<List<WalletIssuanceContinuation>> =
         walletBridgeCall { operations.listDeferredIssuance() }
 
     /** Resumes one deferred credential issuance result. */
@@ -362,7 +362,7 @@ internal interface WalletSdkBridgeOperations {
         count: Int, keyType: MobileWalletKeyType?, didMethod: String, policy: KeyUseAuthorizationPolicy?,
     ): List<MobileWalletHolderBinding>
 
-    suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceSession
+    suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceBatchSession
 
     suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<MobileWalletCredentialSelection>?): WalletIssuanceAuthorization
 
@@ -379,7 +379,7 @@ internal interface WalletSdkBridgeOperations {
 
     suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome
 
-    suspend fun listDeferredIssuance(): List<WalletDeferredCredential>
+    suspend fun listDeferredIssuance(): List<WalletIssuanceContinuation>
 
     suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletIssuanceOutcome
 
@@ -459,7 +459,7 @@ internal class MobileWalletSdkBridgeOperations(
         count: Int, keyType: MobileWalletKeyType?, didMethod: String, policy: KeyUseAuthorizationPolicy?,
     ): List<MobileWalletHolderBinding> = wallet.createIssuanceHolderKeys(count, keyType, didMethod, policy)
 
-    override suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceSession =
+    override suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceBatchSession =
         wallet.startIssuance(request)
 
     override suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<MobileWalletCredentialSelection>?): WalletIssuanceAuthorization =
@@ -481,7 +481,7 @@ internal class MobileWalletSdkBridgeOperations(
     override suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome =
         wallet.cancelIssuance(sessionId)
 
-    override suspend fun listDeferredIssuance(): List<WalletDeferredCredential> = wallet.listDeferredIssuance()
+    override suspend fun listDeferredIssuance(): List<WalletIssuanceContinuation> = wallet.listDeferredIssuance()
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletIssuanceOutcome =
         wallet.resumeDeferredIssuance(deferredCredentialId)

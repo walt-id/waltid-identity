@@ -642,7 +642,7 @@ final class WalletAPITests: XCTestCase {
             did: "did:key:holder"
         )
         let bindings = try await wallet.createIssuanceHolderKeys(count: 2)
-        let selections = [IssuanceCredentialSelection(configurationID: "identity", holderBindings: bindings)]
+        let selections = [IssuanceCredentialSelection(configurationID: "identity", holders: .existing(bindings))]
 
         let session = try await wallet.startIssuance(request)
         let authorization = try await wallet.beginAuthorizationIssuance(sessionID: session.id, credentials: selections)

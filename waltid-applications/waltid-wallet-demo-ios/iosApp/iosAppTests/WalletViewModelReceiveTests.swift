@@ -15,8 +15,6 @@ final class WalletViewModelReceiveTests: XCTestCase {
             model.previewOffer()
             try await waitUntil { model.offerPreview != nil && !model.isLoading }
             XCTAssertEqual(model.issuanceCopyCounts["ExampleCredential"], 1)
-            let beforeConsent = await client.createdHolderKeyCounts
-            XCTAssertTrue(beforeConsent.isEmpty)
             model.updateIssuanceCopies("ExampleCredential", 0)
             XCTAssertFalse(model.acceptOfferEnabled)
             model.updateIssuanceCopies("ExampleCredential", 99)
@@ -24,35 +22,8 @@ final class WalletViewModelReceiveTests: XCTestCase {
             model.acceptOffer()
             try await waitUntil { !model.isLoading }
             let selections = await client.receivedIssuanceSelections
-            let created = await client.createdHolderKeyCounts
-            XCTAssertEqual(created, [3])
-            XCTAssertEqual(selections.compactMap { $0 }.first?.first?.holderBindings.map(\.keyID), ["holder-0", "holder-1", "holder-2"])
+            XCTAssertEqual(selections.compactMap { $0 }.first?.first?.holders, .newKeys(count: 3))
         }
-    }
-
-    func testHolderKeyCreationForCancelledOfferCannotChangeNextSelection() async throws {
-        let client = TransactionCodeWalletClient(transactionCode: nil, batchSize: 3, suspendHolderCreation: true)
-        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
-        model.unlockForTests()
-        try await waitUntil { model.isReady }
-        model.offerUrl = "openid-credential-offer://issuer.example/old"
-        model.previewOffer()
-        try await waitUntil { model.offerPreview != nil && !model.isLoading }
-        model.updateIssuanceCopies("ExampleCredential", 3)
-        model.acceptOffer()
-        try await waitUntilAsync { await client.holderCreationSuspended }
-        model.declineOffer()
-        model.offerUrl = "openid-credential-offer://issuer.example/new"
-        model.previewOffer()
-        try await waitUntil { model.offerPreview != nil && !model.isLoading }
-        await client.finishHolderCreation()
-        try await waitUntilAsync { await client.holderCreationFinished }
-        await Task.yield()
-        model.acceptOffer()
-        try await waitUntil { !model.isLoading }
-        let selections = await client.receivedIssuanceSelections.compactMap { $0 }
-        XCTAssertEqual(selections.count, 1)
-        XCTAssertEqual(selections.first?.first?.holderBindings.map(\.keyID), ["key-1"])
     }
 
     func testMixedImmediateAndDeferredOutcomeRefreshesSavedCredentials() async throws {
@@ -667,12 +638,7 @@ private actor TransactionCodeWalletClient: WalletClient {
     private let batchSize: Int?
     private let failWithProgress: Bool
     private let deferWithProgress: Bool
-    private let suspendHolderCreation: Bool
-    private var holderCreationContinuation: CheckedContinuation<Void, Never>?
-    var holderCreationSuspended: Bool { holderCreationContinuation != nil }
-    private(set) var holderCreationFinished = false
     private(set) var receivedIssuanceSelections: [[IssuanceCredentialSelection]?] = []
-    private(set) var createdHolderKeyCounts: [Int] = []
     private let issuanceGrant: IssuanceGrant
     private let startsWithCredential: Bool
     private let presentationPreviewDelayNanoseconds: UInt64
@@ -689,7 +655,6 @@ private actor TransactionCodeWalletClient: WalletClient {
         batchSize: Int? = nil,
         failWithProgress: Bool = false,
         deferWithProgress: Bool = false,
-        suspendHolderCreation: Bool = false,
         startsWithCredential: Bool = false,
         presentationPreviewDelayNanoseconds: UInt64 = 0,
         presentationActionDelayNanoseconds: UInt64 = 0
@@ -700,7 +665,6 @@ private actor TransactionCodeWalletClient: WalletClient {
         self.batchSize = batchSize
         self.failWithProgress = failWithProgress
         self.deferWithProgress = deferWithProgress
-        self.suspendHolderCreation = suspendHolderCreation
         self.startsWithCredential = startsWithCredential
         self.presentationPreviewDelayNanoseconds = presentationPreviewDelayNanoseconds
         self.presentationActionDelayNanoseconds = presentationActionDelayNanoseconds
@@ -749,18 +713,6 @@ private actor TransactionCodeWalletClient: WalletClient {
         return available.filter { !deletedCredentialIDs.contains($0.id) }
     }
 
-    func createIssuanceHolderKeys(count: Int) async throws -> [IssuanceHolderBinding] {
-        createdHolderKeyCounts.append(count)
-        if suspendHolderCreation {
-            await withCheckedContinuation { holderCreationContinuation = $0 }
-        }
-        holderCreationFinished = true
-        return (0..<count).map { IssuanceHolderBinding(keyID: "holder-\($0)", did: "did:key:holder-\($0)") }
-    }
-    func finishHolderCreation() {
-        holderCreationContinuation?.resume()
-        holderCreationContinuation = nil
-    }
     func listDeferredIssuance() async throws -> [DeferredCredential] {
         (failWithProgress || deferWithProgress) && credentialIssued ? [.init(id: "pending", credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)] : []
     }

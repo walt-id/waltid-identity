@@ -145,7 +145,6 @@ class WalletViewModel: ObservableObject {
     @Published var selectedPresentationDisclosureOptions: Set<PresentationDisclosureSelection> = []
     @Published var selectedTab: WalletTab = .credentials
     @Published var issuanceCopyCounts: [String: Int] = [:]
-    private var preparedIssuanceSelections: [IssuanceCredentialSelection]?
     @Published var offerPreview: IssuanceOfferPreview?
     @Published private(set) var authorizationRequestURL: URL?
     @Published var deferredCredentials: [DeferredCredential] = []
@@ -371,6 +370,10 @@ class WalletViewModel: ObservableObject {
                     setError(WalletStatusText.failure(WalletStatusText.resetWalletFailed, error))
                 }
             } catch {
+                // Cleanup may have removed keys before failing. Keep reset available, but do not
+                // present the old identity and credentials as a usable wallet.
+                identityScreen = nil
+                clearWalletState()
                 setError(WalletStatusText.failure(WalletStatusText.resetWalletFailed, error))
             }
         }
@@ -926,7 +929,6 @@ class WalletViewModel: ObservableObject {
                 issuanceSession = session
                 offerPreview = session.offer
                 issuanceCopyCounts = Dictionary(uniqueKeysWithValues: session.offer.credentials.map { ($0.configurationID, 1) })
-                preparedIssuanceSelections = nil
                 newSession = nil
                 setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)
                 Task {
@@ -951,34 +953,19 @@ class WalletViewModel: ObservableObject {
     }
 
     func updateIssuanceCopies(_ configurationID: String, _ count: Int) {
-        guard offerReviewEnabled else { return }
-        issuanceCopyCounts[configurationID] = min(max(0, count), offerPreview?.batchSize ?? 1)
-        preparedIssuanceSelections = nil
+        guard offerReviewEnabled,
+              offerPreview?.credentials.contains(where: { $0.configurationID == configurationID }) == true else { return }
+        issuanceCopyCounts[configurationID] = min(max(0, count), max(1, offerPreview?.batchSize ?? 1))
     }
 
-    private func acceptedIssuanceSelections(_ preview: IssuanceOfferPreview, request: ReceiveRequest) async throws -> [IssuanceCredentialSelection] {
-        if let preparedIssuanceSelections { return preparedIssuanceSelections }
-        let selected = preview.credentials.compactMap { credential -> (String, Int)? in
+    private func issuanceSelections(_ preview: IssuanceOfferPreview) throws -> [IssuanceCredentialSelection] {
+        let selections = preview.credentials.compactMap { credential -> IssuanceCredentialSelection? in
             let count = issuanceCopyCounts[credential.configurationID] ?? 1
-            return count > 0 ? (credential.configurationID, count) : nil
+            guard count > 0 else { return nil }
+            return IssuanceCredentialSelection(configurationID: credential.configurationID,
+                holders: count == 1 ? .existing([.init(keyID: keyID, did: did.isEmpty ? nil : did)]) : .newKeys(count: count))
         }
-        guard !selected.isEmpty else { throw WalletError.invalidInput("Select at least one credential") }
-        let freshCount = selected.filter { $0.1 > 1 }.reduce(0) { $0 + $1.1 }
-        let fresh = freshCount > 0 ? try await walletClient.createIssuanceHolderKeys(count: freshCount) : []
-        try Task.checkCancellation()
-        guard isCurrent(request) else { throw CancellationError() }
-        var offset = 0
-        let selections = selected.map { configuration, count in
-            let holders: [IssuanceHolderBinding]
-            if count == 1 {
-                holders = [.init(keyID: keyID, did: did.isEmpty ? nil : did)]
-            } else {
-                holders = Array(fresh[offset..<(offset + count)])
-                offset += count
-            }
-            return IssuanceCredentialSelection(configurationID: configuration, holderBindings: holders)
-        }
-        preparedIssuanceSelections = selections
+        guard !selections.isEmpty else { throw WalletError.invalidInput("Select at least one credential") }
         return selections
     }
 
@@ -998,7 +985,7 @@ class WalletViewModel: ObservableObject {
         setLoading(WalletStatusText.receivingCredential, tab: .receive)
         receiveTask = Task {
             do {
-                let selections = try await acceptedIssuanceSelections(session.offer, request: request)
+                let selections = try issuanceSelections(session.offer)
                 try Task.checkCancellation()
                 guard isCurrent(request) else { return }
                 switch session.offer.grant {

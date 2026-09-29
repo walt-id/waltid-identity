@@ -97,7 +97,7 @@ class ItbWalletDriver internal constructor(
                 httpClient = client,
             )
         }
-        check(result.credentialIds.isNotEmpty() && result.deferredCredentials.isEmpty() && result.failure == null) {
+        check(result.credentialIds.isNotEmpty() && result.deferredTransactionIds.isEmpty()) {
             "The wallet did not store the issued credential"
         }
     }

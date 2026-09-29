@@ -9,6 +9,7 @@ import id.walt.openid4vci.metadata.issuer.toSignedJwt
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
+import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vci.wallet.metadata.MetadataSigner
 import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import id.waltid.openid4vci.wallet.metadata.ResolvedCredentialIssuerMetadata
@@ -36,8 +37,10 @@ class WalletIssuanceHandlerPreviewTest {
 
     @Test
     fun credentialCountCallbackRunsBeforeBatchPersistence() = runTest {
-        val holderKey = JWKKey.generate(KeyType.secp256r1)
-        val credential = batchTestCredential(holderKey)
+        val keys = InMemoryKeyStore()
+        val holders = List(2) { JWKKey.generate(KeyType.secp256r1) }
+        val bindings = holders.map { CredentialHolderBinding(keyId = keys.addKey(it)) }
+        val credentials = holders.map { batchTestCredential(it) }
         val events = mutableListOf<String>()
         val client = HttpClient(MockEngine) {
             engine {
@@ -48,7 +51,7 @@ class WalletIssuanceHandlerPreviewTest {
                         "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
                         "$ISSUER/token" -> respondJson("""{"access_token":"token","token_type":"bearer"}""")
                         "$ISSUER/credential" -> respondJson(
-                            """{"credentials":[{"credential":${Json.encodeToString(credential)}},{"credential":${Json.encodeToString(credential)}}]}"""
+                            """{"credentials":[{"credential":${Json.encodeToString(credentials[0])}},{"credential":${Json.encodeToString(credentials[1])}}]}"""
                         )
                         else -> error("Unexpected request: ${request.method.value} ${request.url}")
                     }
@@ -61,14 +64,14 @@ class WalletIssuanceHandlerPreviewTest {
         val store = RecordingCredentialStore(events)
         val wallet = Wallet(
             id = "pre-persistence-callback-test",
-            staticKey = holderKey,
+            keyStores = listOf(keys),
             credentialStores = listOf(store),
         )
 
-        val result = WalletIssuanceHandler.receiveCredential(
+        val result = WalletIssuanceHandler.receiveCredentials(
             wallet = wallet,
             request = ReceiveCredentialRequest(
-                credentials = listOf(WalletCredentialSelection("pid", holderBindings = List(2) { CredentialHolderBinding() })),
+                credentials = listOf(WalletCredentialSelection("pid", holderBindings = bindings)),
                 offerJson = Json.parseToJsonElement(CREDENTIAL_OFFER).jsonObject,
                 txCode = "1234",
             ),
@@ -126,14 +129,14 @@ class WalletIssuanceHandlerPreviewTest {
         )
 
         assertFails {
-            WalletIssuanceHandler.receiveCredential(
+            WalletIssuanceHandler.receiveCredentials(
                 wallet,
                 ReceiveCredentialFromPreviewRequest(first.previewHandle),
                 httpClient = client,
             )
         }
         assertFails {
-            WalletIssuanceHandler.receiveCredential(
+            WalletIssuanceHandler.receiveCredentials(
                 wallet,
                 ReceiveCredentialFromPreviewRequest(second.previewHandle),
                 httpClient = client,
@@ -199,7 +202,7 @@ class WalletIssuanceHandlerPreviewTest {
 
         repeat(2) {
             assertFails {
-                WalletIssuanceHandler.receiveCredential(
+                WalletIssuanceHandler.receiveCredentials(
                     wallet = wallet,
                     request = ReceiveCredentialFromPreviewRequest(
                         previewHandle = preview.previewHandle,
@@ -215,7 +218,7 @@ class WalletIssuanceHandlerPreviewTest {
         assertEquals(2, tokenRequests)
 
         assertFails {
-            WalletIssuanceHandler.receiveCredential(
+            WalletIssuanceHandler.receiveCredentials(
                 wallet = wallet.copy(id = "direct-receive-test"),
                 request = ReceiveCredentialRequest(
                     offerUrl = Url(OFFER_DEEP_LINK),
@@ -391,7 +394,7 @@ class WalletIssuanceHandlerPreviewTest {
             client,
         )
 
-        val result = WalletIssuanceHandler.receiveCredential(
+        val result = WalletIssuanceHandler.receiveCredentials(
             wallet,
             ReceiveCredentialFromPreviewRequest(preview.previewHandle),
             httpClient = client,
@@ -400,7 +403,7 @@ class WalletIssuanceHandlerPreviewTest {
         kotlin.test.assertNull(result.failure)
         kotlin.test.assertNotNull(result.deferredCredentials.single().deferredCredentialId)
         val error = assertFailsWith<PreviewSessionException> {
-            WalletIssuanceHandler.receiveCredential(
+            WalletIssuanceHandler.receiveCredentials(
                 wallet,
                 ReceiveCredentialFromPreviewRequest(preview.previewHandle),
                 httpClient = client,

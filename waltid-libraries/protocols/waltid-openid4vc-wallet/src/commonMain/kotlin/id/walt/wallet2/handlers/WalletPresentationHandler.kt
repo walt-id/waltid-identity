@@ -1301,10 +1301,10 @@ object WalletPresentationHandler {
     ): suspend (String, DigitalCredential) -> CredentialPresentationKey? = { credentialId, credential ->
         val stored = isolatedCredentialsById[credentialId] ?: findCredential(credentialId)
         if (stored?.holderKeyBinding == null) null else {
-            val material = resolveHolderKey(stored, setOf(KeyUsage.SIGN)).keyMaterial
-            CredentialPresentationKey(material.legacyKey, material.crypto2Key, credential.subject,
+            val key = resolveHolderKey(stored, setOf(KeyUsage.SIGN)).keyMaterial.requireCrypto2SigningKey()
+            CredentialPresentationKey(key, credential.subject,
                 scaAuthorizer?.let { authorizer ->
-                    ScaPresentationAuthorizer { authorizer.authorize(material.requireCrypto2Key(), it) }
+                    ScaPresentationAuthorizer { authorizer.authorize(key, it) }
                 })
         }
     }
@@ -1318,7 +1318,7 @@ object WalletPresentationHandler {
         } else {
             resolveHolderKey(credentialId, setOf(KeyUsage.SIGN))
         }
-        resolved.keyMaterial.requireCrypto2Key()
+        resolved.keyMaterial.requireCrypto2SigningKey()
     }
 
     suspend fun submitDcApiPresentation(

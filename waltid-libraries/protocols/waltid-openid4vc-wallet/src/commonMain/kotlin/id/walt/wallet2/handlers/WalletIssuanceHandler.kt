@@ -71,6 +71,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 import kotlin.jvm.JvmInline
 import kotlin.time.Clock
@@ -117,47 +121,38 @@ fun CredentialOfferSource.checkOfferSource() {
  */
 @Serializable
 data class ReceiveCredentialRequest(
-    /** Omit to receive one instance of every selected/offered configuration. */
-    val credentials: List<WalletCredentialSelection>? = null,
     /**
      * A credential offer URL (openid-credential-offer://...).
      * Provide this when the offer arrives as a URL (QR code, deep link).
      */
     override val offerUrl: Url? = null,
-
     /**
      * A credential offer as a parsed JSON object.
      * Provide this when the offer arrives as inline JSON.
      */
     override val offerJson: JsonObject? = null,
-
     /**
      * Inline key to use for proof-of-possession.
      *
      * When provided, this serialized key is used directly and takes precedence over [keyId]
-     * and the wallet's stores. Prefer [keyId] for store-backed / crypto2 keys so the wallet can
-     * resolve a signing-capable [WalletKeyStoreEntry] (e.g. Enterprise `keyReference.path`).
+     * and the wallet's stores. Storage requires wallet-resolved holder keys: use [keyId], the
+     * wallet default, or explicit [credentials] with stored holder key IDs. An inline key cannot
+     * be used as a stored credential's holder, even when its public material matches a wallet key.
      */
     val key: DirectSerializedKey? = null,
-
     /**
      * ID of the key to use for proof-of-possession (resolved from the wallet's key stores).
      * Ignored when [key] is provided. Defaults to the wallet's default key.
      */
     val keyId: String? = null,
-
     /** DID to use as the credential subject / holder binding. Defaults to wallet's default DID. */
     val did: String? = null,
-
     /** Transaction code (PIN) required by some pre-authorized code flows. */
     val txCode: String? = null,
-
     /** OAuth 2.0 client_id presented to the authorization server. */
     val clientId: String = DEFAULT_CLIENT_ID,
-
     /** redirect_uri registered with the authorization server (auth-code flows only). */
     val redirectUri: Url = Url("openid://"),
-
     /**
      * Additional HTTP headers to attach to the token request, e.g. the attestation-based client
      * authentication headers `OAuth-Client-Attestation` / `OAuth-Client-Attestation-PoP`
@@ -167,13 +162,48 @@ data class ReceiveCredentialRequest(
      * the library can create attestation headers from authorization server metadata and the wallet key.
      */
     val tokenRequestHeaders: Map<String, String> = emptyMap(),
-
     /**
      * Optional arbitrary metadata to store alongside the received credential(s).
      * This metadata is passed through to [StoredCredential.metadata] when credentials are stored.
      */
     val metadata: JsonObject? = null,
+    /** Omit to receive one instance of every selected/offered configuration. */
+    val credentials: List<WalletCredentialSelection>? = null,
 ) : CredentialOfferSource {
+    /** Retains the released constructor contract. */
+    constructor(
+        offerUrl: Url? = null,
+        offerJson: JsonObject? = null,
+        key: DirectSerializedKey? = null,
+        keyId: String? = null,
+        did: String? = null,
+        txCode: String? = null,
+        clientId: String = DEFAULT_CLIENT_ID,
+        redirectUri: Url = Url("openid://"),
+        tokenRequestHeaders: Map<String, String> = emptyMap(),
+        metadata: JsonObject? = null,
+    ) : this(
+        offerUrl, offerJson, key, keyId, did, txCode, clientId, redirectUri, tokenRequestHeaders, metadata,
+        credentials = null,
+    )
+
+    /** Retains the released copy contract and preserves the added fields. */
+    fun copy(
+        offerUrl: Url? = this.offerUrl,
+        offerJson: JsonObject? = this.offerJson,
+        key: DirectSerializedKey? = this.key,
+        keyId: String? = this.keyId,
+        did: String? = this.did,
+        txCode: String? = this.txCode,
+        clientId: String = this.clientId,
+        redirectUri: Url = this.redirectUri,
+        tokenRequestHeaders: Map<String, String> = this.tokenRequestHeaders,
+        metadata: JsonObject? = this.metadata,
+    ): ReceiveCredentialRequest = ReceiveCredentialRequest(
+        offerUrl, offerJson, key, keyId, did, txCode, clientId, redirectUri, tokenRequestHeaders, metadata,
+        credentials = this.credentials,
+    )
+
     init {
         checkOfferSource()
     }
@@ -199,8 +229,6 @@ value class IssuancePreviewHandle(val value: String) {
 @Serializable
 data class ReceiveCredentialFromPreviewRequest(
     val previewHandle: IssuancePreviewHandle,
-    /** Omit to receive one instance of every selected/offered configuration. */
-    val credentials: List<WalletCredentialSelection>? = null,
     val key: DirectSerializedKey? = null,
     val keyId: String? = null,
     val did: String? = null,
@@ -208,11 +236,60 @@ data class ReceiveCredentialFromPreviewRequest(
     val clientId: String = DEFAULT_CLIENT_ID,
     val redirectUri: Url = Url("openid://"),
     val tokenRequestHeaders: Map<String, String> = emptyMap(),
-)
+    /** Omit to receive one instance of every selected/offered configuration. */
+    val credentials: List<WalletCredentialSelection>? = null,
+) {
+    /** Retains the released constructor contract. */
+    constructor(
+        previewHandle: IssuancePreviewHandle,
+        key: DirectSerializedKey? = null,
+        keyId: String? = null,
+        did: String? = null,
+        txCode: String? = null,
+        clientId: String = DEFAULT_CLIENT_ID,
+        redirectUri: Url = Url("openid://"),
+        tokenRequestHeaders: Map<String, String> = emptyMap(),
+    ) : this(
+        previewHandle, key, keyId, did, txCode, clientId, redirectUri, tokenRequestHeaders, credentials = null,
+    )
+
+    /** Retains the released copy contract and preserves the added fields. */
+    fun copy(
+        previewHandle: IssuancePreviewHandle = this.previewHandle,
+        key: DirectSerializedKey? = this.key,
+        keyId: String? = this.keyId,
+        did: String? = this.did,
+        txCode: String? = this.txCode,
+        clientId: String = this.clientId,
+        redirectUri: Url = this.redirectUri,
+        tokenRequestHeaders: Map<String, String> = this.tokenRequestHeaders,
+    ): ReceiveCredentialFromPreviewRequest = ReceiveCredentialFromPreviewRequest(
+        previewHandle, key, keyId, did, txCode, clientId, redirectUri, tokenRequestHeaders,
+        credentials = this.credentials,
+    )
+}
+
 
 /** Result of a completed issuance flow. */
 @Serializable
 data class ReceiveCredentialResult(
+    /** All credentials that were successfully issued and stored. */
+    val credentialIds: List<String>,
+    /**
+     * Transaction IDs for credentials deferred by the issuer.
+     * Each entry maps a credential configuration ID to the transaction ID
+     * that should be used with [WalletIssuanceHandler.pollDeferredFlow] to
+     * retrieve the credential once it becomes available.
+     */
+    val deferredTransactionIds: Map<String, String> = emptyMap()
+) {
+    /** Fails with complete progress when the released map cannot represent this outcome. */
+    constructor(result: ReceiveCredentialsResult) : this(result.credentialIds, result.releasedDeferredTransactions())
+}
+
+/** Result of a completed issuance flow. */
+@Serializable
+data class ReceiveCredentialsResult(
     /** All credentials that were successfully issued and stored. */
     val credentialIds: List<String>,
     /**
@@ -233,11 +310,6 @@ data class ReceiveCredentialResult(
         }
     }
 
-    /** Existing REST projection, unavailable when multiple datasets share a configuration. */
-    @EncodeDefault
-    val deferredTransactionIds: Map<String, String>? = deferredCredentials
-        .takeIf { targets -> targets.map { it.credentialConfigurationId }.distinct().size == targets.size }
-        ?.associate { it.credentialConfigurationId to it.transactionId }
 }
 
 /** Retains the target and holder selections for one deferred Credential Request. */
@@ -276,7 +348,6 @@ data class ResolveOfferResult(
     val txCodeRequired: Boolean,
     val credentialEndpoint: Url,
     val offeredCredentials: List<String>,
-    val batchSize: Int? = null,
     val tokenEndpoint: Url? = null,
     val nonceEndpoint: Url? = null,
 )
@@ -365,6 +436,37 @@ data class RequestTokenRequest(
     val authorizationDetails: List<AuthorizationDetail>? = null,
     val scope: String? = null,
 ) {
+    /** Retains the released constructor contract. */
+    constructor(
+        tokenEndpoint: Url,
+        preAuthorizedCode: String,
+        credentialIssuer: String? = null,
+        txCode: String? = null,
+        clientId: String = DEFAULT_CLIENT_ID,
+        redirectUri: Url = Url("openid://"),
+        tokenRequestHeaders: Map<String, String> = emptyMap(),
+        anonymousPreAuthorizedCode: Boolean = false,
+    ) : this(
+        tokenEndpoint, preAuthorizedCode, credentialIssuer, txCode, clientId, redirectUri, tokenRequestHeaders,
+        anonymousPreAuthorizedCode, credentialConfigurationIds = null, authorizationDetails = null, scope = null,
+    )
+
+    /** Retains the released copy contract and preserves the added fields. */
+    fun copy(
+        tokenEndpoint: Url = this.tokenEndpoint,
+        preAuthorizedCode: String = this.preAuthorizedCode,
+        credentialIssuer: String? = this.credentialIssuer,
+        txCode: String? = this.txCode,
+        clientId: String = this.clientId,
+        redirectUri: Url = this.redirectUri,
+        tokenRequestHeaders: Map<String, String> = this.tokenRequestHeaders,
+        anonymousPreAuthorizedCode: Boolean = this.anonymousPreAuthorizedCode,
+    ): RequestTokenRequest = RequestTokenRequest(
+        tokenEndpoint, preAuthorizedCode, credentialIssuer, txCode, clientId, redirectUri, tokenRequestHeaders,
+        anonymousPreAuthorizedCode, credentialConfigurationIds = this.credentialConfigurationIds,
+        authorizationDetails = this.authorizationDetails, scope = this.scope,
+    )
+
     init {
         require(authorizationDetails == null || scope == null) { "Use authorizationDetails or scope, not both" }
         if (credentialConfigurationIds != null) {
@@ -378,23 +480,31 @@ data class RequestTokenRequest(
     }
 }
 
+/** Released token result; its successful serialized shape is fixed. */
 @Serializable
 data class RequestTokenResult(
-    val authorizationDetails: List<AuthorizationDetail>? = null,
-    val scope: String? = null,
     val accessToken: String,
     val expiresIn: Long? = null,
-    /**
-     * OAuth `token_type`, e.g. `DPoP` or `Bearer`.
-     *
-     * RFC 9449 Section 7.1: a DPoP-typed access token must be presented with a per-request proof, and
-     * a Bearer token must not be. Dropping this made the authorization-code flow request credentials
-     * without a proof even after the token endpoint had issued it a DPoP token.
-     */
+    /** OAuth token_type. Preserve it when presenting the token (RFC 9449 Section 7.1). */
     val tokenType: String? = null,
 ) {
     override fun toString(): String =
         "RequestTokenResult(accessToken=<redacted>, expiresIn=$expiresIn, tokenType=$tokenType)"
+}
+
+/** Token plus the authorization server's granted configurations, datasets and scopes. */
+@Serializable
+data class RequestTokenDetailedResult(
+    val accessToken: String,
+    val expiresIn: Long? = null,
+    val tokenType: String? = null,
+    val authorizationDetails: List<AuthorizationDetail>? = null,
+    val scope: String? = null,
+) {
+    internal fun toReleasedResult(): RequestTokenResult = RequestTokenResult(accessToken, expiresIn, tokenType)
+
+    override fun toString(): String =
+        "RequestTokenDetailedResult(accessToken=<redacted>, expiresIn=$expiresIn, tokenType=$tokenType)"
 }
 
 @Serializable
@@ -411,7 +521,6 @@ data class RequestNonceResult(
 
 @Serializable
 data class SignProofRequest(
-    val holderBindings: List<CredentialHolderBinding> = listOf(CredentialHolderBinding()),
     val issuerUrl: Url,
     /**
      * Credential configuration id whose `proof_types_supported` constrains the proof algorithm.
@@ -438,20 +547,80 @@ data class SignProofRequest(
 }
 
 @Serializable
-data class SignProofResult(val proofs: Proofs) {
-    /** Existing single-proof REST response; batch callers consume [proofs]. */
-    @EncodeDefault
-    val proofJwt: String? = proofs.jwt?.singleOrNull()
+data class SignProofResult(
+    val proofJwt: String
+)
+
+/** Input for signing one proof for each accepted holder. */
+@Serializable
+data class SignProofsRequest(
+    val holderBindings: List<CredentialHolderBinding> = listOf(CredentialHolderBinding()),
+    val issuerUrl: Url,
+    /**
+     * Credential configuration id whose `proof_types_supported` constrains the proof algorithm.
+     * Resolved against the issuer metadata at [issuerUrl].
+     */
+    val credentialConfigurationId: String,
+    val nonce: String? = null,
+    /** Inline key to sign the proof with; takes precedence over [keyId]. */
+    val key: DirectSerializedKey? = null,
+    val keyId: String? = null,
+    val did: String? = null,
+    /**
+     * OAuth `client_id` written as the proof `iss` claim for client-bound token requests.
+     * Leave unset for anonymous pre-authorized access (OpenID4VCI 1.0 Appendix F.1).
+     */
+    val clientId: String? = null,
+) {
+    init {
+        require(credentialConfigurationId.isNotBlank()) {
+            "credentialConfigurationId must not be blank"
+        }
+        require(clientId == null || clientId.isNotBlank()) { "clientId cannot be blank" }
+    }
 }
+
+@Serializable(with = SignProofsResult.Companion::class)
+data class SignProofsResult(val proofs: Proofs) {
+    init {
+        val jwt = proofs.jwt
+        require(!jwt.isNullOrEmpty() && jwt.all { it.isNotBlank() } &&
+                proofs.diVp == null && proofs.attestation == null) { "Expected a non-empty collection of JWT proofs" }
+    }
+
+    /** Keeps the released single-proof wire shape without adding a second internal proof representation. */
+    companion object : KSerializer<SignProofsResult> {
+        override val descriptor = SignProofsWire.serializer().descriptor
+
+        override fun serialize(encoder: Encoder, value: SignProofsResult) {
+            val single = value.proofs.jwt?.singleOrNull()
+            val wire = if (single != null) SignProofsWire(proofJwt = single) else SignProofsWire(proofs = value.proofs)
+            encoder.encodeSerializableValue(SignProofsWire.serializer(), wire)
+        }
+
+        override fun deserialize(decoder: Decoder): SignProofsResult {
+            val wire = decoder.decodeSerializableValue(SignProofsWire.serializer())
+            require((wire.proofJwt == null) != (wire.proofs == null)) { "Expected proofJwt or proofs, not both" }
+            return SignProofsResult(wire.proofs ?: Proofs(jwt = listOf(requireNotNull(wire.proofJwt))))
+        }
+    }
+}
+
+@Serializable
+@SerialName("SignProofsResult")
+private data class SignProofsWire(
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val proofJwt: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val proofs: Proofs? = null,
+)
+
 
 @Serializable
 data class FetchCredentialRequest(
     val credentialEndpoint: Url,
     val accessToken: String,
     val credentialConfigurationId: String,
-    val proofs: Proofs? = null,
-    val credentialIdentifier: String? = null,
-    val holderBindings: List<CredentialHolderBinding> = listOf(CredentialHolderBinding()),
+    /** Existing single-proof REST input. Mutually exclusive with [proofs]. */
+    val proofJwt: String? = null,
     val clientId: String = DEFAULT_CLIENT_ID,
     /**
      * When true, [WalletIssuanceHandler.fetchCredential] stores the fetched
@@ -459,7 +628,8 @@ data class FetchCredentialRequest(
      *
      * When storing, pass [credentialIssuerBaseUrl] (and optionally [metadata]/[label])
      * so issuer display metadata and credential labels are persisted the same way as
-     * the full pre-authorized receive path.
+     * the full pre-authorized receive path. [holderBindings] must identify the stored wallet keys
+     * used for [proofs]; inline holder keys are rejected, and copies require distinct public keys.
      */
     val storeInWallet: Boolean = false,
     /**
@@ -476,13 +646,51 @@ data class FetchCredentialRequest(
      * [storeInWallet] stores an mdoc; it must identify the exact key used to create [proofs].
      */
     val keyId: String? = null,
+    val proofs: Proofs? = null,
+    val credentialIdentifier: String? = null,
+    val holderBindings: List<CredentialHolderBinding> = listOf(CredentialHolderBinding()),
     /** Token type returned by the authorization server. */
     val tokenType: String = "Bearer",
     /** Key that sender-constrains the access token, independent of credential holder bindings. */
     val dpopKeyId: String? = null,
-    /** Existing single-proof REST input. Mutually exclusive with [proofs]. */
-    val proofJwt: String? = null,
 ) {
+    /** Retains the released constructor contract. */
+    constructor(
+        credentialEndpoint: Url,
+        accessToken: String,
+        credentialConfigurationId: String,
+        proofJwt: String? = null,
+        clientId: String = DEFAULT_CLIENT_ID,
+        storeInWallet: Boolean = false,
+        credentialIssuerBaseUrl: String? = null,
+        metadata: JsonObject? = null,
+        label: String? = null,
+        keyId: String? = null,
+    ) : this(
+        credentialEndpoint, accessToken, credentialConfigurationId, proofJwt, clientId, storeInWallet,
+        credentialIssuerBaseUrl, metadata, label, keyId, proofs = null, credentialIdentifier = null,
+        holderBindings = listOf(CredentialHolderBinding()), tokenType = "Bearer", dpopKeyId = null,
+    )
+
+    /** Retains the released copy contract and preserves the added fields. */
+    fun copy(
+        credentialEndpoint: Url = this.credentialEndpoint,
+        accessToken: String = this.accessToken,
+        credentialConfigurationId: String = this.credentialConfigurationId,
+        proofJwt: String? = this.proofJwt,
+        clientId: String = this.clientId,
+        storeInWallet: Boolean = this.storeInWallet,
+        credentialIssuerBaseUrl: String? = this.credentialIssuerBaseUrl,
+        metadata: JsonObject? = this.metadata,
+        label: String? = this.label,
+        keyId: String? = this.keyId,
+    ): FetchCredentialRequest = FetchCredentialRequest(
+        credentialEndpoint, accessToken, credentialConfigurationId, proofJwt, clientId, storeInWallet,
+        credentialIssuerBaseUrl, metadata, label, keyId, proofs = this.proofs,
+        credentialIdentifier = this.credentialIdentifier, holderBindings = this.holderBindings,
+        tokenType = this.tokenType, dpopKeyId = this.dpopKeyId,
+    )
+
     init {
         require(proofs == null || proofJwt == null) { "Provide proofs or proofJwt, not both" }
         require(proofJwt == null || proofJwt.isNotBlank()) { "proofJwt cannot be blank" }
@@ -491,14 +699,45 @@ data class FetchCredentialRequest(
     val effectiveProofs: Proofs? get() = proofs ?: proofJwt?.let { Proofs(jwt = listOf(it)) }
 }
 
+/** Released isolated-fetch result. Detailed progress is available from [FetchCredentialsResult]. */
 @Serializable
-data class FetchCredentialResult(
+data class FetchCredentialResult(val rawCredentials: List<String>) {
+    constructor(result: FetchCredentialsResult) : this(result.releasedRawCredentials())
+}
+
+/** Complete isolated-fetch progress, including remote deferral and local-save recovery. */
+@Serializable
+data class FetchCredentialsResult(
     val rawCredentials: List<String> = emptyList(),
     val deferredCredential: DeferredCredentialTransaction? = null,
-    val interval: Long? = null,
     /** Local save result, including committed IDs and retained handles when storage is incomplete. */
     val storageOutcome: WalletIssuanceOutcome? = null,
+) {
+    init {
+        require(rawCredentials.isNotEmpty() xor (deferredCredential != null)) {
+            "A fetch result must contain credentials or a deferred transaction"
+        }
+        require(deferredCredential == null || storageOutcome == null) {
+            "A deferred response cannot have local storage progress"
+        }
+        require(storageOutcome == null || storageOutcome is WalletIssuanceOutcome.Stored ||
+                storageOutcome is WalletIssuanceOutcome.Failed) {
+            "Local storage must either complete or retain its failure"
+        }
+    }
+}
+
+/** The released fetch result cannot represent this progress; do not repeat the issuer request. */
+class CredentialFetchException(val result: FetchCredentialsResult) : Exception(
+    "Credential fetch requires continuation; inspect result instead of fetching again"
 )
+
+private fun FetchCredentialsResult.releasedRawCredentials(): List<String> {
+    if (deferredCredential != null || storageOutcome is WalletIssuanceOutcome.Failed) {
+        throw CredentialFetchException(this)
+    }
+    return rawCredentials
+}
 
 /**
  * Completes the authorization-code grant in one call: exchanges [code] for an access token, builds a
@@ -511,17 +750,14 @@ data class FetchCredentialResult(
  */
 @Serializable
 data class ReceiveAuthorizedCredentialRequest(
-    /** Explicit targets selected during authorization; one instance per configuration by default. */
-    val credentials: List<WalletCredentialSelection>? = null,
     /** Authorization code from the redirect callback. */
     val code: String,
-    /** Existing single-target REST input. Mutually exclusive with [credentials]. */
-    val credentialConfigurationId: String? = null,
     /** PKCE verifier returned by `authorization-url`; required whenever PKCE was used. */
     val codeVerifier: String? = null,
     /** Credential Issuer Identifier, used to re-resolve issuer and authorization server metadata. */
     val credentialIssuer: String,
     val credentialEndpoint: Url,
+    val credentialConfigurationId: String,
     /** Issuer nonce endpoint, when it advertises one; validated against issuer metadata. */
     val nonceEndpoint: Url? = null,
     val clientId: String = DEFAULT_CLIENT_ID,
@@ -552,13 +788,45 @@ data class ReceiveAuthorizedCredentialRequest(
     init {
         require(code.isNotBlank()) { "Authorization code must not be blank" }
         require(credentialIssuer.isNotBlank()) { "credentialIssuer must not be blank" }
-        require((credentials != null) != (credentialConfigurationId != null)) { "Provide credentials or credentialConfigurationId" }
-        require(credentials == null || credentials.isNotEmpty()) { "credentials must not be empty" }
-        require(credentialConfigurationId == null || credentialConfigurationId.isNotBlank()) { "credentialConfigurationId cannot be blank" }
+        require(credentialConfigurationId.isNotBlank()) { "credentialConfigurationId must not be blank" }
     }
+}
 
-    fun selectedCredentials(): List<WalletCredentialSelection> = credentials
-        ?: listOf(WalletCredentialSelection(requireNotNull(credentialConfigurationId)))
+
+/** Completes authorization for an explicit collection of accepted credential selections. */
+@Serializable
+data class ReceiveAuthorizedCredentialsRequest(
+    /** Targets accepted during authorization, with the holder bindings for each credential. */
+    val credentials: List<WalletCredentialSelection>,
+    /** Authorization code from the redirect callback. */
+    val code: String,
+    /** PKCE verifier returned by `authorization-url`; required whenever PKCE was used. */
+    val codeVerifier: String? = null,
+    /** Credential Issuer Identifier, used to re-resolve issuer and authorization server metadata. */
+    val credentialIssuer: String,
+    val credentialEndpoint: Url,
+    /** Issuer nonce endpoint, when it advertises one; validated against issuer metadata. */
+    val nonceEndpoint: Url? = null,
+    val clientId: String = DEFAULT_CLIENT_ID,
+    val redirectUri: Url = Url("openid://"),
+    /** Explicit sender constraint; see [ReceiveAuthorizedCredentialRequest.useDpop]. */
+    val useDpop: Boolean = false,
+
+    /** Inline default proof key; storage requires explicit wallet-resolved holders in [credentials]. */
+    val key: DirectSerializedKey? = null,
+    val keyId: String? = null,
+    /** Holder DID; when absent the proof is bound to the raw JWK. */
+    val did: String? = null,
+    /** Optional metadata stored alongside the received credential(s). */
+    val metadata: JsonObject? = null,
+    /** Optional label override; otherwise derived from the credential configuration display. */
+    val label: String? = null,
+) {
+    init {
+        require(code.isNotBlank()) { "Authorization code must not be blank" }
+        require(credentialIssuer.isNotBlank()) { "credentialIssuer must not be blank" }
+        require(credentials.isNotEmpty()) { "credentials must not be empty" }
+    }
 }
 
 /**
@@ -584,9 +852,6 @@ class CredentialEndpointException(
 
 @Serializable
 data class PollDeferredRequest(
-    /** Copy from the deferred result to retain single-instance proof-binding validation. */
-    val proofRequired: Boolean = false,
-    val holderBindings: List<CredentialHolderBinding> = listOf(CredentialHolderBinding()),
     /** The deferred credential endpoint URL from the issuer's metadata. */
     val deferredCredentialEndpoint: Url,
     /** The transaction_id received when the credential was deferred. */
@@ -609,13 +874,49 @@ data class PollDeferredRequest(
      * stores an mdoc; it must identify the exact key used for the original credential request.
      */
     val keyId: String? = null,
+    /** Copy from the deferred result to retain single-instance proof-binding validation. */
+    val proofRequired: Boolean = false,
+    val holderBindings: List<CredentialHolderBinding> = listOf(CredentialHolderBinding()),
     /** Token type returned by the authorization server. */
     val tokenType: String = "Bearer",
     /** Key that sender-constrains the access token, independent of credential holder bindings. */
     val dpopKeyId: String? = null,
     /** Dataset identifier from the original deferred result, when provided by the issuer. */
     val credentialIdentifier: String? = null,
-)
+) {
+    /** Retains the released constructor contract. */
+    constructor(
+        deferredCredentialEndpoint: Url,
+        transactionId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String? = null,
+        credentialConfigurationId: String? = null,
+        metadata: JsonObject? = null,
+        label: String? = null,
+        keyId: String? = null,
+    ) : this(
+        deferredCredentialEndpoint, transactionId, accessToken, credentialIssuerBaseUrl, credentialConfigurationId,
+        metadata, label, keyId, proofRequired = false, holderBindings = listOf(CredentialHolderBinding()),
+        tokenType = "Bearer", dpopKeyId = null, credentialIdentifier = null,
+    )
+
+    /** Retains the released copy contract and preserves the added fields. */
+    fun copy(
+        deferredCredentialEndpoint: Url = this.deferredCredentialEndpoint,
+        transactionId: String = this.transactionId,
+        accessToken: String = this.accessToken,
+        credentialIssuerBaseUrl: String? = this.credentialIssuerBaseUrl,
+        credentialConfigurationId: String? = this.credentialConfigurationId,
+        metadata: JsonObject? = this.metadata,
+        label: String? = this.label,
+        keyId: String? = this.keyId,
+    ): PollDeferredRequest = PollDeferredRequest(
+        deferredCredentialEndpoint, transactionId, accessToken, credentialIssuerBaseUrl, credentialConfigurationId,
+        metadata, label, keyId, proofRequired = this.proofRequired, holderBindings = this.holderBindings,
+        tokenType = this.tokenType, dpopKeyId = this.dpopKeyId, credentialIdentifier = this.credentialIdentifier,
+    )
+}
+
 
 /** A successful deferred poll that requires waiting before another attempt. */
 @Serializable
@@ -631,11 +932,11 @@ data class PollDeferredResult(
     val credentialIds: List<String>,
     val pending: DeferredCredentialPending? = null,
     /** Retained local-save progress after a storage failure; resumption must not poll the issuer again. */
-    val storageOutcome: WalletIssuanceOutcome? = null,
+    val storageOutcome: WalletIssuanceOutcome.Failed? = null,
 ) {
     init {
         require(pending == null || (credentialIds.isEmpty() && storageOutcome == null))
-        require(storageOutcome !is WalletIssuanceOutcome.Failed || storageOutcome.storedCredentialIds == credentialIds)
+        require(storageOutcome == null || storageOutcome.storedCredentialIds == credentialIds)
     }
 }
 
@@ -646,6 +947,37 @@ class CredentialStorageException(val outcome: WalletIssuanceOutcome.Failed) : Ex
 
 @Serializable
 data class GenerateAuthorizationUrlRequest(
+    override val offerUrl: Url? = null,
+    override val offerJson: JsonObject? = null,
+    val clientId: String = DEFAULT_CLIENT_ID,
+    val redirectUri: Url = Url("openid://"),
+    val usePkce: Boolean = true,
+    /**
+     * Request the credential by OAuth `scope` instead of `authorization_details`.
+     *
+     * OID4VCI 1.0 Section 5.1.2 defines both, as alternatives. `authorization_details` is the default
+     * because it names the credential configuration directly; scope-based authorization needs the
+     * issuer to publish a `scope` on the configuration, and some profiles (HAIP among them) require it.
+     */
+    val useScope: Boolean = false,
+) : CredentialOfferSource {
+    init {
+        checkOfferSource()
+    }
+}
+
+@Serializable
+data class GenerateAuthorizationUrlResult(
+    val authorizationUrl: Url,
+    val state: String,
+    val codeVerifier: String? = null,
+    val credentialConfigurationId: String,
+    val credentialIssuerBaseUrl: String,
+    val nonceEndpoint: Url? = null,
+)
+
+@Serializable
+data class GenerateBatchAuthorizationUrlRequest(
     /** Wallet-initiated issuance without an offer. Mutually exclusive with offerUrl/offerJson. */
     val credentialIssuer: String? = null,
     val credentialConfigurationIds: List<String>? = null,
@@ -656,6 +988,11 @@ data class GenerateAuthorizationUrlRequest(
     val usePkce: Boolean = true,
 ) : CredentialOfferSource {
     init {
+        require(credentialConfigurationIds == null || (credentialConfigurationIds.isNotEmpty() &&
+                credentialConfigurationIds.all(String::isNotBlank) &&
+                credentialConfigurationIds.distinct().size == credentialConfigurationIds.size)) {
+            "Select non-empty, distinct credential configuration IDs"
+        }
         if (credentialIssuer == null) checkOfferSource() else {
             require(offerUrl == null && offerJson == null)
             require(credentialIssuer.isNotBlank() && !credentialConfigurationIds.isNullOrEmpty())
@@ -664,7 +1001,7 @@ data class GenerateAuthorizationUrlRequest(
 }
 
 @Serializable
-data class GenerateAuthorizationUrlResult(
+data class GenerateBatchAuthorizationUrlResult(
     val authorizationUrl: Url,
     val state: String,
     val codeVerifier: String? = null,
@@ -672,9 +1009,10 @@ data class GenerateAuthorizationUrlResult(
     val credentialIssuerBaseUrl: String,
     val nonceEndpoint: Url? = null,
 ) {
-    /** Existing single-target REST output. Multiple configurations require the plural field. */
-    @EncodeDefault
-    val credentialConfigurationId: String? = credentialConfigurationIds.singleOrNull()
+    init {
+        require(credentialConfigurationIds.isNotEmpty() && credentialConfigurationIds.all(String::isNotBlank) &&
+                credentialConfigurationIds.distinct().size == credentialConfigurationIds.size)
+    }
 }
 
 @Serializable
@@ -753,10 +1091,39 @@ object WalletIssuanceHandler {
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         /**
          * Called whenever the issuer defers a credential.
-         * Each deferred target identifies its configuration and optional dataset;
+         * [credentialConfigurationId] identifies which credential was deferred;
          * [transactionId] should be stored and passed to [pollDeferredFlow] later.
          */
-        onDeferredCredential: suspend (DeferredCredentialTransaction) -> Unit = {},
+        onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit = { _, _ -> },
+        /** Called with the exact response batch size before any credential of that batch is persisted. */
+        beforeCredentialsStored: suspend (Int) -> Unit = {},
+        onCredentialStored: suspend (StoredCredential) -> Unit = {},
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
+    ): Flow<StoredCredential> = receiveCredentialFlow(
+        wallet = wallet,
+        request = request,
+        attestationAssembler = attestationAssembler,
+        onEvent = onEvent,
+        httpClient = httpClient,
+        onDeferredTarget = { target -> onDeferredTransactionId(target.credentialConfigurationId, target.transactionId) },
+        beforeCredentialsStored = beforeCredentialsStored,
+        onCredentialStored = onCredentialStored,
+        metadataTrustResolver = metadataTrustResolver,
+    )
+
+    /** Streams issuance with the complete target and holder context for each deferred request. */
+    fun receiveCredentialFlow(
+        wallet: Wallet,
+        request: ReceiveCredentialRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        /**
+         * Called whenever the issuer defers a credential.
+         * Each deferred target identifies its configuration and optional dataset;
+         * [DeferredCredentialTransaction.transactionId] should be stored and passed to [pollDeferredFlow] later.
+         */
+        onDeferredTarget: suspend (DeferredCredentialTransaction) -> Unit,
         /** Called with the exact response batch size before any credential of that batch is persisted. */
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
@@ -768,7 +1135,7 @@ object WalletIssuanceHandler {
         attestationAssembler = attestationAssembler,
         onEvent = onEvent,
         httpClient = httpClient,
-        onDeferredCredential = onDeferredCredential,
+        onDeferredCredential = onDeferredTarget,
         beforeCredentialsStored = beforeCredentialsStored,
         onCredentialStored = onCredentialStored,
         metadataTrustResolver = metadataTrustResolver,
@@ -785,7 +1152,29 @@ object WalletIssuanceHandler {
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
-        onDeferredCredential: suspend (DeferredCredentialTransaction) -> Unit = {},
+        onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit = { _, _ -> },
+        /** Called with the exact response batch size before any credential of that batch is persisted. */
+        beforeCredentialsStored: suspend (Int) -> Unit = {},
+        onCredentialStored: suspend (StoredCredential) -> Unit = {},
+    ): Flow<StoredCredential> = receiveCredentialFlow(
+        wallet = wallet,
+        request = request,
+        attestationAssembler = attestationAssembler,
+        onEvent = onEvent,
+        httpClient = httpClient,
+        onDeferredTarget = { target -> onDeferredTransactionId(target.credentialConfigurationId, target.transactionId) },
+        beforeCredentialsStored = beforeCredentialsStored,
+        onCredentialStored = onCredentialStored,
+    )
+
+    /** Streams issuance with the complete target and holder context for each deferred request. */
+    fun receiveCredentialFlow(
+        wallet: Wallet,
+        request: ReceiveCredentialFromPreviewRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        onDeferredTarget: suspend (DeferredCredentialTransaction) -> Unit,
         /** Called with the exact response batch size before any credential of that batch is persisted. */
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
@@ -802,7 +1191,7 @@ object WalletIssuanceHandler {
                     attestationAssembler = attestationAssembler,
                     onEvent = onEvent,
                     httpClient = httpClient,
-                    onDeferredCredential = onDeferredCredential,
+                    onDeferredCredential = onDeferredTarget,
                     beforeCredentialsStored = beforeCredentialsStored,
                     onCredentialStored = onCredentialStored,
                     metadataTrustResolver = null,
@@ -865,6 +1254,7 @@ object WalletIssuanceHandler {
 
         val selections = wallet.resolveCredentialSelections(request.credentials, offer.credentialConfigurationIds,
             issuerMetadata, keyMaterial, did)
+            .onEach { it.bindings.requireStoredHolderKeys() }
         log.debug { "Offer contains ${offeredCredentials.size} credential(s)" }
 
         // 3. Pre-authorized code grant only (auth-code handled by separate flow)
@@ -932,90 +1322,28 @@ object WalletIssuanceHandler {
         log.trace { "Token obtained" }
         onEvent.emitSafely(WalletSessionEvent.issuance_token_obtained)
 
-        // A DPoP-typed access token must carry a per-request proof; a Bearer token must not.
-        val credentialDpop = dpopAlgorithmsForToken(tokenResponse.token_type, dpopAlgorithms)
-            ?.let { DpopRequestContext(it, keyMaterial) }
-
-        val credentialEndpoint = issuerMetadata.credentialEndpoint
-        log.trace { "Credential endpoint: $credentialEndpoint" }
-
-        val targets = grantedCredentialSelections(issuerMetadata, selections,
-            tokenResponse.authorization_details, tokenResponse.scope)
-        for ((index, selection) in targets.withIndex()) {
-            val (target, selected) = selection
-            var stage = CredentialIssuanceStage.PROOF
-            try {
-                val configuration = issuerMetadata.credentialConfigurationsSupported.getValue(target.credentialConfigurationId)
-                val algorithms = supportedJwtProofAlgorithms(configuration.proofTypesSupported, wallet.attachedKeyAttestationProvider() != null)
-                stage = CredentialIssuanceStage.REQUEST
-                val credentialResponse = requestCredentialWithNonceRetry(
-                    request = FetchCredentialRequest(
-                        credentialEndpoint = Url(credentialEndpoint),
-                        accessToken = tokenResponse.access_token,
-                        credentialConfigurationId = target.credentialConfigurationId,
-                        credentialIdentifier = target.credentialIdentifier,
-                    ),
-                    nonceEndpoint = issuerMetadata.nonceEndpoint,
-                    httpClient = httpClient,
-                    buildProof = algorithms?.let { { nonce ->
-                        stage = CredentialIssuanceStage.PROOF
-                        buildProofCollection(wallet, selected, configuration,
-                        issuerMetadata.credentialIssuer, nonce, request.clientId.takeUnless { anonymousPreAuthorizedCode }).also { stage = CredentialIssuanceStage.REQUEST }
-                    } },
-                    onProofGenerated = { onEvent.emitSafely(WalletSessionEvent.issuance_proof_signed) },
-                    dpop = credentialDpop,
-                )
-                stage = CredentialIssuanceStage.RESPONSE
-                onEvent.emitSafely(WalletSessionEvent.issuance_credential_received)
-                val rawCredentials = credentialResponse.credentials
-                if (rawCredentials == null) {
-                    val endpoint = requireNotNull(issuerMetadata.deferredCredentialEndpoint) { "Issuer did not advertise a deferred endpoint" }
-                    stage = CredentialIssuanceStage.STORAGE
-                    retainDeferredTarget(wallet, target, selected, configuration, credentialResponse,
-                        endpoint, tokenResponse.access_token, tokenResponse.token_type, credentialDpop, keyMaterial,
-                        request.key == null, configuration.credentialMetadata?.display?.firstOrNull()?.name,
-                        storedCredentialDisplayMetadata(issuerMetadata, target.credentialConfigurationId, requestMetadata),
-                        httpClient, onDeferredCredential)
-                    onEvent.emitSafely(WalletSessionEvent.issuance_deferred)
-                    continue
-                }
-                val prepared = wallet.prepareIssuedCredentials(rawCredentials.map {
-                    val value = it.credential
-                    if (value is JsonPrimitive) value.content else value.toString()
-                }, selected.bindings,
-                    configuration.credentialMetadata?.display?.firstOrNull()?.name,
-                    storedCredentialDisplayMetadata(issuerMetadata, target.credentialConfigurationId, requestMetadata),
-                    proofRequired = algorithms != null, expectedConfiguration = configuration)
-                stage = CredentialIssuanceStage.STORAGE
-                val outcome = wallet.issuanceSessions(httpClient).storeReceivedCredentials(
-                    prepared, target.credentialConfigurationId, target.credentialIdentifier,
-                    persistable = request.key == null && selected.selection.holderBindings.none { it.key != null },
-                    beforeCredentialsStored = beforeCredentialsStored,
-                    onCredentialStored = { entry ->
-                        stage = CredentialIssuanceStage.OBSERVER
-                        onCredentialStored(entry)
-                        onEvent.emitSafely(WalletSessionEvent.issuance_credential_stored)
-                        send(entry)
-                        stage = CredentialIssuanceStage.STORAGE
-                    },
-                )
-                if (outcome is WalletIssuanceOutcome.Failed) throw CredentialStorageException(outcome)
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                throw CredentialIssuanceException(
-                    CredentialIssuanceFailure(target, stage, targets.drop(index + 1).map { it.first }), error,
-                    storageOutcome = (error as? CredentialStorageException)?.outcome,
-                )
-            }
-        }
+        executeCredentialTargets(
+            wallet, httpClient, issuerMetadata,
+            grantedCredentialSelections(issuerMetadata, selections, tokenResponse.authorization_details, tokenResponse.scope),
+            CredentialIssuanceAccess(tokenResponse.access_token, keyMaterial,
+                dpopAlgorithmsForToken(tokenResponse.token_type, dpopAlgorithms),
+                request.clientId.takeUnless { anonymousPreAuthorizedCode }),
+            persistable = request.key == null, sessions = wallet.issuanceSessions(httpClient), requestMetadata = requestMetadata, onEvent = onEvent,
+            beforeCredentialsStored = beforeCredentialsStored,
+            onCredentialStored = { entry ->
+                onCredentialStored(entry)
+                onEvent.emitSafely(WalletSessionEvent.issuance_credential_stored)
+                send(entry)
+            },
+            onDeferredCredential = onDeferredCredential,
+        )
 
         onEvent.emitSafely(WalletSessionEvent.issuance_completed)
     }
 
     /**
-     * Convenience wrapper that collects [receiveCredentialFlow] into a result.
-     * Deferred credential transaction IDs are included in [ReceiveCredentialResult.deferredCredentials].
+     * Retains the released transaction-map result. Use [receiveCredentials] for detailed progress.
+     * Partial failures or repeated deferred configurations throw [CredentialReceiveException] with that progress.
      */
     suspend fun receiveCredential(
         wallet: Wallet,
@@ -1027,22 +1355,17 @@ object WalletIssuanceHandler {
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
         metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
-    ): ReceiveCredentialResult {
-        val progress = IssuanceResultCollector(onCredentialStored)
-        return progress.collect(receiveCredentialFlow(
-            wallet = wallet,
-            request = request,
-            attestationAssembler = attestationAssembler,
-            onEvent = onEvent,
-            httpClient = httpClient,
-            onDeferredCredential = progress::deferred,
-            beforeCredentialsStored = beforeCredentialsStored,
-            onCredentialStored = progress::stored,
-            metadataTrustResolver = metadataTrustResolver,
-        ))
-    }
+    ): ReceiveCredentialResult = receiveCredentials(
+        wallet = wallet,
+        request = request,
+        attestationAssembler = attestationAssembler,
+        onEvent = onEvent,
+        httpClient = httpClient,
+        beforeCredentialsStored = beforeCredentialsStored,
+        onCredentialStored = onCredentialStored,
+        metadataTrustResolver = metadataTrustResolver,
+    ).let(::ReceiveCredentialResult)
 
-    /** Receives credentials using exactly the offer resolution selected by [request]. */
     suspend fun receiveCredential(
         wallet: Wallet,
         request: ReceiveCredentialFromPreviewRequest,
@@ -1052,7 +1375,28 @@ object WalletIssuanceHandler {
         /** Called with the exact response batch size before any credential of that batch is persisted. */
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
-    ): ReceiveCredentialResult {
+    ): ReceiveCredentialResult = receiveCredentials(
+        wallet = wallet,
+        request = request,
+        attestationAssembler = attestationAssembler,
+        onEvent = onEvent,
+        httpClient = httpClient,
+        beforeCredentialsStored = beforeCredentialsStored,
+        onCredentialStored = onCredentialStored,
+    ).let(::ReceiveCredentialResult)
+
+    /** Collects stored IDs, every deferred target and any stopped-target/storage progress. */
+    suspend fun receiveCredentials(
+        wallet: Wallet,
+        request: ReceiveCredentialRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        /** Called with the exact response batch size before any credential of that batch is persisted. */
+        beforeCredentialsStored: suspend (Int) -> Unit = {},
+        onCredentialStored: suspend (StoredCredential) -> Unit = {},
+        metadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
+    ): ReceiveCredentialsResult {
         val progress = IssuanceResultCollector(onCredentialStored)
         return progress.collect(receiveCredentialFlow(
             wallet = wallet,
@@ -1060,7 +1404,32 @@ object WalletIssuanceHandler {
             attestationAssembler = attestationAssembler,
             onEvent = onEvent,
             httpClient = httpClient,
-            onDeferredCredential = progress::deferred,
+            onDeferredTarget = progress::deferred,
+            beforeCredentialsStored = beforeCredentialsStored,
+            onCredentialStored = progress::stored,
+            metadataTrustResolver = metadataTrustResolver,
+        ))
+    }
+
+    /** Receives credentials using exactly the offer resolution selected by [request]. */
+    suspend fun receiveCredentials(
+        wallet: Wallet,
+        request: ReceiveCredentialFromPreviewRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        /** Called with the exact response batch size before any credential of that batch is persisted. */
+        beforeCredentialsStored: suspend (Int) -> Unit = {},
+        onCredentialStored: suspend (StoredCredential) -> Unit = {},
+    ): ReceiveCredentialsResult {
+        val progress = IssuanceResultCollector(onCredentialStored)
+        return progress.collect(receiveCredentialFlow(
+            wallet = wallet,
+            request = request,
+            attestationAssembler = attestationAssembler,
+            onEvent = onEvent,
+            httpClient = httpClient,
+            onDeferredTarget = progress::deferred,
             beforeCredentialsStored = beforeCredentialsStored,
             onCredentialStored = progress::stored,
         ))
@@ -1128,7 +1497,6 @@ object WalletIssuanceHandler {
                 tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) },
                 credentialEndpoint = Url(issuerMetadata.credentialEndpoint),
                 offeredCredentials = offeredCredentials.map { it.credentialConfigurationId },
-                batchSize = issuerMetadata.batchCredentialIssuance?.batchSize,
                 nonceEndpoint = issuerMetadata.nonceEndpoint?.let { Url(it) },
             ),
             offer = offer,
@@ -1199,11 +1567,7 @@ object WalletIssuanceHandler {
     }
 
     suspend fun requestToken(request: RequestTokenRequest): RequestTokenResult =
-        requestToken(
-            request = request,
-            tokenAttestation = null,
-            anonymousPreAuthorizedCode = request.anonymousPreAuthorizedCode,
-        )
+        requestTokenDetailed(request).toReleasedResult()
 
     suspend fun requestToken(
         wallet: Wallet,
@@ -1211,7 +1575,22 @@ object WalletIssuanceHandler {
         attestationAssembler: ClientAttestationAssembler? = null,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         onAttestationObtained: suspend () -> Unit = {},
-    ): RequestTokenResult {
+    ): RequestTokenResult = requestTokenDetailed(wallet, request, attestationAssembler, httpClient, onAttestationObtained).toReleasedResult()
+
+    suspend fun requestTokenDetailed(request: RequestTokenRequest): RequestTokenDetailedResult =
+        requestTokenDetailed(
+            request = request,
+            tokenAttestation = null,
+            anonymousPreAuthorizedCode = request.anonymousPreAuthorizedCode,
+        )
+
+    suspend fun requestTokenDetailed(
+        wallet: Wallet,
+        request: RequestTokenRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        onAttestationObtained: suspend () -> Unit = {},
+    ): RequestTokenDetailedResult {
         val credentialIssuer = request.credentialIssuer?.takeIf { it.isNotBlank() }
         val asMetadata = credentialIssuer?.let {
             val metadataResolver = IssuerMetadataResolver(httpClient)
@@ -1236,7 +1615,7 @@ object WalletIssuanceHandler {
                             request.tokenRequestHeaders.isEmpty() &&
                             tokenAttestation == null)
 
-        return requestToken(
+        return requestTokenDetailed(
             request = request,
             tokenAttestation = tokenAttestation,
             anonymousPreAuthorizedCode = anonymousPreAuthorizedCode,
@@ -1244,12 +1623,12 @@ object WalletIssuanceHandler {
         )
     }
 
-    private suspend fun requestToken(
+    private suspend fun requestTokenDetailed(
         request: RequestTokenRequest,
         tokenAttestation: TokenClientAttestation?,
         anonymousPreAuthorizedCode: Boolean,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
-    ): RequestTokenResult {
+    ): RequestTokenDetailedResult {
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
             redirectUris = listOf(request.redirectUri.toString())
@@ -1280,7 +1659,7 @@ object WalletIssuanceHandler {
             onResponseHeaders = tokenAttestation?.onResponseHeaders ?: {},
             attestationHeadersFactory = tokenAttestation?.factory,
         )
-        return RequestTokenResult(
+        return RequestTokenDetailedResult(
             accessToken = tokenResponse.access_token,
             expiresIn = tokenResponse.expires_in,
             tokenType = tokenResponse.token_type,
@@ -1303,11 +1682,24 @@ object WalletIssuanceHandler {
         )
     }
 
+    /** Signs one proof, preserving the released single-proof SDK contract. */
     suspend fun signProof(
         wallet: Wallet,
         request: SignProofRequest,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
-    ): SignProofResult {
+    ): SignProofResult = SignProofResult(
+        signProofs(wallet, SignProofsRequest(
+            issuerUrl = request.issuerUrl, credentialConfigurationId = request.credentialConfigurationId,
+            nonce = request.nonce, key = request.key, keyId = request.keyId, did = request.did, clientId = request.clientId,
+        ), httpClient).proofs.jwt!!.single()
+    )
+
+    /** Signs the accepted holders through the shared proof preflight and builder. */
+    suspend fun signProofs(
+        wallet: Wallet,
+        request: SignProofsRequest,
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+    ): SignProofsResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available for signing proof")
@@ -1321,7 +1713,7 @@ object WalletIssuanceHandler {
         val selected = wallet.resolveCredentialSelections(
             listOf(WalletCredentialSelection(request.credentialConfigurationId, holderBindings = request.holderBindings)),
             listOf(request.credentialConfigurationId), issuerMetadata, keyMaterial, request.did).single()
-        return SignProofResult(buildProofCollection(wallet, selected, configuration, issuerMetadata.credentialIssuer, request.nonce, request.clientId))
+        return SignProofsResult(buildProofCollection(wallet, selected, configuration, issuerMetadata.credentialIssuer, request.nonce, request.clientId))
     }
 
     internal suspend fun buildProofCollection(
@@ -1347,13 +1739,17 @@ object WalletIssuanceHandler {
     }
 
     suspend fun fetchCredential(request: FetchCredentialRequest): FetchCredentialResult =
-        fetchCredential(request, httpClient)
+        FetchCredentialResult(fetchCredentials(request))
 
-    internal suspend fun fetchCredential(
+    /** Fetches complete progress without projecting away deferral or storage recovery. */
+    suspend fun fetchCredentials(request: FetchCredentialRequest): FetchCredentialsResult =
+        fetchCredentials(request, httpClient)
+
+    internal suspend fun fetchCredentials(
         request: FetchCredentialRequest,
         httpClient: HttpClient,
         dpop: DpopRequestContext? = null,
-    ): FetchCredentialResult {
+    ): FetchCredentialsResult {
         require(request.tokenType.equals(if (dpop == null) "Bearer" else "DPoP", ignoreCase = true)) {
             "A DPoP token requires its sender-constraining key and a wallet"
         }
@@ -1371,30 +1767,32 @@ object WalletIssuanceHandler {
             "Supply one holder binding for each proof when storing credentials"
         }
         val credentialResponse = requestCredential(request, httpClient, dpop)
-        if (credentialResponse.transactionId != null) return FetchCredentialResult(
+        if (credentialResponse.transactionId != null) return FetchCredentialsResult(
             deferredCredential = DeferredCredentialTransaction(request.credentialConfigurationId,
                 request.credentialIdentifier, requireNotNull(credentialResponse.transactionId),
                 request.holderBindings.map { it.copy(key = null, keyId = it.keyId ?: request.keyId) },
                 intervalSeconds = requireNotNull(credentialResponse.interval),
                 proofRequired = request.effectiveProofs != null),
-            interval = credentialResponse.interval,
         )
         val rawCredentials = credentialResponse.credentials
             ?.map { it.credential.let { c -> if (c is JsonPrimitive) c.content else c.toString() } }
             ?: error("Credential response contained no credentials")
-        require(rawCredentials.isNotEmpty() && rawCredentials.size <= requestedCount) { "Invalid credential response count" }
-        return FetchCredentialResult(rawCredentials = rawCredentials)
+        require(rawCredentials.isNotEmpty() && (request.effectiveProofs == null || rawCredentials.size <= requestedCount)) {
+            "Invalid credential response count"
+        }
+        return FetchCredentialsResult(rawCredentials = rawCredentials)
     }
 
     private suspend fun requestCredential(
         request: FetchCredentialRequest,
         httpClient: HttpClient,
         dpop: DpopRequestContext? = null,
+        onStage: (CredentialIssuanceStage) -> Unit = {},
     ): CredentialResponse {
         val credentialRequestJson = CredentialRequestBuilder.build(
             CredentialIssuanceTarget(request.credentialConfigurationId, request.credentialIdentifier), request.effectiveProofs)
         return requestCredentialResponse(request.credentialEndpoint.toString(), request.accessToken,
-            credentialRequestJson, httpClient, dpop)
+            credentialRequestJson, httpClient, dpop, onStage = onStage)
     }
 
     private suspend fun requestCredentialResponse(
@@ -1404,12 +1802,14 @@ object WalletIssuanceHandler {
         httpClient: HttpClient,
         dpop: DpopRequestContext?,
         expectedTransactionId: String? = null,
+        onStage: (CredentialIssuanceStage) -> Unit = {},
     ): CredentialResponse {
         val scheme = if (dpop != null) "DPoP" else "Bearer"
-        var dpopNonce: String? = null
+        var dpopNonce: String? = dpop?.nonce
 
         repeat(DPOP_NONCE_ATTEMPTS) { attempt ->
             val proof = dpop?.let {
+                onStage(CredentialIssuanceStage.PROOF)
                 buildDpopProof(
                     keyMaterial = it.keyMaterial,
                     algorithms = it.algorithms,
@@ -1418,13 +1818,16 @@ object WalletIssuanceHandler {
                     nonce = dpopNonce,
                 )
             }
+            onStage(CredentialIssuanceStage.REQUEST)
             val response = postFollowingRedirects(httpClient, endpoint) {
                 header(HttpHeaders.Authorization, "$scheme ${accessToken}")
                 proof?.let { header(DPOP_HEADER, it) }
                 contentType(ContentType.Application.Json)
                 setBody(body.toString())
             }
+            dpop?.nonce = response.headers[DPOP_NONCE_HEADER] ?: dpopNonce
             if (response.status.isSuccess()) {
+                onStage(CredentialIssuanceStage.RESPONSE)
                 return response.body<CredentialResponse>().validateCredentialResponse(response.status.value, expectedTransactionId)
             }
 
@@ -1474,11 +1877,16 @@ object WalletIssuanceHandler {
         buildProof: (suspend (String?) -> Proofs?)?,
         onProofGenerated: suspend () -> Unit = {},
         dpop: DpopRequestContext? = null,
+        onStage: (CredentialIssuanceStage) -> Unit = {},
     ): CredentialResponse {
         suspend fun fetchWithFreshProof(): CredentialResponse {
-            val proofs = buildProof?.invoke(requestProofNonce(httpClient, nonceEndpoint))
+            val proofs = buildProof?.let {
+                val nonce = requestProofNonce(httpClient, nonceEndpoint)
+                onStage(CredentialIssuanceStage.PROOF)
+                it(nonce)
+            }
             onProofGenerated()
-            return requestCredential(request.copy(proofs = proofs), httpClient, dpop)
+            return requestCredential(request.copy(proofs = proofs), httpClient, dpop, onStage)
         }
 
         return try {
@@ -1504,13 +1912,24 @@ object WalletIssuanceHandler {
         wallet: Wallet,
         request: FetchCredentialRequest,
         httpClient: HttpClient = defaultHttpClient(),
+        beforeCredentialsStored: suspend (Int) -> Unit = {},
+        onCredentialStored: suspend (StoredCredential) -> Unit = {},
+    ): FetchCredentialResult = FetchCredentialResult(
+        fetchCredentials(wallet, request, httpClient, beforeCredentialsStored, onCredentialStored)
+    )
+
+    /** Fetches and optionally stores credentials while retaining complete continuation details. */
+    suspend fun fetchCredentials(
+        wallet: Wallet,
+        request: FetchCredentialRequest,
+        httpClient: HttpClient = defaultHttpClient(),
         /** Called with the exact response batch size before any credential of that batch is persisted. */
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
-    ): FetchCredentialResult {
+    ): FetchCredentialsResult {
         wallet.issuanceSessions(httpClient).ensureOpen()
         val dpop = resolveIsolatedDpop(wallet, request.tokenType, request.dpopKeyId, request.credentialIssuerBaseUrl, httpClient)
-        if (!request.storeInWallet) return fetchCredential(request, httpClient, dpop)
+        if (!request.storeInWallet) return fetchCredentials(request, httpClient, dpop)
         val storage = resolveCredentialStorageContext(
             credentialIssuerBaseUrl = request.credentialIssuerBaseUrl,
             credentialConfigurationId = request.credentialConfigurationId,
@@ -1518,15 +1937,10 @@ object WalletIssuanceHandler {
             labelOverride = request.label,
             httpClient = httpClient,
         )
-        val defaultKey = wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
-        val bindings = request.holderBindings.mapNotNull { binding ->
-            val material = binding.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
-                ?: binding.keyId?.let { requireNotNull(wallet.resolveKeyMaterial(it, setOf(KeyUsage.SIGN))) }
-                ?: defaultKey ?: return@mapNotNull null
-            ResolvedCredentialHolderBinding(material, binding.did)
-        }
-        require(request.effectiveProofs == null || bindings.size == request.holderBindings.size) { "Holder keys are unavailable" }
-        val result = fetchCredential(request, httpClient, dpop)
+        val bindings = wallet.resolveStoredCredentialBindings(
+            request.holderBindings, request.keyId, proofRequired = request.effectiveProofs != null,
+        )
+        val result = fetchCredentials(request, httpClient, dpop)
         if (result.deferredCredential != null) return result
         val prepared = wallet.prepareIssuedCredentials(result.rawCredentials, bindings, storage.label, storage.metadata,
             proofRequired = request.effectiveProofs != null,
@@ -1561,18 +1975,19 @@ object WalletIssuanceHandler {
      * [generateAuthorizationUrl] overload that takes one.
      */
     private suspend fun pushAuthorizationRequest(
-        request: GenerateAuthorizationUrlRequest,
+        request: GenerateBatchAuthorizationUrlRequest,
         offer: CredentialOffer?,
         issuerMetadata: CredentialIssuerMetadata,
         asMetadata: AuthorizationServerMetadata,
         authorizationEndpoint: String,
         authBuilder: AuthorizationRequestBuilder,
         credentialConfigurationIds: List<String>,
+        scope: String?,
         parEndpoint: String,
         keyMaterial: WalletKeyStoreEntry?,
         attestationAssembler: ClientAttestationAssembler?,
         httpClient: HttpClient,
-    ): GenerateAuthorizationUrlResult {
+    ): GenerateBatchAuthorizationUrlResult {
         // Binds the eventual access token to this wallet's key at authorization time (RFC 9449
         // Section 10). Only offered when the key can actually sign an advertised algorithm.
         val dpopJkt = keyMaterial
@@ -1587,7 +2002,7 @@ object WalletIssuanceHandler {
             redirectUri = request.redirectUri.toString(),
             dpopJkt = dpopJkt,
             credentialIssuerLocations = issuerMetadata.authorizationDetailLocations(),
-            scope = CredentialRequestBuilder.authorizationScope(issuerMetadata, credentialConfigurationIds, asMetadata),
+            scope = scope,
         )
 
         // A pushed authorization request authenticates the client exactly as the token request does
@@ -1620,7 +2035,7 @@ object WalletIssuanceHandler {
             attestationHeaders = attestationHeaders,
         )
 
-        return GenerateAuthorizationUrlResult(
+        return GenerateBatchAuthorizationUrlResult(
             authorizationUrl = Url(
                 URLBuilder(authorizationEndpoint).apply {
                     parameters.append("client_id", request.clientId)
@@ -1933,12 +2348,57 @@ object WalletIssuanceHandler {
     suspend fun generateAuthorizationUrl(request: GenerateAuthorizationUrlRequest): GenerateAuthorizationUrlResult =
         generateAuthorizationUrl(request = request, keyMaterial = null)
 
+    /** Authorizes selected configurations, negotiating scopes or authorization details from metadata. */
+    suspend fun generateBatchAuthorizationUrl(
+        wallet: Wallet,
+        request: GenerateBatchAuthorizationUrlRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+    ): GenerateBatchAuthorizationUrlResult = generateAuthorizationUrl(
+        request = request,
+        keyMaterial = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)),
+        attestationAssembler = attestationAssembler,
+        httpClient = httpClient,
+    )
+
+    suspend fun generateBatchAuthorizationUrl(request: GenerateBatchAuthorizationUrlRequest): GenerateBatchAuthorizationUrlResult =
+        generateAuthorizationUrl(request = request, keyMaterial = null)
+
     private suspend fun generateAuthorizationUrl(
         request: GenerateAuthorizationUrlRequest,
         keyMaterial: WalletKeyStoreEntry?,
         attestationAssembler: ClientAttestationAssembler? = null,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ): GenerateAuthorizationUrlResult {
+        val result = generateAuthorizationUrl(
+            request = GenerateBatchAuthorizationUrlRequest(offerUrl = request.offerUrl, offerJson = request.offerJson,
+                clientId = request.clientId, redirectUri = request.redirectUri, usePkce = request.usePkce),
+            keyMaterial = keyMaterial, attestationAssembler = attestationAssembler, httpClient = httpClient,
+            selection = AuthorizationSelection.ReleasedSingle(request.useScope),
+        )
+        return GenerateAuthorizationUrlResult(result.authorizationUrl, result.state, result.codeVerifier,
+            result.credentialConfigurationIds.single(), result.credentialIssuerBaseUrl, result.nonceEndpoint)
+    }
+
+    private fun CredentialIssuerMetadata.requireCredentialScope(credentialConfigurationId: String): String =
+        requireNotNull(credentialConfigurationsSupported[credentialConfigurationId]?.scope) {
+            "Credential configuration '$credentialConfigurationId' publishes no scope, so this " +
+                    "credential cannot be requested by scope (OID4VCI 1.0 Section 5.1.2)"
+        }
+
+
+    private sealed interface AuthorizationSelection {
+        data object Negotiated : AuthorizationSelection
+        data class ReleasedSingle(val useScope: Boolean) : AuthorizationSelection
+    }
+
+    private suspend fun generateAuthorizationUrl(
+        request: GenerateBatchAuthorizationUrlRequest,
+        keyMaterial: WalletKeyStoreEntry?,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        selection: AuthorizationSelection = AuthorizationSelection.Negotiated,
+    ): GenerateBatchAuthorizationUrlResult {
         val offer = if (request.credentialIssuer == null) resolveOffer(request, httpClient) else null
         val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(request.credentialIssuer ?: requireNotNull(offer).credentialIssuer).metadata
         val asMetadata =
@@ -1949,12 +2409,23 @@ object WalletIssuanceHandler {
 
         val clientConfig = clientConfig(request.clientId, request.redirectUri)
         val authBuilder = AuthorizationRequestBuilder(clientConfig)
-        val credentialConfigurationIds = request.credentialConfigurationIds ?: requireNotNull(offer).credentialConfigurationIds
+        val credentialConfigurationIds = when (selection) {
+            is AuthorizationSelection.ReleasedSingle -> listOf(requireNotNull(offer).credentialConfigurationIds.first())
+            AuthorizationSelection.Negotiated -> request.credentialConfigurationIds ?: requireNotNull(offer).credentialConfigurationIds
+        }
         require(credentialConfigurationIds.isNotEmpty() && credentialConfigurationIds.distinct().size == credentialConfigurationIds.size)
         credentialConfigurationIds.forEach {
             require(it in issuerMetadata.credentialConfigurationsSupported && (offer == null || it in offer.credentialConfigurationIds)) {
                 "Unknown or unoffered credential configuration '$it'"
             }
+        }
+
+        val scope = when (selection) {
+            is AuthorizationSelection.ReleasedSingle -> if (selection.useScope) {
+                issuerMetadata.requireCredentialScope(credentialConfigurationIds.single())
+            } else null
+            AuthorizationSelection.Negotiated -> CredentialRequestBuilder.authorizationScope(
+                issuerMetadata, credentialConfigurationIds, asMetadata)
         }
 
         // Engaged only when the authorization server *requires* PAR, not merely advertises an
@@ -1977,6 +2448,7 @@ object WalletIssuanceHandler {
                 authorizationEndpoint = authorizationEndpoint,
                 authBuilder = authBuilder,
                 credentialConfigurationIds = credentialConfigurationIds,
+                scope = scope,
                 parEndpoint = parEndpoint,
                 keyMaterial = keyMaterial,
                 attestationAssembler = attestationAssembler,
@@ -1991,9 +2463,9 @@ object WalletIssuanceHandler {
             credentialIssuerLocations = issuerMetadata.authorizationDetailLocations(),
             usePKCE = request.usePkce,
             metadata = asMetadata,
-            scope = CredentialRequestBuilder.authorizationScope(issuerMetadata, credentialConfigurationIds, asMetadata),
+            scope = scope,
         )
-        return GenerateAuthorizationUrlResult(
+        return GenerateBatchAuthorizationUrlResult(
             authorizationUrl = Url(authRequest.url),
             state = authRequest.state,
             codeVerifier = authRequest.pkceData?.codeVerifier,
@@ -2007,12 +2479,27 @@ object WalletIssuanceHandler {
      * Step 2 of auth-code grant: exchange the authorization code for a token.
      * Wraps [TokenRequestBuilder.exchangeAuthorizationCode].
      */
-    suspend fun exchangeCode(request: ExchangeCodeRequest): RequestTokenResult {
+    suspend fun exchangeCode(request: ExchangeCodeRequest): RequestTokenResult =
+        exchangeCodeDetailed(request).toReleasedResult()
+
+    suspend fun exchangeCode(
+        wallet: Wallet,
+        request: ExchangeCodeRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        onAttestationObtained: suspend () -> Unit = {},
+        keyMaterial: WalletKeyStoreEntry? = null,
+        useDpop: Boolean = false,
+    ): RequestTokenResult = exchangeCodeDetailed(
+        wallet, request, attestationAssembler, httpClient, onAttestationObtained, keyMaterial, useDpop,
+    ).toReleasedResult()
+
+    suspend fun exchangeCodeDetailed(request: ExchangeCodeRequest): RequestTokenDetailedResult {
         val httpClient = httpClient
         val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
             ?: error("credentialIssuerBaseUrl must be provided")
         val asMetadata = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient)
-        return exchangeCode(
+        return exchangeCodeDetailed(
             request = request,
             tokenEndpoint = asMetadata.tokenEndpoint
                 ?: error("Authorization server metadata contains no token_endpoint"),
@@ -2021,7 +2508,7 @@ object WalletIssuanceHandler {
         )
     }
 
-    suspend fun exchangeCode(
+    suspend fun exchangeCodeDetailed(
         wallet: Wallet,
         request: ExchangeCodeRequest,
         attestationAssembler: ClientAttestationAssembler? = null,
@@ -2040,7 +2527,7 @@ object WalletIssuanceHandler {
         keyMaterial: WalletKeyStoreEntry? = null,
         /** See [ReceiveAuthorizedCredentialRequest.useDpop]. Client authentication is unaffected. */
         useDpop: Boolean = false,
-    ): RequestTokenResult {
+    ): RequestTokenDetailedResult {
         val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
             ?: error("credentialIssuerBaseUrl must be provided")
         val asMetadata = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient)
@@ -2058,7 +2545,7 @@ object WalletIssuanceHandler {
             onAttestationObtained = onAttestationObtained,
             httpClient = httpClient,
         )
-        return exchangeCode(
+        return exchangeCodeDetailed(
             request = request,
             tokenEndpoint = tokenEndpoint,
             tokenAttestation = tokenAttestation,
@@ -2069,7 +2556,7 @@ object WalletIssuanceHandler {
         )
     }
 
-    private suspend fun exchangeCode(
+    private suspend fun exchangeCodeDetailed(
         request: ExchangeCodeRequest,
         tokenEndpoint: String,
         tokenAttestation: TokenClientAttestation?,
@@ -2082,7 +2569,7 @@ object WalletIssuanceHandler {
         asMetadata: AuthorizationServerMetadata? = null,
         keyMaterial: WalletKeyStoreEntry? = null,
         useDpop: Boolean = false,
-    ): RequestTokenResult {
+    ): RequestTokenDetailedResult {
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
             redirectUris = listOf(request.redirectUri.toString())
@@ -2119,7 +2606,7 @@ object WalletIssuanceHandler {
             onResponseHeaders = tokenAttestation?.onResponseHeaders ?: {},
             attestationHeadersFactory = tokenAttestation?.factory,
         )
-        return RequestTokenResult(
+        return RequestTokenDetailedResult(
             accessToken = tokenResponse.access_token,
             expiresIn = tokenResponse.expires_in,
             tokenType = tokenResponse.token_type,
@@ -2149,17 +2636,30 @@ object WalletIssuanceHandler {
         /** Called with the exact response batch size before any credential of that batch is persisted. */
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
-        onPending: suspend (DeferredCredentialPending) -> Unit = {},
+    ): Flow<StoredCredential> = pollDeferredFlow(
+        wallet = wallet,
+        request = request,
+        onEvent = onEvent,
+        httpClient = httpClient,
+        beforeCredentialsStored = beforeCredentialsStored,
+        onCredentialStored = onCredentialStored,
+        onPending = {},
+    )
+
+    fun pollDeferredFlow(
+        wallet: Wallet,
+        request: PollDeferredRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        /** Called with the exact response batch size before any credential of that batch is persisted. */
+        beforeCredentialsStored: suspend (Int) -> Unit = {},
+        onCredentialStored: suspend (StoredCredential) -> Unit = {},
+        onPending: suspend (DeferredCredentialPending) -> Unit,
     ): Flow<StoredCredential> = channelFlow {
         wallet.issuanceSessions(httpClient).ensureOpen()
-        val defaultKey = wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
-        val bindings = request.holderBindings.mapNotNull { binding ->
-            val material = binding.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
-                ?: binding.keyId?.let { requireNotNull(wallet.resolveKeyMaterial(it, setOf(KeyUsage.SIGN))) }
-                ?: defaultKey ?: return@mapNotNull null
-            ResolvedCredentialHolderBinding(material, binding.did)
-        }
-        require(bindings.size == request.holderBindings.size) { "Holder keys are unavailable" }
+        val bindings = wallet.resolveStoredCredentialBindings(
+            request.holderBindings, request.keyId, proofRequired = request.proofRequired || request.holderBindings.size > 1,
+        )
         val dpop = resolveIsolatedDpop(wallet, request.tokenType, request.dpopKeyId,
             request.credentialIssuerBaseUrl, httpClient)
         val storage = resolveCredentialStorageContext(
@@ -2261,12 +2761,11 @@ object WalletIssuanceHandler {
      */
     fun receiveCredentialAuthCodeFlow(
         wallet: Wallet,
-        credentials: List<WalletCredentialSelection>,
-        onDeferredCredential: suspend (DeferredCredentialTransaction) -> Unit = {},
         code: String,
         codeVerifier: String?,
         credentialIssuerBaseUrl: String,
         credentialEndpoint: Url,
+        credentialConfigurationId: String,
         nonceEndpoint: String? = null,
         clientId: String = DEFAULT_CLIENT_ID,
         redirectUri: Url = Url("openid://"),
@@ -2292,113 +2791,87 @@ object WalletIssuanceHandler {
         /** Called with the exact response batch size before any credential of that batch is persisted. */
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
+    ): Flow<StoredCredential> = receiveCredentialsAuthCodeFlow(
+        wallet = wallet,
+        request = ReceiveAuthorizedCredentialsRequest(
+            credentials = listOf(WalletCredentialSelection(credentialConfigurationId)), code = code,
+            codeVerifier = codeVerifier, credentialIssuer = credentialIssuerBaseUrl, credentialEndpoint = credentialEndpoint,
+            nonceEndpoint = nonceEndpoint?.let(::Url), clientId = clientId, redirectUri = redirectUri, useDpop = useDpop,
+            key = key, keyId = keyReference, did = did, metadata = metadata, label = label,
+        ),
+        attestationAssembler = attestationAssembler, onEvent = onEvent, httpClient = httpClient,
+        beforeCredentialsStored = beforeCredentialsStored, onCredentialStored = onCredentialStored,
+    )
+
+    /** Streams stored credentials for explicit accepted targets through the shared issuance executor. */
+    fun receiveCredentialsAuthCodeFlow(
+        wallet: Wallet,
+        request: ReceiveAuthorizedCredentialsRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        beforeCredentialsStored: suspend (Int) -> Unit = {},
+        onCredentialStored: suspend (StoredCredential) -> Unit = {},
+        onDeferredCredential: suspend (DeferredCredentialTransaction) -> Unit = {},
     ): Flow<StoredCredential> = channelFlow {
         wallet.issuanceSessions(httpClient).ensureOpen()
-        val keyMaterial = key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
-            ?: wallet.resolveKeyMaterial(keyReference, setOf(KeyUsage.SIGN))
+        val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
+            ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: error("No key available for proof-of-possession")
-        val holderDid = did ?: wallet.defaultDid()
+        val holderDid = request.did ?: wallet.defaultDid()
 
         val issuerMetadata = IssuerMetadataResolver(httpClient)
-            .resolveCredentialIssuerMetadata(credentialIssuerBaseUrl).metadata
-        require(credentialEndpoint.toString() == issuerMetadata.credentialEndpoint) { "Credential endpoint does not match issuer metadata" }
+            .resolveCredentialIssuerMetadata(request.credentialIssuer).metadata
+        require(request.credentialEndpoint.toString() == issuerMetadata.credentialEndpoint) { "Credential endpoint does not match issuer metadata" }
+        request.nonceEndpoint?.toString()?.let { require(it == issuerMetadata.nonceEndpoint) { "Nonce endpoint does not match issuer metadata" } }
         val selections = wallet.resolveCredentialSelections(
-            credentials,
+            request.credentials,
             issuerMetadata.credentialConfigurationsSupported.keys.toList(), issuerMetadata, keyMaterial, holderDid)
+            .onEach { it.bindings.requireStoredHolderKeys() }
 
         // Exchange code for token
         val exchangeRequest = ExchangeCodeRequest(
-            code = code,
-            codeVerifier = codeVerifier,
-            clientId = clientId,
-            redirectUri = redirectUri,
-            credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+            code = request.code,
+            codeVerifier = request.codeVerifier,
+            clientId = request.clientId,
+            redirectUri = request.redirectUri,
+            credentialIssuerBaseUrl = request.credentialIssuer,
         )
-        val tokenResult = exchangeCode(
+        val tokenResult = exchangeCodeDetailed(
             wallet = wallet,
             request = exchangeRequest,
             attestationAssembler = attestationAssembler,
             httpClient = httpClient,
             onAttestationObtained = { onEvent.emitSafely(WalletSessionEvent.issuance_attestation_obtained) },
             keyMaterial = keyMaterial,
-            useDpop = useDpop,
+            useDpop = request.useDpop,
         )
         onEvent.emitSafely(WalletSessionEvent.issuance_token_obtained)
 
-        nonceEndpoint?.let { require(it == issuerMetadata.nonceEndpoint) { "Nonce endpoint does not match issuer metadata" } }
-        val dpop = if (!useDpop) null else dpopAlgorithmsForToken(
+        val dpop = if (!request.useDpop) null else dpopAlgorithmsForToken(
             tokenResult.tokenType ?: "Bearer",
-            usableDpopAlgorithms(resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient), keyMaterial),
+            usableDpopAlgorithms(resolveAuthorizationCodeAuthorizationServerMetadata(request.credentialIssuer, httpClient), keyMaterial),
         )?.let { DpopRequestContext(it, keyMaterial) }
-        val targets = grantedCredentialSelections(issuerMetadata, selections,
-            tokenResult.authorizationDetails, tokenResult.scope)
-        for ((index, selection) in targets.withIndex()) {
-            val (target, selected) = selection
-            var stage = CredentialIssuanceStage.PROOF
-            try {
-                val configuration = issuerMetadata.credentialConfigurationsSupported.getValue(target.credentialConfigurationId)
-                val algorithms = supportedJwtProofAlgorithms(configuration.proofTypesSupported, wallet.attachedKeyAttestationProvider() != null)
-                stage = CredentialIssuanceStage.REQUEST
-                val response = requestCredentialWithNonceRetry(
-                    FetchCredentialRequest(credentialEndpoint, tokenResult.accessToken, target.credentialConfigurationId,
-                        credentialIdentifier = target.credentialIdentifier),
-                    issuerMetadata.nonceEndpoint, httpClient,
-                    buildProof = algorithms?.let { { nonce ->
-                        stage = CredentialIssuanceStage.PROOF
-                        buildProofCollection(wallet, selected, configuration,
-                        issuerMetadata.credentialIssuer, nonce, clientId).also { stage = CredentialIssuanceStage.REQUEST }
-                    } },
-                    onProofGenerated = { onEvent.emitSafely(WalletSessionEvent.issuance_proof_signed) }, dpop = dpop)
-                stage = CredentialIssuanceStage.RESPONSE
-                onEvent.emitSafely(WalletSessionEvent.issuance_credential_received)
-                if (response.credentials == null) {
-                    val endpoint = requireNotNull(issuerMetadata.deferredCredentialEndpoint) { "Issuer did not advertise a deferred endpoint" }
-                    stage = CredentialIssuanceStage.STORAGE
-                    retainDeferredTarget(wallet, target, selected, configuration, response,
-                        endpoint, tokenResult.accessToken, tokenResult.tokenType ?: "Bearer", dpop, keyMaterial,
-                        key == null, label ?: configuration.credentialMetadata?.display?.firstOrNull()?.name,
-                        storedCredentialDisplayMetadata(issuerMetadata, target.credentialConfigurationId, metadata),
-                        httpClient, onDeferredCredential)
-                    onEvent.emitSafely(WalletSessionEvent.issuance_deferred)
-                    continue
-                }
-                val prepared = wallet.prepareIssuedCredentials(requireNotNull(response.credentials).map {
-                    val value = it.credential
-                    if (value is JsonPrimitive) value.content else value.toString()
-                }, selected.bindings, label ?: configuration.credentialMetadata?.display?.firstOrNull()?.name,
-                    storedCredentialDisplayMetadata(issuerMetadata, target.credentialConfigurationId, metadata),
-                    proofRequired = algorithms != null, expectedConfiguration = configuration)
-                stage = CredentialIssuanceStage.STORAGE
-                val outcome = wallet.issuanceSessions(httpClient).storeReceivedCredentials(
-                    prepared, target.credentialConfigurationId, target.credentialIdentifier,
-                    persistable = key == null && selected.selection.holderBindings.none { it.key != null },
-                    beforeCredentialsStored = beforeCredentialsStored,
-                    onCredentialStored = { entry ->
-                        stage = CredentialIssuanceStage.OBSERVER
-                        onCredentialStored(entry)
-                        onEvent.emitSafely(WalletSessionEvent.issuance_credential_stored)
-                        send(entry)
-                        stage = CredentialIssuanceStage.STORAGE
-                    },
-                )
-                if (outcome is WalletIssuanceOutcome.Failed) throw CredentialStorageException(outcome)
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                throw CredentialIssuanceException(
-                    CredentialIssuanceFailure(target, stage, targets.drop(index + 1).map { it.first }), error,
-                    storageOutcome = (error as? CredentialStorageException)?.outcome,
-                )
-            }
-        }
+        executeCredentialTargets(
+            wallet, httpClient, issuerMetadata,
+            grantedCredentialSelections(issuerMetadata, selections, tokenResult.authorizationDetails, tokenResult.scope),
+            CredentialIssuanceAccess(tokenResult.accessToken, keyMaterial, dpop?.algorithms, request.clientId),
+            persistable = request.key == null, sessions = wallet.issuanceSessions(httpClient), requestMetadata = request.metadata,
+            labelFor = { request.label ?: issuerMetadata.credentialConfigurationsSupported.getValue(it).credentialMetadata?.display?.firstOrNull()?.name },
+            onEvent = onEvent, beforeCredentialsStored = beforeCredentialsStored,
+            onCredentialStored = { entry ->
+                onCredentialStored(entry)
+                onEvent.emitSafely(WalletSessionEvent.issuance_credential_stored)
+                send(entry)
+            },
+            onDeferredCredential = onDeferredCredential,
+        )
         onEvent.emitSafely(WalletSessionEvent.issuance_completed)
     }
 
     /**
-     * Collects [receiveCredentialAuthCodeFlow] into a result, so the authorization-code grant has the
-     * same single-call shape over HTTP that [receiveCredential] gives the pre-authorized code grant.
-     *
-     * Deferred targets and their holder bindings are returned alongside any immediately stored IDs.
+     * Retains the released authorization-code result. Use [receiveCredentialsAuthCode] for detailed progress.
+     * Partial failures or repeated deferred configurations throw [CredentialReceiveException] with that progress.
      */
     suspend fun receiveCredentialAuthCode(
         wallet: Wallet,
@@ -2406,32 +2879,32 @@ object WalletIssuanceHandler {
         attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+    ): ReceiveCredentialResult = receiveCredentialsAuthCode(
+        wallet = wallet,
+        request = ReceiveAuthorizedCredentialsRequest(
+            credentials = listOf(WalletCredentialSelection(request.credentialConfigurationId)), code = request.code,
+            codeVerifier = request.codeVerifier, credentialIssuer = request.credentialIssuer,
+            credentialEndpoint = request.credentialEndpoint, nonceEndpoint = request.nonceEndpoint,
+            clientId = request.clientId, redirectUri = request.redirectUri, useDpop = request.useDpop,
+            key = request.key, keyId = request.keyId, did = request.did, metadata = request.metadata, label = request.label,
+        ),
+        attestationAssembler = attestationAssembler, onEvent = onEvent, httpClient = httpClient,
+    ).let(::ReceiveCredentialResult)
+
+    suspend fun receiveCredentialsAuthCode(
+        wallet: Wallet,
+        request: ReceiveAuthorizedCredentialsRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
-    ): ReceiveCredentialResult {
+    ): ReceiveCredentialsResult {
         val progress = IssuanceResultCollector(onCredentialStored)
-        return progress.collect(receiveCredentialAuthCodeFlow(
-            wallet = wallet,
-            credentials = request.selectedCredentials(),
-            onDeferredCredential = progress::deferred,
-            code = request.code,
-            codeVerifier = request.codeVerifier,
-            credentialIssuerBaseUrl = request.credentialIssuer,
-            credentialEndpoint = request.credentialEndpoint,
-            useDpop = request.useDpop,
-            nonceEndpoint = request.nonceEndpoint?.toString(),
-            clientId = request.clientId,
-            redirectUri = request.redirectUri,
-            key = request.key,
-            keyReference = request.keyId,
-            did = request.did,
-            metadata = request.metadata,
-            label = request.label,
-            attestationAssembler = attestationAssembler,
-            beforeCredentialsStored = beforeCredentialsStored,
-            onCredentialStored = progress::stored,
-            onEvent = onEvent,
-            httpClient = httpClient,
+        return progress.collect(receiveCredentialsAuthCodeFlow(
+            wallet = wallet, request = request, attestationAssembler = attestationAssembler,
+            onEvent = onEvent, httpClient = httpClient, beforeCredentialsStored = beforeCredentialsStored,
+            onCredentialStored = progress::stored, onDeferredCredential = progress::deferred,
         ))
     }
 
@@ -2494,50 +2967,6 @@ object WalletIssuanceHandler {
     }
 }
 
-private suspend fun retainDeferredTarget(
-    wallet: Wallet,
-    target: CredentialIssuanceTarget,
-    selection: ResolvedWalletCredentialSelection,
-    configuration: CredentialConfiguration,
-    response: CredentialResponse,
-    endpoint: String,
-    accessToken: String,
-    tokenType: String,
-    dpop: DpopRequestContext?,
-    senderKey: WalletKeyStoreEntry,
-    persistable: Boolean,
-    label: String?,
-    metadata: JsonObject?,
-    httpClient: HttpClient,
-    onDeferred: suspend (DeferredCredentialTransaction) -> Unit,
-) {
-    val public = WalletDeferredCredential(
-        id = Uuid.random().toString(),
-        credentialConfigurationId = target.credentialConfigurationId,
-        credentialIdentifier = target.credentialIdentifier,
-        intervalSeconds = requireNotNull(response.interval),
-    )
-    val transaction = DeferredCredentialTransaction(
-        target.credentialConfigurationId, target.credentialIdentifier, requireNotNull(response.transactionId),
-        selection.bindings.map { CredentialHolderBinding(it.material.keyId, it.did) },
-        intervalSeconds = requireNotNull(response.interval),
-        proofRequired = !configuration.proofTypesSupported.isNullOrEmpty(),
-        deferredCredentialId = public.id,
-    )
-    withContext(NonCancellable) {
-        try {
-            wallet.issuanceSessions(httpClient).retainDeferredCredential(
-                public, configuration, selection, transaction.proofRequired, endpoint, transaction.transactionId,
-                accessToken, tokenType, dpop?.algorithms, senderKey, persistable, label, metadata,
-            )
-        } finally {
-            // Report progress retained during a storage outage, but not after wallet deletion.
-            wallet.issuanceSessions(httpClient).ensureOpen()
-            onDeferred(transaction)
-        }
-    }
-}
-
 internal fun supportedJwtProofAlgorithms(
     proofTypes: Map<String, ProofType>?,
     keyAttestationProviderAvailable: Boolean = false,
@@ -2569,6 +2998,18 @@ class CredentialIssuanceException(
     val storageOutcome: WalletIssuanceOutcome.Failed? = null,
 ) : Exception("Credential issuance stopped during ${failure.stage}", cause)
 
+/** Complete issuance progress when it cannot be represented by the released collected API. */
+class CredentialReceiveException(val result: ReceiveCredentialsResult) : Exception(
+    "Issuance progress requires ReceiveCredentialsResult; use the plural receive API. Do not redeem the grant again."
+)
+
+private fun ReceiveCredentialsResult.releasedDeferredTransactions(): Map<String, String> {
+    if (failure != null || deferredCredentials.map { it.credentialConfigurationId }.distinct().size != deferredCredentials.size) {
+        throw CredentialReceiveException(this)
+    }
+    return deferredCredentials.associate { it.credentialConfigurationId to it.transactionId }
+}
+
 private class IssuanceResultCollector(private val onStored: suspend (StoredCredential) -> Unit) {
     private val ids = mutableListOf<String>()
     private val pending = mutableListOf<DeferredCredentialTransaction>()
@@ -2580,19 +3021,19 @@ private class IssuanceResultCollector(private val onStored: suspend (StoredCrede
 
     fun deferred(target: DeferredCredentialTransaction) { pending += target }
 
-    suspend fun collect(flow: Flow<StoredCredential>): ReceiveCredentialResult {
+    suspend fun collect(flow: Flow<StoredCredential>): ReceiveCredentialsResult {
         val failure = try {
             flow.collect { }
             null
         } catch (error: CredentialIssuanceException) {
             error
         }
-        return ReceiveCredentialResult(ids.toList(), pending.toList(), failure?.failure, failure?.storageOutcome)
+        return ReceiveCredentialsResult(ids.toList(), pending.toList(), failure?.failure, failure?.storageOutcome)
     }
 }
 
 /** Lifecycle events are notifications; cancellation still belongs to the caller. */
-private suspend fun (suspend (WalletSessionEvent) -> Unit).emitSafely(event: WalletSessionEvent) {
+internal suspend fun (suspend (WalletSessionEvent) -> Unit).emitSafely(event: WalletSessionEvent) {
     try {
         this(event)
     } catch (error: CancellationException) {

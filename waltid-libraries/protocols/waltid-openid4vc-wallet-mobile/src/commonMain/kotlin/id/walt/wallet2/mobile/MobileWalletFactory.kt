@@ -236,10 +236,10 @@ internal fun createSqlDelightMobileWallet(
     return MobileWallet(
         scaAuthorizer = NativeScaPresentationAuthorizer(keyProvider),
         walletId = config.walletId,
-        createSigningIdentityManager = { onActive ->
+        createSigningIdentityManager = { lifecycle, onActive ->
             id.walt.wallet2.mobile.identity.SigningIdentityManager(
                 config.walletId, config.signingIdentity, config.defaultKeyUseAuthorizationPolicy, config.keyUseAuthorizationPrompt,
-                keyStore, didStore, keyProvider, queries, didService, onActive,
+                keyStore, didStore, keyProvider, queries, didService, onActive, lifecycle,
             )
         },
         keyStore = keyStore,

@@ -7,9 +7,18 @@ import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
 import org.jetbrains.exposed.v1.jdbc.upsert
+import org.jetbrains.exposed.v1.jdbc.update
 
 class ExposedStoreRegistry(private val db: Database) {
     fun issuanceSessionStore(walletId: String) = ExposedIssuanceSessionStore(walletId, db)
+
+    /** Resolve one wallet's descriptor and adapters before deletion or configuration changes can intervene. */
+    suspend fun <T> withWalletLock(walletId: String, resolve: suspend () -> T): T? = suspendTransaction(db) {
+        val exists = Wallet2Tables.Wallets.update({ Wallet2Tables.Wallets.id eq walletId }) {
+            it[Wallet2Tables.Wallets.id] = walletId
+        } != 0
+        if (exists) resolve() else null
+    }
 
     suspend fun resolveKeyStore(storeId: String): ExposedKeyStore? =
         if (keyStoreExists(storeId)) ExposedKeyStore(storeId, db) else null
@@ -29,6 +38,9 @@ class ExposedStoreRegistry(private val db: Database) {
 
     suspend fun resolveCredentialStore(storeId: String): ExposedCredentialStore? =
         if (credentialStoreExists(storeId)) ExposedCredentialStore(storeId, db) else null
+
+    suspend fun resolveCredentialStoreForWallet(walletId: String, storeId: String): ExposedCredentialStore? =
+        resolveCredentialStore(storeId)?.forWallet(ExposedWalletScope(walletId, db))
 
     suspend fun createCredentialStore(storeId: String): ExposedCredentialStore {
         suspendTransaction(db) {

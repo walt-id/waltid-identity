@@ -135,18 +135,16 @@ platform locale preferences.
 ### Explicit batches and multiple configurations
 
 Issuance requests one instance of each selected configuration by default. A batch
-is opt-in: after reviewing `session.offer.batchSize`, pass one existing holder
-key per instance at acceptance. A missing batch size means single issuance only;
+is opt-in: after reviewing `session.batchSize`, choose existing holders or explicitly request new keys
+at acceptance. A missing batch size means single issuance only;
 an oversized batch fails before the token is redeemed.
 
 ```kotlin
-// Optional explicit key creation, using the wallet's platform key-use policy.
-// Existing keys may be selected instead. Preview never generates keys.
-val holders = wallet.createIssuanceHolderKeys(count = 2)
+// Preparation happens inside acceptance, using the platform key-use policy.
 val accepted = listOf(
     MobileWalletCredentialSelection(
         credentialConfigurationId = session.offer.credentials.first().configurationId,
-        holderBindings = holders.map { MobileWalletHolderBinding(it.keyId, it.did) },
+        holders = MobileWalletCredentialHolders.NewKeys(count = 2),
     )
 )
 val outcome = wallet.continuePreAuthorizedIssuance(session.id, transactionCode, accepted)
@@ -158,23 +156,25 @@ Add selections for other offered configurations to receive multiple datasets or
 formats. They use separate Credential Requests under the same token. Returned
 `authorization_details.credential_identifiers` are expanded automatically;
 scope-only grants use configuration IDs. Do not invent dataset identifiers.
-Both flows select authorization parameters automatically from metadata: prefer
-`authorization_details` when `openid_credential` is advertised, otherwise use the
-selected configurations' advertised scopes. Unsupported metadata fails explicitly;
-no application-level authorization-strategy switch is needed.
+Authorization-code flows select authorization parameters from advertised
+`openid_credential` authorization details or the selected configurations' scopes;
+missing both is an error. An offered pre-authorized code already authorizes its
+credentials and does not require either selector. When available, supported
+selectors narrow the token request automatically.
 
-For wallet-initiated authorization without an offer, start with
-`MobileWalletCredentialOffer.Issuer(issuerUrl, configurationIds)`; authorization
-parameter selection follows the same metadata-based rules.
-
-The session persists accepted key references and public identities across browser
+Each copy requires a distinct stored holder key, including when different key IDs resolve
+to the same public key. The session persists accepted key references and public identities across browser
 callbacks and deferred issuance. Responses are matched by holder public key,
 not array order, and may contain fewer instances than requested. Each stored
 credential retains its own key association for later presentation. The OAuth/DPoP
 key remains separate from the selected holder keys.
 
-Swift callers can use the same acceptance selections and explicit
-`createIssuanceHolderKeys` operation through `WalletSdkBridge`.
+Use `MobileWalletCredentialHolders.Existing` to choose existing bindings. SDK-generated
+keys are cleaned up when preparation or validation fails before acceptance. Accepted
+keys remain wallet-owned even if persistence or remote work fails. A retry, including
+after restart, reuses the accepted keys; changing holders or copy counts then requires
+a new session. Explicit `createIssuanceHolderKeys` remains available for callers that
+want to own key allocation independently. Swift exposes the same choices.
 Existing issuance lifecycle events remain in place; the stored event is emitted
 for each successful save, and failed outcomes retain any already stored IDs.
 
@@ -184,10 +184,14 @@ without sending another issuer request. A new pending response resets the deadli
 Once the response has arrived, a local-save handle has no interval and can be resumed
 immediately; retrying storage does not contact the issuer.
 
-Wallet deletion permanently closes issuance admission on that wallet runtime. A late
-resolved offer or issuer response cannot recreate a session or save credentials after
-closure. Deletion is rejected while a retained transition or local save is active; finish
-that operation before retrying deletion. Use a newly opened wallet instance afterward.
+Wallet deletion rejects an active wallet or signing-identity operation before any
+cleanup starts. Once admitted, deletion permanently closes that instance to wallet
+and identity operations and continues despite caller cancellation. Platform key
+and database deletion cannot roll back: after a failure, retry `deleteWallet()` on
+the same instance to finish cleanup. It skips stores already cleared before the
+database driver closed, and repeated successful deletion is a no-op. Use a newly
+opened wallet only after cleanup succeeds. This coordinates one writable mobile
+instance; it does not add cross-process write coordination.
 
 Retained grants claim their durable state before building a browser request or exchanging
 an authorization/pre-authorized code. Independent runtimes cannot consume the same state.

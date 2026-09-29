@@ -1,19 +1,43 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.openid4vp.conformance
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.did.dids.DidService
+import id.walt.dcql.models.CredentialFormat
+import id.walt.dcql.models.CredentialQuery
+import id.walt.dcql.models.DcqlQuery
+import id.walt.dcql.models.meta.MsoMdocMeta
+import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.openid4vp.conformance.adapter.VciWalletConformanceAdapter
 import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.keys.ClientAttestationTestAuthority
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
+import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.*
 import id.walt.openid4vp.conformance.testplans.runner.VciWalletTestPlanRunner
 import id.walt.wallet2.OSSWallet2FeatureCatalog
 import id.walt.wallet2.OSSWallet2ServiceConfig
 import id.walt.wallet2.WalletAttestationConfig
+import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.verifier2.OSSVerifier2FeatureCatalog
+import id.walt.verifier2.OSSVerifier2ServiceConfig
+import id.walt.verifier2.data.CrossDeviceFlowSetup
+import id.walt.verifier2.data.GeneralFlowConfig
+import id.walt.verifier2.data.VerificationSessionSetup
+import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
+import id.walt.verifier2.verifierApi
+import id.walt.wallet2.data.HolderKeyBinding
+import id.walt.wallet2.data.StoredCredentialMetadata
+import id.walt.wallet2.data.WalletKeyInfo
+import id.walt.wallet2.handlers.BuildVpTokenRequest
+import id.walt.wallet2.handlers.BuildVpTokenResult
+import id.walt.wallet2.handlers.SendAuthorizationResponseRequest
 import id.walt.wallet2.server.handlers.CreateWalletRequest
 import id.walt.wallet2.server.handlers.ImportKeyRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
@@ -23,62 +47,30 @@ import io.ktor.client.call.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.install
 import kotlinx.coroutines.runBlocking
 import id.waltid.openid4vci.wallet.attestation.PUBLIC_JWK_PLACEHOLDER
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
 
 /**
- * VCI Wallet Conformance Tests
- *
- * Tests wallet's ability to receive credentials from an OpenID4VCI issuer.
- * The OpenID conformance suite acts as the credential issuer.
- *
- * ## Test Profile
- *
- * Based on issuer-req.md requirements (wallet perspective):
- *
- * | Property | Value |
- * |----------|-------|
- * | Credential Format | sd_jwt_vc |
- * | Sender Constraint | dpop |
- * | Client Authentication | private_key_jwt |
- * | Grant Type | authorization_code |
- * | FAPI Profile | vci |
- *
- * ## Prerequisites
- *
- * 1. OpenID conformance suite running:
- *    ```bash
- *    cd ~/dev/openid/conformance-suite
- *    docker compose -f docker-compose-walt.yml up -d
- *    ```
- *
- * 2. wallet-api2 running:
- *    ```bash
- *    ./gradlew :waltid-services:waltid-wallet-api2:run
- *    ```
- *
- * 3. /etc/hosts entry:
- *    ```
- *    127.0.0.1 localhost.emobix.co.uk
- *    ```
- *
- * ## Run
- *
- * ```bash
- * ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:vciWalletSdJwtVcAuthorizationCodeHaipFullTarget \
- *     -PrunIntegrationTests
- * ```
+ * Exercises Wallet2 against the OpenID suite acting as issuer. Wallet2 and the callback adapter
+ * run in-process; the batch gate also hosts Verifier2 to prove both stored credentials are usable.
+ * See docs/VCI-WALLET.md for suite setup, profile scope, commands and evidence boundaries.
  */
 class VciWalletConformanceTests {
 
@@ -166,9 +158,12 @@ class VciWalletConformanceTests {
         plan: VciWalletTestPlan,
         walletId: String,
         attestationAuthority: ClientAttestationTestAuthority? = null,
-    ) {
+        batchHolderKeyIds: List<String> = emptyList(),
+        clientKeyId: String? = null,
+        requiredModules: Set<String> = emptySet(),
+    ): List<TestPlanResult> {
         val httpClient = createHttpClient()
-        val adapter = startAdapterIfNeeded(httpClient, walletId, attestationAuthority)
+        val adapter = startAdapterIfNeeded(httpClient, walletId, attestationAuthority, batchHolderKeyIds, clientKeyId)
         val adapterBaseUrl = "http://127.0.0.1:$adapterPort"
 
         try {
@@ -180,7 +175,7 @@ class VciWalletConformanceTests {
                 walletAdapterUrl = adapterBaseUrl
             )
 
-            runner.test()
+            return runner.test(requiredModules)
         } finally {
             adapter?.stop()
             httpClient.close()
@@ -191,6 +186,8 @@ class VciWalletConformanceTests {
         httpClient: HttpClient,
         walletId: String,
         attestationAuthority: ClientAttestationTestAuthority?,
+        batchHolderKeyIds: List<String>,
+        clientKeyId: String?,
     ): VciWalletConformanceAdapter? {
         val adapterAlreadyRunning = try {
             val response = httpClient.get("http://127.0.0.1:$adapterPort/health")
@@ -200,6 +197,7 @@ class VciWalletConformanceTests {
         }
 
         if (adapterAlreadyRunning) {
+            check(batchHolderKeyIds.isEmpty()) { "Batch conformance requires its own adapter and holder keys" }
             println("[VCI Test] Using existing adapter on port $adapterPort")
             return null
         }
@@ -210,7 +208,94 @@ class VciWalletConformanceTests {
             adapterPort = adapterPort,
             walletId = walletId,
             attestationAuthority = attestationAuthority,
+            batchHolderKeyIds = batchHolderKeyIds,
+            testKeyId = clientKeyId,
         ).also { it.start(httpClient) }
+    }
+
+    @Test
+    fun vciWalletBatchBothGrantsAndFormats() {
+        check(isConformanceAvailable) { "The pinned suite is required for wallet batch acceptance" }
+        runBlocking {
+            ConformanceInterface(conformanceHost, conformancePort).use { suite ->
+                val version = suite.conformanceHttp.get("/api/server").body<JsonObject>()
+                assertEquals("db1080a", version["revision"]?.jsonPrimitive?.content)
+                assertEquals("5.2.4", version["version"]?.jsonPrimitive?.content)
+            }
+        }
+        for (format in listOf("sd_jwt_vc", "mdoc")) {
+            for (grant in listOf("authorization_code", "pre_authorization_code")) {
+                withInProcessWallet(withVerifier = true) { walletId ->
+                    val base = if (format == "mdoc") VciWalletMdocDpop(
+                        walletApiUrl, "http://127.0.0.1:$adapterPort/credential-offer",
+                        "http://127.0.0.1:$adapterPort/callback", conformanceHost, conformancePort, adapterHostIp,
+                    ) else VciWalletSdJwtDpop(
+                        walletApiUrl, "http://127.0.0.1:$adapterPort/credential-offer",
+                        "http://127.0.0.1:$adapterPort/callback", conformanceHost, conformancePort, adapterHostIp,
+                    )
+                    val plan = object : VciWalletTestPlan {
+                        override val description = "Wallet batch: $format / $grant / two distinct holders"
+                        override val configuration = base.configuration
+                        override val variant = base.variant + mapOf("vci_grant_type" to grant)
+                    }
+                    createHttpClient().use { client ->
+                        val clientKeyId = client.get("$walletApiUrl/wallet/$walletId/keys")
+                            .body<List<WalletKeyInfo>>().single().keyId
+                        val holders = List(2) {
+                            client.post("$walletApiUrl/wallet/$walletId/keys/generate") {
+                                contentType(ContentType.Application.Json)
+                                setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.secp256r1))
+                            }.also { assertEquals(HttpStatusCode.Created, it.status) }.body<WalletKeyInfo>().keyId
+                        }
+                        val result = runPlan(plan, walletId, batchHolderKeyIds = holders, clientKeyId = clientKeyId,
+                            requiredModules = setOf("oid4vci-1_0-wallet-test-batch-credential-issuance")).single()
+                        assertEquals("FINISHED", result.conformanceStatus)
+                        assertEquals("PASSED", result.conformanceResult, result.errorMessage)
+                        val credentials = client.get("$walletApiUrl/wallet/$walletId/credentials")
+                            .body<List<StoredCredentialMetadata>>()
+                        assertEquals(2, credentials.size)
+                        val bindings = credentials.map {
+                            val stored = client.get("$walletApiUrl/wallet/$walletId/credentials/${it.id}")
+                                .body<JsonObject>()
+                            Json.decodeFromJsonElement<HolderKeyBinding>(assertNotNull(stored["holderKeyBinding"]))
+                        }
+                        assertEquals(2, bindings.map { it.publicKeyThumbprint }.distinct().size)
+                        assertEquals(2, bindings.map { it.keyReference }.distinct().size)
+                        for (credential in credentials) {
+                            presentStoredCredential(client, walletId, credential.id, format)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Each selection must resolve its persisted holder key; no signing override is supplied. */
+    private suspend fun presentStoredCredential(client: HttpClient, walletId: String, credentialId: String, format: String) {
+        val query = CredentialQuery(
+            id = "pid",
+            format = if (format == "mdoc") CredentialFormat.MSO_MDOC else CredentialFormat.DC_SD_JWT,
+            meta = if (format == "mdoc") MsoMdocMeta(doctypeValue = "eu.europa.ec.eudi.pid.1")
+                else SdJwtVcMeta(vctValues = listOf("urn:eudi:pid:1")),
+        )
+        val session = client.post("$walletApiUrl/verification-session/create") {
+            contentType(ContentType.Application.Json)
+            setBody<VerificationSessionSetup>(CrossDeviceFlowSetup(core = GeneralFlowConfig(
+                dcqlQuery = DcqlQuery(credentials = listOf(query)),
+            )))
+        }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+            .body<VerificationSessionCreationResponse>()
+        val requestUrl = assertNotNull(session.bootstrapAuthorizationRequestUrl)
+        val presentation = client.post("$walletApiUrl/wallet/$walletId/credentials/present/build-vp-token") {
+            contentType(ContentType.Application.Json)
+            setBody(BuildVpTokenRequest(requestUrl, selectedCredentialIds = mapOf("pid" to listOf(credentialId))))
+        }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<BuildVpTokenResult>()
+        client.post("$walletApiUrl/wallet/$walletId/credentials/present/send-response") {
+            contentType(ContentType.Application.Json)
+            setBody(SendAuthorizationResponseRequest(requestUrl, presentation.vpToken, presentation.idToken))
+        }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+        val result = client.get("$walletApiUrl/verification-session/${session.sessionId}/info").body<JsonObject>()
+        assertEquals("SUCCESSFUL", result["status"]?.jsonPrimitive?.content, result.toString())
     }
 
     /**
@@ -327,7 +412,7 @@ class VciWalletConformanceTests {
      * Run [block] against a freshly created wallet in an in-process Wallet2.
      *
      * Mirrors how Verifier2 is hosted for the verifier suite: no separately launched service and no
-     * fixed external port to coordinate. Unlike the presentation suite no *credential* is provisioned -
+     * separately configured wallet service. No credential is provisioned locally -
      * OpenID4VCI is about receiving one.
      *
      * A signing key is still required: the credential request carries a JWT proof of possession, so
@@ -339,11 +424,18 @@ class VciWalletConformanceTests {
      * No DID is created - `buildJwtProof` binds the proof to the raw JWK when the wallet has no DID,
      * which is the natural binding for SD-JWT VC (`cnf.jwk`).
      */
-    private fun withInProcessWallet(block: suspend (walletId: String) -> Unit) {
+    private fun withInProcessWallet(withVerifier: Boolean = false, block: suspend (walletId: String) -> Unit) {
         E2ETest(WALLET_HOST, WALLET_PORT, failEarly = true).testBlock(
             timeout = 30.minutes,
-            features = listOf(OSSWallet2FeatureCatalog),
+            features = if (withVerifier) listOf(OSSWallet2FeatureCatalog, OSSVerifier2FeatureCatalog)
+                else listOf(OSSWallet2FeatureCatalog),
             preload = {
+                if (withVerifier) ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(
+                    clientId = null,
+                    clientMetadata = ClientMetadata(clientName = "Batch holder verification"),
+                    urlPrefix = "$walletApiUrl/verification-session",
+                    urlHost = "openid4vp://authorize",
+                ))
                 ConfigManager.preloadConfig(
                     "wallet-service",
                     OSSWallet2ServiceConfig(
@@ -363,7 +455,13 @@ class VciWalletConformanceTests {
                 )
             },
             init = { DidService.minimalInit() },
-            module = { wallet2Module(withPlugins = false) },
+            module = {
+                wallet2Module(withPlugins = false)
+                if (withVerifier) {
+                    install(io.ktor.server.sse.SSE)
+                    verifierApi()
+                }
+            },
         ) {
             val walletId = testAndReturn("Create wallet") {
                 testHttpClient().post("/wallet") {

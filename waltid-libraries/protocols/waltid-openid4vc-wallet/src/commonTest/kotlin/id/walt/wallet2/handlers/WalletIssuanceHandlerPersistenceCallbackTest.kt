@@ -5,6 +5,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
+import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -74,16 +75,18 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
 
     @Test
     fun `callback reports first credential when second persistence fails`() = runTest {
-        val holderKey = JWKKey.generate(KeyType.Ed25519)
-        val credential = batchTestCredential(holderKey)
+        val keys = InMemoryKeyStore()
+        val holders = List(2) { JWKKey.generate(KeyType.Ed25519) }
+        val bindings = holders.map { CredentialHolderBinding(keyId = keys.addKey(it)) }
+        val credentials = holders.map { batchTestCredential(it) }
         val store = FailingCredentialStore(failAtAttempt = 2)
         val callbacks = mutableListOf<String>()
 
         val failure = assertFailsWith<CredentialStorageException> {
             WalletIssuanceHandler.pollDeferredFlow(
-                wallet = Wallet(id = "wallet", staticKey = holderKey, credentialStores = listOf(store)),
-                request = deferredRequest().copy(holderBindings = List(2) { CredentialHolderBinding(keyId = holderKey.getKeyId()) }),
-                httpClient = credentialResponseClient(credentialCount = 2, credential = credential),
+                wallet = Wallet(id = "wallet", keyStores = listOf(keys), credentialStores = listOf(store)),
+                request = deferredRequest().copy(holderBindings = bindings),
+                httpClient = credentialResponseClient(credentials),
                 onCredentialStored = { callbacks += it.id },
             ).toList()
         }
@@ -96,16 +99,18 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
 
     @Test
     fun `callback reports nothing when persistence fails before first credential`() = runTest {
-        val holderKey = JWKKey.generate(KeyType.Ed25519)
-        val credential = batchTestCredential(holderKey)
+        val keys = InMemoryKeyStore()
+        val holders = List(2) { JWKKey.generate(KeyType.Ed25519) }
+        val bindings = holders.map { CredentialHolderBinding(keyId = keys.addKey(it)) }
+        val credentials = holders.map { batchTestCredential(it) }
         val store = FailingCredentialStore(failAtAttempt = 1)
         var callbacks = 0
 
         val failure = assertFailsWith<CredentialStorageException> {
             WalletIssuanceHandler.pollDeferredFlow(
-                wallet = Wallet(id = "wallet", staticKey = holderKey, credentialStores = listOf(store)),
-                request = deferredRequest().copy(holderBindings = List(2) { CredentialHolderBinding(keyId = holderKey.getKeyId()) }),
-                httpClient = credentialResponseClient(credentialCount = 2, credential = credential),
+                wallet = Wallet(id = "wallet", keyStores = listOf(keys), credentialStores = listOf(store)),
+                request = deferredRequest().copy(holderBindings = bindings),
+                httpClient = credentialResponseClient(credentials),
                 onCredentialStored = { callbacks++ },
             ).toList()
         }
@@ -122,11 +127,11 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
         transactionId = "transaction",
     )
 
-    private fun credentialResponseClient(credentialCount: Int, credential: String) = HttpClient(MockEngine) {
+    private fun credentialResponseClient(credentials: List<String>) = HttpClient(MockEngine) {
         engine {
             addHandler {
                 respond(
-                    content = """{"credentials":[${List(credentialCount) { "{\"credential\":${Json.encodeToString(credential)}}" }.joinToString()}]}""",
+                    content = """{"credentials":[${credentials.map { "{\"credential\":${Json.encodeToString(it)}}" }.joinToString()}]}""",
                     status = HttpStatusCode.OK,
                     headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
                 )

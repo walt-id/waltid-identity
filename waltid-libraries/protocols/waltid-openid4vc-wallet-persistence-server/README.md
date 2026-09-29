@@ -72,6 +72,22 @@ wallet2-persistence {
 }
 ```
 
+### Lifecycle contract tests
+
+`ExposedIssuanceSessionStoreTest` checks wallet scoping, concurrent claims, stale generations,
+transaction rollback/commit and a credential write racing with deletion. It uses SQLite by default.
+To run the same contract on PostgreSQL, provide `WALLET2_TEST_POSTGRES_URL` for a disposable database
+with the test-only role/password `wallet_test` / `wallet_test` and permission to create schemas:
+
+```sh
+WALLET2_TEST_POSTGRES_URL=jdbc:postgresql://127.0.0.1:5432/wallet_test ./gradlew \
+  :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-server:test \
+  --tests '*ExposedIssuanceSessionStoreTest'
+```
+
+Each test creates a fresh schema. Dispose of the fixture database after the run. The selected
+backend URL is a Gradle test input, so changing profiles cannot reuse the other backend's result.
+
 ## Usage
 
 ### Initialize Database

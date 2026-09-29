@@ -83,9 +83,6 @@ actor MockWalletClient: WalletClient {
         return storedCredentials
     }
 
-    func createIssuanceHolderKeys(count: Int) async throws -> [IssuanceHolderBinding] {
-        (0..<count).map { IssuanceHolderBinding(keyID: "holder-\($0)", did: "did:key:holder-\($0)") }
-    }
     func listDeferredIssuance() async throws -> [DeferredCredential] { [] }
 
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {

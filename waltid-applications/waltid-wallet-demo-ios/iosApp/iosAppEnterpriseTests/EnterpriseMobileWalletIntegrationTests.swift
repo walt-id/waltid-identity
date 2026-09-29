@@ -60,17 +60,15 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         let offer = try await fixture.createOffer(scenario: scenario, platform: .ios)
         let walletID = "ios-enterprise-batch-\(UUID().uuidString)"
         let wallet = try await makeWallet(walletId: walletID, attestation: nil)
-        let identity = try await initializeSigningIdentity(wallet)
+        _ = try await initializeSigningIdentity(wallet)
         let session = try await wallet.startIssuance(
             IssuanceRequest(offer: try XCTUnwrap(URL(string: offer.offerUrl)), redirectURI: URL(string: "openid://")!)
         )
-        let holders = try await wallet.createIssuanceHolderKeys(count: 2)
-        XCTAssertEqual(Set(holders.map(\.keyID)).count, 2)
-        XCTAssertFalse(holders.contains { $0.keyID == identity.keyID })
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(session.offer.batchSize), 2)
         let outcome = try await wallet.continuePreAuthorizedIssuance(
             sessionID: session.id,
             credentials: [.init(configurationID: try XCTUnwrap(session.offer.credentials.first).configurationID,
-                                holderBindings: holders)]
+                                holders: .newKeys(count: 2))]
         )
         guard case let .stored(_, credentialIDs) = outcome else {
             return XCTFail("Expected two stored credentials, got \(outcome)")
@@ -116,12 +114,12 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         let session = try await wallet.startIssuance(
             IssuanceRequest(offer: try XCTUnwrap(URL(string: offer.offerUrl)), redirectURI: URL(string: "openid://")!)
         )
-        let first = try await wallet.createIssuanceHolderKeys(count: 1, policy: .none)
+        let first = try await wallet.createIssuanceHolderKeys(count: 1, policy: WalletKeyUseAuthorizationPolicy.none)
         let second = try await wallet.createIssuanceHolderKeys(count: 1, policy: .deviceCredential(timeoutSeconds: 0))
         let outcome = try await wallet.continuePreAuthorizedIssuance(
             sessionID: session.id,
             credentials: [.init(configurationID: try XCTUnwrap(session.offer.credentials.first).configurationID,
-                                holderBindings: first + second)]
+                                holders: .existing(first + second))]
         )
         guard case let .failed(_, failure, storedIDs, deferred) = outcome else {
             return XCTFail("Expected a signing failure after operator cancellation, got \(outcome)")

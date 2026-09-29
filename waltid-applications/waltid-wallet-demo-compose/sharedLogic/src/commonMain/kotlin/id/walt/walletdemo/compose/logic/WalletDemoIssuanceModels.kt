@@ -6,13 +6,17 @@ data class WalletDemoHolderBinding(val keyId: String, val did: String? = null) {
     init { require(keyId.isNotBlank()) }
 }
 
+sealed interface WalletDemoCredentialHolders {
+    data class Existing(val bindings: List<WalletDemoHolderBinding>) : WalletDemoCredentialHolders
+    data class NewKeys(val count: Int) : WalletDemoCredentialHolders
+}
+
 data class WalletDemoCredentialSelection(
     val credentialConfigurationId: String,
-    val holderBindings: List<WalletDemoHolderBinding>,
+    val holders: WalletDemoCredentialHolders,
 ) {
     init {
         require(credentialConfigurationId.isNotBlank())
-        require(holderBindings.isNotEmpty())
     }
 }
 

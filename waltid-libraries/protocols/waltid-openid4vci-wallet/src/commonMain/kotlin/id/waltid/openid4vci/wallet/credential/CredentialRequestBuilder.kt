@@ -34,14 +34,20 @@ object CredentialRequestBuilder {
         }.distinct().joinToString(" ")
     }
 
-    /** Select authorization parameters from issuer and authorization-server metadata, never a caller flag. */
+    /** Narrow an already-authorized offer when supported; the pre-authorized code needs no extra selector. */
     fun preAuthorizedTokenParameters(
         metadata: CredentialIssuerMetadata,
         configurationIds: List<String>,
         authorizationServerMetadata: AuthorizationServerMetadata,
     ): Map<String, String> {
-        authorizationScope(metadata, configurationIds, authorizationServerMetadata)?.let {
-            return mapOf("scope" to it)
+        require(configurationIds.isNotEmpty()) { "At least one credential configuration must be selected" }
+        val configurations = configurationIds.distinct().map {
+            requireNotNull(metadata.credentialConfigurationsSupported[it]) { "Unknown credential configuration '$it'" }
+        }
+        if ("openid_credential" !in authorizationServerMetadata.authorizationDetailsTypesSupported.orEmpty()) {
+            // Partial scope lists could accidentally narrow away an accepted configuration.
+            val scopes = configurations.map { it.scope?.takeIf(String::isNotBlank) ?: return emptyMap() }
+            return mapOf("scope" to scopes.distinct().joinToString(" "))
         }
         val details = buildJsonArray {
             configurationIds.distinct().forEach { configurationId ->
