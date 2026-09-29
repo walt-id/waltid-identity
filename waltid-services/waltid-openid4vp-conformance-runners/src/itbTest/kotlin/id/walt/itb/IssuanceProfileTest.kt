@@ -2,6 +2,7 @@ package id.walt.itb
 
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.wallet2.handlers.WalletCredentialSelection
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -62,7 +63,7 @@ class IssuanceProfileTest {
             val received = WalletIssuanceHandler.receiveCredentialAuthCodeFlow(
                 wallet = fixture.wallet(), code = "synthetic-code", codeVerifier = "synthetic-pkce-verifier",
                 credentialIssuerBaseUrl = issuer, credentialEndpoint = Url("$issuer/credential"),
-                credentialConfigurationId = "identity", clientId = clientId, httpClient = client,
+                credentials = listOf(WalletCredentialSelection("identity")), clientId = clientId, httpClient = client,
             ).toList()
             assertEquals(1, received.size)
         }
