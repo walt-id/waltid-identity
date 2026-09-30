@@ -59,7 +59,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
             x5Chain = x5Chain,
             display = display,
             w3cVersion = w3cVersion,
-            verifiedProof = instance.verifiedProof,
+            verifiedBinding = instance.verifiedBinding,
         )
     }
 
@@ -90,7 +90,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
             x5Chain = x5Chain,
             display = display,
             w3cVersion = w3cVersion,
-            verifiedProof = instance.verifiedProof,
+            verifiedBinding = instance.verifiedBinding,
         )
     }
 

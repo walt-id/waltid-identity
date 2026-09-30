@@ -88,7 +88,7 @@ class MdocCredentialSignerKeyAuthorizationsTest {
             signatureAlgorithm = ES256,
             issuerCertificate = listOf(CoseCertificate(byteArrayOf(1, 2, 3))),
             docType = SCA_DOC_TYPE,
-            verifiedProof = verifiedProof(),
+            verifiedBinding = verifiedProof().binding(),
             authorizedTransactionDataTypes = authorizedTransactionDataTypes,
         ).let { credential ->
             coseCompliantCbor.decodeFromByteArray<IssuerSigned>(credential.base64UrlDecode())

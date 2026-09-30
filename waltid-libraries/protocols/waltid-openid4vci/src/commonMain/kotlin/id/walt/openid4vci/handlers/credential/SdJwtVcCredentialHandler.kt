@@ -62,7 +62,7 @@ class SdJwtVcCredentialHandler(
             x5Chain = x5Chain,
             display = display,
             sdJwtTypeHeader = configuration.format.value,
-            verifiedProof = instance.verifiedProof,
+            verifiedBinding = instance.verifiedBinding,
         )
     }
 
@@ -94,7 +94,7 @@ class SdJwtVcCredentialHandler(
             x5Chain = x5Chain,
             display = display,
             sdJwtTypeHeader = configuration.format.value,
-            verifiedProof = instance.verifiedProof,
+            verifiedBinding = instance.verifiedBinding,
         )
     }
 

@@ -78,7 +78,7 @@ class MdocCredentialHandler(
                         validUntil = effectiveValidUntil,
                         status = instance.input.credentialStatus,
                         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
-                        verifiedProof = instance.verifiedProof,
+                        verifiedBinding = instance.verifiedBinding,
                         authorizedTransactionDataTypes = authorizedTransactionDataTypes,
                     )
                 },
@@ -132,7 +132,7 @@ class MdocCredentialHandler(
                     validUntil = effectiveValidUntil,
                     status = instance.input.credentialStatus,
                     mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
-                    verifiedProof = instance.verifiedProof,
+                    verifiedBinding = instance.verifiedBinding,
                     authorizedTransactionDataTypes = authorizedTransactionDataTypes,
                 )
             },

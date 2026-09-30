@@ -19,7 +19,7 @@ import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.mso.KeyAuthorization
 import id.walt.mdoc.objects.mso.Status
 import id.walt.mdoc.schema.MdocsSchemaMappingFunction.toCborElement
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
@@ -55,7 +55,7 @@ object MdocCredentialSigner {
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
         status: Status? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
-        verifiedProof: VerifiedCredentialProof? = null,
+        verifiedBinding: VerifiedCredentialBinding? = null,
         authorizedTransactionDataTypes: List<String>? = null,
         signedAt: Instant? = null,
         valueMappingFunction: (
@@ -75,7 +75,7 @@ object MdocCredentialSigner {
         validUntil = validUntil,
         status = status,
         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
-        verifiedProof = verifiedProof,
+        verifiedBinding = verifiedBinding,
         authorizedTransactionDataTypes = authorizedTransactionDataTypes,
         valueMappingFunction = valueMappingFunction,
     )
@@ -92,7 +92,7 @@ object MdocCredentialSigner {
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
         status: Status? = null,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
-        verifiedProof: VerifiedCredentialProof? = null,
+        verifiedBinding: VerifiedCredentialBinding? = null,
         authorizedTransactionDataTypes: List<String>? = null,
         signedAt: Instant? = null,
         valueMappingFunction: (
@@ -112,7 +112,7 @@ object MdocCredentialSigner {
         validUntil = validUntil,
         status = status,
         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
-        verifiedProof = verifiedProof,
+        verifiedBinding = verifiedBinding,
         authorizedTransactionDataTypes = authorizedTransactionDataTypes,
         valueMappingFunction = valueMappingFunction,
     )
@@ -129,7 +129,7 @@ object MdocCredentialSigner {
         validUntil: Instant,
         status: Status?,
         mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
-        verifiedProof: VerifiedCredentialProof?,
+        verifiedBinding: VerifiedCredentialBinding?,
         authorizedTransactionDataTypes: List<String>?,
         valueMappingFunction: (
             docType: String,
@@ -139,7 +139,7 @@ object MdocCredentialSigner {
         ) -> CborElement?,
     ): String {
         // A proof verified upfront already carries the holder key, so it is not resolved twice.
-        val holderKey = verifiedProof?.toCosePublicKey() ?: resolveHolderKey(credentialRequest)
+        val holderKey = verifiedBinding?.toCosePublicKey() ?: resolveHolderKey(credentialRequest)
         validateIssuerKey(issuerSigningKey)
         val namespaces = credentialData.mapValues { (namespace, namespaceData) ->
             requireNotNull(namespaceData as? JsonObject) {
@@ -224,7 +224,7 @@ object MdocCredentialSigner {
         return JwtProofUtils.resolveHolderKey(jwtProof)
     }
 
-    private suspend fun VerifiedCredentialProof.toCosePublicKey(): CoseKey =
+    private suspend fun VerifiedCredentialBinding.toCosePublicKey(): CoseKey =
         holderKey.exportPublicJwk().toCoseKey()
 
     private fun validateIssuerKey(issuerKey: IssuerSigningKey) {

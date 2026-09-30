@@ -36,10 +36,10 @@ class DefaultCredentialProofVerifierTest {
             context = context(),
         )
 
-        assertEquals(1, verified.size)
+        assertEquals(1, verified.proofs.size)
         assertEquals(
             holderKey.getPublicKey().getThumbprint(),
-            Jwk.sha256Thumbprint(verified.single().holderKey.exportPublicJwk()),
+            Jwk.sha256Thumbprint(verified.proofs.single().holderKey.exportPublicJwk()),
         )
     }
 
@@ -56,10 +56,10 @@ class DefaultCredentialProofVerifierTest {
             context = context(),
         )
 
-        assertEquals("EdDSA", verified.single().algorithm)
+        assertEquals("EdDSA", verified.proofs.single().algorithm)
         assertEquals(
             holderKey.getPublicKey().getThumbprint(),
-            Jwk.sha256Thumbprint(verified.single().holderKey.exportPublicJwk()),
+            Jwk.sha256Thumbprint(verified.proofs.single().holderKey.exportPublicJwk()),
         )
     }
 

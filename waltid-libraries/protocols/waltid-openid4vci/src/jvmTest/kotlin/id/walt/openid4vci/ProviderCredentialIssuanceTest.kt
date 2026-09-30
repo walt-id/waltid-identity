@@ -408,8 +408,8 @@ class ProviderCredentialIssuanceTest {
         )
         val batch = CredentialIssuanceBatch(
             inputs = List(count) { CredentialIssuanceInput(buildJsonObject { put("given_name", "Jane") }) },
-            verifiedProofs = List(count) { index ->
-                VerifiedCredentialProof("jwt", "", "ES256", buildJsonObject {}, buildJsonObject {}, key("holder-$index"), null, null, null)
+            bindings = List(count) { index ->
+                VerifiedCredentialProof("jwt", "", "ES256", buildJsonObject {}, buildJsonObject {}, key("holder-$index"), null, null, null).binding(index)
             },
         )
         var clockReads = 0

@@ -8,7 +8,7 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDMap
@@ -43,7 +43,7 @@ object W3cJwtVcCredentialSigner {
         display: List<CredentialDisplay>? = null,
         credentialStatus: JsonElement? = null,
         w3cVersion: String? = null,
-        verifiedProof: VerifiedCredentialProof? = null,
+        verifiedBinding: VerifiedCredentialBinding? = null,
     ): String = generateW3CJwtVC(
         credentialRequest = credentialRequest,
         credentialData = credentialData,
@@ -55,7 +55,7 @@ object W3cJwtVcCredentialSigner {
         display = display,
         credentialStatus = credentialStatus,
         w3cVersion = w3cVersion,
-        verifiedProof = verifiedProof,
+        verifiedBinding = verifiedBinding,
     )
 
     suspend fun generateW3CJwtVC(
@@ -70,7 +70,7 @@ object W3cJwtVcCredentialSigner {
         display: List<CredentialDisplay>? = null,
         credentialStatus: JsonElement? = null,
         w3cVersion: String? = null,
-        verifiedProof: VerifiedCredentialProof? = null,
+        verifiedBinding: VerifiedCredentialBinding? = null,
     ): String = generateW3CJwtVC(
         credentialRequest = credentialRequest,
         credentialData = credentialData,
@@ -82,7 +82,7 @@ object W3cJwtVcCredentialSigner {
         display = display,
         credentialStatus = credentialStatus,
         w3cVersion = w3cVersion,
-        verifiedProof = verifiedProof,
+        verifiedBinding = verifiedBinding,
     )
 
     private suspend fun generateW3CJwtVC(
@@ -96,15 +96,16 @@ object W3cJwtVcCredentialSigner {
         display: List<CredentialDisplay>?,
         credentialStatus: JsonElement?,
         w3cVersion: String?,
-        verifiedProof: VerifiedCredentialProof?,
+        verifiedBinding: VerifiedCredentialBinding?,
     ): String {
-        val proofHeader = verifiedProof?.header ?: credentialRequest.proofs?.jwt?.let { JwtUtils.parseJWTHeader(it.first()) }
-            ?: throw IllegalArgumentException("Missing JWT proof in proofs")
+        val proofHeader = if (verifiedBinding != null) JsonObject(emptyMap()) else
+            credentialRequest.proofs?.jwt?.let { JwtUtils.parseJWTHeader(it.first()) }
+                ?: throw IllegalArgumentException("Missing JWT proof in proofs")
 
-        val holderKid = verifiedProof?.holderKid ?: proofHeader[JWT_HEADER_KID]?.jsonPrimitive?.content
+        val holderKid = if (verifiedBinding != null) verifiedBinding.holderKid else proofHeader[JWT_HEADER_KID]?.jsonPrimitive?.content
 
-        val holderDid = verifiedProof?.holderDid
-            ?: if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else null
+        val holderDid = if (verifiedBinding != null) verifiedBinding.holderDid
+            else if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else null
 
         val additionalJwtHeaders = x5Chain?.let {
             mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert ->

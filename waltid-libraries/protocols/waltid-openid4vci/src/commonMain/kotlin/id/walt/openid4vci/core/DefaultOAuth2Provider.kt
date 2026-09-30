@@ -48,7 +48,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.proofs.CredentialProofValidationException
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialEndpointHandler
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
@@ -597,15 +597,15 @@ class DefaultOAuth2Provider(
         validUntil: Instant?,
         proofValidationContext: CredentialProofValidationContext?,
     ): CredentialResponseResult {
-        val verifiedProofs = when (
+        val bindings = when (
             val proofResult = verifyCredentialProofs(request, configuration, proofValidationContext)
         ) {
-            is CredentialProofVerification.Success -> proofResult.proofs
+            is CredentialProofVerification.Success -> proofResult.bindings
             is CredentialProofVerification.Failure -> return CredentialResponseResult.Failure(proofResult.error)
         }
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return missingCredentialHandler(configuration)
-        val issuanceBatch = createCredentialIssuanceBatch(verifiedProofs, issuanceInputData)
+        val issuanceBatch = createCredentialIssuanceBatch(bindings, issuanceInputData)
 
         return handler.sign(
             request = request,
@@ -642,10 +642,10 @@ class DefaultOAuth2Provider(
         validUntil: Instant?,
         proofValidationContext: CredentialProofValidationContext?,
     ): CredentialResponseResult {
-        val verifiedProofs = when (
+        val bindings = when (
             val proofResult = verifyCredentialProofs(request, configuration, proofValidationContext)
         ) {
-            is CredentialProofVerification.Success -> proofResult.proofs
+            is CredentialProofVerification.Success -> proofResult.bindings
             is CredentialProofVerification.Failure -> return CredentialResponseResult.Failure(proofResult.error)
         }
         val registeredHandler = config.credentialEndpointHandlers.get(configuration.format)
@@ -657,7 +657,7 @@ class DefaultOAuth2Provider(
                     description = "Handler for format ${configuration.format.value} does not support crypto2 signing",
                 )
             )
-        val issuanceBatch = createCredentialIssuanceBatch(verifiedProofs, issuanceInputData)
+        val issuanceBatch = createCredentialIssuanceBatch(bindings, issuanceInputData)
 
         return handler.sign(
             request = request,
@@ -786,23 +786,25 @@ class DefaultOAuth2Provider(
             )
 
         return try {
-            val verifiedProofs = verifier.verify(
+            val verification = verifier.verify(
                 credentialRequest = request,
                 credentialConfiguration = configuration,
                 context = context,
             )
             val submittedProofCount = request.credentialProofCount()
-            if (submittedProofCount > 0 && verifiedProofs.size != submittedProofCount) {
+            if (submittedProofCount > 0 && (verification.proofs.size != submittedProofCount || verification.bindings.isEmpty())) {
                 throw CredentialProofValidationException(
                     CredentialErrorCodes.INVALID_PROOF,
                     "Credential proof verification result does not match the submitted proof count",
                 )
             }
-            CredentialProofVerification.Success(verifiedProofs)
+            CredentialProofVerification.Success(verification.bindings)
         } catch (e: CancellationException) {
             throw e
         } catch (e: CredentialProofValidationException) {
             CredentialProofVerification.Failure(CredentialError(e.errorCode, e.message))
+        } catch (e: id.walt.openid4vci.proofs.attestation.KeyAttestationServiceException) {
+            throw e
         } catch (e: Exception) {
             CredentialProofVerification.Failure(
                 CredentialError(CredentialErrorCodes.INVALID_PROOF, e.message ?: "Invalid credential proof"),
@@ -838,15 +840,15 @@ class DefaultOAuth2Provider(
     } ?: 0
 
     private suspend fun createCredentialIssuanceBatch(
-        verifiedProofs: List<VerifiedCredentialProof>,
+        bindings: List<VerifiedCredentialBinding>,
         issuanceInputData: CredentialIssuanceInputProvider,
     ): CredentialIssuanceBatch {
-        val expectedCount = verifiedProofs.size.coerceAtLeast(1)
+        val expectedCount = bindings.size.coerceAtLeast(1)
         val inputs = issuanceInputData.provide(expectedCount)
         check(inputs.size == expectedCount) {
             "Credential issuance input data returned ${inputs.size} inputs; expected $expectedCount"
         }
-        return CredentialIssuanceBatch(inputs, verifiedProofs)
+        return CredentialIssuanceBatch(inputs, bindings)
     }
 
     private fun missingCredentialHandler(configuration: CredentialConfiguration) =
@@ -917,7 +919,7 @@ class DefaultOAuth2Provider(
     }
 
     private sealed class CredentialProofVerification {
-        data class Success(val proofs: List<VerifiedCredentialProof>) :
+        data class Success(val bindings: List<VerifiedCredentialBinding>) :
             CredentialProofVerification()
 
         data class Failure(val error: CredentialError) : CredentialProofVerification()

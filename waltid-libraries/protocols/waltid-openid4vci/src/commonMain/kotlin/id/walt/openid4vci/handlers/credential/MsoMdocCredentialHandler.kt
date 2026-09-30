@@ -9,7 +9,7 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceBatch
 import id.walt.openid4vci.handlers.endpoints.credential.signEach
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.sdjwt.SDMap
@@ -70,7 +70,7 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
                     "credentialData must contain at least one namespace for mso_mdoc"
                 }
 
-                val holderKey = extractHolderKey(request, listOfNotNull(instance.verifiedProof))
+                val holderKey = extractHolderKey(request, listOfNotNull(instance.verifiedBinding))
                     ?: throw IllegalArgumentException("Could not extract holder key from proof")
 
                 issueMdoc(
@@ -95,8 +95,8 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
      */
     protected open suspend fun extractHolderKey(
         request: CredentialRequest,
-        verifiedProofs: List<VerifiedCredentialProof>,
-    ): Crypto2Key? = verifiedProofs.firstOrNull()?.holderKey
+        bindings: List<VerifiedCredentialBinding>,
+    ): Crypto2Key? = bindings.firstOrNull()?.holderKey
 
     /**
      * Perform the actual mdoc CBOR/COSE signing.

@@ -137,10 +137,10 @@ class MdocPortraitCaptureCompatibilityTest {
                     "Standard portrait values must not reach a custom fallback callback")
                 MdocIssuer.defaultSchemalessMappingFunction(type, fieldNamespace, element, value)
             },
-            verifiedProof = VerifiedCredentialProof(
+            verifiedBinding = VerifiedCredentialProof(
                 proofType = "jwt", jwt = "", algorithm = "ES256", header = buildJsonObject {}, payload = buildJsonObject {},
                 holderKey = holder, holderKid = null, holderDid = null, nonce = null,
-            ),
+            ).binding(),
         )
         return coseCompliantCbor.decodeFromByteArray<IssuerSigned>(credential.base64UrlDecode()).also {
             assertTrue(it.issuerAuth.verify(issuer, -7))

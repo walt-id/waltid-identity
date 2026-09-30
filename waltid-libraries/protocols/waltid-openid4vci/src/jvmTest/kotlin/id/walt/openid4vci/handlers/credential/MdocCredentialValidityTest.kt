@@ -111,8 +111,8 @@ class MdocCredentialValidityTest {
                             credentialData = buildJsonObject { putJsonObject("org.example") { put("given_name", "Jane") } },
                         )
                     },
-                    verifiedProofs = holders.take(credentialCount).map { holder ->
-                        VerifiedCredentialProof("jwt", "", "ES256", buildJsonObject {}, buildJsonObject {}, holder, null, null, null)
+                    bindings = holders.take(credentialCount).map { holder ->
+                        VerifiedCredentialProof("jwt", "", "ES256", buildJsonObject {}, buildJsonObject {}, holder, null, null, null).binding()
                     },
                 ),
                 dataMapping = null, selectiveDisclosure = null, x5Chain = listOf(certificate),

@@ -30,6 +30,7 @@ The library includes:
 - **Authorization Endpoint** - Handles authorization requests and generates authorization codes
 - **Token Endpoint** - Issues access tokens for credential requests
 - **JWT Access Tokens** - JWT-based access token generation and signing
+- **JWT Key Attestations** - [Trusted attester verification and multi-key credential binding](docs/key-attestation.md)
 - **Request Validation** - Validates authorization and token requests according to OAuth2/OpenID4VCI specs
 - **Repository Interfaces** - Pluggable storage for authorization codes and pre-authorized codes
 - **Session Management** - Session tracking for issuance flows

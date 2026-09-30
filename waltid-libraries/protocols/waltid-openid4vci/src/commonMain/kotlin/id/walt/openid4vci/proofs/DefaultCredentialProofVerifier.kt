@@ -6,12 +6,14 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.crypto2.jose.supportsJwsAlgorithm
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.CryptographicBindingMethod
+import id.walt.openid4vci.proofs.attestation.KeyAttestationVerifier
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.ProofType
 import id.walt.openid4vci.prooftypes.ProofTypeId
@@ -19,7 +21,6 @@ import id.walt.openid4vci.prooftypes.Proofs
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
-import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -32,6 +33,7 @@ class DefaultCredentialProofVerifier(
 
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val didKeyResolver = Crypto2JwtKeyResolver()
+    private val keyAttestationVerifier = KeyAttestationVerifier(clockSkewSeconds, now)
 
     init {
         require(proofMaxAgeSeconds > 0) { "Credential proof maximum age must be positive" }
@@ -42,10 +44,10 @@ class DefaultCredentialProofVerifier(
         credentialRequest: CredentialRequest,
         credentialConfiguration: CredentialConfiguration,
         context: CredentialProofValidationContext,
-    ): List<VerifiedCredentialProof> {
+    ): CredentialProofVerificationResult {
         val supportedProofTypes = credentialConfiguration.proofTypesSupported
         val proofs = credentialRequest.proofs
-        if (supportedProofTypes == null && proofs == null) return emptyList()
+        if (supportedProofTypes == null && proofs == null) return CredentialProofVerificationResult(emptyList())
         if (proofs == null) throw invalidCredentialProof("Credential request is missing proofs")
 
         val presentTypes = proofs.presentTypes()
@@ -62,7 +64,7 @@ class DefaultCredentialProofVerifier(
             }
         val jwtProofs = proofs.jwt ?: throw invalidCredentialProof("Credential request is missing JWT proofs")
 
-        return jwtProofs.map { proofJwt ->
+        val verifiedProofs = jwtProofs.map { proofJwt ->
             verifyJwtProof(
                 proofJwt = proofJwt,
                 proofType = jwtProofType,
@@ -70,6 +72,10 @@ class DefaultCredentialProofVerifier(
                 context = context,
             )
         }
+        return CredentialProofVerificationResult(
+            verifiedProofs,
+            selectCredentialBindings(verifiedProofs, credentialConfiguration, context),
+        )
     }
 
     private suspend fun verifyJwtProof(
@@ -109,7 +115,22 @@ class DefaultCredentialProofVerifier(
         validateAudience(verifiedPayload, context.credentialIssuer)
         validateIssuedAt(verifiedPayload)
         validateIssuer(verifiedPayload, context)
-        validateNonce(verifiedPayload, context)
+        validateCredentialNonce(verifiedPayload, context)
+
+        val attestationJwt = decoded.header.optionalStringHeader(JWT_HEADER_KEY_ATTESTATION)
+        if (attestationJwt == null && proofType?.keyAttestationsRequired != null) {
+            throw invalidCredentialProof("Key attestation is required for this credential configuration")
+        }
+        val attestation = attestationJwt?.let { jwt ->
+            val options = context.keyAttestation
+                ?: throw invalidCredentialProof("Key attestation verification is not configured")
+            keyAttestationVerifier.verify(jwt, proofType, context, credentialConfiguration, options).also { evidence ->
+                val signerThumbprint = Jwk.sha256Thumbprint(resolvedHolderKey.key.exportPublicJwk())
+                requireCredentialProof(evidence.attestedKeys.any { Jwk.sha256Thumbprint(it.exportPublicJwk()) == signerThumbprint }) {
+                    "Credential proof signing key is not an attested key"
+                }
+            }
+        }
 
         return VerifiedCredentialProof(
             proofType = ProofTypeId.JWT.value,
@@ -121,6 +142,7 @@ class DefaultCredentialProofVerifier(
             holderKid = resolvedHolderKey.kid,
             holderDid = resolvedHolderKey.did,
             nonce = verifiedPayload.optionalStringClaim(PROOF_NONCE_CLAIM),
+            keyAttestation = attestation,
         )
     }
 
@@ -176,9 +198,6 @@ class DefaultCredentialProofVerifier(
     }
 
     private fun rejectUnsupportedTrustHeaders(header: JsonObject) {
-        if (JWT_HEADER_KEY_ATTESTATION in header) {
-            throw invalidCredentialProof("Credential proof key_attestation is not supported")
-        }
         if (JWT_HEADER_TRUST_CHAIN in header) {
             throw invalidCredentialProof("Credential proof trust_chain is not supported")
         }
@@ -293,22 +312,6 @@ class DefaultCredentialProofVerifier(
             requireCredentialProof(context.clientId != null && issuer == context.clientId) {
                 "Credential proof issuer claim must match the access token client_id"
             }
-        }
-    }
-
-    private suspend fun validateNonce(payload: JsonObject, context: CredentialProofValidationContext) {
-        val nonceValidation = context.nonceValidation ?: return
-        val nonce = payload.optionalStringClaim(PROOF_NONCE_CLAIM)
-            ?: throw invalidCredentialNonce("Credential proof nonce is required")
-        val result = try {
-            nonceValidation.service.validate(nonce, nonceValidation.binding)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            throw invalidCredentialNonce("Credential proof nonce verification failed", e)
-        }
-        if (result != CredentialNonceValidationResult.VALID) {
-            throw invalidCredentialNonce("Credential proof nonce is invalid")
         }
     }
 
