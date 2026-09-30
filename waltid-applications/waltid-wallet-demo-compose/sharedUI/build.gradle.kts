@@ -66,8 +66,8 @@ kotlin {
                     // dispatcher, so a provider surface can turn it into an Activity result.
                     implementation(identityLibs.androidx.activity.compose)
                     implementation(identityLibs.zxing.core)
-                    implementation(identityLibs.androidx.core.ktx)
-                    implementation(identityLibs.androidx.lifecycle.runtime.ktx)
+                    implementation(identityLibs.androidx.core)
+                    implementation(identityLibs.androidx.lifecycle.runtime)
                     implementation(identityLibs.androidx.lifecycle.runtime.compose)
                 }
             }

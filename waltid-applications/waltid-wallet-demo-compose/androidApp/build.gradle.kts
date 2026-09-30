@@ -97,7 +97,7 @@ dependencies {
     implementation(identityLibs.androidx.activity.compose)
     implementation(identityLibs.androidx.credentials.registry.provider)
     debugImplementation(identityLibs.androidx.credentials.play.services.auth)
-    debugImplementation(identityLibs.androidx.lifecycle.runtime.ktx)
+    debugImplementation(identityLibs.androidx.lifecycle.runtime)
     implementation(identityLibs.kotlinx.coroutines.android)
     implementation(identityLibs.kotlinx.serialization.json)
     implementation(identityLibs.androidx.fragment)
