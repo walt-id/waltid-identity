@@ -8,6 +8,7 @@ import id.walt.ktorauthnz.events.AuthnzEvents
 import id.walt.ktorauthnz.security.PasswordHashingConfiguration
 import id.walt.ktorauthnz.sessions.SessionStore
 import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
+import id.walt.ktorauthnz.tokens.RefreshTokenSettings
 import id.walt.ktorauthnz.tokens.TokenHandler
 import io.ktor.server.application.*
 
@@ -23,6 +24,9 @@ class KtorAuthnzConfig {
     var expiringStore: ExpiringStore? = null
     var attemptLimits: AttemptLimits? = null
     var passwordHashing: PasswordHashingConfiguration? = null
+
+    /** Issue refresh tokens with each login token; see [RefreshTokenSettings]. */
+    var refreshTokens: RefreshTokenSettings? = null
 
     internal val cookie = CookieConfig()
     internal val listeners = mutableListOf<AuthnzEventListener>()
@@ -69,6 +73,7 @@ val KtorAuthnz = createApplicationPlugin("KtorAuthnz", ::KtorAuthnzConfig) {
     config.expiringStore?.let { KtorAuthnzManager.expiringStore = it }
     config.attemptLimits?.let { KtorAuthnzManager.attemptLimits = it }
     config.passwordHashing?.let { KtorAuthnzManager.passwordHashingConfig = it }
+    config.refreshTokens?.let { KtorAuthnzManager.refreshTokens = it }
 
     config.cookie.name?.let { SessionTokenCookieHandler.cookieName = it }
     config.cookie.domain?.let { SessionTokenCookieHandler.domain = it }
