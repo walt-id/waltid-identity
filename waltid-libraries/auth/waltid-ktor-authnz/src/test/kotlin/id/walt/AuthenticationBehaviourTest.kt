@@ -50,7 +50,7 @@ class AuthenticationBehaviourTest {
         install(StatusPages) {
             exception<Throwable> { call, cause ->
                 val status = when (cause) {
-                    is StatusException -> HttpStatusCode.fromValue(cause.status)
+                    is id.walt.errors.HttpStatusError -> HttpStatusCode.fromValue(cause.status)
                     is IllegalArgumentException -> HttpStatusCode.BadRequest
                     else -> HttpStatusCode.InternalServerError
                 }
