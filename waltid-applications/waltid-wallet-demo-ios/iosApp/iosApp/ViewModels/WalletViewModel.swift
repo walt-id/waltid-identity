@@ -629,6 +629,7 @@ class WalletViewModel: ObservableObject {
                 bearerToken: attestationBearerToken,
                 hostHeader: attestationHostHeader
             ),
+            clientIDTrustConfiguration: DemoClientIdTrust.clientIDTrustConfiguration,
             transactionDataProfiles: transactionDataProfiles.profiles,
             crossProcessAccess: Self.crossProcessAccessConfiguration(),
             defaultKeyUseAuthorizationPolicy: signingProtectionMode.defaultSelection.authorizationPolicy,
