@@ -1,6 +1,7 @@
 package id.walt.ktorauthnz.sessions
 
 import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.exceptions.AuthSessionStateException
 import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.flows.methods
 import id.walt.ktorauthnz.methods.AuthenticationMethod
@@ -54,7 +55,13 @@ data class AuthSession(
 
     var expiration: Instant? = null,
 
-    var sessionData: MutableMap<String, SessionData>? = null
+    var sessionData: MutableMap<String, SessionData>? = null,
+
+    /** When the session was opened; unfinished sessions expire some time after it. */
+    val createdAt: Instant? = null,
+
+    /** Tenant the session was opened for, if the service is multi-tenant; other tenants cannot continue it. */
+    val tenant: String? = null,
 ) {
     companion object {
         private val log = logger("AuthSession")
@@ -79,11 +86,16 @@ data class AuthSession(
         expiration = expiration
     )
 
-    suspend fun progressFlow(method: AuthenticationMethod) {
-        check(flows!!.any { it.method == method.id }) { "Trying to progress flow with wrong authentication method. Allowed methods: ${flows!!.methods()}, tried method: ${method.id}" }
+    /** The flow of [method] among the current choices, or the reason this session cannot take a step with it. */
+    private fun currentFlowFor(method: AuthenticationMethod): AuthFlow {
+        val choices = flows ?: throw AuthSessionStateException("This authentication session is already complete")
+        return choices.firstOrNull { it.method == method.id }
+            ?: throw AuthSessionStateException("This authentication session expects ${choices.methods()} next, not ${method.id}")
+    }
 
+    suspend fun progressFlow(method: AuthenticationMethod) {
+        val currentFlow = currentFlowFor(method)
         setStepInformation(method, null)
-        val currentFlow = flows!!.first { it.method == method.id }
 
         if (currentFlow.continueWith != null) {
             flows = currentFlow.continueWith
@@ -106,9 +118,7 @@ data class AuthSession(
     }
 
     suspend fun progressStep(method: AuthenticationMethod, nextStepInfo: AuthSessionNextStep) {
-        check(flows!!.any { it.method == method.id }) { "Trying to progress flow step with wrong authentication method. Allowed methods: ${flows!!.methods()}, tried method: ${method.id}" }
-
-        //val currentFlow = flows!!.first { it.method == method.id }
+        currentFlowFor(method)
         setStepInformation(method, nextStepInfo)
         status = AuthSessionStatus.CONTINUE_NEXT_STEP
 
@@ -129,9 +139,10 @@ data class AuthSession(
     }
 
     inline fun <reified V : AuthMethodConfiguration> lookupFlowMethodConfiguration(method: AuthenticationMethod): V {
-        require(flows?.isNotEmpty() == true) { "No possible authentication flows to go from here in this Authentication Session (are you already authenticated?)" }
-        val flow = flows!!.firstOrNull { it.method == method.id }
-            ?: error("This authentication session provides no matching flow to go from here for authentication method: ${method.id}")
+        val choices = flows?.takeIf { it.isNotEmpty() }
+            ?: throw AuthSessionStateException("This authentication session is already complete")
+        val flow = choices.firstOrNull { it.method == method.id }
+            ?: throw AuthSessionStateException("This authentication session expects ${choices.methods()} next, not ${method.id}")
         val config: V =
             flow.config?.let {
                 runCatching { Json.decodeFromJsonElement<V>(flow.config) }.getOrElse {
