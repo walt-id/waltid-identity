@@ -1,6 +1,5 @@
-package id.walt.commons.config.list
+package id.walt.verifier.openid.transactiondata
 
-import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import kotlinx.serialization.Serializable
 
 @Serializable
