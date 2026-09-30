@@ -5,6 +5,7 @@ import id.walt.ktorauthnz.attempts.AttemptLimits
 import id.walt.ktorauthnz.ephemeral.ExpiringStore
 import id.walt.ktorauthnz.events.AuthnzEventListener
 import id.walt.ktorauthnz.ephemeral.InMemoryExpiringStore
+import id.walt.ktorauthnz.methods.config.PasskeySettings
 import id.walt.ktorauthnz.security.PasswordHashingConfiguration
 import id.walt.ktorauthnz.sessions.InMemorySessionStore
 import id.walt.ktorauthnz.sessions.SessionStore
@@ -28,6 +29,9 @@ object KtorAuthnzManager {
 
     /** Issue refresh tokens with each login token; off when null. */
     var refreshTokens: RefreshTokenSettings? = null
+
+    /** The WebAuthn relying party, for passkeys; passkeys are off when null. */
+    var passkeys: PasskeySettings? = null
 
     /** Receivers of authentication events (audit, alerts, metrics). */
     val eventListeners: MutableList<AuthnzEventListener> = java.util.concurrent.CopyOnWriteArrayList()
