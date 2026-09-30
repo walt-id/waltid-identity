@@ -46,6 +46,7 @@ kotlin {
                     implementation(identityLibs.ktor.client.content.negotiation)
                     implementation(identityLibs.ktor.serialization.kotlinx.json)
                     implementation(identityLibs.cryptography.core)
+                    implementation(identityLibs.okio)
                     implementation(identityLibs.whyoleg.cryptography.random)
                 }
             }
