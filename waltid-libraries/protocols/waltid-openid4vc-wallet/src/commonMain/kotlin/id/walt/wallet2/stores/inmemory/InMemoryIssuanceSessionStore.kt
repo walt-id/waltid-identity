@@ -1,12 +1,12 @@
 package id.walt.wallet2.stores.inmemory
 
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
-import id.walt.wallet2.handlers.WalletIssuanceSessionStore
+import id.walt.wallet2.handlers.AtomicWalletIssuanceSessionStore
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /** Process-local continuations. Create a separate instance for each wallet. */
-class InMemoryIssuanceSessionStore : WalletIssuanceSessionStore {
+class InMemoryIssuanceSessionStore : AtomicWalletIssuanceSessionStore {
     private val records = linkedMapOf<String, WalletIssuanceSessionRecord>()
     private val mutex = Mutex()
 

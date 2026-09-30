@@ -2,7 +2,7 @@ package id.walt.wallet2.persistence
 
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecordKind
-import id.walt.wallet2.handlers.WalletIssuanceSessionStore
+import id.walt.wallet2.handlers.AtomicWalletIssuanceSessionStore
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -18,7 +18,7 @@ import org.jetbrains.exposed.v1.jdbc.update
  * The database must provide the same confidentiality and integrity boundary as wallet private keys.
  * Payloads contain bearer tokens and must never be exposed through named-store or credential APIs.
  */
-class ExposedIssuanceSessionStore(private val scopedWalletId: String, private val db: Database) : WalletIssuanceSessionStore {
+class ExposedIssuanceSessionStore(private val scopedWalletId: String, private val db: Database) : AtomicWalletIssuanceSessionStore {
     private val scope = ExposedWalletScope(scopedWalletId, db)
     val walletGeneration: String get() = scope.generation
     private val table = Wallet2Tables.IssuanceSessions

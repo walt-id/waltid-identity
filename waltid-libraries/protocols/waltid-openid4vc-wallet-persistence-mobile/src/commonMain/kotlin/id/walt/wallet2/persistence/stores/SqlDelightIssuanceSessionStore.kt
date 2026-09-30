@@ -2,13 +2,13 @@ package id.walt.wallet2.persistence.stores
 
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecordKind
-import id.walt.wallet2.handlers.WalletIssuanceSessionStore
+import id.walt.wallet2.handlers.AtomicWalletIssuanceSessionStore
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 
 /** SQLCipher-backed storage for sensitive OpenID4VCI continuation records. */
 public class SqlDelightIssuanceSessionStore(
     private val queries: WalletPersistenceQueries,
-) : WalletIssuanceSessionStore {
+) : AtomicWalletIssuanceSessionStore {
     /** Returns the encrypted continuation record identified by [id], when present. */
     override suspend fun get(id: String): WalletIssuanceSessionRecord? =
         queries.selectIssuanceSessionRecordById(id).executeAsOneOrNull()?.let { row ->

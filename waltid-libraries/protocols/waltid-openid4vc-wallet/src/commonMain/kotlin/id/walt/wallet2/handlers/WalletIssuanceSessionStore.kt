@@ -41,6 +41,17 @@ interface WalletIssuanceSessionStore {
 
     suspend fun put(record: WalletIssuanceSessionRecord)
 
+    suspend fun remove(id: String): Boolean
+}
+
+/**
+ * Atomic continuation updates, coordinated across connections to the backing store.
+ *
+ * Implement this capability for cross-runtime claim exclusion. The released
+ * [WalletIssuanceSessionStore] remains supported with serialized updates within one wallet runtime;
+ * its persisted snapshots alone do not exclude concurrent writers in another runtime.
+ */
+interface AtomicWalletIssuanceSessionStore : WalletIssuanceSessionStore {
     /**
      * Atomically replaces a record only when every stored field equals [expected]. Returns false
      * for a missing or changed record. A null replacement removes the matching record. A non-null
@@ -48,6 +59,4 @@ interface WalletIssuanceSessionStore {
      * coordinate across all connections to the backing store, not just this adapter instance.
      */
     suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean
-
-    suspend fun remove(id: String): Boolean
 }

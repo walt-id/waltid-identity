@@ -249,9 +249,11 @@ class WalletBatchIssuanceTest {
     }
 
     @Test fun retainedSessionsNegotiateBothGrantsAndPreserveBatchSelectionsAcrossRestart() = runTest {
-        for (detailsSupported in listOf(false, true)) for (authorized in listOf(false, true)) {
+        for (detailsSupported in listOf(false, true)) for (authorized in listOf(false, true))
+            for (atomic in listOf(false, true)) {
             val fixture = batchTestFixture(true)
-            val records = MemorySessionStore()
+            val backingStore = MemorySessionStore()
+            val records = if (atomic) backingStore else object : WalletIssuanceSessionStore by backingStore {}
             val http = batchTestClient(authorizationDetailsSupported = detailsSupported, token = { parameters ->
                 if (!authorized) assertAutomaticParameters(parameters, detailsSupported)
                 negotiatedToken(detailsSupported)
@@ -1211,7 +1213,7 @@ class WalletBatchIssuanceTest {
         val fixture = batchTestFixture(true)
         val records = MemorySessionStore()
         var unavailable = true
-        val store = object : WalletIssuanceSessionStore by records {
+        val store = object : AtomicWalletIssuanceSessionStore by records {
             override suspend fun put(record: WalletIssuanceSessionRecord) {
                 check(!unavailable) { "Continuation store unavailable" }
                 records.put(record)
@@ -1239,7 +1241,7 @@ class WalletBatchIssuanceTest {
         val records = MemorySessionStore()
         val checkpointed = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
-        val store = object : WalletIssuanceSessionStore by records {
+        val store = object : AtomicWalletIssuanceSessionStore by records {
             override suspend fun put(record: WalletIssuanceSessionRecord) {
                 records.put(record)
                 checkpointed.complete(Unit)
@@ -1355,7 +1357,7 @@ class WalletBatchIssuanceTest {
         val fixture = batchTestFixture(true)
         val records = MemorySessionStore()
         var failWrites = false
-        val failingStore = object : WalletIssuanceSessionStore by records {
+        val failingStore = object : AtomicWalletIssuanceSessionStore by records {
             override suspend fun put(record: WalletIssuanceSessionRecord) {
                 check(!failWrites) { "Database unavailable" }
                 records.put(record)
@@ -1623,7 +1625,7 @@ class WalletBatchIssuanceTest {
             val releaseDeletion = CompletableDeferred<Unit>()
             val pollStarted = CompletableDeferred<Unit>()
             val releasePoll = CompletableDeferred<Unit>()
-            val cancellingStore = object : WalletIssuanceSessionStore by records {
+            val cancellingStore = object : AtomicWalletIssuanceSessionStore by records {
                 override suspend fun list(): List<WalletIssuanceSessionRecord> {
                     val snapshot = records.list()
                     snapshotRead.complete(Unit)
@@ -1664,7 +1666,7 @@ class WalletBatchIssuanceTest {
         val fixture = batchTestFixture(true)
         val records = MemorySessionStore()
         var unavailable = true
-        val store = object : WalletIssuanceSessionStore by records {
+        val store = object : AtomicWalletIssuanceSessionStore by records {
             override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean {
                 check(!unavailable || expected.kind != WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL) { "Database unavailable" }
                 return records.compareAndSet(expected, replacement)
@@ -1693,7 +1695,7 @@ class WalletBatchIssuanceTest {
             val records = id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore()
             val claiming = CompletableDeferred<Unit>()
             val releaseClaim = CompletableDeferred<Unit>()
-            val delayedStore = object : WalletIssuanceSessionStore by records {
+            val delayedStore = object : AtomicWalletIssuanceSessionStore by records {
                 override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean {
                     if (replacement?.kind == WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL) {
                         claiming.complete(Unit)
@@ -1769,7 +1771,7 @@ class WalletBatchIssuanceTest {
         val fixture = batchTestFixture(true)
         val records = MemorySessionStore()
         var unavailable = true
-        val store = object : WalletIssuanceSessionStore by records {
+        val store = object : AtomicWalletIssuanceSessionStore by records {
             override suspend fun put(record: WalletIssuanceSessionRecord) {
                 check(!unavailable) { "Database unavailable" }
                 records.put(record)
@@ -1942,7 +1944,7 @@ class WalletBatchIssuanceTest {
         }
     }
 
-    private class MemorySessionStore : WalletIssuanceSessionStore {
+    private class MemorySessionStore : AtomicWalletIssuanceSessionStore {
         val records = mutableMapOf<String, WalletIssuanceSessionRecord>()
         override suspend fun get(id: String) = records[id]
         override suspend fun put(record: WalletIssuanceSessionRecord) { records[record.id] = record }
