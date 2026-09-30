@@ -134,6 +134,16 @@ kotlin {
     }
 }
 
+// Kotlin 2.4.20's webpack treats import.meta as ESM. Older transitive kotlinx-io
+// versions leave it in the browser bundle; 0.9.1 fixes that module-loading path.
+dependencies {
+    constraints {
+        add("commonMainImplementation", identityLibs.kotlinx.io.core) {
+            because("Kotlin 2.4.20 requires the kotlinx-io 0.9.1 browser module-loading fix")
+        }
+    }
+}
+
 val jvmTestCompilation = kotlin.targets.getByName("jvm").compilations.getByName("test")
 
 tasks.register<JavaExec>("benchmarkStoredKeys") {

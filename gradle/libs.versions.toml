@@ -45,7 +45,7 @@ kotlinx-serialization-cbor-TEMP = "1.11.1-waltid-20260811"
 kotlinx-datetime = "0.8.0"
 kotlinx-coroutines = "1.11.0"
 kotlinx-atomicfu = "0.33.0"
-kotlinx-io = "0.9.0"
+kotlinx-io = "0.9.1"
 
 # Logging
 kotlinlogging = "8.0.4"
