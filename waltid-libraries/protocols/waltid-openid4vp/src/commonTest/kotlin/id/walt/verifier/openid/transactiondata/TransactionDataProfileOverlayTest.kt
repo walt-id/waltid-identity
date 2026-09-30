@@ -1,7 +1,5 @@
-package id.walt.commons.config.list
+package id.walt.verifier.openid.transactiondata
 
-import id.walt.commons.web.ConflictException
-import id.walt.commons.web.WebException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -65,9 +63,10 @@ class TransactionDataProfileOverlayTest {
 
     @Test
     fun createRejectsDuplicates() {
-        assertFailsWith<ConflictException> {
+        val error = assertFailsWith<TransactionDataProfileExistsException> {
             TransactionDataProfileOverlay().create(listOf(paymentAuthorization), paymentAuthorization)
         }
+        assertEquals(409, error.status)
     }
 
     @Test
@@ -75,7 +74,7 @@ class TransactionDataProfileOverlayTest {
         val seed = listOf(paymentAuthorization, scaPayment)
         val hidden = TransactionDataProfileOverlay().delete(seed, scaPayment.type)
         assertFalse(hidden.applyTo(seed).any { it.type == scaPayment.type })
-        assertFailsWith<WebException> { hidden.requireExisting(seed, scaPayment.type) }
+        assertFailsWith<TransactionDataProfileNotFoundException> { hidden.requireExisting(seed, scaPayment.type) }
 
         val (restored, created) = hidden.create(seed, scaPayment.copy(displayName = "SCA Payment restored"))
         assertEquals("SCA Payment restored", created.displayName)
@@ -100,7 +99,7 @@ class TransactionDataProfileOverlayTest {
 
     @Test
     fun getUnknownTypeIsNotFound() {
-        val error = assertFailsWith<WebException> {
+        val error = assertFailsWith<TransactionDataProfileNotFoundException> {
             TransactionDataProfileOverlay().requireExisting(listOf(paymentAuthorization), "missing")
         }
         assertEquals(404, error.status)
