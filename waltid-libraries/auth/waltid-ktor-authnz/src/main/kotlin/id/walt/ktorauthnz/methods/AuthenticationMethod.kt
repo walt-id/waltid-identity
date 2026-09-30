@@ -20,6 +20,7 @@ import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
 import id.walt.ktorauthnz.utils.HtmlRedirect.htmlBasedRedirect
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.application.DuplicatePluginException
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.EncodeDefault
@@ -174,17 +175,19 @@ abstract class AuthenticationMethod(open val id: String) {
 }
 
 
-/** Groups the routes of authentication methods without adding a path segment, and tracks their failed attempts. */
-private object AuthenticationMethodRoutesSelector : RouteSelector() {
-    override suspend fun evaluate(context: RoutingResolveContext, segmentIndex: Int) = RouteSelectorEvaluation.Transparent
-    override fun toString() = "(ktor-authnz methods)"
-}
-
-private fun Route.authenticationMethodRoutes(block: Route.() -> Unit) =
-    createChild(AuthenticationMethodRoutesSelector).apply {
+/**
+ * Registers method routes here and tracks their failed attempts. The tracking goes on this route itself - a grouping
+ * child route would show up in the OpenAPI paths - and only counts calls a method marked as an attempt, so other routes
+ * here are unaffected.
+ */
+private fun Route.authenticationMethodRoutes(block: Route.() -> Unit) {
+    try {
         install(AuthAttemptTracking)
-        block()
+    } catch (_: DuplicatePluginException) {
+        // already tracked: methods registered here before
     }
+    block()
+}
 
 fun Route.registerAuthenticationMethod(
     method: AuthenticationMethod,
