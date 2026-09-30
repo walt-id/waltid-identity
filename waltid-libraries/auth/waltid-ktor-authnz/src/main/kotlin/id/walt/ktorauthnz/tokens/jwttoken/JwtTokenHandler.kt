@@ -94,7 +94,7 @@ class JwtTokenHandler private constructor(
         if (!requireActiveSession) return true
         val sessionId = runCatching { getTokenSessionId(token) }.getOrNull() ?: return false
         val session = KtorAuthnzManager.sessionStore.findSessionById(sessionId) ?: return false
-        return session.status.isSuccess() && session.token == token
+        return session.status.isSuccess() && (session.token == null || session.token == token)
     }
 
     private suspend fun validateSignatureAndExpiration(token: String): Boolean {
