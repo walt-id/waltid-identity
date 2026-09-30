@@ -4,6 +4,7 @@ import id.walt.ktorauthnz.attempts.AttemptLimiter
 import id.walt.ktorauthnz.attempts.AttemptLimiter.attemptOnSession
 import id.walt.ktorauthnz.attempts.AuthAttemptTracking
 import id.walt.ktorauthnz.exceptions.AccountDataNotFoundException
+import id.walt.ktorauthnz.exceptions.AuthSessionNotFoundException
 import id.walt.ktorauthnz.exceptions.AuthSessionStateException
 import id.walt.ktorauthnz.exceptions.TooManyAttemptsException
 import id.walt.ktorauthnz.sessions.AuthSessionStatus
@@ -154,12 +155,14 @@ abstract class AuthenticationMethod(open val id: String) {
     suspend fun ApplicationCall.getAuthSession(authContext: ApplicationCall.() -> AuthContext): AuthSession {
         val currentContext = authContext.invoke(this)
         if (currentContext.implicitSessionGeneration && currentContext.sessionId == null) {
-            return SessionManager.openImplicitGlobalSession(currentContext.initialFlow!!)
+            return SessionManager.openImplicitGlobalSession(currentContext.initialFlow!!, tenant = currentContext.tenant)
         }
 
         val sessionId = currentContext.sessionId ?: throw AuthSessionStateException("No authentication session id given")
         val session = SessionManager.getSessionById(sessionId)
         when {
+            // Another tenant's session is not continued here, and not revealed either.
+            session.tenant != null && session.tenant != currentContext.tenant -> throw AuthSessionNotFoundException(sessionId)
             session.status == AuthSessionStatus.FAILURE ->
                 throw TooManyAttemptsException("This authentication session failed; start a new one")
             session.status.isSuccess() || session.flows == null ->
