@@ -24,10 +24,47 @@ import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.Key
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.toHexString
 import kotlin.test.*
 
 class X509CertificateSigningTest {
+
+    @Test
+    fun shouldEncodeCertificateSerialNumbersCanonically() = runTest {
+        // JVM/Android (Bouncy Castle) already canonicalizes via BigInteger; the JS and iOS
+        // (Signum) runs are the ones that catch non-minimal INTEGER encoding.
+        val serialNumbers = listOf(
+            byteArrayOf(0x00, 0x7f) to byteArrayOf(0x7f),
+            byteArrayOf(0x00, 0x00, 0x7f) to byteArrayOf(0x7f),
+            byteArrayOf(0x00, 0x80.toByte()) to byteArrayOf(0x00, 0x80.toByte()),
+            byteArrayOf(0x7f) to byteArrayOf(0x7f),
+        )
+        withCertificateTestKey(KeyType.secp256r1) { caKey ->
+            val crypto2Key = TestKeyUtil.genEcKey("serial-number-crypto2")
+            val sigAlg = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
+            for ((input, expected) in serialNumbers) {
+                val caCert = X509CertificateUtil.createSelfSignedCertificate(caKey) {
+                    subjectDn = "CN=Serial Number CA"
+                    serialNumberRaw = ByteString(input)
+                }
+                val crypto2CaCert = X509CertificateUtil.createSelfSignedCertificate(crypto2Key, sigAlg) {
+                    subjectDn = "CN=Crypto2 Serial Number CA"
+                    serialNumberRaw = ByteString(input)
+                }
+                val leafCert = X509CertificateUtil.createCertificate(crypto2Key, crypto2CaCert, sigAlg) {
+                    subjectDn = "CN=Serial Number Leaf"
+                    subjectPublicKey(crypto2Key)
+                    serialNumberRaw = ByteString(input)
+                }
+                verifyPemChain(caCert.encodedPem, caCert.encodedPem)
+                verifyPemChain(leafCert.encodedPem, crypto2CaCert.encodedPem)
+                assertContentEquals(expected, caCert.data.serialNumberRaw.toByteArray())
+                assertContentEquals(expected, crypto2CaCert.data.serialNumberRaw.toByteArray())
+                assertContentEquals(expected, leafCert.data.serialNumberRaw.toByteArray())
+            }
+        }
+    }
 
     @Test
     fun shouldSignCertificateWithRsaKey() = runTest {
