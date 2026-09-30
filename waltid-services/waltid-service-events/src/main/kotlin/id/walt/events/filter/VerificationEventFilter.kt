@@ -1,6 +1,6 @@
-package id.walt.commons.events.filter
+package id.walt.events.filter
 
-import id.walt.commons.events.DeviceFlow
+import id.walt.events.DeviceFlow
 import kotlinx.serialization.Serializable
 
 @Serializable
