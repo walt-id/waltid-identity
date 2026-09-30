@@ -422,13 +422,6 @@ between evaluations. The default revocation policy remains `NotChecked`; demo
 trust settings do not configure a CRL client. OCSP needs a separate request and
 signed-response verifier and is not implemented by this evaluator.
 
-For IACA-issued readers, set `requiredIacaIssuerCertificateDerBase64Url` in the trust
-configuration to the application-identified direct issuer. The validated path must contain
-that exact direct issuer, and the reader must carry non-critical issuerAlternativeName with
-an email/URI contact. A self-signed or imported generic CA does not establish the IACA role.
-Without this context, validation covers the unconditional reader fields; do not claim the
-conditional IACA profile has been checked.
-
 Configuration snapshots detach collection data while retaining provider/evaluator service
 references. Providers and revocation sources are queried at evaluation time. Persisted
 settings decoding checks structure; import checks current CA usage and RICAL material;

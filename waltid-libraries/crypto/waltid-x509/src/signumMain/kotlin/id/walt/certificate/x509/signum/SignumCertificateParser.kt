@@ -11,20 +11,27 @@ class SignumCertificateParser : X509CertificateParser {
     override fun parseCertificatePem(pem: String): X509Certificate {
         val result = SignumCertificate.decodeFromPem(pem)
         if (result.isFailure) {
-            throw IllegalArgumentException("Failed to parse certificate pem '${pem}'", result.exceptionOrNull())
+            throw IllegalArgumentException(
+                "Failed to parse certificate pem '${pem}'",
+                result.exceptionOrNull()
+            )
         }
-        return SignumX509Certificate(result.getOrThrow())
+        return createSignumX509Certificate(result.getOrThrow())
     }
 
     override fun parseCertificateDerEncoded(derEncoded: ByteString): X509Certificate = try {
         val signumCert = SignumCertificate.decodeFromDer(derEncoded.toByteArray())
+        return createSignumX509Certificate(signumCert)
+    } catch (error: Asn1Exception) {
+        // Signum's parse failures extend Throwable directly; keep the provider detail here.
+        throw IllegalArgumentException("Invalid DER certificate", error)
+    }
+
+    private fun createSignumX509Certificate(signumCert: SignumCertificate): SignumX509Certificate {
         //check it here and not with validator to have same behavior as BouncyCastle implementation
         require(signumCert.tbsCertificate.signatureAlgorithm.oid == signumCert.signatureAlgorithm.oid) {
             "Signature algorithm in TBS (${signumCert.tbsCertificate.signatureAlgorithm.oid}) not equal to signature algoritm in certificate (${signumCert.signatureAlgorithm.oid})"
         }
-        SignumX509Certificate(signumCert)
-    } catch (error: Asn1Exception) {
-        // Signum's parse failures extend Throwable directly; keep the provider detail here.
-        throw IllegalArgumentException("Invalid DER certificate", error)
+        return SignumX509Certificate(signumCert)
     }
 }

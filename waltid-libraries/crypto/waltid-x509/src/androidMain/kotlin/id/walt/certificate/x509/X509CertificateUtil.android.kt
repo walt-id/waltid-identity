@@ -1,22 +1,22 @@
 package id.walt.certificate.x509
 
-import id.walt.certificate.x509.validation.X509CertificateChainValidator
-import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
-import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
-import id.walt.x509.id.walt.certificate.x509.JavaX509CertificateSerialNumberGenerator
 import id.walt.certificate.x509.bouncycastle.BouncyPkcs10CertificateSigningRequestParser
 import id.walt.certificate.x509.bouncycastle.BouncyPkcs10CertificateSigningRequestSigner
 import id.walt.certificate.x509.bouncycastle.BouncyX509CertificateParser
 import id.walt.certificate.x509.bouncycastle.BouncyX509CertificateSigner
+import id.walt.certificate.x509.validation.X509CertificateChainValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateAuthorityKeyIdValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateCaHasKeyCertSignKeyUsageValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.x509.id.walt.certificate.x509.JavaX509CertificateSerialNumberGenerator
 import id.walt.x509.id.walt.certificate.x509.javasec.JavaDefaultTrustStore
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import java.security.Provider
 import java.security.Security
-import kotlin.jvm.java
 
 actual fun platformDefaultServices(): X509CertificateServices {
     initBouncyCastleProvider()
@@ -35,6 +35,7 @@ actual fun platformDefaultServices(): X509CertificateServices {
                 X509CertificateValidityValidator(),
                 X509CertificateBasicConstraintsValidator(),
                 X509CertificateAuthorityKeyIdValidator(),
+                X509CertificateCaHasKeyCertSignKeyUsageValidator(),
                 X509CertificateSignatureValidator(certificateSigner)
             ),
             JavaDefaultTrustStore(certificateParser)
