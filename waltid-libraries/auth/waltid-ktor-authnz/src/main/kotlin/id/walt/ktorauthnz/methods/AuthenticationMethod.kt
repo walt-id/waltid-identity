@@ -1,6 +1,12 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.attempts.AttemptLimiter
+import id.walt.ktorauthnz.attempts.AttemptLimiter.attemptOnSession
+import id.walt.ktorauthnz.attempts.AuthAttemptTracking
 import id.walt.ktorauthnz.exceptions.AccountDataNotFoundException
+import id.walt.ktorauthnz.exceptions.AuthSessionStateException
+import id.walt.ktorauthnz.exceptions.TooManyAttemptsException
+import id.walt.ktorauthnz.sessions.AuthSessionStatus
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
@@ -47,6 +53,7 @@ abstract class AuthenticationMethod(open val id: String) {
     private suspend fun ApplicationCall.handleSessionAuthSuccess(session: AuthSession, authContext: AuthContext, accountId: String?) {
         accountId?.let { session.accountId = it }
         session.progressFlow(this@AuthenticationMethod)
+        AttemptLimiter.recordSuccess(this)
 
         if (session.status.isSuccess()) {
             session.currentlyActiveMethod = null // No longer any method active, authentication is done for this session
@@ -135,24 +142,31 @@ abstract class AuthenticationMethod(open val id: String) {
 
     suspend inline fun <reified V : AuthMethodStoredData> lookupAccountStoredData(accountId: String): V {
         val storedData =
-            KtorAuthnzManager.accountStore.lookupStoredDataForAccount(accountId, this) ?: error("No stored data for method: $id")
+            KtorAuthnzManager.accountStore.lookupStoredDataForAccount(accountId, this) ?: throw AccountDataNotFoundException(id)
         return (storedData as? V) ?: error("${storedData::class.simpleName} is not requested ${V::class.simpleName}")
     }
 
-    private suspend fun sessionForAuthContext(currentContext: AuthContext): AuthSession {
-        val session = if (currentContext.implicitSessionGeneration && currentContext.sessionId == null) {
-            // Implicit session start
-            SessionManager.openImplicitGlobalSession(currentContext.initialFlow!!)
-        } else {
-            // Session was started explicitly
-            KtorAuthnzManager.sessionStore.resolveSessionById(currentContext.sessionId ?: error("No session id"))
+    /**
+     * The session this call works on: a new one for the first step of an implicit flow (stored once a step succeeds),
+     * otherwise the one named in the context - refused if it failed, is complete, or used up its attempts.
+     */
+    suspend fun ApplicationCall.getAuthSession(authContext: ApplicationCall.() -> AuthContext): AuthSession {
+        val currentContext = authContext.invoke(this)
+        if (currentContext.implicitSessionGeneration && currentContext.sessionId == null) {
+            return SessionManager.openImplicitGlobalSession(currentContext.initialFlow!!)
         }
 
+        val sessionId = currentContext.sessionId ?: throw AuthSessionStateException("No authentication session id given")
+        val session = SessionManager.getSessionById(sessionId)
+        when {
+            session.status == AuthSessionStatus.FAILURE ->
+                throw TooManyAttemptsException("This authentication session failed; start a new one")
+            session.status.isSuccess() || session.flows == null ->
+                throw AuthSessionStateException("This authentication session is already complete")
+        }
+        attemptOnSession(session.id)
         return session
     }
-
-    suspend fun ApplicationCall.getAuthSession(authContext: ApplicationCall.() -> AuthContext): AuthSession =
-        sessionForAuthContext(currentContext = authContext.invoke(this))
 
     // Relations
     open val relatedAuthMethodStoredData: KClass<out AuthMethodStoredData>? = null
@@ -160,13 +174,27 @@ abstract class AuthenticationMethod(open val id: String) {
 }
 
 
+/** Groups the routes of authentication methods without adding a path segment, and tracks their failed attempts. */
+private object AuthenticationMethodRoutesSelector : RouteSelector() {
+    override suspend fun evaluate(context: RoutingResolveContext, segmentIndex: Int) = RouteSelectorEvaluation.Transparent
+    override fun toString() = "(ktor-authnz methods)"
+}
+
+private fun Route.authenticationMethodRoutes(block: Route.() -> Unit) =
+    createChild(AuthenticationMethodRoutesSelector).apply {
+        install(AuthAttemptTracking)
+        block()
+    }
+
 fun Route.registerAuthenticationMethod(
     method: AuthenticationMethod,
     authContext: ApplicationCall.() -> AuthContext,
     functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>? = null
 ) {
-    method.apply {
-        registerAuthenticationRoutes(authContext, functionAmendments)
+    authenticationMethodRoutes {
+        method.apply {
+            registerAuthenticationRoutes(authContext, functionAmendments)
+        }
     }
 }
 
@@ -175,9 +203,11 @@ fun Route.registerAuthenticationMethods(
     authContext: ApplicationCall.() -> AuthContext,
     functionAmendments: Map<AuthenticationMethod, Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>>? = null
 ) {
-    methods.forEach { method ->
-        method.apply {
-            registerAuthenticationRoutes(authContext, functionAmendments?.get(method))
+    authenticationMethodRoutes {
+        methods.forEach { method ->
+            method.apply {
+                registerAuthenticationRoutes(authContext, functionAmendments?.get(method))
+            }
         }
     }
 }
