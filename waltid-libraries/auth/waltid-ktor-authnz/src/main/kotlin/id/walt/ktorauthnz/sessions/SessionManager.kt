@@ -2,6 +2,8 @@ package id.walt.ktorauthnz.sessions
 
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.events.AuthnzEvent
+import id.walt.ktorauthnz.events.AuthnzEvents
 import id.walt.ktorauthnz.exceptions.AuthSessionNotFoundException
 import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.utils.ExternalMappingList
@@ -61,6 +63,7 @@ object SessionManager {
 
     suspend fun invalidateAllSessionsForAccount(accountId: String) {
         KtorAuthnzManager.sessionStore.invalidateAllSessionsForAccount(accountId)
+        AuthnzEvents.emit(AuthnzEvent.SessionsRevoked(accountId))
     }
 
     suspend fun getSessionIdByExternalId(namespace: String, externalId: String): String? {
