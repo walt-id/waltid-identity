@@ -47,7 +47,7 @@ import kotlinx.serialization.json.*
  * @param testDid Optional DID to use for credential requests
  * @param testKeyId Registered client key, also the holder key in single-copy mode
  * @param attestationAuthority Test attester for plans using attestation-based client authentication
- * @param useScope Authorize the single-copy plan by scope, as HAIP requires
+ * @param useScope Authorize the offered configuration by scope, as HAIP requires
  * @param batchHolderKeyIds Two distinct stored holder keys for the explicit batch gate; empty for single-copy plans
  */
 class VciWalletConformanceAdapter(
@@ -61,7 +61,6 @@ class VciWalletConformanceAdapter(
     private val batchHolderKeyIds: List<String> = emptyList(),
 ) {
     init {
-        require(!useScope || batchHolderKeyIds.isEmpty()) { "Explicit scope selection uses the single-copy authorization endpoint" }
         require(batchHolderKeyIds.isEmpty() ||
             (batchHolderKeyIds.size == 2 && batchHolderKeyIds.all(String::isNotBlank) && batchHolderKeyIds.distinct().size == 2)) {
             "The batch conformance adapter requires two distinct stored holder keys"
@@ -292,7 +291,10 @@ class VciWalletConformanceAdapter(
 
         // 2. Authorization URL, PKCE verifier and state.
         val batchSuffix = if (batchHolderKeyIds.isEmpty()) "" else "/batch"
-        val authUrlResponse = client.post("$walletApiUrl/wallet/$walletId/credentials/receive/authorization-url$batchSuffix") {
+        // The released scope endpoint authorizes one configuration; the batch receive endpoint
+        // then requests its explicit holder copies under that same authorization.
+        val authorizationSuffix = if (useScope) "" else batchSuffix
+        val authUrlResponse = client.post("$walletApiUrl/wallet/$walletId/credentials/receive/authorization-url$authorizationSuffix") {
             contentType(ContentType.Application.Json)
             setBody(
                 buildJsonObject {
@@ -313,7 +315,7 @@ class VciWalletConformanceAdapter(
         val state = authorization["state"]?.jsonPrimitive?.content
             ?: return ClaimResult(false, "authorization-url returned no state")
         val codeVerifier = authorization["codeVerifier"]?.jsonPrimitive?.contentOrNull
-        val configurationIds = if (batchHolderKeyIds.isEmpty()) {
+        val configurationIds = if (batchHolderKeyIds.isEmpty() || useScope) {
             listOf(authorization["credentialConfigurationId"]?.jsonPrimitive?.content
                 ?: return ClaimResult(false, "authorization-url returned no credentialConfigurationId"))
         } else authorization.getValue("credentialConfigurationIds").jsonArray.map { it.jsonPrimitive.content }

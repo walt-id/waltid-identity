@@ -16,7 +16,8 @@ for these tests. Authorization-code redirects are followed automatically.
 | `vciWalletBatchBothGrantsAndFormats` | SD-JWT VC and mdoc | Both grants | `private_key_jwt` |
 
 The batch gate requires suite revision `db1080a`, version `5.2.4`, and the module
-`oid4vci-1_0-wallet-test-batch-credential-issuance`. Each of its four variants
+`oid4vci-1_0-wallet-test-batch-credential-issuance`. Each of its nine variants
+(RAR/simple across both grants and formats, plus HAIP SD-JWT authorization code)
 uses two newly generated P-256 holder keys, separate from the registered client
 key. The suite checks distinct proofs and returns credentials in reverse order.
 The gate requires an executed `FINISHED` / `PASSED`, two stored bindings with
@@ -25,10 +26,13 @@ of both credentials to in-process Verifier2. Presentation supplies only the
 credential selection, without a signing-key override; default verifier policies
 remain enabled.
 
-An absent suite/module, skipped batch, warning, or failed presentation fails this
-gate. Other profile tests may skip when their suite is unavailable. Full-profile
+An absent suite/module, skipped batch, failed presentation or warning fails this
+gate, except the two named TLS-header warnings allowed by the gate when the suite
+cannot observe TLS protocol/cipher headers behind the test proxy. Other profile tests may skip when their suite is unavailable. Full-profile
 results can include unsupported modules; inspect the recorded skip reasons.
-This targeted batch gate is neither a complete HAIP run nor certification.
+The targeted gate selects immediate, plain issuance explicitly; other HAIP modules
+remain part of the separate full-profile report. This is neither a complete HAIP run
+nor certification.
 
 ## Setup and execution
 
