@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.exceptions.AuthenticationFailureException
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.ktorauthnz.exceptions.JWTVerificationException
@@ -19,12 +20,13 @@ object JWT : AuthenticationMethod("jwt") {
 
     fun auth(jwt: String, config: JwtAuthConfiguration): JWTIdentifier {
         // todo: handle others
-        val parsedJws = JWSObject.parse(jwt)
+        val parsedJws = runCatching { JWSObject.parse(jwt) }.getOrNull() ?: throw JWTVerificationException()
         val jwtVerifier = MACVerifier(config.verifyKey)
 
         authCheck(parsedJws.verify(jwtVerifier), JWTVerificationException())
 
-        val id = parsedJws.payload.toJSONObject()[config.identifyClaim] as String
+        val id = parsedJws.payload.toJSONObject()[config.identifyClaim] as? String
+            ?: throw AuthenticationFailureException("JWT has no \"${config.identifyClaim}\" claim")
 
         return JWTIdentifier(id)
     }
