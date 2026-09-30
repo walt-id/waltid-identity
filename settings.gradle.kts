@@ -123,6 +123,7 @@ val modules = listOfNotNull(
     // Service commons
     "$services:waltid-service-commons",
     "$services:waltid-service-commons-test",
+    "$services:waltid-service-events",
 
     // Services based on libs
     "$services:waltid-issuer-api",
