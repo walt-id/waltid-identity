@@ -32,6 +32,7 @@ abstract interface id.walt.wallet2.persistence.db/WalletPersistenceDatabase : ap
         final val Schema // id.walt.wallet2.persistence.db/WalletPersistenceDatabase.Companion.Schema|{}Schema[0]
             final fun <get-Schema>(): app.cash.sqldelight.db/SqlSchema<app.cash.sqldelight.db/QueryResult.Value<kotlin/Unit>> // id.walt.wallet2.persistence.db/WalletPersistenceDatabase.Companion.Schema.<get-Schema>|<get-Schema>(){}[0]
 
+        final fun allTableNames(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.persistence.db/WalletPersistenceDatabase.Companion.allTableNames|allTableNames(){}[0]
         final fun invoke(app.cash.sqldelight.db/SqlDriver): id.walt.wallet2.persistence.db/WalletPersistenceDatabase // id.walt.wallet2.persistence.db/WalletPersistenceDatabase.Companion.invoke|invoke(app.cash.sqldelight.db.SqlDriver){}[0]
     }
 }

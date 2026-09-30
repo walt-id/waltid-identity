@@ -108,8 +108,8 @@ whyoleg-cryptography = "0.6.0"
 tink = "1.23.0"
 
 # Persistence
-sqldelight = "2.3.2"
-sqlcipher-android = "4.16.0"
+sqldelight = "2.4.0"
+sqlcipher-android = "4.19.1"
 skie = "0.10.15"
 
 # Testing
@@ -154,7 +154,7 @@ clikt-testkit = "3.1.1"
 password4j = "1.8.4"
 cose-js = "0.9.0"
 multipaz = "0.101.0"
-sqlcipher-swift = "4.16.0"
+sqlcipher-swift = "4.19.0"
 kotlinx-browser = "0.3"
 canonicalize-npm = "2.0.0"
 uuid-npm = "9.0.1"

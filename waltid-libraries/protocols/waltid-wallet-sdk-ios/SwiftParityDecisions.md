@@ -25,3 +25,7 @@ the current Swift facade remains correct.
   no-argument constructors for two defaulted crypto providers (KT-78623).
   Neither change adds a Swift wallet capability, so the existing `WalletSDK`
   facade remains correct.
+- 2026-09-30: SQLDelight 2.4.0 adds `allTableNames()` to the generated
+  `WalletPersistenceDatabase.Companion`. The Android and native ABI changes are
+  additive. No Swift facade change is needed because `WalletSDK` does not expose
+  generated persistence types; wallet storage and deletion remain internal.

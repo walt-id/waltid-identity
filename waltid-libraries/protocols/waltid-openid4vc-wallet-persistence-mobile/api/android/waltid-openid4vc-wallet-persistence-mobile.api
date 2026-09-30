@@ -74,6 +74,7 @@ public abstract interface class id/walt/wallet2/persistence/db/WalletPersistence
 }
 
 public final class id/walt/wallet2/persistence/db/WalletPersistenceDatabase$Companion {
+	public final fun allTableNames ()Ljava/util/List;
 	public final fun getSchema ()Lapp/cash/sqldelight/db/SqlSchema;
 	public final fun invoke (Lapp/cash/sqldelight/db/SqlDriver;)Lid/walt/wallet2/persistence/db/WalletPersistenceDatabase;
 }
