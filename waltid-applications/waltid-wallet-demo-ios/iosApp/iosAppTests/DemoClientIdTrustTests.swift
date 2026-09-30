@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import WalletSDK
 import XCTest
 @testable import iosApp
 
