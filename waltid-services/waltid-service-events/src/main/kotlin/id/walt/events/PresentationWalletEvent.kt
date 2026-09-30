@@ -1,8 +1,12 @@
-package id.walt.commons.events
+package id.walt.events
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+// The serial name is the class name from before the move out of service-commons: stored and exported events
+// carry it as their type, and must stay readable.
 @Serializable
+@SerialName("id.walt.commons.events.PresentationWalletEvent")
 class PresentationWalletEvent(
     override val originator: String? = null,
     override val organization: String,
