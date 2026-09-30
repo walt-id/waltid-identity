@@ -49,7 +49,6 @@ data class AuthFlow(
         if (ok != null) {
             val msg = "Your AuthFlow configuration contains deprecated end-condition \"ok\" - use \"success\" instead."
             runBlocking { log.warn { msg } }
-            println(msg)
         }
 
         check(isEndConditionSuccess() || continueWith != null) { "No end condition in auth flow with method $method" }
