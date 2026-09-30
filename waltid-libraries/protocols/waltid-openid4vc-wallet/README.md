@@ -128,32 +128,21 @@ with the complete detailed result; do not redeem the grant again. REST requests 
 `credentials` selections and `/authorized/batch` use the detailed result. Omitted pre-authorized
 selections and `/authorized` retain the released successful response shape.
 
-Batch selections use `WalletCredentialSelection.holderBindings`: one distinct stored holder key
-per requested copy, within the issuer's advertised limit. Omitting selections requests one copy
-per offered configuration. Responses are matched to holder public keys, so reordered responses
-retain the correct key for presentation. Storage-producing receive, fetch and poll operations
-reject inline holder keys before consuming authorization; isolated proof signing can use them.
+For batches, supply `WalletCredentialSelection` with one distinct stored holder key per copy:
 
-Isolated fetch and deferred poll can store proofless bearer response arrays without a wallet key.
-The issuer controls their count; proof-bound responses remain limited to one credential per supplied key.
-Explicit key references must resolve before the request; any returned holder confirmation must
-match a selected key. A W3C subject DID alone does not establish holder binding in a proofless flow.
+```kotlin
+val selections = listOf(WalletCredentialSelection(
+    "identity", holderBindings = listOf(CredentialHolderBinding(keyId = "holder-1"), CredentialHolderBinding(keyId = "holder-2"))))
+val result = WalletIssuanceHandler.receiveCredentials(wallet, request.copy(credentials = selections))
+```
 
-Authorization-code flows require advertised `openid_credential` authorization details or
-configuration scopes. An offered pre-authorized code works without either selector; supported
-selectors narrow its token request automatically.
-
-Use `listIssuanceContinuations()` to list both remote deferred issuance and retained local-save
-work, then `resumeDeferred(id)` to continue it without redeeming the grant again. Local-save
-recovery from isolated calls may lack the original configuration ID. The released
-`listDeferredCredentials()` retains its non-null configured references; if any handle lacks
-that metadata, it throws `WalletIssuanceContinuationException` containing the complete listing.
-Mobile and the new REST continuation listing use the general handle directly.
-
-Pending issuance records saved by 1.1.0 remain resumable after an upgrade while their saved key
-is available. Resumption checks that key and any explicit credential holder binding. These older
-records did not retain the requested configuration or proof requirement, so those original
-constraints cannot be rechecked. A poll with a lost response remains blocked from automatic replay.
+See the [Wallet2 batch guide](https://docs.walt.id/community-stack/wallet2/credential-receiving/batch-issuance)
+for grants, dataset identifiers, partial results and continuation handling.
+Storage-producing flows require wallet-owned keys; isolated proof signing can use inline keys.
+Released result APIs keep their successful wire shapes and throw progress-bearing exceptions when
+that contract cannot represent a result. Use the detailed APIs and `listIssuanceContinuations()`
+for new consumers. Pending 1.1.0 records remain resumable with their saved key, but cannot recheck
+configuration/proof constraints that the old record did not retain.
 
 When issuer metadata requires a key attestation, attach a `KeyAttestationProvider` to the wallet before issuance. The provider receives the actual proof key's public JWK, the credential issuer, the current nonce, and any advertised storage or authentication constraints. It returns a signed `key-attestation+jwt` and exposes its public verification key. The wallet checks the signature, key binding, nonce, lifetime, and advertised constraints before placing the attestation in the JWT proof header. The provider is runtime configuration: reattach it after restoring or copying a wallet. Without a provider, a required-attestation request fails before sending the proof. The issuer must independently trust the attester; attaching a provider does not establish issuer trust or certify the key's security properties.
 
