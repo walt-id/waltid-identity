@@ -20,6 +20,7 @@ import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
+import id.walt.crypto.utils.BASE64_BYTES_TYPE
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.Key
@@ -1119,8 +1120,10 @@ class DigitalCredentialSharingE2ETest {
                 .getValue(presentedCredentialId).jsonArray.single().jsonObject
                 .getValue("credentialData").jsonObject
             val returnedImage = if (presentedCredentialId == "mdl") {
-                presented.getValue(MDL_NAMESPACE).jsonObject.getValue("portrait").jsonArray
-                    .map { it.jsonPrimitive.int.toByte() }.toByteArray()
+                val portrait = presented.getValue(MDL_NAMESPACE).jsonObject.getValue("portrait").jsonObject
+                assertEquals(BASE64_BYTES_TYPE, portrait.getValue("type").jsonPrimitive.content)
+                assertEquals(IMAGE_BYTES.size, portrait.getValue("length").jsonPrimitive.int)
+                Base64.decode(portrait.getValue("base64url").jsonPrimitive.content, Base64.URL_SAFE)
             } else {
                 Base64.decode(presented.getValue("portrait").jsonPrimitive.content, Base64.DEFAULT)
             }
