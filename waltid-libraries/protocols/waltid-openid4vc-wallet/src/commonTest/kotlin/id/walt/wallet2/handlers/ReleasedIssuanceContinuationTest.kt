@@ -143,10 +143,7 @@ class ReleasedIssuanceContinuationTest {
             val fixture = batchTestFixture(false)
             val records = InMemoryIssuanceSessionStore().also { it.put(releasedRecord(fixture)) }
             val credential = if (foreignHolder) batchTestCredential(fixture.keys[1])
-            else fixture.keys.first().legacyKey!!.signJws(
-                """{"iss":"https://issuer.example","vct":"identity","given_name":"Ada"}""".encodeToByteArray(),
-                mapOf("typ" to JsonPrimitive("dc+sd-jwt")),
-            ) + "~"
+            else batchTestCredential(publicJwk = null)
             val http = batchTestClient(credential = { error("Must not restart issuance") }, deferred = { response(credential) })
             val service = WalletIssuanceSessionService(fixture.wallet, httpClient = http, sessionStore = records,
                 now = { Instant.fromEpochMilliseconds(3000) })
