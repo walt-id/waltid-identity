@@ -20,6 +20,7 @@ object AuthMethodManager {
             // Kerberos,
             LDAP,
             OIDC,
+            Passkey,
             RADIUS,
             RecoveryCode,
             TOTP,
