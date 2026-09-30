@@ -54,30 +54,29 @@ dependencies {
     implementation(identityLibs.kotlinx.serialization.json)
 
     // -- Android --
-    implementation("androidx.biometric:biometric:1.2.0-alpha05")
-    implementation("androidx.biometric:biometric-ktx:1.2.0-alpha05")
-    implementation("androidx.navigation:navigation-compose:2.7.7")
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.3")
-    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation(identityLibs.androidx.biometric.preview)
+    implementation(identityLibs.androidx.navigation.compose)
+    implementation(identityLibs.androidx.core)
+    implementation(identityLibs.androidx.lifecycle.runtime)
+    implementation(identityLibs.androidx.activity.compose)
 
     // Compose
-    implementation(platform("androidx.compose:compose-bom:2024.02.01"))
+    implementation(platform(identityLibs.androidx.compose.bom))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose")
+    implementation(identityLibs.androidx.lifecycle.runtime.compose)
 
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("androidx.test.ext:junit:1.2.1")
-    testImplementation("androidx.test.espresso:espresso-core:3.6.1")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.01"))
+    testImplementation(identityLibs.kotlinx.coroutines.test)
+    testImplementation(identityLibs.junit)
+    testImplementation(identityLibs.androidx.test.ext.junit)
+    testImplementation(identityLibs.androidx.test.espresso)
+    androidTestImplementation(identityLibs.androidx.test.ext.junit)
+    androidTestImplementation(identityLibs.androidx.test.espresso)
+    androidTestImplementation(platform(identityLibs.androidx.compose.bom))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 
     // Debug
