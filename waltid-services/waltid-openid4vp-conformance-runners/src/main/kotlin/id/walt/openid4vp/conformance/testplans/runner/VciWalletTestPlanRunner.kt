@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Executes VCI wallet conformance test plans through the local wallet adapter.
@@ -49,7 +50,10 @@ class VciWalletTestPlanRunner(
     /**
      * Execute the test plan and return results.
      */
-    suspend fun test(requiredModules: Set<String> = emptySet()): List<TestPlanResult> {
+    suspend fun test(
+        requiredModules: Set<String> = emptySet(),
+        requiredVariant: Map<String, String> = emptyMap(),
+    ): List<TestPlanResult> {
         printHeader()
 
         val results = mutableListOf<TestPlanResult>()
@@ -63,7 +67,14 @@ class VciWalletTestPlanRunner(
             // Get modules
             val missing = requiredModules - createResponse.modules.map { it.testModule }.toSet()
             check(missing.isEmpty()) { "Required wallet modules are absent from the pinned suite: $missing" }
-            val modules = createResponse.modules.filter { requiredModules.isEmpty() || it.testModule in requiredModules }
+            val modules = createResponse.modules.filter { module ->
+                (requiredModules.isEmpty() || module.testModule in requiredModules) && requiredVariant.all { (name, value) ->
+                    (module.variant[name]?.jsonPrimitive?.content ?: testPlan.variant[name]) == value
+                }
+            }
+            check((requiredModules - modules.map { it.testModule }.toSet()).isEmpty()) {
+                "Required wallet module variant is absent from the pinned suite: $requiredVariant"
+            }
             println("Test modules: ${modules.size}")
             modules.forEach { println("   - ${it.testModule}") }
             println()

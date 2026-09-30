@@ -162,9 +162,11 @@ class VciWalletConformanceTests {
         batchHolderKeyIds: List<String> = emptyList(),
         clientKeyId: String? = null,
         requiredModules: Set<String> = emptySet(),
+        useScope: Boolean = plan.isHaip,
+        requiredVariant: Map<String, String> = emptyMap(),
     ): List<TestPlanResult> {
         val httpClient = createHttpClient()
-        val adapter = startAdapterIfNeeded(httpClient, walletId, attestationAuthority, batchHolderKeyIds, clientKeyId, plan.isHaip)
+        val adapter = startAdapterIfNeeded(httpClient, walletId, attestationAuthority, batchHolderKeyIds, clientKeyId, useScope)
         val adapterBaseUrl = "http://127.0.0.1:$adapterPort"
 
         try {
@@ -176,7 +178,7 @@ class VciWalletConformanceTests {
                 walletAdapterUrl = adapterBaseUrl
             )
 
-            return runner.test(requiredModules)
+            return runner.test(requiredModules, requiredVariant)
         } finally {
             adapter?.stop()
             httpClient.close()
@@ -228,62 +230,78 @@ class VciWalletConformanceTests {
         }
         for (format in listOf("sd_jwt_vc", "mdoc")) {
             for (grant in listOf("authorization_code", "pre_authorization_code")) {
-                withInProcessWallet(withVerifier = true) { walletId ->
-                    val base = if (format == "mdoc") VciWalletMdocDpop(
-                        walletApiUrl, "http://127.0.0.1:$adapterPort/credential-offer",
-                        "http://127.0.0.1:$adapterPort/callback", conformanceHost, conformancePort, adapterHostIp,
-                    ) else VciWalletSdJwtDpop(
-                        walletApiUrl, "http://127.0.0.1:$adapterPort/credential-offer",
-                        "http://127.0.0.1:$adapterPort/callback", conformanceHost, conformancePort, adapterHostIp,
-                    )
-                    val plan = object : VciWalletTestPlan {
-                        override val description = "Wallet batch: $format / $grant / two distinct holders"
-                        override val configuration = base.configuration
-                        override val variant = base.variant + mapOf("vci_grant_type" to grant)
-                        override val producerId get() = "batch/${super<VciWalletTestPlan>.producerId}"
-                    }
-                    createHttpClient().use { client ->
-                        val clientKeyId = client.get("$walletApiUrl/wallet/$walletId/keys")
-                            .body<List<WalletKeyInfo>>().single().keyId
-                        val holders = List(2) {
-                            client.post("$walletApiUrl/wallet/$walletId/keys/generate") {
-                                contentType(ContentType.Application.Json)
-                                setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.secp256r1))
-                            }.also { assertEquals(HttpStatusCode.Created, it.status) }.body<WalletKeyInfo>().keyId
+                for (profile in listOf("rar", "simple", "haip")) {
+                    if (profile == "haip" && (format != "sd_jwt_vc" || grant != "authorization_code")) continue
+                    withInProcessWallet(withVerifier = true) { walletId ->
+                        val attester = if (profile == "haip") ClientAttestationTestAuthority.create(
+                            clientId = ConformanceConfig.VCI_WALLET_CLIENT_ID) else null
+                        val base = if (attester != null) VciWalletSdJwtHaip(
+                            walletApiUrl, "http://127.0.0.1:$adapterPort/credential-offer",
+                            "http://127.0.0.1:$adapterPort/callback", conformanceHost, conformancePort, adapterHostIp,
+                            attestationAuthority = attester,
+                        ) else if (format == "mdoc") VciWalletMdocDpop(
+                            walletApiUrl, "http://127.0.0.1:$adapterPort/credential-offer",
+                            "http://127.0.0.1:$adapterPort/callback", conformanceHost, conformancePort, adapterHostIp,
+                        ) else VciWalletSdJwtDpop(
+                            walletApiUrl, "http://127.0.0.1:$adapterPort/credential-offer",
+                            "http://127.0.0.1:$adapterPort/callback", conformanceHost, conformancePort, adapterHostIp,
+                        )
+                        val plan = object : VciWalletTestPlan {
+                            override val description = "Wallet batch: $format / $grant / $profile / two distinct holders"
+                            override val configuration = base.configuration
+                            override val planName = base.planName
+                            override val isHaip = base.isHaip
+                            override val clientAuthType = base.clientAuthType
+                            override val variant = if (isHaip) base.variant else base.variant + mapOf(
+                                "vci_grant_type" to grant, "authorization_request_type" to profile)
+                            override val producerId get() = "batch/${super<VciWalletTestPlan>.producerId}"
                         }
-                        val result = runPlan(plan, walletId, batchHolderKeyIds = holders, clientKeyId = clientKeyId,
-                            requiredModules = setOf("oid4vci-1_0-wallet-test-batch-credential-issuance")).single()
-                        assertEquals("FINISHED", result.conformanceStatus)
-                        if (result.conformanceResult == "WARNING") {
-                            // Hosted tunnels omit TLS evidence headers. Keep WARNING in the report;
-                            // accept only those missing-header warnings, never a TLS-policy failure.
-                            val warnings = ConformanceInterface(conformanceHost, conformancePort).use { suite ->
-                                suite.getTestLog(result.conformanceTestId).filter { it.result == "WARNING" }
+                        createHttpClient().use { client ->
+                            val clientKeyId = client.get("$walletApiUrl/wallet/$walletId/keys")
+                                .body<List<WalletKeyInfo>>().single().keyId
+                            val holders = List(2) {
+                                client.post("$walletApiUrl/wallet/$walletId/keys/generate") {
+                                    contentType(ContentType.Application.Json)
+                                    setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.secp256r1))
+                                }.also { assertEquals(HttpStatusCode.Created, it.status) }.body<WalletKeyInfo>().keyId
                             }
-                            assertTrue(warnings.isNotEmpty(), "A suite WARNING requires its diagnostic evidence")
-                            val missingTlsHeaders = setOf(
-                                "EnsureIncomingTls12WithSecureCipherOrTls13" to
-                                    "TLS Protocol not found; this header should have been set by the apache proxy",
-                                "EnsureIncomingTls13" to
-                                    "TLS protocol not found; this header should have been set by the nginx proxy",
-                            )
-                            assertEquals(emptyList(), warnings.filter { (it.src to it.msg) !in missingTlsHeaders },
-                                "Batch acceptance only tolerates missing tunnel TLS headers")
-                        } else {
-                            assertEquals("PASSED", result.conformanceResult, result.errorMessage)
-                        }
-                        val credentials = client.get("$walletApiUrl/wallet/$walletId/credentials")
-                            .body<List<StoredCredentialMetadata>>()
-                        assertEquals(2, credentials.size)
-                        val bindings = credentials.map {
-                            val stored = client.get("$walletApiUrl/wallet/$walletId/credentials/${it.id}")
-                                .body<JsonObject>()
-                            Json.decodeFromJsonElement<HolderKeyBinding>(assertNotNull(stored["holderKeyBinding"]))
-                        }
-                        assertEquals(2, bindings.map { it.publicKeyThumbprint }.distinct().size)
-                        assertEquals(2, bindings.map { it.keyReference }.distinct().size)
-                        for (credential in credentials) {
-                            presentStoredCredential(client, walletId, credential.id, format)
+                            val result = runPlan(plan, walletId, attestationAuthority = attester,
+                                batchHolderKeyIds = holders, clientKeyId = clientKeyId, useScope = profile != "rar",
+                                requiredModules = setOf("oid4vci-1_0-wallet-test-batch-credential-issuance"),
+                                requiredVariant = mapOf("vci_credential_issuance_mode" to "immediate",
+                                    "vci_credential_encryption" to "plain")).single()
+                            assertEquals("FINISHED", result.conformanceStatus)
+                            if (result.conformanceResult == "WARNING") {
+                                // Hosted tunnels omit TLS evidence headers. Keep WARNING in the report;
+                                // accept only those missing-header warnings, never a TLS-policy failure.
+                                val warnings = ConformanceInterface(conformanceHost, conformancePort).use { suite ->
+                                    suite.getTestLog(result.conformanceTestId).filter { it.result == "WARNING" }
+                                }
+                                assertTrue(warnings.isNotEmpty(), "A suite WARNING requires its diagnostic evidence")
+                                val missingTlsHeaders = setOf(
+                                    "EnsureIncomingTls12WithSecureCipherOrTls13" to
+                                        "TLS Protocol not found; this header should have been set by the apache proxy",
+                                    "EnsureIncomingTls13" to
+                                        "TLS protocol not found; this header should have been set by the nginx proxy",
+                                )
+                                assertEquals(emptyList(), warnings.filter { (it.src to it.msg) !in missingTlsHeaders },
+                                    "Batch acceptance only tolerates missing tunnel TLS headers")
+                            } else {
+                                assertEquals("PASSED", result.conformanceResult, result.errorMessage)
+                            }
+                            val credentials = client.get("$walletApiUrl/wallet/$walletId/credentials")
+                                .body<List<StoredCredentialMetadata>>()
+                            assertEquals(2, credentials.size)
+                            val bindings = credentials.map {
+                                val stored = client.get("$walletApiUrl/wallet/$walletId/credentials/${it.id}")
+                                    .body<JsonObject>()
+                                Json.decodeFromJsonElement<HolderKeyBinding>(assertNotNull(stored["holderKeyBinding"]))
+                            }
+                            assertEquals(2, bindings.map { it.publicKeyThumbprint }.distinct().size)
+                            assertEquals(2, bindings.map { it.keyReference }.distinct().size)
+                            for (credential in credentials) {
+                                presentStoredCredential(client, walletId, credential.id, format)
+                            }
                         }
                     }
                 }
