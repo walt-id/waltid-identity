@@ -1,142 +1,134 @@
 package id.walt.ktorauthnz.methods
 
-import com.nfeld.jsonpathkt.JsonPath
-import com.nfeld.jsonpathkt.kotlinx.resolveAsStringOrNull
 import id.walt.ktorauthnz.AuthContext
+import id.walt.ktorauthnz.accounts.identifiers.methods.VerifiableCredentialIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.exceptions.AccountNotFoundException
+import id.walt.ktorauthnz.exceptions.AuthSessionStateException
+import id.walt.ktorauthnz.exceptions.AuthenticationFailureException
 import id.walt.ktorauthnz.methods.config.VerifiableCredentialAuthConfiguration
+import id.walt.ktorauthnz.methods.sessiondata.VerifiableCredentialSessionData
+import id.walt.ktorauthnz.sessions.AuthSessionInformation
+import id.walt.ktorauthnz.sessions.AuthSessionNextStepRedirectData
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
-import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.server.util.*
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlin.io.encoding.Base64
 
+/**
+ * Login by presenting a verifiable credential, verified by a verifier2 service ([VerifiableCredentialAuthConfiguration]).
+ *
+ * - `POST vc/start`: opens a verifier2 session; the next step names its authorization request URL (for a QR code, or
+ *   to open in a wallet on the same device)
+ * - `GET {sessionId}/vc/status`: while the wallet has not presented, answers the unchanged session; once verified,
+ *   logs in the account of the presented claim (or registers it via the `Registration` function amendment, which gets
+ *   the [VerifiableCredentialIdentifier]); a failed or expired verification fails the step
+ */
 object VerifiableCredential : AuthenticationMethod("vc") {
 
+    override val relatedAuthMethodConfiguration = VerifiableCredentialAuthConfiguration::class
 
-    // TODO:
-    val verifierUrl = "http://localhost:7003"
+    private val http = HttpClient {
+        install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+    }
+
+    private fun VerifiableCredentialAuthConfiguration.endpoint(path: String) = verifierUrl.trimEnd('/') + "/verification-session/" + path
+
+    /** Opens the verifier2 session; returns its id and the authorization request URL for the wallet. */
+    suspend fun startVerification(config: VerifiableCredentialAuthConfiguration): Pair<String, Url> {
+        val response = http.post(config.endpoint("create")) {
+            contentType(ContentType.Application.Json)
+            setBody(config.setup)
+        }
+        check(response.status.isSuccess()) { "Verifier refused the verification session: ${response.status} ${response.bodyAsText()}" }
+        val created = response.body<JsonObject>()
+        val sessionId = created["sessionId"]?.jsonPrimitive?.contentOrNull ?: error("Verifier answered no sessionId")
+        val url = (created["bootstrapAuthorizationRequestUrl"] ?: created["fullAuthorizationRequestUrl"])?.jsonPrimitive?.contentOrNull
+            ?: error("Verifier answered no authorization request URL")
+        return sessionId to Url(url)
+    }
+
+    /** The verifier2 session, as its `info` endpoint shows it. */
+    suspend fun verification(config: VerifiableCredentialAuthConfiguration, verifierSessionId: String): JsonObject {
+        val response = http.get(config.endpoint("$verifierSessionId/info"))
+        check(response.status.isSuccess()) { "Verifier has no session $verifierSessionId: ${response.status}" }
+        return response.body()
+    }
+
+    /** The configured claim of the first credential presented (for the configured query), or null. */
+    fun identifierOf(verification: JsonObject, config: VerifiableCredentialAuthConfiguration): VerifiableCredentialIdentifier? {
+        val presented = verification["presented_credentials"] as? JsonObject ?: return null
+        val credentials = (config.credentialQueryId?.let { presented[it] } ?: presented.values.firstOrNull()) as? JsonArray
+        val credentialData = (credentials?.firstOrNull() as? JsonObject)?.get("credentialData") as? JsonObject ?: return null
+        val claim = config.identifierClaim.fold<String, JsonElement?>(credentialData) { element, key -> (element as? JsonObject)?.get(key) }
+        val value = (claim as? JsonPrimitive)?.contentOrNull ?: return null
+        return VerifiableCredentialIdentifier(config.identifierClaim.joinToString("/"), value)
+    }
 
     override fun Route.registerAuthenticationRoutes(
         authContext: ApplicationCall.() -> AuthContext,
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
-        route("vc", {
-
-        }) {
-            get("start-presentation") {
+        route("vc", { tags("Authentication") }) {
+            post("start", {
+                summary = "Start a verifiable credential login"
+                response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
+            }) {
                 val session = call.getAuthSession(authContext)
                 val config = session.lookupFlowMethodConfiguration<VerifiableCredentialAuthConfiguration>(this@VerifiableCredential)
 
-                val redirectUrl = call.request.uri.removeSuffix("/start-presentation") + "/callback"
+                val (verifierSessionId, requestUrl) = startVerification(config)
+                session.setSessionData(this@VerifiableCredential, VerifiableCredentialSessionData(verifierSessionId))
 
-                val resp = Verifier.verify(verifierUrl, config.verification, redirectUrl)
-
-                call.respond(resp.presentationRequest)
+                call.handleAuthNextStep(
+                    session = session,
+                    nextStepInfo = AuthSessionNextStepRedirectData(requestUrl),
+                    nextStepDescription = "Present the requested credential from your wallet: open the URL on this device, " +
+                            "or scan it as a QR code. Then poll `${session.id}/vc/status` until the login completes.",
+                )
             }
-            get("callback") {
-                call.respond("handle further...")
-                //val session = getSession(authContext)
-                //context.handleAuthSuccess(session, )
-            }
-        }
-    }
-}
 
-enum class VerificationStatus {
-    WAITING_FOR_SUBMISSION,
-    RESPONSE_RECEIVED
-}
+            get("status", {
+                summary = "Check a verifiable credential login"
+                response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
+            }) {
+                val session = call.getAuthSession(authContext)
+                val config = session.lookupFlowMethodConfiguration<VerifiableCredentialAuthConfiguration>(this@VerifiableCredential)
+                val verifierSessionId = session.getSessionData<VerifiableCredentialSessionData>(this@VerifiableCredential)?.verifierSessionId
+                    ?: throw AuthSessionStateException("No credential verification started for this session; use vc/start")
 
-data class VerificationResultStatus(
-    val state: VerificationStatus,
-    val success: Boolean? = null,
-    val claims: Map<String, String?>? = null,
-)
+                val verification = verification(config, verifierSessionId)
+                when (val status = verification["status"]?.jsonPrimitive?.contentOrNull) {
+                    "SUCCESSFUL" -> {
+                        val identifier = identifierOf(verification, config)
+                            ?: throw AuthenticationFailureException("The presented credential has no ${config.identifierClaim.joinToString("/")} claim")
+                        val accountId = identifier.resolveIfExists() ?: run {
+                            val register = functionAmendments?.get(AuthMethodFunctionAmendments.Registration)
+                                ?: throw AccountNotFoundException(identifier.accountIdentifierName)
+                            register(identifier)
+                            identifier.resolveToAccountId()
+                        }
+                        call.handleAuthSuccess(session, authContext(call), accountId)
+                    }
 
-object Verifier {
+                    "FAILED", "EXPIRED" -> throw AuthenticationFailureException(
+                        "Credential verification ${status.lowercase()}: ${verification["statusReason"]?.jsonPrimitive?.contentOrNull ?: "no reason given"}"
+                    )
 
-    private val client = HttpClient {
-        install(ContentNegotiation) {
-            json()
-        }
-        defaultRequest {
-            contentType(ContentType.Application.Json)
-        }
-    }
-
-    @Serializable
-    data class VerificationSessionResponse(
-        val presentationRequest: String,
-        val state: String,
-    )
-
-    suspend fun verify(
-        verifierUrl: String,
-        verificationRequest: Map<String, JsonElement>,
-        redirectUrl: String? = null,
-    ): VerificationSessionResponse {
-        val response: HttpResponse = client.post("$verifierUrl/openid4vc/verify") {
-            setBody(verificationRequest)
-
-            redirectUrl?.let {
-                header("successRedirectUri", redirectUrl)
-                header("errorRedirectUri", redirectUrl)
+                    else -> call.respond(session.toInformation())
+                }
             }
         }
-
-        val presentationRequest = response.bodyAsText()
-
-        val state = parseQueryString(presentationRequest).getOrFail("state")
-        return VerificationSessionResponse(presentationRequest, state)
     }
 
-    suspend fun getVerificationResult(verifierUrl: String, id: String, requestedClaims: List<String>): VerificationResultStatus {
-        val resp = client.get("$verifierUrl/openid4vc/session/$id").body<JsonObject>()
-
-        if (resp["tokenResponse"] == null) {
-            return VerificationResultStatus(VerificationStatus.WAITING_FOR_SUBMISSION)
-        }
-
-        val overall = resp["verificationResult"]?.jsonPrimitive?.boolean == true
-
-
-        val base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
-
-        val payload = base64.decode(resp["tokenResponse"]!!.jsonObject["vp_token"]!!.jsonPrimitive.content.split(".")[1]).decodeToString()
-        val vp = Json.parseToJsonElement(payload).jsonObject
-
-        val did = vp["sub"]!!.jsonPrimitive.content
-
-        val credentials = vp["vp"]!!.jsonObject["verifiableCredential"]!!.jsonArray.map {
-            Json.parseToJsonElement(
-                base64.decode(
-                    it.jsonPrimitive.content.split(".")[1]
-                ).decodeToString()
-            ).jsonObject["vc"]!!.jsonObject
-        }
-
-        val vc = credentials.first()
-
-
-        val claims = requestedClaims.map {
-            Pair(it, vc.resolveAsStringOrNull(JsonPath.compile(it)))
-        }.toMap().toMutableMap().apply {
-            put("sub", did)
-        }
-
-        return VerificationResultStatus(VerificationStatus.RESPONSE_RECEIVED, overall, claims)
-    }
 }
