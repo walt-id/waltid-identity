@@ -13,6 +13,7 @@ import {
   annexCRequestedElements,
   claimsFromIssuerMetadata,
   dcqlFromIssuerMetadata,
+  defaultSelectedClaimIds,
   isMdocConfiguration,
   isPidConfiguration,
 } from "~/utils/dcqlFromIssuerMetadata";
@@ -129,11 +130,15 @@ const canSubmit = computed(() => {
 });
 
 watch(
-  () => selectedCard.value?.credentialConfigurationId,
+  () => [
+    selectedCard.value?.credentialConfigurationId,
+    availableClaims.value.map((claim) => claim.id).join("\0"),
+  ],
   () => {
-    selectedClaimIds.value = claimsFromIssuerMetadata(
+    selectedClaimIds.value = defaultSelectedClaimIds(
       selectedCard.value?.configuration,
-    ).map((claim) => claim.id);
+      selectedCard.value?.credentialConfigurationId,
+    );
   },
   { immediate: true },
 );
