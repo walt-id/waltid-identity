@@ -14,6 +14,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import java.io.ByteArrayOutputStream
+import java.util.regex.Pattern
 
 internal object WalletComposeE2EHelper {
     private val walletPackage: String get() = InstrumentationRegistry.getInstrumentation().targetContext.packageName
@@ -428,6 +429,23 @@ internal object WalletComposeE2EHelper {
 
     private fun claimTag(path: String): String =
         "wallet.claim.${path.map { if (it.isLetterOrDigit()) it else '_' }.joinToString("")}"
+
+    /** Every card tag currently in the tree, sweeping the list so off-screen cards are included. */
+    fun UiDevice.credentialCardTags(): Set<String> {
+        val cardTag = Pattern.compile("wallet\\.credentialCard\\..*")
+        val tags = mutableSetOf<String>()
+        fun collect() {
+            findObjects(By.res(cardTag))
+                .mapNotNullTo(tags) { runCatching { it.resourceName }.getOrNull() }
+        }
+        collect()
+        repeat(6) {
+            scrollDown()
+            collect()
+        }
+        repeat(6) { scrollUp() }
+        return tags
+    }
 
     internal fun UiDevice.scrollDown() = scrollContent(towardBottom = true)
 
