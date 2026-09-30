@@ -6,25 +6,29 @@ import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.response.*
 
+/** The authenticated caller: its login token, account and session (the session is unknown for foreign JWTs). */
+data class KtorAuthnzPrincipal(
+    val token: String,
+    val accountId: String,
+    val sessionId: String?,
+)
+
 /**
- * A `basic` [Authentication] provider.
+ * The ktor-authnz [Authentication] provider: takes the token from the `ktor-authnz-auth` header, a Bearer
+ * `Authorization` header, or the session cookie, validates it with the configured token handler, and sets a
+ * [KtorAuthnzPrincipal].
  *
- * @see [basic]
- * @property name is the name of the provider, or `null` for a default provider.
+ * @see [ktorAuthnz]
  */
 class DefaultKtorAuthnzAuthentication internal constructor(
-    config: Config,
+    private val config: Config,
 ) : KtorAuthnzAuthenticationProvider(config) {
 
     val log = logger<DefaultKtorAuthnzAuthentication>()
-//    private val challengeFunction: FormAuthChallengeFunction = config.challengeFunction
-
 
     suspend fun fail(context: AuthenticationContext, cause: AuthenticationFailedCause) {
         log.debug { "Fail http request auth for: $cause" }
-        @Suppress("NAME_SHADOWING")
         context.challenge("ktor-authnz-challenge", cause) { challenge, call ->
-            // TODO: better error messages
             call.respond(HttpStatusCode.Unauthorized, "Unauthorized ($cause)")
             if (!challenge.completed && call.response.status() != null) {
                 challenge.complete()
@@ -35,34 +39,47 @@ class DefaultKtorAuthnzAuthentication internal constructor(
     override suspend fun onAuthenticate(context: AuthenticationContext) {
         val call = context.call
 
-        val effectiveToken = call.getEffectiveRequestAuthToken()
-
-        if (effectiveToken == null) {
+        val token = call.getEffectiveRequestAuthToken()
+        if (token == null) {
             log.debug { "Missing authentication token for request" }
             fail(context, AuthenticationFailedCause.NoCredentials)
             return
         }
 
-        val principal = if (KtorAuthnzManager.tokenHandler.validateToken(effectiveToken))
-            UserIdPrincipal(effectiveToken)
-        else null
+        val handler = KtorAuthnzManager.tokenHandler
+        val principal = runCatching {
+            if (!handler.validateToken(token)) return@runCatching null
+            KtorAuthnzPrincipal(
+                token = token,
+                accountId = handler.getTokenAccountId(token),
+                sessionId = runCatching { handler.getTokenSessionId(token) }.getOrNull(),
+            )
+        }.getOrElse {
+            log.debug { "Token rejected: ${it.message}" }
+            null
+        }?.let { config.validate(call, it) }
 
-        if (principal != null) {
-            context.principal(name, principal)
-            return
-        } else {
+        if (principal == null) {
             log.debug { "Missing principal (Invalid Credentials) for request" }
             fail(context, AuthenticationFailedCause.InvalidCredentials)
+            return
         }
+        context.principal(name, principal)
     }
 
     /**
      * A configuration for the ktor-authnz authentication provider.
      */
     class Config internal constructor(name: String?) : AuthenticationProvider.Config(name) {
-        /*internal var challengeFunction: FormAuthChallengeFunction = {
-            call.respond(UnauthorizedResponse())
-        }*/
+        internal var validate: suspend (io.ktor.server.application.ApplicationCall, KtorAuthnzPrincipal) -> Any? = { _, p -> p }
+
+        /**
+         * Checks or enriches an authenticated caller: return the principal to use (the given one, or your own), or
+         * null to answer 401. Runs after the token was validated, e.g. to check the account is active or to meter use.
+         */
+        fun validate(block: suspend io.ktor.server.application.ApplicationCall.(KtorAuthnzPrincipal) -> Any?) {
+            validate = { call, principal -> call.block(principal) }
+        }
     }
 }
 
@@ -71,7 +88,7 @@ class DefaultKtorAuthnzAuthentication internal constructor(
  */
 fun AuthenticationConfig.ktorAuthnz(
     name: String? = null,
-    configure: DefaultKtorAuthnzAuthentication.Config.() -> Unit,
+    configure: DefaultKtorAuthnzAuthentication.Config.() -> Unit = {},
 ) {
     val provider = DefaultKtorAuthnzAuthentication(DefaultKtorAuthnzAuthentication.Config(name).apply(configure))
     register(provider)
