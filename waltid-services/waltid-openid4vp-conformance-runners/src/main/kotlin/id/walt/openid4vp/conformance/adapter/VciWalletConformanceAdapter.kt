@@ -47,6 +47,7 @@ import kotlinx.serialization.json.*
  * @param testDid Optional DID to use for credential requests
  * @param testKeyId Registered client key, also the holder key in single-copy mode
  * @param attestationAuthority Test attester for plans using attestation-based client authentication
+ * @param useScope Authorize the single-copy plan by scope, as HAIP requires
  * @param batchHolderKeyIds Two distinct stored holder keys for the explicit batch gate; empty for single-copy plans
  */
 class VciWalletConformanceAdapter(
@@ -56,9 +57,11 @@ class VciWalletConformanceAdapter(
     private val testDid: String? = null,
     private val testKeyId: String? = null,
     private val attestationAuthority: ClientAttestationTestAuthority? = null,
+    private val useScope: Boolean = false,
     private val batchHolderKeyIds: List<String> = emptyList(),
 ) {
     init {
+        require(!useScope || batchHolderKeyIds.isEmpty()) { "Explicit scope selection uses the single-copy authorization endpoint" }
         require(batchHolderKeyIds.isEmpty() ||
             (batchHolderKeyIds.size == 2 && batchHolderKeyIds.all(String::isNotBlank) && batchHolderKeyIds.distinct().size == 2)) {
             "The batch conformance adapter requires two distinct stored holder keys"
@@ -316,6 +319,7 @@ class VciWalletConformanceAdapter(
                     put("clientId", CLIENT_ID)
                     put("redirectUri", getRedirectUri())
                     put("usePkce", true)
+                    if (useScope) put("useScope", true)
                 }.toString()
             )
         }
