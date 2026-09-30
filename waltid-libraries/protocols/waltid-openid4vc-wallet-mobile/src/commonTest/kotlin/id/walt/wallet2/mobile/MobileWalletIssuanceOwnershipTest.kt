@@ -81,7 +81,7 @@ class MobileWalletIssuanceOwnershipTest {
         for (authorization in listOf(false, true)) {
             val delegate = InMemoryIssuanceSessionStore()
             var attemptedCheckpoint = false
-            val records = object : WalletIssuanceSessionStore by delegate {
+            val records = object : AtomicWalletIssuanceSessionStore by delegate {
                 override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean {
                     if (replacement?.payload?.contains("generated-") == true) {
                         // The store may commit before losing its acknowledgement. The keys must survive either outcome.

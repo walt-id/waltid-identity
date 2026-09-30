@@ -1732,7 +1732,7 @@ class WalletIssuanceSessionService(
         val store = sessionStore ?: return
         if (!active.persistable) {
             active.persistedSnapshot?.let { expected ->
-                if (!store.compareAndSet(expected, null)) {
+                if (!runtime.compareAndSet(expected, null)) {
                     throw IssuanceStageException(WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN)
                 }
                 active.persistedSnapshot = null
@@ -1770,7 +1770,7 @@ class WalletIssuanceSessionService(
                 expected?.updatedAtEpochMilliseconds?.plus(1) ?: Long.MIN_VALUE),
         )
         if (expected == null) store.put(replacement)
-        else if (!store.compareAndSet(expected, replacement)) {
+        else if (!runtime.compareAndSet(expected, replacement)) {
             throw IssuanceStageException(WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN)
         }
         active.persistedSnapshot = replacement
@@ -1778,7 +1778,7 @@ class WalletIssuanceSessionService(
 
     private suspend fun removePersistedActive(active: ActiveSession) {
         active.persistedSnapshot?.let { expected ->
-            sessionStore?.compareAndSet(expected, null)
+            runtime.compareAndSet(expected, null)
             active.persistedSnapshot = null
         }
     }
@@ -1851,7 +1851,7 @@ class WalletIssuanceSessionService(
             )
             val expected = record.persistedSnapshot
             if (expected == null) store.put(replacement)
-            else check(store.compareAndSet(expected, replacement)) { "Issuance continuation changed during the operation" }
+            else check(runtime.compareAndSet(expected, replacement)) { "Issuance continuation changed during the operation" }
             record.persistedSnapshot = replacement
             deferred[record.public.id] = record
         } catch (error: CancellationException) {
@@ -1998,9 +1998,9 @@ class WalletIssuanceSessionService(
         }
     }
 
-    /** Called under the runtime mutex; the store also protects against other service processes. */
+    /** Called under the runtime mutex; atomic stores also exclude other service processes. */
     private suspend fun removeUnchangedRecord(record: WalletIssuanceSessionRecord): Boolean {
-        if (sessionStore?.compareAndSet(record, null) != true) return false
+        if (!runtime.compareAndSet(record, null)) return false
         when (record.kind) {
             WalletIssuanceSessionRecordKind.ACTIVE_SESSION -> sessions.remove(record.sessionId)
             WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL ->

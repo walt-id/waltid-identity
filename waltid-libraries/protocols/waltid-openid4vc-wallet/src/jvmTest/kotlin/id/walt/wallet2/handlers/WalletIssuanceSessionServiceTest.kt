@@ -807,7 +807,7 @@ class WalletIssuanceSessionServiceTest {
             val firstClaimStarted = CompletableDeferred<Unit>()
             val releaseFirstClaim = CompletableDeferred<Unit>()
             var blockFirstClaim = false
-            val store = object : WalletIssuanceSessionStore by records {
+            val store = object : AtomicWalletIssuanceSessionStore by records {
                 override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord,
                     replacement: WalletIssuanceSessionRecord?): Boolean {
                     if (blockFirstClaim && replacement?.kind == WalletIssuanceSessionRecordKind.ACTIVE_SESSION &&
@@ -2432,7 +2432,7 @@ class WalletIssuanceSessionServiceTest {
         override suspend fun removeCredential(id: String): Boolean = credentials.removeAll { it.id == id }
     }
 
-    private class RecordingSessionStore : WalletIssuanceSessionStore {
+    private class RecordingSessionStore : AtomicWalletIssuanceSessionStore {
         val records = linkedMapOf<String, WalletIssuanceSessionRecord>()
 
         override suspend fun get(id: String): WalletIssuanceSessionRecord? = records[id]
@@ -2449,7 +2449,7 @@ class WalletIssuanceSessionServiceTest {
         override suspend fun remove(id: String): Boolean = records.remove(id) != null
     }
 
-    private class BlockingTransitionSessionStore : WalletIssuanceSessionStore {
+    private class BlockingTransitionSessionStore : AtomicWalletIssuanceSessionStore {
         val records = linkedMapOf<String, WalletIssuanceSessionRecord>()
         val processingWriteStarted = CompletableDeferred<Unit>()
 
@@ -2471,7 +2471,7 @@ class WalletIssuanceSessionServiceTest {
         override suspend fun remove(id: String): Boolean = records.remove(id) != null
     }
 
-    private class FailingAuthorizationStateStore : WalletIssuanceSessionStore {
+    private class FailingAuthorizationStateStore : AtomicWalletIssuanceSessionStore {
         val records = linkedMapOf<String, WalletIssuanceSessionRecord>()
         private var failAwaitingCallback = true
 
