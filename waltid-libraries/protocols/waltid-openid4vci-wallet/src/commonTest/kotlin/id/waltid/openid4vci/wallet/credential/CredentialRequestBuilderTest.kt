@@ -2,7 +2,6 @@ package id.waltid.openid4vci.wallet.credential
 
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
-import id.walt.openid4vci.prooftypes.Proofs
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import kotlinx.serialization.json.*
 import kotlin.test.*
@@ -24,7 +23,7 @@ class CredentialRequestBuilderTest {
     @Test fun singleAndBatchUseTheSameProofCollection() {
         for (count in listOf(1, 2, 5)) {
             val request = CredentialRequestBuilder.build(CredentialIssuanceTarget("identity"),
-                Proofs(jwt = List(count) { "proof-$it" }))
+                List(count) { "proof-$it" })
             assertEquals(count, request["proofs"]!!.jsonObject["jwt"]!!.jsonArray.size)
             assertEquals("identity", request["credential_configuration_id"]!!.jsonPrimitive.content)
             assertNull(request["credential_identifier"])
@@ -89,9 +88,9 @@ class CredentialRequestBuilderTest {
     }
 
     @Test fun rejectsEmptyProofCollectionsButAllowsRepeatedProofs() {
-        assertFailsWith<IllegalArgumentException> { CredentialRequestBuilder.build(CredentialIssuanceTarget("identity"), Proofs(jwt = emptyList())) }
-        assertFailsWith<IllegalArgumentException> { CredentialRequestBuilder.build(CredentialIssuanceTarget("identity"), Proofs(jwt = listOf(""))) }
-        assertEquals(2, CredentialRequestBuilder.build(CredentialIssuanceTarget("identity"), Proofs(jwt = listOf("same", "same")))
+        assertFailsWith<IllegalArgumentException> { CredentialRequestBuilder.build(CredentialIssuanceTarget("identity"), emptyList()) }
+        assertFailsWith<IllegalArgumentException> { CredentialRequestBuilder.build(CredentialIssuanceTarget("identity"), listOf("")) }
+        assertEquals(2, CredentialRequestBuilder.build(CredentialIssuanceTarget("identity"), listOf("same", "same"))
             ["proofs"]!!.jsonObject["jwt"]!!.jsonArray.size)
     }
 

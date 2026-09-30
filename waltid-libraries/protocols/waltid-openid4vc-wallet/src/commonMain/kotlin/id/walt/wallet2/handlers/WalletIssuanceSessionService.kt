@@ -1041,7 +1041,7 @@ class WalletIssuanceSessionService(
                 grantedCredentialSelections(metadata, requireNotNull(active.selections), token.authorization_details, token.scope),
                 CredentialIssuanceAccess(token.access_token, active.keyMaterial, dpopAlgorithms,
                     active.request.clientId.takeUnless { active.tokenRequestAnonymous }),
-                persistable = active.persistable, sessions = this, sessionId = active.public.id,
+                sessions = this, sessionId = active.public.id,
                 labelFor = { active.public.offer.credentialName(it) },
                 ensureOwned = { ensureContinuationOwned(active.persistedSnapshot) },
                 onEvent = ::emitEvent,
@@ -1168,7 +1168,6 @@ class WalletIssuanceSessionService(
         active.selections = wallet.resolveCredentialSelections(credentials,
             active.resolved.offeredCredentials.map { it.credentialConfigurationId },
             active.resolved.issuerMetadata.metadata, active.keyMaterial, active.did)
-            .onEach { it.bindings.requireStoredHolderKeys() }
     }
 
     @Serializable
@@ -1914,7 +1913,7 @@ class WalletIssuanceSessionService(
         retainDeferred(DeferredRecord(
             public = public,
             sessionId = sessionId,
-            persistable = persistable && selection.selection.holderBindings.none { it.key != null },
+            persistable = persistable,
             content = DeferredContent.Remote(DeferredRequest(
                 validation = DeferredResponseValidation.Configured(configuration, proofRequired),
                 bindings = selection.bindings,
@@ -2158,7 +2157,7 @@ class WalletIssuanceSessionService(
         var persistedSnapshot: WalletIssuanceSessionRecord? = null,
         var selections: List<ResolvedWalletCredentialSelection>? = null,
     ) {
-        val persistable: Boolean get() = request.key == null && selections?.all { it.selection.holderBindings.all { it.key == null } } != false
+        val persistable: Boolean get() = keyMaterial.keyReference != null
     }
 
     internal sealed interface DeferredContent {
