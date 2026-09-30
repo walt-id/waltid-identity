@@ -33,7 +33,7 @@ kotlin {
         }
 
         if (enableMobileWallet) {
-            val mobileMain by creating {
+            val mobileMain = create("mobileMain") {
                 dependsOn(commonMain.get())
                 dependencies {
                     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))

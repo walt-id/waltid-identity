@@ -50,7 +50,7 @@ kotlin {
         }
 
         if (enableAndroidBuild || enableIosBuild) {
-            val mobileMain by creating {
+            val mobileMain = create("mobileMain") {
                 dependsOn(commonMain.get())
                 dependencies {
                     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
@@ -94,7 +94,7 @@ kotlin {
         }
 
         if (enableAndroidBuild || enableIosBuild) {
-            val mobileUiTest by creating {
+            val mobileUiTest = create("mobileUiTest") {
                 dependsOn(commonTest.get())
 
                 dependencies {
@@ -104,13 +104,13 @@ kotlin {
             }
 
             if (enableIosBuild) {
-                val iosTest by getting {
+                val iosTest = getByName("iosTest") {
                     dependsOn(mobileUiTest)
                 }
             }
 
             if (enableAndroidBuild) {
-                val androidHostTest by getting {
+                val androidHostTest = getByName("androidHostTest") {
                     dependsOn(mobileUiTest)
 
                     dependencies {

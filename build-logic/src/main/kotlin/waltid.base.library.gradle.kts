@@ -9,7 +9,7 @@ tasks.withType<Test> {
 
     // Use the following condition to optionally run the integration tests:
     // > gradle build -PrunIntegrationTests
-    if (!project.hasProperty("runIntegrationTests")) {
+    if (!providers.gradleProperty("runIntegrationTests").isPresent) {
         exclude("id/walt/test/integration/**")
     }
 }

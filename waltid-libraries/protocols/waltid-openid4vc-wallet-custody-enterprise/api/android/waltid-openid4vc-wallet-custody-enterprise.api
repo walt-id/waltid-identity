@@ -1,0 +1,9 @@
+public final class id/walt/wallet2/custody/enterprise/EnterpriseIdentityKeyCustodian : id/walt/wallet2/mobile/identity/IdentityKeyCustodian, java/lang/AutoCloseable {
+	public fun <init> (Lio/ktor/client/HttpClient;Lio/ktor/http/Url;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Lio/ktor/client/HttpClient;Lio/ktor/http/Url;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun close ()V
+	public fun getDisplayName ()Ljava/lang/String;
+	public fun getId ()Ljava/lang/String;
+	public fun importKey (Lid/walt/wallet2/mobile/identity/SigningIdentity;Lid/walt/crypto2/keys/EncodedKey$Jwk;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+

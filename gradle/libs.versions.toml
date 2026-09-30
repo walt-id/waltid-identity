@@ -1,8 +1,8 @@
 [versions]
 # Build/compilation versions
-kotlin = "2.4.0"
+kotlin = "2.4.20"
 binary-compatibility-validator = "0.18.2"
-suspend-transform = "2.4.0-0.14.0"
+suspend-transform = "2.4.20-0.15.0"
 jspecify = "1.0.0"
 
 # Used for build-plugins
@@ -10,12 +10,12 @@ java-service = "21"
 java-library = "17"
 
 # Plugins
-vanniktech-publish = "0.36.0"
+vanniktech-publish = "0.37.0"
 npm-publish = "3.5.3"
-jib = "3.5.3"
-android-gradle = "9.2.1"
-gradle-shadow = "9.4.2"
-buildconfig = "6.0.10"
+jib = "3.5.4"
+android-gradle = "9.4.1"
+gradle-shadow = "9.6.1"
+buildconfig = "6.1.2"
 licensee = "1.14.1"
 compose-multiplatform = "1.11.1"
 compose-material3 = "1.11.0-alpha07"
@@ -109,12 +109,12 @@ tink = "1.21.0"
 # Persistence
 sqldelight = "2.3.2"
 sqlcipher-android = "4.16.0"
-skie = "0.10.13"
+skie = "0.10.15"
 
 # Testing
 junit = "4.13.2"
 junit-jupiter = "6.1.0"
-mokkery = "3.4.1"
+mokkery = "3.5.0"
 robolectric = "4.16"
 
 # AndroidX
@@ -152,7 +152,7 @@ binary-compatibility-validator = { module = "org.jetbrains.kotlinx:binary-compat
 
 kotlin-plugin-serialization = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
 ktor-gradle-plugin = { module = "io.ktor.plugin:plugin", version.ref = "ktor" }
-benmanes-versions = { module = "com.github.ben-manes.versions:com.github.ben-manes.versions.gradle.plugin", version = "0.54.0" }
+benmanes-versions = { module = "io.github.ben-manes:gradle-versions-plugin", version = "0.64.0" }
 owasp-dependencycheck = { module = "org.owasp.dependencycheck:org.owasp.dependencycheck.gradle.plugin", version = "12.2.2" }
 jib-gradle-plugin = { module = "com.google.cloud.tools:jib-gradle-plugin", version.ref = "jib" }
 vanniktech-publish-plugin = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "vanniktech-publish" }
@@ -445,8 +445,8 @@ buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 shadow = { id = "com.gradleup.shadow", version.ref = "gradle-shadow" }
-versions = { id = "com.github.ben-manes.versions", version = "0.54.0" }
-license = { id = "com.github.jk1.dependency-license-report", version = "3.1.2" }
+versions = { id = "io.github.ben-manes.versions", version = "0.64.0" }
+license = { id = "com.github.jk1.dependency-license-report", version = "3.1.4" }
 licensee = { id = "app.cash.licensee", version.ref = "licensee" }
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
 skie = { id = "co.touchlab.skie", version.ref = "skie" }

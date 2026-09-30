@@ -4,7 +4,7 @@ import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
-    id("com.github.ben-manes.versions")
+    id("io.github.ben-manes.versions")
     //id("org.owasp.dependencycheck")
 }
 
@@ -54,8 +54,11 @@ tasks.withType<ProcessResources> {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
-tasks.withType<DependencyUpdatesTask> {
-    rejectVersionIf {
-        listOf("-beta", "-alpha", "-rc").any { it in candidate.version.lowercase() } || candidate.version.takeLast(4).contains("RC")
+tasks.withType<DependencyUpdatesTask>().configureEach {
+    checkConstraints = true
+    // Cinterop commonization resolves derived artifacts, not dependency update candidates.
+    filterConfigurations = Spec {
+        it.attributes.getAttribute(Usage.USAGE_ATTRIBUTE)?.name != "kotlin-commonized-cinterop"
     }
+    rejectPreReleases = true
 }
