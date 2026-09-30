@@ -1,8 +1,8 @@
 package id.walt.openid4vci.mdoc
 
-import id.walt.w3c.issuance.dataFunctionsFor
-import id.walt.w3c.utils.CredentialDataMergeUtils
-import id.walt.w3c.utils.CredentialDataMergeUtils.isTemplate
+import id.walt.credentials.issuance.dataFunctionsFor
+import id.walt.credentials.issuance.CredentialDataMergeUtils
+import id.walt.credentials.issuance.CredentialDataMergeUtils.isTemplate
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
