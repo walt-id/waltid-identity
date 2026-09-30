@@ -1,6 +1,8 @@
 package id.walt.ktorauthnz.sessions
 
 import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.events.AuthnzEvent
+import id.walt.ktorauthnz.events.AuthnzEvents
 import id.walt.ktorauthnz.exceptions.AuthSessionStateException
 import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.flows.methods
@@ -133,6 +135,7 @@ data class AuthSession(
 
         KtorAuthnzManager.tokenHandler.dropToken(token!!)
         SessionManager.invalidateSession(this)
+        AuthnzEvents.emit(AuthnzEvent.LoggedOut(id, accountId))
     }
 
     suspend fun RoutingCall.logoutAndDeleteCookie() {
