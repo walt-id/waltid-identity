@@ -66,23 +66,28 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
         authContext: ApplicationCall.() -> AuthContext,
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
-        post("emailpass", {
-            request { body<EmailPassCredentials> { required = true } }
-            response {
-                HttpStatusCode.OK to {
-                    description = "Successful authentication"
-                    body<AuthSessionInformation>()
+        // The route is the method id, like every method's, so clients can follow `next_method`; `emailpass` is the
+        // former route, kept for existing clients.
+        listOf(id, "emailpass").forEach { path ->
+            post(path, {
+                request { body<EmailPassCredentials> { required = true } }
+                response {
+                    HttpStatusCode.OK to {
+                        description = "Successful authentication"
+                        body<AuthSessionInformation>()
+                    }
                 }
+                if (path != id) deprecated = true
+            }) {
+                val session = call.getAuthSession(authContext)
+
+                val credential = call.getUsernamePasswordFromRequest()
+
+                val identifier = auth(session, credential, call)
+
+                val authContext = authContext(call)
+                call.handleAuthSuccess(session, authContext, identifier.resolveToAccountId())
             }
-        }) {
-            val session = call.getAuthSession(authContext)
-
-            val credential = call.getUsernamePasswordFromRequest()
-
-            val identifier = auth(session, credential, call)
-
-            val authContext = authContext(call)
-            call.handleAuthSuccess(session, authContext, identifier.resolveToAccountId())
         }
     }
 
