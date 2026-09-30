@@ -164,7 +164,7 @@ class VciWalletConformanceTests {
         requiredModules: Set<String> = emptySet(),
     ): List<TestPlanResult> {
         val httpClient = createHttpClient()
-        val adapter = startAdapterIfNeeded(httpClient, walletId, attestationAuthority, batchHolderKeyIds, clientKeyId)
+        val adapter = startAdapterIfNeeded(httpClient, walletId, attestationAuthority, batchHolderKeyIds, clientKeyId, plan.isHaip)
         val adapterBaseUrl = "http://127.0.0.1:$adapterPort"
 
         try {
@@ -189,6 +189,7 @@ class VciWalletConformanceTests {
         attestationAuthority: ClientAttestationTestAuthority?,
         batchHolderKeyIds: List<String>,
         clientKeyId: String?,
+        useScope: Boolean,
     ): VciWalletConformanceAdapter? {
         val adapterAlreadyRunning = try {
             val response = httpClient.get("http://127.0.0.1:$adapterPort/health")
@@ -209,6 +210,7 @@ class VciWalletConformanceTests {
             adapterPort = adapterPort,
             walletId = walletId,
             attestationAuthority = attestationAuthority,
+            useScope = useScope,
             batchHolderKeyIds = batchHolderKeyIds,
             testKeyId = clientKeyId,
         ).also { it.start(httpClient) }
@@ -238,6 +240,7 @@ class VciWalletConformanceTests {
                         override val description = "Wallet batch: $format / $grant / two distinct holders"
                         override val configuration = base.configuration
                         override val variant = base.variant + mapOf("vci_grant_type" to grant)
+                        override val producerId get() = "batch/${super<VciWalletTestPlan>.producerId}"
                     }
                     createHttpClient().use { client ->
                         val clientKeyId = client.get("$walletApiUrl/wallet/$walletId/keys")
