@@ -619,7 +619,7 @@ class ProximityReaderTrustTest {
                             signerRevocationEvaluator
                         ),
                         establishReaderTrust = true,
-                        provider = ProximityRicalProvider {
+                        provider = {
                             ProximityRicalProviderResult.Available(SIGNED_RICAL)
                         },
                     )

@@ -413,7 +413,7 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
             },
             clock = clock,
             pathValidator = { reader, rical ->
-                X509RicalReaderPathValidator()
+                X509RicalReaderPathValidator(clock)
                     .validate(reader, rical)
                     .also { result ->
                         if (result is RicalReaderPathResult.Valid) {
