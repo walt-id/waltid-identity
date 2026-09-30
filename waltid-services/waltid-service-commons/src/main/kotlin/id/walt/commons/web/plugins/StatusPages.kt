@@ -1,10 +1,10 @@
 package id.walt.commons.web.plugins
 
-import id.walt.commons.web.AuthException
 import id.walt.commons.web.SerializableWebException
 import id.walt.commons.web.WebException
 import id.walt.crypto.exceptions.KeyAlreadyExistsException
 import id.walt.crypto.exceptions.KeySerializationException
+import id.walt.errors.StatusException
 import io.klogging.logger
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -30,11 +30,6 @@ fun Application.configureStatusPages() {
             val status = statusCodeForException(cause)
             call.respond(status, exceptionMap(cause, status))
         }
-        exception<AuthException> { call, cause ->
-            logger.error(cause)
-            val status = HttpStatusCode.fromValue(cause.status.value)
-            call.respond(status, exceptionMap(cause, status))
-        }
 
 
     }
@@ -53,6 +48,7 @@ internal fun statusCodeForException(cause: Throwable): HttpStatusCode = when (ca
     is IllegalStateException -> HttpStatusCode.InternalServerError
     is JedisException -> HttpStatusCode.InternalServerError
     is SerializableWebException -> HttpStatusCode.fromValue(cause.status)
+    is StatusException -> HttpStatusCode.fromValue(cause.status)
     is WebException -> HttpStatusCode.fromValue(cause.status)
     else -> HttpStatusCode.InternalServerError
 }
