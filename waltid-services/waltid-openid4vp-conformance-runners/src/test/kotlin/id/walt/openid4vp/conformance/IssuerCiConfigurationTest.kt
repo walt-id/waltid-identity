@@ -31,6 +31,12 @@ class IssuerCiConfigurationTest {
             .single { it.getString("type") == "client-attestation" }
         val root = requireNotNull(javaClass.getResource("/certs/root-ca.pem")).readText().trim()
         assertEquals(listOf(root), attestation.getStringList("config.verificationMethod.trustedRootCertificatesPem").map(String::trim))
+        val keyAttestation = service.getConfig("keyAttestationConfig.verificationMethod")
+        assertEquals("static-jwk", keyAttestation.getString("type"))
+        val trustedKey = ECKey.parse(keyAttestation.getConfig("jwk").root().render(ConfigRenderOptions.concise()))
+        val signingKey = ECKey.parse(requireNotNull(javaClass.getResource("/keys/attester-key.json")).readText())
+        assertFalse(trustedKey.isPrivate)
+        assertEquals(signingKey.computeThumbprint(), trustedKey.computeThumbprint())
     }
 
     @Test
@@ -48,6 +54,8 @@ class IssuerCiConfigurationTest {
         metadata.values.forEach { value ->
             val config = (value as com.typesafe.config.ConfigObject).toConfig()
             assertTrue("ES256" in config.getStringList("proof_types_supported.jwt.proof_signing_alg_values_supported"))
+            assertTrue(config.hasPath("proof_types_supported.jwt.key_attestations_required"))
+            assertTrue(config.getObject("proof_types_supported.jwt.key_attestations_required").isEmpty())
         }
     }
 

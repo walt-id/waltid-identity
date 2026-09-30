@@ -51,6 +51,9 @@ class IssuerConformanceTestRunner(
     private val variantSelection: IssuerVariantSelection = IssuerVariantSelection.fromEnvironment(),
     private val requireBatchPass: Boolean = System.getenv("OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS")
         ?.toBooleanStrict() ?: false,
+    private val keyAttesterJwks: JsonObject? = null,
+    private val requireKeyAttestationPass: Boolean = System.getenv("OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS")
+        ?.toBooleanStrict() ?: false,
 ) {
     suspend fun run(): List<TestPlanResult> {
         val conformance = ConformanceInterface(conformanceHost, conformancePort)
@@ -89,6 +92,9 @@ class IssuerConformanceTestRunner(
         }
         require(!requireBatchPass || !variantSelection.discoveryOnly) {
             "Batch acceptance requires executed modules; discovery mode cannot verify batch issuance."
+        }
+        require(!requireKeyAttestationPass || (!variantSelection.discoveryOnly && keyAttesterJwks != null)) {
+            "Key attestation acceptance requires executed modules and OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE."
         }
 
         println("Resolved issuer credential configuration ids:")
@@ -139,6 +145,7 @@ class IssuerConformanceTestRunner(
                         variant = variant,
                         clientAttestationIssuer = clientAttestationIssuer,
                         clientAttesterJwks = clientAttesterJwks,
+                        keyAttesterJwks = keyAttesterJwks,
                         authorizationServer = authorizationServer,
                         credentialProofTypeHint = credentialProofTypeHint,
                         staticTxCode = staticTxCode,
@@ -170,6 +177,9 @@ class IssuerConformanceTestRunner(
         // Write the unmodified reports first so missing, skipped, and failed modules remain diagnosable.
         if (requireBatchPass) {
             requireExecutedBatchIssuance(results)
+        }
+        if (requireKeyAttestationPass) {
+            requireExecutedKeyAttestation(results)
         }
 
         if (variantSelection.strictResults) {

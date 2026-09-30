@@ -341,7 +341,8 @@ jobs:
         run: |
           ./gradlew :waltid-services:waltid-issuer-api2:buildFatJar --no-daemon --console=plain --warning-mode=summary
           ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test -PskipLiveConformance=true \
-            --tests id.walt.openid4vp.conformance.IssuerCiConfigurationTest --no-configuration-cache --console=plain
+            --tests id.walt.openid4vp.conformance.IssuerCiConfigurationTest \
+            --tests id.walt.openid4vp.conformance.IssuerKeyAttestationTest --no-configuration-cache --console=plain
         env:
           CI: "true"
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
@@ -408,9 +409,10 @@ jobs:
                  "identity_credential_haip": "dc+sd-jwt", "org.iso.18013.5.1.mDL.haip": "mso_mdoc"}
               | to_entries | all(.[]; . as $entry
                 | $configs[$entry.key].format == $entry.value
-                and (($configs[$entry.key].proof_types_supported.jwt.proof_signing_alg_values_supported // []) | index("ES256") != null)))
+                and (($configs[$entry.key].proof_types_supported.jwt.proof_signing_alg_values_supported // []) | index("ES256") != null)
+                and ($configs[$entry.key].proof_types_supported.jwt.key_attestations_required | type == "object")))
           ' "$ISSUER_DIAGNOSTICS_DIR/issuer-metadata.json" >/dev/null || {
-            echo '::error::Issuer metadata must expose the public URL, batch size >= 2 and all four proof-bound CI configurations. Check the batch merge and CI configuration.'
+            echo '::error::Issuer metadata must expose the public URL, batch size >= 2 and all four CI configurations requiring JWT key attestation. Check the issuer implementation and CI configuration.'
             exit 1
           }
           echo "url=$TUNNEL_URL" >> "$GITHUB_OUTPUT"
@@ -423,7 +425,7 @@ jobs:
           set -euo pipefail
           if [ -n "$ISSUER_BASE_URL" ]; then
             export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="$ISSUER_BASE_URL/openid4vci"
-            echo 'Running wallet, verifier and issuer conformance together (issuer strict + batch checks enabled).'
+            echo 'Running wallet, verifier and issuer conformance together (issuer strict, batch and key-attestation checks enabled).'
           else
             unset OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL
             echo 'Running wallet/verifier conformance; no issuer runtime was prepared.'
@@ -452,6 +454,7 @@ jobs:
           OPENID4VCI_CONFORMANCE_DISCOVERY_ONLY: "false"
           OPENID4VCI_CONFORMANCE_STRICT: "true"
           OPENID4VCI_CONFORMANCE_REQUIRE_BATCH_PASS: "true"
+          OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS: "true"
           OPENID4VCI_CONFORMANCE_SUITE_HOST: conformance.waltid.cloud
           OPENID4VCI_CONFORMANCE_SUITE_PORT: "443"
           OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID: identity_credential
@@ -459,6 +462,8 @@ jobs:
           OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID: identity_credential_haip
           OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID: org.iso.18013.5.1.mDL.haip
           OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/keys/attester-key.json
+          OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/keys/attester-key.json
+          OPENID4VCI_CONFORMANCE_CREDENTIAL_PROOF_TYPE_HINT: jwt
           OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem
           OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem
           OPENID4VCI_CONFORMANCE_FILTER_FAPI_PROFILES: vci,vci_haip

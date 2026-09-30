@@ -529,9 +529,10 @@ internal data class IssuerModuleSelection(
     val groups: Set<String> = emptySet(),
     val modules: Set<String> = emptySet(),
     val excludedModules: Set<String> = emptySet(),
+    val additionalModules: Set<String> = emptySet(),
 ) {
     val isActive: Boolean
-        get() = groups.isNotEmpty() || modules.isNotEmpty() || excludedModules.isNotEmpty()
+        get() = groups.isNotEmpty() || modules.isNotEmpty() || excludedModules.isNotEmpty() || additionalModules.isNotEmpty()
 
     val description: String
         get() = buildList {
@@ -544,10 +545,13 @@ internal data class IssuerModuleSelection(
             if (excludedModules.isNotEmpty()) {
                 add("excluded=${excludedModules.joinToString(",")}")
             }
+            if (additionalModules.isNotEmpty()) {
+                add("additional=${additionalModules.joinToString(",")}")
+            }
         }.joinToString("; ").ifBlank { "all modules" }
 
     fun matches(moduleName: String): Boolean =
-        groups.matchesGroup(moduleName) && modules.matchesName(moduleName)
+        (groups.matchesGroup(moduleName) && modules.matchesName(moduleName)) || moduleName in additionalModules
 
     fun exclusionReason(moduleName: String): String? =
         if (moduleName in excludedModules) "excluded by OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES" else null
@@ -587,6 +591,7 @@ internal data class IssuerModuleSelection(
                 groups = groups,
                 modules = csv("OPENID4VCI_CONFORMANCE_MODULES"),
                 excludedModules = csv("OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES"),
+                additionalModules = csv("OPENID4VCI_CONFORMANCE_ADDITIONAL_MODULES"),
             )
         }
 
