@@ -135,7 +135,7 @@ platform locale preferences.
 ### Explicit batches and multiple configurations
 
 Issuance requests one instance of each selected configuration by default. A batch
-is opt-in: after reviewing `session.batchSize`, choose existing holders or explicitly request new keys
+is opt-in: after reviewing `session.offer.batchSize`, choose existing holders or explicitly request new keys
 at acceptance. A missing batch size means single issuance only;
 an oversized batch fails before the token is redeemed.
 
@@ -152,37 +152,13 @@ val outcome = wallet.continuePreAuthorizedIssuance(session.id, transactionCode, 
 // val authorization = wallet.beginAuthorizationIssuance(session.id, accepted)
 ```
 
-Add selections for other offered configurations to receive multiple datasets or
-formats. They use separate Credential Requests under the same token. Returned
-`authorization_details.credential_identifiers` are expanded automatically;
-scope-only grants use configuration IDs. Do not invent dataset identifiers.
-Authorization-code flows select authorization parameters from advertised
-`openid_credential` authorization details or the selected configurations' scopes;
-missing both is an error. An offered pre-authorized code already authorizes its
-credentials and does not require either selector. When available, supported
-selectors narrow the token request automatically.
-
-Each copy requires a distinct stored holder key, including when different key IDs resolve
-to the same public key. The session persists accepted key references and public identities across browser
-callbacks and deferred issuance. Responses are matched by holder public key,
-not array order, and may contain fewer instances than requested. Each stored
-credential retains its own key association for later presentation. The OAuth/DPoP
-key remains separate from the selected holder keys.
-
-Use `MobileWalletCredentialHolders.Existing` to choose existing bindings. SDK-generated
-keys are cleaned up when preparation or validation fails before acceptance. Accepted
-keys remain wallet-owned even if persistence or remote work fails. A retry, including
-after restart, reuses the accepted keys; changing holders or copy counts then requires
-a new session. Explicit `createIssuanceHolderKeys` remains available for callers that
-want to own key allocation independently. Swift exposes the same choices.
-Existing issuance lifecycle events remain in place; the stored event is emitted
-for each successful save, and failed outcomes retain any already stored IDs.
-
-Retained handles honor the issuer's polling interval across restart. An early resume
-returns a deferred outcome with the remaining wait, rounded up to whole seconds,
-without sending another issuer request. A new pending response resets the deadline.
-Once the response has arrived, a local-save handle has no interval and can be resumed
-immediately; retrying storage does not contact the issuer.
+`Existing` selects wallet-owned keys; `NewKeys` prepares keys only during acceptance.
+Use `createIssuanceHolderKeys` when copies need different platform authorization policies,
+then pass the resulting bindings through `Existing`. Validation failures remove unaccepted
+SDK-generated keys; accepted keys remain wallet-owned and retries reuse them after restart.
+Swift exposes the same choices. See the [Wallet2 batch guide](https://docs.walt.id/community-stack/wallet2/credential-receiving/batch-issuance)
+for target selection, issuer limits, partial results and polling. Mobile consumers use
+`listDeferredIssuance()` and `resumeDeferredIssuance(id)` for retained progress.
 
 Wallet deletion rejects an active wallet or signing-identity operation before any
 cleanup starts. Once admitted, deletion permanently closes that instance to wallet
@@ -193,30 +169,10 @@ database driver closed, and repeated successful deletion is a no-op. Use a newly
 opened wallet only after cleanup succeeds. This coordinates one writable mobile
 instance; it does not add cross-process write coordination.
 
-Retained grants claim their durable state before building a browser request or exchanging
-an authorization/pre-authorized code. Independent runtimes cannot consume the same state.
-An interrupted processing record reports `REMOTE_OUTCOME_UNCERTAIN` after restart and
-is preserved; cancellation, expiration cleanup and session clearing cannot remove another
-runtime's claim. Explicitly rejected transaction codes can still be corrected and retried.
-
-Retained deferred requests are checkpointed before polling. A failure with code
-`REMOTE_OUTCOME_UNCERTAIN` indicates an in-progress request or a lost response;
-restarting the wallet does not cause that request to be sent again. Keep the returned
-handle and surface the error. Issuer reconciliation is required if the response
-was lost and the original runtime cannot finish saving it.
-
-Local saves also retain an ownership claim. `STORAGE_OUTCOME_UNCERTAIN` reports an
-active or interrupted writer and includes already readable saved IDs; another
-runtime does not automatically take over. A caught storage failure or cancellation
-releases its own claim and preserves the received batch. Resuming saves only the
-remaining credentials with their original IDs and does not poll the issuer again.
-
-Immediate responses in both retained grants use the same save checkpoint. If a later
-batch fails to save, the failed outcome preserves earlier stored IDs, the stopped and
-unattempted targets, and a handle for the received batch. Resume that handle rather
-than starting the offer again. Cancellation after checkpointing leaves the batch
-available from the retained-handle list. Successful intermediate batches emit stored
-events, while completion is emitted only when the operation finishes.
+Retained records distinguish remote requests from received batches awaiting local save.
+`REMOTE_OUTCOME_UNCERTAIN` and `STORAGE_OUTCOME_UNCERTAIN` preserve an active/interrupted
+claim; they do not authorize another runtime to replay or take over. Resume a recoverable
+local-save handle to save the remaining credentials without contacting the issuer again.
 
 After changing the Swift-facing API, regenerate and check its native ABI on macOS:
 
