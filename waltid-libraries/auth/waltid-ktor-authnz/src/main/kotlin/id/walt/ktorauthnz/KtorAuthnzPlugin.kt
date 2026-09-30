@@ -3,6 +3,8 @@ package id.walt.ktorauthnz
 import id.walt.ktorauthnz.accounts.EditableAccountStore
 import id.walt.ktorauthnz.attempts.AttemptLimits
 import id.walt.ktorauthnz.ephemeral.ExpiringStore
+import id.walt.ktorauthnz.events.AuthnzEventListener
+import id.walt.ktorauthnz.events.AuthnzEvents
 import id.walt.ktorauthnz.security.PasswordHashingConfiguration
 import id.walt.ktorauthnz.sessions.SessionStore
 import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
@@ -23,6 +25,12 @@ class KtorAuthnzConfig {
     var passwordHashing: PasswordHashingConfiguration? = null
 
     internal val cookie = CookieConfig()
+    internal val listeners = mutableListOf<AuthnzEventListener>()
+
+    /** Receives every authentication event, e.g. to write an audit log. */
+    fun onEvent(listener: AuthnzEventListener) {
+        listeners += listener
+    }
 
     /** The session token cookie set on successful login and read on requests. */
     fun cookie(configure: CookieConfig.() -> Unit) = cookie.configure()
@@ -65,4 +73,5 @@ val KtorAuthnz = createApplicationPlugin("KtorAuthnz", ::KtorAuthnzConfig) {
     config.cookie.name?.let { SessionTokenCookieHandler.cookieName = it }
     config.cookie.domain?.let { SessionTokenCookieHandler.domain = it }
     config.cookie.secure?.let { SessionTokenCookieHandler.secure = it }
+    config.listeners.forEach { AuthnzEvents.listen(it) }
 }
