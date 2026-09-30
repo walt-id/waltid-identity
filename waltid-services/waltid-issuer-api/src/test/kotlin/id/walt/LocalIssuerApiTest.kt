@@ -1,9 +1,9 @@
 package id.walt
 
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.events.Action
-import id.walt.commons.events.IssuanceEvent
-import id.walt.commons.events.Status
+import id.walt.events.Action
+import id.walt.events.IssuanceEvent
+import id.walt.events.Status
 import id.walt.crypto.keys.KeyManager
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.createCredentialOfferUri
