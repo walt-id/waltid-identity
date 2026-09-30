@@ -1,6 +1,6 @@
-package id.walt.commons.events.filter
+package id.walt.events.filter
 
-import id.walt.commons.events.EventType
+import id.walt.events.EventType
 import kotlinx.serialization.Serializable
 
 @Serializable
