@@ -71,3 +71,10 @@ data class OidcTokenValidationPolicyData(
         idTokenSigningAlgorithms = openIdConfiguration.idTokenSigningAlgValuesSupported.toSet(),
     )
 }
+
+/** The verifier2 session a VC login waits for. */
+@Serializable
+@SerialName("vc-verification")
+data class VerifiableCredentialSessionData(
+    val verifierSessionId: String,
+) : SessionData
