@@ -1,34 +1,16 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+import Foundation
+import WalletSDK
 
-package id.walt.walletdemo.compose.logic
-
-import id.walt.certificate.x509.X509CertificateUtil
-import id.walt.certificate.x509.truststore.InMemoryTrustStore
-import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
-
-/**
- * Example verifier trust anchors for the Compose demo.
- *
- * OpenID4VP `x509_san_dns` and `x509_hash` clients fail closed unless the wallet pins at least one
- * X.509 trust anchor. `decentralized_identifier` clients still authenticate through DID resolution
- * and do not use this list.
- *
- * These PEMs are demo trust anchors for signed Request Objects. Replace or append entries in
- * [x509TrustAnchorPems] with your own CAs (or pinned leaves) before shipping a production wallet.
- */
-object DemoClientIdTrust {
-
-    /**
-     * Self-signed leaf from `waltid-verifier-api2/config/verifier-service.conf` (`x5c`).
-     *
-     * SAN DNS `verifier.example.com`. Pair with:
-     * - `x509_san_dns:verifier.example.com` (commented next to `clientId: "verifier2"`)
-     * - `x509_hash:OPpTDyXlg6WRu2-Qn4rpQcA9uVqSrNExCS8kCYUe09A` (SHA-256 of this leaf)
-     *
-     * Demo material only, not a production CA. Valid until 2026-10-14.
-     * Production wallets should pin a CA and use client-auth leaves.
-     */
-    val VERIFIER2_EXAMPLE_LEAF_PEM = """
+/// Example verifier trust anchors for the native iOS demo.
+///
+/// OpenID4VP `x509_san_dns` and `x509_hash` clients fail closed unless the wallet pins at least one
+/// X.509 trust anchor. `decentralized_identifier` clients still authenticate through DID resolution
+/// and do not use this list.
+///
+/// Keep this list aligned with the Compose demo `DemoClientIdTrust`. Replace or append entries in
+/// `x509TrustAnchorPems` with your own CAs (or pinned leaves) before shipping a production wallet.
+enum DemoClientIdTrust {
+    static let verifier2ExampleLeafPem = """
         -----BEGIN CERTIFICATE-----
         MIIB2DCCAX+gAwIBAgIUHM9IDlzSNPwZcKStPxhcDrQBxPEwCgYIKoZIzj0EAwIw
         MTEdMBsGA1UEAwwUdmVyaWZpZXIuZXhhbXBsZS5jb20xEDAOBgNVBAoMB3dhbHQu
@@ -41,33 +23,30 @@ object DemoClientIdTrust {
         e/M4MYmLvzAKBggqhkjOPQQDAgNHADBEAiAI8wYnWdTWeqNLKMVw8UU4xPPnZkR4
         5NhD/iUNKexRdgIgCdTIULB9hbTNdm+S7nANVTuVw3Kw0tnUjF7Ihdia/dw=
         -----END CERTIFICATE-----
-    """.trimIndent()
+        """
 
-
-    /* CAs from the EUDI Reference Wallet */
-
-    val PID_CZ_CA_PEM = """
+    static let pidCzCaPem = """
         -----BEGIN CERTIFICATE-----
-            MIIC0zCCAnmgAwIBAgIUFxoZrqz1jgmJeXu6UxkuRcCgf/AwCgYIKoZIzj0EAwMw
-            VzEZMBcGA1UEAwwQUElEIElzc3VlciBDQSAwMjEtMCsGA1UECgwkRVVESSBXYWxs
-            ZXQgUmVmZXJlbmNlIEltcGxlbWVudGF0aW9uMQswCQYDVQQGEwJDWjAeFw0yNTA0
-            MDgyMzU0MTFaFw0zNDA3MDUyMzU0MTBaMFcxGTAXBgNVBAMMEFBJRCBJc3N1ZXIg
-            Q0EgMDIxLTArBgNVBAoMJEVVREkgV2FsbGV0IFJlZmVyZW5jZSBJbXBsZW1lbnRh
-            dGlvbjELMAkGA1UEBhMCQ1owWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQujURw
-            lrlAeGV/8wYTl9ceasR2YM55vI9cSaZOeXpBu3v6wlEhOHvDLVxlz2zJEJrqvg37
-            3DOO0RdWEvkGwf7Zo4IBITCCAR0wEgYDVR0TAQH/BAgwBgEB/wIBADAfBgNVHSME
-            GDAWgBSzozJELVa05Qse3atn1+cKtbbXgDATBgNVHSUEDDAKBggrgQICAAABBzBD
-            BgNVHR8EPDA6MDigNqA0hjJodHRwczovL3ByZXByb2QucGtpLmV1ZGl3LmRldi9j
-            cmwvcGlkX0NBX0NaXzAyLmNybDAdBgNVHQ4EFgQUs6MyRC1WtOULHt2rZ9fnCrW2
-            14AwDgYDVR0PAQH/BAQDAgEGMF0GA1UdEgRWMFSGUmh0dHBzOi8vZ2l0aHViLmNv
-            bS9ldS1kaWdpdGFsLWlkZW50aXR5LXdhbGxldC9hcmNoaXRlY3R1cmUtYW5kLXJl
-            ZmVyZW5jZS1mcmFtZXdvcmswCgYIKoZIzj0EAwMDSAAwRQIhAOWHisDphPFySZtS
-            +/1Ufp5aW+Ci3w4aDSw7+EW+TD6mAiAh3/SiF2zzZybp64sG/OiwdhH2LqsizuTD
-            1zFx4oCdqQ==
-            -----END CERTIFICATE-----
-    """.trimIndent()
+        MIIC0zCCAnmgAwIBAgIUFxoZrqz1jgmJeXu6UxkuRcCgf/AwCgYIKoZIzj0EAwMw
+        VzEZMBcGA1UEAwwQUElEIElzc3VlciBDQSAwMjEtMCsGA1UECgwkRVVESSBXYWxs
+        ZXQgUmVmZXJlbmNlIEltcGxlbWVudGF0aW9uMQswCQYDVQQGEwJDWjAeFw0yNTA0
+        MDgyMzU0MTFaFw0zNDA3MDUyMzU0MTBaMFcxGTAXBgNVBAMMEFBJRCBJc3N1ZXIg
+        Q0EgMDIxLTArBgNVBAoMJEVVREkgV2FsbGV0IFJlZmVyZW5jZSBJbXBsZW1lbnRh
+        dGlvbjELMAkGA1UEBhMCQ1owWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQujURw
+        lrlAeGV/8wYTl9ceasR2YM55vI9cSaZOeXpBu3v6wlEhOHvDLVxlz2zJEJrqvg37
+        3DOO0RdWEvkGwf7Zo4IBITCCAR0wEgYDVR0TAQH/BAgwBgEB/wIBADAfBgNVHSME
+        GDAWgBSzozJELVa05Qse3atn1+cKtbbXgDATBgNVHSUEDDAKBggrgQICAAABBzBD
+        BgNVHR8EPDA6MDigNqA0hjJodHRwczovL3ByZXByb2QucGtpLmV1ZGl3LmRldi9j
+        cmwvcGlkX0NBX0NaXzAyLmNybDAdBgNVHQ4EFgQUs6MyRC1WtOULHt2rZ9fnCrW2
+        14AwDgYDVR0PAQH/BAQDAgEGMF0GA1UdEgRWMFSGUmh0dHBzOi8vZ2l0aHViLmNv
+        bS9ldS1kaWdpdGFsLWlkZW50aXR5LXdhbGxldC9hcmNoaXRlY3R1cmUtYW5kLXJl
+        ZmVyZW5jZS1mcmFtZXdvcmswCgYIKoZIzj0EAwMDSAAwRQIhAOWHisDphPFySZtS
+        +/1Ufp5aW+Ci3w4aDSw7+EW+TD6mAiAh3/SiF2zzZybp64sG/OiwdhH2LqsizuTD
+        1zFx4oCdqQ==
+        -----END CERTIFICATE-----
+        """
 
-    val PID_EE_CA_PEM = """
+    static let pidEeCaPem = """
         -----BEGIN CERTIFICATE-----
         MIIC0jCCAnmgAwIBAgIUPP5TRFaC6GrLVVc5T83dCyunbcMwCgYIKoZIzj0EAwMw
         VzEZMBcGA1UEAwwQUElEIElzc3VlciBDQSAwMjEtMCsGA1UECgwkRVVESSBXYWxs
@@ -86,10 +65,9 @@ object DemoClientIdTrust {
         eLB5C9vZmqOf8+MNKzoB+uHjK+wCIE5fee6J0rnBkw2ZnFHpX0zxUiuDL9C5sjkw
         AbVJjmT1
         -----END CERTIFICATE-----
-    """.trimIndent()
+        """
 
-
-    val PID_EU_CA_PEM = """
+    static let pidEuCaPem = """
         -----BEGIN CERTIFICATE-----
         MIIC0zCCAnmgAwIBAgIUXRXxkLbUM6+njr/XT0IIw/HA/uowCgYIKoZIzj0EAwMw
         VzEZMBcGA1UEAwwQUElEIElzc3VlciBDQSAwMjEtMCsGA1UECgwkRVVESSBXYWxs
@@ -108,30 +86,30 @@ object DemoClientIdTrust {
         TKkzzWgc09hzDMsCl3O2le2sQfG7AiA2soqAN5gtUOLQKWK00DUz22EW79rvaV+V
         JPvfdQeokA==
         -----END CERTIFICATE-----
-    """.trimIndent()
+        """
 
-    val PID_LU_CA_PEM = """
+    static let pidLuCaPem = """
         -----BEGIN CERTIFICATE-----
-            MIIC0zCCAnmgAwIBAgIUYGz2Xxw7UFgSmRsIkFTTBclg8fcwCgYIKoZIzj0EAwMw
-            VzEZMBcGA1UEAwwQUElEIElzc3VlciBDQSAwMjEtMCsGA1UECgwkRVVESSBXYWxs
-            ZXQgUmVmZXJlbmNlIEltcGxlbWVudGF0aW9uMQswCQYDVQQGEwJMVTAeFw0yNTA0
-            MDkwMDA1MzlaFw0zNDA3MDYwMDA1MzhaMFcxGTAXBgNVBAMMEFBJRCBJc3N1ZXIg
-            Q0EgMDIxLTArBgNVBAoMJEVVREkgV2FsbGV0IFJlZmVyZW5jZSBJbXBsZW1lbnRh
-            dGlvbjELMAkGA1UEBhMCTFUwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAR6X1Nl
-            EGbdWUWiUrSA/YiNpcZeI95z2MglbvISRO19YUc4GvPTevbg/Fm9MekJeHqRQO4G
-            HTlBPNGM2aiBtu5Mo4IBITCCAR0wEgYDVR0TAQH/BAgwBgEB/wIBADAfBgNVHSME
-            GDAWgBRcYvvRpiZ6Zz81VxQ4+AdY4Iez8DATBgNVHSUEDDAKBggrgQICAAABBzBD
-            BgNVHR8EPDA6MDigNqA0hjJodHRwczovL3ByZXByb2QucGtpLmV1ZGl3LmRldi9j
-            cmwvcGlkX0NBX0xVXzAyLmNybDAdBgNVHQ4EFgQUXGL70aYmemc/NVcUOPgHWOCH
-            s/AwDgYDVR0PAQH/BAQDAgEGMF0GA1UdEgRWMFSGUmh0dHBzOi8vZ2l0aHViLmNv
-            bS9ldS1kaWdpdGFsLWlkZW50aXR5LXdhbGxldC9hcmNoaXRlY3R1cmUtYW5kLXJl
-            ZmVyZW5jZS1mcmFtZXdvcmswCgYIKoZIzj0EAwMDSAAwRQIgd69HgNvnIVbHg5lY
-            2SzgExy72DUNCyi20An6OGNqWw4CIQDkDMDTmPd6p/aHAtYP8Jh7z/4Nb/09LxpN
-            XQS72ouixA==
-            -----END CERTIFICATE-----
-    """.trimIndent()
+        MIIC0zCCAnmgAwIBAgIUYGz2Xxw7UFgSmRsIkFTTBclg8fcwCgYIKoZIzj0EAwMw
+        VzEZMBcGA1UEAwwQUElEIElzc3VlciBDQSAwMjEtMCsGA1UECgwkRVVESSBXYWxs
+        ZXQgUmVmZXJlbmNlIEltcGxlbWVudGF0aW9uMQswCQYDVQQGEwJMVTAeFw0yNTA0
+        MDkwMDA1MzlaFw0zNDA3MDYwMDA1MzhaMFcxGTAXBgNVBAMMEFBJRCBJc3N1ZXIg
+        Q0EgMDIxLTArBgNVBAoMJEVVREkgV2FsbGV0IFJlZmVyZW5jZSBJbXBsZW1lbnRh
+        dGlvbjELMAkGA1UEBhMCTFUwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAR6X1Nl
+        EGbdWUWiUrSA/YiNpcZeI95z2MglbvISRO19YUc4GvPTevbg/Fm9MekJeHqRQO4G
+        HTlBPNGM2aiBtu5Mo4IBITCCAR0wEgYDVR0TAQH/BAgwBgEB/wIBADAfBgNVHSME
+        GDAWgBRcYvvRpiZ6Zz81VxQ4+AdY4Iez8DATBgNVHSUEDDAKBggrgQICAAABBzBD
+        BgNVHR8EPDA6MDigNqA0hjJodHRwczovL3ByZXByb2QucGtpLmV1ZGl3LmRldi9j
+        cmwvcGlkX0NBX0xVXzAyLmNybDAdBgNVHQ4EFgQUXGL70aYmemc/NVcUOPgHWOCH
+        s/AwDgYDVR0PAQH/BAQDAgEGMF0GA1UdEgRWMFSGUmh0dHBzOi8vZ2l0aHViLmNv
+        bS9ldS1kaWdpdGFsLWlkZW50aXR5LXdhbGxldC9hcmNoaXRlY3R1cmUtYW5kLXJl
+        ZmVyZW5jZS1mcmFtZXdvcmswCgYIKoZIzj0EAwMDSAAwRQIgd69HgNvnIVbHg5lY
+        2SzgExy72DUNCyi20An6OGNqWw4CIQDkDMDTmPd6p/aHAtYP8Jh7z/4Nb/09LxpN
+        XQS72ouixA==
+        -----END CERTIFICATE-----
+        """
 
-    val PID_NL_CA_PEM = """
+    static let pidNlCaPem = """
         -----BEGIN CERTIFICATE-----
         MIIC0jCCAnmgAwIBAgIUWcI7dH8iTcdDsGe93t9tWfdoKr0wCgYIKoZIzj0EAwMw
         VzEZMBcGA1UEAwwQUElEIElzc3VlciBDQSAwMjEtMCsGA1UECgwkRVVESSBXYWxs
@@ -150,9 +128,9 @@ object DemoClientIdTrust {
         /WRe28t4Q575ktymDiHPzwj5UCQCIGoSN5ntiPEa4dk8P48blwgXY74+1svzmTVT
         WYtVmCsv
         -----END CERTIFICATE-----
-    """.trimIndent()
+        """
 
-    val PID_PT_CA_PEM = """
+    static let pidPtCaPem = """
         -----BEGIN CERTIFICATE-----
         MIIC3jCCAoOgAwIBAgIUZXIN5wL8XzOB1WtwPqAr6GSIm2MwCgYIKoZIzj0EAwMw
         XDEeMBwGA1UEAwwVUElEIElzc3VlciBDQSAtIFBUIDAyMS0wKwYDVQQKDCRFVURJ
@@ -171,9 +149,9 @@ object DemoClientIdTrust {
         H7B1TjFfNI2mr3zDy2TCboDgcgiQ/Xzh5ZNfyeT3/gIhAK7frwdyKHyhe1ruHEhK
         6bZ/eovd4pE/w+WDPBOqYcIM
         -----END CERTIFICATE-----
-    """.trimIndent()
+        """
 
-    val PID_UT_CA_PEM = """
+    static let pidUtCaPem = """
         -----BEGIN CERTIFICATE-----
         MIIC3TCCAoOgAwIBAgIUEwybFc9Jw+az3r188OiHDaxCfHEwCgYIKoZIzj0EAwMw
         XDEeMBwGA1UEAwwVUElEIElzc3VlciBDQSAtIFVUIDAyMS0wKwYDVQQKDCRFVURJ
@@ -192,11 +170,9 @@ object DemoClientIdTrust {
         4R9rO4JhFp821kO8Gkb8rXm4qGG/e5/Oi2XmnTQqOQIgfFs+LDbnP2/j1MB4rwZ1
         FgGdpr4oyrFB9daZyRIcP90=
         -----END CERTIFICATE-----
-    """.trimIndent()
+        """
 
-    /** Certificates for Authologic demos */
-
-    val AUTHOLOGIC_VERIFIER_PEM = """
+    static let authologicVerifierPem = """
         -----BEGIN CERTIFICATE-----
         MIICWjCCAf+gAwIBAgIURMxgfdZVyDkuuDk+5EF0O6Eq56MwCgYIKoZIzj0EAwIw
         ejELMAkGA1UEBhMCUEwxFDASBgNVBAgMC01hem93aWVja2llMQ8wDQYDVQQHDAZX
@@ -212,9 +188,9 @@ object DemoClientIdTrust {
         BAMCA0kAMEYCIQD+u+EPuNX47F9Fhu9Okj6rs6MdGAXkMPBz8dIgO0CsLgIhAIXd
         VWuOtBE3oUD8rAOwlVMDD0Mh/viqNJ5MbS9VB2q+
         -----END CERTIFICATE-----
-    """.trimIndent()
+        """
 
-    val AUTHOLOGIC_READER_PEM = """
+    static let authologicReaderPem = """
         -----BEGIN CERTIFICATE-----
         MIIB3DCCAYOgAwIBAgIUcMNDYnHDDVHpOP3Hr7ICtlcYLuwwCgYIKoZIzj0EAwIw
         RDEgMB4GA1UEAwwXQXV0aG9sb2dpYyBWZXJpZmllciBEZXYxEzARBgNVBAoMCkF1
@@ -227,13 +203,9 @@ object DemoClientIdTrust {
         EwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDRwAwRAIhAJ0ak5Vluoj6irVz5CjuAcUe
         ivkGqOZBNz0HMNc86pgvAh9VgANGh61oaZL5S9FfCr6PtcBABmmIo3ejZwDdLCms
         -----END CERTIFICATE-----
-    """.trimIndent()
+        """
 
-    /**
-     * Additional demo trust-registry CAs for signed Request Objects.
-     * Self-signed. Valid until 2029-03-19.
-     */
-    val TRUST_REGISTRY_RC_PROVIDER_PEM = """
+    static let trustRegistryRcProviderPem = """
         -----BEGIN CERTIFICATE-----
         MIIDfjCCAySgAwIBAgIQRAL20BMQkFskig+t5XJgmDAKBggqhkjOPQQDAjCByzEL
         MAkGA1UEBhMCTkwxDzANBgNVBAgTBkhlc3NlbjEPMA0GA1UEBxMGTGFuZ2VuMRcw
@@ -255,9 +227,9 @@ object DemoClientIdTrust {
         KoZIzj0EAwIDSAAwRQIhAKlIRTuWT+K1SU2hA0w5PCDDhgsbyWrAt6J1gvcOcxsH
         AiAwrUu7Q8mZxYlhUZ72F4vfj6wRMI5qxY7TFJiWS50z0w==
         -----END CERTIFICATE-----
-    """.trimIndent()
+        """
 
-    val TRUST_REGISTRY_RANDOM_LIST_PEM = """
+    static let trustRegistryRandomListPem = """
         -----BEGIN CERTIFICATE-----
         MIIDfjCCAySgAwIBAgIQWazmWTkci584bZtw3m3yEDAKBggqhkjOPQQDAjCByzEL
         MAkGA1UEBhMCTkwxDzANBgNVBAgTBkhlc3NlbjEPMA0GA1UEBxMGTGFuZ2VuMRcw
@@ -279,39 +251,25 @@ object DemoClientIdTrust {
         KoZIzj0EAwIDSAAwRQIhAIstc7ItvqhoEnIzwtkwq7pQaowa2877saiHdRWly2kr
         AiAgiDr75Zz321//G+IbGVZ1nb+o736cyUOJa6M+dsi/rw==
         -----END CERTIFICATE-----
-    """.trimIndent()
+        """
 
-    /**
-     * PEM trust anchors passed into [id.walt.wallet2.mobile.MobileWalletFactory.create].
-     *
-     * Append more PEM strings to allow additional `x509_san_dns` / `x509_hash` verifiers:
-     *
-     * ```
-     * """
-     * -----BEGIN CERTIFICATE-----
-     * ...your organisation's CA...
-     * -----END CERTIFICATE-----
-     * """.trimIndent(),
-     * ```
-     */
-    val x509TrustAnchorPems: List<String> = listOf(
-        VERIFIER2_EXAMPLE_LEAF_PEM,
-        PID_CZ_CA_PEM,
-        PID_EE_CA_PEM,
-        PID_EU_CA_PEM,
-        PID_LU_CA_PEM,
-        PID_NL_CA_PEM,
-        PID_PT_CA_PEM,
-        PID_UT_CA_PEM,
-        AUTHOLOGIC_VERIFIER_PEM,
-        AUTHOLOGIC_READER_PEM,
-        TRUST_REGISTRY_RC_PROVIDER_PEM,
-        TRUST_REGISTRY_RANDOM_LIST_PEM,
-    )
+    /// PEM trust anchors passed into `WalletConfiguration.clientIDTrustConfiguration`.
+    static let x509TrustAnchorPems: [String] = [
+        verifier2ExampleLeafPem,
+        pidCzCaPem,
+        pidEeCaPem,
+        pidEuCaPem,
+        pidLuCaPem,
+        pidNlCaPem,
+        pidPtCaPem,
+        pidUtCaPem,
+        authologicVerifierPem,
+        authologicReaderPem,
+        trustRegistryRcProviderPem,
+        trustRegistryRandomListPem,
+    ]
 
-    val configuration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(
-        x509TrustAnchors = InMemoryTrustStore(
-            x509TrustAnchorPems.map(X509CertificateUtil::parseCertificatePem),
-        ),
-    )
+    static var clientIDTrustConfiguration: WalletClientIDTrustConfiguration {
+        WalletClientIDTrustConfiguration(x509TrustAnchorsPEM: x509TrustAnchorPems)
+    }
 }

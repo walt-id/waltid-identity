@@ -16,5 +16,6 @@ class DemoClientIdTrustTest {
             assertEquals(certificate.encodedDer, stored.encodedDer)
         }
         assertEquals(expected.map { it.encodedDer }.toSet().size, expected.size)
+        assertEquals(12, expected.size)
     }
 }
