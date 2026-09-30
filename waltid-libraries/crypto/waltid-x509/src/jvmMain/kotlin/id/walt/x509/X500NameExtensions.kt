@@ -43,7 +43,8 @@ fun X500Name.getLocalityName(): String? {
  * Build an X.500 name from optional attribute values.
  *
  * Only non-null values are included. Bouncy Castle validates attribute syntax,
- * including the two-character country code; no additional normalization is performed. The attributes are added in the following order: C, CN, ST, O, L.
+ * including the two-character country code; no additional normalization is
+ * performed. Attributes are added in the following order: C, CN, ST, O, L.
  */
 fun buildX500Name(
     country: String? = null,
