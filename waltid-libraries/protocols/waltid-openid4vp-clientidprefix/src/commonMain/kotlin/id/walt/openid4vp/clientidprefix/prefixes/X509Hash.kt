@@ -53,7 +53,7 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
     ): ClientValidationResult {
         val jws = context.requestObjectJws
             ?: return ClientValidationResult.Failure(ClientIdError.MissingRequestObject)
-        if (trustConfiguration.x509TrustAnchors.isMissing()) {
+        if (!trustConfiguration.trustAlreadyEstablished && trustConfiguration.x509TrustAnchors.isMissing()) {
             return ClientValidationResult.Failure(ClientIdError.MissingX509TrustAnchors)
         }
 
@@ -78,8 +78,10 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
         val leafCertificate = certificates.firstOrNull()
             ?: return ClientValidationResult.Failure(ClientIdError.EmptyX5cHeader)
 
-        ClientIdCrypto2.validateCertificateChain(certificates, trustConfiguration.x509TrustStore)?.let { error ->
-            return error
+        if (!trustConfiguration.trustAlreadyEstablished) {
+            ClientIdCrypto2.validateCertificateChain(certificates, trustConfiguration.x509TrustStore)?.let { error ->
+                return error
+            }
         }
         try {
             ClientIdCrypto2.verify(jws, leafCertificate.restoreSubjectPublicKey(ClientIdCrypto2.runtime))
