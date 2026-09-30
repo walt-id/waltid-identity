@@ -1,6 +1,9 @@
 package id.walt.ktorauthnz
 
 import id.walt.ktorauthnz.accounts.EditableAccountStore
+import id.walt.ktorauthnz.attempts.AttemptLimits
+import id.walt.ktorauthnz.ephemeral.ExpiringStore
+import id.walt.ktorauthnz.ephemeral.InMemoryExpiringStore
 import id.walt.ktorauthnz.security.PasswordHashingConfiguration
 import id.walt.ktorauthnz.sessions.InMemorySessionStore
 import id.walt.ktorauthnz.sessions.SessionStore
@@ -14,11 +17,13 @@ object KtorAuthnzManager {
     var sessionStore: SessionStore = InMemorySessionStore()
 
     var tokenHandler: TokenHandler = KtorAuthNzTokenHandler()
-    /*var tokenHandler: TokenHandler = JwtTokenHandler().apply {
-        runBlocking {
-            signingKey = JWKKey.importJWK("{\"kty\":\"OKP\",\"d\":\"1JU5RIQIs4L5RPoYc3Qfzk_n_m6Ende1_hcJOSf2NYU\",\"crv\":\"Ed25519\",\"kid\":\"CSMdhzTFRmrnKxir3gPFs6lmSLKZrNnwk9meKBg5bYM\",\"x\":\"UBOjkIuse1xW6yLQyZkPfIMennHW2l1mg7vOpIJPrqM\"}").getOrThrow()
-            verificationKey = signingKey
-        }
-    }*/
 
+    /** Short-lived data: attempt counters, one-time challenges, pending enrolments, reset and refresh tokens. */
+    var expiringStore: ExpiringStore = InMemoryExpiringStore()
+
+    /** Limits on failed authentication attempts, per session and per account identifier. */
+    var attemptLimits = AttemptLimits()
+
+    internal val isAccountStoreConfigured: Boolean
+        get() = ::accountStore.isInitialized
 }
