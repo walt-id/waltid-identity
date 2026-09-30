@@ -817,12 +817,9 @@ jobs:
           GOOGLE_SERVICES_PRODUCTION_JSON: ${{ secrets.GOOGLE_SERVICES_PRODUCTION_JSON }}
         run: bash waltid-identity/.github/scripts/mobile-ci/write-google-services.sh
 
-      - name: Set version
-        run: |
-          sed -i "s/1.0.0-SNAPSHOT/${{ inputs.version }}/g" build.gradle.kts
-
       - name: Publish
         env:
+          RELEASE_VERSION: ${{ inputs.version }}
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-        run: ./gradlew publish --no-daemon
+        run: ./gradlew publish -Pversion="$RELEASE_VERSION" --no-daemon
