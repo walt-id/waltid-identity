@@ -42,7 +42,7 @@ class Web3LoginTest {
             install(ContentNegotiation) { json() }
             install(StatusPages) {
                 exception<Throwable> { call, cause ->
-                    val status = (cause as? StatusException)?.status?.let(HttpStatusCode::fromValue) ?: HttpStatusCode.InternalServerError
+                    val status = (cause as? id.walt.errors.HttpStatusError)?.status?.let(HttpStatusCode::fromValue) ?: HttpStatusCode.InternalServerError
                     call.respondText("${cause::class.simpleName}: ${cause.message}", status = status)
                 }
             }
