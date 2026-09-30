@@ -82,24 +82,18 @@ data class OidcAuthConfiguration(
      * Validates if a client-specified redirect URL is allowed.
      * Returns the validated URL or null if not allowed.
      */
-    fun validateRedirectUrl(redirectTo: String?): Url? {
-        if (redirectTo == null) return null
-        if (allowedRedirectUrls.isEmpty()) return null
+    fun validateRedirectUrl(redirectTo: String?): Url? =
+        redirectTo?.let { matchesAnyRedirectPattern(it, allowedRedirectUrls) }?.let(::Url)
 
-        val requestedUrl = try {
-            Url(redirectTo)
-        } catch (e: Exception) {
-            return null
+    override fun authMethod() = OIDC
+
+    companion object {
+        /** [url] if it matches one of [patterns] (exact, a host wildcard or a path prefix), else null. */
+        fun matchesAnyRedirectPattern(url: String, patterns: List<String>): String? {
+            if (patterns.isEmpty()) return null
+            val requestedUrl = runCatching { Url(url) }.getOrNull() ?: return null
+            return url.takeIf { patterns.any { matchesPattern(requestedUrl, it) } }
         }
-
-        for (pattern in allowedRedirectUrls) {
-            if (matchesPattern(requestedUrl, pattern)) {
-                return requestedUrl
-            }
-        }
-
-        return null
-    }
 
     private fun matchesPattern(url: Url, pattern: String): Boolean {
         if (url.toString() == pattern || url.toString().trimEnd('/') == pattern.trimEnd('/')) {
@@ -134,6 +128,5 @@ data class OidcAuthConfiguration(
 
         return true
     }
-
-    override fun authMethod() = OIDC
+    }
 }
