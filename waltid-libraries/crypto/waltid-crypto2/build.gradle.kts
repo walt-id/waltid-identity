@@ -117,7 +117,7 @@ kotlin {
             implementation(identityLibs.bouncycastle.prov)
         }
 
-        val opensslMain by creating {
+        val opensslMain = create("opensslMain") {
             dependsOn(commonMain.get())
             dependencies {
                 implementation(identityLibs.cryptography.provider.openssl3.prebuilt)
@@ -126,7 +126,7 @@ kotlin {
         linuxMain.get().dependsOn(opensslMain)
         mingwMain.get().dependsOn(opensslMain)
 
-        val opensslTest by creating {
+        val opensslTest = create("opensslTest") {
             dependsOn(commonTest.get())
         }
         linuxX64Test.get().dependsOn(opensslTest)
@@ -144,7 +144,7 @@ tasks.register<JavaExec>("benchmarkStoredKeys") {
     mainClass.set("id.walt.crypto2.StoredKeyBenchmark")
 }
 
-val checkTypeScriptDefinitions by tasks.registering(CheckTypeScriptBaseline::class) {
+val checkTypeScriptDefinitions = tasks.register<CheckTypeScriptBaseline>("checkTypeScriptDefinitions") {
     group = "verification"
     description = "Checks the generated crypto2 TypeScript declarations against the committed baseline"
     dependsOn("jsProductionLibraryCompileSync")
@@ -152,7 +152,7 @@ val checkTypeScriptDefinitions by tasks.registering(CheckTypeScriptBaseline::cla
     generated.set(layout.buildDirectory.file("compileSync/js/main/productionLibrary/kotlin/waltid-crypto2.d.ts"))
 }
 
-val checkSerializationApiPublication by tasks.registering(CheckSerializationApiPublication::class) {
+val checkSerializationApiPublication = tasks.register<CheckSerializationApiPublication>("checkSerializationApiPublication") {
     group = "verification"
     description = "Checks that kotlinx.serialization is published as part of the crypto2 API"
     dependsOn("generateMetadataFileForJvmPublication")

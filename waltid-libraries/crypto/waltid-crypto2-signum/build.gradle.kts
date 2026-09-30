@@ -44,7 +44,7 @@ kotlin {
         }
 
         if (enableAndroidBuild || enableIosBuild) {
-            val mobileMain by creating {
+            val mobileMain = create("mobileMain") {
                 dependsOn(commonMain.get())
                 dependencies {
                     implementation(identityLibs.signum.indispensable)
