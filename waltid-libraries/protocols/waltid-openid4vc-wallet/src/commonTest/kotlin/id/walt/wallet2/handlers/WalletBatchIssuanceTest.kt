@@ -1,7 +1,5 @@
 package id.walt.wallet2.handlers
 
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
@@ -90,7 +88,7 @@ class WalletBatchIssuanceTest {
     }
 
     @Test fun contradictoryOrBlankHolderSelectorsCannotEnterTheIssuanceFlow() = runTest {
-        val inline = id.walt.crypto.keys.DirectSerializedKey(JWKKey.generate(KeyType.Ed25519))
+        val inline = id.walt.crypto.keys.DirectSerializedKey(batchTestLegacyKey())
         assertFailsWith<IllegalArgumentException> { CredentialHolderBinding(keyId = "stored", key = inline) }
         val encoded = Json.encodeToJsonElement(CredentialHolderBinding(key = inline)).jsonObject
         assertFailsWith<IllegalArgumentException> {
@@ -375,7 +373,7 @@ class WalletBatchIssuanceTest {
             credential = { irreversibleCalls++; error("Must not issue") },
             deferred = { irreversibleCalls++; error("Must not poll") })
         // Matching public material does not implicitly import or select an inline key.
-        for (key in listOf(JWKKey.generate(KeyType.Ed25519), fixture.keys.first().legacyKey!!)) {
+        for (key in listOf(batchTestLegacyKey(), fixture.keys.first().legacyKey!!)) {
             val inline = id.walt.crypto.keys.DirectSerializedKey(key)
             val binding = CredentialHolderBinding(key = inline)
             for (perHolder in listOf(false, true)) {
@@ -449,7 +447,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun unknownHolderKeyInLastResponseEntryPreventsAllWritesAndCallbacks() = runTest {
         val fixture = batchTestFixture(true)
-        val foreign = batchTestCredential(JWKKey.generate(KeyType.Ed25519))
+        val foreign = batchTestCredential(batchTestLegacyKey())
         var before = 0
         var stored = 0
         val result = WalletIssuanceHandler.receiveCredentials(fixture.wallet,

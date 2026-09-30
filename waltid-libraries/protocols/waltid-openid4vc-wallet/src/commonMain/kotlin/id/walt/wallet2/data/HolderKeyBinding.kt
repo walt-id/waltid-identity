@@ -8,8 +8,10 @@ import id.walt.did.dids.DidService
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toPublicJwk
+import id.walt.crypto2.serialization.BinaryData
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.EncodeDefault
@@ -530,9 +532,9 @@ private suspend fun MdocsCredential.holderKeyThumbprint(): PublicKeyThumbprint =
 
 internal suspend fun WalletKeyStoreEntry.publicKeyThumbprint(): PublicKeyThumbprint =
     crypto2Key?.publicKeyThumbprint()
-        ?: PublicKeyThumbprint(value = requireNotNull(legacyKey) {
+        ?: requireNotNull(legacyKey) {
             "Key '$keyId' has no usable public representation"
-        }.getPublicKey().getThumbprint())
+        }.publicKeyThumbprint()
 
 /** Credential-bound public identities, including W3C subject DIDs. No wallet default fallback. */
 internal suspend fun DigitalCredential.holderKeyThumbprints(includeSubjectDid: Boolean = true): Set<PublicKeyThumbprint> {
@@ -543,14 +545,20 @@ internal suspend fun DigitalCredential.holderKeyThumbprints(includeSubjectDid: B
     } catch (cause: Exception) {
         // Legacy-only curves/providers remain supported; never ignore malformed binding material.
         val legacy = getHolderKey() ?: throw cause
-        return setOf(PublicKeyThumbprint(value = legacy.getPublicKey().getThumbprint()))
+        return setOf(legacy.publicKeyThumbprint())
     }
     if (!includeSubjectDid) return emptySet()
     val holderDid = subject?.takeIf { it.startsWith("did:") } ?: return emptySet()
     val crypto2 = DidService.resolveToCrypto2Keys(holderDid)
     if (crypto2.isSuccess) return crypto2.getOrThrow().map { it.publicKeyThumbprint() }.toSet()
     return DidService.resolveToKeys(holderDid).getOrThrow()
-        .map { PublicKeyThumbprint(value = it.getPublicKey().getThumbprint()) }.toSet()
+        .map { it.publicKeyThumbprint() }.toSet()
+}
+
+// Legacy providers may return a thumbprint URI; holder identity uses the RFC 7638 value.
+internal suspend fun id.walt.crypto.keys.Key.publicKeyThumbprint(): PublicKeyThumbprint {
+    val jwk = EncodedKey.Jwk(BinaryData(getPublicKey().exportJWK().encodeToByteArray()), privateMaterial = false)
+    return PublicKeyThumbprint(value = Jwk.sha256Thumbprint(jwk))
 }
 
 private suspend fun id.walt.crypto2.keys.Key.publicKeyThumbprint(): PublicKeyThumbprint {

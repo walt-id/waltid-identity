@@ -9,12 +9,12 @@ import id.walt.crypto2.jose.selectJwsAlgorithm
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.keys.toStoredSoftwareKey
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.wallet2.data.WalletKeyStoreEntry
+import id.walt.wallet2.data.publicKeyThumbprint
 import id.waltid.openid4vci.wallet.dpop.DPoPProofBuilder
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -203,13 +203,4 @@ internal suspend fun migrateLocalJwk(key: Key) =
  * eventual access token to this key at authorization time. Lives here rather than in a single caller
  * so the server-side and session-service authorization flows compute it identically.
  */
-internal suspend fun WalletKeyStoreEntry.jwkThumbprint(): String {
-    crypto2Key?.let { key ->
-        val exported = requireNotNull(key.capabilities.publicKeyExporter) {
-            "Key '$keyId' does not export public material"
-        }.exportPublicKey().toPublicJwk(key.spec)
-        return Jwk.sha256Thumbprint(exported)
-    }
-    val legacy = requireNotNull(legacyKey) { "Key '$keyId' has no usable public representation" }
-    return legacy.getPublicKey().getThumbprint()
-}
+internal suspend fun WalletKeyStoreEntry.jwkThumbprint(): String = publicKeyThumbprint().value
