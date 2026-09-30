@@ -1,3 +1,5 @@
+import Foundation
+
 /// One requested credential instance and its existing wallet holder key.
 public struct IssuanceHolderBinding: Equatable, Sendable {
     /// Identifier of the wallet key that will sign the credential proof.
@@ -37,7 +39,22 @@ public struct IssuanceCredentialSelection: Equatable, Sendable {
     ///   - configurationID: Offered credential configuration identifier.
     ///   - credentialIdentifier: Optional identifier granted by the issuer.
     ///   - holders: Existing keys or a count of new keys, validated against issuer capabilities by the core.
-    public init(configurationID: String, credentialIdentifier: String? = nil, holders: IssuanceCredentialHolders) {
+    /// - Throws: ``WalletError`` for an empty selection, blank identifier, or invalid count.
+    public init(configurationID: String, credentialIdentifier: String? = nil, holders: IssuanceCredentialHolders) throws {
+        func isBlank(_ value: String) -> Bool { value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        guard !isBlank(configurationID), credentialIdentifier.map({ !isBlank($0) }) ?? true else {
+            throw WalletError.invalidInput("Credential identifiers must not be blank")
+        }
+        switch holders {
+        case .existing(let bindings):
+            guard !bindings.isEmpty, bindings.allSatisfy({ !isBlank($0.keyID) && ($0.did.map({ !isBlank($0) }) ?? true) }) else {
+                throw WalletError.invalidInput("Supply at least one holder binding with nonblank identifiers")
+            }
+        case .newKeys(let count):
+            guard count > 0, Int32(exactly: count) != nil else {
+                throw WalletError.invalidInput("Holder-key count must be a positive 32-bit integer")
+            }
+        }
         self.configurationID = configurationID
         self.credentialIdentifier = credentialIdentifier
         self.holders = holders

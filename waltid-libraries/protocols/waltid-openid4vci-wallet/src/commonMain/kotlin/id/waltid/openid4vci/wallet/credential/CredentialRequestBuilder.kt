@@ -2,7 +2,6 @@ package id.waltid.openid4vci.wallet.credential
 
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
-import id.walt.openid4vci.prooftypes.Proofs
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -63,19 +62,15 @@ object CredentialRequestBuilder {
         return mapOf("authorization_details" to details.toString())
     }
 
-    fun build(target: CredentialIssuanceTarget, proofs: Proofs? = null): JsonObject = buildJsonObject {
+    fun build(target: CredentialIssuanceTarget, jwtProofs: List<String>? = null): JsonObject = buildJsonObject {
         require(target.credentialConfigurationId.isNotBlank()) { "Credential configuration must not be blank" }
         if (target.credentialIdentifier != null) {
             require(target.credentialIdentifier.isNotBlank()) { "Credential identifier must not be blank" }
             put("credential_identifier", target.credentialIdentifier)
         } else put("credential_configuration_id", target.credentialConfigurationId)
-        proofs?.let {
-            require(it.diVp == null && it.attestation == null && !it.jwt.isNullOrEmpty()) {
-                "Wallet credential requests support a non-empty JWT proof collection"
-            }
-            val jwt = requireNotNull(it.jwt)
-            require(jwt.none(String::isBlank)) { "Credential proofs must not be blank" }
-            putJsonObject("proofs") { put("jwt", JsonArray(jwt.map(::JsonPrimitive))) }
+        jwtProofs?.let {
+            require(it.isNotEmpty() && it.none(String::isBlank)) { "Supply a non-empty collection of JWT proofs" }
+            putJsonObject("proofs") { put("jwt", JsonArray(it.map(::JsonPrimitive))) }
         }
     }
 

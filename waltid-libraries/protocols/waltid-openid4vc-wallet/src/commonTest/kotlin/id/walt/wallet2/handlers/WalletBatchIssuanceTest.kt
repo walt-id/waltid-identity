@@ -98,6 +98,23 @@ class WalletBatchIssuanceTest {
         assertFailsWith<IllegalArgumentException> { CredentialHolderBinding(did = " ") }
     }
 
+    @Test fun detailedResultsRejectContradictoryProgressWithoutCouplingProofAndRetention() {
+        val transaction = DeferredCredentialTransaction("identity", transactionId = "transaction",
+            holderBindings = listOf(CredentialHolderBinding()), intervalSeconds = 1, proofRequired = true)
+        // An isolated caller can own a proof-bound transaction without a wallet continuation handle.
+        assertNull(transaction.deferredCredentialId)
+        assertEquals(transaction, Json.decodeFromString<DeferredCredentialTransaction>(Json.encodeToString(transaction)))
+        for (invalid in listOf<() -> Unit>(
+            { transaction.copy(transactionId = " ") }, { transaction.copy(holderBindings = emptyList()) },
+            { transaction.copy(deferredCredentialId = " ") }, { FetchCredentialsResult() },
+            { FetchCredentialsResult(listOf("credential"), transaction) },
+            { PollDeferredResult(listOf("stored"), DeferredCredentialPending("transaction", 1)) },
+        )) assertFailsWith<IllegalArgumentException> { invalid() }
+        assertEquals(transaction, FetchCredentialsResult(deferredCredential = transaction).deferredCredential)
+        assertEquals(listOf("credential"), FetchCredentialsResult(listOf("credential")).rawCredentials)
+        assertTrue(PollDeferredResult(emptyList(), DeferredCredentialPending("transaction", 1)).credentialIds.isEmpty())
+    }
+
     @Test fun deferredIntervalsSurviveRestartAndEarlyCallsDoNotMoveTheDeadline() = runTest {
         val fixture = batchTestFixture(true)
         val records = MemorySessionStore()
@@ -378,23 +395,27 @@ class WalletBatchIssuanceTest {
         for (key in listOf(batchTestLegacyKey(), fixture.keys.first().legacyKey!!)) {
             val inline = id.walt.crypto.keys.DirectSerializedKey(key)
             val binding = CredentialHolderBinding(key = inline)
-            for (perHolder in listOf(false, true)) {
-                val selections = listOf(WalletCredentialSelection("identity", holderBindings = listOf(binding))).takeIf { perHolder }
-                assertFailsWith<IllegalArgumentException> {
-                    WalletIssuanceHandler.receiveCredentials(fixture.wallet,
-                        ReceiveCredentialRequest(offerJson = batchTestOffer(), key = inline.takeUnless { perHolder }, credentials = selections),
-                        httpClient = http)
-                }
-                assertFailsWith<IllegalArgumentException> {
-                    WalletIssuanceHandler.receiveCredentialsAuthCode(fixture.wallet,
-                        ReceiveAuthorizedCredentialsRequest(code = "code", credentialIssuer = BATCH_TEST_ISSUER,
-                            credentialEndpoint = Url("$BATCH_TEST_ISSUER/credential"),
-                            key = inline.takeUnless { perHolder }, credentials = selections ?: listOf(WalletCredentialSelection("identity"))), httpClient = http)
-                }
-                val service = newSessionService(fixture.wallet, http)
-                val review = service.start(WalletIssuanceSessionRequest(offerJson = batchTestOffer(), key = inline.takeUnless { perHolder }))
-                assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(review.id, credentials = selections))
+            assertFailsWith<IllegalArgumentException> {
+                WalletCredentialSelection("identity", holderBindings = listOf(binding))
             }
+            assertFailsWith<IllegalArgumentException> {
+                val wire = Json.encodeToString(binding)
+                Json.decodeFromString<WalletCredentialSelection>(
+                    """{"credentialConfigurationId":"identity","holderBindings":[$wire]}""")
+            }
+            assertFailsWith<IllegalArgumentException> {
+                WalletIssuanceHandler.receiveCredentials(fixture.wallet,
+                    ReceiveCredentialRequest(offerJson = batchTestOffer(), key = inline), httpClient = http)
+            }
+            assertFailsWith<IllegalArgumentException> {
+                WalletIssuanceHandler.receiveCredentialsAuthCode(fixture.wallet,
+                    ReceiveAuthorizedCredentialsRequest(code = "code", credentialIssuer = BATCH_TEST_ISSUER,
+                        credentialEndpoint = Url("$BATCH_TEST_ISSUER/credential"), key = inline,
+                        credentials = listOf(WalletCredentialSelection("identity"))), httpClient = http)
+            }
+            val service = newSessionService(fixture.wallet, http)
+            val review = service.start(WalletIssuanceSessionRequest(offerJson = batchTestOffer(), key = inline))
+            assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(review.id))
             assertFailsWith<IllegalArgumentException> {
                 WalletIssuanceHandler.fetchCredentials(fixture.wallet, FetchCredentialRequest(
                     credentialEndpoint = Url("$BATCH_TEST_ISSUER/credential"), accessToken = "access",
@@ -407,9 +428,13 @@ class WalletBatchIssuanceTest {
                     deferredCredentialEndpoint = Url("$BATCH_TEST_ISSUER/deferred"), accessToken = "access",
                     transactionId = "transaction", holderBindings = listOf(binding), proofRequired = true), httpClient = http).toList()
             }
-            val proof = WalletIssuanceHandler.signProofs(fixture.wallet,
-                SignProofsRequest(issuerUrl = Url(BATCH_TEST_ISSUER), credentialConfigurationId = "identity", key = inline), httpClient = http)
-            assertEquals(1, proof.proofs.jwt!!.size)
+            for (perHolder in listOf(false, true)) {
+                val proof = WalletIssuanceHandler.signProofs(fixture.wallet,
+                    SignProofsRequest(issuerUrl = Url(BATCH_TEST_ISSUER), credentialConfigurationId = "identity",
+                        key = inline.takeUnless { perHolder }, holderBindings = listOf(binding).takeIf { perHolder }
+                            ?: listOf(CredentialHolderBinding())), httpClient = http)
+                assertEquals(1, proof.proofs.jwt!!.size)
+            }
         }
         assertEquals(0, irreversibleCalls)
         assertTrue(fixture.store.listCredentials().toList().isEmpty())
@@ -1885,7 +1910,7 @@ class WalletBatchIssuanceTest {
             config, fixture.keys.first(), null).single()
         WalletIssuanceHandler.requestCredentialWithNonceRetry(
             FetchCredentialRequest(Url("$BATCH_TEST_ISSUER/credential"), "access", "identity"), "$BATCH_TEST_ISSUER/nonce", http,
-            buildProof = { WalletIssuanceHandler.buildProofCollection(fixture.wallet, selected, config.credentialConfigurationsSupported.getValue("identity"), BATCH_TEST_ISSUER, it, null) })
+            buildProof = { WalletIssuanceHandler.buildProofCollection(fixture.wallet, selected.bindings, config.credentialConfigurationsSupported.getValue("identity"), BATCH_TEST_ISSUER, it, null) })
         assertEquals(listOf(5, 5), collections.map { it.size })
         for ((index, proofs) in collections.withIndex()) {
             assertTrue(proofs.all { proof ->

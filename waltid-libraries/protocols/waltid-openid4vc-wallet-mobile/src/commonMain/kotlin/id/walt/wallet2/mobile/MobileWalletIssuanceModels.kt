@@ -64,7 +64,12 @@ public data class MobileWalletIssuanceRequest(
 public data class MobileWalletHolderBinding(
     public val keyId: String,
     public val did: String? = null,
-)
+) {
+    init {
+        require(keyId.isNotBlank()) { "Holder key ID must not be blank" }
+        require(did == null || did.isNotBlank()) { "Holder DID must not be blank" }
+    }
+}
 
 /** Holder-key choice for one accepted configuration or dataset. */
 public sealed interface MobileWalletCredentialHolders {
@@ -73,14 +78,18 @@ public sealed interface MobileWalletCredentialHolders {
      *
      * @property bindings Existing wallet keys for the requested credential instances.
      */
-    public data class Existing(public val bindings: List<MobileWalletHolderBinding>) : MobileWalletCredentialHolders
+    public data class Existing(public val bindings: List<MobileWalletHolderBinding>) : MobileWalletCredentialHolders {
+        init { require(bindings.isNotEmpty()) { "At least one holder binding is required" } }
+    }
 
     /**
      * Creates distinct platform keys inside acceptance, using the wallet's configured key policy.
      *
      * @property count Number of credential instances for which to create distinct holder keys.
      */
-    public data class NewKeys(public val count: Int) : MobileWalletCredentialHolders
+    public data class NewKeys(public val count: Int) : MobileWalletCredentialHolders {
+        init { require(count >= 1) { "At least one holder key must be requested" } }
+    }
 }
 
 /**
@@ -97,4 +106,9 @@ public data class MobileWalletCredentialSelection(
     public val credentialConfigurationId: String,
     public val holders: MobileWalletCredentialHolders,
     public val credentialIdentifier: String? = null,
-)
+) {
+    init {
+        require(credentialConfigurationId.isNotBlank()) { "Credential configuration must not be blank" }
+        require(credentialIdentifier == null || credentialIdentifier.isNotBlank()) { "Credential identifier must not be blank" }
+    }
+}

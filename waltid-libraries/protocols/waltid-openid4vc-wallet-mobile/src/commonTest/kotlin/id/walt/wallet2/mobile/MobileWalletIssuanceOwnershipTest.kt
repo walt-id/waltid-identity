@@ -22,13 +22,20 @@ import kotlinx.serialization.json.Json
 import kotlin.test.*
 
 class MobileWalletIssuanceOwnershipTest {
+    @Test fun selectionsRejectInvalidHoldersAtConstruction() {
+        for (count in listOf(0, -1)) assertFailsWith<IllegalArgumentException> { MobileWalletCredentialHolders.NewKeys(count) }
+        assertFailsWith<IllegalArgumentException> { MobileWalletCredentialHolders.Existing(emptyList()) }
+        assertFailsWith<IllegalArgumentException> { MobileWalletHolderBinding(" ") }
+        assertFailsWith<IllegalArgumentException> { MobileWalletHolderBinding("key", " ") }
+        assertFailsWith<IllegalArgumentException> { MobileWalletCredentialSelection(" ", MobileWalletCredentialHolders.NewKeys(1)) }
+        assertFailsWith<IllegalArgumentException> { MobileWalletCredentialSelection("identity", MobileWalletCredentialHolders.NewKeys(1), " ") }
+    }
+
     @Test fun invalidSessionAndExcessCopiesDoNotGenerateKeys() = runTest {
         val fixture = fixture()
         assertIs<WalletIssuanceOutcome.Failed>(fixture.wallet.continuePreAuthorizedIssuance("missing", "123", listOf(selection(2))))
         val session = fixture.wallet.startIssuance(request())
-        for (copies in listOf(0, 3)) {
-            assertIs<WalletIssuanceOutcome.Failed>(fixture.wallet.continuePreAuthorizedIssuance(session.id, "123", listOf(selection(copies))))
-        }
+        assertIs<WalletIssuanceOutcome.Failed>(fixture.wallet.continuePreAuthorizedIssuance(session.id, "123", listOf(selection(3))))
         assertEquals(0, fixture.created)
         assertEquals(0, fixture.tokenCalls)
     }

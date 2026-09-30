@@ -959,10 +959,10 @@ class WalletViewModel: ObservableObject {
     }
 
     private func issuanceSelections(_ preview: IssuanceOfferPreview) throws -> [IssuanceCredentialSelection] {
-        let selections = preview.credentials.compactMap { credential -> IssuanceCredentialSelection? in
+        let selections = try preview.credentials.compactMap { credential -> IssuanceCredentialSelection? in
             let count = issuanceCopyCounts[credential.configurationID] ?? 1
             guard count > 0 else { return nil }
-            return IssuanceCredentialSelection(configurationID: credential.configurationID,
+            return try IssuanceCredentialSelection(configurationID: credential.configurationID,
                 holders: count == 1 ? .existing([.init(keyID: keyID, did: did.isEmpty ? nil : did)]) : .newKeys(count: count))
         }
         guard !selections.isEmpty else { throw WalletError.invalidInput("Select at least one credential") }
