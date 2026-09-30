@@ -91,6 +91,7 @@ mina-core = "2.2.8"
 commons-lang3 = "3.20.0"
 onetime = "2.2.0"
 kedis = "0.0.12"
+webauthn4j = "0.31.10.RELEASE"
 
 # Crypto
 # One Bouncy Castle flavour for the whole repo: the mainline jdk18on line. The lts8on line (2.7x) publishes the
@@ -391,6 +392,8 @@ mina-core = { module = "org.apache.mina:mina-core", version.ref = "mina-core" }
 commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
 onetime = { module = "com.atlassian:onetime", version.ref = "onetime" }
 kedis = { module = "io.github.domgew:kedis", version.ref = "kedis" }
+webauthn4j-core = { module = "com.webauthn4j:webauthn4j-core", version.ref = "webauthn4j" }
+webauthn4j-test = { module = "com.webauthn4j:webauthn4j-test", version.ref = "webauthn4j" }
 
 ## a-sit-plus signum (mobile crypto)
 signum-indispensable = { module = "at.asitplus.signum:indispensable", version.ref = "signum" }
