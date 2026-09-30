@@ -5,6 +5,7 @@ import id.walt.ktorauthnz.attempts.AttemptLimits
 import id.walt.ktorauthnz.ephemeral.ExpiringStore
 import id.walt.ktorauthnz.events.AuthnzEventListener
 import id.walt.ktorauthnz.events.AuthnzEvents
+import id.walt.ktorauthnz.methods.config.PasskeySettings
 import id.walt.ktorauthnz.security.PasswordHashingConfiguration
 import id.walt.ktorauthnz.sessions.SessionStore
 import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
@@ -24,6 +25,9 @@ class KtorAuthnzConfig {
     var expiringStore: ExpiringStore? = null
     var attemptLimits: AttemptLimits? = null
     var passwordHashing: PasswordHashingConfiguration? = null
+
+    /** The WebAuthn relying party, needed for passkeys. */
+    var passkeys: PasskeySettings? = null
 
     /** Issue refresh tokens with each login token; see [RefreshTokenSettings]. */
     var refreshTokens: RefreshTokenSettings? = null
@@ -74,6 +78,7 @@ val KtorAuthnz = createApplicationPlugin("KtorAuthnz", ::KtorAuthnzConfig) {
     config.attemptLimits?.let { KtorAuthnzManager.attemptLimits = it }
     config.passwordHashing?.let { KtorAuthnzManager.passwordHashingConfig = it }
     config.refreshTokens?.let { KtorAuthnzManager.refreshTokens = it }
+    config.passkeys?.let { KtorAuthnzManager.passkeys = it }
 
     config.cookie.name?.let { SessionTokenCookieHandler.cookieName = it }
     config.cookie.domain?.let { SessionTokenCookieHandler.domain = it }
