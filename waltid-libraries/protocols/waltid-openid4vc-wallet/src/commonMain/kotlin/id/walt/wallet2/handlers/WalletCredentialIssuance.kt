@@ -248,11 +248,11 @@ private suspend fun Wallet.resolveProofDid(did: String?, material: WalletKeyStor
                 val key = vm["publicKeyJwk"]?.jsonObject ?: return@forEach
                 if (('#' !in did || id == did) && fields.isNotEmpty() && fields.all { key[it] != null && key[it] == publicJwk[it] }) return id
             }
-        } else if (staticDid?.substringBefore('#') == baseDid && staticKey?.getPublicKey()?.getThumbprint() == material.jwkThumbprint()) {
+        } else if (staticDid?.substringBefore('#') == baseDid && staticKey?.publicKeyThumbprint() == material.publicKeyThumbprint()) {
             return did
         } else {
             val keys = DidService.resolveToKeys(did).getOrNull().orEmpty()
-            if (keys.any { it.getPublicKey().getThumbprint() == material.jwkThumbprint() }) {
+            if (keys.any { it.publicKeyThumbprint() == material.publicKeyThumbprint() }) {
                 return DidService.resolveAuthenticationMethodId(did, material.keyId)
             }
         }

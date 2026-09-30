@@ -1,7 +1,6 @@
 package id.walt.wallet2.handlers
 
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.resolveKeyMaterial
@@ -21,13 +20,14 @@ import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toPrivateJwk
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.wallet2.data.WalletKeyStoreEntry
 import kotlinx.serialization.json.*
 
-internal suspend fun batchTestCredential(publicJwk: JsonObject, vct: String = "identity"): String {
+internal suspend fun batchTestCredential(publicJwk: JsonObject?, vct: String = "identity"): String {
     val issuerKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
         GenerateSoftwareKeyRequest(KeyId("test-issuer"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN)),
     )
@@ -39,7 +39,7 @@ internal suspend fun batchTestCredential(publicJwk: JsonObject, vct: String = "i
             put("vct", vct)
             put("iat", 1700000000)
             put("given_name", "Ada")
-            putJsonObject("cnf") { put("jwk", publicJwk) }
+            if (publicJwk != null) putJsonObject("cnf") { put("jwk", publicJwk) }
         }.toString().encodeToByteArray(),
         protectedHeader = buildJsonObject { put("typ", "dc+sd-jwt") },
     ) + "~"
@@ -64,12 +64,20 @@ internal suspend fun batchTestResponse(proofs: List<String>, vct: String = "iden
 internal const val BATCH_TEST_ISSUER = "https://issuer.example"
 internal const val BATCH_TEST_TOKEN = """{"access_token":"access","token_type":"Bearer"}"""
 
+// Software P-256 imports are supported across targets without creating iOS Keychain entries.
+internal suspend fun batchTestLegacyKey(): JWKKey {
+    val key = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(GenerateSoftwareKeyRequest(
+        KeyId(kotlin.uuid.Uuid.random().toString()), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY)))
+    val jwk = key.capabilities.privateKeyExporter!!.exportPrivateKey().toPrivateJwk(key.spec)
+    return JWKKey(jwk.data.toByteArray().decodeToString(), key.id.value).apply { init() }
+}
+
 internal suspend fun batchTestFixture(crypto2: Boolean): BatchTestFixture {
     val keys = InMemoryKeyStore()
     val ids = (1..5).map { index ->
         if (crypto2) keys.addCrypto2Key(CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
             GenerateSoftwareKeyRequest(KeyId("holder-$index"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))))
-        else keys.addKey(JWKKey.generate(KeyType.Ed25519))
+        else keys.addKey(batchTestLegacyKey())
     }
     val store = InMemoryCredentialStore()
     val wallet = Wallet("batch-wallet", keyStores = listOf(keys), credentialStores = listOf(store), defaultKeyId = ids.first())
@@ -88,7 +96,7 @@ internal fun batchTestOffer(): JsonObject = Json.parseToJsonElement(
 internal fun batchTestMetadata(batchSize: Int = 5) = """{"credential_issuer":"$BATCH_TEST_ISSUER","credential_endpoint":"$BATCH_TEST_ISSUER/credential",
     "deferred_credential_endpoint":"$BATCH_TEST_ISSUER/deferred","nonce_endpoint":"$BATCH_TEST_ISSUER/nonce","batch_credential_issuance":{"batch_size":$batchSize},
     "credential_configurations_supported":{"identity":{"format":"dc+sd-jwt","vct":"identity","scope":"identity",
-    "cryptographic_binding_methods_supported":["jwk"],"proof_types_supported":{"jwt":{"proof_signing_alg_values_supported":["ES256","EdDSA"]}}}}}"""
+    "cryptographic_binding_methods_supported":["jwk"],"proof_types_supported":{"jwt":{"proof_signing_alg_values_supported":["ES256"]}}}}}"""
 
 internal fun batchTestClient(
     metadata: String = batchTestMetadata(),
