@@ -18,8 +18,11 @@ import org.jetbrains.exposed.v1.jdbc.update
  * The database must provide the same confidentiality and integrity boundary as wallet private keys.
  * Payloads contain bearer tokens and must never be exposed through named-store or credential APIs.
  */
-class ExposedIssuanceSessionStore(private val scopedWalletId: String, private val db: Database) : AtomicWalletIssuanceSessionStore {
-    private val scope = ExposedWalletScope(scopedWalletId, db)
+class ExposedIssuanceSessionStore internal constructor(
+    private val scope: ExposedWalletScope,
+    private val db: Database,
+) : AtomicWalletIssuanceSessionStore {
+    private val scopedWalletId get() = scope.walletId
     val walletGeneration: String get() = scope.generation
     private val table = Wallet2Tables.IssuanceSessions
 

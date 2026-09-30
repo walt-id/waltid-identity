@@ -5,19 +5,26 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.selectAll
-import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
 import org.jetbrains.exposed.v1.jdbc.update
 import java.util.UUID
 
 /** Durable lifecycle identity shared by a wallet's continuation and credential adapters. */
-internal class ExposedWalletScope(val walletId: String, db: Database) {
+internal class ExposedWalletScope private constructor(val walletId: String, val generation: String) {
     private val wallets = Wallet2Tables.Wallets
-    val generation: String = transaction(db) {
-        wallets.update({ (wallets.id eq walletId) and wallets.generation.isNull() }) {
-            it[wallets.generation] = UUID.randomUUID().toString()
-        }
-        checkNotNull(wallets.selectAll().where { wallets.id eq walletId }.singleOrNull()?.get(wallets.generation)) {
-            "Wallet no longer exists"
+
+    companion object {
+        suspend fun resolve(walletId: String, db: Database): ExposedWalletScope = suspendTransaction(db) {
+            val wallets = Wallet2Tables.Wallets
+            fun generation() = wallets.selectAll().where { wallets.id eq walletId }
+                .singleOrNull()?.get(wallets.generation)
+            val current = generation() ?: run {
+                wallets.update({ (wallets.id eq walletId) and wallets.generation.isNull() }) {
+                    it[wallets.generation] = UUID.randomUUID().toString()
+                }
+                checkNotNull(generation()) { "Wallet no longer exists" }
+            }
+            ExposedWalletScope(walletId, current)
         }
     }
 
