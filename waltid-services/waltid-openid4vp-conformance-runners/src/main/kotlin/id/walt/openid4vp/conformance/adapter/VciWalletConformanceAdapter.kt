@@ -136,25 +136,6 @@ class VciWalletConformanceAdapter(
     // ─────────────────────────────────────────────────────────────────────────────
 
     /**
-     * Fetch credential format from issuer metadata
-     */
-    private suspend fun getCredentialFormat(credentialIssuerUrl: String, configurationId: String): String? {
-        return try {
-            val metadataUrl = "$credentialIssuerUrl/.well-known/openid-credential-issuer"
-            val response = httpClient?.get(metadataUrl)
-            if (response?.status?.isSuccess() == true) {
-                val metadata = Json.parseToJsonElement(response.bodyAsText()).jsonObject
-                val configurations = metadata["credential_configurations_supported"]?.jsonObject
-                val config = configurations?.get(configurationId)?.jsonObject
-                config?.get("format")?.jsonPrimitive?.content
-            } else null
-        } catch (e: Exception) {
-            println("[VCI Adapter] Could not fetch format: ${e.message}")
-            null
-        }
-    }
-
-    /**
      * POST /credential-offer - API endpoint for programmatic access
      */
     private suspend fun handleCredentialOfferApi(call: ApplicationCall) {

@@ -1005,42 +1005,8 @@ object WalletPresentFunctionality2 {
         resolvedAuthorizationRequest = resolvedAuthorizationRequest,
         beforeCredentialsUsed = beforeCredentialsUsed,
         mdocHolderKeyResolver = mdocHolderKeyResolver,
-        credentialHolderKeyResolver = null,
-    )
-
-    @Deprecated("Use the Crypto2Key overload")
-    suspend fun walletPresentHandling(
-        holderKey: Key,
-        holderDid: String?,
-        presentationRequestUrl: Url,
-        selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>>,
-        holderPoliciesToRun: Flow<HolderPolicy>?,
-        runPolicies: Boolean?,
-        transactionDataTypeRegistry: TransactionDataTypeRegistry,
-        legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
-        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
-        resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
-        beforeCredentialsUsed: suspend (Int) -> Unit = {},
-        mdocHolderKeyResolver: (suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key)? = null,
-        credentialHolderKeyResolver: (suspend (String, DigitalCredential) -> CredentialPresentationKey?)?,
-    ): Result<WalletPresentResult> = walletPresentHandling(
-        holderKey = holderKey,
-        holderDid = holderDid,
-        presentationRequestUrl = presentationRequestUrl,
-        selectCredentialsForQuery = selectCredentialsForQuery,
-        holderPoliciesToRun = holderPoliciesToRun,
-        runPolicies = runPolicies,
-        transactionDataTypeRegistry = transactionDataTypeRegistry,
-        legacyFallbackCallback = legacyFallbackCallback,
-        unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
-        resolvedAuthorizationRequest = resolvedAuthorizationRequest,
         holderCrypto2Key = null,
         clientIdTrustConfiguration = ClientIdTrustConfiguration(),
-        beforeCredentialsUsed = beforeCredentialsUsed,
-        mdocHolderKeyResolver = mdocHolderKeyResolver,
-        credentialHolderKeyResolver = credentialHolderKeyResolver,
-        scaAuthorizer = null,
     )
 
     @Deprecated("Use the Crypto2Key overload")

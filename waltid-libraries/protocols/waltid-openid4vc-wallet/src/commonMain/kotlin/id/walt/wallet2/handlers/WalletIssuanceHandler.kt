@@ -10,7 +10,6 @@ import id.walt.crypto2.jose.selectJwsAlgorithm
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
-import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.walt.openid4vci.errors.CredentialError
@@ -1675,10 +1674,7 @@ object WalletIssuanceHandler {
         val issuerMetadata = IssuerMetadataResolver(httpClient)
             .resolveCredentialIssuerMetadata(request.credentialIssuer.toString()).metadata
         return RequestNonceResult(
-            nonce = requestProofNonce(
-                httpClient = httpClient,
-                issuerMetadata = issuerMetadata,
-            )
+            nonce = requestProofNonce(httpClient, issuerMetadata.nonceEndpoint)
         )
     }
 
@@ -1959,10 +1955,6 @@ object WalletIssuanceHandler {
     // ---------------------------------------------------------------------------
 
     /**
-     * Builds a [ClientConfiguration] from the common clientId/redirectUri pair.
-     * Extracted to eliminate four identical constructions across issuance functions.
-     */
-    /**
      * Perform a pushed authorization request (RFC 9126) and return the browser URL for it.
      *
      * The resulting authorization request carries **only** `client_id` and `request_uri`. Anything
@@ -2064,69 +2056,30 @@ object WalletIssuanceHandler {
     private fun clientConfig(clientId: String, redirectUri: Url) =
         ClientConfiguration(clientId = clientId, redirectUris = listOf(redirectUri.toString()))
 
-    /**
-     * Merges issuer and credential configuration display into sidecar metadata.
-     */
-    private fun mergeIssuerDisplayMetadata(
-        issuerMetadata: CredentialIssuerMetadata,
-        requestMetadata: JsonObject? = null,
-        credentialConfigurationId: String? = null,
-    ): JsonObject? = storedCredentialDisplayMetadata(
-        issuerMetadata = issuerMetadata,
-        credentialConfigurationId = credentialConfigurationId,
-        requestMetadata = requestMetadata,
-    )
-
-    private fun credentialConfigurationLabel(
-        issuerMetadata: CredentialIssuerMetadata?,
-        credentialConfigurationId: String?,
-    ): String? =
-        credentialConfigurationId
-            ?.let { issuerMetadata?.credentialConfigurationsSupported?.get(it) }
-            ?.credentialMetadata
-            ?.display
-            ?.firstOrNull()
-            ?.name
-
     private data class CredentialStorageContext(
-        val configuration: CredentialConfiguration? = null,
-        val label: String? = null,
-        val metadata: JsonObject? = null,
+        val configuration: CredentialConfiguration?,
+        val label: String?,
+        val metadata: JsonObject?,
     )
 
-    /**
-     * Resolves label + sidecar metadata for any receive→store path.
-     * When [credentialIssuerBaseUrl] is provided, issuer metadata is fetched so
-     * `issuerDisplay` and configuration display labels match the full receive path.
-     */
+    /** Resolve configuration and display metadata before an isolated fetch or poll. */
     private suspend fun resolveCredentialStorageContext(
         credentialIssuerBaseUrl: String?,
         credentialConfigurationId: String?,
-        requestMetadata: JsonObject? = null,
-        labelOverride: String? = null,
-        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
-        issuerMetadata: CredentialIssuerMetadata? = null,
+        requestMetadata: JsonObject?,
+        labelOverride: String?,
+        httpClient: HttpClient,
     ): CredentialStorageContext {
-        val resolvedIssuerMetadata = issuerMetadata
-            ?: credentialIssuerBaseUrl?.let {
-                IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(it).metadata
-            }
+        val issuer = credentialIssuerBaseUrl?.let {
+            IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(it).metadata
+        }
+        val configuration = credentialConfigurationId?.let { id ->
+            issuer?.let { requireNotNull(it.credentialConfigurationsSupported[id]) { "Unknown credential configuration '$id'" } }
+        }
         return CredentialStorageContext(
-            configuration = credentialConfigurationId?.let { id ->
-                resolvedIssuerMetadata?.let { metadata ->
-                    requireNotNull(metadata.credentialConfigurationsSupported[id]) { "Unknown credential configuration '$id'" }
-                }
-            },
-            label = labelOverride
-                ?: credentialConfigurationLabel(resolvedIssuerMetadata, credentialConfigurationId),
-            metadata = resolvedIssuerMetadata
-                ?.let {
-                    mergeIssuerDisplayMetadata(
-                        issuerMetadata = it,
-                        requestMetadata = requestMetadata,
-                        credentialConfigurationId = credentialConfigurationId,
-                    )
-                }
+            configuration = configuration,
+            label = labelOverride ?: configuration?.credentialMetadata?.display?.firstOrNull()?.name,
+            metadata = issuer?.let { storedCredentialDisplayMetadata(it, credentialConfigurationId, requestMetadata) }
                 ?: requestMetadata,
         )
     }
@@ -2286,25 +2239,9 @@ object WalletIssuanceHandler {
 
     private suspend fun requestProofNonce(
         httpClient: HttpClient,
-        issuerMetadata: CredentialIssuerMetadata,
-    ): String? = requestProofNonce(httpClient, issuerMetadata.nonceEndpoint)
-
-    private suspend fun requestProofNonce(
-        httpClient: HttpClient,
         nonceEndpoint: String?,
     ): String? = nonceEndpoint?.let {
         NonceRequestBuilder(httpClient).requestNonce(it).cNonce
-    }
-
-    private fun shouldPreferJwkBinding(
-        methods: Set<CryptographicBindingMethod>?
-    ): Boolean {
-        if (methods.isNullOrEmpty()) return false
-        val supportsJwk = methods.any {
-            it is CryptographicBindingMethod.Jwk || it is CryptographicBindingMethod.CoseKey
-        }
-        val supportsDid = methods.any { it is CryptographicBindingMethod.Did }
-        return supportsJwk && !supportsDid
     }
 
     private fun isSameOrigin(source: String, target: String): Boolean {

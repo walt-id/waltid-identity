@@ -36,18 +36,11 @@ class WalletApi2IssuanceOwnershipTest {
     fun cancelledAuthorizationCannotBeRestoredByLateResponse() = runTest {
         withFixture {
             val session = start(authorization = true)
-            val entered = CompletableDeferred<Unit>()
-            val release = CompletableDeferred<Unit>()
-            beforeRequest = { request ->
-                if (request.url.encodedPath.endsWith("authorization-url/batch")) {
-                    entered.complete(Unit)
-                    release.await()
-                }
-            }
+            val pause = pauseRequests { request -> request.url.encodedPath.endsWith("authorization-url/batch") }
             val pending = async { runCatching { wallet.beginAuthorizationIssuance(session, copies()) } }
-            entered.await()
+            pause.entered.await()
             wallet.cancelIssuance(session)
-            release.complete(Unit)
+            pause.release.complete(Unit)
             assertTrue(pending.await().isFailure)
             assertNull(wallet.pendingAuthorizationIssuance())
             assertFailsWith<IllegalStateException> { wallet.beginAuthorizationIssuance(session, copies()) }
@@ -59,16 +52,9 @@ class WalletApi2IssuanceOwnershipTest {
     fun concurrentAcceptanceCannotSendTheSameSessionTwice() = runTest {
         withFixture {
             val session = start()
-            val entered = CompletableDeferred<Unit>()
-            val release = CompletableDeferred<Unit>()
-            beforeRequest = { request ->
-                if (request.url.encodedPath.endsWith("/receive")) {
-                    entered.complete(Unit)
-                    release.await()
-                }
-            }
+            val pause = pauseRequests { request -> request.url.encodedPath.endsWith("/receive") }
             val first = async { wallet.continuePreAuthorizedIssuance(session, null, copies()) }
-            entered.await()
+            pause.entered.await()
             val duplicate = async {
                 runCatching { wallet.continuePreAuthorizedIssuance(session, null, copies()) }
             }
@@ -77,7 +63,7 @@ class WalletApi2IssuanceOwnershipTest {
             try {
                 assertTrue(duplicate.isCompleted, "Concurrent acceptance must reject without waiting for HTTP")
             } finally {
-                release.complete(Unit)
+                pause.release.complete(Unit)
             }
             assertIs<WalletDemoIssuanceOutcome.Stored>(first.await())
             assertTrue(duplicate.await().isFailure)
@@ -90,15 +76,9 @@ class WalletApi2IssuanceOwnershipTest {
     fun cancellingKeyPreparationCleansOnlyAcknowledgedKeys() = runTest {
         withFixture {
             val session = start()
-            val entered = CompletableDeferred<Unit>()
-            beforeRequest = { request ->
-                if (request.url.encodedPath.endsWith("dids/create") && generatedKeys == 2) {
-                    entered.complete(Unit)
-                    CompletableDeferred<Unit>().await()
-                }
-            }
+            val pause = pauseRequests { request -> request.url.encodedPath.endsWith("dids/create") && generatedKeys == 2 }
             val pending = async { wallet.continuePreAuthorizedIssuance(session, null, copies()) }
-            entered.await()
+            pause.entered.await()
             pending.cancelAndJoin()
             assertEquals(listOf("key-1", "key-2"), deletedKeys)
             assertEquals(listOf("did:jwk:key-1"), deletedDids)
@@ -113,18 +93,11 @@ class WalletApi2IssuanceOwnershipTest {
     fun sessionCancellationDuringPreparationCannotAdoptNewKeys() = runTest {
         withFixture {
             val session = start()
-            val entered = CompletableDeferred<Unit>()
-            val release = CompletableDeferred<Unit>()
-            beforeRequest = { request ->
-                if (request.url.encodedPath.endsWith("dids/create") && generatedKeys == 2) {
-                    entered.complete(Unit)
-                    release.await()
-                }
-            }
+            val pause = pauseRequests { request -> request.url.encodedPath.endsWith("dids/create") && generatedKeys == 2 }
             val pending = async { runCatching { wallet.continuePreAuthorizedIssuance(session, null, copies()) } }
-            entered.await()
+            pause.entered.await()
             wallet.cancelIssuance(session)
-            release.complete(Unit)
+            pause.release.complete(Unit)
             assertTrue(pending.await().isFailure)
             assertEquals(listOf("key-1", "key-2"), deletedKeys)
             assertEquals(listOf("did:jwk:key-1", "did:jwk:key-2"), deletedDids)
@@ -201,24 +174,17 @@ class WalletApi2IssuanceOwnershipTest {
         for (suffix in listOf("resolve-offer/batch", "dids/create", "/receive")) {
             withFixture {
                 val session = if (suffix == "resolve-offer/batch") null else start()
-                val entered = CompletableDeferred<Unit>()
-                val release = CompletableDeferred<Unit>()
-                beforeRequest = { request ->
-                    if (request.url.encodedPath.endsWith(suffix)) {
-                        entered.complete(Unit)
-                        release.await()
-                    }
-                }
+                val pause = pauseRequests { request -> request.url.encodedPath.endsWith(suffix) }
                 val pending = async {
                     if (session == null) start() else wallet.continuePreAuthorizedIssuance(session, null, copies())
                 }
-                entered.await()
+                pause.entered.await()
                 try {
                     assertFailsWith<IllegalStateException> { wallet.deleteWallet() }
                     assertEquals(0, walletDeletes)
                     assertEquals(0, walletCreates)
                 } finally {
-                    release.complete(Unit)
+                    pause.release.complete(Unit)
                 }
                 pending.await()
                 beforeRequest = {}
@@ -241,16 +207,9 @@ class WalletApi2IssuanceOwnershipTest {
         withFixture {
             val session = start(authorization = true)
             wallet.beginAuthorizationIssuance(session, copies())
-            val entered = CompletableDeferred<Unit>()
-            val release = CompletableDeferred<Unit>()
-            beforeRequest = { request ->
-                if (request.method == HttpMethod.Delete && request.url.encodedPath == "/wallet/wallet") {
-                    entered.complete(Unit)
-                    release.await()
-                }
-            }
+            val pause = pauseRequests { request -> request.method == HttpMethod.Delete && request.url.encodedPath == "/wallet/wallet" }
             val reset = async { wallet.deleteWallet() }
-            entered.await()
+            pause.entered.await()
             val requestCount = requests.size
             val handle = WalletDemoPresentationPreviewHandle("request")
             val operations: List<suspend () -> Unit> = listOf(
@@ -274,7 +233,7 @@ class WalletApi2IssuanceOwnershipTest {
                 for (operation in operations) assertFailsWith<IllegalStateException> { operation() }
                 assertEquals(requestCount, requests.size, "Rejected operations must not reach HTTP")
             } finally {
-                release.complete(Unit)
+                pause.release.complete(Unit)
             }
             reset.await()
             assertFailsWith<IllegalStateException> { wallet.beginAuthorizationIssuance(session, copies()) }
@@ -332,15 +291,9 @@ class WalletApi2IssuanceOwnershipTest {
     @Test
     fun cancellationDuringResetLeavesOperationsClosedUntilRetry() = runTest {
         withFixture {
-            val entered = CompletableDeferred<Unit>()
-            beforeRequest = { request ->
-                if (request.method == HttpMethod.Delete) {
-                    entered.complete(Unit)
-                    CompletableDeferred<Unit>().await()
-                }
-            }
+            val pause = pauseRequests { request -> request.method == HttpMethod.Delete }
             val reset = async { wallet.deleteWallet() }
-            entered.await()
+            pause.entered.await()
             reset.cancelAndJoin()
             assertFailsWith<IllegalStateException> { start() }
             beforeRequest = {}
@@ -366,6 +319,16 @@ class WalletApi2IssuanceOwnershipTest {
         }
     }
 
+    private class RequestPause {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+
+        suspend fun awaitRelease() {
+            entered.complete(Unit)
+            release.await()
+        }
+    }
+
     private class Fixture {
         val requests = mutableListOf<String>()
         val publishedWalletIds = mutableListOf<String>()
@@ -380,6 +343,9 @@ class WalletApi2IssuanceOwnershipTest {
         val deletedDids = mutableListOf<String>()
         val receiveBodies = mutableListOf<JsonObject>()
         var beforeRequest: suspend (HttpRequestData) -> Unit = {}
+        fun pauseRequests(matches: (HttpRequestData) -> Boolean) = RequestPause().also { pause ->
+            beforeRequest = { request -> if (matches(request)) pause.awaitRelease() }
+        }
         var failReceive = false
         var failSecondDid = false
         var failDidDeletion = false
