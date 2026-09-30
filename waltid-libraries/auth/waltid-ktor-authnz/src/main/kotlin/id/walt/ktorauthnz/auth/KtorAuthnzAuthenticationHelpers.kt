@@ -2,6 +2,7 @@ package id.walt.ktorauthnz.auth
 
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.sessions.AuthSession
+import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -29,8 +30,9 @@ suspend fun PipelineContext<Unit, ApplicationCall>.getAuthenticatedSession(): Au
 suspend fun ApplicationCall.getAuthenticatedAccount(): String = KtorAuthnzManager.tokenHandler.getTokenAccountId(getAuthToken())
 
 fun ApplicationCall.getEffectiveRequestAuthToken(): String? {
-    val ktorAuthnzHeader = request.headers.get("ktor-authnz-auth")
-    val cookie = request.cookies["ktor-authnz-auth"] ?: request.cookies["auth.token"]
+    val cookieName = SessionTokenCookieHandler.cookieName
+    val ktorAuthnzHeader = request.headers.get(cookieName)
+    val cookie = request.cookies[cookieName] ?: request.cookies["auth.token"]
     val authHeader = request.headers[HttpHeaders.Authorization]
         ?.takeIf { it.startsWith("Bearer ", ignoreCase = true) }
         ?.substringAfter(' ')
