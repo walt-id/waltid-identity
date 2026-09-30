@@ -4,14 +4,20 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +29,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -211,22 +218,40 @@ private fun CredentialCopySelection(
     enabled: Boolean,
     onChange: (String, Int) -> Unit,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .testTag("issuance-select-$configurationId")
+            .semantics { contentDescription = "Receive $title" }
+            .toggleable(count > 0, enabled = enabled, role = Role.Switch) {
+                onChange(configurationId, if (it) 1 else 0)
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("Receive $title", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Switch(
             checked = count > 0,
-            onCheckedChange = { onChange(configurationId, if (it) 1 else 0) },
+            onCheckedChange = null,
             enabled = enabled,
-            modifier = Modifier.testTag("issuance-select-$configurationId").semantics { contentDescription = "Receive $title" },
         )
-        Text("Receive $title", modifier = Modifier.weight(1f))
     }
     if (count > 0 && limit > 1) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Copies: $count", modifier = Modifier.weight(1f).testTag("issuance-copies-$configurationId"))
-            TextButton(onClick = { onChange(configurationId, count - 1) }, enabled = enabled && count > 1,
-                modifier = Modifier.testTag("issuance-fewer-$configurationId").semantics { contentDescription = "Fewer copies of $title" }) { Text("Fewer") }
-            TextButton(onClick = { onChange(configurationId, count + 1) }, enabled = enabled && count < limit,
-                modifier = Modifier.testTag("issuance-more-$configurationId").semantics { contentDescription = "More copies of $title" }) { Text("More") }
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Copies: $count", style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f).testTag("issuance-copies-$configurationId"))
+            Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { onChange(configurationId, count - 1) }, enabled = enabled && count > 1,
+                        modifier = Modifier.testTag("issuance-fewer-$configurationId").semantics { contentDescription = "Fewer copies of $title" }) {
+                        Text("−", style = MaterialTheme.typography.titleLarge)
+                    }
+                    VerticalDivider(modifier = Modifier.height(24.dp))
+                    IconButton(onClick = { onChange(configurationId, count + 1) }, enabled = enabled && count < limit,
+                        modifier = Modifier.testTag("issuance-more-$configurationId").semantics { contentDescription = "More copies of $title" }) {
+                        Text("+", style = MaterialTheme.typography.titleLarge)
+                    }
+                }
+            }
         }
     }
 }
