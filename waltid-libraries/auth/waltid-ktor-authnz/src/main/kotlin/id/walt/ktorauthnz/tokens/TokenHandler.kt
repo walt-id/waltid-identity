@@ -1,6 +1,7 @@
 package id.walt.ktorauthnz.tokens
 
 import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.exceptions.InvalidTokenException
 import id.walt.ktorauthnz.sessions.AuthSession
 
 interface TokenHandler {
@@ -14,8 +15,10 @@ interface TokenHandler {
     suspend fun dropToken(token: String)
 
 
-    suspend fun resolveTokenToSession(token: String) = getTokenSessionId(token)
-        .let { sessionId -> KtorAuthnzManager.sessionStore.resolveSessionById(sessionId) }
-        .also { session -> check(token == session.token) { "Token was not mapped to correct session" } }
+    suspend fun resolveTokenToSession(token: String): AuthSession {
+        val session = KtorAuthnzManager.sessionStore.findSessionById(getTokenSessionId(token))
+        if (session == null || session.token != token) throw InvalidTokenException("Token has no active session")
+        return session
+    }
 
 }
