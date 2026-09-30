@@ -72,7 +72,7 @@ import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecordKind
-import id.walt.wallet2.handlers.WalletIssuanceSessionStore
+import id.walt.wallet2.handlers.AtomicWalletIssuanceSessionStore
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
@@ -2377,7 +2377,7 @@ class MobileWalletTest {
 
     private class RecordingIssuanceSessionStore(
         vararg records: WalletIssuanceSessionRecord,
-    ) : WalletIssuanceSessionStore {
+    ) : AtomicWalletIssuanceSessionStore {
         val records = records.associateByTo(linkedMapOf()) { it.id }
 
         override suspend fun get(id: String): WalletIssuanceSessionRecord? = records[id]
