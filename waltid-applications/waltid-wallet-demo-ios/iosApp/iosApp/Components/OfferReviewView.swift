@@ -52,7 +52,7 @@ struct OfferReviewView: View {
                 ) {
                     ForEach(preview.credentials, id: \.configurationID) { credential in
                         CredentialCardArtView(summary: credential.cardSummary)
-                        Toggle("Receive \(credential.name ?? credential.configurationID)", isOn: Binding(
+                        Toggle("Receive \(credential.cardSummary.title)", isOn: Binding(
                             get: { (copies[credential.configurationID] ?? 1) > 0 },
                             set: { onCopiesChange(credential.configurationID, $0 ? 1 : 0) }
                         ))
