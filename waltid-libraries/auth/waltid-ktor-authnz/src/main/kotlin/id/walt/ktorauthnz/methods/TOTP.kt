@@ -1,5 +1,7 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.KtorAuthnzManager
+import kotlin.time.Duration.Companion.minutes
 import id.walt.ktorauthnz.exceptions.AuthSessionStateException
 import com.atlassian.onetime.core.TOTP
 import com.atlassian.onetime.model.TOTPSecret
@@ -33,6 +35,11 @@ object TOTP : AuthenticationMethod("totp") {
         val service = DefaultTOTPService()
         authCheck(
             service.verify(userProvidedOtpCode, secret).isSuccess(), OTPAuthException()
+        )
+        // A code logs in once: codes stay valid for a few 30 s windows, so a seen one is refused meanwhile.
+        authCheck(
+            KtorAuthnzManager.expiringStore.putIfAbsent("totp-used:$accountId:$code", "used", 3.minutes),
+            OTPAuthException()
         )
     }
 
