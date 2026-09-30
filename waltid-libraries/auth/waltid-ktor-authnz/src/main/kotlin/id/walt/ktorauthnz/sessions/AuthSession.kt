@@ -104,6 +104,8 @@ data class AuthSession(
             flows = null
             status = AuthSessionStatus.SUCCESS
 
+            // Stored before its token exists: token stores may only map tokens to stored sessions.
+            SessionManager.updateSession(this)
             token = KtorAuthnzManager.tokenHandler.generateToken(this)
         } else {
             error("Cannot process flow: No next step defined but current step is not end step!")
