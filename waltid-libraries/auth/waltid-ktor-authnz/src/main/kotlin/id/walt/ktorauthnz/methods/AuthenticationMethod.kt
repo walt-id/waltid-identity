@@ -2,6 +2,9 @@ package id.walt.ktorauthnz.methods
 
 import id.walt.ktorauthnz.attempts.AttemptLimiter
 import id.walt.ktorauthnz.attempts.AttemptLimiter.attemptOnSession
+import id.walt.ktorauthnz.attempts.AttemptLimiter.attemptWithMethod
+import id.walt.ktorauthnz.events.AuthnzEvent
+import id.walt.ktorauthnz.events.AuthnzEvents
 import id.walt.ktorauthnz.attempts.AuthAttemptTracking
 import id.walt.ktorauthnz.exceptions.AccountDataNotFoundException
 import id.walt.ktorauthnz.exceptions.AuthSessionNotFoundException
@@ -56,6 +59,7 @@ abstract class AuthenticationMethod(open val id: String) {
         accountId?.let { session.accountId = it }
         session.progressFlow(this@AuthenticationMethod)
         AttemptLimiter.recordSuccess(this)
+        AuthnzEvents.emit(AuthnzEvent.LoginStepSucceeded(session.id, id, session.accountId, session.status.isSuccess()))
 
         if (session.status.isSuccess()) {
             session.currentlyActiveMethod = null // No longer any method active, authentication is done for this session
@@ -154,6 +158,7 @@ abstract class AuthenticationMethod(open val id: String) {
      */
     suspend fun ApplicationCall.getAuthSession(authContext: ApplicationCall.() -> AuthContext): AuthSession {
         val currentContext = authContext.invoke(this)
+        attemptWithMethod(id)
         if (currentContext.implicitSessionGeneration && currentContext.sessionId == null) {
             return SessionManager.openImplicitGlobalSession(currentContext.initialFlow!!, tenant = currentContext.tenant)
         }
@@ -183,7 +188,7 @@ abstract class AuthenticationMethod(open val id: String) {
  * child route would show up in the OpenAPI paths - and only counts calls a method marked as an attempt, so other routes
  * here are unaffected.
  */
-private fun Route.authenticationMethodRoutes(block: Route.() -> Unit) {
+internal fun Route.authenticationMethodRoutes(block: Route.() -> Unit) {
     try {
         install(AuthAttemptTracking)
     } catch (_: DuplicatePluginException) {
