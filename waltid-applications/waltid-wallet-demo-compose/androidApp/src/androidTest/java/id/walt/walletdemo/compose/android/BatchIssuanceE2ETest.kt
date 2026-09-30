@@ -2,12 +2,12 @@ package id.walt.walletdemo.compose.android
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import id.walt.mobile.test.backend.EnterpriseMobileFixtureClient
 import id.walt.mobile.test.backend.EnterpriseMobilePlatform
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceTextEquals
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.credentialCardTags
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.latestStatus
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.relaunchAndUnlock
@@ -20,7 +20,6 @@ import org.junit.Assume.assumeNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
-import java.util.regex.Pattern
 
 /** Real issuer and wallet acceptance; requires the coordinated Enterprise mobile fixture. */
 @RunWith(AndroidJUnit4::class)
@@ -36,7 +35,7 @@ class BatchIssuanceE2ETest {
         val context = instrumentation.targetContext
         val device = UiDevice.getInstance(instrumentation)
         launchAndUnlock(context, device)
-        val previousIds = credentialIds(device)
+        val previousIds = device.credentialCardTags()
 
         sendDeepLink(context, offer.offerUrl)
         clickByTag(device, "wallet.receiveButton")
@@ -54,17 +53,14 @@ class BatchIssuanceE2ETest {
         assertTrue("Batch receive did not finish: ${latestStatus(device)}", waitForStatus(
             device, 90_000, { it.startsWith("Received 2") }, listOf("Receive failed"),
         ))
-        val receivedIds = credentialIds(device) - previousIds
+        val receivedIds = device.credentialCardTags() - previousIds
         assertEquals("Expected two distinct stored credential cards", 2, receivedIds.size)
         screenshot(device, "batch-stored")
 
         relaunchAndUnlock(context, device)
-        assertTrue("Stored credentials missing after Activity relaunch", credentialIds(device).containsAll(receivedIds))
+        assertTrue("Stored credentials missing after Activity relaunch", device.credentialCardTags().containsAll(receivedIds))
         screenshot(device, "batch-relaunched")
     }
-
-    private fun credentialIds(device: UiDevice): Set<String> =
-        device.findObjects(By.res(Pattern.compile("wallet\\.credentialCard\\..+"))).map { it.resourceName }.toSet()
 
     private fun screenshot(device: UiDevice, name: String) {
         val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "batch-evidence")
