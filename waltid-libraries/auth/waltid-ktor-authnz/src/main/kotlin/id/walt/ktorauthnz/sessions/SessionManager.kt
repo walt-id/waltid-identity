@@ -37,6 +37,9 @@ object SessionManager {
     suspend fun getSessionById(sessionId: String): AuthSession =
         KtorAuthnzManager.sessionStore.findSessionById(sessionId) ?: throw AuthSessionNotFoundException(sessionId)
 
+    /** The stored session, or null. */
+    suspend fun findSessionById(sessionId: String): AuthSession? = KtorAuthnzManager.sessionStore.findSessionById(sessionId)
+
     /** Session is explicitly started, e.g. by a `start` route, before its first step. */
     suspend fun openExplicitGlobalSession(authFlow: AuthFlow, tenant: String? = null): AuthSession =
         newSession(authFlow, persist = true, tenant = tenant)
