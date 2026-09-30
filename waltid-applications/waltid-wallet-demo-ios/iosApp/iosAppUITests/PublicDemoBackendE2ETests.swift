@@ -15,6 +15,30 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     private let credentialOperationTimeout: TimeInterval = 90
     private let verifierPollingTimeout: TimeInterval = 30
 
+    /// Run with credential-cache-fixture.py; inspect the host app's cache files afterwards.
+    func testRejectedCredentialCacheFixture() throws {
+        guard let offer = ProcessInfo.processInfo.environment["CREDENTIAL_CACHE_TEST_OFFER_URL"] else {
+            throw XCTSkip("Requires the local rejected-credential cache fixture")
+        }
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        let environment = ["E2E_WALLET_ID": "cache-test-\(UUID().uuidString)"]
+        ui.launch(environment: environment)
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 60), "Wallet ready")
+        ui.tapTab(label: "Receive")
+        ui.replaceText(in: ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL"), value: offer)
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 30), "Review credential offer")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        XCTAssertTrue(ui.waitForStatus(prefixes: ["Receive failed", "Received"], timeout: 30)?.hasPrefix("Receive failed") == true)
+        app.terminate()
+        ui.launch(environment: environment)
+        XCTAssertTrue(app.buttons["wallet.settingsButton"].waitForExistence(timeout: 60))
+        ui.tapTab(label: "Credentials")
+        XCTAssertEqual(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard.")).count, 0)
+    }
+
     func testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2() async throws {
         let scenario = try publicDemoScenario()
         let offer = try await backend.createOffer(scenario: scenario)
