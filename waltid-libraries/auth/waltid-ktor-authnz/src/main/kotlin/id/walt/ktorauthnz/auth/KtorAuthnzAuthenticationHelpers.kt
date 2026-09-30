@@ -9,8 +9,12 @@ import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 import io.ktor.util.pipeline.*
 
+/** The authenticated caller of this call, if the ktor-authnz provider authenticated it. */
+fun ApplicationCall.authnzPrincipal(): KtorAuthnzPrincipal? = principal<KtorAuthnzPrincipal>()
+
+/** The login token of this call - from the ktor-authnz principal, or a `UserIdPrincipal` holding the token. */
 fun ApplicationCall.getAuthToken(): String {
-    val token = principal<UserIdPrincipal>()?.name
+    val token = authnzPrincipal()?.token ?: principal<UserIdPrincipal>()?.name
     requireNotNull(token) { "Missing token: No token for request principal" }
 
     return token
@@ -27,7 +31,8 @@ suspend fun RoutingContext.getAuthenticatedSession(): AuthSession =
 suspend fun PipelineContext<Unit, ApplicationCall>.getAuthenticatedSession(): AuthSession =
     KtorAuthnzManager.tokenHandler.resolveTokenToSession(call.getAuthToken())
 
-suspend fun ApplicationCall.getAuthenticatedAccount(): String = KtorAuthnzManager.tokenHandler.getTokenAccountId(getAuthToken())
+suspend fun ApplicationCall.getAuthenticatedAccount(): String =
+    authnzPrincipal()?.accountId ?: KtorAuthnzManager.tokenHandler.getTokenAccountId(getAuthToken())
 
 fun ApplicationCall.getEffectiveRequestAuthToken(): String? {
     val cookieName = SessionTokenCookieHandler.cookieName
