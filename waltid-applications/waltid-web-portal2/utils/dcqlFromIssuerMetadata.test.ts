@@ -5,6 +5,7 @@ import {
   claimsFromIssuerMetadata,
   dcqlCredentialQueryId,
   dcqlFromIssuerMetadata,
+  defaultSelectedClaimIds,
   isMdocConfiguration,
   isPidConfiguration,
 } from "./dcqlFromIssuerMetadata.ts";
@@ -131,6 +132,49 @@ test("ignores claims without a path and refuses an empty selection", () => {
     () => dcqlFromIssuerMetadata("identity_credential", configuration, []),
     /at least one claim/,
   );
+});
+
+test("PID defaults to family name, given name, and birth date", () => {
+  const configuration = {
+    format: "mso_mdoc",
+    doctype: "eu.europa.ec.eudi.pid.1",
+    credential_metadata: {
+      claims: [
+        { path: ["eu.europa.ec.eudi.pid.1", "family_name"] },
+        { path: ["eu.europa.ec.eudi.pid.1", "given_name"] },
+        { path: ["eu.europa.ec.eudi.pid.1", "birth_date"] },
+        { path: ["eu.europa.ec.eudi.pid.1", "age_over_18"] },
+        { path: ["eu.europa.ec.eudi.pid.1", "nationality"] },
+      ],
+    },
+  };
+
+  assert.deepEqual(
+    defaultSelectedClaimIds(configuration, "eu.europa.ec.eudi.pid.1"),
+    [
+      "eu.europa.ec.eudi.pid.1.family_name",
+      "eu.europa.ec.eudi.pid.1.given_name",
+      "eu.europa.ec.eudi.pid.1.birth_date",
+    ],
+  );
+});
+
+test("non-PID credentials still default to every advertised claim", () => {
+  const configuration = {
+    format: "mso_mdoc",
+    doctype: "org.iso.18013.5.1.mDL",
+    credential_metadata: {
+      claims: [
+        { path: ["org.iso.18013.5.1", "family_name"] },
+        { path: ["org.iso.18013.5.1", "portrait"] },
+      ],
+    },
+  };
+
+  assert.deepEqual(defaultSelectedClaimIds(configuration, "isoMdl"), [
+    "org.iso.18013.5.1.family_name",
+    "org.iso.18013.5.1.portrait",
+  ]);
 });
 
 test("sanitizes credential query ids to OpenID4VP identifier characters", () => {

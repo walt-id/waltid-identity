@@ -5,7 +5,7 @@ on:
   workflow_call:
     inputs:
       deploy:
-        description: "Package the generated HTML into the sdk-docs image and publish it (release only)"
+        description: "Package the generated Dokka and DocC HTML into the sdk-docs image and publish it (release only)"
         required: false
         type: boolean
         default: false
@@ -186,6 +186,25 @@ jobs:
           path: waltid-identity/waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc/WalletSDK.doccarchive.tar.gz
           if-no-files-found: error
 
+      - name: Transform Swift WalletSDK DocC archive for static hosting
+        if: ${{ inputs.deploy }}
+        working-directory: waltid-identity
+        run: |
+          out="$RUNNER_TEMP/ios-sdk-docs-html"
+          rm -rf "$out"
+          xcrun docc process-archive transform-for-static-hosting \
+            waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc/WalletSDK.doccarchive \
+            --output-path "$out"
+
+      - name: Upload iOS SDK docs HTML artifact
+        if: ${{ inputs.deploy }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-sdk-docs-html
+          path: ${{ runner.temp }}/ios-sdk-docs-html
+          retention-days: 1
+          if-no-files-found: error
+
   publish:
     needs: mobile-sdk-docs
     if: ${{ inputs.deploy == true }}
@@ -203,6 +222,12 @@ jobs:
         with:
           name: sdk-docs-html
           path: waltid-identity/docs/mobile-sdk-api/html
+
+      - name: Download iOS SDK docs HTML artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: ios-sdk-docs-html
+          path: waltid-identity/docs/mobile-sdk-api/ios-html
 
       - name: Login to Docker Hub
         uses: docker/login-action@v4
