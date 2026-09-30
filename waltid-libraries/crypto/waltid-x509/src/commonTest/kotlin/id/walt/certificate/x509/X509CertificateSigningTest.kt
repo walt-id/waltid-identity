@@ -24,10 +24,45 @@ import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.Key
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.toHexString
 import kotlin.test.*
 
 class X509CertificateSigningTest {
+
+    @Test
+    fun shouldEncodeCertificateSerialNumbersCanonically() = runTest {
+        val serialNumbers = listOf(
+            byteArrayOf(0x00, 0x7f) to byteArrayOf(0x7f),
+            byteArrayOf(0x00, 0x00, 0x7f) to byteArrayOf(0x7f),
+            byteArrayOf(0x00, 0x80.toByte()) to byteArrayOf(0x00, 0x80.toByte()),
+            byteArrayOf(0x7f) to byteArrayOf(0x7f),
+        )
+        withCertificateTestKey(KeyType.secp256r1) { caKey ->
+            val leafKey = TestKeyUtil.genEcKey("serial-number-leaf")
+            val sigAlg = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
+            for ((input, expected) in serialNumbers) {
+                val caCert = X509CertificateUtil.createSelfSignedCertificate(caKey) {
+                    subjectDn = "CN=Serial Number CA"
+                    serialNumberRaw = ByteString(input)
+                }
+                val crypto2CaCert = X509CertificateUtil.createSelfSignedCertificate(leafKey, sigAlg) {
+                    subjectDn = "CN=Crypto2 Serial Number CA"
+                    serialNumberRaw = ByteString(input)
+                }
+                val leafCert = X509CertificateUtil.createCertificate(leafKey, crypto2CaCert, sigAlg) {
+                    subjectDn = "CN=Serial Number Leaf"
+                    subjectPublicKey(leafKey)
+                    serialNumberRaw = ByteString(input)
+                }
+                verifyPemChain(caCert.encodedPem, caCert.encodedPem)
+                verifyPemChain(leafCert.encodedPem, crypto2CaCert.encodedPem)
+                assertContentEquals(expected, caCert.data.serialNumberRaw.toByteArray())
+                assertContentEquals(expected, crypto2CaCert.data.serialNumberRaw.toByteArray())
+                assertContentEquals(expected, leafCert.data.serialNumberRaw.toByteArray())
+            }
+        }
+    }
 
     @Test
     fun shouldSignCertificateWithRsaKey() = runTest {

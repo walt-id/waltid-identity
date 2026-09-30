@@ -3,6 +3,7 @@ package id.walt.certificate.x509.signum
 
 import at.asitplus.signum.indispensable.CryptoPublicKey
 import at.asitplus.signum.indispensable.asn1.Asn1Element
+import at.asitplus.signum.indispensable.asn1.Asn1Integer
 import at.asitplus.signum.indispensable.asn1.Asn1Time
 import at.asitplus.signum.indispensable.asn1.encoding.parse
 import at.asitplus.signum.indispensable.pki.Pkcs10CertificationRequest
@@ -156,7 +157,8 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
 
         return TbsCertificate(
             version = builder.version - 1,
-            serialNumber = builder.serialNumberRaw.toByteArray(),
+            // Signum writes these bytes verbatim; ASN.1 INTEGER requires minimal two's-complement encoding.
+            serialNumber = Asn1Integer.fromTwosComplement(builder.serialNumberRaw.toByteArray()).twosComplement(),
             signatureAlgorithm = signumSigAlgorithmDescription,
             issuerName = issuerDn,
             validFrom = notBefore,
