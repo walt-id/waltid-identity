@@ -8,6 +8,7 @@ import id.walt.ktorauthnz.ephemeral.InMemoryExpiringStore
 import id.walt.ktorauthnz.security.PasswordHashingConfiguration
 import id.walt.ktorauthnz.sessions.InMemorySessionStore
 import id.walt.ktorauthnz.sessions.SessionStore
+import id.walt.ktorauthnz.tokens.RefreshTokenSettings
 import id.walt.ktorauthnz.tokens.TokenHandler
 import id.walt.ktorauthnz.tokens.ktorauthnztoken.KtorAuthNzTokenHandler
 
@@ -24,6 +25,9 @@ object KtorAuthnzManager {
 
     /** Limits on failed authentication attempts, per session and per account identifier. */
     var attemptLimits = AttemptLimits()
+
+    /** Issue refresh tokens with each login token; off when null. */
+    var refreshTokens: RefreshTokenSettings? = null
 
     /** Receivers of authentication events (audit, alerts, metrics). */
     val eventListeners: MutableList<AuthnzEventListener> = java.util.concurrent.CopyOnWriteArrayList()
