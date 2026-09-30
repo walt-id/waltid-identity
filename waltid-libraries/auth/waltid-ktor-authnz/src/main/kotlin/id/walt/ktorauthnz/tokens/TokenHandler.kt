@@ -17,7 +17,7 @@ interface TokenHandler {
 
     suspend fun resolveTokenToSession(token: String): AuthSession {
         val session = KtorAuthnzManager.sessionStore.findSessionById(getTokenSessionId(token))
-        if (session == null || session.token != token) throw InvalidTokenException("Token has no active session")
+        if (session == null || (session.token != null && session.token != token)) throw InvalidTokenException("Token has no active session")
         return session
     }
 
