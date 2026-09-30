@@ -100,7 +100,7 @@ After review, request new keys inside acceptance or select existing wallet keys:
 ```swift
 guard let configuration = session.offer.credentials.first,
       (session.offer.batchSize ?? 1) >= 2 else { return }
-let selections = [IssuanceCredentialSelection(
+let selections = [try IssuanceCredentialSelection(
     configurationID: configuration.configurationID,
     holders: .newKeys(count: 2)
 )]
@@ -156,19 +156,7 @@ interval and can be resumed immediately. Transient failures retain recoverable h
 terminal denial consumes them. Listing handles exposes no access token or private key.
 
 
-Retained grant continuations claim their saved state before creating a browser request
-or exchanging a code. Independent runtimes cannot consume the same state. A processing
-record found after restart is preserved and reports uncertainty; cancelling or clearing
-sessions does not release another runtime's claim.
-
-``IssuanceErrorCode/remoteOutcomeUncertain`` means an issuer request is running or its
-response was lost. ``IssuanceErrorCode/storageOutcomeUncertain`` means a local save is
-running or stopped without releasing ownership. Preserve the returned handle and any
-saved IDs; neither outcome authorizes an automatic retry or takeover by another runtime.
-Caught storage failures release their own claim and retain the received batch, so a later
-resume saves only missing credentials without another issuer request.
-
-A retained handle can also represent credentials already received but not yet saved.
-For such a handle, resumption only finishes local storage. Its configuration ID may be
-nil when the original isolated request did not supply one; display a generic label
-without substituting an invented protocol identifier.
+``IssuanceErrorCode/remoteOutcomeUncertain`` and ``IssuanceErrorCode/storageOutcomeUncertain``
+retain ownership; neither permits automatic retry or takeover by another runtime. Preserve
+handles and stored IDs. A recoverable local-save handle resumes only missing saves and
+never repeats the issuer request. Its configuration ID may be nil for isolated calls.
