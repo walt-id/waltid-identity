@@ -1,6 +1,8 @@
 package id.walt.ktorauthnz.attempts
 
 import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.events.AuthnzEvent
+import id.walt.ktorauthnz.events.AuthnzEvents
 import id.walt.ktorauthnz.exceptions.AuthException
 import id.walt.ktorauthnz.exceptions.TooManyAttemptsException
 import id.walt.ktorauthnz.sessions.AuthSessionStatus
@@ -22,6 +24,11 @@ object AttemptLimiter {
 
     private val sessionKey = AttributeKey<String>("ktor-authnz-attempt-session")
     private val identifierKey = AttributeKey<String>("ktor-authnz-attempt-identifier")
+    private val methodKey = AttributeKey<String>("ktor-authnz-attempt-method")
+    private val enteredIdentifierKey = AttributeKey<String>("ktor-authnz-attempt-entered-identifier")
+
+    /** The method this call is a step of, for events. */
+    fun ApplicationCall.attemptWithMethod(method: String) = attributes.put(methodKey, method)
 
     private val limits get() = KtorAuthnzManager.attemptLimits
     private val store get() = KtorAuthnzManager.expiringStore
@@ -47,6 +54,8 @@ object AttemptLimiter {
     suspend fun ApplicationCall.attemptOnIdentifier(method: String, identifier: String) {
         val key = "$method:${identifier.lowercase()}"
         attributes.put(identifierKey, key)
+        attributes.put(methodKey, method)
+        attributes.put(enteredIdentifierKey, identifier)
         val max = limits.maxFailuresPerIdentifier
         if (max > 0 && count(identifierCounter(key)) >= max) {
             throw TooManyAttemptsException("Too many failed attempts for this account; try again later")
@@ -70,6 +79,17 @@ object AttemptLimiter {
         }
     }
 
+    internal suspend fun emitFailure(call: ApplicationCall, cause: AuthException) {
+        val a = call.attributes
+        AuthnzEvents.emit(
+            if (cause is TooManyAttemptsException) {
+                AuthnzEvent.AttemptsExceeded(a.getOrNull(sessionKey), a.getOrNull(methodKey), a.getOrNull(enteredIdentifierKey))
+            } else {
+                AuthnzEvent.LoginStepFailed(a.getOrNull(sessionKey), a.getOrNull(methodKey), a.getOrNull(enteredIdentifierKey), cause.message)
+            }
+        )
+    }
+
     internal suspend fun recordSuccess(call: ApplicationCall) {
         call.attributes.getOrNull(identifierKey)?.let { store.remove(identifierCounter(it)) }
     }
@@ -91,5 +111,6 @@ val AuthAttemptTracking = createRouteScopedPlugin("KtorAuthnzAttemptTracking") {
         if (cause is AuthException && cause !is TooManyAttemptsException) {
             AttemptLimiter.recordFailure(call)
         }
+        if (cause is AuthException) AttemptLimiter.emitFailure(call, cause)
     }
 }
