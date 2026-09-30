@@ -107,7 +107,7 @@ kotlin {
                 // The ISO 18013-7 Annex C matcher is a vendored WASM binary, not a dependency:
                 // ANNEX-C-MATCHER.md records its origin and how to refresh it.
             }
-            val androidHostTest by getting {
+            val androidHostTest = getByName("androidHostTest") {
                 dependencies {
                     implementation(kotlin("test"))
                     implementation(identityLibs.junit)
@@ -139,7 +139,7 @@ kotlin {
             }
         }
         if (enableAndroidBuild) {
-            val androidDeviceTest by getting {
+            val androidDeviceTest = getByName("androidDeviceTest") {
                 kotlin.srcDir("../../../waltid-services/waltid-openid4vp-conformance-runners/src/deviceShared/kotlin")
                 kotlin.srcDir("src/scaTestFixtures/kotlin")
                 if (enableProximityPhysicalTests) {

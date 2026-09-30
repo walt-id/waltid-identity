@@ -48,7 +48,7 @@ kotlin {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }
-        val jvmAndroidMain by getting {
+        val jvmAndroidMain = getByName("jvmAndroidMain") {
             dependencies {
                 // Json canonicalization
                 implementation(identityLibs.java.json.canonicalization)

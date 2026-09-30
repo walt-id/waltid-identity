@@ -34,7 +34,7 @@ configurations {
 }
 
 // Package the test classes in a jar
-val testJar by tasks.register<Jar>(Jar::class.toString()) {
+val testJar = tasks.register<Jar>(Jar::class.toString()) {
     archiveClassifier.set("test")
     from(sourceSets["test"].output)
 }
