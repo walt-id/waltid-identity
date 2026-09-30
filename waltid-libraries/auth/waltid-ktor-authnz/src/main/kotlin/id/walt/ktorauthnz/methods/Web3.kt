@@ -1,5 +1,7 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.KtorAuthnzManager
+import kotlin.time.Duration.Companion.seconds
 import id.walt.ktorauthnz.exceptions.InvalidChallengeException
 import id.walt.ktorauthnz.exceptions.Web3AuthException
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -76,7 +78,8 @@ object Web3 : AuthenticationMethod("web3") {
         val messageHash = Sign.getEthereumMessageHash(challenge.toByteArray())
 
         // Parse signature components
-        val signatureBytes = Numeric.hexStringToByteArray(signature.removePrefix("0x"))
+        val signatureBytes = runCatching { Numeric.hexStringToByteArray(signature.removePrefix("0x")) }.getOrNull()
+        authCheck(signatureBytes != null && signatureBytes.size == 65, Web3AuthException("Signature must be 65 bytes, hex encoded"))
         val r = BigInteger(1, signatureBytes.copyOfRange(0, 32))
         val s = BigInteger(1, signatureBytes.copyOfRange(32, 64))
 
@@ -112,6 +115,11 @@ object Web3 : AuthenticationMethod("web3") {
         log.trace { "Challenge was: $challenge. Verifying challenge authenticity..." }
 
         authCheck(jwtHandler.validateToken(challenge), InvalidChallengeException())
+        // A challenge logs in once: a replayed (challenge, signature) pair is refused.
+        authCheck(
+            KtorAuthnzManager.expiringStore.putIfAbsent("web3-used-challenge:$challenge", "used", (NONCE_VALIDITY_SECONDS + 60).seconds),
+            InvalidChallengeException()
+        )
         log.trace { "Challenge is authentic. Verifying challenge timestamp..." }
 
         val decodedJwt = challenge.decodeJws()
