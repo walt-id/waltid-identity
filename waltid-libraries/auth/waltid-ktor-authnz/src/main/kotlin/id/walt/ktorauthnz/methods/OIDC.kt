@@ -1,5 +1,7 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.auth.getEffectiveRequestAuthToken
+import kotlin.uuid.Uuid
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
@@ -212,12 +214,11 @@ object OIDC : AuthenticationMethod("oidc") {
                 val subject = idTokenPayload["sub"]?.jsonPrimitive?.content
                     ?: throw IllegalStateException("ID Token is missing 'sub' claim.")
 
-                val sid = idTokenPayload["sid"]?.jsonPrimitive?.content ?: throw IllegalStateException("ID Token is missing 'sid' claim.")
-
-                // --- Our logout is successful
+                // `sid` is optional (many IdPs omit it); without it, IdP-initiated logout cannot find the session.
+                val sid = idTokenPayload["sid"]?.jsonPrimitive?.contentOrNull
 
                 session.dropExternalIdMapping(OIDC_STATE_NAMESPACE, returnedState) // No longer need this
-                session.storeExternalIdMapping(OIDC_SESSION_NAMESPACE, sid) // sid
+                if (sid != null) session.storeExternalIdMapping(OIDC_SESSION_NAMESPACE, sid)
 
                 val identifier = OIDCIdentifier(oidcConfig.issuer, subject)
 
@@ -238,14 +239,18 @@ object OIDC : AuthenticationMethod("oidc") {
                         idTokenClaims = idTokenPayload,
                         userInfoClaims = userInfo,
                         idTokenRaw = tokenResponse.idToken,
+                        clientId = config.clientId,
+                        postLogoutRedirectUri = config.postLogoutRedirectUri?.toString(),
+                        allowedPostLogoutRedirectUrls = config.allowedPostLogoutRedirectUrls,
                     )
                 )
                 session.setOidcTokenValidationPolicy(tokenValidationPolicy)
 
                 val accountId = identifier.resolveIfExists() ?: run {
-                    // No existing account found - use addAccountIdentifierToAccount to create one
-                    // The AccountStore implementation (e.g., Enterprise) handles JIT provisioning
-                    KtorAuthnzManager.accountStore.addAccountIdentifierToAccount(subject, identifier)
+                    // No account for this issuer + subject yet: provision one (the AccountStore implementation, e.g.
+                    // Enterprise, creates it). Its id is new - never the IdP's `sub`, which another IdP could also
+                    // use, and which need not have the store's id format.
+                    KtorAuthnzManager.accountStore.addAccountIdentifierToAccount(Uuid.random().toString(), identifier)
                     identifier.resolveToAccountId()
                 }
 
@@ -345,9 +350,7 @@ object OIDC : AuthenticationMethod("oidc") {
 
                 val postLogoutRedirect = call.request.queryParameters["post_logout_redirect_uri"]
 
-                // Get token from cookie or header
-                val token = call.request.cookies[SessionTokenCookieHandler.cookieName]
-                    ?: call.request.headers["Authorization"]?.removePrefix("Bearer ")?.trim()
+                val token = call.getEffectiveRequestAuthToken()
 
                 var idTokenRaw: String? = null
                 var endSessionEndpoint: String? = null
@@ -371,19 +374,15 @@ object OIDC : AuthenticationMethod("oidc") {
                             endSessionEndpoint = oidcConfig.endSessionEndpoint
                         }
 
-                        // Get clientId from registered flows (if available in session)
-                        session.flows?.firstOrNull { it.method == id }?.config?.let { flowConfig ->
-                            try {
-                                val config = Json.decodeFromJsonElement<OidcAuthConfiguration>(flowConfig)
-                                clientId = config.clientId
-                                validatedPostLogout = postLogoutRedirect?.let { uri ->
-                                    config.allowedPostLogoutRedirectUrls.takeIf { it.isNotEmpty() }?.let {
-                                        config.validateRedirectUrl(uri)?.toString()
-                                    }
-                                } ?: config.postLogoutRedirectUri?.toString()
-                            } catch (e: Exception) {
-                                log.debug { "Could not parse OIDC config from session flow: ${e.message}" }
-                            }
+                        // The flow's choices are gone once it succeeded; its client settings were kept at login.
+                        oidcSessionData?.let { data ->
+                            clientId = data.clientId
+                            validatedPostLogout = postLogoutRedirect
+                                ?.takeIf { data.allowedPostLogoutRedirectUrls.isNotEmpty() }
+                                ?.let { uri ->
+                                    OidcAuthConfiguration.matchesAnyRedirectPattern(uri, data.allowedPostLogoutRedirectUrls)
+                                }
+                                ?: data.postLogoutRedirectUri
                         }
 
                         // Terminate local session
