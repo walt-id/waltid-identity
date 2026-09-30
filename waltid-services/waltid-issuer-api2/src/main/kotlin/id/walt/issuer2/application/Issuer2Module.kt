@@ -1,5 +1,6 @@
 package id.walt.issuer2.application
 
+import id.walt.openid4vci.proofs.attestation.KeyAttestationKeyReferenceResolver
 import id.walt.commons.config.ConfigManager
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
 import id.walt.issuer2.config.Issuer2MetadataConfig
@@ -31,6 +32,7 @@ class Issuer2Module @JvmOverloads constructor(
     credentialProofKeyCommitment: CredentialProofKeyCommitment? = null,
     issuanceSessionRepository: IssuanceSessionRepository = ConfiguredIssuanceSessionRepository(),
     preAuthorizedCodeRepository: PreAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository(),
+    keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver? = null,
 ) {
     private val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
     private val parRepository = ConfiguredPARRepository()
@@ -43,6 +45,7 @@ class Issuer2Module @JvmOverloads constructor(
         preAuthorizedCodeRepository = preAuthorizedCodeRepository,
         parRepository = parRepository,
         refreshTokenRepository = refreshTokenRepository,
+        keyAttestationKeyResolver = keyAttestationKeyResolver,
     )
 
     private val credentialProfileService = CredentialProfileService(
@@ -81,6 +84,7 @@ class Issuer2Module @JvmOverloads constructor(
         credentialProofKeyAcceptance = credentialProofKeyAcceptance,
         credentialProofKeyCommitment = credentialProofKeyCommitment,
         credentialNonceService = openId4VciModule.credentialNonceService,
+        keyAttestation = openId4VciModule.keyAttestation,
     )
 
     val managementController = Issuer2ManagementController(

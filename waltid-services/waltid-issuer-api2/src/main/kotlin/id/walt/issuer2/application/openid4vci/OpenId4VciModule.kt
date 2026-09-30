@@ -1,5 +1,6 @@
 package id.walt.issuer2.application.openid4vci
 
+import id.walt.openid4vci.proofs.attestation.*
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.Jwk
@@ -55,6 +56,7 @@ data class OpenId4VciModule(
     val credentialNonceService: CredentialNonceService,
     /** Crypto2 token signing key, or `null` when the configured token key is not crypto2-capable. */
     val crypto2TokenSigningKey: Crypto2JwtSigningKey?,
+    val keyAttestation: KeyAttestationVerificationOptions? = null,
 ) {
 
     companion object {
@@ -64,6 +66,7 @@ data class OpenId4VciModule(
             preAuthorizedCodeRepository: PreAuthorizedCodeRepository,
             parRepository: PARRepository,
             refreshTokenRepository: RefreshTokenRepository,
+            keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver? = null,
         ): OpenId4VciModule {
             val crypto2TokenKey = resolveCrypto2TokenKey(config)
             val signingKeyResolver = JwtSigningKeyResolver {
@@ -153,6 +156,15 @@ data class OpenId4VciModule(
                 preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,
                 credentialNonceService = credentialNonceService,
                 crypto2TokenSigningKey = crypto2TokenKey,
+                keyAttestation = runBlocking {
+                    config.keyAttestationConfig?.toVerificationOptions(keyAttestationKeyResolver).also {
+                        (config.keyAttestationConfig?.verificationMethod as? KeyAttestationVerificationMethod.KeyReference)?.let { method ->
+                            require(requireNotNull(keyAttestationKeyResolver).resolve(method.reference).isNotEmpty()) {
+                                "Configured key attestation verification key is unavailable"
+                            }
+                        }
+                    }
+                },
             )
         }
 

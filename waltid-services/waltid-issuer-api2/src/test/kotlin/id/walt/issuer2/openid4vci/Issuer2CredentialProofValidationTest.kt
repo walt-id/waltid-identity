@@ -1,5 +1,11 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.openid4vci.proofs.attestation.KeyAttestationConfig
+import id.walt.openid4vci.proofs.attestation.KeyAttestationVerificationMethod
+import id.walt.sdjwt.SDJwtVC
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -142,6 +148,51 @@ class Issuer2CredentialProofValidationTest {
         val session = flow.client.getSession(flow.sessionId)
         assertEquals(IssuanceSessionStatus.ACTIVE, session.status)
         assertFalse(session.isClosed)
+    }
+
+    @Test
+    fun `attested bindings all reach acceptance and produce corresponding credentials`() = testApplication {
+        val attester = JWKKey.generate(KeyType.secp256r1)
+        val holders = List(3) { JWKKey.generate(KeyType.secp256r1) }
+        var acceptedKeys: List<JsonObject>? = null
+        var acceptBindings = false
+        val attesterJwk = attester.getPublicKey().exportJWKObject()
+        installIssuer2WithConfigFiles(
+            credentialProofKeyAcceptance = CredentialProofKeyAcceptance { _, keys -> acceptedKeys = keys; acceptBindings },
+            configureServiceConfig = { it.copy(keyAttestationConfig = KeyAttestationConfig(
+                KeyAttestationVerificationMethod.StaticJwk(attesterJwk),
+            )) },
+        )
+        val flow = prepareFlow(apiClient())
+        val nonce = flow.nonce()
+        val now = Clock.System.now().epochSeconds
+        val inner = attester.signJws(buildJsonObject {
+            put("iat", now)
+            put("exp", now + 300)
+            put("nonce", nonce)
+            put("attested_keys", JsonArray(holders.map { it.getPublicKey().exportJWKObject() }))
+        }.toString().encodeToByteArray(), mapOf("typ" to JsonPrimitive("key-attestation+jwt")))
+        val outer = holders[0].signJws(buildJsonObject {
+            put("aud", flow.resolvedOffer.issuerMetadata.credentialIssuer)
+            put("iat", now)
+            put("nonce", nonce)
+        }.toString().encodeToByteArray(), mapOf(
+            "typ" to JsonPrimitive("openid4vci-proof+jwt"),
+            "jwk" to holders[0].getPublicKey().exportJWKObject(),
+            "key_attestation" to JsonPrimitive(inner),
+        ))
+        val expected = holders.map { it.getThumbprint() }
+        assertRejectedCredentialRequest(flow.request(Proofs(jwt = listOf(outer))))
+        assertEquals(expected, requireNotNull(acceptedKeys).map { JWKKey.importJWK(it.toString()).getOrThrow().getThumbprint() })
+        assertEquals(IssuanceSessionStatus.ACTIVE, flow.client.getSession(flow.sessionId).status)
+        acceptBindings = true
+        val response = flow.request(Proofs(jwt = listOf(outer)))
+        assertEquals(HttpStatusCode.OK, response.status)
+        val credentials = response.body<JsonObject>().getValue("credentials").jsonArray
+        assertEquals(expected, credentials.map {
+            val jwt = it.jsonObject.getValue("credential").jsonPrimitive.content
+            JWKKey.importJWK(requireNotNull(SDJwtVC.parse(jwt).holderKeyJWK).toString()).getOrThrow().getThumbprint()
+        })
     }
 
     private suspend fun prepareFlow(client: HttpClient): ProofTestFlow {

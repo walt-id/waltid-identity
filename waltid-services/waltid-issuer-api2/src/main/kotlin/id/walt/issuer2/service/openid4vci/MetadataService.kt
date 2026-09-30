@@ -1,5 +1,6 @@
 package id.walt.issuer2.service.openid4vci
 
+import id.walt.openid4vci.proofs.attestation.validateKeyAttestationConfiguration
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.StoredKey
@@ -65,6 +66,10 @@ class MetadataService(
                 configuration.vct?.let { validateSelfHostedVct(configurationId, it) }
             }
         }
+
+    init {
+        validateKeyAttestationConfiguration(credentialConfigurations.values, serviceConfig.keyAttestationConfig)
+    }
 
     private val configuredTypeMetadata: Map<String, SdJwtVcTypeMetadataDraft04> = buildMap {
         metadataConfig.sdJwtVcTypeMetadataConfiguration.forEach { (configurationId, metadata) ->
