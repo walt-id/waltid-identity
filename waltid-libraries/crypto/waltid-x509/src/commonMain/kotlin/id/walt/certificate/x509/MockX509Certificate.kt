@@ -37,9 +37,6 @@ class MockX509Certificate(private val subjectDn: String) : X509Certificate {
         override val subjectPublicKeyInfo: Pkcs10CertificateSigningRequest.SubjectPublicKeyInfo
             get() = TODO("Not yet implemented")
 
-        override val signatureAlgorithmOid: String
-            get() = TODO("Not yet implemented")
-
         override val extensions: Map<String, Extension>
             get() = emptyMap()
     }

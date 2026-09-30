@@ -95,9 +95,6 @@ open class X509CertificateDataBuilder private constructor(
         subjectPublicKeyInfo = WaltIdKeySubjectPublicKeyInfoBuilder(spki)
     }
 
-    override val signatureAlgorithmOid: String
-        get() = error("Not allowed in builder")
-
     class WaltIdKeySubjectPublicKeyInfoBuilder private constructor(
         val selfSigned: Boolean,
         val crypto1key: Crypto1Key?,

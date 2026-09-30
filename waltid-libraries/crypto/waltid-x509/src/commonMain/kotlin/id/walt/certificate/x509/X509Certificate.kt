@@ -55,8 +55,6 @@ interface X509Certificate {
         val issuerDnRaw: ByteString
 
         val validity: Validity
-
-        val signatureAlgorithmOid: String
     }
 
     data class Validity(

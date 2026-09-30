@@ -52,9 +52,6 @@ class SignumX509Certificate(
                 certificate.tbsCertificate.decodedPublicKey.getOrThrow()
             )
 
-        override val signatureAlgorithmOid: String
-            get() = certificate.tbsCertificate.signatureAlgorithm.oid.toString()
-
         override val extensions: Map<String, Extension>
             get() = try {
                 certificate.tbsCertificate.extensions?.map {

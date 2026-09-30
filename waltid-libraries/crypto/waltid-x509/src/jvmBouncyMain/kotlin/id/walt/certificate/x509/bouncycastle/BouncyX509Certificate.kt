@@ -31,9 +31,6 @@ class BouncyX509Certificate(val certificate: X509CertificateHolder) : X509Certif
             notAfter = certificate.notAfter.toInstant().toKotlinInstant()
         )
 
-        override val signatureAlgorithmOid: String =
-            certificate.tbsCertificate.signature.algorithm.id
-
         override val extensions: Map<String, Extension>
             get() {
                 return certificate.extensions?.extensionOIDs?.let { extensionOids ->

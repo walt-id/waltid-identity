@@ -1,7 +1,6 @@
 package id.walt.certificate.x509
 
 import id.walt.certificate.x509.validation.X509CertificateChainValidator
-import id.walt.certificate.x509.validation.validator.X509CertificateSignatureAlgorithmMatchValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
 import id.walt.x509.id.walt.certificate.x509.JavaX509CertificateSerialNumberGenerator
@@ -36,7 +35,6 @@ actual fun platformDefaultServices(): X509CertificateServices {
                 X509CertificateValidityValidator(),
                 X509CertificateBasicConstraintsValidator(),
                 X509CertificateAuthorityKeyIdValidator(),
-                X509CertificateSignatureAlgorithmMatchValidator(),
                 X509CertificateSignatureValidator(certificateSigner)
             ),
             JavaDefaultTrustStore(certificateParser)
