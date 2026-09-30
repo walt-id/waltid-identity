@@ -14,6 +14,11 @@ import {
   parseTransactionFieldValue,
   stringifyTransactionFieldValue,
 } from "~/utils/transactionDataFields";
+import {
+  prefixedCoreFlowClientId,
+  requiresClientIdValue,
+  type CoreFlowClientIdType,
+} from "~/utils/coreFlowClientId";
 
 const props = defineProps<{
   swagger: ReturnType<typeof useSwaggerExamples>;
@@ -25,13 +30,7 @@ const selectedIndex = defineModel<number>("selectedIndex", { default: 0 });
 
 const config = useRuntimeConfig();
 
-type ClientIdType =
-  | "x509_hash"
-  | "x509_san_dns"
-  | "redirect_uri"
-  | "decentralized_identifier"
-  | "verifier_attestation"
-  | "pre_registered";
+type ClientIdType = CoreFlowClientIdType;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -141,8 +140,8 @@ const clientIdOptions = [
   },
   {
     value: "redirect_uri",
-    label: "redirect_uri",
-    placeholder: "https://verifier.example.com/callback",
+    label: "redirect_uri (blank = auto from response_uri)",
+    placeholder: "Leave blank to auto-generate from the session response_uri",
   },
   {
     value: "decentralized_identifier",
@@ -165,6 +164,10 @@ const selectedClientIdOption = computed(() =>
   clientIdOptions.find((option) => option.value === clientIdType.value)!,
 );
 const clientIdNeedsInput = computed(() => clientIdType.value !== "x509_hash");
+const autoRedirectUri = computed(
+  () =>
+    clientIdType.value === "redirect_uri" && !clientIdInput.value.trim(),
+);
 const parsedPayload = computed<Record<string, unknown> | null>(() => {
   try {
     const parsed = JSON.parse(json.value || "{}");
@@ -197,7 +200,11 @@ const canSubmit = computed(() => {
   }
 });
 const missingRequiredClientId = computed(
-  () => clientIdNeedsInput.value && !clientIdInput.value.trim(),
+  () =>
+    requiresClientIdValue(clientIdType.value) && !clientIdInput.value.trim(),
+);
+const signedRequestNeedsClientId = computed(
+  () => signedRequest.value && autoRedirectUri.value,
 );
 const transactionDataUnavailable = computed(
   () =>
@@ -215,6 +222,7 @@ const submitDisabled = computed(
     !canSubmit.value ||
     !!optionsError.value ||
     missingRequiredClientId.value ||
+    signedRequestNeedsClientId.value ||
     transactionDataUnavailable.value ||
     props.session.loading.value ||
     (isDcApiPayload.value && !dcApiSupport.value.supported),
@@ -268,18 +276,22 @@ async function buildClientId(x5c: string[]): Promise<string | null> {
       : x509HashClientIdPreset.value || null;
   }
 
-  const value = clientIdInput.value.trim();
-  if (!value)
-    throw new Error(`${selectedClientIdOption.value.label} requires a value.`);
-
-  return clientIdType.value === "pre_registered"
-    ? value
-    : `${clientIdType.value}:${value}`;
+  return prefixedCoreFlowClientId(
+    clientIdType.value,
+    clientIdInput.value,
+    { signedRequest: signedRequest.value },
+  );
 }
 
 function applyClientIdPreset(clientId: string) {
   const trimmed = clientId.trim();
   if (!trimmed) return;
+
+  if (trimmed === "redirect_uri") {
+    clientIdType.value = "redirect_uri";
+    clientIdInput.value = "";
+    return;
+  }
 
   const prefixedOption = clientIdOptions
     .filter((option) => option.value !== "pre_registered")
@@ -975,8 +987,24 @@ async function submit() {
               :placeholder="selectedClientIdOption.placeholder"
             />
             <p class="text-xs text-[--color-text-muted] mt-1">
-              The selected prefix will be added automatically in
-              <code>core_flow.clientId</code>.
+              <template v-if="clientIdType === 'redirect_uri'">
+                Leave blank to send
+                <code>core_flow.clientId</code> as
+                <code>redirect_uri</code> so the verifier binds it to this
+                session's <code>response_uri</code>. Signed requests cannot
+                use a blank redirect_uri.
+              </template>
+              <template v-else>
+                The selected prefix will be added automatically in
+                <code>core_flow.clientId</code>.
+              </template>
+            </p>
+            <p
+              v-if="signedRequestNeedsClientId"
+              class="text-xs text-amber-800 mt-1"
+            >
+              Enable an explicit client ID, or turn off signed_request, to
+              create this session.
             </p>
           </div>
 
