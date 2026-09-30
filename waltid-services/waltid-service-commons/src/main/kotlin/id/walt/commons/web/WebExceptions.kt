@@ -2,16 +2,17 @@
 
 package id.walt.commons.web
 
+import id.walt.errors.HttpStatusError
 import io.ktor.http.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-open class WebException(val status: Int, override val message: String) : Exception(message)
+open class WebException(override val status: Int, override val message: String) : Exception(message), HttpStatusError
 
 @Serializable
-sealed class SerializableWebException(val status: Int, override val message: String?) : Exception(message)
+sealed class SerializableWebException(override val status: Int, override val message: String?) : Exception(message), HttpStatusError
 
 @Serializable
 @SerialName("DuplicateTarget")
