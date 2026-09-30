@@ -32,7 +32,8 @@ class KtorAuthNzTokenHandler : TokenHandler {
         val session = KtorAuthnzManager.sessionStore.findSessionById(sessionId)
         // A store may keep no token in the session (the token store maps it); a different token means a newer login.
         val live = session != null && session.status.isSuccess() && (session.token == null || session.token == token) &&
-                session.expiration?.let { Clock.System.now() < it } != false
+                session.expiration?.let { Clock.System.now() < it } != false &&
+                session.tokenExpiration?.let { Clock.System.now() < it } != false
         if (!live) {
             tokenStore.dropToken(token)
             return null
