@@ -232,6 +232,9 @@ class VciWalletConformanceTests {
             for (grant in listOf("authorization_code", "pre_authorization_code")) {
                 for (profile in listOf("rar", "simple", "haip")) {
                     if (profile == "haip" && (format != "sd_jwt_vc" || grant != "authorization_code")) continue
+                    // db1080a's VCIInjectRequestScopePreAuthorizedCodeFlow hard-codes the SD-JWT
+                    // scope, granting a different configuration from its mdoc offer.
+                    if (format == "mdoc" && grant == "pre_authorization_code" && profile == "simple") continue
                     withInProcessWallet(withVerifier = true) { walletId ->
                         val attester = if (profile == "haip") ClientAttestationTestAuthority.create(
                             clientId = ConformanceConfig.VCI_WALLET_CLIENT_ID) else null

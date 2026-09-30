@@ -16,8 +16,9 @@ for these tests. Authorization-code redirects are followed automatically.
 | `vciWalletBatchBothGrantsAndFormats` | SD-JWT VC and mdoc | Both grants | `private_key_jwt` |
 
 The batch gate requires suite revision `db1080a`, version `5.2.4`, and the module
-`oid4vci-1_0-wallet-test-batch-credential-issuance`. Each of its nine variants
-(RAR/simple across both grants and formats, plus HAIP SD-JWT authorization code)
+`oid4vci-1_0-wallet-test-batch-credential-issuance`. Each of its eight variants
+(RAR/simple across both grants and formats except mdoc pre-authorized scope,
+plus HAIP SD-JWT authorization code)
 uses two newly generated P-256 holder keys, separate from the registered client
 key. The suite checks distinct proofs and returns credentials in reverse order.
 The gate requires an executed `FINISHED` / `PASSED`, two stored bindings with
@@ -33,6 +34,11 @@ results can include unsupported modules; inspect the recorded skip reasons.
 The targeted gate selects immediate, plain issuance explicitly; other HAIP modules
 remain part of the separate full-profile report. This is neither a complete HAIP run
 nor certification.
+
+The pinned suite's `VCIInjectRequestScopePreAuthorizedCodeFlow` hard-codes
+`eudi.pid.1`, so its mdoc pre-authorized scope variant grants SD-JWT despite
+offering mdoc. That variant is excluded until the suite fixes this mismatch;
+Wallet2 must reject the unrelated grant. The suite is used without patches.
 
 ## Setup and execution
 
