@@ -3,7 +3,7 @@ package id.walt.wallet2
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.config.list.TransactionDataProfilesConfig
+import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
