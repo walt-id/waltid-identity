@@ -21,6 +21,7 @@ object AuthMethodManager {
             LDAP,
             OIDC,
             RADIUS,
+            RecoveryCode,
             TOTP,
             UserPass,
             VerifiableCredential,
