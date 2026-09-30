@@ -53,7 +53,12 @@ object AttemptLimiter {
         }
     }
 
+    private val recordedKey = AttributeKey<Unit>("ktor-authnz-attempt-recorded")
+
     internal suspend fun recordFailure(call: ApplicationCall) {
+        // Tracking installed on nested routes sees the same failure more than once.
+        if (call.attributes.contains(recordedKey)) return
+        call.attributes.put(recordedKey, Unit)
         call.attributes.getOrNull(identifierKey)?.let { key ->
             if (limits.maxFailuresPerIdentifier > 0) store.increment(identifierCounter(key), limits.identifierWindow)
         }
