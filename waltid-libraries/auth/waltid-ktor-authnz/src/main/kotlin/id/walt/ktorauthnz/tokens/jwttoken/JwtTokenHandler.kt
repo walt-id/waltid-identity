@@ -50,7 +50,7 @@ class JwtTokenHandler private constructor(
     private var warnedAboutMissingExpiration = false
 
     override suspend fun generateToken(session: AuthSession): String {
-        if (session.expiration == null && !warnedAboutMissingExpiration) {
+        if (session.expiration == null && session.tokenExpiration == null && !warnedAboutMissingExpiration) {
             warnedAboutMissingExpiration = true
             log.warn {
                 "Issuing JWT login tokens without expiration: the auth flow sets no `expiration`, so these tokens stay " +
@@ -60,7 +60,7 @@ class JwtTokenHandler private constructor(
         val payload = buildJsonObject {
             put("sub", session.accountId)
             put("session", session.id)
-            if (session.expiration != null) put("exp", session.expiration!!.epochSeconds)
+            (session.tokenExpiration ?: session.expiration)?.let { put("exp", it.epochSeconds) }
         }.toString().toByteArray()
 
         crypto2Keys?.let { keys ->
