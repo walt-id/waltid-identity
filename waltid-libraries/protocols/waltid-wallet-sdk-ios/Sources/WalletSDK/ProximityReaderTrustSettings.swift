@@ -238,17 +238,11 @@ public enum ProximityReaderTrustSettingsCodec {
         now: Date = Date()
     ) async throws -> ProximityReaderTrustImportPreview {
         #if canImport(WalletCore) && os(iOS)
-        let seconds = now.timeIntervalSince1970
-        let wholeSeconds = Int64(seconds.rounded(.down))
-        let nanoseconds = Int32(((seconds - Double(wholeSeconds)) * 1_000_000_000).rounded())
         let preview = try await WalletCore.ProximityReaderTrustSettingsCodec.shared.prepareImport(
             sourceName: sourceName,
             bytes: data.toKotlinByteArray(),
             existing: existing.toKMPSettings(),
-            now: KotlinInstant.companion.fromEpochSeconds(
-                epochSeconds: wholeSeconds,
-                nanosecondAdjustment: nanoseconds
-            )
+            clock: ReaderTrustImportClock(date: now)
         )
         return try preview.toSwiftPreview()
         #else
@@ -358,6 +352,21 @@ private func configuredReaderTrustEvaluator(
 
 #if canImport(WalletCore) && os(iOS)
 @preconcurrency import WalletCore
+
+private final class ReaderTrustImportClock: NSObject, KotlinClock {
+    private let instant: KotlinInstant
+
+    init(date: Date) {
+        let seconds = date.timeIntervalSince1970
+        let wholeSeconds = Int64(seconds.rounded(.down))
+        instant = KotlinInstant.companion.fromEpochSeconds(
+            epochSeconds: wholeSeconds,
+            nanosecondAdjustment: Int32(((seconds - Double(wholeSeconds)) * 1_000_000_000).rounded())
+        )
+    }
+
+    func now() -> KotlinInstant { instant }
+}
 
 private extension ProximityStoredReaderPolicy {
     var kmpPolicy: WalletCore.ProximityReaderPolicy {

@@ -74,6 +74,42 @@ final class KMPProximityProjectionTests: XCTestCase {
 
     #endif
 
+    func testReaderCAImportUsesSuppliedDateForValidity() async throws {
+        // Public WAL-1349 test CA, valid from 2026-09-01 to 2036-08-29.
+        let certificate = try XCTUnwrap(Data(base64Encoded: Self.readerCaDerBase64))
+        let settings = WalletSDK.ProximityReaderTrustSettings(readerPolicy: .requireTrusted)
+        let validFrom = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-01T08:15:22Z"))
+        let validUntil = try XCTUnwrap(ISO8601DateFormatter().date(from: "2036-08-29T08:15:22Z"))
+
+        for date in [validFrom, validFrom.addingTimeInterval(0.25), validUntil] {
+            let preview = try await WalletSDK.ProximityReaderTrustSettingsCodec.prepareImport(
+                sourceName: "reader-ca.der", data: certificate, existing: settings, now: date
+            )
+            XCTAssertEqual(preview.readerAuthorities.count, 1)
+            XCTAssertEqual(preview.readerAuthorities.first?.validFrom, validFrom)
+            XCTAssertEqual(preview.readerAuthorities.first?.validUntil, validUntil)
+            XCTAssertEqual(preview.resultingSettings.readerPolicy, .requireTrusted)
+            XCTAssertEqual(preview.resultingSettings.trustAnchors.count, 1)
+            XCTAssertTrue(settings.trustAnchors.isEmpty)
+        }
+
+        for date in [validFrom.addingTimeInterval(-0.25), validUntil.addingTimeInterval(0.25)] {
+            do {
+                _ = try await WalletSDK.ProximityReaderTrustSettingsCodec.prepareImport(
+                    sourceName: "reader-ca.der", data: certificate, existing: settings, now: date
+                )
+                XCTFail("Import accepted a certificate outside its validity period")
+            } catch {
+                XCTAssertTrue(error.localizedDescription.contains(
+                    date < validFrom ? "not yet valid" : "expired"
+                ), "Unexpected import error: \(error)")
+            }
+        }
+    }
+
+    private static let readerCaDerBase64 =
+        "MIIB5jCCAYygAwIBAgIIQAAAAAAAAAIwCgYIKoZIzj0EAwIwKDEmMCQGA1UEAwwdV0FMLTEzNDkgTG9jYWwgUmVhZGVyIFRlc3QgQ0EwHhcNMjYwOTAxMDgxNTIyWhcNMzYwODI5MDgxNTIyWjAoMSYwJAYDVQQDDB1XQUwtMTM0OSBMb2NhbCBSZWFkZXIgVGVzdCBDQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABLkoxDaSw3orgCt+rU6tkUzMqbvwbGSW79yUDGFF7/RACZJuY33ELFPTTZnx6vYGuVFZ4DiMI8a7YfPwQRY4mVajgZ8wgZwwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFI7/672ZcKzVj4pzE9lFgmc6kpFvMFcGA1UdIwRQME6AFI7/672ZcKzVj4pzE9lFgmc6kpFvoSykKjAoMSYwJAYDVQQDDB1XQUwtMTM0OSBMb2NhbCBSZWFkZXIgVGVzdCBDQYIIQAAAAAAAAAIwCgYIKoZIzj0EAwIDSAAwRQIhAKrZrpvBEYeWpezCh6b48gvPzaHLXUbGfmOApayRI9MVAiBds/mL9fhhsBWtlFj2LSaMGsuPYVVIbT2d3YeWSVrJxg=="
+
     func testFailedStatePreservesCodeRecoveryAndHasNoLegalActions() throws {
         let error = WalletCore.ProximityError(category: .transport, code: "peer_disconnected",
             message: "Reader disconnected", recovery: .startNewSession)

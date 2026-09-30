@@ -4860,7 +4860,7 @@ final object id.walt.wallet2.mobile/ProximityReaderTrustSettingsCodec { // id.wa
 
     final fun decode(kotlin/String): id.walt.wallet2.mobile/ProximityReaderTrustSettings // id.walt.wallet2.mobile/ProximityReaderTrustSettingsCodec.decode|decode(kotlin.String){}[0]
     final fun encode(id.walt.wallet2.mobile/ProximityReaderTrustSettings): kotlin/String // id.walt.wallet2.mobile/ProximityReaderTrustSettingsCodec.encode|encode(id.walt.wallet2.mobile.ProximityReaderTrustSettings){}[0]
-    final suspend fun prepareImport(kotlin/String, kotlin/ByteArray, id.walt.wallet2.mobile/ProximityReaderTrustSettings, kotlin.time/Instant = ...): id.walt.wallet2.mobile/ProximityReaderTrustImportPreview // id.walt.wallet2.mobile/ProximityReaderTrustSettingsCodec.prepareImport|prepareImport(kotlin.String;kotlin.ByteArray;id.walt.wallet2.mobile.ProximityReaderTrustSettings;kotlin.time.Instant){}[0]
+    final suspend fun prepareImport(kotlin/String, kotlin/ByteArray, id.walt.wallet2.mobile/ProximityReaderTrustSettings, kotlin.time/Clock = ...): id.walt.wallet2.mobile/ProximityReaderTrustImportPreview // id.walt.wallet2.mobile/ProximityReaderTrustSettingsCodec.prepareImport|prepareImport(kotlin.String;kotlin.ByteArray;id.walt.wallet2.mobile.ProximityReaderTrustSettings;kotlin.time.Clock){}[0]
 }
 
 final object id.walt.wallet2.mobile/UnavailableMobileWalletCredentialRegistry : id.walt.wallet2.mobile/MobileWalletCredentialRegistry { // id.walt.wallet2.mobile/UnavailableMobileWalletCredentialRegistry|null[0]
