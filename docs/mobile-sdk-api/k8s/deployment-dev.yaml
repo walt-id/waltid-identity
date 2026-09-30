@@ -55,9 +55,20 @@ spec:
   tls:
     - hosts:
         - sdk-docs.test.waltid.cloud
+        - ios-sdk-docs.test.waltid.cloud
       secretName: sdk-docs-tls-secret
   rules:
     - host: sdk-docs.test.waltid.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sdk-docs
+                port:
+                  name: http
+    - host: ios-sdk-docs.test.waltid.cloud
       http:
         paths:
           - path: /
