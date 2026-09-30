@@ -33,6 +33,10 @@ data class OidcSessionAuthenticatedData(
     val idTokenClaims: JsonObject? = null,
     val userInfoClaims: JsonObject? = null,
     val idTokenRaw: String? = null,  // Raw ID token for logout (id_token_hint)
+    /** Client id and post-logout redirect settings of the flow, for RP-initiated logout after the flow ended. */
+    val clientId: String? = null,
+    val postLogoutRedirectUri: String? = null,
+    val allowedPostLogoutRedirectUrls: List<String> = emptyList(),
 ) : SessionData {
 
     @Serializable
