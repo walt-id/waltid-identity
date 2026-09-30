@@ -93,6 +93,19 @@ The library includes key resolution mechanisms to verify credentials:
 - **X.509 Certificate Resolution**: Extracts keys from X.509 certificate chains
 - **Well-Known Endpoint Resolution**: Fetches keys from well-known endpoints
 
+### Issuance Templates
+
+`id.walt.credentials.issuance` merges a credential's data with a mapping for every format. Template values such as
+`<timestamp>`, `<timestamp-in:P1D>`, `<uuid>` or `<subjectDid>` are replaced by the named data function.
+
+- **One engine** (`CredentialDataMergeUtils`) with a per-format `MergePolicy`: W3C and SD-JWT payloads append mapped
+  arrays and copy templates inside them literally; mdoc namespaces replace arrays and evaluate templates everywhere.
+- **One context** (`issuanceTemplateContext`): `issuerId`, `issuerDid` (the issuer id, also when it is not a DID),
+  `subjectDid`, `display`.
+- **One clock**: `issuanceDataFunctions()` reads the issuance time set with `IssuanceClock`, so every timestamp of an
+  issuance agrees. `dataFunctions` always uses the system clock.
+- `MergingIssuer.mergingJwtIssue` / `mergingSdJwtIssue` issue W3C credentials from merged data.
+
 ## Assumptions and Dependencies
 
 This library makes several important assumptions:
