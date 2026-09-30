@@ -1192,10 +1192,7 @@ extension IssuanceCredentialSelection {
         case .existing(let bindings):
             selection = MobileWalletCredentialHoldersExisting(bindings: bindings.map { MobileWalletHolderBinding(keyId: $0.keyID, did: $0.did) })
         case .newKeys(let count):
-            guard count > 0, let nativeCount = Int32(exactly: count) else {
-                throw WalletError.invalidInput("Holder-key count must be a positive 32-bit integer")
-            }
-            selection = MobileWalletCredentialHoldersNewKeys(count: nativeCount)
+            selection = MobileWalletCredentialHoldersNewKeys(count: Int32(count))
         }
         return MobileWalletCredentialSelection(credentialConfigurationId: configurationID,
             holders: selection, credentialIdentifier: credentialIdentifier)

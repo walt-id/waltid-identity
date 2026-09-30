@@ -5,7 +5,7 @@ import XCTest
 
 final class IssuanceBridgeContractTests: XCTestCase {
     func testExplicitSelectionPreservesDatasetAndEveryHolderBinding() throws {
-        let selection = IssuanceCredentialSelection(configurationID: "identity", credentialIdentifier: "dataset-a",
+        let selection = try IssuanceCredentialSelection(configurationID: "identity", credentialIdentifier: "dataset-a",
             holders: .existing([.init(keyID: "first", did: "did:key:first"), .init(keyID: "second")]))
         let core = try selection.toKMPSelection()
         XCTAssertEqual(core.credentialConfigurationId, "identity")
@@ -15,12 +15,21 @@ final class IssuanceBridgeContractTests: XCTestCase {
     }
 
     func testGeneratedSelectionPreservesCountAndRejectsInvalidNativeCounts() throws {
-        let selection = IssuanceCredentialSelection(configurationID: "identity", holders: .newKeys(count: 2))
+        let selection = try IssuanceCredentialSelection(configurationID: "identity", holders: .newKeys(count: 2))
         let core = try selection.toKMPSelection()
         XCTAssertEqual((core.holders as! MobileWalletCredentialHoldersNewKeys).count, 2)
         for count in [0, -1, Int.max] {
             XCTAssertThrowsError(try IssuanceCredentialSelection(configurationID: "identity", holders: .newKeys(count: count)).toKMPSelection())
         }
+    }
+
+    func testSelectionRejectsEmptyOrBlankBindingsBeforeCallingKotlin() {
+        for holders in [IssuanceCredentialHolders.existing([]), .existing([.init(keyID: " ")]),
+                        .existing([.init(keyID: "key", did: " ")])] {
+            XCTAssertThrowsError(try IssuanceCredentialSelection(configurationID: "identity", holders: holders))
+        }
+        XCTAssertThrowsError(try IssuanceCredentialSelection(configurationID: " ", holders: .newKeys(count: 1)))
+        XCTAssertThrowsError(try IssuanceCredentialSelection(configurationID: "identity", credentialIdentifier: " ", holders: .newKeys(count: 1)))
     }
 
     func testUncertainOutcomesRemainDistinctFromRetryableNetworkAndStorageFailures() throws {

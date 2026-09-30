@@ -49,6 +49,7 @@ data class WalletCredentialSelection(
         require(credentialConfigurationId.isNotBlank())
         require(credentialIdentifier == null || credentialIdentifier.isNotBlank())
         require(holderBindings.isNotEmpty()) { "At least one holder binding is required" }
+        require(holderBindings.none { it.key != null }) { "Stored selections require wallet-owned holder keys" }
     }
 }
 
@@ -80,29 +81,42 @@ internal suspend fun Wallet.resolveCredentialSelections(
     return selected.map { selection ->
         require(selection.credentialConfigurationId in offeredConfigurationIds) { "Selected credential is not offered" }
         val configuration = requireNotNull(metadata.credentialConfigurationsSupported[selection.credentialConfigurationId])
-        CredentialRequestBuilder.validateBatchSize(metadata, selection.holderBindings.size)
-        require(selection.holderBindings.size == 1 || supportedJwtProofAlgorithms(configuration.proofTypesSupported, attachedKeyAttestationProvider() != null) != null) {
-            "Multiple instances require an advertised JWT proof type"
-        }
-        val bindings = selection.holderBindings.map { binding ->
-            val material = binding.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
-                ?: binding.keyId?.let { requireNotNull(resolveKeyMaterial(it, setOf(KeyUsage.SIGN))) { "Holder key '$it' is unavailable" } }
-                ?: defaultKey
-            require(configuration.proofTypesSupported?.get("jwt")?.keyAttestationsRequired == null || material.crypto2Key != null) {
-                "Key attestation requires a Crypto2 holder key"
-            }
-            supportedJwtProofAlgorithms(configuration.proofTypesSupported, attachedKeyAttestationProvider() != null)?.let { algorithms ->
-                if (material.crypto2Key != null) material.crypto2Key.selectJwsAlgorithm(algorithms)
-                else require(requireNotNull(material.legacyKey).keyType.jwsAlg in algorithms) {
-                    "Issuer does not support the selected holder key's proof algorithm"
-                }
-            }
-            ResolvedCredentialHolderBinding(material, resolveProofDid(
-                binding.did ?: defaultDid.takeIf { material.keyId == defaultKey.keyId }, material, configuration))
-        }
-        bindings.requireDistinctHolderKeys()
+        val bindings = resolveProofHolderBindings(selection.holderBindings, metadata, configuration, defaultKey, defaultDid)
+            .also { it.requireStoredHolderKeys() }
         ResolvedWalletCredentialSelection(selection, bindings)
     }
+}
+
+/** Isolated proof holders may be inline; storing selections validate wallet ownership separately. */
+internal suspend fun Wallet.resolveProofHolderBindings(
+    holders: List<CredentialHolderBinding>,
+    metadata: CredentialIssuerMetadata,
+    configuration: CredentialConfiguration,
+    defaultKey: WalletKeyStoreEntry,
+    defaultDid: String?,
+): List<ResolvedCredentialHolderBinding> {
+    CredentialRequestBuilder.validateBatchSize(metadata, holders.size)
+    require(holders.size == 1 || supportedJwtProofAlgorithms(configuration.proofTypesSupported, attachedKeyAttestationProvider() != null) != null) {
+        "Multiple instances require an advertised JWT proof type"
+    }
+    val bindings = holders.map { binding ->
+        val material = binding.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
+            ?: binding.keyId?.let { requireNotNull(resolveKeyMaterial(it, setOf(KeyUsage.SIGN))) { "Holder key '$it' is unavailable" } }
+            ?: defaultKey
+        require(configuration.proofTypesSupported?.get("jwt")?.keyAttestationsRequired == null || material.crypto2Key != null) {
+            "Key attestation requires a Crypto2 holder key"
+        }
+        supportedJwtProofAlgorithms(configuration.proofTypesSupported, attachedKeyAttestationProvider() != null)?.let { algorithms ->
+            if (material.crypto2Key != null) material.crypto2Key.selectJwsAlgorithm(algorithms)
+            else require(requireNotNull(material.legacyKey).keyType.jwsAlg in algorithms) {
+                "Issuer does not support the selected holder key's proof algorithm"
+            }
+        }
+        ResolvedCredentialHolderBinding(material, resolveProofDid(
+            binding.did ?: defaultDid.takeIf { material.keyId == defaultKey.keyId }, material, configuration))
+    }
+    bindings.requireDistinctHolderKeys()
+    return bindings
 }
 
 /** Resolve isolated storage inputs before consuming a credential or deferred response. */

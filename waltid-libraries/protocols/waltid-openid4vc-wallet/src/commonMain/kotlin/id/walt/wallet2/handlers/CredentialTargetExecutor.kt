@@ -23,6 +23,7 @@ internal class CredentialIssuanceAccess(
 ) {
     val dpop = dpopAlgorithms?.let { DpopRequestContext(it, senderKey) }
     val tokenType: String get() = if (dpop == null) "Bearer" else "DPoP"
+    val persistable: Boolean get() = senderKey.keyReference != null
 }
 
 /** Executes accepted targets once; grant acquisition and session ownership stay with the caller. */
@@ -32,7 +33,6 @@ internal suspend fun executeCredentialTargets(
     issuerMetadata: CredentialIssuerMetadata,
     targets: List<ResolvedCredentialIssuanceTarget>,
     access: CredentialIssuanceAccess,
-    persistable: Boolean,
     sessions: WalletIssuanceSessionService,
     sessionId: String? = null,
     labelFor: (String) -> String? = { issuerMetadata.credentialConfigurationsSupported.getValue(it).credentialMetadata?.display?.firstOrNull()?.name },
@@ -56,7 +56,7 @@ internal suspend fun executeCredentialTargets(
                     target.credentialConfigurationId, credentialIdentifier = target.credentialIdentifier),
                 issuerMetadata.nonceEndpoint, httpClient,
                 buildProof = algorithms?.let { { nonce ->
-                    WalletIssuanceHandler.buildProofCollection(wallet, selected, configuration,
+                    WalletIssuanceHandler.buildProofCollection(wallet, selected.bindings, configuration,
                         issuerMetadata.credentialIssuer, nonce, access.proofIssuer)
                 } },
                 onProofGenerated = { if (algorithms != null) onEvent.emitSafely(WalletSessionEvent.issuance_proof_signed) },
@@ -84,7 +84,7 @@ internal suspend fun executeCredentialTargets(
                         ensureOwned()
                         sessions.retainDeferredCredential(public, configuration, selected, transaction.proofRequired,
                             endpoint, transaction.transactionId, access.accessToken, access.tokenType,
-                            access.dpop?.algorithms, access.senderKey, persistable, label, metadata,
+                            access.dpop?.algorithms, access.senderKey, access.persistable, label, metadata,
                             sessionId = sessionId ?: public.id, dpopNonce = access.dpop?.nonce)
                     } finally {
                         // Keep accepted progress during a storage outage, but not after terminal closure.
@@ -105,7 +105,7 @@ internal suspend fun executeCredentialTargets(
                 ensureOwned()
                 val outcome = sessions.storeReceivedCredentials(
                     prepared, target.credentialConfigurationId, target.credentialIdentifier,
-                    persistable = persistable, sessionId = sessionId,
+                    persistable = access.persistable, sessionId = sessionId,
                     beforeCredentialsStored = beforeCredentialsStored,
                     onCredentialStored = { entry ->
                         stage = CredentialIssuanceStage.OBSERVER
