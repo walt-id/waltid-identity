@@ -9,7 +9,7 @@ import kotlin.uuid.Uuid
 
 /**
  * Opaque tokens, mapped to their session in [tokenStore]. A token is valid only while its session is: stored,
- * finished, not expired, and still holding this token - so logout, expiry and revoking an account's sessions end it.
+ * finished, not expired, and not holding another token - so logout, expiry and revoking an account's sessions end it.
  */
 class KtorAuthNzTokenHandler : TokenHandler {
 
@@ -30,7 +30,8 @@ class KtorAuthNzTokenHandler : TokenHandler {
         if (!tokenStore.validateToken(token)) return null
         val sessionId = runCatching { tokenStore.getTokenSessionId(token) }.getOrNull() ?: return null
         val session = KtorAuthnzManager.sessionStore.findSessionById(sessionId)
-        val live = session != null && session.status.isSuccess() && session.token == token &&
+        // A store may keep no token in the session (the token store maps it); a different token means a newer login.
+        val live = session != null && session.status.isSuccess() && (session.token == null || session.token == token) &&
                 session.expiration?.let { Clock.System.now() < it } != false
         if (!live) {
             tokenStore.dropToken(token)
