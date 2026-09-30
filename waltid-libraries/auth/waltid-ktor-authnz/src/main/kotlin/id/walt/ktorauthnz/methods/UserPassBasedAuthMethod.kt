@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.attempts.AttemptLimiter.attemptOnIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.sessions.AuthSession
 import io.ktor.http.*
@@ -35,7 +36,10 @@ abstract class UserPassBasedAuthMethod(
      * 2. JSON document body
      * 3. Form post
      */
-    suspend fun ApplicationCall.getUsernamePasswordFromRequest(): UserPasswordCredential {
+    suspend fun ApplicationCall.getUsernamePasswordFromRequest(): UserPasswordCredential =
+        readUsernamePassword().also { attemptOnIdentifier(id, it.name) }
+
+    private suspend fun ApplicationCall.readUsernamePassword(): UserPasswordCredential {
         val contentType = request.contentType()
         when {
             // As JSON document
