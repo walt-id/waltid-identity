@@ -1,10 +1,13 @@
-package id.walt.commons.config.list
+package id.walt.verifier.openid.transactiondata
 
-import id.walt.commons.web.ConflictException
-import id.walt.commons.web.WebException
-import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
-import io.ktor.http.HttpStatusCode
+import id.walt.errors.StatusException
 import kotlinx.serialization.Serializable
+
+class TransactionDataProfileNotFoundException(type: String) :
+    StatusException(404, "Transaction data profile '$type' was not found")
+
+class TransactionDataProfileExistsException(type: String) :
+    StatusException(409, "Transaction data profile '$type' already exists")
 
 /**
  * Runtime overlay applied on top of HOCON-seeded [TransactionDataProfile] entries.
@@ -39,7 +42,7 @@ data class TransactionDataProfileOverlay(
 
     fun requireExisting(seed: List<TransactionDataProfile>, type: String): TransactionDataProfile =
         applyTo(seed).find { it.type == type }
-            ?: throw WebException(HttpStatusCode.NotFound.value, "Transaction data profile '$type' was not found")
+            ?: throw TransactionDataProfileNotFoundException(type)
 
     fun create(
         seed: List<TransactionDataProfile>,
@@ -47,7 +50,7 @@ data class TransactionDataProfileOverlay(
     ): Pair<TransactionDataProfileOverlay, TransactionDataProfile> {
         val normalized = requireValidProfile(profile)
         if (applyTo(seed).any { it.type == normalized.type }) {
-            throw ConflictException("Transaction data profile '${normalized.type}' already exists")
+            throw TransactionDataProfileExistsException(normalized.type)
         }
         return copy(
             overrides = overrides + (normalized.type to normalized),
