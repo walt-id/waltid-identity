@@ -59,7 +59,7 @@ class MergingIssuerTest {
     }
 
     @Test
-    fun `the template context names the issuer in both fields, also when it is not a DID`() {
+    fun `the template context names the issuer in both fields also when it is not a DID`() {
         // The example profiles map "issuer": {"id": "<issuerDid>"}; an issuer URL must still resolve it.
         val url = issuanceTemplateContext(issuerId = "https://issuer.example", subjectDid = "did:example:holder")
         assertEquals(JsonPrimitive("https://issuer.example"), url["issuerId"])
