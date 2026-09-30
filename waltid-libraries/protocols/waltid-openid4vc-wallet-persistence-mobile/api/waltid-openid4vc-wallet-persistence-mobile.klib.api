@@ -435,7 +435,7 @@ final class id.walt.wallet2.persistence.stores/SqlDelightDidStore : id.walt.wall
     final suspend fun removeDid(kotlin/String): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightDidStore.removeDid|removeDid(kotlin.String){}[0]
 }
 
-final class id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore : id.walt.wallet2.handlers/WalletIssuanceSessionStore { // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore|null[0]
+final class id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore : id.walt.wallet2.handlers/AtomicWalletIssuanceSessionStore { // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore|null[0]
     constructor <init>(id.walt.wallet2.persistence.db/WalletPersistenceQueries) // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore.<init>|<init>(id.walt.wallet2.persistence.db.WalletPersistenceQueries){}[0]
 
     final suspend fun compareAndSet(id.walt.wallet2.handlers/WalletIssuanceSessionRecord, id.walt.wallet2.handlers/WalletIssuanceSessionRecord?): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore.compareAndSet|compareAndSet(id.walt.wallet2.handlers.WalletIssuanceSessionRecord;id.walt.wallet2.handlers.WalletIssuanceSessionRecord?){}[0]
