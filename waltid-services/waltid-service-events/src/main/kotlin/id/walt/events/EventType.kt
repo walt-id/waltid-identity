@@ -1,4 +1,4 @@
-package id.walt.commons.events
+package id.walt.events
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
