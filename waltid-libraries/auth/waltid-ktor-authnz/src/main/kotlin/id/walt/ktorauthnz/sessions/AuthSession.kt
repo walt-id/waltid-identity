@@ -5,6 +5,7 @@ import id.walt.ktorauthnz.events.AuthnzEvent
 import id.walt.ktorauthnz.events.AuthnzEvents
 import id.walt.ktorauthnz.exceptions.AuthSessionStateException
 import id.walt.ktorauthnz.flows.AuthFlow
+import id.walt.ktorauthnz.tokens.RefreshTokens
 import id.walt.ktorauthnz.flows.methods
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.config.AuthMethodConfiguration
@@ -64,7 +65,14 @@ data class AuthSession(
 
     /** Tenant the session was opened for, if the service is multi-tenant; other tenants cannot continue it. */
     val tenant: String? = null,
+
+    /** Expiry of the current login token, when it ends before the session (refresh tokens). */
+    var tokenExpiration: Instant? = null,
 ) {
+    /** The refresh token just issued - handed to the client once, never stored (only its digest is). */
+    @kotlinx.serialization.Transient
+    var refreshToken: String? = null
+
     companion object {
         private val log = logger("AuthSession")
     }
@@ -85,7 +93,8 @@ data class AuthSession(
                     "Follow the steps in `next_step` (${nextStepInformation?.let { it::class.simpleName ?: "" }}) " +
                     "to complete the authentication method.",
         token = if (revealTokenToClient) token else null,
-        expiration = expiration
+        expiration = tokenExpiration ?: expiration,
+        refreshToken = if (revealTokenToClient) refreshToken else null,
     )
 
     /** The flow of [method] among the current choices, or the reason this session cannot take a step with it. */
@@ -105,6 +114,7 @@ data class AuthSession(
         } else if (currentFlow.isEndConditionSuccess()) {
             flows = null
             status = AuthSessionStatus.SUCCESS
+            KtorAuthnzManager.refreshTokens?.let { RefreshTokens.startRefreshableSession(this, it) }
 
             // Stored before its token exists: token stores may only map tokens to stored sessions.
             SessionManager.updateSession(this)
@@ -231,4 +241,9 @@ data class AuthSessionInformation(
 
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val expiration: Instant? = null,
+
+    /** Exchange at `token/refresh` for a new login token; only with refresh tokens enabled. */
+    @SerialName("refresh_token")
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val refreshToken: String? = null,
 )
