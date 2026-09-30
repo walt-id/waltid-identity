@@ -56,6 +56,7 @@ interface X509Certificate {
 
         val validity: Validity
 
+        val signatureAlgorithmOid: String
     }
 
     data class Validity(
