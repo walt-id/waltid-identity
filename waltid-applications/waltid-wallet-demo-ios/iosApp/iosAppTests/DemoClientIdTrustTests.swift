@@ -7,7 +7,7 @@ import XCTest
 final class DemoClientIdTrustTests: XCTestCase {
     func testDemoAnchorsParseAsDistinctCertificates() throws {
         let ders = try DemoClientIdTrust.x509TrustAnchorPems.map(der(fromPEM:))
-        XCTAssertEqual(ders.count, 12)
+        XCTAssertEqual(ders.count, 11)
         XCTAssertEqual(Set(ders).count, ders.count)
         XCTAssertEqual(
             DemoClientIdTrust.clientIDTrustConfiguration.x509TrustAnchorsPEM,

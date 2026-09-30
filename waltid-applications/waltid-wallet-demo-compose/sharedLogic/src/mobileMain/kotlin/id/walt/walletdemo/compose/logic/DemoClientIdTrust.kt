@@ -257,30 +257,6 @@ object DemoClientIdTrust {
         -----END CERTIFICATE-----
     """.trimIndent()
 
-    val TRUST_REGISTRY_RANDOM_LIST_PEM = """
-        -----BEGIN CERTIFICATE-----
-        MIIDfjCCAySgAwIBAgIQWazmWTkci584bZtw3m3yEDAKBggqhkjOPQQDAjCByzEL
-        MAkGA1UEBhMCTkwxDzANBgNVBAgTBkhlc3NlbjEPMA0GA1UEBxMGTGFuZ2VuMRcw
-        FQYDVQQJEw5SaGVpbnN0cmFzc2UgNTEOMAwGA1UEERMFNjMyMjUxQTA/BgNVBAoT
-        OFdFQlVJTEQgLSBXUCA0IC0gR3JvdXAgNSAtIFRydXN0IFJlZ2lzdHJ5IEluZnJh
-        c3RydWN0dXJlMS4wLAYDVQQDEyVodHRwczovL3dlYnVpbGQtY29uc29ydGl1bS5n
-        aXRodWIuaW8vMB4XDTI2MDkxNDEzMTIwNloXDTI5MDMxOTIzNTk1OVowgcsxCzAJ
-        BgNVBAYTAk5MMQ8wDQYDVQQIEwZIZXNzZW4xDzANBgNVBAcTBkxhbmdlbjEXMBUG
-        A1UECRMOUmhlaW5zdHJhc3NlIDUxDjAMBgNVBBETBTYzMjI1MUEwPwYDVQQKEzhX
-        RUJVSUxEIC0gV1AgNCAtIEdyb3VwIDUgLSBUcnVzdCBSZWdpc3RyeSBJbmZyYXN0
-        cnVjdHVyZTEuMCwGA1UEAxMlaHR0cHM6Ly93ZWJ1aWxkLWNvbnNvcnRpdW0uZ2l0
-        aHViLmlvLzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABFbimfEODFsk0dMqdyWL
-        4E0cN/aOj+wA72Ls/jD4vjsgcaKYZh0Ts4MTSjXV3CBKsRncYA5BvqPomaeaq2Sp
-        mpyjgecwgeQwDgYDVR0PAQH/BAQDAgGGMBEGA1UdJQQKMAgGBgQAkTcDADAPBgNV
-        HRMBAf8EBTADAQH/MB0GA1UdDgQWBBS5dqLLqit4Q3xeK4wncTzpvHMjwTAfBgNV
-        HSMEGDAWgBS5dqLLqit4Q3xeK4wncTzpvHMjwTBuBgNVHREEZzBlgQ9pbmZvQGlk
-        dW5pb24uZXWGUmh0dHBzOi8vYXBpLndhbGxldC5pZHVuaW9uLmluZm8vYXBpL3Yx
-        L2lzc3Vlci8wMWEwYTAwYi00NWM1LTc3NTItYWE3NC1lMWYzMDhhMTE2MzUwCgYI
-        KoZIzj0EAwIDSAAwRQIhAIstc7ItvqhoEnIzwtkwq7pQaowa2877saiHdRWly2kr
-        AiAgiDr75Zz321//G+IbGVZ1nb+o736cyUOJa6M+dsi/rw==
-        -----END CERTIFICATE-----
-    """.trimIndent()
-
     /**
      * PEM trust anchors passed into [id.walt.wallet2.mobile.MobileWalletFactory.create].
      *
@@ -306,7 +282,6 @@ object DemoClientIdTrust {
         AUTHOLOGIC_VERIFIER_PEM,
         AUTHOLOGIC_READER_PEM,
         TRUST_REGISTRY_RC_PROVIDER_PEM,
-        TRUST_REGISTRY_RANDOM_LIST_PEM,
     )
 
     val configuration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(
