@@ -6,10 +6,9 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.Key as Crypto2Key
-import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.proofs.VerifiedCredentialBinding
-import id.walt.openid4vci.requests.credential.CredentialRequest
+import id.walt.openid4vci.proofs.invalidCredentialProof
 import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDMap
 import id.walt.w3c.CredentialBuilder
@@ -30,10 +29,11 @@ import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
+/** Generates credentials from an explicitly supplied binding. This signer rejects null bindings. */
 object W3cJwtVcCredentialSigner {
     @Deprecated("Use the Crypto2Key overload")
     suspend fun generateW3CJwtVC(
-        credentialRequest: CredentialRequest,
+        verifiedBinding: VerifiedCredentialBinding?,
         credentialData: JsonObject,
         issuerKey: Key,
         issuerId: String,
@@ -43,9 +43,7 @@ object W3cJwtVcCredentialSigner {
         display: List<CredentialDisplay>? = null,
         credentialStatus: JsonElement? = null,
         w3cVersion: String? = null,
-        verifiedBinding: VerifiedCredentialBinding? = null,
     ): String = generateW3CJwtVC(
-        credentialRequest = credentialRequest,
         credentialData = credentialData,
         issuerSigningKey = IssuerSigningKey.Legacy(issuerKey),
         issuerId = issuerId,
@@ -59,7 +57,7 @@ object W3cJwtVcCredentialSigner {
     )
 
     suspend fun generateW3CJwtVC(
-        credentialRequest: CredentialRequest,
+        verifiedBinding: VerifiedCredentialBinding?,
         credentialData: JsonObject,
         issuerKey: Crypto2Key,
         algorithm: JwsAlgorithm,
@@ -70,9 +68,7 @@ object W3cJwtVcCredentialSigner {
         display: List<CredentialDisplay>? = null,
         credentialStatus: JsonElement? = null,
         w3cVersion: String? = null,
-        verifiedBinding: VerifiedCredentialBinding? = null,
     ): String = generateW3CJwtVC(
-        credentialRequest = credentialRequest,
         credentialData = credentialData,
         issuerSigningKey = IssuerSigningKey.Crypto2(issuerKey, algorithm),
         issuerId = issuerId,
@@ -86,7 +82,7 @@ object W3cJwtVcCredentialSigner {
     )
 
     private suspend fun generateW3CJwtVC(
-        credentialRequest: CredentialRequest,
+        verifiedBinding: VerifiedCredentialBinding?,
         credentialData: JsonObject,
         issuerSigningKey: IssuerSigningKey,
         issuerId: String,
@@ -96,16 +92,10 @@ object W3cJwtVcCredentialSigner {
         display: List<CredentialDisplay>?,
         credentialStatus: JsonElement?,
         w3cVersion: String?,
-        verifiedBinding: VerifiedCredentialBinding?,
     ): String {
-        val proofHeader = if (verifiedBinding != null) JsonObject(emptyMap()) else
-            credentialRequest.proofs?.jwt?.let { JwtUtils.parseJWTHeader(it.first()) }
-                ?: throw IllegalArgumentException("Missing JWT proof in proofs")
-
-        val holderKid = if (verifiedBinding != null) verifiedBinding.holderKid else proofHeader[JWT_HEADER_KID]?.jsonPrimitive?.content
-
-        val holderDid = if (verifiedBinding != null) verifiedBinding.holderDid
-            else if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else null
+        val binding = verifiedBinding
+            ?: throw invalidCredentialProof("W3C JWT VC issuance requires a verified credential binding")
+        val holderDid = binding.holderDid
 
         val additionalJwtHeaders = x5Chain?.let {
             mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert ->
@@ -256,7 +246,6 @@ object W3cJwtVcCredentialSigner {
         data class Crypto2(val key: Crypto2Key, val algorithm: JwsAlgorithm) : IssuerSigningKey
     }
 
-    private const val JWT_HEADER_KID = "kid"
     private const val JWT_HEADER_X5C = "x5c"
 }
 

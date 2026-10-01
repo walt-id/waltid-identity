@@ -58,7 +58,6 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         validUntil: Instant?,
     ): CredentialResponseResult = sign(configuration, issuanceBatch) { instance ->
         W3cJwtVcCredentialSigner.generateW3CJwtVC(
-            credentialRequest = request,
             credentialData = instance.input.credentialData,
             issuerId = issuerId,
             issuerKey = issuerKey,
@@ -88,7 +87,6 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         validUntil: Instant?,
     ): CredentialResponseResult = sign(configuration, issuanceBatch) { instance ->
         W3cJwtVcCredentialSigner.generateW3CJwtVC(
-            credentialRequest = request,
             credentialData = instance.input.credentialData,
             issuerId = issuerId,
             issuerKey = issuerKey.key,
