@@ -293,6 +293,8 @@ jobs:
           sudo xcode-select -s "$XCODE_DEVELOPER_DIR"
           echo "DEVELOPER_DIR=$XCODE_DEVELOPER_DIR" >> "$GITHUB_ENV"
           xcodebuild -version
+          destination=$(python3 waltid-identity/.github/scripts/mobile-ci/ensure_ios_simulator.py)
+          echo "IOS_SIMULATOR_DESTINATION=$destination" >> "$GITHUB_ENV"
 
       - name: Execute Enterprise iOS mobile platform tests
         id: enterprise_ios_mobile_tests
