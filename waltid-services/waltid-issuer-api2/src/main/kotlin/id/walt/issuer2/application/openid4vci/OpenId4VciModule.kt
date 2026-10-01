@@ -31,6 +31,7 @@ import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.proofs.CredentialNonceService
+import id.walt.openid4vci.proofs.CredentialProofVerifier
 import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.openid4vci.proofs.JwtCredentialNonceService
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
@@ -67,6 +68,24 @@ data class OpenId4VciModule(
             parRepository: PARRepository,
             refreshTokenRepository: RefreshTokenRepository,
             keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver? = null,
+        ): OpenId4VciModule = create(
+            config = config,
+            authorizationCodeRepository = authorizationCodeRepository,
+            preAuthorizedCodeRepository = preAuthorizedCodeRepository,
+            parRepository = parRepository,
+            refreshTokenRepository = refreshTokenRepository,
+            keyAttestationKeyResolver = keyAttestationKeyResolver,
+            credentialProofVerifier = DefaultCredentialProofVerifier(),
+        )
+
+        internal fun create(
+            config: Issuer2ServiceConfig,
+            authorizationCodeRepository: AuthorizationCodeRepository,
+            preAuthorizedCodeRepository: PreAuthorizedCodeRepository,
+            parRepository: PARRepository,
+            refreshTokenRepository: RefreshTokenRepository,
+            keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver?,
+            credentialProofVerifier: CredentialProofVerifier,
         ): OpenId4VciModule {
             val crypto2TokenKey = resolveCrypto2TokenKey(config)
             val signingKeyResolver = JwtSigningKeyResolver {
@@ -125,7 +144,7 @@ data class OpenId4VciModule(
 
                     accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
                     credentialRequestValidator = DefaultCredentialRequestValidator(),
-                    credentialProofVerifier = DefaultCredentialProofVerifier(),
+                    credentialProofVerifier = credentialProofVerifier,
 
                     authorizationCodeRepository = authorizationCodeRepository,
                     preAuthorizedCodeRepository = preAuthorizedCodeRepository,
