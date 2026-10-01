@@ -6,6 +6,7 @@ from pathlib import Path
 import plistlib
 import shutil
 import subprocess
+from swiftpm_framework import imported_framework
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--output", type=Path, required=True)
@@ -77,8 +78,10 @@ if result.returncode:
 modules = root / "waltid-libraries/protocols"
 shutil.copy2(modules / "waltid-openid4vc-wallet-mobile/build/bin/iosSimulatorArm64/debugTest/test.kexe", app / "RecoveryTests")
 framework = app / "Frameworks/SQLCipher.framework"
-shutil.copytree(modules / "waltid-openid4vc-wallet-persistence-mobile/build/kotlin/swiftImportDd/dd_iphonesimulator/Build/Products/Debug-iphonesimulator/PackageFrameworks/SQLCipher.framework",
-                framework, dirs_exist_ok=True)
+# Use the search paths of the cinterop actually compiled above, rather than a
+# version-specific SwiftPM cache directory or an unrelated cached framework.
+definition = modules / "waltid-openid4vc-wallet-persistence-mobile/build/kotlin/swiftImportDefs/iphonesimulator/arm64.def"
+shutil.copytree(imported_framework(definition, "SQLCipher"), framework, dirs_exist_ok=True)
 for target in (framework, app):
     subprocess.run(["codesign", "--force", "--sign", "-", str(target)], check=True)
 print(f"Simulator test app: {app}")

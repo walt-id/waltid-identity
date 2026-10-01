@@ -359,7 +359,10 @@ class WalletDemoAppTestScenarios(
         unlockWithPin()
         awaitTaggedNode(WalletUiTestTags.CredentialsLoading)
         gate.completeExceptionally(IllegalStateException("Credential storage unavailable"))
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Failed }
+        waitUntil(timeoutMillis = 5_000) {
+            controller.state.value.session is WalletSessionState.Failed &&
+                onAllNodesWithTag(WalletUiTestTags.CredentialsLoading).fetchSemanticsNodes().isEmpty()
+        }
         onNodeWithTag(WalletUiTestTags.CredentialsLoading).assertDoesNotExist()
         onNodeWithTag(WalletUiTestTags.CredentialsEmpty).assertDoesNotExist()
     }
