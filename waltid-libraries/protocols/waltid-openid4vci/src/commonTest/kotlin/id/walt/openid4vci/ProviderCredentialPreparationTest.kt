@@ -1,7 +1,5 @@
 package id.walt.openid4vci
 
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
@@ -145,7 +143,7 @@ class ProviderCredentialPreparationTest {
             request, configuration, Crypto2CredentialSigningKey.select(key, configuration), context.credentialIssuer,
             inputs, proofValidationContext = context,
         ) else provider.createCredentialResponse(
-            request, configuration, JWKKey.generate(KeyType.secp256r1), context.credentialIssuer,
+            request, configuration, LegacyP256TestKey(key), context.credentialIssuer,
             inputs, proofValidationContext = context,
         )
     }
