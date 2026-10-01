@@ -191,6 +191,26 @@ public class WalletSdkBridge private constructor(
     public suspend fun listDeferredIssuance(): WalletBridgeResult<List<WalletIssuanceContinuation>> =
         walletBridgeCall { operations.listDeferredIssuance() }
 
+    /**
+     * Reports OpenID4VCI `credential_deleted` for a credential the holder rejected instead of storing.
+     */
+    public suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String? = null,
+        notificationEndpoint: String? = null,
+        eventDescription: String? = null,
+    ): WalletBridgeResult<Unit> =
+        walletBridgeCall {
+            operations.rejectIssuedCredential(
+                notificationId = notificationId,
+                accessToken = accessToken,
+                credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+                notificationEndpoint = notificationEndpoint,
+                eventDescription = eventDescription,
+            )
+        }
+
     /** Resumes one deferred credential issuance result. */
     public suspend fun resumeDeferredIssuance(
         deferredCredentialId: String,
@@ -400,6 +420,14 @@ internal interface WalletSdkBridgeOperations {
 
     suspend fun listDeferredIssuance(): List<WalletIssuanceContinuation>
 
+    suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String?,
+        notificationEndpoint: String?,
+        eventDescription: String?,
+    )
+
     suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletIssuanceOutcome
 
     suspend fun credentials(): List<MobileWalletCredential>
@@ -512,6 +540,22 @@ internal class MobileWalletSdkBridgeOperations(
         wallet.cancelIssuance(sessionId)
 
     override suspend fun listDeferredIssuance(): List<WalletIssuanceContinuation> = wallet.listDeferredIssuance()
+
+    override suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String?,
+        notificationEndpoint: String?,
+        eventDescription: String?,
+    ) {
+        wallet.rejectIssuedCredential(
+            notificationId = notificationId,
+            accessToken = accessToken,
+            credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+            notificationEndpoint = notificationEndpoint,
+            eventDescription = eventDescription,
+        )
+    }
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletIssuanceOutcome =
         wallet.resumeDeferredIssuance(deferredCredentialId)
