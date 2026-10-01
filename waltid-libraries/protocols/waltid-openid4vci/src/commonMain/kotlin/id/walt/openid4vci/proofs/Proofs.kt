@@ -8,15 +8,21 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-/**
- * Proof type identifiers (OpenID4VCI 1.0).
- */
-enum class ProofTypeId(val value: String) {
-    JWT("jwt"),
-    DI_VP("di_vp"),
-    ATTESTATION("attestation");
+private const val JWT_PROOF_TYPE = "jwt"
+private const val DI_VP_PROOF_TYPE = "di_vp"
+private const val ATTESTATION_PROOF_TYPE = "attestation"
+
+/** Proof type identifiers (OpenID4VCI 1.0). */
+enum class ProofType(val value: String) {
+    JWT(JWT_PROOF_TYPE),
+    DI_VP(DI_VP_PROOF_TYPE),
+    ATTESTATION(ATTESTATION_PROOF_TYPE);
 
     override fun toString(): String = value
+
+    companion object {
+        fun fromValue(value: String): ProofType? = entries.firstOrNull { it.value == value }
+    }
 }
 
 /**
@@ -26,11 +32,11 @@ enum class ProofTypeId(val value: String) {
  */
 @Serializable
 data class Proofs(
-    @SerialName("jwt")
+    @SerialName(JWT_PROOF_TYPE)
     val jwt: List<String>? = null,
-    @SerialName("di_vp")
+    @SerialName(DI_VP_PROOF_TYPE)
     val diVp: List<JsonObject>? = null,
-    @SerialName("attestation")
+    @SerialName(ATTESTATION_PROOF_TYPE)
     val attestation: List<String>? = null,
 ) {
     companion object {
@@ -39,13 +45,13 @@ data class Proofs(
             require(unsupportedProofTypes.isEmpty()) {
                 "Unsupported credential proof type: ${unsupportedProofTypes.first()}"
             }
-            val jwt = json["jwt"]?.let { parseStringArray("jwt", it) }
-            val diVp = json["di_vp"]?.let { parseObjectArray("di_vp", it) }
-            val attestation = json["attestation"]?.let { parseStringArray("attestation", it) }
+            val jwt = json[ProofType.JWT.value]?.let { parseStringArray(ProofType.JWT.value, it) }
+            val diVp = json[ProofType.DI_VP.value]?.let { parseObjectArray(ProofType.DI_VP.value, it) }
+            val attestation = json[ProofType.ATTESTATION.value]?.let { parseStringArray(ProofType.ATTESTATION.value, it) }
             return Proofs(jwt = jwt, diVp = diVp, attestation = attestation)
         }
 
-        private val supportedProofTypes = setOf("jwt", "di_vp", "attestation")
+        private val supportedProofTypes = ProofType.entries.map { it.value }.toSet()
 
         private fun parseStringArray(name: String, element: JsonElement): List<String> {
             val array = element as? JsonArray
