@@ -1,52 +1,46 @@
 package id.walt.openid4vci.proofs
 
-import id.walt.cose.toCoseKey
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.exportPublicJwk
-import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
-import kotlinx.coroutines.CancellationException
 
-/** Select only after every proof has been verified, before allocating issuance inputs or status entries. */
+/** Select only after all evidence passed validation. No proof-specific fields are inspected here. */
 internal suspend fun selectCredentialBindings(
-    proofs: List<VerifiedCredentialProof>,
+    results: List<CredentialProofHandlerResult>,
     configuration: CredentialConfiguration,
-    context: CredentialProofValidationContext,
 ): List<VerifiedCredentialBinding> {
-    // Preserve ordinary JWT issuance, including its existing duplicate-key behavior.
-    if (proofs.none { it.keyAttestation != null }) return proofs.mapIndexed { index, proof -> proof.binding(index) }
-    val options = context.keyAttestation ?: throw invalidCredentialProof("Key attestation verification is not configured")
-    val signers = proofs.mapIndexed { index, proof ->
-        Jwk.sha256Thumbprint(proof.holderKey.exportPublicJwk()) to proof.binding(index)
-    }.groupBy({ it.first }, { it.second })
-    val bindings = linkedMapOf<String, VerifiedCredentialBinding>()
-    proofs.forEachIndexed { index, proof ->
-        (proof.keyAttestation?.attestedKeys ?: listOf(proof.holderKey)).forEach { key ->
-            val thumbprint = Jwk.sha256Thumbprint(key.exportPublicJwk())
-            val signer = signers[thumbprint]?.firstOrNull { it.holderDid != null }
-                ?: signers[thumbprint]?.firstOrNull()
-            val binding = VerifiedCredentialBinding(key, signer?.holderKid, signer?.holderDid, setOf(index))
-            val methods = configuration.cryptographicBindingMethodsSupported
-            if (binding.holderDid == null && methods != null &&
-                methods.none { it == CryptographicBindingMethod.Jwk || it == CryptographicBindingMethod.CoseKey }) {
-                throw invalidCredentialProof("An attested key has no verified identifier for the supported binding methods")
-            }
-            if (configuration.format !in setOf(CredentialFormat.SD_JWT_VC, CredentialFormat.MSO_MDOC) && binding.holderDid == null) {
-                throw invalidCredentialProof("This credential format requires a verified DID for each attested key")
-            }
-            if (configuration.format == CredentialFormat.MSO_MDOC) {
-                try {
-                    key.exportPublicJwk().toCoseKey()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    throw invalidCredentialProof("An attested key cannot be represented by the mdoc credential handler", e)
-                }
-            }
-            val previous = bindings[thumbprint]
-            bindings[thumbprint] = binding.copy(proofIndexes = previous?.proofIndexes.orEmpty() + index)
+    val distinct = results.any { it.multiplicity == CredentialBindingMultiplicity.DISTINCT_KEYS }
+    if (!distinct) {
+        val bindings = results.flatMapIndexed { index, result ->
+            result.candidates.map { VerifiedCredentialBinding(it.holderKey, it.holderKid, it.holderDid, setOf(index)) }
+        }
+        bindings.forEach { validateSelectedBinding(it, configuration) }
+        return bindings
+    }
+    val selected = linkedMapOf<String, VerifiedCredentialBinding>()
+    results.forEachIndexed { index, result ->
+        result.candidates.forEach { candidate ->
+            val thumbprint = Jwk.sha256Thumbprint(candidate.holderKey.exportPublicJwk())
+            val previous = selected[thumbprint]
+            // Keep the first identity unless this is the first verified DID for the key.
+            val keepIdentity = previous != null && (previous.holderDid != null || candidate.holderDid == null)
+            selected[thumbprint] = VerifiedCredentialBinding(
+                holderKey = candidate.holderKey,
+                holderKid = if (keepIdentity) previous?.holderKid else candidate.holderKid,
+                holderDid = if (keepIdentity) previous?.holderDid else candidate.holderDid,
+                proofIndexes = previous?.proofIndexes.orEmpty() + index,
+            )
         }
     }
-    return bindings.values.toList()
+    selected.values.forEach { validateSelectedBinding(it, configuration) }
+    return selected.values.toList()
+}
+
+private fun validateSelectedBinding(binding: VerifiedCredentialBinding, configuration: CredentialConfiguration) {
+    val methods = configuration.cryptographicBindingMethodsSupported
+    if (binding.holderDid == null && methods != null &&
+        methods.none { it == CryptographicBindingMethod.Jwk || it == CryptographicBindingMethod.CoseKey }) {
+        throw invalidCredentialProof("A selected key has no verified identifier for the supported binding methods")
+    }
 }
