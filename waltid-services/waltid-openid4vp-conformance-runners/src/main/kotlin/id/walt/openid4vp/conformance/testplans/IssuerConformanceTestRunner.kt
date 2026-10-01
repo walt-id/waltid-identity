@@ -106,20 +106,13 @@ class IssuerConformanceTestRunner(
         println("  haip mdoc      -> ${resolvedIds.haipMdoc ?: "<not found>"}")
         println("Selected OpenID4VCI issuer variants: ${protocolVariants.size}/${allVariants.size}; ${selectedVariants.size} proof-mode runs")
 
+        val preflightResults = preflightIssuerConfigurations(metadata, selectedVariants) { variant ->
+            credentialConfigurationIdFor(variant, resolvedIds)
+        }
+        IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, preflightResults, variantSelection.strictResults)
+        requireIssuerConfigurationPreflight(preflightResults)
+
         if (variantSelection.discoveryOnly) {
-            val discoveryResults = selectedVariants.map { variant ->
-                val credentialConfigurationId = credentialConfigurationIdFor(variant, resolvedIds)
-                if (credentialConfigurationId == null) {
-                    blockedResult(variant, "No issuer metadata credential configuration id found for ${variant.credentialFormat}.")
-                } else {
-                    IssuerVariantRunResult(
-                        variantId = variant.id,
-                        variant = variant.toJsonObject(),
-                        status = IssuerVariantRunStatus.GENERATED,
-                    )
-                }
-            }
-            IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, discoveryResults, variantSelection.strictResults)
             println("Wrote issuer conformance discovery artifacts to ${variantSelection.reportDir}")
             return emptyList()
         }
@@ -131,14 +124,7 @@ class IssuerConformanceTestRunner(
         try {
             selectedVariants.forEachIndexed { index, variant ->
                 println("Running issuer matrix variant ${index + 1}/${selectedVariants.size}: ${variant.id}")
-                val credentialConfigurationId = credentialConfigurationIdFor(variant, resolvedIds)
-                if (credentialConfigurationId == null) {
-                    results += blockedResult(
-                        variant,
-                        "No issuer metadata credential configuration id found for ${variant.credentialFormat}."
-                    )
-                    return@forEachIndexed
-                }
+                val credentialConfigurationId = requireNotNull(credentialConfigurationIdFor(variant, resolvedIds))
 
                 results += runCatching {
                     val plan = Oid4vciIssuerVariantPlan(
@@ -265,14 +251,6 @@ class IssuerConformanceTestRunner(
         "mdoc" -> if (variant.isHaip) resolvedIds.haipMdoc else resolvedIds.mdoc
         else -> null
     }?.let { id -> if (variant.credentialProofType == "attestation") "$id.attestation" else id }
-
-    private fun blockedResult(variant: IssuerVariant, error: String): IssuerVariantRunResult =
-        IssuerVariantRunResult(
-            variantId = variant.id,
-            variant = variant.toJsonObject(),
-            status = IssuerVariantRunStatus.BLOCKED,
-            error = error,
-        )
 
     private fun buildIssuerMetadataUrl(issuerUrl: String): String {
         val issuerUri = URI.create(issuerUrl)
