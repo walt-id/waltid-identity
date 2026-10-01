@@ -360,8 +360,31 @@ data class IssuerVariantMatrixEntry(
 
 object IssuerVariantReportWriter {
     private val json = Json { prettyPrint = true }
+    private val proofModes = setOf("jwt", "attestation")
+
+    fun prepareForRun(reportDir: String) {
+        clearGeneratedFiles(Path.of(reportDir))
+        proofModes.forEach { clearGeneratedFiles(Path.of(reportDir, it)) }
+    }
+
+    private fun clearGeneratedFiles(dir: Path) {
+        listOf("matrix.json", "results.json", "summary.md").forEach { Files.deleteIfExists(dir.resolve(it)) }
+    }
 
     fun write(reportDir: String, variants: List<IssuerVariant>, results: List<IssuerVariantRunResult>, strictResults: Boolean) {
+        val selectedModes = variants.mapNotNull { it.credentialProofType }.toSet()
+        (proofModes - selectedModes).forEach { clearGeneratedFiles(Path.of(reportDir, it)) }
+        writeReport(reportDir, variants, results, strictResults)
+        // Keep an aggregate report for CI and independent evidence for each proof mode.
+        selectedModes.forEach { proofType ->
+            val selected = variants.filter { it.credentialProofType == proofType }
+            val ids = selected.map { it.id }.toSet()
+            writeReport(Path.of(reportDir, proofType).toString(), selected,
+                results.filter { it.variantId in ids }, strictResults)
+        }
+    }
+
+    private fun writeReport(reportDir: String, variants: List<IssuerVariant>, results: List<IssuerVariantRunResult>, strictResults: Boolean) {
         val dir = Path.of(reportDir)
         Files.createDirectories(dir)
 

@@ -57,6 +57,8 @@ class IssuerConformanceTestRunner(
     private val proofModes: List<String> = parseIssuerProofModes(System.getenv("OPENID4VCI_CONFORMANCE_PROOF_MODES")),
 ) {
     suspend fun run(): List<TestPlanResult> {
+        // Even failures before metadata is available must not leave an earlier run's passing reports.
+        IssuerVariantReportWriter.prepareForRun(variantSelection.reportDir)
         val conformance = ConformanceInterface(conformanceHost, conformancePort)
         return try {
             val metadataHttp = HttpClient {
