@@ -2,6 +2,8 @@
 
 package id.walt.wallet2.mobile.swiftinterop
 
+import id.walt.wallet2.consent.PaymentConsentException
+import id.walt.wallet2.consent.PaymentConsentFailure
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.credentials.CredentialParser
@@ -71,6 +73,8 @@ public data class WalletBridgeConfiguration(
     public val issuerMetadataTrustResolver: WalletBridgeIssuerMetadataTrustResolver? = null,
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    /** Independently configured payment attestation issuer keys. */
+    public val paymentCredentialIssuers: List<WalletBridgePaymentCredentialIssuer> = emptyList(),
     public val clientIdTrustConfiguration: WalletBridgeClientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(),
     public val appGroupIdentifier: String? = null,
     public val keychainAccessGroup: String? = null,
@@ -255,6 +259,7 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
         persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
         preferredLocales = preferredLocales,
         transactionDataProfiles = transactionDataProfiles,
+        paymentCredentialIssuers = paymentCredentialIssuers.map { it.toCore() },
         defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy.toCorePolicy(),
         keyUseAuthorizationPrompt = keyUseAuthorizationPrompt,
         signingIdentity = signingIdentity,
@@ -586,6 +591,9 @@ public enum class WalletBridgeErrorCategory {
     /** Key-use authorization was unavailable or was not completed. */
     authorization,
 
+    /** A payment could not be reviewed or authorized. */
+    paymentConsent,
+
     /** Unexpected wallet failure that does not fit a narrower category. */
     internalFailure,
 }
@@ -596,6 +604,7 @@ public enum class WalletBridgeErrorCategory {
  * @property category Coarse failure category.
  * @property message Human-readable failure message.
  * @property causeClass Kotlin exception class name when available.
+ * @property paymentConsentFailure Stable payment failure when paymentConsent is the category.
  * @property authorizationFailure Stable key-use authorization failure when authorization is the category.
  */
 @Serializable
@@ -604,8 +613,12 @@ public class WalletBridgeError internal constructor(
     public val message: String,
     public val causeClass: String? = null,
     public val authorizationFailure: KeyUseAuthorizationFailure? = null,
+    public val paymentConsentFailure: PaymentConsentFailure? = null,
 ) {
     init {
+        require((category == WalletBridgeErrorCategory.paymentConsent) == (paymentConsentFailure != null)) {
+            "Payment consent bridge errors must include exactly one payment failure"
+        }
         require((category == WalletBridgeErrorCategory.authorization) == (authorizationFailure != null)) {
             "Authorization bridge errors must include exactly one authorization failure"
         }
@@ -613,7 +626,9 @@ public class WalletBridgeError internal constructor(
     internal companion object {
         fun fromThrowable(throwable: Throwable): WalletBridgeError {
             val authorizationFailure = (throwable as? KeyUseAuthorizationException)?.failure
+            val paymentFailure = (throwable as? PaymentConsentException)?.reason
             val category = when {
+                paymentFailure != null -> WalletBridgeErrorCategory.paymentConsent
                 authorizationFailure != null -> WalletBridgeErrorCategory.authorization
                 throwable is CancellationException -> WalletBridgeErrorCategory.cancelled
                 throwable is IllegalArgumentException -> WalletBridgeErrorCategory.invalidInput
@@ -627,6 +642,7 @@ public class WalletBridgeError internal constructor(
                 message = throwable.message ?: throwable::class.simpleName ?: "Unknown wallet error",
                 causeClass = throwable::class.simpleName,
                 authorizationFailure = authorizationFailure,
+                paymentConsentFailure = paymentFailure,
             )
         }
     }
@@ -650,3 +666,25 @@ public sealed interface WalletBridgeResult<out T> {
      */
     public data class Failure(public val error: WalletBridgeError) : WalletBridgeResult<Nothing>
 }
+
+/**
+ * Swift-friendly public verification material.
+ * @property issuer Exact credential issuer identifier to trust.
+ * @property publicJwkJson Independently configured public verification key as JWK JSON.
+ * @property algorithm Allowed JWS algorithm identifier for this key.
+ */
+public data class WalletBridgePaymentCredentialIssuer(
+    public val issuer: String,
+    public val publicJwkJson: String,
+    public val algorithm: String = "ES256",
+) {
+    internal fun toCore(): id.walt.wallet2.consent.PaymentCredentialIssuer = id.walt.wallet2.consent.PaymentCredentialIssuer(
+        issuer, publicJwkJson, id.walt.crypto2.jose.JwsAlgorithm.entries.first { it.identifier == algorithm },
+    )
+}
+
+/**
+ * Successful preparation; failures use the normal result channel.
+ * @property consent Prepared review, or null when this selection requires no SD-JWT TS-12 review.
+ */
+public data class WalletBridgePaymentConsentPreparation(public val consent: id.walt.wallet2.consent.PreparedPaymentConsent?)

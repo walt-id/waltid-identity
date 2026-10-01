@@ -719,11 +719,19 @@ private actor TransactionCodeWalletClient: WalletClient {
         )
     }
 
-    func submitPresentation(
+    func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
+    ) async throws -> PaymentConsent? { nil }
+
+    func submitPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection],
+        did: String?,
+        paymentConsentRevision: String?
     ) async throws -> PresentationResult {
         presentationSubmitCalls += 1
         if presentationActionDelayNanoseconds > 0 {

@@ -123,7 +123,12 @@ class WalletViewModel: ObservableObject {
     }
     @Published var txCode = ""
     @Published var presentationRequestUrl = ""
-    @Published private(set) var presentationReview: PresentationPreviewResult?
+    @Published private(set) var presentationReview: PresentationPreviewResult? {
+        didSet {
+            paymentConsentTask?.cancel()
+            paymentReview = .notRequired
+        }
+    }
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
     @Published var selectedPresentationDisclosureOptions: Set<PresentationDisclosureSelection> = []
     @Published var selectedTab: WalletTab = .credentials
@@ -186,6 +191,8 @@ class WalletViewModel: ObservableObject {
     private var issuanceSession: IssuanceSession?
     private var pendingPresentationSuccessMessage: String?
     private var presentationTask: Task<Void, Never>?
+    private var paymentConsentTask: Task<Void, Never>?
+    @Published var paymentReview: PaymentReviewState = .notRequired
     private var biometricSigningAvailabilityTask: Task<Void, Never>?
     private var foregroundSequence = 0
     private var lastWarnedForegroundSequence: Int?
@@ -322,6 +329,7 @@ class WalletViewModel: ObservableObject {
 
     func resetWallet() {
         receiveTask?.cancel()
+        paymentConsentTask?.cancel()
         presentationTask?.cancel()
         cancelIssuanceIfPresent()
         discardPresentationPreviewIfPresent()
@@ -356,6 +364,7 @@ class WalletViewModel: ObservableObject {
     func lock() {
         proximityPresentation.dismiss()
         receiveTask?.cancel()
+        paymentConsentTask?.cancel()
         presentationTask?.cancel()
         cancelIssuanceIfPresent()
         discardPresentationPreviewIfPresent()
@@ -478,7 +487,7 @@ class WalletViewModel: ObservableObject {
         guard auth == .setup,
               signingProtectionMode == .optional,
               !isAuthenticating,
-              protection != .biometric || isBiometricSigningAvailable else { return }
+              !protection.requiresBiometrics || isBiometricSigningAvailable else { return }
         selectedSigningProtection = protection
         signingProtectionError = nil
     }
@@ -489,7 +498,7 @@ class WalletViewModel: ObservableObject {
 
     func requestSigningProtectionChange(_ protection: WalletDemoSigningProtection) {
         guard signingProtectionMode.allows(protection), !isChangingSigningProtection, !isLoading else { return }
-        guard protection != .biometric || isBiometricSigningAvailable else { return }
+        guard !protection.requiresBiometrics || isBiometricSigningAvailable else { return }
         if signingProtectionReprovisionTarget != nil {
             reprovisionWallet(
                 target: protection,
@@ -631,13 +640,17 @@ class WalletViewModel: ObservableObject {
             ),
             clientIDTrustConfiguration: DemoClientIdTrust.clientIDTrustConfiguration,
             transactionDataProfiles: transactionDataProfiles.profiles,
+            paymentCredentialIssuers: [WalletPaymentCredentialIssuer(
+                issuer: "https://issuer2.demo.walt.id/openid4vci",
+                publicJWKJSON: #"{"kty":"EC","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}"#
+            )],
             crossProcessAccess: Self.crossProcessAccessConfiguration(),
             defaultKeyUseAuthorizationPolicy: signingProtectionMode.defaultSelection.authorizationPolicy,
             keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(
                 message: "Authorize wallet signing",
                 cancelText: "Cancel"
             ),
-            signingIdentity: .init(alternativeAuthorizations: signingProtectionMode.allows(.none) ? [.none] : [],
+            signingIdentity: .init(alternativeAuthorizations: signingProtectionMode.alternativeAuthorizations,
                 keychain: .init(accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup),
                 recoveryProviders: [KeychainIdentityRecovery(namespace: "wallet-demo",
                     accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup)])
@@ -745,7 +758,7 @@ class WalletViewModel: ObservableObject {
 
         switch fetchResult {
         case .success(let profiles):
-            return TransactionDataProfilesConfiguration(profiles: withTemporaryVerificationPaymentCard(profiles))
+            return TransactionDataProfilesConfiguration(profiles: profiles)
         case .failure(let error):
             return transactionDataProfilesUnavailable("Could not fetch transaction data profiles from \(url.absoluteString): \(error)")
         case nil:
@@ -756,30 +769,10 @@ class WalletViewModel: ObservableObject {
     private static func transactionDataProfilesUnavailable(_ reason: String) -> TransactionDataProfilesConfiguration {
         NSLog("[WalletE2E] Transaction data profiles unavailable: \(reason)")
         return TransactionDataProfilesConfiguration(
-            profiles: withTemporaryVerificationPaymentCard([]),
+            profiles: [],
             warning: WalletStatusText.transactionDataProfilesUnavailable
         )
     }
-
-    /// Temporary local verification aid. The live request uses type `payment_card` from a
-    /// different issuer; do not treat this as a product seed. Remove once the loaded
-    /// profiles already include this type.
-    private static func withTemporaryVerificationPaymentCard(
-        _ profiles: [WalletTransactionDataProfile]
-    ) -> [WalletTransactionDataProfile] {
-        if profiles.contains(where: { $0.type == temporaryVerificationPaymentCardType }) {
-            return profiles
-        }
-        return profiles + [
-            WalletTransactionDataProfile(
-                type: temporaryVerificationPaymentCardType,
-                displayName: "Payment Card",
-                fields: ["merchant_name", "amount"]
-            )
-        ]
-    }
-
-    private static let temporaryVerificationPaymentCardType = "payment_card"
 
     private struct TransactionDataProfilesConfiguration {
         let profiles: [WalletTransactionDataProfile]
@@ -810,6 +803,7 @@ class WalletViewModel: ObservableObject {
         switch url.scheme.flatMap(WalletDeepLinkScheme.init(rawValue:)) {
         case .credentialOffer:
             receiveTask?.cancel()
+            paymentConsentTask?.cancel()
             presentationTask?.cancel()
             cancelIssuanceIfPresent()
             discardPresentationPreviewIfPresent()
@@ -828,6 +822,7 @@ class WalletViewModel: ObservableObject {
             resetFlowStatusForIncomingURL()
         case .presentationRequest:
             receiveTask?.cancel()
+            paymentConsentTask?.cancel()
             presentationTask?.cancel()
             cancelIssuanceIfPresent()
             discardPresentationPreviewIfPresent()
@@ -870,6 +865,7 @@ class WalletViewModel: ObservableObject {
     }
 
     func startNewPresentationFlow() {
+        paymentConsentTask?.cancel()
         presentationTask?.cancel()
         discardPresentationPreviewIfPresent()
         resetInputFocus()
@@ -1234,6 +1230,7 @@ class WalletViewModel: ObservableObject {
                     selectedPresentationCredentialOptions = preview.sharingReview().defaultCredentialSelection()
                     selectedPresentationDisclosureOptions = []
                     setSuccess(WalletStatusText.reviewPresentationRequest, tab: .present)
+                    prepareSelectedPaymentConsent()
                 case .invalid:
                     selectedPresentationCredentialOptions = []
                     selectedPresentationDisclosureOptions = []
@@ -1266,11 +1263,37 @@ class WalletViewModel: ObservableObject {
     private func apply(_ selection: SharingSelection) {
         selectedPresentationCredentialOptions = selection.credentials
         selectedPresentationDisclosureOptions = selection.disclosures
+        prepareSelectedPaymentConsent()
+    }
+
+    private func prepareSelectedPaymentConsent() {
+        paymentConsentTask?.cancel()
+        guard let preview = presentationPreview else { return }
+        let credentials = selectedPresentationCredentialOptions
+        let disclosures = selectedPresentationDisclosureOptions
+        let selectedDid = did.isEmpty ? nil : did
+        paymentReview = .loading
+        guard presentationCredentialSelectionComplete else { return }
+        paymentConsentTask = Task {
+            do {
+                let consent = try await walletClient.preparePaymentConsent(previewHandle: preview.previewHandle,
+                    selectedCredentialOptions: Array(credentials), selectedDisclosureOptions: Array(disclosures), did: selectedDid)
+                try Task.checkCancellation()
+                guard presentationPreview?.previewHandle == preview.previewHandle,
+                      selectedPresentationCredentialOptions == credentials,
+                      selectedPresentationDisclosureOptions == disclosures else { return }
+                paymentReview = consent.map { .ready($0) } ?? .notRequired
+            } catch is CancellationError { return
+            } catch {
+                guard !Task.isCancelled else { return }
+                paymentReview = .blocked(error.localizedDescription)
+            }
+        }
     }
 
     func submitPresentation() {
         resetInputFocus()
-        guard !isLoading else { return }
+        guard !isLoading, paymentReview.canConfirm else { return }
         guard let previewHandle = presentationPreview?.previewHandle else { return }
         guard presentationCredentialSelectionComplete else {
             setError(WalletStatusText.failure(WalletStatusText.presentFailed, WalletStatusText.selectCredentialForEveryRequest), tab: .present)
@@ -1281,6 +1304,7 @@ class WalletViewModel: ObservableObject {
         let selectedCredentialOptions = Array(selectedPresentationCredentialOptions)
         let selectedDid = did.isEmpty ? nil : did
 
+        let consentRevision = paymentReview.consent?.revision
         setLoading(WalletStatusText.presentingCredential, tab: .present)
         presentationTask = Task {
             do {
@@ -1288,7 +1312,8 @@ class WalletViewModel: ObservableObject {
                     previewHandle: previewHandle,
                     selectedCredentialOptions: selectedCredentialOptions,
                     selectedDisclosureOptions: Array(selectedDisclosureOptions),
-                    did: selectedDid
+                    did: selectedDid,
+                    paymentConsentRevision: consentRevision
                 )
                 try Task.checkCancellation()
                 resetPresentationToEntry()
@@ -1362,6 +1387,7 @@ class WalletViewModel: ObservableObject {
     func cancelPresentationReview() {
         resetInputFocus()
         guard !isLoading, let previewHandle = presentationReview?.previewHandle else { return }
+        paymentConsentTask?.cancel()
         presentationTask?.cancel()
         resetPresentationToEntry()
         setSuccess(WalletStatusText.presentationReviewCancelled, tab: .present)
@@ -1572,7 +1598,7 @@ class WalletViewModel: ObservableObject {
     private func validateSigningProtection(_ protection: WalletDemoSigningProtection) async -> Bool {
         do {
             let availability = try await walletClient.signingProtectionAvailability(protection)
-            if protection == .biometric {
+            if protection.requiresBiometrics {
                 biometricSigningAvailability = availability
                 if availability == .available {
                     signingProtectionWarning = nil
@@ -1589,7 +1615,7 @@ class WalletViewModel: ObservableObject {
                 WalletStatusText.signingProtectionChangeFailed,
                 error
             )
-            if protection == .biometric {
+            if protection.requiresBiometrics {
                 biometricSigningAvailability = .unsupported
             }
             return false
@@ -1602,7 +1628,9 @@ class WalletViewModel: ObservableObject {
             guard let self else { return }
             let availability: WalletDemoSigningProtectionAvailability
             do {
-                availability = try await walletClient.signingProtectionAvailability(.biometric)
+                availability = try await walletClient.signingProtectionAvailability(
+                    appliedSigningProtection.flatMap { $0.requiresBiometrics ? $0 : nil } ?? .biometric
+                )
             } catch {
                 availability = .unsupported
             }
@@ -1619,7 +1647,7 @@ class WalletViewModel: ObservableObject {
         guard let warningSequence,
               lastWarnedForegroundSequence != warningSequence,
               auth == .unlocked,
-              appliedSigningProtection == .biometric,
+              appliedSigningProtection?.requiresBiometrics == true,
               let availability = biometricSigningAvailability,
               let warning = availability.warningMessage(
                   canChooseNoBiometricSigning: signingProtectionMode.allows(.none)
@@ -1630,6 +1658,7 @@ class WalletViewModel: ObservableObject {
 
     private func cancelActiveWalletOperations() {
         receiveTask?.cancel()
+        paymentConsentTask?.cancel()
         presentationTask?.cancel()
         cancelIssuanceIfPresent()
         discardPresentationPreviewIfPresent()
