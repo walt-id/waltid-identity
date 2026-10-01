@@ -102,7 +102,7 @@ class Issuer2CredentialProofValidationTest {
         assertRejected(proof(key, nonce = null), CredentialErrorCodes.INVALID_NONCE)
         assertRejected(proof(key, nonce = UUID.randomUUID().toString()), CredentialErrorCodes.INVALID_NONCE)
         assertRejected(proof(key, nonce = flow.nonce(), type = "JWT"))
-        assertRejected(Proofs())
+        assertRejected(Proofs(), CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST)
         assertRejected(Proofs(jwt = listOf("not-a-jwt")))
         assertRejected(proof(key, nonce = flow.nonce(), kid = "did:example:unrelated#key-1"))
         val holderDid = DidJwkRegistrar().registerByKey(key, DidJwkCreateOptions(KeyType.secp256r1)).did
