@@ -78,6 +78,12 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Install qualified DC API emulator runtime dependency
+        if: matrix.phase == 'dc-api-compose'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libpulse0
+
       - name: Restore configured DC API AVD
         if: matrix.phase == 'dc-api-compose'
         id: dc-api-avd-cache
