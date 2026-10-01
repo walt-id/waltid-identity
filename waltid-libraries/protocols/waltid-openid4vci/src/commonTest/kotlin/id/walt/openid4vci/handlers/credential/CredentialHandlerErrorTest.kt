@@ -3,10 +3,9 @@ package id.walt.openid4vci.handlers.credential
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.crypto.keys.Key as LegacyKey
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
+import id.walt.cose.verify
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
@@ -24,6 +23,7 @@ import id.walt.crypto2.serialization.BinaryData
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultClient
+import id.walt.openid4vci.LegacyP256TestKey
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.*
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
@@ -86,17 +86,20 @@ class CredentialHandlerErrorTest {
                 val encoded = credential.credential.jsonPrimitive.content
                 when (format) {
                     CredentialFormat.SD_JWT_VC -> {
+                        CompactJws.verify(encoded.substringBefore('~'), fixture.issuer, JwsAlgorithm.ES256)
                         val jwk = SDJwt.parse(encoded).fullPayload.getValue("cnf").jsonObject.getValue("jwk").jsonObject
                         val encodedJwk = EncodedKey.Jwk(BinaryData(jwk.toString().encodeToByteArray()), privateMaterial = false)
                         assertEquals(Jwk.sha256Thumbprint(binding.holderKey.exportPublicJwk()), Jwk.sha256Thumbprint(encodedJwk))
                         assertEquals(binding.holderKey.id.value, jwk["kid"]?.jsonPrimitive?.content)
                     }
                     CredentialFormat.JWT_VC_JSON -> {
-                        val payload = Json.parseToJsonElement(CompactJws.decodeUnverified(encoded).payload.decodeToString()).jsonObject
+                        val payload = Json.parseToJsonElement(CompactJws.verify(encoded, fixture.issuer, JwsAlgorithm.ES256).payload.decodeToString()).jsonObject
                         assertEquals(binding.holderDid, payload["sub"]?.jsonPrimitive?.content)
                     }
                     CredentialFormat.MSO_MDOC -> {
-                        val mso = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(encoded.base64UrlDecode()).decodeMobileSecurityObject()
+                        val issuerSigned = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(encoded.base64UrlDecode())
+                        assertTrue(issuerSigned.issuerAuth.verify(fixture.issuer, -7))
+                        val mso = issuerSigned.decodeMobileSecurityObject()
                         assertEquals(binding.holderKey.exportPublicJwk().toCoseKey(), mso.deviceKeyInfo.deviceKey)
                     }
                     else -> error("Unexpected test format")
@@ -197,7 +200,7 @@ class CredentialHandlerErrorTest {
         val certificate = X509CertificateUtil.createSelfSignedCertificate(
             issuer, SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER),
         ) { subjectDn = "CN=credential handler test" }
-        return Fixture(issuer, JWKKey.generate(KeyType.secp256r1), certificate)
+        return Fixture(issuer, LegacyP256TestKey(issuer), certificate)
     }
 
     private class Fixture(val issuer: Key, val legacyIssuer: LegacyKey, val certificate: X509Certificate) {
