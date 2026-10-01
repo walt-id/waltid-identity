@@ -10,6 +10,8 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.domain.IssuanceSessionStatus
+import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
+import id.walt.issuer2.testsupport.Issuer2CredentialScenario
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
 import id.walt.issuer2.testsupport.Issuer2TxCodeMode
@@ -24,19 +26,24 @@ import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.openid4vci.offers.AuthenticationMethod
+import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethodConfig
 import id.walt.openid4vci.errors.CredentialErrorCodes
-import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.proofs.Proofs
+import id.walt.openid4vci.proofs.ProofType
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -83,7 +90,13 @@ class Issuer2CredentialProofValidationTest {
             assertFalse(session.isClosed)
         }
 
-        assertRejected(proof(key, nonce = flow.nonce(), audience = listOf("https://wrong.example")))
+        assertRejected(proof(key, nonce = flow.nonce(), audience = JsonPrimitive("https://wrong.example")))
+        for (audience in listOf(
+            JsonArray(listOf(JsonPrimitive(flow.resolvedOffer.issuerMetadata.credentialIssuer))),
+            JsonArray(listOf(JsonPrimitive("https://other.example"), JsonPrimitive(flow.resolvedOffer.issuerMetadata.credentialIssuer))),
+        )) {
+            assertRejected(proof(key, nonce = flow.nonce(), audience = audience))
+        }
         assertRejected(proof(key, nonce = flow.nonce(), issuedAt = now - 10.minutes.inWholeSeconds))
         assertRejected(proof(key, nonce = flow.nonce(), issuedAt = now + 2.minutes.inWholeSeconds))
         assertRejected(proof(key, nonce = null), CredentialErrorCodes.INVALID_NONCE)
@@ -113,7 +126,7 @@ class Issuer2CredentialProofValidationTest {
         val validProof = proof(
             key = key,
             nonce = reusableNonce,
-            audience = listOf("https://other.example", flow.resolvedOffer.issuerMetadata.credentialIssuer),
+            audience = JsonPrimitive(flow.resolvedOffer.issuerMetadata.credentialIssuer),
         ).jwt.orEmpty().single()
         val response = flow.request(Proofs(jwt = listOf(validProof)))
         assertEquals(HttpStatusCode.OK, response.status)
@@ -137,7 +150,7 @@ class Issuer2CredentialProofValidationTest {
         val proofs = proof(
             key = JWKKey.generate(KeyType.secp256r1),
             nonce = flow.nonce(),
-            audience = listOf(flow.resolvedOffer.issuerMetadata.credentialIssuer),
+            audience = JsonPrimitive(flow.resolvedOffer.issuerMetadata.credentialIssuer),
         )
 
         assertRejectedCredentialRequest(flow.request(proofs))
@@ -216,19 +229,14 @@ class Issuer2CredentialProofValidationTest {
         key: Key,
         nonce: String?,
         signingKey: Key = key,
-        audience: List<String> = listOf("http://localhost/openid4vci"),
+        audience: JsonElement = JsonPrimitive("http://localhost/openid4vci"),
         issuedAt: Long = Clock.System.now().epochSeconds,
         type: String = "openid4vci-proof+jwt",
         kid: String? = null,
         includeJwk: Boolean = true,
     ): Proofs {
         val payload = buildJsonObject {
-            val audienceClaim = if (audience.size == 1) {
-                JsonPrimitive(audience.single())
-            } else {
-                JsonArray(audience.map(::JsonPrimitive))
-            }
-            put("aud", audienceClaim)
+            put("aud", audience)
             put("iat", issuedAt)
             nonce?.let { put("nonce", it) }
         }
