@@ -131,4 +131,24 @@ class RicalPathForChainTest {
             ricalOf(pki).pathForChain(listOf(pki.leaf, other.leaf))
         }
     }
+
+    @Test
+    fun `selects issuer by key identifier when several certificates share the subject DN`() = runTest {
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+        val oldKey = runtime.generateMdocTestKey("rollover-old", signUsages)
+        val newKey = runtime.generateMdocTestKey("rollover-new", signUsages)
+        val leafKey = runtime.generateMdocTestKey("rollover-leaf", signUsages)
+        val dn = "CN=Rollover Root, O=Walt.id"
+        val oldRoot = X509CertificateUtil.createSelfSignedCertificate(oldKey, sigAlg) { subjectDn = dn }
+        val newRoot = X509CertificateUtil.createSelfSignedCertificate(newKey, sigAlg) { subjectDn = dn }
+        val leaf = X509CertificateUtil.createCertificate(newKey, newRoot, sigAlg) {
+            subjectDn = "CN=Rollover Reader, O=Walt.id"
+            subjectPublicKey(leafKey)
+        }
+        // old root listed first so a plain subject-DN lookup would pick the wrong one
+        val rical = rical(info(oldRoot, 1, null, true), info(newRoot, 2, null, true))
+        val (path, anchor) = rical.pathForChain(listOf(leaf))
+        assertEquals(listOf(leaf), path)
+        assertEquals(newRoot, anchor)
+    }
 }

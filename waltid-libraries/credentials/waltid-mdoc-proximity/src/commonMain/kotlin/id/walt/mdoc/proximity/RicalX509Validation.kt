@@ -2,6 +2,8 @@ package id.walt.mdoc.proximity
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
+import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.cose.Cose
 import id.walt.cose.verify
@@ -112,7 +114,7 @@ class X509RicalReaderPathValidator(clock: Clock = Clock.System) : RicalReaderPat
 
 /**
  * Builds the path from the reader leaf up to the highest RICAL trust anchor. Issuers are looked up by
- * subject DN, first among the reader-provided certificates, then among the RICAL certificates.
+ * subject DN (disambiguated by AKI/SKI when several certificates share a DN), first among the reader-provided certificates, then among the RICAL certificates.
  *
  * @param chain provided by the reader (any order, must form a single path)
  * @return path without trust anchor, leaf first (provided reader certificates plus intermediate certificates
@@ -126,20 +128,34 @@ internal fun Rical.pathForChain(chain: Collection<X509Certificate>): Pair<List<X
     val ricalCertificates = certificateInfos.map {
         it to X509CertificateUtil.parseCertificateDerEncoded(ByteString(it.certificateDer.toByteArray()))
     }
-    val anchorDers = ricalCertificates.filter { it.first.isTrustAnchor }.map { it.second.encodedDer }.toSet()
+    val anchorDers =
+        ricalCertificates.filter { it.first.isTrustAnchor }.map { it.second.encodedDer }.toSet()
 
     val issuerDns = readerCertificates.map { it.data.issuerDn }.toSet()
     val leaf = readerCertificates.filter { it.data.subjectDn !in issuerDns }.singleOrNull()
         ?: readerCertificates.singleOrNull()
         ?: throw IllegalArgumentException("Reader certificate chain does not form a single path")
 
-    val candidates = (readerCertificates + ricalCertificates.map { it.second }).distinctBy { it.encodedDer }
+    val candidates =
+        (readerCertificates + ricalCertificates.map { it.second }).distinctBy { it.encodedDer }
     val path = mutableListOf(leaf)
     while (true) {
         val current = path.last()
         if (current.data.subjectDn == current.data.issuerDn) break
         val issuer = candidates.firstOrNull { candidate ->
-            candidate.data.subjectDn == current.data.issuerDn && path.none { it.encodedDer == candidate.encodedDer }
+            candidate.data.subjectDn == current.data.issuerDn &&
+                    current.data.extensionAuthorityKeyIdentifier?.let { authorityKeyIdentifierExtension ->
+                        val candidateSubjectKeyIdExtension =
+                            candidate.data.extensionSubjectKeyIdentifier
+                        if (candidateSubjectKeyIdExtension == null) {
+                            true
+                        } else {
+                            authorityKeyIdentifierExtension.keyIdentifier?.equals(
+                                candidateSubjectKeyIdExtension.keyIdentifier
+                            ) ?: false
+                        }
+                    } ?: true &&
+                    path.none { it.encodedDer == candidate.encodedDer }
         } ?: break
         path.add(issuer)
     }
