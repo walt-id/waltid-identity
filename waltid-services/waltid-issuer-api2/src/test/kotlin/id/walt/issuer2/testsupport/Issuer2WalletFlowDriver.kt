@@ -16,7 +16,7 @@ import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.IssuerStateMode
-import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.proofs.Proofs
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
