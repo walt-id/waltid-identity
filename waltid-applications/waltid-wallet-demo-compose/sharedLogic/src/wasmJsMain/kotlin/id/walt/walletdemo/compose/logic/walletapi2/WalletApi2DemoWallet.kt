@@ -193,6 +193,7 @@ private class WalletApi2DemoWallet(
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
+        paymentConsentRevision: String?,
     ): WalletDemoOperationResult {
         val session = presentationSessions[previewHandle.value]
         val built = client.buildVpToken(

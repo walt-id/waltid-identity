@@ -16,6 +16,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import id.walt.walletdemo.compose.logic.*
+import id.walt.walletdemo.compose.ui.components.rememberPaymentReview
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
@@ -56,10 +58,13 @@ fun WalletDemoSharingReviewScreen(
     enabled: Boolean = true,
     onBackAtRoot: (() -> Unit)? = null,
     compact: Boolean = true,
+    preparePaymentConsent: (suspend (WalletDemoSharingSelection) -> WalletDemoPaymentConsent?)? = null,
 ) {
     var selection by remember(review) {
         mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
     }
+
+    val paymentReview = rememberPaymentReview(review, selection, preparePaymentConsent)
 
     // Called unconditionally, as the platform handlers require. A submission already in flight
     // consumes the gesture and does nothing: the response is on its way, so neither closing this
@@ -86,9 +91,10 @@ fun WalletDemoSharingReviewScreen(
                         .safeDrawingPadding(),
                     actions = {
                         SharingActionsRow(
+                            paymentReview = paymentReview,
                             enabled = enabled,
                             selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
-                            onSubmit = { onSubmit(selection) },
+                            onSubmit = { onSubmit(selection.copy(paymentConsentRevision = paymentReview.consent?.revision)) },
                             onCancel = onCancel,
                             onReject = onReject,
                         )
@@ -100,6 +106,7 @@ fun WalletDemoSharingReviewScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                     SharingReviewSection(
+                        paymentReview = paymentReview,
                         review = review,
                         selectedCredentialOptions = selection.credentials,
                         selectedDisclosureOptions = selection.disclosures,
@@ -114,7 +121,7 @@ fun WalletDemoSharingReviewScreen(
                             )
                         },
                         onToggleDisclosure = { disclosure -> selection = selection.toggleDisclosure(disclosure) },
-                        onSubmit = { onSubmit(selection) },
+                        onSubmit = { onSubmit(selection.copy(paymentConsentRevision = paymentReview.consent?.revision)) },
                         onCancel = onCancel,
                         onReject = onReject,
                     )
@@ -138,10 +145,12 @@ fun WalletDemoSharingReviewSheet(
     onCancel: () -> Unit,
     onBackAtRoot: () -> Unit,
     enabled: Boolean = true,
+    preparePaymentConsent: (suspend (WalletDemoSharingSelection) -> WalletDemoPaymentConsent?)? = null,
 ) {
     var selection by remember(review) {
         mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
     }
+    val paymentReview = rememberPaymentReview(review, selection, preparePaymentConsent)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     SystemBackHandler(enabled = true) {
@@ -168,9 +177,10 @@ fun WalletDemoSharingReviewSheet(
                         fillViewport = false,
                         actions = {
                             SharingActionsRow(
+                            paymentReview = paymentReview,
                                 enabled = enabled,
                                 selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
-                                onSubmit = { onSubmit(selection) },
+                                onSubmit = { onSubmit(selection.copy(paymentConsentRevision = paymentReview.consent?.revision)) },
                                 onCancel = onCancel,
                                 onReject = null,
                             )
@@ -182,6 +192,7 @@ fun WalletDemoSharingReviewSheet(
                             fontWeight = FontWeight.SemiBold,
                         )
                         SharingReviewSection(
+                        paymentReview = paymentReview,
                             review = review,
                             selectedCredentialOptions = selection.credentials,
                             selectedDisclosureOptions = selection.disclosures,
@@ -198,7 +209,7 @@ fun WalletDemoSharingReviewSheet(
                             onToggleDisclosure = { disclosure ->
                                 selection = selection.toggleDisclosure(disclosure)
                             },
-                            onSubmit = { onSubmit(selection) },
+                            onSubmit = { onSubmit(selection.copy(paymentConsentRevision = paymentReview.consent?.revision)) },
                             onCancel = onCancel,
                         )
                     }

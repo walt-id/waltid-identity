@@ -1,4 +1,5 @@
 import XCTest
+import WalletSDK
 @testable import iosApp
 
 @MainActor
@@ -7,6 +8,16 @@ final class WalletKeySetupTests: XCTestCase {
     private func option(_ recovery: String, _ storage: String, _ approval: String) -> Model.SetupOption {
         func value(_ id: String) -> Model.Selection { .init(id: id, title: id, detail: id) }
         return .init(recovery: value(recovery), storage: value(storage), approval: value(approval), restoring: false, perform: {})
+    }
+
+    func testPerUseBiometricsSurviveRestoreWithoutChangingTimedProtection() throws {
+        XCTAssertEqual(try WalletDemoSigningProtection(appliedPolicy: .biometricCurrentSet), .biometricPerUse)
+        XCTAssertEqual(WalletDemoSigningProtection.biometricPerUse.authorizationPolicy, .biometricCurrentSet)
+        XCTAssertEqual(WalletDemoSigningProtection.biometric.authorizationPolicy, .biometricTimedReuse(timeoutSeconds: 10))
+        XCTAssertTrue(WalletDemoSigningProtectionMode.required.allows(.biometricPerUse))
+        XCTAssertFalse(WalletDemoSigningProtectionMode.disabled.allows(.biometricPerUse))
+        XCTAssertEqual(WalletDemoSigningProtectionMode.required.resolve(.biometricPerUse), .biometricPerUse)
+        XCTAssertTrue(WalletDemoSigningProtectionMode.required.alternativeAuthorizations.contains(.biometricCurrentSet))
     }
 
     func testRecoveryFiltersHardwareAndPreservesCompatibleApproval() {

@@ -1,10 +1,98 @@
+import Combine
 import Foundation
 import WalletDemoSharingUI
-import WalletSDK
+@testable import WalletSDK
 import XCTest
 @testable import iosApp
 
 final class WalletViewModelPresentationTests: XCTestCase {
+
+    @MainActor
+    func testPaymentPreparationBlocksSubmissionWhileLoadingAndAfterFailure() async throws {
+        let preparation = PendingPaymentPreparation()
+        let client = MockWalletClient(paymentConsent: { try await preparation.prepare() })
+        let viewModel = try await paymentViewModel(client)
+        try await waitUntilAsync { await preparation.count == 1 }
+        XCTAssertEqual(viewModel.paymentReview, .loading)
+        viewModel.submitPresentation()
+        var submitted = await client.submittedPaymentConsentRevisions
+        XCTAssertTrue(submitted.isEmpty)
+
+        await preparation.complete(0, with: .failure(WalletError.internalFailure("Missing issuer labels")))
+        try await waitUntil { if case .blocked = viewModel.paymentReview { true } else { false } }
+        viewModel.submitPresentation()
+        submitted = await client.submittedPaymentConsentRevisions
+        XCTAssertTrue(submitted.isEmpty)
+    }
+
+    @MainActor
+    func testPaymentSelectionChangeDiscardsLateConsentAndSubmitsCurrentRevision() async throws {
+        let preparation = PendingPaymentPreparation()
+        let client = MockWalletClient(paymentConsent: { try await preparation.prepare() })
+        let viewModel = try await paymentViewModel(client)
+        try await waitUntilAsync { await preparation.count == 1 }
+        let credential = try XCTUnwrap(viewModel.selectedPresentationCredentialOptions.first)
+        viewModel.togglePresentationDisclosure(PresentationDisclosureSelection(
+            queryID: credential.queryID, credentialID: credential.credentialID, path: "$.given_name"
+        ))
+        XCTAssertEqual(viewModel.paymentReview, .loading)
+        try await waitUntilAsync { await preparation.count == 2 }
+        await preparation.complete(1, with: .success(paymentConsent("current")))
+        try await waitUntil { viewModel.paymentReview.consent?.revision == "current" }
+
+        let stale = expectation(description: "Stale consent must not replace the current review")
+        stale.isInverted = true
+        let observation = viewModel.$paymentReview.sink { state in
+            if state.consent?.revision == "stale" { stale.fulfill() }
+        }
+        await preparation.complete(0, with: .success(paymentConsent("stale")))
+        await fulfillment(of: [stale], timeout: 0.2)
+        withExtendedLifetime(observation) {}
+        XCTAssertEqual(viewModel.paymentReview.consent?.revision, "current")
+        viewModel.submitPresentation()
+        try await waitUntil { viewModel.presentationReview == nil && !viewModel.isLoading }
+        let submitted = await client.submittedPaymentConsentRevisions
+        XCTAssertEqual(submitted, ["current"])
+    }
+
+    @MainActor
+    func testLockPreventsLatePaymentPreparationFromRestoringConsent() async throws {
+        let preparation = PendingPaymentPreparation()
+        let client = MockWalletClient(paymentConsent: { try await preparation.prepare() })
+        let viewModel = try await paymentViewModel(client)
+        try await waitUntilAsync { await preparation.count == 1 }
+        viewModel.lock()
+        XCTAssertEqual(viewModel.paymentReview, .notRequired)
+        XCTAssertNil(viewModel.presentationPreview)
+        let restored = expectation(description: "Locked wallet must not restore payment consent")
+        restored.isInverted = true
+        let observation = viewModel.$paymentReview.sink { state in
+            if state.consent != nil { restored.fulfill() }
+        }
+        await preparation.complete(0, with: .success(paymentConsent("late")))
+        await fulfillment(of: [restored], timeout: 0.2)
+        withExtendedLifetime(observation) {}
+        XCTAssertEqual(viewModel.auth, .login)
+        XCTAssertEqual(viewModel.paymentReview, .notRequired)
+        let submitted = await client.submittedPaymentConsentRevisions
+        XCTAssertTrue(submitted.isEmpty)
+    }
+
+    @MainActor
+    private func paymentViewModel(_ client: MockWalletClient) async throws -> WalletViewModel {
+        let viewModel = WalletViewModel(walletID: "payment-review-\(UUID().uuidString)", walletClient: client)
+        viewModel.unlockForTests()
+        try await waitUntil { viewModel.isReady }
+        viewModel.presentationRequestUrl = "openid4vp://mock"
+        viewModel.previewPresentation()
+        try await waitUntil { viewModel.presentationPreview != nil }
+        return viewModel
+    }
+
+    private func paymentConsent(_ revision: String) -> PaymentConsent {
+        PaymentConsent(revision: revision, locale: "en", title: "Payment", securityHint: nil,
+                       affirmativeAction: "Pay", denialAction: nil, requiresUnsignedRequestWarning: false, fields: [])
+    }
 
     @MainActor
     func testInvalidRequestCanBeDismissedLocallyOrReportedToVerifier() async throws {
@@ -472,5 +560,19 @@ private actor RegistrationUpdateCounter {
 
     func increment() {
         count += 1
+    }
+}
+
+/// Deliberately completes even after cancellation to exercise the view model's stale-result guard.
+private actor PendingPaymentPreparation {
+    private var continuations: [CheckedContinuation<PaymentConsent?, Error>] = []
+    var count: Int { continuations.count }
+
+    func prepare() async throws -> PaymentConsent? {
+        try await withCheckedThrowingContinuation { continuations.append($0) }
+    }
+
+    func complete(_ index: Int, with result: Result<PaymentConsent?, Error>) {
+        continuations[index].resume(with: result)
     }
 }

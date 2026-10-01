@@ -8,6 +8,12 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.sdjwt.*
+import id.walt.wallet2.consent.PaymentCredentialIssuer
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpHeaders
+import io.ktor.http.headersOf
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.StoredCredential
@@ -24,10 +30,14 @@ internal data class ScaWalletFixture(val wallet: MobileWallet, val request: Json
             dataJson = request.toString(), verifiedOrigin = "https://verifier.example",
         ),
     )
-    suspend fun submit(preview: MobileWalletDigitalCredentialPreview): MobileWalletDigitalCredentialResponse =
-        wallet.submitDigitalCredentialPresentation(preview.requestId, preview.credentialOptions.map {
+    suspend fun submit(preview: MobileWalletDigitalCredentialPreview): MobileWalletDigitalCredentialResponse {
+        val selections = preview.credentialOptions.map {
             MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
-        })
+        }
+        val consent = requireNotNull(wallet.prepareDigitalCredentialPaymentConsent(preview.requestId, selections))
+        return wallet.submitDigitalCredentialPresentation(preview.requestId, selections,
+            paymentConsentRevision = consent.revision)
+    }
 }
 
 internal suspend fun scaWalletFixture(key: Key, provider: PlatformManagedKeyProvider): ScaWalletFixture {
@@ -71,6 +81,38 @@ internal suspend fun scaWalletFixture(key: Key, provider: PlatformManagedKeyProv
         walletId = "synthetic-sca-wallet", keyStore = keys, didStore = InMemoryDidStore(), credentialStore = credentials,
         transactionDataProfiles = listOf(MobileWalletTransactionDataProfile("urn:eudi:sca:payment:1")),
         scaAuthorizer = NativeScaPresentationAuthorizer(provider),
+        preferredLocales = listOf("en"),
+        paymentCredentialIssuers = listOf(PaymentCredentialIssuer("https://issuer.example",
+            requireNotNull(issuer.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(issuer.spec)
+                .data.toByteArray().decodeToString())),
+        paymentMetadataHttpClient = HttpClient(MockEngine { request ->
+            check(request.url.toString() == vct) { "Unexpected metadata request: ${request.url}" }
+            respond(buildJsonObject {
+                put("vct", vct)
+                put("category", "urn:eu:europa:ec:eudi:sua:sca")
+                put("transaction_data_types", buildJsonObject {
+                    put("urn:eudi:sca:payment:1", buildJsonObject {
+                        put("schema", "urn:eudi:sca:payment:1")
+                        put("claims", buildJsonArray {
+                            for (path in listOf(listOf("transaction_id"), listOf("amount"), listOf("currency"),
+                                listOf("payee", "name"), listOf("payee", "id"))) {
+                                add(buildJsonObject {
+                                    put("path", JsonArray(path.map(::JsonPrimitive)))
+                                    put("display", buildJsonArray { add(buildJsonObject {
+                                        put("locale", "en"); put("label", path.last())
+                                    }) })
+                                })
+                            }
+                        })
+                        put("ui_labels", buildJsonObject {
+                            put("affirmative_action_label", buildJsonArray { add(buildJsonObject {
+                                put("lang", "en"); put("value", "Pay")
+                            }) })
+                        })
+                    })
+                })
+            }.toString(), headers = headersOf(HttpHeaders.ContentType, "application/json"))
+        }),
     )
     return ScaWalletFixture(wallet, request)
 }

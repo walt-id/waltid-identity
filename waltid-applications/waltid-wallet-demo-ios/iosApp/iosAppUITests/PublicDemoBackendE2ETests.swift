@@ -15,6 +15,75 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     private let credentialOperationTimeout: TimeInterval = 90
     private let verifierPollingTimeout: TimeInterval = 30
 
+    /// Run explicitly on enrolled physical hardware with WALLET_SCA_OPERATOR=approve.
+    func testScaPaymentWithNativeAuthorization() async throws {
+        continueAfterFailure = false
+        #if targetEnvironment(simulator)
+        throw XCTSkip("SCA acceptance requires physical Secure Enclave and enrolled biometrics")
+        #else
+        guard ProcessInfo.processInfo.environment["WALLET_SCA_OPERATOR"] == "approve" else {
+            throw XCTSkip("Select the operator-assisted SCA lane explicitly")
+        }
+        let offer = try await backend.createOffer(scenario: DemoBackend.scaPaymentScenario)
+        let app = XCUIApplication()
+        app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: publicDemoEnvironment().merging(["WALLET_SIGNING_PROTECTION_MODE": "required"]) { _, new in new },
+                  initializeSigningIdentity: false)
+        let next = app.buttons["wallet.keySetupContinue"]
+        XCTAssertTrue(app.staticTexts["1 of 3 · Recovery"].waitForExistence(timeout: 20))
+        next.tap() // Default: no recovery, so Secure Enclave remains eligible.
+        let storage = app.staticTexts["Secure Enclave"]
+        XCTAssertTrue(storage.waitForExistence(timeout: 10))
+        storage.tap()
+        next.tap()
+        let approval = app.staticTexts["Current biometrics only"]
+        XCTAssertTrue(approval.waitForExistence(timeout: 10))
+        approval.tap()
+        print("SCA_OPERATOR: approve iPhone key setup and issuance prompts")
+        next.tap()
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 180), "Wallet ready")
+        let authentication = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts["com.apple.localauthentication.ax.authentication.alert"]
+        let authorized = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: authentication)
+        XCTAssertEqual(XCTWaiter.wait(for: [authorized], timeout: 180), .completed, "Native setup authorization is still pending")
+
+        ui.tapTab(label: "Receive")
+        ui.replaceText(in: ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL"), value: offer.offerUrl)
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 90), "Review credential offer")
+        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        ui.assertExists(identifierPrefix: "wallet.credentialCard.", timeout: 180)
+
+        let session = try await backend.createScaPaymentVerifierSession()
+        ui.tapTab(label: "Present")
+        ui.replaceText(in: ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL"), value: session.authorizationRequestUri)
+        ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview")
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Review presentation request", "Preview failed"], timeout: 60), "Review presentation request")
+        let payment = app.descendants(matching: .any).matching(identifier: "payment-consent").firstMatch
+        XCTAssertTrue(payment.waitForExistence(timeout: 60), app.debugDescription)
+        for value in ["Super Store", "11.56", "EUR", "Confirm this payment", "Payee", "Payee ID", "Currency", "Amount",
+                      "Check the payee and amount before confirming."] {
+            let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch
+            for _ in 0..<8 where !text.isHittable { app.swipeDown() }
+            for _ in 0..<12 where !text.isHittable { app.swipeUp() }
+            XCTAssertTrue(text.isHittable, "Missing visible payment value: \(value)")
+        }
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "SCA payment review before native signing"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        print("SCA_OPERATOR: approve iPhone payment signing")
+        XCTAssertTrue(app.buttons["Confirm payment"].exists, "Missing issuer affirmative action")
+        XCTAssertTrue(app.buttons["Cancel payment"].exists, "Missing issuer denial action")
+        ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
+        let status = ui.waitForStatus(prefixes: ["Presentation sent", "Presentation finished", "Present failed"], timeout: 180)
+        XCTAssertNotNil(status)
+        XCTAssertFalse(status?.hasPrefix("Present failed") ?? true, status ?? "No presentation outcome")
+        try await backend.verifyScaPayment(sessionID: session.sessionID, timeoutSeconds: verifierPollingTimeout)
+        print("SCA_DEVICE_E2E nativeApproved=true paymentReviewed=true verifier=SUCCESSFUL session=\(session.sessionID)")
+        #endif
+    }
+
     func testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2() async throws {
         let scenario = try publicDemoScenario()
         let offer = try await backend.createOffer(scenario: scenario)

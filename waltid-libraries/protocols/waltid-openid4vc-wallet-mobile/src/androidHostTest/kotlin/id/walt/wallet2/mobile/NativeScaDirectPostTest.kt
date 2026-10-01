@@ -10,6 +10,8 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.wallet2.persistence.keys.*
 import io.ktor.http.URLBuilder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import java.net.InetSocketAddress
@@ -20,7 +22,7 @@ import kotlin.test.*
 /** Real reviewed wallet submission and HTTP delivery; native authentication is simulated here. */
 class NativeScaDirectPostTest {
     @Test
-    fun reviewedOrdinaryPaymentDeliversTheSignedProof() = runTest {
+    fun reviewedOrdinaryPaymentDeliversTheSignedProof() = runTest { withContext(Dispatchers.Default) {
         val software = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
             GenerateSoftwareKeyRequest(KeyId("synthetic-holder"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY)),
         )
@@ -69,9 +71,11 @@ class NativeScaDirectPostTest {
                 parameters["client_id"] = "redirect_uri:$endpoint"
             }.buildString()
             val preview = assertIs<MobileWalletPresentationPreviewResult.Ready>(fixture.wallet.previewPresentation(request)).preview
-            fixture.wallet.submitPresentation(preview.previewHandle, preview.credentialOptions.map {
+            val selections = preview.credentialOptions.map {
                 MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
-            })
+            }
+            val consent = assertNotNull(fixture.wallet.preparePaymentConsent(preview.previewHandle, selections))
+            fixture.wallet.submitPresentation(preview.previewHandle, selections, paymentConsentRevision = consent.revision)
             val vp = Json.parseToJsonElement(assertNotNull(received.get())["vp_token"]!!)
                 .jsonObject.getValue("payment").jsonArray.single().jsonPrimitive.content
             val proof = CompactJws.verify(vp.substringAfterLast('~'), key, JwsAlgorithm.ES256)
@@ -81,5 +85,5 @@ class NativeScaDirectPostTest {
             assertEquals(2, claims["amr"]?.jsonArray?.size)
             assertFalse(claims["jti"]?.jsonPrimitive?.content.isNullOrBlank())
         } finally { server.stop(0) }
-    }
+    } }
 }

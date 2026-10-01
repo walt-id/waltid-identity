@@ -199,7 +199,8 @@ struct PresentView: View {
                 onReject: viewModel.rejectPresentation,
                 onCancel: viewModel.cancelPresentationReview,
                 compact: false,
-                showActions: false
+                showActions: false,
+                paymentReview: viewModel.paymentReview
             )
         } actions: {
             ReviewActions(
@@ -207,7 +208,8 @@ struct PresentView: View {
                 isLoading: !viewModel.presentationReviewEnabled,
                 onSubmit: viewModel.submitPresentation,
                 onReject: viewModel.rejectPresentation,
-                onCancel: viewModel.cancelPresentationReview
+                onCancel: viewModel.cancelPresentationReview,
+                paymentReview: viewModel.paymentReview
             )
         }
     }

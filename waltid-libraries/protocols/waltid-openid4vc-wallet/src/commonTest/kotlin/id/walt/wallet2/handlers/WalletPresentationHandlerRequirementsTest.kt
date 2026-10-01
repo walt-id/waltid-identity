@@ -594,6 +594,10 @@ class WalletPresentationHandlerRequirementsTest {
             result.getUrl,
         )
         assertEquals(1, resolutionCalls)
+        val consumed = assertFailsWith<PreviewSessionException> {
+            WalletPresentationHandler.rejectPresentation(wallet, RejectPresentationRequest(invalidPreview.handle))
+        }
+        assertEquals(PreviewSessionFailureReason.CONSUMED, consumed.reason)
     }
 
     @Test

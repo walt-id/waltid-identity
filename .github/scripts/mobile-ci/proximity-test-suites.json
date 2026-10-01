@@ -203,12 +203,23 @@
     "swift-bridge": {
       "executionClass": "simulated-platform",
       "sources": [
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/WalletAPITests.swift",
         "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/KMPProximityProjectionTests.swift",
         "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/ProximityBridgeContractTests.swift",
         "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/ProximityInputValidationTests.swift",
         "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/KMPKeyAttestationProviderTests.swift"
       ],
       "requiredTests": [
+        {
+          "class": "WalletAPITests",
+          "name": "testTypedPaymentFailuresRemainActionableThroughFacade",
+          "oracle": "Payment consent failures preserve their typed identity and displayed message through the Swift facade."
+        },
+        {
+          "class": "WalletAPITests",
+          "name": "testSubmitPresentationForwardsSelectionAndReturnsResult",
+          "oracle": "Presentation submission forwards the reviewed payment consent revision, credential and disclosure selections, signing identity and policy choice."
+        },
         {
           "class": "KMPProximityProjectionTests",
           "name": "testSubmissionProjectionPreservesEveryApprovedField",
