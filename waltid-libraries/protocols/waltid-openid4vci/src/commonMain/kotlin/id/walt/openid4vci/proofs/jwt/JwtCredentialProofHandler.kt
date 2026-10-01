@@ -300,32 +300,12 @@ class JwtCredentialProofHandler(
     }
 
     private fun validateAudience(payload: JsonObject, credentialIssuer: String) {
-        val audiences = payload.extractAudience()
-        requireCredentialProof(credentialIssuer in audiences) {
+        val audience = payload.optionalStringClaim(JwtPayloadClaims.AUDIENCE)
+            ?: throw invalidCredentialProof("Credential proof audience claim is required")
+        requireCredentialProof(audience == credentialIssuer) {
             "Credential proof audience must be the Credential Issuer Identifier"
         }
     }
-
-    private fun JsonObject.extractAudience(): Set<String> {
-        val element = this[JwtPayloadClaims.AUDIENCE]
-            ?: throw invalidCredentialProof("Credential proof audience claim is required")
-        return when (element) {
-            is JsonArray -> element.map { audience ->
-                (audience as? JsonPrimitive)?.contentOrNull
-                    ?: throw invalidCredentialProof(
-                        "Credential proof audience claim must be a non-empty string or string array",
-                    )
-            }.toSet()
-
-            is JsonPrimitive -> element.contentOrNull?.let(::setOf).orEmpty()
-            else -> emptySet()
-        }.also { audiences ->
-            requireCredentialProof(audiences.isNotEmpty()) {
-                "Credential proof audience claim must be a non-empty string or string array"
-            }
-        }
-    }
-
 
     private fun validateIssuedAt(payload: JsonObject) {
         val issuedAt = payload.requiredLongClaim(JwtPayloadClaims.ISSUED_AT)
