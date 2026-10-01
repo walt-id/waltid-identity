@@ -4,20 +4,21 @@ package id.walt.openid4vci.proofs
 import id.walt.cose.CoseCertificate
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.exportPublicJwk
+import id.walt.crypto2.jose.exportPublicJwkObject
+import id.walt.crypto2.jose.preferredJwsAlgorithm
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.toStoredSoftwareKey
+import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.toPrivateJwk
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
@@ -64,7 +65,7 @@ class KeyAttestationProofTest {
         val result = verifier.verify(request(jwt), configuration, context(attester))
         assertEquals(1, result.proofs.size)
         assertEquals(4, assertIs<VerifiedJwtProof>(result.proofs.single()).keyAttestation!!.attestedKeys.size)
-        assertEquals(holders.map { it.getThumbprint() }, result.bindings.map { Jwk.sha256Thumbprint(it.holderKey.exportPublicJwk()) })
+        assertEquals(holders.map { Jwk.sha256Thumbprint(it.exportPublicJwk()) }, result.bindings.map { Jwk.sha256Thumbprint(it.holderKey.exportPublicJwk()) })
         assertTrue(result.bindings.all { it.holderDid == null && it.proofIndexes == setOf(0) })
     }
 
@@ -128,7 +129,9 @@ class KeyAttestationProofTest {
             mapOf("key_storage" to JsonArray(emptyList())),
             mapOf("user_authentication" to JsonPrimitive("iso_18045_high")),
             mapOf("attested_keys" to JsonArray(emptyList())),
-            mapOf("attested_keys" to JsonArray(listOf(holder.exportJWKObject()))),
+            mapOf("attested_keys" to JsonArray(listOf(Jwk.parse(
+                requireNotNull(holder.capabilities.privateKeyExporter).exportPrivateKey().toPrivateJwk(holder.spec),
+            )))),
             mapOf("attested_keys" to JsonArray(listOf(buildJsonObject { put("kty", "oct"); put("k", "c2VjcmV0") }))),
         )
         for (claims in invalidClaims) {
@@ -136,7 +139,7 @@ class KeyAttestationProofTest {
                 verifier.verify(request(proof(holder, attestation(attester, listOf(holder), claims))), configuration, context(attester))
             }
         }
-        for (headers in listOf(mapOf("typ" to JsonPrimitive("oauth-client-attestation+jwt")), mapOf("jwk" to attester.getPublicKey().exportJWKObject()))) {
+        for (headers in listOf(mapOf("typ" to JsonPrimitive("oauth-client-attestation+jwt")), mapOf("jwk" to attester.exportPublicJwkObject()))) {
             assertFailsWith<CredentialProofValidationException> {
                 verifier.verify(request(proof(holder, attestation(attester, listOf(holder), headers = headers))), configuration, context(attester))
             }
@@ -183,16 +186,12 @@ class KeyAttestationProofTest {
         val holders = List(33) { key() }
         val attestation = attestation(attester, holders, mapOf("padding" to JsonPrimitive("x".repeat(65_536))))
         assertTrue(attestation.length > 65_536)
-        val holderKey = CryptoRuntime(defaultSoftwareKeyProviders()).restore(
-            EncodedKey.Jwk(BinaryData(holders[0].exportJWK().encodeToByteArray()), privateMaterial = true)
-                .toStoredSoftwareKey(KeyId("holder"), setOf(KeyUsage.SIGN, KeyUsage.VERIFY)),
-        )
         val request = request(CompactJws.sign(
             buildJsonObject { put("aud", issuer); put("iat", now.epochSeconds); put("nonce", "nonce") }.toString().encodeToByteArray(),
-            holderKey, JwsAlgorithm.ES256,
+            holders[0], JwsAlgorithm.ES256,
             buildJsonObject {
                 put("typ", "openid4vci-proof+jwt")
-                put("jwk", holders[0].getPublicKey().exportJWKObject())
+                put("jwk", holders[0].exportPublicJwkObject())
                 put("key_attestation", attestation)
             },
         ))
@@ -204,15 +203,15 @@ class KeyAttestationProofTest {
         }
         // batch_size counts proofs, not attested keys or issued credentials.
         val response = assertIs<CredentialResponseResult.Success>(provider.createCredentialResponse(
-            request = request, configuration = configuration, issuerKey = key(), issuerId = issuer,
+            request = request, configuration = configuration, issuerKey = Crypto2CredentialSigningKey.select(key(), configuration), issuerId = issuer,
             issuanceInputData = inputs, proofValidationContext = context(attester).copy(batchCredentialIssuance = BatchCredentialIssuance(2)),
         ))
         assertEquals(holders.size, allocated)
         val keys = response.response.credentials!!.map {
             val credential = SDJwtVC.parse(it.credential.jsonPrimitive.content)
-            JWKKey.importJWK(requireNotNull(credential.holderKeyJWK).toString()).getOrThrow().getThumbprint()
+            Jwk.sha256Thumbprint(EncodedKey.Jwk(BinaryData(requireNotNull(credential.holderKeyJWK).toString().encodeToByteArray()), privateMaterial = false))
         }
-        assertEquals(holders.map { it.getThumbprint() }, keys)
+        assertEquals(holders.map { Jwk.sha256Thumbprint(it.exportPublicJwk()) }, keys)
     }
 
     @Test
@@ -224,7 +223,7 @@ class KeyAttestationProofTest {
         assertFailsWith<KeyAttestationServiceException> {
             provider.createCredentialResponse(
                 request = request(proof(holder, attestation(attester, listOf(holder)))), configuration = configuration,
-                issuerKey = key(), issuerId = issuer, proofValidationContext = context,
+                issuerKey = Crypto2CredentialSigningKey.select(key(), configuration), issuerId = issuer, proofValidationContext = context,
                 issuanceInputData = CredentialIssuanceInputProvider { error("Must not allocate") },
             )
         }
@@ -236,14 +235,15 @@ class KeyAttestationProofTest {
         val holder = key()
         val provider = buildOAuth2Provider(createTestConfig(credentialProofVerifier = verifier))
         val issuerKey = key()
+        val w3c = configuration.copy(format = CredentialFormat.JWT_VC_JSON)
         val response = provider.createCredentialResponse(
-            request(proof(holder, attestation(attester, listOf(holder, key())))), configuration.copy(format = CredentialFormat.JWT_VC_JSON),
-            issuerKey, issuer, CredentialIssuanceInputProvider { count -> List(count) { CredentialIssuanceInput(w3cData()) } },
+            request(proof(holder, attestation(attester, listOf(holder, key())))), w3c,
+            Crypto2CredentialSigningKey.select(issuerKey, w3c), issuer, CredentialIssuanceInputProvider { count -> List(count) { CredentialIssuanceInput(w3cData()) } },
             proofValidationContext = context(attester),
         )
         val credentials = assertNotNull(assertIs<CredentialResponseResult.Success>(response).response.credentials)
         assertEquals(2, credentials.size)
-        credentials.forEach { assertTrue(issuerKey.verifyJws(it.credential.jsonPrimitive.content).isSuccess) }
+        credentials.forEach { CompactJws.verify(it.credential.jsonPrimitive.content, issuerKey, JwsAlgorithm.ES256) }
     }
 
     @Test
@@ -276,7 +276,7 @@ class KeyAttestationProofTest {
                 validations++
                 assertEquals(2, bindings.size)
                 assertTrue(bindings.all { it.holderDid == null })
-                assertEquals(setOf(holder.getThumbprint()), bindings.map { Jwk.sha256Thumbprint(it.holderKey.exportPublicJwk()) }.toSet())
+                assertEquals(setOf(Jwk.sha256Thumbprint(holder.exportPublicJwk())), bindings.map { Jwk.sha256Thumbprint(it.holderKey.exportPublicJwk()) }.toSet())
             }
         }
         for (useCrypto2 in listOf(false, true)) {
@@ -291,14 +291,14 @@ class KeyAttestationProofTest {
                 }
                 val response = if (useCrypto2) provider.createCredentialResponse(
                     request, w3c, Crypto2CredentialSigningKey.select(crypto2IssuerKey, w3c), issuer, inputs, proofValidationContext = context,
-                ) else provider.createCredentialResponse(request, w3c, issuerKey, issuer, inputs, proofValidationContext = context)
+                ) else provider.createCredentialResponse(request, w3c, LegacyP256TestKey(issuerKey), issuer, inputs, proofValidationContext = context)
                 val credentials = assertNotNull(assertIs<CredentialResponseResult.Success>(response).response.credentials)
                 assertEquals(2, credentials.size)
                 assertEquals(2, allocated)
                 if (!useCustom) credentials.forEach { credential ->
                     val jwt = credential.credential.jsonPrimitive.content
                     if (useCrypto2) CompactJws.verify(jwt, crypto2IssuerKey, JwsAlgorithm.ES256)
-                    else assertTrue(issuerKey.verifyJws(jwt).isSuccess)
+                    else CompactJws.verify(jwt, issuerKey, JwsAlgorithm.ES256)
                     val payload = Json.parseToJsonElement(CompactJws.decodeUnverified(jwt).payload.decodeToString()).jsonObject
                     assertEquals(issuer, payload["iss"]?.jsonPrimitive?.content)
                     assertTrue(payload["sub"]?.jsonPrimitive?.content.isNullOrEmpty())
@@ -318,7 +318,7 @@ class KeyAttestationProofTest {
 
     @Test
     fun `configuration round trips and required metadata cannot omit trust`() = runTest {
-        val config = KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(key().getPublicKey().exportJWKObject()))
+        val config = KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(key().exportPublicJwkObject()))
         val json = Json { encodeDefaults = true }
         val encoded = json.encodeToJsonElement(config)
         assertEquals(setOf("verificationMethod"), encoded.jsonObject.keys)
@@ -344,7 +344,7 @@ class KeyAttestationProofTest {
 
     @Test
     fun `inner signing algorithm must be advertised independently of outer algorithm`() = runTest {
-        val attester = JWKKey.generate(KeyType.secp384r1)
+        val attester = key(KeySpec.Ec(EcCurve.P384))
         val holder = key()
         val jwt = proof(holder, attestation(attester, listOf(holder)))
         assertFailsWith<CredentialProofValidationException> {
@@ -361,10 +361,13 @@ class KeyAttestationProofTest {
         val holder = key()
         val extra = key()
         val did = DidService.registerByKey("jwk", holder).did
-        suspend fun didProof(keys: List<JWKKey>) = holder.signJws(
+        suspend fun didProof(keys: List<Key>) = CompactJws.sign(
             buildJsonObject { put("aud", issuer); put("iat", now.epochSeconds) }.toString().encodeToByteArray(),
-            mapOf("typ" to JsonPrimitive("openid4vci-proof+jwt"), "kid" to JsonPrimitive("$did#0"),
-                "key_attestation" to JsonPrimitive(attestation(attester, keys))),
+            holder, JwsAlgorithm.ES256,
+            buildJsonObject {
+                put("typ", "openid4vci-proof+jwt"); put("kid", "$did#0")
+                put("key_attestation", attestation(attester, keys))
+            },
         )
         val didConfiguration = configuration.copy(cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Did("jwk")))
         val single = verifier.verify(request(didProof(listOf(holder))), didConfiguration, context(attester))
@@ -383,13 +386,14 @@ class KeyAttestationProofTest {
     fun `unsupported mdoc binding fails before allocating issuance inputs`() = runTest {
         val attester = key()
         val holder = key()
-        val rsa = JWKKey.generate(KeyType.RSA)
+        val rsa = key(KeySpec.Rsa(2048))
         val provider = buildOAuth2Provider(createTestConfig(credentialProofVerifier = verifier))
+        val mdoc = configuration.copy(format = CredentialFormat.MSO_MDOC, doctype = "example", vct = null,
+            cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.CoseKey))
         val result = provider.createCredentialResponse(
             request = request(proof(holder, attestation(attester, listOf(holder, rsa)))),
-            configuration = configuration.copy(format = CredentialFormat.MSO_MDOC, doctype = "example", vct = null,
-                cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.CoseKey)),
-            issuerKey = key(), issuerId = issuer, proofValidationContext = context(attester),
+            configuration = mdoc,
+            issuerKey = Crypto2CredentialSigningKey.select(key(), mdoc), issuerId = issuer, proofValidationContext = context(attester),
             issuanceInputData = CredentialIssuanceInputProvider { error("Must not allocate") },
         )
         assertEquals(CredentialErrorCodes.INVALID_PROOF, assertIs<CredentialResponseResult.Failure>(result).error.error)
@@ -443,27 +447,32 @@ class KeyAttestationProofTest {
         }
     }
 
-    private suspend fun key() = JWKKey.generate(KeyType.secp256r1)
-    private suspend fun context(attester: JWKKey) = CredentialProofValidationContext(
+    private suspend fun key(spec: KeySpec = KeySpec.Ec(EcCurve.P256)): Key =
+        CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(GenerateSoftwareKeyRequest(
+            KeyId("test-key"), spec, setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+        ))
+    private suspend fun context(attester: Key) = CredentialProofValidationContext(
         credentialIssuer = issuer,
         batchCredentialIssuance = BatchCredentialIssuance(10),
-        keyAttestation = KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(attester.getPublicKey().exportJWKObject())).toVerificationOptions(),
+        keyAttestation = KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(attester.exportPublicJwkObject())).toVerificationOptions(),
     )
-    private suspend fun attestation(attester: JWKKey, keys: List<JWKKey>, claims: Map<String, JsonElement> = emptyMap(), headers: Map<String, JsonElement> = emptyMap()): String = attester.signJws(
+    private suspend fun attestation(attester: Key, keys: List<Key>, claims: Map<String, JsonElement> = emptyMap(), headers: Map<String, JsonElement> = emptyMap()): String = CompactJws.sign(
         buildJsonObject {
             put("iat", now.epochSeconds)
             put("exp", now.epochSeconds + 300)
             put("nonce", "nonce")
-            put("attested_keys", JsonArray(keys.map { it.getPublicKey().exportJWKObject() }))
+            put("attested_keys", JsonArray(keys.map { it.exportPublicJwkObject() }))
             claims.forEach { (key, value) -> put(key, value) }
         }.toString().encodeToByteArray(),
-        mapOf("typ" to JsonPrimitive("key-attestation+jwt")) + headers,
+        attester, attester.preferredJwsAlgorithm(),
+        JsonObject(mapOf("typ" to JsonPrimitive("key-attestation+jwt")) + headers),
     )
-    private suspend fun proof(holder: JWKKey, attestation: String?): String = holder.signJws(
+    private suspend fun proof(holder: Key, attestation: String?): String = CompactJws.sign(
         buildJsonObject { put("aud", issuer); put("iat", now.epochSeconds); put("nonce", "nonce") }.toString().encodeToByteArray(),
-        buildMap {
+        holder, JwsAlgorithm.ES256,
+        buildJsonObject {
             put("typ", JsonPrimitive("openid4vci-proof+jwt"))
-            put("jwk", holder.getPublicKey().exportJWKObject())
+            put("jwk", holder.exportPublicJwkObject())
             attestation?.let { put("key_attestation", JsonPrimitive(it)) }
         },
     )
