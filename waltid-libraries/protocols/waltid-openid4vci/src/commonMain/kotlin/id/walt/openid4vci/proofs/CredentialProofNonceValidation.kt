@@ -14,7 +14,7 @@ internal suspend fun validateCredentialNonce(payload: JsonObject, context: Crede
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        throw invalidCredentialNonce("Credential proof nonce verification failed", e)
+        throw CredentialProofServiceException("Credential proof nonce verification service failed", e)
     }
     if (result != CredentialNonceValidationResult.VALID) throw invalidCredentialNonce("Credential proof nonce is invalid")
 }

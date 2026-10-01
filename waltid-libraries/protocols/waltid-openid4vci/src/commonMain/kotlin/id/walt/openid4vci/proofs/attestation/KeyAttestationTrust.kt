@@ -8,6 +8,7 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.Key
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
+import id.walt.openid4vci.proofs.CredentialProofServiceException
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.proofs.invalidCredentialProof
 import kotlinx.coroutines.CancellationException
@@ -47,7 +48,7 @@ data class KeyAttestationVerificationOptions(
 )
 
 /** An issuer/deployment failure, not invalid evidence from the wallet. */
-class KeyAttestationServiceException(message: String, cause: Throwable? = null) : IllegalStateException(message, cause)
+class KeyAttestationServiceException(message: String, cause: Throwable? = null) : CredentialProofServiceException(message, cause)
 
 internal suspend fun createKeyAttestationTrustResolver(
     method: KeyAttestationVerificationMethod,
