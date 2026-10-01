@@ -26,6 +26,11 @@ on:
         required: false
         type: boolean
         default: false
+      run-payment-demo:
+        description: "Require deployed SD-JWT payment issuance and presentation acceptance"
+        required: false
+        type: boolean
+        default: false
       run-conformance:
         description: "Run the live OpenID4VP and OpenID4VCI conformance suites"
         required: false
@@ -51,6 +56,11 @@ on:
         required: false
         type: string
         default: "conformance (ubuntu-22.04)"
+      upload-test-results:
+        description: "Upload the JUnit XML results as artifacts (for the enterprise release evidence bundle)"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   gradle:
@@ -83,6 +93,7 @@ jobs:
         run: test -f "$KLOGGING_CONFIG_PATH"
 
       - name: Configure gradle
+        id: gradle-setup
         uses: ./waltid-identity/.github/actions/gradle-setup-action
         with:
           # Restricted to pushes to main because Dependabot only consumes the default-branch
@@ -172,6 +183,17 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
+      - name: Require public SD-JWT payment acceptance
+        if: ${{ !cancelled() && inputs.run-payment-demo && steps.gradle-setup.outcome == 'success' }}
+        timeout-minutes: 20
+        run: >-
+          ./gradlew :waltid-services:waltid-issuer-api2:paymentDemoTest
+          --max-workers=2 --console=plain
+        env:
+          CI: "true"
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
       - name: Summarize Gradle task outcomes and memory
         if: always()
         run: |
@@ -215,6 +237,15 @@ jobs:
           detailed_summary: true
           include_passed: false
           include_skipped: false
+
+      - name: Upload test results
+        if: ${{ always() && inputs.upload-test-results }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-gradle
+          path: '**/build/test-results/**/*.xml'
+          if-no-files-found: warn
+          retention-days: 90
 
   conformance:
     name: conformance (ubuntu-22.04)
@@ -503,6 +534,15 @@ jobs:
           detailed_summary: true
           include_passed: false
           include_skipped: false
+
+      - name: Upload test results
+        if: ${{ always() && inputs.upload-test-results }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-conformance
+          path: '**/waltid-openid4vp-conformance-runners/build/test-results/**/*.xml'
+          if-no-files-found: warn
+          retention-days: 90
 
       - name: Publish OpenID conformance summary
         if: always()

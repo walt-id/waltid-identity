@@ -3,6 +3,12 @@ package id.walt.wallet2.handlers
 import dev.whyoleg.cryptography.random.CryptographyRandom
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -49,6 +55,8 @@ public class PreviewSessionStore<T>(
         val expiresAt: Instant,
         var inUse: Boolean = false,
         var discardRequested: Boolean = false,
+        var operation: Job? = null,
+        var preparing: Boolean = false,
     )
 
     private data class Tombstone(
@@ -132,6 +140,82 @@ public class PreviewSessionStore<T>(
         }
     }
 
+    /** Presentation submission with cancellation/expiry checks after preparing consent. */
+    internal suspend fun <R> usePreparedRetainingOnFailure(walletId: String, id: String, block: suspend (T) -> R): R =
+        use(walletId, id, consumeOnSuccess = true, consumeOnFailure = false, block = block)
+
+    /** Replaces an unfinished preparation, retaining the pending submission. Signing is never interrupted. */
+    suspend fun <R> prepare(walletId: String, id: String, block: suspend (T) -> R): R {
+        cancelPreparation(walletId, id)
+        return use(walletId, id, consumeOnSuccess = false, consumeOnFailure = false, preparing = true, block = block)
+    }
+
+    /** Cancellation must finish before another operation can acquire the preview's lease. */
+    private suspend fun cancelPreparation(walletId: String, id: String) {
+        val operation = mutex.withLock {
+            lookup(walletId, id, now()).takeIf { it.preparing }?.operation
+        }
+        operation?.cancelAndJoin()
+    }
+
+    /** One-shot action. Validation runs before acquiring the lease; every started attempt consumes it. */
+    suspend fun <R> useOnce(walletId: String, id: String, validate: (T) -> Unit = {}, block: suspend (T) -> R): R =
+        use(walletId, id, consumeOnSuccess = true, consumeOnFailure = true, validate = validate, block = block)
+
+    private suspend fun <R> use(
+        walletId: String,
+        id: String,
+        consumeOnSuccess: Boolean,
+        consumeOnFailure: Boolean,
+        preparing: Boolean = false,
+        validate: (T) -> Unit = {},
+        block: suspend (T) -> R,
+    ): R = coroutineScope {
+        val operation = currentCoroutineContext()[Job]!!
+        val entry = mutex.withLock {
+            val currentTime = now()
+            cleanupExpired(currentTime)
+            lookup(walletId, id, currentTime).also {
+                if (it.inUse) fail(PreviewSessionFailureReason.IN_USE)
+                validate(it.value)
+                it.inUse = true
+                it.operation = operation
+                it.preparing = preparing
+            }
+        }
+        var completed = false
+        try {
+            val result = withTimeout(entry.expiresAt - now()) { block(entry.value) }
+            currentCoroutineContext().ensureActive()
+            mutex.withLock {
+                if (entry.discardRequested) fail(PreviewSessionFailureReason.DISCARDED)
+                if (now() >= entry.expiresAt) fail(PreviewSessionFailureReason.EXPIRED)
+                completed = true
+            }
+            result
+        } finally {
+            withContext(NonCancellable) {
+                mutex.withLock {
+                    val currentTime = now()
+                    val reason = when {
+                        entry.discardRequested -> PreviewSessionFailureReason.DISCARDED
+                        currentTime >= entry.expiresAt -> PreviewSessionFailureReason.EXPIRED
+                        if (completed) consumeOnSuccess else consumeOnFailure -> PreviewSessionFailureReason.CONSUMED
+                        else -> null
+                    }
+                    if (reason != null) {
+                        entries.remove(id)
+                        rememberTermination(id, entry.walletId, reason, currentTime)
+                    } else {
+                        entry.inUse = false
+                        entry.operation = null
+                        entry.preparing = false
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * Atomically validates, consumes, and returns the selected preview before a one-shot action
      * begins. A failed validation leaves the preview available for the action that can use it.
@@ -140,15 +224,18 @@ public class PreviewSessionStore<T>(
         walletId: String,
         id: String,
         validate: (T) -> Unit = {},
-    ): T = mutex.withLock {
-        val currentTime = now()
-        cleanupExpired(currentTime)
-        val entry = lookup(walletId, id, currentTime)
-        if (entry.inUse) fail(PreviewSessionFailureReason.IN_USE)
-        validate(entry.value)
-        entries.remove(id)
-        rememberTermination(id, entry.walletId, PreviewSessionFailureReason.CONSUMED, currentTime)
-        entry.value
+    ): T {
+        cancelPreparation(walletId, id)
+        return mutex.withLock {
+            val currentTime = now()
+            cleanupExpired(currentTime)
+            val entry = lookup(walletId, id, currentTime)
+            if (entry.inUse) fail(PreviewSessionFailureReason.IN_USE)
+            validate(entry.value)
+            entries.remove(id)
+            rememberTermination(id, entry.walletId, PreviewSessionFailureReason.CONSUMED, currentTime)
+            entry.value
+        }
     }
 
     /** Explicitly discards a preview after local dismissal. */
@@ -158,6 +245,7 @@ public class PreviewSessionStore<T>(
         val entry = lookup(walletId, id, currentTime)
         if (entry.inUse) {
             entry.discardRequested = true
+            entry.operation?.cancel()
             return@withLock
         }
         entries.remove(id)

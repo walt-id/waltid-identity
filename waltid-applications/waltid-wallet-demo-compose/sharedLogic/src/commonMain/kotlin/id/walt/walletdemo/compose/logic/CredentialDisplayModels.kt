@@ -13,6 +13,7 @@ data class ClaimGroup(
     val title: String,
     val items: List<ClaimItem>,
     val initiallyExpanded: Boolean = true,
+    val transactionType: String? = null,
 )
 
 class ClaimItemPath private constructor(

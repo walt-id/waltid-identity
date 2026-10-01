@@ -3,20 +3,15 @@
 package id.walt.walletdemo.compose.android
 
 import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.util.Base64
 import androidx.credentials.DigitalCredential
 import androidx.credentials.ExperimentalDigitalCredentialApi
-import androidx.credentials.GetCredentialResponse
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
-import androidx.test.uiautomator.StaleObjectException
-import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
@@ -37,33 +32,31 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
 import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
-import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
-import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
-import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
-import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
+import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleInForegroundWindow
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.foregroundWindowSnapshot
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
+import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
+import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
+import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
+import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
 import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewTestTags
-import kotlinx.coroutines.delay
+import java.io.ByteArrayOutputStream
+import java.security.MessageDigest
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
@@ -75,43 +68,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
-import org.junit.After
-import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.ByteArrayOutputStream
-import java.security.MessageDigest
 
-/**
- * OS-mediated Digital Credentials sharing E2Es against the public demo verifier, one per protocol
- * variant the wallet supports natively on Android. Nothing is stubbed: issuer2 issues, Credential
- * Manager mediates, and verifier2 verifies the OpenID4VP variants.
- *
- * Annex C is verified in-process with the shared verifier-side [AnnexCRequestBuilder] and
- * [AnnexCResponseVerifier], because it has no back-channel - the encrypted DeviceResponse returns
- * through the OS to whoever called `getCredential`, so reader and caller are the same party. A hosted
- * session could not be bound to this caller either: it requires a secure-context origin, while
- * Credential Manager asserts `android:apk-key-hash:...` for a native one.
- *
- * These require Google Play services, so only the dedicated Google APIs lane runs them.
- */
+/** Unattended Credential Manager coverage using the ordinary demo fixture. */
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalDigitalCredentialApi::class)
-class DigitalCredentialSharingE2ETest {
-
-    private val activeRequests = mutableListOf<DigitalCredentialRequestHandle>()
-
-    @Before
-    fun prepareTest() {
-        val fixture = fixture()
-        assertCredentialManagerIdle(fixture)
-        createAndroidDemoSharingSettingsStore(fixture.context).setShowDcApiPresentationPreview(true)
-        activeRequests.clear()
-        runBlocking { assertSharedCredentialStateUnchanged() }
-    }
-
+internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
+    override val wallet: MobileWallet get() = provisionedWallet
+    override val issuedCredentialIds: Set<String> get() = provisionedCredentialIds
     /**
      * A small platform gate before the protocol assertions: registration has to be visible to the
      * platform and a real Digital Credentials request has to open Google's selector. The remaining
@@ -146,28 +112,9 @@ class DigitalCredentialSharingE2ETest {
         }
     }
 
-    @After
-    fun cleanupTest() {
-        val fixture = fixture()
-        activeRequests.forEach { request -> runCatching { request.abandon() } }
-        runBlocking {
-            activeRequests.forEach { request ->
-                withTimeout(CLEANUP_TIMEOUT) { request.awaitSettled() }
-            }
-        }
-        activeRequests.clear()
-        settleCredentialManagerInteraction(fixture)
-        createAndroidDemoSharingSettingsStore(fixture.context).setShowDcApiPresentationPreview(true)
-        assertEquals(
-            "Verifier request registry was not empty after test cleanup",
-            0,
-            DigitalCredentialTestVerifier.activeRequestCount(),
-        )
-    }
-
     /** Disabling the wallet preview submits the picker's default selection without showing a sheet. */
     @Test
-    fun sharesMdocWithoutWalletReviewWhenPreviewIsDisabled() = runBlocking {
+    fun sharesMdocWithoutWalletReviewWhenPreviewIsDisabled(): Unit = runBlocking {
         val fixture = fixture()
         val settings = createAndroidDemoSharingSettingsStore(fixture.context)
         settings.setShowDcApiPresentationPreview(false)
@@ -216,10 +163,9 @@ class DigitalCredentialSharingE2ETest {
         assertNotNull("DC API response carries no data object", data)
         assertNotNull("Clear dc_api response carries no vp_token", data!!["vp_token"])
 
-        assertVerifierAccepted(
+        assertVerifierAcceptedWithImage(
             sessionId = session.sessionId,
             responseJson = credential.credentialJson,
-            expectedImage = true,
             presentedCredentialId = "mdl",
             requiredPolicyIds = MDOC_REQUIRED_POLICIES,
         )
@@ -295,15 +241,74 @@ class DigitalCredentialSharingE2ETest {
             keyBindingClaims["transaction_data_hashes"]?.jsonArray?.map { it.jsonPrimitive.content },
         )
 
-        assertVerifierAccepted(
+        assertVerifierAcceptedWithImage(
             sessionId = session.sessionId,
             responseJson = credential.credentialJson,
-            expectedImage = true,
             presentedCredentialId = "pid",
             // Named explicitly because it is the policy that would silently not run if the verifier
             // stopped recognising the item.
             requiredPolicyIds = SD_JWT_REQUIRED_POLICIES + "dc+sd-jwt/transaction-data-hash-check",
         )
+    }
+
+    /** Both preview settings retain native SCA authorization; ordinary fixture keys must never sign. */
+    @Test
+    fun scaSdJwtRespectsPreviewSettingAndRejectsUnprotectedSigning() = runBlocking {
+        val fixture = fixture()
+        val scenario = DemoTestBackend.scaPaymentSdJwtScenario
+        val paymentIds = issueFromDemoIssuer(wallet, scenario)
+        try {
+            val registration = wallet.refreshDigitalCredentialRegistration()
+            assertTrue("Payment registration unavailable: ${registration.reason}", registration.available)
+            assertEquals(issuedCredentialIds.size + paymentIds.size, registration.registeredEntryCount)
+            for (showPreview in listOf(true, false)) {
+                createAndroidDemoSharingSettingsStore(fixture.context).setShowDcApiPresentationPreview(showPreview)
+                val session = DemoTestBackend.createDcApiVerifierSession(
+                    credentialQueries = listOf(scenario.verifierCredentialQuery),
+                    expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
+                    transactionData = listOf(DemoTestBackend.scaPaymentTransactionData("sca_payment")),
+                )
+                val request = fixture.startCredentialRequest(session.requestJson)
+                val confirmationStarted = System.currentTimeMillis() / 1000.0
+                val outcome = if (showPreview) {
+                    fixture.enterProviderReview(request, scenario.credentialConfigurationId)
+                    listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, "merchant-001", "EUR", SCA_AMOUNT_TEXT).forEach { value ->
+                        assertTextContainingVisibleAfterScrolling(fixture.device, value, "Payment review is missing '$value'")
+                    }
+                    listOf("Confirm this payment", "Payee", "Payee ID", "Currency", "Amount",
+                        "Check the payee and amount before confirming.", "Confirm payment", "Cancel payment").forEach { label ->
+                        WalletComposeE2EHelper.assertTextVisibleAfterScrolling(fixture.device, listOf(label),
+                            "Payment review is missing issuer instruction '$label'")
+                    }
+                    clickByTag(fixture.device, WALLET_SHARE_BUTTON_TAG)
+                    withTimeout(CREDENTIAL_OPERATION_TIMEOUT) { request.await() }
+                } else {
+                    fixture.completeWithoutWalletReview(request, scenario.credentialConfigurationId) { device ->
+                        listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, SCA_AMOUNT_TEXT).forEach { value ->
+                            assertTextContainingVisibleInForegroundWindow(device, value, "Platform payment prompt is missing '$value'")
+                        }
+                    }
+                }
+                assertTrue("Unprotected payment signing must fail (showPreview=$showPreview), got $outcome",
+                    outcome.exceptionOrNull() is GetCredentialUnknownException)
+                // The generic platform failure must come from native SCA policy, not another error.
+                val rejectedByNativePolicy = fixture.device.executeShellCommand(
+                    "logcat -d -v epoch -s WaltDigitalCredentials:E",
+                ).lineSequence().any { line ->
+                    val timestamp = line.trimStart().substringBefore(' ').toDoubleOrNull()
+                    timestamp != null && timestamp >= confirmationStarted &&
+                        "TS12 authentication evidence is unavailable:" in line
+                }
+                assertTrue("Submission did not reach the native SCA key-policy rejection", rejectedByNativePolicy)
+                assertFalse("Rejected signing must not reach the verifier",
+                    DemoTestBackend.verifierSessionInfo(session.sessionId).getValue("attempted").jsonPrimitive.boolean)
+            }
+        } finally {
+            paymentIds.forEach { id -> check(wallet.deleteCredential(id)) { "Failed to delete temporary payment credential $id" } }
+            val registration = wallet.refreshDigitalCredentialRegistration()
+            assertTrue("Credential registration was unavailable after payment cleanup", registration.available)
+            assertEquals(issuedCredentialIds.size, registration.registeredEntryCount)
+        }
     }
 
     /**
@@ -434,7 +439,7 @@ class DigitalCredentialSharingE2ETest {
                 vpToken.keys,
             )
 
-            assertVerifierAccepted(
+            val info = assertVerifierAccepted(
                 sessionId = session.sessionId,
                 responseJson = credential.credentialJson,
                 presentedCredentialId = SCA_CREDENTIAL_QUERY_ID,
@@ -444,7 +449,7 @@ class DigitalCredentialSharingE2ETest {
             // credential was verified rather than merely carried along.
             assertNotNull(
                 "Verifier did not report the second credential",
-                DemoTestBackend.verifierSessionInfo(session.sessionId)["presented_credentials"]
+                info["presented_credentials"]
                     ?.jsonObject?.get(AGE_CREDENTIAL_QUERY_ID),
             )
         } finally {
@@ -573,10 +578,9 @@ class DigitalCredentialSharingE2ETest {
         val compactJwe = requireNotNull(data["response"]?.jsonPrimitive?.content) { "No response member" }
         assertEquals("Encrypted response is not a compact JWE: $compactJwe", 5, compactJwe.split('.').size)
 
-        assertVerifierAccepted(
+        assertVerifierAcceptedWithImage(
             sessionId = session.sessionId,
             responseJson = credential.credentialJson,
-            expectedImage = true,
             presentedCredentialId = "mdl",
             requiredPolicyIds = MDOC_REQUIRED_POLICIES,
         )
@@ -696,7 +700,7 @@ class DigitalCredentialSharingE2ETest {
         fixture.enterProviderReview(request, candidateText = MDL_DOC_TYPE)
         clickByTag(fixture.device, WalletDemoSharingReviewTestTags.CancelButton)
 
-        val outcome = fixture.awaitCancellationOutcome(request)
+        val outcome = fixture.awaitCancellationOutcome(request, MDL_DOC_TYPE)
         val error = outcome.exceptionOrNull()
         assertNotNull("Cancel produced a credential instead of a cancellation: ${outcome.getOrNull()}", error)
         assertTrue(
@@ -711,7 +715,7 @@ class DigitalCredentialSharingE2ETest {
      * still live is proven by re-entering and completing the same session.
      */
     @Test
-    fun backingOutOfTheProviderReviewLeavesTheRequestAnswerable() = runBlocking {
+    fun backingOutOfTheProviderReviewLeavesTheRequestAnswerable(): Unit = runBlocking {
         val fixture = fixture()
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
         val session = DemoTestBackend.createDcApiVerifierSession(
@@ -751,404 +755,6 @@ class DigitalCredentialSharingE2ETest {
             responseJson = credential.credentialJson,
             presentedCredentialId = "mdl",
             requiredPolicyIds = MDOC_REQUIRED_POLICIES,
-        )
-    }
-
-    /** A device fixture; the wallet itself is provisioned once for the whole test class. */
-    private class Fixture(val context: Context, val device: UiDevice)
-
-    private fun fixture(): Fixture {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        return Fixture(instrumentation.targetContext, UiDevice.getInstance(instrumentation))
-    }
-
-    private fun Fixture.startCredentialRequest(requestJson: String): DigitalCredentialRequestHandle {
-        assertCredentialManagerIdle(this)
-        val request = DigitalCredentialTestVerifier.prepare()
-        activeRequests += request
-        context.startActivity(
-            Intent(context, DigitalCredentialTestVerifierActivity::class.java)
-                .putExtra(EXTRA_REQUEST_ID, request.id)
-                .putExtra(EXTRA_REQUEST_JSON, requestJson)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-        return request
-    }
-
-    /** Runs one request handle through Credential Manager and returns the wallet's response. */
-    private suspend fun Fixture.share(
-        request: DigitalCredentialRequestHandle,
-        candidateText: String,
-        onCredentialManagerPrompt: (UiDevice) -> Unit = {},
-        beforeShare: (UiDevice) -> Unit = {},
-    ): DigitalCredential {
-        enterProviderReview(request, candidateText, onCredentialManagerPrompt)
-        beforeShare(device)
-        clickByTag(device, WALLET_SHARE_BUTTON_TAG)
-
-        val response = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) {
-            request.await().getOrThrow()
-        }
-        return requireNotNull(response.credential as? DigitalCredential) {
-            "Caller did not receive a digital credential: ${response.credential}"
-        }
-    }
-
-    /** Selects a Credential Manager candidate and requires completion without a wallet review. */
-    private suspend fun Fixture.shareWithoutWalletReview(
-        request: DigitalCredentialRequestHandle,
-        candidateText: String,
-    ): DigitalCredential {
-        val deadline = System.currentTimeMillis() + CREDENTIAL_OPERATION_TIMEOUT
-        var candidateSelected = false
-
-        while (!request.isComplete && System.currentTimeMillis() < deadline) {
-            assertFalse("Wallet review appeared while preview was disabled", walletReviewVisible())
-            if (!candidateSelected && device.findCredentialManagerText(candidateText) != null) {
-                assertTrue(
-                    "Could not click the '$candidateText' candidate",
-                    device.clickCredentialManagerCandidate(candidateText),
-                )
-                candidateSelected = true
-            } else if (device.findEnabledCredentialManagerContinue() != null) {
-                assertTrue(
-                    "Could not click Credential Manager's Continue button",
-                    device.clickCredentialManagerNode(::isCredentialManagerContinue),
-                )
-            }
-            delay(CLEANUP_POLL_MILLIS)
-        }
-
-        if (!request.isComplete) {
-            fail(
-                "Credential Manager did not complete without a wallet review.\n" +
-                    pickerDiagnostic(request, candidateText, candidateSelected),
-            )
-        }
-        assertFalse("Wallet review appeared while preview was disabled", walletReviewVisible())
-
-        val response = request.await().getOrThrow()
-        return requireNotNull(response.credential as? DigitalCredential) {
-            "Caller did not receive a digital credential: ${response.credential}"
-        }
-    }
-
-    /** Candidate selection, optional confirmation and provider transition share one deadline. */
-    private fun Fixture.enterProviderReview(
-        request: DigitalCredentialRequestHandle,
-        candidateText: String,
-        onCredentialManagerPrompt: (UiDevice) -> Unit = {},
-    ) {
-        val deadline = System.currentTimeMillis() + UI_ELEMENT_TIMEOUT
-        var promptAsserted = false
-        var candidateSelected = false
-
-        while (System.currentTimeMillis() < deadline) {
-            if (walletReviewVisible()) return
-            if (request.isComplete) {
-                fail(
-                    "Credential Manager completed the request before wallet provider review opened: " +
-                        request.completedResultDescription(),
-                )
-            }
-
-            if (!candidateSelected && device.findCredentialManagerText(candidateText) != null) {
-                if (!promptAsserted) {
-                    onCredentialManagerPrompt(device)
-                    promptAsserted = true
-                }
-                assertTrue(
-                    "Could not click the '$candidateText' candidate",
-                    device.clickCredentialManagerCandidate(candidateText),
-                )
-                candidateSelected = true
-                continue
-            }
-
-            if (device.findEnabledCredentialManagerContinue() != null) {
-                assertTrue(
-                    "Could not click Credential Manager's Continue button",
-                    device.clickCredentialManagerNode(::isCredentialManagerContinue),
-                )
-                continue
-            }
-
-            Thread.sleep(CLEANUP_POLL_MILLIS)
-        }
-
-        fail(
-            "Credential Manager did not open wallet provider review.\n" +
-                pickerDiagnostic(request, candidateText, candidateSelected),
-        )
-    }
-
-    private suspend fun Fixture.awaitCancellationOutcome(
-        request: DigitalCredentialRequestHandle,
-    ): Result<GetCredentialResponse> {
-        val completed = withTimeoutOrNull(CANCELLATION_TRANSITION_TIMEOUT) {
-            while (!request.isComplete) {
-                if (!walletReviewVisible() && device.credentialManagerWindowVisible()) {
-                    fail(
-                        "Credential Manager selector reappeared after provider Cancel without " +
-                            "resolving the caller request.\n" +
-                            pickerDiagnostic(request, MDL_DOC_TYPE, candidateSelected = true),
-                    )
-                }
-                delay(CLEANUP_POLL_MILLIS)
-            }
-            true
-        }
-        if (completed != true) {
-            fail(
-                "Provider Cancel did not resolve the caller request within " +
-                    "$CANCELLATION_TRANSITION_TIMEOUT ms.\n" +
-                    pickerDiagnostic(request, MDL_DOC_TYPE, candidateSelected = true),
-            )
-        }
-        return request.await()
-    }
-
-    /**
-     * Drives an unsupported request until Credential Manager shows its empty state. A candidate is a
-     * failure, and the request is only allowed to complete after the GMS-scoped Close action.
-     */
-    private fun Fixture.awaitUnsupportedRequestEmptyState(
-        request: DigitalCredentialRequestHandle,
-        protocol: String,
-        candidateText: String,
-    ) {
-        val deadline = System.currentTimeMillis() + UI_ELEMENT_TIMEOUT
-        while (System.currentTimeMillis() < deadline) {
-            if (device.findCredentialManagerText(candidateText) != null) {
-                fail(
-                    "Credential Manager surfaced a '$candidateText' candidate for $protocol.\n" +
-                        pickerDiagnostic(request, candidateText, candidateSelected = false),
-                )
-            }
-            if (request.isComplete) {
-                fail(
-                    "$protocol completed before Credential Manager's empty state was dismissed: " +
-                        request.completedResultDescription(),
-                )
-            }
-            if (device.findCredentialManagerClose() != null) {
-                assertTrue(
-                    "Could not dismiss Credential Manager's empty state for $protocol",
-                    device.clickCredentialManagerNode(::isCredentialManagerClose),
-                )
-                return
-            }
-            Thread.sleep(CLEANUP_POLL_MILLIS)
-        }
-
-        fail(
-            "Credential Manager did not show its empty state for $protocol.\n" +
-                pickerDiagnostic(request, candidateText, candidateSelected = false),
-        )
-    }
-
-    private suspend fun assertSharedCredentialStateUnchanged() {
-        val storedIds = wallet.credentials().map { it.id }.toSet()
-        assertEquals(
-            "Shared credential state was modified by a previous test",
-            issuedCredentialIds,
-            storedIds,
-        )
-    }
-
-    private fun assertCredentialManagerIdle(fixture: Fixture) {
-        val deadline = System.currentTimeMillis() + CLEANUP_TIMEOUT
-        while (System.currentTimeMillis() < deadline) {
-            if (!fixture.walletReviewVisible() &&
-                !fixture.device.credentialManagerWindowVisible() &&
-                DigitalCredentialTestVerifier.activeRequestCount() == 0
-            ) {
-                return
-            }
-            Thread.sleep(CLEANUP_POLL_MILLIS)
-        }
-        fail("Credential Manager was not idle before the test started.\n${interactionDiagnostic(fixture)}")
-    }
-
-    private fun settleCredentialManagerInteraction(fixture: Fixture) {
-        val deadline = System.currentTimeMillis() + CLEANUP_TIMEOUT
-        while (System.currentTimeMillis() < deadline) {
-            val walletReviewVisible = fixture.walletReviewVisible()
-            val selectorVisible = fixture.device.credentialManagerWindowVisible()
-            if (!walletReviewVisible &&
-                !selectorVisible &&
-                DigitalCredentialTestVerifier.activeRequestCount() == 0
-            ) {
-                return
-            }
-            if (walletReviewVisible || selectorVisible) fixture.device.pressBack()
-            Thread.sleep(CLEANUP_POLL_MILLIS)
-        }
-        fail("Credential Manager did not settle after test cleanup.\n${interactionDiagnostic(fixture)}")
-    }
-
-    private fun interactionDiagnostic(fixture: Fixture): String = """
-        activeRequestCount=${DigitalCredentialTestVerifier.activeRequestCount()}
-        currentPackage=${fixture.device.currentPackageName}
-        selectorVisible=${fixture.device.credentialManagerWindowVisible()}
-        walletReviewVisible=${fixture.walletReviewVisible()}
-        foreground=${foregroundWindowSnapshot(fixture.device)}
-    """.trimIndent()
-
-    private fun DigitalCredentialRequestHandle.completedResultDescription(): String {
-        val result = completedResult()
-            ?: return "request is complete but its result was unavailable"
-        result.exceptionOrNull()?.let { exception ->
-            return "${exception::class.java.name}: ${exception.message}"
-        }
-        return "unexpected credential response: ${result.getOrNull()}"
-    }
-
-    private fun Fixture.walletReviewVisible(): Boolean =
-        device.findObject(By.res(WALLET_SHARING_REVIEW_TAG)) != null
-
-    private fun UiDevice.credentialManagerWindowVisible(): Boolean =
-        currentPackageName == CREDENTIAL_SELECTOR_PACKAGE ||
-            findObjects(By.pkg(CREDENTIAL_SELECTOR_PACKAGE)).isNotEmpty()
-
-    private fun UiDevice.findCredentialManagerText(text: String): UiObject2? =
-        credentialManagerNodes().firstOrNull { node ->
-            runCatching { node.text?.contains(text) == true }.getOrDefault(false)
-        }
-
-    private fun UiDevice.findCredentialManagerClose(): UiObject2? =
-        credentialManagerNodes().firstOrNull(::isCredentialManagerClose)
-
-    private fun isCredentialManagerClose(node: UiObject2): Boolean =
-        runCatching { node.isEnabled && node.text == CREDENTIAL_SELECTOR_CLOSE_LABEL }.getOrDefault(false)
-
-    private fun UiDevice.clickCredentialManagerCandidate(candidateText: String): Boolean =
-        clickCredentialManagerNode { node ->
-            runCatching { node.text?.contains(candidateText) == true }.getOrDefault(false)
-        }
-
-    private fun UiDevice.clickCredentialManagerNode(matcher: (UiObject2) -> Boolean): Boolean {
-        repeat(CANDIDATE_CLICK_ATTEMPTS) {
-            val clicked = runCatching {
-                val node = credentialManagerNodes().firstOrNull(matcher) ?: return@runCatching false
-                (node.clickableAncestorOrSelf() ?: node).click()
-                true
-            }
-            clicked.getOrNull()?.let { if (it) return true }
-            if (clicked.exceptionOrNull() !is StaleObjectException) return false
-        }
-        return false
-    }
-
-    private fun UiDevice.findEnabledCredentialManagerContinue(): UiObject2? =
-        credentialManagerNodes().firstOrNull { node ->
-            runCatching { node.isEnabled && isCredentialManagerContinue(node) }.getOrDefault(false)
-        }
-
-    private fun UiDevice.findCredentialManagerContinue(): UiObject2? =
-        credentialManagerNodes().firstOrNull(::isCredentialManagerContinue)
-
-    private fun isCredentialManagerContinue(node: UiObject2): Boolean =
-        runCatching {
-            node.text?.contains("continue", ignoreCase = true) == true ||
-                node.resourceName?.substringAfterLast(':') == "continue_button"
-        }.getOrDefault(false)
-
-    private fun UiDevice.credentialManagerNodes(): List<UiObject2> =
-        findObjects(By.pkg(CREDENTIAL_SELECTOR_PACKAGE)).flatMap { it.flatten() }
-
-    private fun UiObject2.flatten(): List<UiObject2> =
-        listOf(this) + runCatching { children.flatMap { it.flatten() } }.getOrDefault(emptyList())
-
-    private fun pickerDiagnostic(
-        request: DigitalCredentialRequestHandle,
-        candidateText: String,
-        candidateSelected: Boolean,
-    ): String {
-        val fixture = fixture()
-        val nodes = fixture.device.credentialManagerNodes()
-            .take(MAX_ACCESSIBILITY_NODES)
-            .mapNotNull { node ->
-                runCatching {
-                    "package=$CREDENTIAL_SELECTOR_PACKAGE " +
-                        "resource=${node.resourceName.orEmpty()} " +
-                        "text=${node.text.orEmpty()} " +
-                        "class=${node.className} " +
-                        "enabled=${node.isEnabled} clickable=${node.isClickable} " +
-                        "bounds=${node.visibleBounds.toShortString()}"
-                }.getOrNull()
-            }
-            .joinToString("\n")
-        return """
-            requestComplete=${request.isComplete}
-            currentPackage=${fixture.device.currentPackageName}
-            selectorVisible=${fixture.device.credentialManagerWindowVisible()}
-            expectedCandidateVisible=${fixture.device.findCredentialManagerText(candidateText) != null}
-            expectedCandidateSelected=$candidateSelected
-            continueVisible=${fixture.device.findCredentialManagerContinue() != null}
-            closeVisible=${fixture.device.findCredentialManagerClose() != null}
-            walletReviewVisible=${fixture.walletReviewVisible()}
-            foreground=${foregroundWindowSnapshot(fixture.device)}
-            accessibilityNodes:
-            ${nodes.ifBlank { "<none>" }}
-        """.trimIndent()
-    }
-
-    /**
-     * Posts the wallet's response to verifier2 and asserts it verified.
-     *
-     * Unlike direct_post, `response_mode=dc_api` sends nothing from the wallet to the verifier: the
-     * response returns through the OS to whoever called `getCredential`, and this test is that caller.
-     * Verification is inline, so the session is already terminal when this returns.
-     */
-    private suspend fun assertVerifierAccepted(
-        sessionId: String,
-        responseJson: String,
-        presentedCredentialId: String,
-        requiredPolicyIds: List<String>,
-        expectedImage: Boolean = false,
-    ) {
-        DemoTestBackend.submitDcApiResponse(sessionId, responseJson)
-        val info = DemoTestBackend.verifierSessionInfo(sessionId)
-        assertEquals("SUCCESSFUL", info["status"]?.jsonPrimitive?.content)
-        assertNotNull(
-            "Verifier did not report the presented credential '$presentedCredentialId': $info",
-            info["presented_credentials"]?.jsonObject?.get(presentedCredentialId),
-        )
-        if (expectedImage) {
-            val presented = info.getValue("presented_credentials").jsonObject
-                .getValue(presentedCredentialId).jsonArray.single().jsonObject
-                .getValue("credentialData").jsonObject
-            val returnedImage = if (presentedCredentialId == "mdl") {
-                val portrait = presented.getValue(MDL_NAMESPACE).jsonObject.getValue("portrait").jsonObject
-                assertEquals(BASE64_BYTES_TYPE, portrait.getValue("type").jsonPrimitive.content)
-                assertEquals(IMAGE_BYTES.size, portrait.getValue("length").jsonPrimitive.int)
-                Base64.decode(portrait.getValue("base64url").jsonPrimitive.content, Base64.URL_SAFE)
-            } else {
-                Base64.decode(presented.getValue("portrait").jsonPrimitive.content, Base64.DEFAULT)
-            }
-            assertArrayEquals("Verifier received different image bytes for $presentedCredentialId", IMAGE_BYTES, returnedImage)
-            assertTrue("Image fixture must exercise the large-response path", responseJson.length > 200_000)
-            println(
-                "DC_API_IMAGE_E2E query=$presentedCredentialId imageBytes=${returnedImage.size} " +
-                    "responseChars=${responseJson.length} verifier=SUCCESSFUL exactBytes=true",
-            )
-        }
-        // A skipped policy leaves the session SUCCESSFUL, so "no failures" alone would pass on a
-        // verifier that checked nothing; [requiredPolicyIds] must therefore be asserted as executed.
-        //
-        // mso_mdoc/issuer_auth proves the wallet relayed the issuer signature unaltered, but not that
-        // the document signer meets the ISO 18013-5 certificate profile: issuer2.demo.walt.id signs
-        // with an X.509 v1 certificate carrying neither keyUsage:digitalSignature nor
-        // EKU 1.0.18013.5.1.2, which verifier2 0.23.0 does not yet enforce.
-        val policyResults = info["policy_results"] ?: error("Session info has no policy_results: $info")
-        val executed = policyResults.executedPolicyIds()
-        requiredPolicyIds.forEach { policyId ->
-            assertTrue("$policyId did not run. Executed: $executed", executed.contains(policyId))
-        }
-        assertTrue(
-            "Failed policies: ${policyResults.failedPolicies()}",
-            policyResults.failedPolicies().isEmpty(),
         )
     }
 
@@ -1240,156 +846,33 @@ class DigitalCredentialSharingE2ETest {
     private fun base64Url(bytes: ByteArray): String =
         Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
 
-    /** The claims of an SD-JWT VC presentation's key binding JWT, which is its final `~` segment. */
-    private fun keyBindingJwtClaims(presentation: String): JsonObject {
-        val keyBindingJwt = presentation.substringAfterLast('~')
-        require(keyBindingJwt.isNotBlank()) { "SD-JWT presentation carries no key binding JWT" }
-        val payload = keyBindingJwt.split('.').getOrNull(1)
-            ?: error("SD-JWT key binding JWT is not a compact JWS: $keyBindingJwt")
-        return Json.parseToJsonElement(
-            Base64.decode(payload, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING).decodeToString(),
-        ).jsonObject
-    }
-
-    /**
-     * `android:apk-key-hash:<base64url-sha256(signing cert)>`, the origin Credential Manager asserts for
-     * a native caller. Mirrors `AndroidDigitalCredentialProvider.nativeAppOrigin`, which is internal to
-     * the wallet-mobile module.
-     */
-    private fun nativeAppOrigin(context: Context): String {
-        val signatures = context.packageManager
-            .getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
-            .signingInfo
-            ?.signingCertificateHistory
-            ?: error("Wallet package has no signing certificate")
-        val digest = MessageDigest.getInstance("SHA-256").digest(signatures.first().toByteArray())
-        val hash = Base64.encodeToString(digest, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
-        return "android:apk-key-hash:$hash"
-    }
-
-    /** Collects every `success == false` leaf so a failure names the policy, not just `false`. */
-    private fun JsonElement.failedPolicies(): List<String> = buildList {
-        fun walk(element: JsonElement, path: String) {
-            when (element) {
-                is JsonObject -> {
-                    val id = element["policy_executed"]?.jsonObject?.get("id")?.jsonPrimitive?.content
-                    if (id != null && element["success"]?.jsonPrimitive?.booleanOrNull == false) {
-                        add("$path/$id: ${element["errors"]}")
-                    }
-                    element.forEach { (key, value) -> walk(value, "$path/$key") }
-                }
-
-                is JsonArray ->
-                    element.forEachIndexed { index, value -> walk(value, "$path[$index]") }
-
-                else -> Unit
-            }
+    private suspend fun assertVerifierAcceptedWithImage(
+        sessionId: String,
+        responseJson: String,
+        presentedCredentialId: String,
+        requiredPolicyIds: List<String>,
+    ) {
+        val info = assertVerifierAccepted(sessionId, responseJson, presentedCredentialId, requiredPolicyIds)
+        val presented = info.getValue("presented_credentials").jsonObject
+            .getValue(presentedCredentialId).jsonArray.single().jsonObject
+            .getValue("credentialData").jsonObject
+        val returnedImage = if (presentedCredentialId == "mdl") {
+            val portrait = presented.getValue(MDL_NAMESPACE).jsonObject.getValue("portrait").jsonObject
+            assertEquals(BASE64_BYTES_TYPE, portrait.getValue("type").jsonPrimitive.content)
+            assertEquals(IMAGE_BYTES.size, portrait.getValue("length").jsonPrimitive.int)
+            Base64.decode(portrait.getValue("base64url").jsonPrimitive.content, Base64.URL_SAFE)
+        } else {
+            Base64.decode(presented.getValue("portrait").jsonPrimitive.content, Base64.DEFAULT)
         }
-        walk(this@failedPolicies, "")
+        assertArrayEquals("Verifier received different image bytes for $presentedCredentialId", IMAGE_BYTES, returnedImage)
+        assertTrue("Image fixture must exercise the large-response path", responseJson.length > 200_000)
+        println(
+            "DC_API_IMAGE_E2E query=$presentedCredentialId imageBytes=${returnedImage.size} " +
+                "responseChars=${responseJson.length} verifier=SUCCESSFUL exactBytes=true",
+        )
     }
 
-    private fun JsonElement.executedPolicyIds(): Set<String> = buildSet {
-        fun walk(element: JsonElement) {
-            when (element) {
-                is JsonObject -> {
-                    element["policy_executed"]?.jsonObject?.get("id")?.jsonPrimitive?.content
-                        ?.let { add(it) }
-                    element.values.forEach(::walk)
-                }
-
-                is JsonArray -> element.forEach(::walk)
-                else -> Unit
-            }
-        }
-        walk(this@executedPolicyIds)
-    }
-
-    private fun UiObject2.clickableAncestorOrSelf(): UiObject2? {
-        var node: UiObject2? = this
-        while (node != null) {
-            if (node.isClickable) return node
-            node = node.parent
-        }
-        return null
-    }
-
-    private companion object {
-        private lateinit var wallet: MobileWallet
-        private lateinit var issuedCredentialIds: Set<String>
-
-        @JvmStatic
-        @BeforeClass
-        fun provisionCredentials() = runBlocking {
-            val instrumentation = InstrumentationRegistry.getInstrumentation()
-            val context = instrumentation.targetContext
-            assertTrue(
-                "Digital Credentials E2E requires an Android emulator with Google Play services",
-                hasGooglePlayServices(context),
-            )
-
-            val created = createAndroidDemoMobileWallet(
-                context = context,
-                // This Play Store emulator cannot enforce protected signing keys; production
-                // defaults remain covered by the app, while this fixture needs ordinary keys.
-                config = demoWalletConfig().copy(
-                    signingProtectionMode = WalletDemoSigningProtectionMode.Disabled,
-                ),
-            )
-            wallet = created.wallet
-            val identity = wallet.signingIdentity.initialize()
-            assertTrue("Could not initialize the fixture signing identity: $identity", identity is SigningIdentityOperationResult.Active)
-            created.bootstrap(WalletDemoSigningProtection.None)
-            demoWalletConfig().signingProtectionStore(context).save(WalletDemoSigningProtection.None)
-
-            wallet.credentials().forEach { credential ->
-                check(wallet.deleteCredential(credential.id)) {
-                    "Failed to delete stale credential ${credential.id}"
-                }
-            }
-
-            val emptyRegistration = wallet.refreshDigitalCredentialRegistration()
-            assertTrue(
-                "Credential Manager registration was unavailable after clearing the wallet: " +
-                    emptyRegistration.reason,
-                emptyRegistration.available,
-            )
-            assertEquals(0, emptyRegistration.registeredEntryCount)
-
-            val mdlScenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
-            val sdJwtScenario = DemoTestBackend.presentationScenarios.first { it.id == "eudi-pid-sdjwt" }
-            issuedCredentialIds = (
-                issueFromDemoIssuer(wallet, mdlScenario) + issueFromDemoIssuer(wallet, sdJwtScenario)
-                ).toSet()
-
-            val stored = wallet.credentials()
-            assertEquals("Live setup must store exactly two credentials", 2, stored.size)
-            assertEquals("Issued IDs do not match stored IDs", issuedCredentialIds, stored.map { it.id }.toSet())
-
-            val mdoc = requireNotNull(stored.singleOrNull { it.format == "mso_mdoc" }) {
-                "Expected one mso_mdoc credential, got ${stored.map { it.format }}"
-            }
-            assertEquals(
-                MDL_DOC_TYPE,
-                Json.parseToJsonElement(mdoc.credentialDataJson).jsonObject["docType"]?.jsonPrimitive?.content,
-            )
-
-            val sdJwt = requireNotNull(stored.singleOrNull { it.format == "dc+sd-jwt" }) {
-                "Expected one dc+sd-jwt credential, got ${stored.map { it.format }}"
-            }
-            assertEquals(
-                EUDI_PID_SD_JWT_VCT,
-                Json.parseToJsonElement(sdJwt.credentialDataJson).jsonObject["vct"]?.jsonPrimitive?.content,
-            )
-
-            val registration = wallet.refreshDigitalCredentialRegistration()
-            assertTrue(
-                "Credential Manager registration was unavailable after live provisioning: " +
-                    registration.reason,
-                registration.available,
-            )
-            assertEquals(2, registration.registeredEntryCount)
-        }
-
+    companion object {
         private suspend fun issueFromDemoIssuer(
             wallet: MobileWallet,
             scenario: DemoTestBackend.CredentialScenario,
@@ -1448,8 +931,6 @@ class DigitalCredentialSharingE2ETest {
         /** How the review labels `age_over_18`, which it humanizes rather than showing verbatim. */
         private const val AGE_DISCLOSURE_LABEL = "Age over 18"
 
-        /** How the amount reads once rendered, on the prompt and on the review alike. */
-        private const val SCA_AMOUNT_TEXT = "11.56"
         private const val MDL_NAMESPACE = "org.iso.18013.5.1"
         private val REQUESTED_MDL_ELEMENTS = listOf("family_name", "given_name", "portrait")
 
@@ -1481,36 +962,92 @@ class DigitalCredentialSharingE2ETest {
             }))
         private const val PAYMENT_AUTHORIZATION_DISPLAY_NAME = "Payment Authorization"
 
-        /** Owns `CredentialSelectorActivity`, i.e. the picker window these tests drive. */
-        private const val CREDENTIAL_SELECTOR_PACKAGE = "com.google.android.gms"
-
-        /** Dismisses Credential Manager's own "Your info wasn't found" state, which has no candidates. */
-        private const val CREDENTIAL_SELECTOR_CLOSE_LABEL = "Close"
-        private const val CANDIDATE_CLICK_ATTEMPTS = 3
-        private const val CLEANUP_TIMEOUT = 10_000L
-        private const val CANCELLATION_TRANSITION_TIMEOUT = 10_000L
-        private const val CLEANUP_POLL_MILLIS = 200L
-        private const val MAX_ACCESSIBILITY_NODES = 80
-
-        /**
-         * Compose test tags of the wallet's shared review, exported as Android resource IDs. The same
-         * tags the in-app OpenID4VP review is driven by; the provider surface is not a separate UI.
-         */
-        private val WALLET_SHARING_REVIEW_TAG = WalletDemoSharingReviewTestTags.Review
-        private val WALLET_SHARE_BUTTON_TAG = WalletDemoSharingReviewTestTags.ShareButton
-
         /**
          * Holder binding, which for the DC API is the session-transcript check, plus issuer
          * authenticity. Both must be asserted as executed, not merely as not failed.
          */
+        // mso_mdoc/issuer_auth proves the wallet relayed the issuer signature unaltered, but not that
+        // the document signer meets the ISO 18013-5 certificate profile: issuer2.demo.walt.id signs
+        // with an X.509 v1 certificate carrying neither keyUsage:digitalSignature nor
+        // EKU 1.0.18013.5.1.2, which verifier2 0.23.0 does not yet enforce.
         private val MDOC_REQUIRED_POLICIES = listOf("mso_mdoc/device-auth", "mso_mdoc/issuer_auth")
 
-        /**
-         * The SD-JWT counterpart: `kb-jwt_signature` is holder binding and `sd_hash-check` ties that
-         * signature to the exact disclosure set presented. Issuer authenticity is absent because
-         * verifier2's default *VP* policy set for `dc+sd-jwt` contains no issuer-signature policy (see
-         * VPVerificationPolicyManager.simpleDcSdJwtPolicies).
-         */
-        private val SD_JWT_REQUIRED_POLICIES = listOf("dc+sd-jwt/kb-jwt_signature", "dc+sd-jwt/sd_hash-check")
+
+
+        private lateinit var provisionedWallet: MobileWallet
+        private lateinit var provisionedCredentialIds: Set<String>
+        @JvmStatic
+        @BeforeClass
+        fun provisionCredentials() = runBlocking {
+            val instrumentation = InstrumentationRegistry.getInstrumentation()
+            val context = instrumentation.targetContext
+            assertTrue(
+                "Digital Credentials E2E requires an Android emulator with Google Play services",
+                hasGooglePlayServices(context),
+            )
+
+            val created = createAndroidDemoMobileWallet(
+                context = context,
+                // This Play Store emulator cannot enforce protected signing keys; production
+                // defaults remain covered by the app, while this fixture needs ordinary keys.
+                config = demoWalletConfig().copy(
+                    signingProtectionMode = WalletDemoSigningProtectionMode.Disabled,
+                ),
+            )
+            provisionedWallet = created.wallet
+            val identity = provisionedWallet.signingIdentity.initialize()
+            assertTrue("Could not initialize the fixture signing identity: $identity", identity is SigningIdentityOperationResult.Active)
+            created.bootstrap(WalletDemoSigningProtection.None)
+            demoWalletConfig().signingProtectionStore(context).save(WalletDemoSigningProtection.None)
+
+            provisionedWallet.credentials().forEach { credential ->
+                check(provisionedWallet.deleteCredential(credential.id)) {
+                    "Failed to delete stale credential ${credential.id}"
+                }
+            }
+
+            val emptyRegistration = provisionedWallet.refreshDigitalCredentialRegistration()
+            assertTrue(
+                "Credential Manager registration was unavailable after clearing the wallet: " +
+                    emptyRegistration.reason,
+                emptyRegistration.available,
+            )
+            assertEquals(0, emptyRegistration.registeredEntryCount)
+
+            val mdlScenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
+            val sdJwtScenario = DemoTestBackend.presentationScenarios.first { it.id == "eudi-pid-sdjwt" }
+            provisionedCredentialIds = (
+                issueFromDemoIssuer(provisionedWallet, mdlScenario) + issueFromDemoIssuer(provisionedWallet, sdJwtScenario)
+                ).toSet()
+
+            val stored = provisionedWallet.credentials()
+            assertEquals("Live setup must store exactly two credentials", 2, stored.size)
+            assertEquals("Issued IDs do not match stored IDs", provisionedCredentialIds, stored.map { it.id }.toSet())
+
+            val mdoc = requireNotNull(stored.singleOrNull { it.format == "mso_mdoc" }) {
+                "Expected one mso_mdoc credential, got ${stored.map { it.format }}"
+            }
+            assertEquals(
+                MDL_DOC_TYPE,
+                Json.parseToJsonElement(mdoc.credentialDataJson).jsonObject["docType"]?.jsonPrimitive?.content,
+            )
+
+            val sdJwt = requireNotNull(stored.singleOrNull { it.format == "dc+sd-jwt" }) {
+                "Expected one dc+sd-jwt credential, got ${stored.map { it.format }}"
+            }
+            assertEquals(
+                EUDI_PID_SD_JWT_VCT,
+                Json.parseToJsonElement(sdJwt.credentialDataJson).jsonObject["vct"]?.jsonPrimitive?.content,
+            )
+
+            val registration = provisionedWallet.refreshDigitalCredentialRegistration()
+            assertTrue(
+                "Credential Manager registration was unavailable after live provisioning: " +
+                    registration.reason,
+                registration.available,
+            )
+            assertEquals(2, registration.registeredEntryCount)
+        }
+
     }
 }

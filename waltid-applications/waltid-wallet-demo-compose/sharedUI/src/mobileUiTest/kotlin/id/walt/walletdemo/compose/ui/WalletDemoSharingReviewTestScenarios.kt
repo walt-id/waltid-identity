@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runComposeUiTest
+import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
@@ -41,6 +42,52 @@ import kotlin.test.assertNull
  */
 @OptIn(ExperimentalTestApi::class)
 class WalletDemoSharingReviewTestScenarios {
+
+    fun paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements() = runComposeUiTest {
+        val consent = WalletDemoPaymentConsent("revision", "de", "Zahlung prüfen", null, "Zahlen", "Ablehnen", true,
+            listOf(
+                WalletDemoPaymentField("Betrag", null, "11.56 EUR", WalletDemoPaymentFieldPlacement.Prominent),
+                WalletDemoPaymentField("Empfänger", null, "Super Store", WalletDemoPaymentFieldPlacement.Main),
+                WalletDemoPaymentField("Transaktions-ID", null, "txn-1", WalletDemoPaymentFieldPlacement.Details),
+                WalletDemoPaymentField("Omitted", null, "bound-but-hidden", WalletDemoPaymentFieldPlacement.Omitted),
+            ))
+        var submitted: WalletDemoSharingSelection? = null
+        setContent {
+            WalletDemoSharingReviewScreen(review = digitalCredentialReview(), title = "Payment", compact = false,
+                onSubmit = { submitted = it }, onCancel = {}, preparePaymentConsent = { consent })
+        }
+        onNodeWithText("Zahlung prüfen").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Betrag").performScrollTo().assertIsDisplayed()
+        onNodeWithText("11.56 EUR").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Empfänger").performScrollTo().assertIsDisplayed()
+        onNodeWithTag("payment-unsigned-warning").performScrollTo().assertIsDisplayed()
+        onNodeWithTag("payment-security-hint").assertDoesNotExist()
+        onNodeWithText("bound-but-hidden").assertDoesNotExist()
+        onNodeWithText("txn-1").assertDoesNotExist()
+        onNodeWithTag("payment-details-toggle").performScrollTo().performClick()
+        onNodeWithText("txn-1").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(WalletDemoPresentationCredentialSelection("pid", "credential-1").id))
+            .performScrollTo().assertIsDisplayed() // Ordinary requested credentials remain reviewable.
+        onNodeWithText("Ablehnen").assertIsDisplayed()
+        onNodeWithText("Zahlen").performClick()
+        assertEquals("revision", submitted?.paymentConsentRevision)
+    }
+
+    fun unavailablePaymentInstructionsBlockSubmissionWithoutGenericFallback() = runComposeUiTest {
+        val review = digitalCredentialReview().let { it.copy(request = it.request.copy(transactionData = it.request.transactionData.map { group ->
+            group.copy(transactionType = "urn:eudi:sca:payment:1")
+        })) }
+        var submitted = false
+        setContent {
+            WalletDemoSharingReviewScreen(review = review, title = "Payment", compact = false,
+                onSubmit = { submitted = true }, onCancel = {},
+                preparePaymentConsent = { error("Required payment instructions are unavailable in your preferred languages.") })
+        }
+        onNodeWithTag("payment-consent-blocked").performScrollTo().assertIsDisplayed()
+        onNodeWithText("42.00").assertDoesNotExist()
+        onNodeWithText("Share").assertIsNotEnabled()
+        assertEquals(false, submitted)
+    }
 
     /**
      * The `dc_api.jwt` case. The signature covers transaction_data, so every authorized value has to be

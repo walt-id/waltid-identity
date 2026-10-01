@@ -1636,6 +1636,48 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun lockSuppressesLatePaymentInstructionsAndLoadingCannotSubmit() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        var preparations = 0
+        val base = FakeDemoWallet(presentationPreview = WalletDemoPresentationPreview(
+            previewHandle = presentationPreviewHandle, responseEncryption = WalletDemoResponseEncryption.NotRequired,
+            verifierMetadata = null, clientId = null, requiresPaymentConsent = true,
+            credentialOptions = listOf(WalletDemoPresentationCredentialOption(
+                queryId = "payment", credentialId = "card", label = "Card", issuer = "Issuer",
+                format = "dc+sd-jwt", credentialDataJson = "{}", disclosures = emptyList()))))
+        val wallet = object : DemoWallet by base {
+            override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult {
+                val result = base.previewPresentation(requestUrl) as WalletDemoPresentationPreviewResult.Ready
+                return WalletDemoPresentationPreviewResult.Ready(result.preview.copy(requiresPaymentConsent = true))
+            }
+            override suspend fun preparePaymentConsent(
+                previewHandle: WalletDemoPresentationPreviewHandle,
+                selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+                selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+                did: String?,
+            ): WalletDemoPaymentConsent = withContext(NonCancellable) {
+                preparations++
+                gate.await()
+                WalletDemoPaymentConsent("late", "en", null, null, "Pay", null, true, emptyList())
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation()
+        runCurrent()
+        assertEquals(1, preparations)
+        assertEquals(WalletDemoPaymentReview.Loading, controller.state.value.paymentReview)
+        controller.submitPresentation()
+        runCurrent()
+        assertEquals(0, base.submitPresentationCalls)
+        controller.lock()
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(WalletDemoPaymentReview.NotRequired, controller.state.value.paymentReview)
+        assertNull(controller.state.value.presentationPreview)
+    }
+
+    @Test
     fun lockDiscardsPresentationPreviewResolvedAfterCancellation() = runTest {
         val previewGate = CompletableDeferred<Unit>()
         val wallet = FakeDemoWallet(
@@ -2667,6 +2709,7 @@ private class FakeDemoWallet(
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
+        paymentConsentRevision: String?,
     ): WalletDemoOperationResult {
         submitPresentationCalls += 1
         submittedPreviewHandle = previewHandle

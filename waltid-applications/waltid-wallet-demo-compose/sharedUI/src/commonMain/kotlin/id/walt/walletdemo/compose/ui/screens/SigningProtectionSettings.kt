@@ -101,7 +101,7 @@ internal fun SigningProtectionSettings(
             OutlinedButton(
                 onClick = { onRequestChange(state.selectedSigningProtection) },
                 enabled = !state.isBusy && (
-                    state.selectedSigningProtection != WalletDemoSigningProtection.Biometric ||
+                    !state.selectedSigningProtection.requiresBiometrics ||
                         biometricSigningAvailable
                     ),
                 modifier = Modifier

@@ -292,11 +292,23 @@ internal class MobileDemoWallet(
                 )
         }
 
+    override suspend fun preparePaymentConsent(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        did: String?,
+    ): WalletDemoPaymentConsent? = mobileWallet.preparePaymentConsent(
+        MobileWalletPresentationPreviewHandle(previewHandle.value),
+        selectedCredentialOptions.map { MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId) },
+        selectedDisclosureOptions.map { MobileWalletPresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }, did,
+    )?.toDemoPaymentConsent()
+
     override suspend fun submitPresentation(
         previewHandle: WalletDemoPresentationPreviewHandle,
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
+        paymentConsentRevision: String?,
     ): WalletDemoOperationResult =
         mobileWallet.submitPresentation(
             previewHandle = MobileWalletPresentationPreviewHandle(previewHandle.value),
@@ -314,6 +326,7 @@ internal class MobileDemoWallet(
                 )
             },
             did = did,
+            paymentConsentRevision = paymentConsentRevision,
         ).toDemoOperationResult(
             successMessage = WalletDisplayText.PresentationSent,
             failureMessage = WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation,
@@ -340,13 +353,21 @@ internal class MobileDemoWallet(
     }
 }
 
+/** Additional choices are preflighted by the existing signing-identity setup on each platform. */
+internal fun WalletDemoSigningProtectionMode.alternativeAuthorizations(): List<KeyUseAuthorizationPolicy> =
+    WalletDemoSigningProtection.entries
+        .filter { it != defaultSelection && allows(it) }
+        .map { it.toKeyUseAuthorizationPolicy() }
+
 internal fun WalletDemoSigningProtection.toKeyUseAuthorizationPolicy(): KeyUseAuthorizationPolicy = when (this) {
     WalletDemoSigningProtection.None -> KeyUseAuthorizationPolicy.None
     WalletDemoSigningProtection.Biometric -> KeyUseAuthorizationPolicy.BiometricTimedReuse(timeoutSeconds = 10)
+    WalletDemoSigningProtection.BiometricPerUse -> KeyUseAuthorizationPolicy.BiometricCurrentSet
 }
 
-private fun KeyUseAuthorizationPolicy.toDemoSigningProtection(): WalletDemoSigningProtection = when (this) {
+internal fun KeyUseAuthorizationPolicy.toDemoSigningProtection(): WalletDemoSigningProtection = when (this) {
     KeyUseAuthorizationPolicy.None -> WalletDemoSigningProtection.None
+    KeyUseAuthorizationPolicy.BiometricCurrentSet -> WalletDemoSigningProtection.BiometricPerUse
     is KeyUseAuthorizationPolicy.BiometricTimedReuse -> {
         check(timeoutSeconds == 10) {
             "Wallet key uses an unsupported biometric signing timeout: $timeoutSeconds seconds"
@@ -355,8 +376,7 @@ private fun KeyUseAuthorizationPolicy.toDemoSigningProtection(): WalletDemoSigni
     }
     KeyUseAuthorizationPolicy.BiometricAny,
     is KeyUseAuthorizationPolicy.DeviceCredential,
-    is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential,
-    KeyUseAuthorizationPolicy.BiometricCurrentSet -> error(
+    is KeyUseAuthorizationPolicy.BiometricOrDeviceCredential -> error(
         "Wallet key uses an unsupported per-operation biometric signing policy",
     )
 }
@@ -397,6 +417,7 @@ internal fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConf
 private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentationPreview =
     WalletDemoPresentationPreview(
         previewHandle = WalletDemoPresentationPreviewHandle(previewHandle.value),
+        requiresPaymentConsent = request.transactionData.any { it.type == "urn:eudi:sca:payment:1" } && credentialOptions.any { it.format == "dc+sd-jwt" },
         verifierMetadata = request.verifierMetadata?.toDemoMetadata(),
         clientId = request.clientId,
         responseUri = request.responseUri,

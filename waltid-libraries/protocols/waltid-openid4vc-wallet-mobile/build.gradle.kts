@@ -157,6 +157,7 @@ kotlin {
                     implementation(identityLibs.androidx.test.runner)
                     implementation(identityLibs.androidx.test.ext.junit)
                     implementation(identityLibs.ktor.client.android)
+                    implementation(identityLibs.ktor.client.mock)
                     implementation(identityLibs.ktor.client.content.negotiation)
                     implementation(identityLibs.ktor.serialization.kotlinx.json)
                     implementation(identityLibs.oshai.kotlinlogging)
@@ -175,6 +176,7 @@ kotlin {
                     kotlin.srcDir("src/physicalTestFixtures/kotlin")
                     kotlin.srcDir("src/iosPhysicalFixtures/kotlin")
                     kotlin.srcDir("src/scaTestFixtures/kotlin")
+                    dependencies { implementation(identityLibs.ktor.client.mock) }
                 }
             }
             binaries.framework("physicalFixtures", listOf(NativeBuildType.RELEASE)) {
