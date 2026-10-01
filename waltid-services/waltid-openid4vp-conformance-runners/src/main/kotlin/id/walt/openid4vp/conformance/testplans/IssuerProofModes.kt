@@ -69,3 +69,18 @@ internal fun requireIsolatedIssuerProofType(metadata: JsonObject, configurationI
         "$configurationId must require key attestations for JWT proof coverage."
     }
 }
+
+/** Require suite evidence for the selected proof generator, rather than trusting the config hint. */
+internal fun requireIssuerProofEvidence(proofType: String, logs: List<TestLogEntry>) {
+    val generator = when (proofType) {
+        "jwt" -> "VCIGenerateJwtProof"
+        "attestation" -> "VCIGenerateAttestationProof"
+        else -> error("Unsupported proof mode $proofType")
+    }
+    require(logs.any { it.src == generator && it.result == "SUCCESS" }) {
+        "No successful $generator evidence in suite log; cannot confirm $proofType proof coverage."
+    }
+    require(logs.any { it.src == "VCIGenerateKeyAttestationIfNecessary" && it.result == "SUCCESS" }) {
+        "No generated key attestation in suite log; cannot confirm key-attestation coverage."
+    }
+}

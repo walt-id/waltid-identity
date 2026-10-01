@@ -1,5 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
+import id.walt.openid4vp.conformance.testplans.keyAttestationAcceptanceModules
+import id.walt.openid4vp.conformance.testplans.requireIssuerProofEvidence
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.http.IssuerInterface
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariant
@@ -124,7 +126,7 @@ class IssuerTestPlanRunner(
         modulesToRun.forEach { println("   - ${it.testModule}") }
 
         val moduleResults = modulesToRun.map { module ->
-            runModuleAttempt(testPlanId, module.testModule, module.variant)
+            runModuleAttempt(testPlanId, module.testModule, module.variant, variant.credentialProofType)
         }
 
         return IssuerVariantRunResult(
@@ -140,6 +142,7 @@ class IssuerTestPlanRunner(
         testPlanId: String,
         testModule: String,
         moduleVariant: JsonObject,
+        proofType: String?,
     ): IssuerVariantModuleRunResult {
         var testId: String? = null
         val logUrlForTest: (String) -> String = { "https://$conformanceHost:$conformancePort/log-detail.html?log=$it" }
@@ -160,6 +163,10 @@ class IssuerTestPlanRunner(
             println("Module $testModule finished with status=${testRunInfo.status}, result=${testRunInfo.result}")
 
             val accepted = acceptsModuleResult(testModule, testRunInfo.status, testRunInfo.result)
+            if (proofType != null && testRunInfo.result == "PASSED" &&
+                (testModule in keyAttestationAcceptanceModules || testModule == "oid4vci-1_0-issuer-batch-issuance")) {
+                requireIssuerProofEvidence(proofType, conformance.getTestLog(testId))
+            }
             IssuerVariantModuleRunResult(
                 testModule = testModule,
                 testId = testId,
