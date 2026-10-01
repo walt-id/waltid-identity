@@ -41,7 +41,7 @@ dependencies {
     /*implementation(platform("dev.whyoleg.cryptography:cryptography-bom:0.4.0"))
     implementation("dev.whyoleg.cryptography:cryptography-core")
     implementation("dev.whyoleg.cryptography:cryptography-provider-jdk")*/
-    implementation("com.password4j:password4j:1.8.4")
+    implementation(identityLibs.password4j)
     implementation(identityLibs.kotlincrypto.hash.sha2)
     implementation(identityLibs.kotlincrypto.random)
 

@@ -20,7 +20,8 @@ the current Swift facade remains correct.
   storage behavior.
 - 2026-09-30: Kotlin 2.4.20 adds ABI validation for the Android KMP library
   plugin (KT-85950). Added Android JVM baselines for the existing SDK modules;
-  every native klib baseline is unchanged. The compiler also adds Java
+  added iOS target coverage to the KMS, migration, and JOSE native baselines
+  without changing their API declarations. The compiler also adds Java
   no-argument constructors for two defaulted crypto providers (KT-78623).
   Neither change adds a Swift wallet capability, so the existing `WalletSDK`
   facade remains correct.

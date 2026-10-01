@@ -1,9 +1,5 @@
 import io.ktor.plugin.features.*
 
-object Versions {
-    const val HOPLITE_VERSION = "2.9.0"
-}
-
 plugins {
     id("waltid.ktorbackend")
     id("waltid.ktordocker")
@@ -40,8 +36,8 @@ dependencies {
     implementation(identityLibs.jsonpathkt)
     implementation(identityLibs.jaywayjsonpath)
 
-    implementation("com.sksamuel.hoplite:hoplite-core:${Versions.HOPLITE_VERSION}")
-    implementation("com.sksamuel.hoplite:hoplite-hocon:${Versions.HOPLITE_VERSION}")
+    implementation(identityLibs.hoplite.core)
+    implementation(identityLibs.hoplite.hocon)
 
     implementation(identityLibs.oshai.kotlinlogging)
     implementation(identityLibs.slf4j.julbridge)
@@ -73,7 +69,7 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-verifier-api2"))
     testImplementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     testImplementation(identityLibs.junit.jupiter.api)
-    testImplementation("com.microsoft.playwright:playwright:1.60.0") {
+    testImplementation(identityLibs.playwright) {
         exclude(group = "org.junit.jupiter")
         exclude(group = "org.junit.platform")
         exclude(group = "org.opentest4j")

@@ -5,11 +5,6 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import java.security.KeyStore
 import java.security.cert.CertificateFactory
 
-object Versions {
-    const val HOPLITE_VERSION = "2.9.0"
-    const val PLAYWRIGHT_VERSION = "1.60.0"
-}
-
 plugins {
     id("waltid.ktorbackend")
     id("waltid.ktordocker")
@@ -64,16 +59,16 @@ dependencies {
     /* -- Misc --*/
 
     // Config
-    implementation("com.sksamuel.hoplite:hoplite-core:${Versions.HOPLITE_VERSION}")
-    implementation("com.sksamuel.hoplite:hoplite-hocon:${Versions.HOPLITE_VERSION}")
+    implementation(identityLibs.hoplite.core)
+    implementation(identityLibs.hoplite.hocon)
 
     // Logging
     implementation(identityLibs.oshai.kotlinlogging)
     implementation(identityLibs.slf4j.julbridge)
     implementation(identityLibs.klogging)
     implementation(identityLibs.slf4j.klogging)
-    implementation("io.ktor:ktor-client-encoding:3.2.2")
-    implementation("com.microsoft.playwright:playwright:${Versions.PLAYWRIGHT_VERSION}") {
+    implementation(identityLibs.ktor.conformance.encoding)
+    implementation(identityLibs.playwright) {
         exclude(group = "org.junit.jupiter")
         exclude(group = "org.junit.platform")
         exclude(group = "org.opentest4j")
