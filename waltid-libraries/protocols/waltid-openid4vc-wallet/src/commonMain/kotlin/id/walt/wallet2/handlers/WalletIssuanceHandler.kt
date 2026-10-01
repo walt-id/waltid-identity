@@ -754,6 +754,35 @@ private fun FetchCredentialsResult.releasedRawCredentials(): List<String> {
 }
 
 /**
+ * Isolated rejection of a credential that was fetched with [FetchCredentialRequest.storeInWallet] left false.
+ *
+ * Pass [notificationId] and [accessToken] from [FetchCredentialResult] / the token response. Supply
+ * either [notificationEndpoint] or [credentialIssuerBaseUrl] so the wallet can resolve the issuer's
+ * OpenID4VCI notification endpoint. This isolated step is Bearer-only, matching isolated fetch.
+ */
+@Serializable
+data class RejectIssuedCredentialRequest(
+    val notificationId: String,
+    val accessToken: String,
+    val credentialIssuerBaseUrl: String? = null,
+    val notificationEndpoint: String? = null,
+    val eventDescription: String? = null,
+) {
+    init {
+        require(notificationId.isNotBlank()) { "notificationId must not be blank" }
+        require(accessToken.isNotBlank()) { "accessToken cannot be blank" }
+        require(!notificationEndpoint.isNullOrBlank() || !credentialIssuerBaseUrl.isNullOrBlank()) {
+            "Either notificationEndpoint or credentialIssuerBaseUrl must be provided"
+        }
+    }
+
+    override fun toString(): String =
+        "RejectIssuedCredentialRequest(notificationId=$notificationId, accessToken=<redacted>, " +
+            "credentialIssuerBaseUrl=$credentialIssuerBaseUrl, notificationEndpoint=$notificationEndpoint, " +
+            "eventDescription=$eventDescription)"
+}
+
+/**
  * Completes the authorization-code grant in one call: exchanges [code] for an access token, builds a
  * proof of possession, fetches the credential(s) and stores them in the wallet.
  *
@@ -1991,6 +2020,31 @@ object WalletIssuanceHandler {
             if (outcome is WalletIssuanceOutcome.Failed) throw CredentialStorageException(outcome)
             result.copy(storageOutcome = outcome)
         }
+    }
+
+    /**
+     * Posts [NotificationEvent.CREDENTIAL_DELETED] for a credential fetched with
+     * [FetchCredentialRequest.storeInWallet] left false. Resolves [RejectIssuedCredentialRequest.notificationEndpoint]
+     * from issuer metadata when only [RejectIssuedCredentialRequest.credentialIssuerBaseUrl] is supplied.
+     * Bearer-only, like isolated fetch. Missing advertised `notification_endpoint` is a best-effort no-op.
+     */
+    suspend fun rejectIssuedCredential(
+        request: RejectIssuedCredentialRequest,
+        httpClient: HttpClient = defaultHttpClient(),
+    ) {
+        val notificationEndpoint = request.notificationEndpoint?.takeIf { it.isNotBlank() }
+            ?: request.credentialIssuerBaseUrl?.takeIf { it.isNotBlank() }?.let { issuer ->
+                IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(issuer)
+                    .metadata.notificationEndpoint
+            }
+        reportCredentialDeleted(
+            notificationEndpoint = notificationEndpoint ?: return,
+            notificationId = request.notificationId,
+            accessToken = request.accessToken,
+            tokenType = "Bearer",
+            eventDescription = request.eventDescription,
+            httpClient = httpClient,
+        )
     }
 
     /**

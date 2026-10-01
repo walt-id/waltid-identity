@@ -444,3 +444,12 @@ internal data class ResolveBatchOfferResponseDto(
     val offer: ResolveOfferDetailedResponseDto,
     val batchSize: Int? = null,
 )
+
+@Serializable
+internal data class RejectIssuedCredentialRequestDto(
+    val notificationId: String,
+    val accessToken: String,
+    val credentialIssuerBaseUrl: String? = null,
+    val notificationEndpoint: String? = null,
+    val eventDescription: String? = null,
+)

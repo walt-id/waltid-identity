@@ -84,7 +84,9 @@ import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResul
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.RequestObjectAuthentication
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
-import io.ktor.client.HttpClient
+import io.ktor.client.request.HttpRequestData
+import io.ktor.http.content.OutgoingContent
+import io.ktor.http.content.TextContent
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
@@ -1195,6 +1197,62 @@ class MobileWalletTest {
     }
 
     @Test
+    fun continuePreAuthorizedIssuancePostsCredentialAccepted() = runTest {
+        val notifications = mutableListOf<String>()
+        val holderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("accepted-notification-holder-key"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "accepted-notification-wallet",
+            keyStore = InMemoryMobileWalletKeyStore().also { it.addCrypto2Key(holderKey) },
+            didStore = InMemoryDidStore().also {
+                it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
+            },
+            credentialStore = InMemoryCredentialStore(),
+            issuanceHttpClient = mockIssuer(notifications),
+        )
+
+        val session = wallet.startIssuance(
+            MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(preAuthorizedOfferUrl()))
+        )
+        assertIs<WalletIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(session.id))
+        assertEquals(listOf("credential_accepted"), notifications)
+    }
+
+    @Test
+    fun rejectIssuedCredentialPostsCredentialDeleted() = runTest {
+        val notifications = mutableListOf<String>()
+        val holderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("deleted-notification-holder-key"),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "deleted-notification-wallet",
+            keyStore = InMemoryMobileWalletKeyStore().also { it.addCrypto2Key(holderKey) },
+            didStore = InMemoryDidStore().also {
+                it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
+            },
+            credentialStore = InMemoryCredentialStore(),
+            issuanceHttpClient = mockIssuer(notifications),
+        )
+
+        wallet.rejectIssuedCredential(
+            notificationId = "notification-id",
+            accessToken = "access",
+            credentialIssuerBaseUrl = MOCK_ISSUER,
+        )
+
+        assertEquals(listOf("credential_deleted"), notifications)
+    }
+
+    @Test
     fun issuanceRequestRejectsBlankOffer() {
         assertFailsWith<IllegalArgumentException> {
             MobileWalletCredentialOffer.Uri("")
@@ -2078,7 +2136,7 @@ class MobileWalletTest {
      * Only the endpoints the flow reaches are served, so a request the wallet should not make surfaces
      * as a 404 instead of being silently absorbed.
      */
-    private fun mockIssuer(): HttpClient = HttpClient(MockEngine) {
+    private fun mockIssuer(notifications: MutableList<String>? = null): HttpClient = HttpClient(MockEngine) {
         engine {
             addHandler { request ->
                 when (request.url.toString()) {
@@ -2087,6 +2145,7 @@ class MobileWalletTest {
                         {
                           "credential_issuer":"$MOCK_ISSUER",
                           "credential_endpoint":"$MOCK_ISSUER/credential",
+                          "notification_endpoint":"$MOCK_ISSUER/notification",
                           "credential_configurations_supported":{
                             "$MOCK_CONFIGURATION_ID":{
                               "format":"dc+sd-jwt",
@@ -2117,14 +2176,29 @@ class MobileWalletTest {
                             put("credentials", buildJsonArray {
                                 add(buildJsonObject { put("credential", SdJwtExamples.sdJwtVcSignedExample2) })
                             })
+                            put("notification_id", "notification-id")
                         }.toString()
                     )
+
+                    "$MOCK_ISSUER/notification" -> {
+                        notifications?.let {
+                            it += displayJson.parseToJsonElement(request.bodyText()).jsonObject
+                                .getValue("event").jsonPrimitive.content
+                        }
+                        respond(content = "", status = HttpStatusCode.NoContent)
+                    }
 
                     else -> respondError(HttpStatusCode.NotFound)
                 }
             }
         }
         install(ContentNegotiation) { json(displayJson) }
+    }
+
+    private fun HttpRequestData.bodyText(): String = when (val requestBody = body) {
+        is OutgoingContent.ByteArrayContent -> requestBody.bytes().decodeToString()
+        is TextContent -> requestBody.text
+        else -> error("Unsupported request body type: ${requestBody::class}")
     }
 
     private fun MockRequestHandleScope.jsonResponse(content: String) = respond(
