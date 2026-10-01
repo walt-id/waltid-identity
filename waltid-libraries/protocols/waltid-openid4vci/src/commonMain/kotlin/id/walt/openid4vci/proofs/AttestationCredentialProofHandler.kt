@@ -6,6 +6,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.proofs.attestation.KeyAttestationUsage
 import id.walt.openid4vci.proofs.attestation.KeyAttestationVerifier
+import id.walt.openid4vci.proofs.attestation.resolveBindings
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Clock
@@ -46,7 +47,7 @@ class AttestationCredentialProofHandler(
         val evidence = verifier.verify(jwt, proofMetadata, context, configuration, options, KeyAttestationUsage.STANDALONE_PROOF)
         return CredentialProofHandlerResult(
             VerifiedAttestationProof(evidence),
-            evidence.attestedKeys.map { VerifiedCredentialBindingCandidate(it) },
+            evidence.resolveBindings(configuration),
             CredentialBindingMultiplicity.DISTINCT_KEYS,
         )
     }
