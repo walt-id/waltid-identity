@@ -2,7 +2,6 @@ package id.walt.openid4vci.proofs
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -10,13 +9,18 @@ import kotlinx.serialization.json.jsonObject
 class ProofsTest {
     @Test
     fun serializesOnlyWireProofTypes() {
-        val serialized = Json.encodeToJsonElement(
-            Proofs.serializer(),
-            Proofs(jwt = listOf("proof")),
-        ).jsonObject
-
-        assertEquals(listOf("proof"), Proofs.fromJsonObject(serialized).jwt)
-        assertFalse("additional" in serialized)
+        val cases = listOf(
+            ProofType.JWT to """{"jwt":["proof"]}""",
+            ProofType.DI_VP to """{"di_vp":[{"proof":"example"}]}""",
+            ProofType.ATTESTATION to """{"attestation":["proof"]}""",
+        )
+        for ((type, wireJson) in cases) {
+            val expected = Json.parseToJsonElement(wireJson).jsonObject
+            val proofs = Proofs.fromJsonObject(expected)
+            assertEquals(type, proofs.normalized().type)
+            assertEquals(expected, Json.encodeToJsonElement(Proofs.serializer(), proofs).jsonObject)
+            assertEquals(proofs, Json.decodeFromJsonElement(Proofs.serializer(), expected))
+        }
     }
 
     @Test
