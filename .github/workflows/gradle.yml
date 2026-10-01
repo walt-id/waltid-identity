@@ -342,7 +342,8 @@ jobs:
           ./gradlew :waltid-services:waltid-issuer-api2:buildFatJar --no-daemon --console=plain --warning-mode=summary
           ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test -PskipLiveConformance=true \
             --tests id.walt.openid4vp.conformance.IssuerCiConfigurationTest \
-            --tests id.walt.openid4vp.conformance.IssuerKeyAttestationTest --no-configuration-cache --console=plain
+            --tests id.walt.openid4vp.conformance.IssuerKeyAttestationTest \
+            --tests id.walt.openid4vp.conformance.IssuerProofModesTest --no-configuration-cache --console=plain
         env:
           CI: "true"
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
@@ -410,9 +411,13 @@ jobs:
               | to_entries | all(.[]; . as $entry
                 | $configs[$entry.key].format == $entry.value
                 and (($configs[$entry.key].proof_types_supported.jwt.proof_signing_alg_values_supported // []) | index("ES256") != null)
-                and ($configs[$entry.key].proof_types_supported.jwt.key_attestations_required | type == "object")))
+                and ($configs[$entry.key].proof_types_supported | keys == ["jwt"])
+                and ($configs[$entry.key].proof_types_supported.jwt.key_attestations_required | type == "object")
+                and ($configs[$entry.key + ".attestation"].format == $entry.value)
+                and ($configs[$entry.key + ".attestation"].proof_types_supported | keys == ["attestation"])
+                and (($configs[$entry.key + ".attestation"].proof_types_supported.attestation.proof_signing_alg_values_supported // []) | index("ES256") != null)))
           ' "$ISSUER_DIAGNOSTICS_DIR/issuer-metadata.json" >/dev/null || {
-            echo '::error::Issuer metadata must expose the public URL, batch size >= 2 and all four CI configurations requiring JWT key attestation. Check the issuer implementation and CI configuration.'
+            echo '::error::Issuer metadata must expose the public URL, batch size >= 2 and four JWT-only and four attestation-only CI configurations using ES256 and required JWT key attestations. Check the issuer implementation and CI configuration.'
             exit 1
           }
           echo "url=$TUNNEL_URL" >> "$GITHUB_OUTPUT"
@@ -463,7 +468,7 @@ jobs:
           OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID: org.iso.18013.5.1.mDL.haip
           OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/keys/attester-key.json
           OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/keys/attester-key.json
-          OPENID4VCI_CONFORMANCE_CREDENTIAL_PROOF_TYPE_HINT: jwt
+          OPENID4VCI_CONFORMANCE_PROOF_MODES: jwt,attestation
           OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem
           OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-root-ca.pem
           OPENID4VCI_CONFORMANCE_FILTER_FAPI_PROFILES: vci,vci_haip
@@ -570,7 +575,8 @@ jobs:
               echo '_Issuer conformance was not requested._'
             else
               echo '- Strict issuer results: `enabled`'
-              echo '- Required executed batch coverage: `enabled`'
+              echo '- Required executed batch and key-attestation coverage: `enabled` for each proof mode'
+              echo '- Proof modes: `jwt` and `attestation` (separate credential configurations)'
               echo "- Issuer runtime setup: \`$ISSUER_SETUP_OUTCOME\`; shared test step: \`$CONFORMANCE_TEST_OUTCOME\`."
               echo
               echo '> CI coverage gap: `oid4vci-1_0-issuer-happy-flow-additional-requests` is excluded because its TLS probes reach the Cloudflare Quick Tunnel edge. This run does not establish TLS conformance. Local runs retain this module.'
@@ -584,11 +590,17 @@ jobs:
                 # Reuse the runner's batch classification; do not duplicate its coverage policy.
                 # Publish only identifiers/statuses, never raw errors, credentials or logs.
                 jq -s '(.[1] // [] | INDEX(.variantId)) as $matrix | .[0] | map({
-                  variantId, status, planId,
+                  variantId, status, planId, proofType: .variant.credential_proof_type,
                   batchCoverage: ($matrix[.variantId].batchCoverage // "UNKNOWN"),
                   modules: [.modules[]? | {testModule, testId, status, result, accepted}]
                 })' "${issuer_reports[@]}" > "$ISSUER_DIAGNOSTICS_DIR/results.json"
+                for proof_type in jwt attestation; do
+                  mkdir -p "$ISSUER_DIAGNOSTICS_DIR/$proof_type"
+                  jq --arg proof "$proof_type" '[.[] | select(.proofType == $proof)]' \
+                    "$ISSUER_DIAGNOSTICS_DIR/results.json" > "$ISSUER_DIAGNOSTICS_DIR/$proof_type/results.json"
+                done
                 jq '{variants: (group_by(.status) | map({status: .[0].status, count: length})),
+                  proof_modes: (group_by(.proofType) | map({proofType: .[0].proofType, count: length})),
                   batch_coverage: (group_by(.batchCoverage) | map({status: .[0].batchCoverage, count: length})),
                   batch_modules: ([.[].modules[] | select(.testModule == "oid4vci-1_0-issuer-batch-issuance")]
                     | group_by(.result) | map({result: .[0].result, count: length}))}' \
@@ -597,6 +609,10 @@ jobs:
                   echo '| Variant status | Count |'
                   echo '|----------------|-------|'
                   jq -r '.variants[] | "| \(.status) | \(.count) |"' "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
+                  echo
+                  echo '| Proof mode | Variant runs |'
+                  echo '|------------|--------------|'
+                  jq -r '.proof_modes[] | "| \(.proofType) | \(.count) |"' "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
                   echo
                   echo '| Batch coverage | Count |'
                   echo '|----------------|-------|'
@@ -634,7 +650,10 @@ jobs:
       - name: Verify issuer results were produced
         if: ${{ !cancelled() && steps.issuer-tunnel.outcome == 'success' && steps.conformance-tests.outcome == 'success' }}
         # Strict results and executed batch coverage are enforced by the Kotlin runner.
-        run: jq -e 'type == "array" and length > 0' "$ISSUER_REPORT_DIR/results.json" >/dev/null
+        run: |
+          jq -e 'type == "array" and length > 0
+            and ([.[].variant.credential_proof_type] | unique == ["attestation", "jwt"])' \
+            "$ISSUER_REPORT_DIR/results.json" >/dev/null
 
       - name: Stop Issuer2 conformance services
         if: ${{ always() && (inputs.run-issuer-conformance || inputs.run-haip-conformance) }}
@@ -656,6 +675,8 @@ jobs:
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/suite-version.json
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/results.json
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/coverage.json
+            ${{ env.ISSUER_DIAGNOSTICS_DIR }}/jwt/results.json
+            ${{ env.ISSUER_DIAGNOSTICS_DIR }}/attestation/results.json
 
   # Maven publish waits for the default Gradle job and, when requested, the live
   # conformance job. Leaving publish on the gradle job let release/fix-release upload
