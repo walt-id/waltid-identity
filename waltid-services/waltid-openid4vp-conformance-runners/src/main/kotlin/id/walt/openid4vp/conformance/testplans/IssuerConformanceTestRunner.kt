@@ -163,11 +163,11 @@ class IssuerConformanceTestRunner(
 
         // Ordinary runs retain capability-based skips. Batch acceptance checks raw suite outcomes.
         // Write the unmodified reports first so missing, skipped, and failed modules remain diagnosable.
-        if (requireBatchPass) {
-            requireExecutedBatchIssuance(results)
-        }
-        if (requireKeyAttestationPass) {
-            requireExecutedKeyAttestation(results)
+        // Each proof mode must independently satisfy the coverage requirements.
+        results.groupBy { it.variant["credential_proof_type"]?.jsonPrimitive?.content }.forEach { (mode, modeResults) ->
+            println("Checking issuer coverage for proof mode ${mode ?: credentialProofTypeHint ?: "auto"}")
+            if (requireBatchPass) requireExecutedBatchIssuance(modeResults)
+            if (requireKeyAttestationPass) requireExecutedKeyAttestation(modeResults)
         }
 
         if (variantSelection.strictResults) {
