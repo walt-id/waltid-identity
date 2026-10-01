@@ -22,7 +22,7 @@ class Issuer2KeyAttestationConfigTest {
         val configs = listOf(
             KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(key.exportPublicJwkObject())),
             KeyAttestationConfig(KeyAttestationVerificationMethod.X509Chain(listOf("root-pem-parsing-is-validated-at-startup"))),
-            KeyAttestationConfig(KeyAttestationVerificationMethod.KeyReference("attester-key"), KeyAttestationLimits(4, 8, 4096)),
+            KeyAttestationConfig(KeyAttestationVerificationMethod.KeyReference("attester-key")),
         )
         for (config in configs) {
             assertEquals(config, load(Json.encodeToJsonElement(KeyAttestationConfig.serializer(), config)).getOrThrow().keyAttestationConfig)
@@ -37,7 +37,6 @@ class Issuer2KeyAttestationConfigTest {
             """{"verificationMethod":{"type":"static-jwk"}}""",
             """{"verificationMethod":{"type":"x509-chain","trustedRootCertificatesPem":[]}}""",
             """{"verificationMethod":{"type":"key-reference","reference":""}}""",
-            """{"verificationMethod":{"type":"key-reference","reference":"attester"},"limits":{"maxCredentials":0}}""",
         )) {
             assertTrue(load(Json.parseToJsonElement(config)).isFailure, config)
         }
