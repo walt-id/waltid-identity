@@ -4,11 +4,15 @@ import WalletSDK
 enum WalletDemoSigningProtection: String, CaseIterable, Hashable, Sendable {
     case none
     case biometric
+    case biometricPerUse
+
+    var requiresBiometrics: Bool { self != .none }
 
     var authorizationPolicy: WalletKeyUseAuthorizationPolicy {
         switch self {
         case .none: .none
         case .biometric: .biometricTimedReuse(timeoutSeconds: 10)
+        case .biometricPerUse: .biometricCurrentSet
         }
     }
 
@@ -19,8 +23,7 @@ enum WalletDemoSigningProtection: String, CaseIterable, Hashable, Sendable {
             self = .biometric
         case .biometricTimedReuse(let timeoutSeconds):
             throw WalletDemoSigningProtectionPolicyError.unsupportedTimeout(timeoutSeconds)
-        case .biometricCurrentSet:
-            throw WalletDemoSigningProtectionPolicyError.unsupportedPerOperationPolicy
+        case .biometricCurrentSet: self = .biometricPerUse
         case .biometricAny, .deviceCredential, .biometricOrDeviceCredential:
             throw WalletDemoSigningProtectionPolicyError.unsupportedAuthorizationPolicy
         }
@@ -30,6 +33,7 @@ enum WalletDemoSigningProtection: String, CaseIterable, Hashable, Sendable {
         switch self {
         case .none: "No biometric signing"
         case .biometric: "Biometric signing"
+        case .biometricPerUse: "Biometrics for every signature"
         }
     }
 
@@ -37,6 +41,7 @@ enum WalletDemoSigningProtection: String, CaseIterable, Hashable, Sendable {
         switch self {
         case .none: "Private-key operations do not require biometric authorization."
         case .biometric: "Strong biometric authorization can be reused for signing for 10 seconds."
+        case .biometricPerUse: "Approve every signature with current biometrics. Changing enrolled biometrics invalidates this key."
         }
     }
 }
@@ -44,7 +49,6 @@ enum WalletDemoSigningProtection: String, CaseIterable, Hashable, Sendable {
 private enum WalletDemoSigningProtectionPolicyError: LocalizedError {
     case unsupportedAuthorizationPolicy
     case unsupportedTimeout(Int)
-    case unsupportedPerOperationPolicy
 
     var errorDescription: String? {
         switch self {
@@ -52,8 +56,6 @@ private enum WalletDemoSigningProtectionPolicyError: LocalizedError {
             "Wallet key uses an authorization policy outside this demo configuration"
         case .unsupportedTimeout(let seconds):
             "Wallet key uses an unsupported biometric signing timeout: \(seconds) seconds"
-        case .unsupportedPerOperationPolicy:
-            "Wallet key uses an unsupported per-operation biometric signing policy"
         }
     }
 }
@@ -72,10 +74,16 @@ enum WalletDemoSigningProtectionMode: String, Equatable, Sendable {
 
     func allows(_ protection: WalletDemoSigningProtection) -> Bool {
         switch self {
-        case .required: protection == .biometric
+        case .required: protection.requiresBiometrics
         case .optional: true
         case .disabled: protection == .none
         }
+    }
+
+    var alternativeAuthorizations: [WalletKeyUseAuthorizationPolicy] {
+        WalletDemoSigningProtection.allCases
+            .filter { $0 != defaultSelection && allows($0) }
+            .map(\.authorizationPolicy)
     }
 
     func resolve(_ stored: WalletDemoSigningProtection?) -> WalletDemoSigningProtection {

@@ -11,6 +11,11 @@ on:
         description: "release tag to create and attach the APK to"
         required: true
         type: string
+      checkout-refs:
+        description: "Exact commits to check out, as a JSON object of unified, identity, enterprise and enterprise_license SHAs (defaults to the branch with main fallback)"
+        required: false
+        type: string
+        default: ''
       make_latest:
         description: "Whether to mark this release as latest"
         required: false
@@ -29,6 +34,7 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
+          resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Detect compose app module
         id: detect
@@ -112,11 +118,13 @@ jobs:
         if: ${{ steps.detect.outputs.exists == 'true' && steps.apk.outputs.path != '' }}
         env:
           VARIANT: production
-          COMMIT_SHA: ${{ github.sha }}
           AUTHOR: ${{ github.actor }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
+          # The checked-out commit, which differs from github.sha when checkout-refs is set.
+          COMMIT_SHA="$(git -C waltid-identity rev-parse HEAD)"
+          export COMMIT_SHA
           script="waltid-identity/.github/scripts/mobile-ci/write-mobile-release-notes.sh"
           if [ -f "$script" ]; then
             bash "$script" "$RUNNER_TEMP/firebase-release-notes.txt"

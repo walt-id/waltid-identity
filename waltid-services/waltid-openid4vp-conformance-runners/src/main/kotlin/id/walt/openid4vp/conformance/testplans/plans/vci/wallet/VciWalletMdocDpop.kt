@@ -1,6 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.plans.vci.wallet
 
 import id.walt.openid4vp.conformance.config.ConformanceConfig
+import id.walt.openid4vp.conformance.config.ConformanceSuiteAlias
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
@@ -63,7 +64,7 @@ class VciWalletMdocDpop(
     override val configuration: JsonObject = Json.decodeFromString(
         """
         {
-            "alias": "vci_wallet_mdoc_dpop",
+            "alias": "${ConformanceSuiteAlias.unique("vci_wallet_mdoc_dpop")}",
             "description": "Wallet VCI - ISO mdoc + DPoP + private_key_jwt + authorization_code",
             "server": {
                 "jwks": {

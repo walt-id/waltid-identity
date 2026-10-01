@@ -37,7 +37,8 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * @property persistence Persistence mode used for wallet-local state.
  * @property onEvent Optional callback for observing wallet issuance and presentation session events.
  * @property preferredLocales Ordered BCP 47 locale preferences used for progressive language-tag lookup.
- * When no preference matches, selection falls back to an unlocalized entry and then the first entry.
+ * Display metadata falls back to an unlocalized entry and then the first entry. Payment consent instead
+ * requires a complete catalogue in a preferred exact or base language and blocks when none matches.
  * @property transactionDataProfiles Transaction data profiles this mobile wallet accepts in OpenID4VP requests.
  * @property credentialIssuerMetadataTrustResolver Optional trust boundary for signed Credential Issuer Metadata.
  * When absent, signed metadata is neither requested nor accepted.
@@ -54,6 +55,8 @@ public data class MobileWalletConfig(
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     public val preferredLocales: List<String> = emptyList(),
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    /** Independent verification keys for issuers whose SD-JWT payment consent this wallet accepts. */
+    public val paymentCredentialIssuers: List<id.walt.wallet2.consent.PaymentCredentialIssuer> = emptyList(),
     public val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     public val credentialRegistry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
     public val readerTrustEvaluator: MobileWalletReaderTrustEvaluator = UnconfiguredMobileWalletReaderTrustEvaluator,
@@ -251,6 +254,7 @@ internal fun createSqlDelightMobileWallet(
         attestationConfig = config.attestationConfig,
         preferredLocales = config.preferredLocales,
         transactionDataProfiles = config.transactionDataProfiles,
+        paymentCredentialIssuers = config.paymentCredentialIssuers,
         clientIdTrustConfiguration = clientIdTrustConfiguration,
         credentialIssuerMetadataTrustResolver = config.credentialIssuerMetadataTrustResolver,
         onEvent = config.onEvent,

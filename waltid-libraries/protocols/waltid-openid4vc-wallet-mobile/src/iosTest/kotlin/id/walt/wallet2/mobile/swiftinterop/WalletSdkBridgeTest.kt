@@ -297,6 +297,7 @@ class WalletSdkBridgeTest {
             selectedDisclosureOptions = listOf(MobileWalletPresentationDisclosureSelection("pid", "credential-1", "$.given_name")),
             did = "did:jwk:issuer",
             runPolicies = false,
+            paymentConsentRevision = "reviewed-revision",
         )
 
         assertIs<WalletBridgeResult.Success<MobileWalletPresentationResult>>(result)
@@ -305,6 +306,7 @@ class WalletSdkBridgeTest {
         assertEquals(MobileWalletPresentationPreviewHandle("presentation-preview"), operations.submittedPreviewHandle)
         assertEquals("did:jwk:issuer", operations.submittedDid)
         assertEquals(false, operations.submittedRunPolicies)
+        assertEquals("reviewed-revision", operations.submittedConsentRevision)
     }
 
     @Test
@@ -660,6 +662,7 @@ class WalletSdkBridgeTest {
             private set
         var submittedDid: String? = null
             private set
+        var submittedConsentRevision: String? = null
         var submittedRunPolicies: Boolean? = null
             private set
         var rejectedPreviewHandle: MobileWalletPresentationPreviewHandle? = null
@@ -783,18 +786,27 @@ class WalletSdkBridgeTest {
             ))
         }
 
+        override suspend fun preparePaymentConsent(
+            previewHandle: MobileWalletPresentationPreviewHandle,
+            selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+            selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
+            did: String?,
+        ): id.walt.wallet2.consent.PreparedPaymentConsent? = null
+
         override suspend fun submitPresentation(
             previewHandle: MobileWalletPresentationPreviewHandle,
             selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
             selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
             did: String?,
             runPolicies: Boolean?,
+            paymentConsentRevision: String?,
         ): MobileWalletPresentationResult {
             submittedPreviewHandle = previewHandle
             submittedCredentialOptions = selectedCredentialOptions
             submittedDisclosureOptions = selectedDisclosureOptions
             submittedDid = did
             submittedRunPolicies = runPolicies
+            submittedConsentRevision = paymentConsentRevision
             return MobileWalletPresentationResult.Transmitted.Succeeded(
                 verifierResponseJson = """{"accepted":true}""",
                 redirectUrl = "wallet://return",

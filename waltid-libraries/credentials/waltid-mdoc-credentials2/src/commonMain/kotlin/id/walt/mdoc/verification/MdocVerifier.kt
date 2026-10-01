@@ -157,6 +157,7 @@ object MdocVerifier {
     fun verifyMso(mso: MobileSecurityObject) {
         log.trace { "--- Verifying MSO ---" }
         val timestamps = mso.validityInfo
+        timestamps.precheck()
         timestamps.validate()
 
         require(MdocCrypto.isSupportedDigest(mso.digestAlgorithm)) {

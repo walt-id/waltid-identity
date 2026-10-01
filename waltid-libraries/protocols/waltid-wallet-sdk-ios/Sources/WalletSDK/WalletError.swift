@@ -23,6 +23,9 @@ public enum WalletError: Error, Equatable, Sendable {
     /// A protected wallet-key request failed for a stable, actionable reason.
     case keyUseAuthorization(WalletKeyUseAuthorizationFailure)
 
+    /// Payment review or authorization failed for a stable reason.
+    case paymentConsent(PaymentConsentFailure, message: String)
+
     /// The requested credential was not found in the wallet.
     case credentialNotFound(String)
 
@@ -46,6 +49,8 @@ extension WalletError: LocalizedError {
              .credentialNotFound(let message),
              .internalFailure(let message):
             return message
+        case .paymentConsent(_, let message):
+            return message
         case .keyUseAuthorization(let failure):
             return "Wallet key authorization failed: \(failure)"
         case .cancelled:
@@ -67,4 +72,28 @@ extension WalletError: LocalizedError {
     public var helpAnchor: String? {
         nil
     }
+}
+
+/// Stable reasons for refusing payment consent, resolved by the shared wallet core.
+public enum PaymentConsentFailure: Equatable, Sendable {
+    /// The credential issuer or signature could not be authenticated.
+    case untrustedCredential
+    /// Required metadata could not be retrieved within the resource limits.
+    case metadataUnavailable
+    /// The issuer instructions are malformed or incomplete.
+    case invalidMetadata
+    /// Fetched metadata does not match a supplied integrity reference.
+    case integrityMismatch
+    /// The schema or inheritance mechanism is not supported.
+    case unsupportedSchema
+    /// The payment shape, currency or number of authorizations is unsupported.
+    case unsupportedPayment
+    /// The transaction contains invalid payment values.
+    case invalidPayment
+    /// No complete preferred-language catalogue is available.
+    case missingTranslation
+    /// This attempt has no prepared and acknowledged review.
+    case consentRequired
+    /// The selection or another bound input changed after review.
+    case staleConsent
 }

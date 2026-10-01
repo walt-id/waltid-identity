@@ -111,38 +111,26 @@ object ResponseEncryption {
         // 2. Select Verifier's Public Key
         // Accept keys explicitly marked for encryption or without a use value; deterministic
         // thumbprint/kid ordering selects one when more than one key is eligible.
+        // Keys that cannot be used for ECDH-ES (unknown kty, missing kid, private material, wrong
+        // use/alg) are skipped: OpenID4VP wallet module ignores-unusable-encryption-key injects
+        // exactly those next to a usable key, and failing closed on the unusable entry fails the
+        // module before a VP is ever produced.
         val keys = metadata.jwks?.keys.orEmpty()
         require(keys.isNotEmpty()) { "client_metadata.jwks must contain at least one response-encryption key" }
-        val keyIds = keys.mapIndexed { index, jwk ->
-            (jwk["kid"] as? kotlinx.serialization.json.JsonPrimitive)
-                ?.takeIf { it.isString }
-                ?.content
-                ?.takeIf { it.isNotBlank() }
-                ?: throw IllegalArgumentException(
-                    "Every JWK in client_metadata.jwks must have a non-blank string kid (invalid key at index $index)"
-                )
+
+        val candidateKeys = keys.mapNotNull(::encryptionKeyCandidate)
+        require(candidateKeys.isNotEmpty()) {
+            "client_metadata.jwks must contain an encryption key with alg=$SUPPORTED_ALGORITHM"
         }
+        val keyIds = candidateKeys.map { it.getValue("kid").jsonPrimitive.content }
         require(keyIds.size == keyIds.toSet().size) {
-            "Every JWK in client_metadata.jwks must have a unique kid"
-        }
-        keys.forEach { jwk ->
-            require(!Jwk.containsPrivateMaterial(jwk)) {
-                "Verifier response-encryption JWK must not contain private material"
-            }
+            "Every usable JWK in client_metadata.jwks must have a unique kid"
         }
 
-        val candidateKeys = keys.filter { jwk ->
-            jwk["alg"]?.jsonPrimitive?.contentOrNull == SUPPORTED_ALGORITHM &&
-                jwk["use"]?.jsonPrimitive?.contentOrNull.let { it == null || it == "enc" }
-        }
         val verifierJwk = candidateKeys
-            .filter(::isSupportedVerifierEncryptionJwk)
             .map { jwk -> jwk to Jwk.sha256Thumbprint(encodePublicJwk(jwk)) }
-            .sortedWith(compareBy<Pair<JsonObject, String>>({ it.second }, { it.first["kid"]!!.jsonPrimitive.content }))
-            .firstOrNull()?.first
-            ?: throw IllegalArgumentException(
-                "client_metadata.jwks must contain an encryption key with alg=$SUPPORTED_ALGORITHM"
-            )
+            .sortedWith(compareBy<Pair<JsonObject, String>>({ it.second }, { it.first.getValue("kid").jsonPrimitive.content }))
+            .first().first
 
         // 3. Select Encryption Algorithm (enc)
         // Spec says default is A128GCM if not specified
@@ -151,6 +139,18 @@ object ResponseEncryption {
             contentEncryption = selectContentEncryption(metadata.encryptedResponseEncValuesSupported),
         )
     }
+
+    /**
+     * A JWKS entry the wallet can encrypt a `direct_post.jwt` response to, or `null` if it should
+     * be ignored. Unknown `kty`, missing `kid`, private material, and non-ECDH-ES keys are all
+     * skippable: throwing on them would fail `ignores-unusable-encryption-key`.
+     */
+    private fun encryptionKeyCandidate(jwk: JsonObject): JsonObject? = runCatching {
+        if (jwk["alg"]?.jsonPrimitive?.contentOrNull != SUPPORTED_ALGORITHM) return@runCatching null
+        if (jwk["use"]?.jsonPrimitive?.contentOrNull.let { it != null && it != "enc" }) return@runCatching null
+        if (!isSupportedVerifierEncryptionJwk(jwk)) return@runCatching null
+        jwk
+    }.getOrNull()
 
     internal fun selectContentEncryption(advertised: List<String>?): JweContentEncryption {
         if (advertised == null) return JweContentEncryption.A128GCM

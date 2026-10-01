@@ -1,4 +1,6 @@
 name: Release candidate on manual push
+# release-evidence.yml in waltid-identity-enterprise finds this run by its name to collect the test results.
+run-name: Release candidate ${{ inputs.release_version }}
 
 on:
   workflow_dispatch:
@@ -7,45 +9,123 @@ on:
         description: 'Release version'
         required: true
 
+concurrency:
+  group: release-candidate-${{ inputs.release_version }}
+  cancel-in-progress: false
+
 jobs:
   version:
     uses: ./.github/workflows/version.yml
     with:
       preferred: ${{ inputs.release_version }}
-  enterprise-ref:
-    name: Resolve enterprise branch ref
+  guard:
+    name: Guard against the wrong start branch
     runs-on: ubuntu-latest
-    outputs:
-      ref: ${{ steps.ref.outputs.ref }}
-      license-ref: ${{ steps.ref.outputs.license-ref }}
+    needs: version
     steps:
-      - name: Determine ref to dispatch on
-        id: ref
+      - name: Require main for X.Y.0 and release/vX.Y.x for patches
         env:
+          VERSION: ${{ needs.version.outputs.release_version }}
           REF: ${{ github.ref_name }}
-          TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
         run: |
-          if git ls-remote --exit-code --heads "https://${TOKEN}@github.com/walt-id/waltid-identity-enterprise.git" "$REF"; then
-            echo "Branch '$REF' found in waltid-identity-enterprise, using it."
-            echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          if [[ ! "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "'$VERSION' is not a plain X.Y.Z release, any branch is allowed."
+            exit 0
+          fi
+          if [ "${BASH_REMATCH[3]}" = "0" ]; then
+            expected="main"
           else
-            echo "Branch '$REF' not found in waltid-identity-enterprise, using main."
-            echo "ref=main" >> "$GITHUB_OUTPUT"
+            expected="release/v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.x"
+          fi
+          if [ "$REF" != "$expected" ]; then
+            echo "::error::${VERSION} must be started from '${expected}', not '${REF}'."
+            exit 1
+          fi
+          echo "Starting ${VERSION} from ${REF}."
+  tag:
+    name: Tag release candidate
+    runs-on: ubuntu-latest
+    needs: [ version, guard ]
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      checkout-refs: ${{ steps.tag.outputs.checkout-refs }}
+      is-latest: ${{ steps.tag.outputs.is-latest }}
+    steps:
+      - name: Create or move the version tag in every repository
+        id: tag
+        env:
+          TAG: v${{ needs.version.outputs.release_version }}
+          VERSION: ${{ needs.version.outputs.release_version }}
+          REF: ${{ github.ref_name }}
+          IDENTITY_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          repos="waltid-identity waltid-unified-build waltid-identity-enterprise waltid-identity-enterprise-license waltid-docs waltid-enterprise-quickstart"
+
+          # Refuse to touch the tag once any repository has a release for it.
+          for repo in $repos; do
+            if out="$(gh api "repos/walt-id/${repo}/releases/tags/${TAG}" --jq .html_url 2>&1)"; then
+              echo "::error::${TAG} is already released (${out}). Use a new version."
+              exit 1
+            elif ! grep -q "HTTP 404" <<< "$out"; then
+              echo "::error::Could not check the releases of walt-id/${repo}: ${out}"
+              exit 1
+            fi
+          done
+
+          # Identity is tagged at the commit this run started from; the other repositories
+          # at the branch of the same name, falling back to their default branch.
+          declare -A shas
+          for repo in $repos; do
+            url="https://${GH_TOKEN}@github.com/walt-id/${repo}.git"
+            if [ "$repo" = "waltid-identity" ]; then
+              shas[$repo]="$IDENTITY_SHA"
+            elif sha="$(git ls-remote --exit-code "$url" "refs/heads/${REF}" | cut -f1)"; then
+              echo "Branch '${REF}' found in walt-id/${repo}, tagging it."
+              shas[$repo]="$sha"
+            else
+              echo "Branch '${REF}' not found in walt-id/${repo}, tagging its default branch."
+              shas[$repo]="$(git ls-remote --exit-code "$url" HEAD | cut -f1)"
+            fi
+          done
+
+          for repo in $repos; do
+            sha="${shas[$repo]}"
+            if git ls-remote --exit-code "https://${GH_TOKEN}@github.com/walt-id/${repo}.git" "refs/tags/${TAG}" > /dev/null; then
+              gh api -X PATCH "repos/walt-id/${repo}/git/refs/tags/${TAG}" -f sha="$sha" -F force=true --silent
+              echo "Moved ${TAG} in walt-id/${repo} to ${sha}."
+            else
+              gh api -X POST "repos/walt-id/${repo}/git/refs" -f ref="refs/tags/${TAG}" -f sha="$sha" --silent
+              echo "Created ${TAG} in walt-id/${repo} at ${sha}."
+            fi
+          done
+
+          highest_released="$(gh release list -R walt-id/waltid-identity --exclude-drafts --exclude-pre-releases --limit 200 --json tagName --jq '.[].tagName' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/^v//' | sort -V | tail -n 1 || true)"
+          if [ "$(printf '%s\n%s\n' "$highest_released" "$VERSION" | sort -V | tail -n 1)" = "$VERSION" ]; then
+            is_latest=true
+          else
+            is_latest=false
+            echo "::notice::${VERSION} is older than the released ${highest_released}; skipping the dev deployment."
           fi
 
-          if git ls-remote --exit-code --heads "https://${TOKEN}@github.com/walt-id/waltid-identity-enterprise-license.git" "$REF"; then
-            echo "Branch '$REF' found in waltid-identity-enterprise-license, using it."
-            echo "license-ref=$REF" >> "$GITHUB_OUTPUT"
-          else
-            echo "Branch '$REF' not found in waltid-identity-enterprise-license, using main."
-            echo "license-ref=main" >> "$GITHUB_OUTPUT"
-          fi
+          checkout_refs="$(jq -cn \
+            --arg unified "${shas[waltid-unified-build]}" \
+            --arg identity "${shas[waltid-identity]}" \
+            --arg enterprise "${shas[waltid-identity-enterprise]}" \
+            --arg enterprise_license "${shas[waltid-identity-enterprise-license]}" \
+            '{unified: $unified, identity: $identity, enterprise: $enterprise, enterprise_license: $enterprise_license}')"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "checkout-refs=${checkout_refs}" >> "$GITHUB_OUTPUT"
+          echo "is-latest=${is_latest}" >> "$GITHUB_OUTPUT"
   gradle:
     uses: ./.github/workflows/gradle.yml
     secrets: inherit
-    needs: version
+    needs: [ version, tag ]
     with:
       version: ${{ needs.version.outputs.release_version }}
+      checkout-refs: ${{ needs.tag.outputs.checkout-refs }}
       enable-android-build: true
       publish: true
       cacheless: true
@@ -54,69 +134,74 @@ jobs:
       run-haip-conformance: true
       report-check-name: 'gradle / gradle (ubuntu-22.04)'
       conformance-report-check-name: 'gradle / conformance (ubuntu-22.04)'
+      upload-test-results: true
   integration-test-aws:
     name: Integration Tests - AWS
     runs-on: ubuntu-latest
-    needs: enterprise-ref
+    needs: tag
     steps:
       - name: Dispatch integration-test-aws.yml and wait
         uses: benc-uk/workflow-dispatch@v1.3.2
         with:
           workflow: integration-test-aws.yml
           repo: walt-id/waltid-identity-enterprise
-          ref: ${{ needs.enterprise-ref.outputs.ref }}
+          ref: ${{ needs.tag.outputs.tag }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           wait-for-completion: true
           sync-status: true
   integration-test-azure:
     name: Integration Tests - Azure
     runs-on: ubuntu-latest
-    needs: enterprise-ref
+    needs: tag
     steps:
       - name: Dispatch integration-test-azure.yml and wait
         uses: benc-uk/workflow-dispatch@v1.3.2
         with:
           workflow: integration-test-azure.yml
           repo: walt-id/waltid-identity-enterprise
-          ref: ${{ needs.enterprise-ref.outputs.ref }}
+          ref: ${{ needs.tag.outputs.tag }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           wait-for-completion: true
           sync-status: true
   docker:
     uses: ./.github/workflows/docker.yml
     secrets: inherit
-    needs: version
+    needs: [ version, tag ]
     with:
       version: ${{ needs.version.outputs.release_version }}
+      checkout-refs: ${{ needs.tag.outputs.checkout-refs }}
       tags: '[]'
       publish: true
   api-docker:
     uses: ./.github/workflows/api-docker.yml
     secrets: inherit
-    needs: version
+    needs: [ version, tag ]
     with:
       version: ${{ needs.version.outputs.release_version }}
+      checkout-refs: ${{ needs.tag.outputs.checkout-refs }}
       tags: '[]'
       publish: true
   sdk-docs:
     uses: ./.github/workflows/mobile-sdk-docs.yml
     secrets: inherit
-    needs: version
+    needs: [ version, tag ]
     with:
       deploy: true
       version: ${{ needs.version.outputs.release_version }}
+      checkout-refs: ${{ needs.tag.outputs.checkout-refs }}
       tags: '[]'
   deploy-license:
     name: Deploy license (staging)
     runs-on: ubuntu-latest
-    needs: [ version, enterprise-ref, gradle, docker, api-docker, sdk-docs, integration-test-aws, integration-test-azure ]
+    needs: [ version, tag, gradle, docker, api-docker, sdk-docs, integration-test-aws, integration-test-azure ]
+    if: ${{ needs.tag.outputs.is-latest == 'true' }}
     steps:
       - name: Dispatch deploy-k8s.yml and wait
         uses: benc-uk/workflow-dispatch@v1.3.2
         with:
           workflow: deploy-k8s.yml
           repo: walt-id/waltid-identity-enterprise-license
-          ref: ${{ needs.enterprise-ref.outputs.license-ref }}
+          ref: ${{ needs.tag.outputs.tag }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           wait-for-completion: true
           sync-status: true
@@ -124,9 +209,11 @@ jobs:
   deploy:
     uses: ./.github/workflows/deployment.yml
     secrets: inherit
-    needs: [ version, deploy-license ]
+    needs: [ version, tag, deploy-license ]
+    if: ${{ needs.tag.outputs.is-latest == 'true' }}
     with:
       version: ${{ needs.version.outputs.release_version }}
+      checkout-refs: ${{ needs.tag.outputs.checkout-refs }}
       deployment: dev
       oss: test-identity-main
       enterprise: test-enterprise-main

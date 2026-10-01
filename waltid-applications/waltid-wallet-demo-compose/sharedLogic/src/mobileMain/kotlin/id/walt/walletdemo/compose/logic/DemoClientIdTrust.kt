@@ -13,7 +13,7 @@ import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
  * X.509 trust anchor. `decentralized_identifier` clients still authenticate through DID resolution
  * and do not use this list.
  *
- * The PEMs match walt.id Verifier2 demo material. Replace or append entries in
+ * These PEMs are demo trust anchors for signed Request Objects. Replace or append entries in
  * [x509TrustAnchorPems] with your own CAs (or pinned leaves) before shipping a production wallet.
  */
 object DemoClientIdTrust {
@@ -230,6 +230,34 @@ object DemoClientIdTrust {
     """.trimIndent()
 
     /**
+     * Additional demo trust-registry CAs for signed Request Objects.
+     * Self-signed. Valid until 2029-03-19.
+     */
+    val TRUST_REGISTRY_RC_PROVIDER_PEM = """
+        -----BEGIN CERTIFICATE-----
+        MIIDfjCCAySgAwIBAgIQRAL20BMQkFskig+t5XJgmDAKBggqhkjOPQQDAjCByzEL
+        MAkGA1UEBhMCTkwxDzANBgNVBAgTBkhlc3NlbjEPMA0GA1UEBxMGTGFuZ2VuMRcw
+        FQYDVQQJEw5SaGVpbnN0cmFzc2UgNTEOMAwGA1UEERMFNjMyMjUxQTA/BgNVBAoT
+        OFdFQlVJTEQgLSBXUCA0IC0gR3JvdXAgNSAtIFRydXN0IFJlZ2lzdHJ5IEluZnJh
+        c3RydWN0dXJlMS4wLAYDVQQDEyVodHRwczovL3dlYnVpbGQtY29uc29ydGl1bS5n
+        aXRodWIuaW8vMB4XDTI2MDkxNDE0MDczNVoXDTI5MDMxOTIzNTk1OVowgcsxCzAJ
+        BgNVBAYTAk5MMQ8wDQYDVQQIEwZIZXNzZW4xDzANBgNVBAcTBkxhbmdlbjEXMBUG
+        A1UECRMOUmhlaW5zdHJhc3NlIDUxDjAMBgNVBBETBTYzMjI1MUEwPwYDVQQKEzhX
+        RUJVSUxEIC0gV1AgNCAtIEdyb3VwIDUgLSBUcnVzdCBSZWdpc3RyeSBJbmZyYXN0
+        cnVjdHVyZTEuMCwGA1UEAxMlaHR0cHM6Ly93ZWJ1aWxkLWNvbnNvcnRpdW0uZ2l0
+        aHViLmlvLzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABMdSOu3aq4Q7RYMAYTMx
+        f2rkuqR2HMNXBmMaKagXqwWPB3a0EicH0KFACmqT1mvfGInOb62B+MPT83nGkMN2
+        yoSjgecwgeQwDgYDVR0PAQH/BAQDAgGGMBEGA1UdJQQKMAgGBgQAkTcDADAPBgNV
+        HRMBAf8EBTADAQH/MB0GA1UdDgQWBBRp9jiDJg2JDnzX4ZKv3waZ6LYAVjAfBgNV
+        HSMEGDAWgBRp9jiDJg2JDnzX4ZKv3waZ6LYAVjBuBgNVHREEZzBlgQ9pbmZvQGlk
+        dW5pb24uZXWGUmh0dHBzOi8vYXBpLndhbGxldC5pZHVuaW9uLmluZm8vYXBpL3Yx
+        L2lzc3Vlci8wMWEwYTAzZS00NWFkLTdjMjQtOTM5OS05M2Y0Y2E3MzEyNjkwCgYI
+        KoZIzj0EAwIDSAAwRQIhAKlIRTuWT+K1SU2hA0w5PCDDhgsbyWrAt6J1gvcOcxsH
+        AiAwrUu7Q8mZxYlhUZ72F4vfj6wRMI5qxY7TFJiWS50z0w==
+        -----END CERTIFICATE-----
+    """.trimIndent()
+
+    /**
      * PEM trust anchors passed into [id.walt.wallet2.mobile.MobileWalletFactory.create].
      *
      * Append more PEM strings to allow additional `x509_san_dns` / `x509_hash` verifiers:
@@ -253,6 +281,7 @@ object DemoClientIdTrust {
         PID_UT_CA_PEM,
         AUTHOLOGIC_VERIFIER_PEM,
         AUTHOLOGIC_READER_PEM,
+        TRUST_REGISTRY_RC_PROVIDER_PEM,
     )
 
     val configuration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(

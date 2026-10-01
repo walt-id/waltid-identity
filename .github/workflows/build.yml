@@ -152,6 +152,7 @@ jobs:
       conformance-report-check-name: 'gradle-build / conformance (ubuntu-22.04)'
       run-conformance: ${{ needs.conformance-eligibility.outputs.should-run == 'true' }}
       run-issuer-conformance: ${{ needs.conformance-eligibility.outputs.should-run == 'true' }}
+      run-payment-demo: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'ci:mobile-dc-api') }}
   distribute-android-preview:
     name: distribute-android-preview
     needs: ci-gate

@@ -1,8 +1,7 @@
 package id.walt.openid4vp.conformance
 
-import id.walt.openid4vp.conformance.report.ConformanceCiFlags
-import id.walt.openid4vp.conformance.report.ConformanceReportFormat
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
+import id.walt.openid4vp.conformance.report.ConformanceReportFormat
 import id.walt.openid4vp.conformance.report.isAccepted
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import java.nio.file.Files
@@ -39,7 +38,6 @@ class ConformanceReportWriterTest {
             conformanceHost = "conformance.example",
             conformancePort = 443,
             reportRoot = reportRoot,
-            allowFailure = true,
         )
 
         val summary = Files.readString(
@@ -49,12 +47,16 @@ class ConformanceReportWriterTest {
         assertTrue(summary.contains("MdlBaseline"))
         assertTrue(summary.contains("SdJwtHaip"))
         assertTrue(summary.contains("audience mismatch"))
-        assertTrue(summary.contains("Soft-fail"))
         assertTrue(summary.contains("[log](https://conformance.example:443/log-detail.html?log=def-456)"))
         assertTrue(summary.contains("# OpenID4VP Verifier Conformance Summary"))
         assertTrue(summary.contains("| Test | Status | Suite | Log | Error |"))
+        assertTrue(summary.contains("<details>"))
+        assertTrue(summary.contains("<summary>OpenID4VP Verifier results</summary>"))
+        assertTrue(summary.contains("</details>"))
         assertFalse(summary.contains("## Failed and skipped"))
         assertFalse(summary.contains("- Fix:"))
+        assertFalse(summary.contains("Soft-fail"))
+        assertFalse(summary.contains("CONFORMANCE_ALLOW_FAILURE"))
     }
 
     @Test
@@ -78,7 +80,6 @@ class ConformanceReportWriterTest {
                     conformanceHost = "conformance.example",
                     conformancePort = 443,
                     reportRoot = reportRoot,
-                    allowFailure = true,
                     producer = role.directoryName,
                 )
                 val summary = Files.readString(
@@ -86,8 +87,9 @@ class ConformanceReportWriterTest {
                 )
                 assertTrue(summary.contains("# ${role.title} Conformance Summary"))
                 assertTrue(summary.contains("| Test | Status | Suite | Log | Error |"))
+                assertTrue(summary.contains("<details>"))
+                assertTrue(summary.contains("<summary>${role.title} results</summary>"))
                 assertTrue(summary.contains("wallet-module"))
-                assertTrue(summary.contains("Soft-fail"))
             }
     }
 
@@ -105,7 +107,6 @@ class ConformanceReportWriterTest {
                 )
             ),
             reportRoot = reportRoot,
-            allowFailure = true,
             producer = "vp-wallet",
         )
         ConformanceReportWriter.writeSkippedIfEmpty(
@@ -128,7 +129,6 @@ class ConformanceReportWriterTest {
             role = ConformanceReportWriter.Role.VCI_WALLET,
             reason = "Conformance suite not available at localhost.emobix.co.uk:8443",
             reportRoot = reportRoot,
-            allowFailure = true,
         )
         val summary = Files.readString(
             ConformanceReportWriter.reportDir(ConformanceReportWriter.Role.VCI_WALLET, reportRoot)
@@ -143,25 +143,36 @@ class ConformanceReportWriterTest {
     }
 
     @Test
-    fun failIfNeededRespectsSoftFail() {
-        val results = listOf(
+    fun failIfNeededFailsOnUnacceptedResults() {
+        val failing = listOf(
             TestPlanResult(
                 testName = "failing",
                 conformanceTestId = "x",
                 conformanceResult = "FAILED",
             )
         )
-        ConformanceReportWriter.failIfNeededFromTestPlanResults(
-            role = ConformanceReportWriter.Role.VP_VERIFIER,
-            results = results,
-            allowFailure = true,
-        )
-        assertFailsWith<IllegalStateException> {
-            ConformanceReportWriter.failIfNeededFromTestPlanResults(
-                role = ConformanceReportWriter.Role.VP_VERIFIER,
-                results = results,
-                allowFailure = false,
+        val passing = listOf(
+            TestPlanResult(
+                testName = "passing",
+                conformanceTestId = "y",
+                conformanceResult = "PASSED",
             )
+        )
+        listOf(
+            ConformanceReportWriter.Role.VP_VERIFIER,
+            ConformanceReportWriter.Role.VCI_WALLET,
+            ConformanceReportWriter.Role.VCI_ISSUER,
+        ).forEach { role ->
+            ConformanceReportWriter.failIfNeededFromTestPlanResults(
+                role = role,
+                results = passing,
+            )
+            assertFailsWith<IllegalStateException> {
+                ConformanceReportWriter.failIfNeededFromTestPlanResults(
+                    role = role,
+                    results = failing,
+                )
+            }
         }
     }
 
@@ -198,7 +209,6 @@ class ConformanceReportWriterTest {
             conformanceHost = "conformance.example",
             conformancePort = 443,
             reportRoot = reportRoot,
-            allowFailure = true,
             producer = producerId,
         )
 
@@ -218,6 +228,8 @@ class ConformanceReportWriterTest {
         assertTrue(summary.contains("negative-test-missing-nonce"))
         assertTrue(summary.contains(compact.variant!!))
         assertTrue(summary.contains("| Test | Status | Suite | Log | Error |"))
+        assertTrue(summary.contains("<details>"))
+        assertTrue(summary.contains("<summary>OpenID4VP Wallet results</summary>"))
         assertTrue(summary.contains("`skipped`"))
         assertTrue(summary.contains("`failed`"))
         assertTrue(summary.contains("audience mismatch"))
@@ -246,7 +258,6 @@ class ConformanceReportWriterTest {
             conformanceHost = "conformance.example",
             conformancePort = 443,
             reportRoot = reportRoot,
-            allowFailure = true,
         )
         val summary = Files.readString(
             ConformanceReportWriter.reportDir(ConformanceReportWriter.Role.VCI_WALLET, reportRoot)
@@ -276,7 +287,6 @@ class ConformanceReportWriterTest {
             conformanceHost = "conformance.example",
             conformancePort = 443,
             reportRoot = reportRoot,
-            allowFailure = true,
         )
         val summary = Files.readString(
             ConformanceReportWriter.reportDir(ConformanceReportWriter.Role.VP_WALLET, reportRoot)
@@ -306,7 +316,6 @@ class ConformanceReportWriterTest {
             role = ConformanceReportWriter.Role.VCI_WALLET,
             results = listOf(interrupted),
             reportRoot = reportRoot,
-            allowFailure = true,
         )
         val summary = Files.readString(
             ConformanceReportWriter.reportDir(ConformanceReportWriter.Role.VCI_WALLET, reportRoot)
@@ -333,7 +342,6 @@ class ConformanceReportWriterTest {
             role = ConformanceReportWriter.Role.VCI_WALLET,
             results = listOf(skipped),
             reportRoot = reportRoot,
-            allowFailure = true,
         )
         val summary = Files.readString(
             ConformanceReportWriter.reportDir(ConformanceReportWriter.Role.VCI_WALLET, reportRoot)
@@ -342,15 +350,5 @@ class ConformanceReportWriterTest {
         assertTrue(summary.contains("`skipped`"))
         assertTrue(summary.contains("wallet-initiated issuance"))
         assertFalse(summary.contains("`failed`"))
-    }
-
-    @Test
-    fun allowFailureDefaultsToTrueWhenUnset() {
-        // When the env var is not injected in this JVM, unset → allow.
-        // CI injects the var (possibly empty); empty is also allow.
-        if (System.getenv(ConformanceCiFlags.ALLOW_FAILURE_ENV) == null) {
-            assertTrue(ConformanceCiFlags.allowFailure())
-            assertFalse(ConformanceCiFlags.strictResults())
-        }
     }
 }

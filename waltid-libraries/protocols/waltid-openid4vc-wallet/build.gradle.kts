@@ -63,6 +63,7 @@ kotlin {
             implementation(project(":waltid-libraries:crypto:waltid-jose"))
             api(project(":waltid-libraries:waltid-did"))
             implementation(identityLibs.whyoleg.cryptography.random)
+            implementation(identityLibs.kotlincrypto.hash.sha2)
         }
 
         jvmMain.dependencies {

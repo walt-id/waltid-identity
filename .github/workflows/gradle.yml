@@ -7,6 +7,11 @@ on:
         description: "release version"
         required: false
         type: string
+      checkout-refs:
+        description: "Exact commits to check out, as a JSON object of unified, identity, enterprise and enterprise_license SHAs (defaults to the branch with main fallback)"
+        required: false
+        type: string
+        default: ''
       publish:
         description: "Specifies whether to publish the artifacts (defaults to false)"
         required: false
@@ -18,6 +23,11 @@ on:
         type: string
       enable-android-build:
         description: "Enable Android targets during the Gradle build"
+        required: false
+        type: boolean
+        default: false
+      run-payment-demo:
+        description: "Require deployed SD-JWT payment issuance and presentation acceptance"
         required: false
         type: boolean
         default: false
@@ -46,6 +56,11 @@ on:
         required: false
         type: string
         default: "conformance (ubuntu-22.04)"
+      upload-test-results:
+        description: "Upload the JUnit XML results as artifacts (for the enterprise release evidence bundle)"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   gradle:
@@ -72,11 +87,13 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
+          resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Verify CI klogging config
         run: test -f "$KLOGGING_CONFIG_PATH"
 
       - name: Configure gradle
+        id: gradle-setup
         uses: ./waltid-identity/.github/actions/gradle-setup-action
         with:
           # Restricted to pushes to main because Dependabot only consumes the default-branch
@@ -166,6 +183,17 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
+      - name: Require public SD-JWT payment acceptance
+        if: ${{ !cancelled() && inputs.run-payment-demo && steps.gradle-setup.outcome == 'success' }}
+        timeout-minutes: 20
+        run: >-
+          ./gradlew :waltid-services:waltid-issuer-api2:paymentDemoTest
+          --max-workers=2 --console=plain
+        env:
+          CI: "true"
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
       - name: Summarize Gradle task outcomes and memory
         if: always()
         run: |
@@ -210,6 +238,15 @@ jobs:
           include_passed: false
           include_skipped: false
 
+      - name: Upload test results
+        if: ${{ always() && inputs.upload-test-results }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-gradle
+          path: '**/build/test-results/**/*.xml'
+          if-no-files-found: warn
+          retention-days: 90
+
   conformance:
     name: conformance (ubuntu-22.04)
     if: ${{ inputs.run-conformance || inputs.run-issuer-conformance || inputs.run-haip-conformance }}
@@ -231,6 +268,7 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
+          resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Verify CI klogging config
         run: test -f "$KLOGGING_CONFIG_PATH"
@@ -439,8 +477,8 @@ jobs:
           CACHELESS: ${{ inputs.cacheless }}
           ISSUER_BASE_URL: ${{ steps.issuer-tunnel.outputs.url }}
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
-          # Wallet/verifier retain the repository soft-fail policy. The issuer-specific override wins below.
-          CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
+          # Wallet, VCI wallet, verifier, and issuer module failures fail this job.
+          # Issuer batch coverage remains required below.
           CONFORMANCE_HOST: conformance.waltid.cloud
           CONFORMANCE_PORT: "443"
           CONFORMANCE_VP_WALLET_ADAPTER_URL: ${{ steps.tunnel.outputs.vp_wallet_url }}/openid4vp/authorize
@@ -497,10 +535,18 @@ jobs:
           include_passed: false
           include_skipped: false
 
+      - name: Upload test results
+        if: ${{ always() && inputs.upload-test-results }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: junit-conformance
+          path: '**/waltid-openid4vp-conformance-runners/build/test-results/**/*.xml'
+          if-no-files-found: warn
+          retention-days: 90
+
       - name: Publish OpenID conformance summary
         if: always()
         env:
-          CONFORMANCE_ALLOW_FAILURE: ${{ vars.CONFORMANCE_ALLOW_FAILURE }}
           ISSUER_REQUESTED: ${{ inputs.run-issuer-conformance || inputs.run-haip-conformance }}
           ISSUER_SETUP_OUTCOME: ${{ steps.issuer-tunnel.outcome }}
           CONFORMANCE_TEST_OUTCOME: ${{ steps.conformance-tests.outcome }}
@@ -509,11 +555,7 @@ jobs:
           {
             echo "## OpenID conformance results"
             echo
-            if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
-              echo "> Soft-fail enabled (\`CONFORMANCE_ALLOW_FAILURE\` unset/true). Wallet/verifier failures are reported below but do not fail this job. Issuer strict and batch checks are independent."
-            else
-              echo "> Soft-fail disabled (\`CONFORMANCE_ALLOW_FAILURE=false\`). Wallet/verifier failures fail this job. Issuer strict and batch checks are independent."
-            fi
+            echo "> Executed OpenID4VP verifier/wallet, OpenID4VCI wallet, and OpenID4VCI issuer failures fail this job. Issuer batch coverage remains required."
             echo
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -535,17 +577,17 @@ jobs:
               {
                 echo "# ${title} Conformance Summary"
                 echo
-                if [ -z "${CONFORMANCE_ALLOW_FAILURE}" ] || [ "${CONFORMANCE_ALLOW_FAILURE}" = "true" ]; then
-                  echo "- Soft-fail (\`CONFORMANCE_ALLOW_FAILURE\`): \`enabled\`"
-                else
-                  echo "- Soft-fail (\`CONFORMANCE_ALLOW_FAILURE\`): \`disabled\`"
-                fi
                 echo "- Total: 0"
                 echo "- Passed: 0"
                 echo "- Failed: 0"
                 echo
+                echo "<details>"
+                echo "<summary>${title} results</summary>"
+                echo
                 echo "| Test | Status | Suite | Log | Error |"
                 echo "|------|--------|-------|-----|-------|"
+                echo
+                echo "</details>"
                 echo
                 echo "_No ${title} conformance results were produced (suite skipped, unavailable, or failed before writing a report)._"
               } >> "$GITHUB_STEP_SUMMARY"
@@ -588,27 +630,44 @@ jobs:
                   batch_modules: ([.[].modules[] | select(.testModule == "oid4vci-1_0-issuer-batch-issuance")]
                     | group_by(.result) | map({result: .[0].result, count: length}))}' \
                   "$ISSUER_DIAGNOSTICS_DIR/results.json" > "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
-                if jq -e 'length > 0' "$ISSUER_DIAGNOSTICS_DIR/results.json" >/dev/null; then
-                  echo '| Variant status | Count |'
-                  echo '|----------------|-------|'
-                  jq -r '.variants[] | "| \(.status) | \(.count) |"' "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
-                  echo
-                  echo '| Batch coverage | Count |'
-                  echo '|----------------|-------|'
-                  jq -r '.batch_coverage[] | "| \(.status) | \(.count) |"' "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
-                  echo
-                  echo '`NOT_OFFERED_BY_PINNED_SUITE` is a coverage gap, not a batch pass. `UNKNOWN` means the runner did not write a batch classification.'
-                  echo
-                  echo '| Variant | Status | Plan | Batch coverage |'
-                  echo '|---------|--------|------|----------------|'
+                issuer_total="$(jq 'length' "$ISSUER_DIAGNOSTICS_DIR/results.json")"
+                echo "- Total: $issuer_total"
+                echo "- Passed: $(jq '[.[] | select(.status == "PASSED")] | length' "$ISSUER_DIAGNOSTICS_DIR/results.json")"
+                echo "- Failed: $(jq '[.[] | select(.status != "PASSED")] | length' "$ISSUER_DIAGNOSTICS_DIR/results.json")"
+                jq -r '.batch_coverage[] | "- Batch coverage \(.status): \(.count)"' "$ISSUER_DIAGNOSTICS_DIR/coverage.json"
+                echo
+                echo '`NOT_OFFERED_BY_PINNED_SUITE` is a coverage gap, not a batch pass. `UNKNOWN` means the runner did not write a batch classification.'
+                echo
+                echo '<details>'
+                echo '<summary>OpenID4VCI Issuer results</summary>'
+                echo
+                echo '| Variant | Status | Plan | Batch coverage |'
+                echo '|---------|--------|------|----------------|'
+                if [ "$issuer_total" -gt 0 ]; then
                   jq -r '.[] | "| \(.variantId | @html) | \(.status | @html) | \(if .planId then "[\(.planId | @html)](https://conformance.waltid.cloud/plan-detail.html?plan=\(.planId | @uri))" else "—" end) | \(.batchCoverage | @html) |"' \
                     "$ISSUER_DIAGNOSTICS_DIR/results.json"
-                else
-                  echo '_No issuer variant results were produced. This does not establish issuer or batch coverage._'
                 fi
                 echo
+                echo '</details>'
+                echo
+                if [ "$issuer_total" -eq 0 ]; then
+                  echo '_No issuer variant results were produced. This does not establish issuer or batch coverage._'
+                  echo
+                fi
                 echo 'See the `issuer-conformance-basic-haip-batch` artifact for sanitized plan/test IDs and https://conformance.waltid.cloud/logs.html for suite logs.'
               else
+                echo '- Total: 0'
+                echo '- Passed: 0'
+                echo '- Failed: 0'
+                echo
+                echo '<details>'
+                echo '<summary>OpenID4VCI Issuer results</summary>'
+                echo
+                echo '| Variant | Status | Plan | Batch coverage |'
+                echo '|---------|--------|------|----------------|'
+                echo
+                echo '</details>'
+                echo
                 echo '_No issuer conformance results were produced. See the setup/test outcomes above and their logs; this is not a passing result._'
               fi
             fi
@@ -616,6 +675,58 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           echo "Published OpenID conformance summaries for verifier, OpenID4VP wallet, OpenID4VCI wallet and issuer (${found} wallet/verifier file(s) found)."
+
+      - name: Fail job on published OpenID conformance failures
+        if: ${{ always() && !cancelled() }}
+        env:
+          ISSUER_REQUESTED: ${{ inputs.run-issuer-conformance || inputs.run-haip-conformance }}
+          ISSUER_SETUP_OUTCOME: ${{ steps.issuer-tunnel.outcome }}
+        run: |
+          set -euo pipefail
+
+          failed=0
+          check_role() {
+            local role_dir="$1"
+            local title="$2"
+            local summary=""
+            local candidate
+            while IFS= read -r candidate; do
+              summary="$candidate"
+              break
+            done < <(find . -path "*/build/reports/openid-conformance/${role_dir}/summary.md" 2>/dev/null)
+
+            if [ -z "$summary" ] || [ ! -f "$summary" ]; then
+              return 0
+            fi
+            local count
+            count="$(awk -F': ' '/^- Failed: / { print $2; exit }' "$summary")"
+            if [ -n "${count:-}" ] && [ "$count" -gt 0 ]; then
+              echo "::error::${title} conformance reported ${count} failed test(s). See the job summary."
+              failed=1
+            fi
+          }
+
+          check_role vp-verifier "OpenID4VP Verifier"
+          check_role vp-wallet "OpenID4VP Wallet"
+          check_role vci-wallet "OpenID4VCI Wallet"
+
+          if [ "$ISSUER_REQUESTED" = "true" ]; then
+            if [ -s "$ISSUER_REPORT_DIR/results.json" ]; then
+              if jq -e '[.[] | select(.status != "PASSED")] | length > 0' "$ISSUER_REPORT_DIR/results.json" >/dev/null; then
+                echo "::error::OpenID4VCI issuer matrix reported non-passing variants. See the job summary."
+                failed=1
+              fi
+              if jq -e '[.[].modules[]? | select(.accepted != true)] | length > 0' "$ISSUER_REPORT_DIR/results.json" >/dev/null; then
+                echo "::error::OpenID4VCI issuer matrix reported unaccepted modules. See the job summary."
+                failed=1
+              fi
+            elif [ "$ISSUER_SETUP_OUTCOME" = "success" ]; then
+              echo "::error::Issuer conformance was requested and the issuer runtime started, but no results.json was produced."
+              failed=1
+            fi
+          fi
+
+          exit "$failed"
 
       - name: Stop wallet and verifier conformance tunnels
         if: always()
@@ -629,6 +740,7 @@ jobs:
       - name: Verify issuer results were produced
         if: ${{ !cancelled() && steps.issuer-tunnel.outcome == 'success' && steps.conformance-tests.outcome == 'success' }}
         # Strict results and executed batch coverage are enforced by the Kotlin runner.
+        # This rejects a green test step with no issuer file.
         run: jq -e 'type == "array" and length > 0' "$ISSUER_REPORT_DIR/results.json" >/dev/null
 
       - name: Stop Issuer2 conformance services
@@ -639,6 +751,15 @@ jobs:
             pid=$(cat "$pid_file")
             if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then kill "$pid" 2>/dev/null || true; fi
           done
+
+      - name: Upload OpenID conformance reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: openid-conformance-summaries
+          if-no-files-found: warn
+          path: |
+            **/build/reports/openid-conformance/**
 
       - name: Upload issuer conformance results
         if: ${{ always() && (inputs.run-issuer-conformance || inputs.run-haip-conformance) }}
@@ -653,7 +774,7 @@ jobs:
             ${{ env.ISSUER_DIAGNOSTICS_DIR }}/coverage.json
 
   # Maven publish waits for the default Gradle job and, when requested, the live
-  # conformance job. Leaving publish on the gradle job let release/fix-release upload
+  # conformance job. Leaving publish on the gradle job let release candidates upload
   # artifacts while conformance was still running or after it had failed.
   publish:
     name: publish
@@ -670,6 +791,7 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
+          resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action

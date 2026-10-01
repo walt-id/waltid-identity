@@ -3,6 +3,7 @@ package id.walt.mdoc.verification
 import id.walt.cose.protectedAlgorithm
 import id.walt.cose.verify
 import id.walt.crypto2.keys.Key
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.mdoc.objects.document.Document
 import id.walt.x509.CertificateDer
 import id.walt.x509.X509ValidationException
@@ -42,6 +43,16 @@ suspend fun verifyIssuerAuthentication(
     }
     if (validateCertificateConstraints) {
         validateDocumentSignerCertificateChain(certificateChain, verificationTime)
+    }
+    val mso = document.issuerSigned.decodeMobileSecurityObject()
+    val leaf = X509CertificateUtil.parseCertificateDerEncoded(certificateChain.first().bytes)
+    val signed = mso.validityInfo.signed
+    val leafValidity = leaf.data.validity
+    require(leafValidity.notBefore <= signed) {
+        "MSO signed is before the document signer certificate notBefore"
+    }
+    require(signed <= leafValidity.notAfter) {
+        "MSO signed is after the document signer certificate notAfter"
     }
     return IssuerAuthenticationVerification(certificateChain, parsed.signerKey, algorithm)
 }

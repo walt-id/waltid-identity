@@ -49,10 +49,10 @@ object DemoTestBackend {
     private const val ISSUER_BASE_URL = "https://issuer2.demo.walt.id"
     private const val ISSUER_IDENTIFIER = "$ISSUER_BASE_URL/openid4vci"
     // RFC 7638 thumbprint of the issuer2 metadata signing key published at
-    // https://issuer2.demo.walt.id/openid4vci/jwks (verified 2026-09-15). This is an independent trust anchor;
+    // https://issuer2.demo.walt.id/openid4vci/jwks (verified 2026-09-29). This is an independent trust anchor;
     // it must not be learned from the signed metadata JWT itself.
     private const val ISSUER_METADATA_SIGNING_KEY_THUMBPRINT =
-        "Tq0T3ytmPJnXFBBrP2-7c_5R_eSV5T0pMtPPuWcArac"
+        "2iEFnGUV5WKiB1JWV8pBeqEDzqJJJ7-7m65b5NRFdOo"
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
     // The demo verifier only accepts signed requests for an explicitly configured client ID.
     const val PUBLIC_DEMO_VERIFIER_CLIENT_ID = "verifier2"
@@ -138,6 +138,23 @@ object DemoTestBackend {
                 namespace = "org.iso.18013.5.1",
                 claims = listOf("given_name", "family_name"),
             ),
+        ),
+    )
+
+    /** Requires an eligible native signing identity; kept outside the ordinary emulator matrix. */
+    val scaPaymentSdJwtScenario = CredentialScenario(
+        id = "sca-payment-card-sdjwt",
+        displayName = "Demo SCA Payment Card SD-JWT VC",
+        profileId = "scaPaymentCardSdJwt",
+        credentialConfigurationId = "sca_payment_card_sd_jwt",
+        format = "dc+sd-jwt",
+        verifierCredentialQuery = credentialQuery(
+            id = "sca_payment",
+            format = "dc+sd-jwt",
+            meta = buildJsonObject {
+                putJsonArray("vct_values") { add(JsonPrimitive("$ISSUER_IDENTIFIER/sca_payment_card_sd_jwt")) }
+            },
+            claimPaths = listOf("card_scheme", "card_last4", "card_holder_name").map { listOf(it) },
         ),
     )
 
@@ -342,7 +359,6 @@ object DemoTestBackend {
         return createVerifierSession(
             credentialQuery = scenario.verifierCredentialQuery,
             transactionData = emptyList(),
-            bindClientIdToResponseUri = true,
         )
     }
 
@@ -444,18 +460,14 @@ object DemoTestBackend {
     private suspend fun createVerifierSession(
         credentialQuery: JsonObject,
         transactionData: List<JsonObject>,
-        bindClientIdToResponseUri: Boolean = false,
         signedRequest: Boolean = false,
     ): VerifierSession {
-        require(!(bindClientIdToResponseUri && signedRequest)) {
-            "A signed verifier request cannot use a response-bound redirect_uri client ID"
-        }
-        val requestedSessionId = Uuid.random().toString().takeIf { bindClientIdToResponseUri }
+        val requestedSessionId = Uuid.random().toString().takeUnless { signedRequest }
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
+                put("signed_request", signedRequest)
                 if (signedRequest) {
-                    put("signed_request", true)
                     put("clientId", PUBLIC_DEMO_VERIFIER_CLIENT_ID)
                 }
                 requestedSessionId?.let { sessionId ->
@@ -494,7 +506,7 @@ object DemoTestBackend {
             ?: error("Public demo verifier2 response is missing bootstrapAuthorizationRequestUrl: $response")
         val bootstrapParameters = Url(authorizationRequestUri).parameters
 
-        if (bindClientIdToResponseUri) {
+        if (!signedRequest) {
             val expectedResponseUri = "$VERIFIER_BASE_URL/verification-session/$sessionId/response"
             check(inlineParameters["client_id"] == "redirect_uri:$expectedResponseUri") {
                 "Public demo verifier2 response-bound client_id does not match the response URI. Response: $response"
@@ -554,6 +566,7 @@ object DemoTestBackend {
         credentialQueries: List<JsonObject>,
         expectedOrigins: List<String>,
         encryptedResponse: Boolean = false,
+        signedRequest: Boolean = false,
         transactionData: List<JsonObject> = emptyList(),
     ): DcApiVerifierSession {
         require(expectedOrigins.isNotEmpty()) { "DC API sessions require at least one expected origin" }
@@ -563,6 +576,7 @@ object DemoTestBackend {
             credentialQueries = credentialQueries,
             expectedOrigins = expectedOrigins,
             encryptedResponse = encryptedResponse,
+            signedRequest = signedRequest,
             transactionData = transactionData,
         )
 
@@ -583,10 +597,16 @@ object DemoTestBackend {
         credentialQueries: List<JsonObject>,
         expectedOrigins: List<String>,
         encryptedResponse: Boolean = false,
+        signedRequest: Boolean = false,
         transactionData: List<JsonObject> = emptyList(),
     ): JsonObject = buildJsonObject {
         put("flow_type", "dc_api_openid4vp")
         putJsonObject("core_flow") {
+            if (signedRequest) {
+                put("signed_request", true)
+                // Matches the certificate independently pinned by the demo wallet.
+                put("clientId", "x509_san_dns:verifier.example.com")
+            }
             putJsonObject("dcql_query") {
                 putJsonArray("credentials") {
                     credentialQueries.forEach { add(it) }

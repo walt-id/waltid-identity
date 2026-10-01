@@ -58,6 +58,7 @@ dependencies {
     implementation(project(":waltid-libraries:crypto:waltid-x509"))
     implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
     implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
+    implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
     implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
     implementation(project(":waltid-libraries:web:waltid-ktor-notifications"))
     api(project(":waltid-libraries:waltid-did"))
@@ -67,6 +68,8 @@ dependencies {
     testImplementation(identityLibs.bundles.waltid.ktortesting)
     testImplementation(identityLibs.bundles.smiley4.schema.kenerator)
     testImplementation(project(":waltid-libraries:protocols:waltid-openid4vci-wallet"))
+    testImplementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
+    testImplementation(project(":waltid-services:waltid-verifier-api2"))
     testImplementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     testImplementation(identityLibs.junit.jupiter.api)
     testImplementation("com.microsoft.playwright:playwright:1.60.0") {
@@ -132,7 +135,7 @@ val installPlaywrightBrowsers = tasks.register<JavaExec>("installPlaywrightBrows
 tasks.test {
     dependsOn(installPlaywrightBrowsers)
     useJUnitPlatform {
-        excludeTags("redis")
+        excludeTags("redis", "live-payment")
     }
 }
 
@@ -169,4 +172,18 @@ tasks.register<Test>("redisTest") {
         includeTags("redis")
     }
     shouldRunAfter(tasks.test)
+}
+
+// Public-service acceptance is explicit and must never reuse a cached successful run.
+tasks.register<Test>("paymentDemoTest") {
+    description = "Verifies deployed SD-JWT payment issuance, wallet presentation and verifier acceptance."
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform { includeTags("live-payment") }
+    for (name in listOf("payment.issuerUrl", "payment.verifierUrl")) {
+        providers.gradleProperty(name).orNull?.let { systemProperty(name, it) }
+    }
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
 }

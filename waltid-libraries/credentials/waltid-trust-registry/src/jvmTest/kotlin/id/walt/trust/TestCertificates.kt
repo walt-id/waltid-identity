@@ -7,6 +7,7 @@ import org.bouncycastle.asn1.x509.KeyUsage
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 import java.math.BigInteger
 import java.security.KeyPair
@@ -26,6 +27,47 @@ internal object TestCertificates {
         val leafKeyPair: KeyPair,
         val leaf: X509Certificate
     )
+
+    data class RsaPssSigner(
+        val keyPair: KeyPair,
+        val certificate: X509Certificate
+    )
+
+    /**
+     * Self-signed certificate whose SubjectPublicKeyInfo uses the explicit id-RSASSA-PSS OID
+     * (rather than the generic rsaEncryption OID), as issued by CAs that restrict a key to
+     * RSASSA-PSS use only. Java reports [java.security.PublicKey.getAlgorithm] for such a key as
+     * "RSASSA-PSS", not "RSA". Some EU national trusted lists (e.g. Germany's) are signed with
+     * exactly this kind of key using xmldsig-more#sha256-rsa-MGF1.
+     */
+    fun createRsaPssSelfSigned(commonName: String = "RSASSA-PSS Trust List Signer"): RsaPssSigner {
+        val keyPair = KeyPairGenerator.getInstance("RSASSA-PSS").apply {
+            initialize(2048, SecureRandom())
+        }.generateKeyPair()
+
+        val subject = X500Name("CN=$commonName,O=walt.id,C=DE")
+        val extensions = JcaX509ExtensionUtils()
+        val builder = JcaX509v3CertificateBuilder(
+            subject,
+            BigInteger(128, SecureRandom()),
+            Date.from(Instant.now().minusSeconds(60)),
+            Date.from(Instant.now().plusSeconds(20L * 365 * 86_400)),
+            subject,
+            keyPair.public
+        )
+        builder.addExtension(Extension.basicConstraints, true, BasicConstraints(false))
+        builder.addExtension(Extension.keyUsage, true, KeyUsage(KeyUsage.digitalSignature))
+        builder.addExtension(
+            Extension.subjectKeyIdentifier,
+            false,
+            extensions.createSubjectKeyIdentifier(keyPair.public)
+        )
+        val signer = JcaContentSignerBuilder("SHA256withRSAandMGF1")
+            .setProvider(BouncyCastleProvider())
+            .build(keyPair.private)
+        val certificate = JcaX509CertificateConverter().getCertificate(builder.build(signer))
+        return RsaPssSigner(keyPair, certificate)
+    }
 
     fun createChain(commonName: String = "WAL-1186"): Chain {
         val rootKeyPair = keyPair()
