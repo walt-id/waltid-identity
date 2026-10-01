@@ -22,7 +22,6 @@ import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.proofs.CredentialProofValidationException
 import id.walt.openid4vci.proofs.invalidCredentialProof
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.sdjwt.SDMap
 import id.walt.w3c.issuance.IssuanceClock
 import id.walt.w3c.issuance.InstantClock
@@ -105,7 +104,7 @@ class MdocCredentialHandler(
                             dataMapping,
                             issuerId,
                             display,
-                            instance.verifiedProof,
+                            instance.verifiedBinding,
                             issuedAt,
                         ),
                         issuerKey = issuerKey,
@@ -165,7 +164,7 @@ class MdocCredentialHandler(
                         dataMapping,
                         issuerId,
                         display,
-                        instance.verifiedProof,
+                        instance.verifiedBinding,
                         issuedAt,
                     ),
                     issuerKey = issuerKey.key,
@@ -194,14 +193,14 @@ class MdocCredentialHandler(
         dataMapping: JsonObject?,
         issuerId: String,
         display: List<CredentialDisplay>?,
-        verifiedProof: VerifiedCredentialProof?,
+        verifiedBinding: VerifiedCredentialBinding?,
         issuedAt: Instant,
     ): JsonObject {
         if (dataMapping == null || dataMapping.isEmpty()) return credentialData
         val namespaceMapping = dataMapping.mdocNamespaceMapping(credentialData) ?: return credentialData
         return credentialData.mergeMdocPayloadWithMapping(
             mapping = namespaceMapping,
-            context = mdocMappingContext(issuerId, display, verifiedProof?.holderDid),
+            context = mdocMappingContext(issuerId, display, verifiedBinding?.holderDid),
             data = dataFunctionsFor(InstantClock(issuedAt)),
         )
     }
