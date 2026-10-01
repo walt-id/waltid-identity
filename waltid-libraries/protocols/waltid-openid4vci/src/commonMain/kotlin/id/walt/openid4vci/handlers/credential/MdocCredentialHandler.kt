@@ -100,8 +100,6 @@ class MdocCredentialHandler(
                 configuration = configuration,
                 issue = { certificateChain, docType, issuedAt, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                     MdocCredentialSigner.generateMdocCredential(
-                        credentialData = instance.input.credentialData,
-                        credentialRequest = request,
                         credentialData = mapMdocData(
                             instance.input.credentialData,
                             dataMapping,
@@ -162,7 +160,6 @@ class MdocCredentialHandler(
             validUntil = validUntil,
             issue = { certificateChain, docType, issuedAt, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                 MdocCredentialSigner.generateMdocCredential(
-                    credentialRequest = request,
                     credentialData = mapMdocData(
                         instance.input.credentialData,
                         dataMapping,
