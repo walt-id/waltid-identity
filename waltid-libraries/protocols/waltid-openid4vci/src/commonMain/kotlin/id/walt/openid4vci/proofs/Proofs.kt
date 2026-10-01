@@ -1,4 +1,4 @@
-package id.walt.openid4vci.prooftypes
+package id.walt.openid4vci.proofs
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -7,6 +7,17 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+
+/**
+ * Proof type identifiers (OpenID4VCI 1.0).
+ */
+enum class ProofTypeId(val value: String) {
+    JWT("jwt"),
+    DI_VP("di_vp"),
+    ATTESTATION("attestation");
+
+    override fun toString(): String = value
+}
 
 /**
  * Proofs object for the OpenID4VCI credential request.

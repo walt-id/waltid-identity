@@ -1,4 +1,4 @@
-package id.walt.openid4vci.prooftypes
+package id.walt.openid4vci.proofs
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
