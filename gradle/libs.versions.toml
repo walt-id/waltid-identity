@@ -508,6 +508,9 @@ smiley4-schema-kenerator = [
 ]
 
 [plugins]
+# Settings requests use these versions before catalog accessors are available.
+versions-settings = { id = "io.github.ben-manes.versions.settings", version.ref = "versions" }
+foojay-resolver = { id = "org.gradle.toolchains.foojay-resolver-convention", version.ref = "foojay-resolver" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
