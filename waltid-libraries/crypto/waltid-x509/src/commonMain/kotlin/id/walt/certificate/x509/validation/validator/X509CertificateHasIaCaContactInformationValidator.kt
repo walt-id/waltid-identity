@@ -39,7 +39,7 @@ class X509CertificateHasIaCaContactInformationValidator(val contactInformationIs
         val contactInfoInCert =
             x509Certificate.data.extensionIssuerAltName?.let { issuerAltNameExtension ->
                 issuerAltNameExtension.alternativeNames.any {
-                    it.value.isNotEmpty() &&
+                    it.value.isNotBlank() &&
                             (it.type == GeneralName.NameType.rfc822Name ||
                                     it.type == GeneralName.NameType.uniformResourceIdentifier)
                 }
