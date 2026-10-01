@@ -37,6 +37,7 @@ import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -199,24 +200,26 @@ class MdocCredentialValidityTest {
     @Test
     fun `timestamp templates must not be used for full-date namespace fields`() = runTest {
         val namespace = "org.iso.18013.5.1"
-        val result = fixture().issueResult(
-            credentialData = buildJsonObject {
-                putJsonObject(namespace) {
-                    put("issue_date", "placeholder")
-                }
-            },
-            dataMapping = buildJsonObject {
-                putJsonObject(namespace) {
-                    put("issue_date", "<timestamp>")
-                }
-            },
-            mDocNameSpacesDataMappingConfig = mapOf(
-                namespace to Json.decodeFromString<JsonObjectToCborMappingConfig>(
-                    """{"entriesConfigMap":{"issue_date":{"type":"string","conversionType":"stringToFullDate"}}}"""
-                )
-            ),
-        )
-        assertIs<CredentialResponseResult.Failure>(result)
+        val failure = assertFailsWith<IllegalArgumentException> {
+            fixture().issueResult(
+                credentialData = buildJsonObject {
+                    putJsonObject(namespace) {
+                        put("issue_date", "placeholder")
+                    }
+                },
+                dataMapping = buildJsonObject {
+                    putJsonObject(namespace) {
+                        put("issue_date", "<timestamp>")
+                    }
+                },
+                mDocNameSpacesDataMappingConfig = mapOf(
+                    namespace to Json.decodeFromString<JsonObjectToCborMappingConfig>(
+                        """{"entriesConfigMap":{"issue_date":{"type":"string","conversionType":"stringToFullDate"}}}"""
+                    )
+                ),
+            )
+        }
+        assertTrue(failure.message!!.contains("2026-09-08T19:18:10Z"))
     }
 
     @Test
@@ -255,46 +258,49 @@ class MdocCredentialValidityTest {
     @Test
     fun `non-object namespace mapping values are rejected`() = runTest {
         val namespace = "org.iso.18013.5.1"
-        val result = fixture().issueResult(
-            credentialData = buildJsonObject {
-                putJsonObject(namespace) { put("given_name", "Jane") }
-            },
-            dataMapping = buildJsonObject {
-                put(namespace, "not-an-object")
-            },
-        )
-        val failure = assertIs<CredentialResponseResult.Failure>(result)
-        assertTrue(failure.error.description!!.contains("must be a JSON object"))
+        val failure = assertFailsWith<IllegalArgumentException> {
+            fixture().issueResult(
+                credentialData = buildJsonObject {
+                    putJsonObject(namespace) { put("given_name", "Jane") }
+                },
+                dataMapping = buildJsonObject {
+                    put(namespace, "not-an-object")
+                },
+            )
+        }
+        assertTrue(failure.message!!.contains("must be a JSON object"))
     }
 
     @Test
     fun `top-level mapping validFrom is rejected in favor of msoData`() = runTest {
-        val result = fixture().issueResult(
-            dataMapping = buildJsonObject {
-                put("validFrom", "<timestamp>")
-            },
-        )
-        val failure = assertIs<CredentialResponseResult.Failure>(result)
-        assertTrue(failure.error.description!!.contains("msoData"))
+        val failure = assertFailsWith<IllegalArgumentException> {
+            fixture().issueResult(
+                dataMapping = buildJsonObject {
+                    put("validFrom", "<timestamp>")
+                },
+            )
+        }
+        assertTrue(failure.message!!.contains("msoData"))
     }
 
     @Test
     fun `mapped mDL issue_date after validFrom is rejected`() = runTest {
         val namespace = "org.iso.18013.5.1"
-        val result = fixture().issueResult(
-            credentialData = buildJsonObject {
-                putJsonObject(namespace) {
-                    put("issue_date", "2019-10-20")
-                }
-            },
-            dataMapping = buildJsonObject {
-                putJsonObject(namespace) {
-                    put("issue_date", "2026-09-15")
-                }
-            },
-        )
-        val failure = assertIs<CredentialResponseResult.Failure>(result)
-        assertTrue(failure.error.description!!.contains("issue_date"))
+        val failure = assertFailsWith<IllegalArgumentException> {
+            fixture().issueResult(
+                credentialData = buildJsonObject {
+                    putJsonObject(namespace) {
+                        put("issue_date", "2019-10-20")
+                    }
+                },
+                dataMapping = buildJsonObject {
+                    putJsonObject(namespace) {
+                        put("issue_date", "2026-09-15")
+                    }
+                },
+            )
+        }
+        assertTrue(failure.message!!.contains("issue_date"))
     }
 
     @Test
