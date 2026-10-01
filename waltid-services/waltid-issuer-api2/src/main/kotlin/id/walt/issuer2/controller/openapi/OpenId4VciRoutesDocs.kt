@@ -183,12 +183,52 @@ object OpenId4VciRoutesDocs {
             Issue one or more credentials for a single credential target. Plaintext JSON and encrypted
             JWT requests are accepted.
 
-            For batch issuance, provide multiple proof JWTs in `proofs.jwt`. Credentials returned by one
-            request share the Credential Format and Credential Dataset selected by either
-            `credential_identifier` or `credential_configuration_id`; each proof supplies the cryptographic
-            binding data for one issued credential. Use separate Credential Endpoint requests for different
-            formats or datasets. The maximum accepted batch size is advertised as
-            `batch_credential_issuance.batch_size` in Credential Issuer metadata.
+            Select one authorized credential target using either `credential_identifier` or
+            `credential_configuration_id`. All credentials returned by one request share that target's
+            format and dataset. Send separate requests for different formats or datasets.
+
+            When sending `proofs`, choose one proof type supported by the selected configuration's
+            `proof_types_supported`; do not combine `jwt` and `attestation` in the same request.
+
+            - `proofs.jwt`: an array of holder-signed JWTs with protected header `typ: openid4vci-proof+jwt`.
+              The nested-attestation examples include the holder's public `jwk` (or DID URL `kid` for W3C) and the attester-signed
+              compact JWT in the protected `key_attestation` header. The outer signing key must appear
+              in that attestation's `attested_keys`. The outer payload has an integer `iat`, the issuer's
+              `nonce`, and an `aud` string exactly matching the Credential Issuer Identifier; audience
+              arrays are rejected. If `iss` is supplied, use the wallet's client ID; omit it for anonymous
+              pre-authorized access. A nested attestation is required when JWT metadata includes
+              `key_attestations_required`, and optional otherwise.
+            - `proofs.attestation`: an array containing exactly one attester-signed key-attestation JWT.
+              It has no outer holder signature. Its protected header has `typ: key-attestation+jwt`,
+              and its payload contains `iat`, `nonce`, and a non-empty `attested_keys` array of public JWKs.
+              The examples also include `exp`, which is required for nested key attestations.
+
+            Obtain `c_nonce` from the advertised `nonce_endpoint` before requesting an attestation
+            from the Wallet Provider, and put that value in the attestation's `nonce`. For nested
+            attestations, the outer proof must also carry a valid issuer nonce. Use algorithms advertised
+            for the selected proof type; both signatures in the nested examples use ES256.
+            Both attestation approaches use `keyAttestationConfig` trust, independently of OAuth
+            client-attestation trust. With X.509 trust, the attester supplies its leaf-first `x5c` chain.
+
+            W3C JWT credentials require a verified holder DID for each selected key. The W3C examples
+            put a DID verification method URL in each attested JWK's `kid`. This library convention
+            is supported for both nested and standalone attestations; OpenID4VCI does not prescribe it.
+            The issuer resolves each reference, checks the public key matches the attested JWK,
+            and requires the DID method to be advertised in `cryptographic_binding_methods_supported`.
+            The attestation's header `kid` or `x5c` identifies its signer and cannot supply a holder DID.
+
+            For plain JWT proofs, each proof requests one credential; multiple proofs require
+            `batch_credential_issuance` and must respect its advertised `batch_size`.
+            For either attestation approach, this issuer selects each distinct attested holder key.
+            The attestation examples carry two attested keys
+            in one attestation and therefore request two credentials, including when nested in one JWT.
+
+            Examples are illustrative and cannot be submitted unchanged. The attestation examples
+            have decodable JWT headers and payloads, but placeholder signatures and an `x5c` certificate
+            placeholder. Obtain a real signed attestation for your wallet keys, use fresh timestamps
+            and nonces, replace the issuer URL and credential selector, and sign any outer JWT proof.
+            A `credential_identifier` from the token response can replace `credential_configuration_id`.
+            See [OpenID4VCI proof types](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-final.html#appendix-F).
 
             Multiple proofs when batch issuance is disabled, or more proofs than the advertised limit,
             return `invalid_credential_request`. Invalid proof signatures return `invalid_proof`.
