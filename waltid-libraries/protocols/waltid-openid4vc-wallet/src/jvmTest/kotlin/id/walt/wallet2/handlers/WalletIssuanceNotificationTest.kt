@@ -147,8 +147,8 @@ class WalletIssuanceNotificationTest {
         ).toList()
 
         assertEquals(1, stored.size)
-        assertEquals(listOf("DPoP access-token", "DPoP access-token"), authorizations)
-        assertEquals(listOf("dpop-proof", "dpop-proof"), proofs)
+        assertEquals(listOf<String?>("DPoP access-token", "DPoP access-token"), authorizations)
+        assertEquals(listOf<String?>("dpop-proof", "dpop-proof"), proofs)
     }
 
     @Test
