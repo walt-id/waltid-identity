@@ -19,4 +19,6 @@ fi
   -PtransactionDataProfiles.url=https://wallet.demo.walt.id/wallet-api/transaction-data-profiles \
   --info
 
-"$script_dir/run-android-compose-cold-restart-test.sh" "$(adb get-serialno)"
+"$identity_dir/gradlew" -p "$identity_dir" \
+  :waltid-applications:waltid-wallet-demo-compose:androidE2eTests:connectedProductionDebugAndroidTest \
+  --info

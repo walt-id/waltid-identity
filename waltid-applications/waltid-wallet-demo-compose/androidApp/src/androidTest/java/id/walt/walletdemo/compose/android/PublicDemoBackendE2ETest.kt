@@ -19,69 +19,12 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.setTextByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
-import org.junit.Assert.assertEquals
-import org.junit.Assume.assumeTrue
-import id.walt.did.dids.DidService
-import id.walt.wallet2.mobile.MobileWalletConfig
-import id.walt.wallet2.mobile.MobileWalletFactory
-import id.walt.wallet2.mobile.identity.SigningIdentityState
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class PublicDemoBackendE2ETest {
-    /** Run the two phases in separate instrumentation processes with run-android-compose-cold-restart-test.sh. */
-    @Test
-    fun receiveAndPresentAfterColdProcessRestart() = runBlocking {
-        val phase = InstrumentationRegistry.getArguments().getString("coldRestartPhase")
-        assumeTrue("Requires separate seed/present instrumentation processes", phase in setOf("seed", "present"))
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        val receipt = context.getSharedPreferences("cold-process-restart", 0)
-        suspend fun savedWallet() = MobileWalletFactory(context).create(
-            MobileWalletConfig(walletId = demoWalletConfig().walletId),
-        )
-        if (phase == "seed") {
-            receiveAndPresentAgainstPublicDemoIssuer2Verifier2()
-            val wallet = savedWallet()
-            val identity = wallet.signingIdentity.state() as SigningIdentityState.Active
-            assertTrue(receipt.edit().putString("identity", identity.identity.id)
-                .putString("did", identity.identity.did)
-                .putStringSet("credentials", wallet.credentials().map { it.id }.toSet()).commit())
-            return@runBlocking
-        }
-
-        assertTrue("The presentation phase must start with cold resolver state", DidService.resolverMethods.isEmpty())
-        val savedIds = requireNotNull(receipt.getStringSet("credentials", null))
-        assertTrue("Seed phase must save credentials", savedIds.isNotEmpty())
-        launchAndUnlock(context, device)
-        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "eudi-pid-mdoc" }
-        val session = DemoTestBackend.createVerifierSession(
-            scenario, signedRequest = true, clientId = DemoTestBackend.PUBLIC_DEMO_DID_VERIFIER_CLIENT_ID,
-        )
-        sendDeepLink(context, session.authorizationRequestUri)
-        assertResourceTextEquals(device, "wallet.presentationInput", session.authorizationRequestUri,
-            UI_ELEMENT_TIMEOUT, "DID request URL did not appear")
-        clickByTag(device, "wallet.presentButton")
-        assertTrue("Cold-process DID preview failed: ${latestStatus(device)}", waitForStatus(
-            device, CREDENTIAL_OPERATION_TIMEOUT, { it == "Review presentation request" },
-            listOf("Preview failed", "Present failed", "Bootstrap failed"),
-        ))
-        clickByTag(device, "wallet.presentationSubmitButton")
-        assertTrue("Cold-process presentation failed: ${latestStatus(device)}", waitForStatus(
-            device, CREDENTIAL_OPERATION_TIMEOUT,
-            { it.startsWith("Presentation sent") || it.startsWith("Presentation finished") },
-            listOf("Present failed", "Bootstrap failed"),
-        ))
-        DemoTestBackend.waitForVerifierSuccess(session.sessionId, timeoutMs = VERIFIER_POLLING_TIMEOUT)
-        val wallet = savedWallet()
-        val identity = wallet.signingIdentity.state() as SigningIdentityState.Active
-        assertEquals(receipt.getString("identity", null), identity.identity.id)
-        assertEquals(receipt.getString("did", null), identity.identity.did)
-        assertEquals(savedIds, wallet.credentials().map { it.id }.toSet())
-        assertTrue(receipt.edit().clear().commit())
-    }
 
     @Test
     fun transactionCodePromptRejectsWrongCodeAndRetriesAgainstPublicDemoIssuer2() = runBlocking {

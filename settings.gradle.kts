@@ -150,6 +150,7 @@ val modules = listOfNotNull(
     "$applications:waltid-wallet-demo-compose:sharedLogic" whenEnabled enableWalletDemoCompose,
     "$applications:waltid-wallet-demo-compose:sharedUI" whenEnabled enableWalletDemoCompose,
     "$applications:waltid-wallet-demo-compose:androidApp" whenEnabled enableAndroidBuild,
+    "$applications:waltid-wallet-demo-compose:androidE2eTests" whenEnabled enableAndroidBuild,
     "$applications:waltid-wallet-demo-compose:iosApp" whenEnabled enableIosBuild,
     "$applications:waltid-wallet-demo-compose:webApp" whenEnabled enableWalletDemoComposeWeb,
 

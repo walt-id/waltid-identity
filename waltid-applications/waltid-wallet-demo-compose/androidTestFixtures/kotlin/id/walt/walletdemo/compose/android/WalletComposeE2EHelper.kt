@@ -16,7 +16,10 @@ import org.junit.Assert.assertTrue
 import java.io.ByteArrayOutputStream
 
 internal object WalletComposeE2EHelper {
-    private val walletPackage: String get() = InstrumentationRegistry.getInstrumentation().targetContext.packageName
+    private val walletPackage: String get() = InstrumentationRegistry.getArguments().getString("targetAppId")
+        ?: InstrumentationRegistry.getInstrumentation().targetContext.packageName
+    private const val SIGNING_PROTECTION_MODE_EXTRA =
+        "id.walt.walletdemo.compose.android.WALLET_SIGNING_PROTECTION_MODE"
     const val PIN = "1234"
     const val WALLET_READY_TIMEOUT = 60_000L
     const val UI_ELEMENT_TIMEOUT = 30_000L
@@ -42,9 +45,9 @@ internal object WalletComposeE2EHelper {
         "Present failed",
     )
 
-    fun launchAndUnlock(context: Context, device: UiDevice) {
+    fun launchAndUnlock(context: Context, device: UiDevice, initializeSigningIdentity: Boolean = true) {
         launch(context)
-        unlock(device)
+        unlock(device, initializeSigningIdentity)
     }
 
     /** Uses the normal setup UI; the operator approves each native signing prompt. */
@@ -100,7 +103,7 @@ internal object WalletComposeE2EHelper {
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             ?.apply {
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, signingProtectionMode)
+                putExtra(SIGNING_PROTECTION_MODE_EXTRA, signingProtectionMode)
             }
             ?: error("Cannot resolve launch intent for ${context.packageName}")
         context.startActivity(launchIntent)
@@ -149,15 +152,13 @@ internal object WalletComposeE2EHelper {
         val intent = Intent(
             Intent.ACTION_VIEW,
             Uri.parse(url),
-            context,
-            MainActivity::class.java,
-            ).apply {
+        ).setClassName(context.packageName, "id.walt.walletdemo.compose.android.MainActivity").apply {
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or
                     Intent.FLAG_ACTIVITY_SINGLE_TOP
             )
-            putExtra(WALLET_SIGNING_PROTECTION_MODE_EXTRA, signingProtectionMode)
+            putExtra(SIGNING_PROTECTION_MODE_EXTRA, signingProtectionMode)
         }
         context.startActivity(intent)
     }

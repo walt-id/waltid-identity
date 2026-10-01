@@ -230,17 +230,21 @@ treating it as a product regression.
 
 For signed DID presentation after a process restart, both iOS demos' `testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2`
 terminate and relaunch the app before previewing a signed `did:key` request and sharing the saved credential.
-Android instrumentation runs inside the app process, so its restart test requires two separate invocations.
-From the Identity repository root, pass an explicit emulator or device serial:
+Android's `MobileWalletRestartTest` runs in the self-instrumenting `androidE2eTests` module,
+separately from the wallet process. One test receives a credential, force-stops and relaunches the app,
+then presents the saved credential through a signed `did:key` request.
+From the Identity repository root, select an emulator or device:
 
 ```bash
-bash .github/scripts/mobile-ci/run-android-compose-cold-restart-test.sh emulator-5554
+ANDROID_SERIAL=emulator-5554 ./gradlew -PenableAndroidBuild=true \
+  :waltid-applications:waltid-wallet-demo-compose:androidE2eTests:connectedProductionDebugAndroidTest
 ```
 
-The script installs Production Debug once, force-stops the app between seed and presentation phases,
-and retains the wallet data. Both phases must report one successful test; the presentation phase also
-asserts cold resolver state, unchanged identity and credential IDs, and verifier success.
-CI runs these phases in the Android Compose demo lane; the native and Compose iOS lanes run
+The test clears wallet app data before setup and preserves it across the restart. It checks that the
+wallet process ended, the runner survived, credential IDs and signing DID/key ID stayed unchanged,
+and the exact verifier session succeeded. `androidTestFixtures/` shares the demo UI helpers between
+the in-process app tests and external tests. CI runs the test in the Android Compose demo lane and
+publishes its standard JUnit report alongside the app tests. The native and Compose iOS lanes run
 the corresponding receive-and-present tests.
 
 Identity document provider configuration is checked on the built products rather than on the source
