@@ -208,10 +208,57 @@ class Issuer2CredentialProofValidationTest {
         })
     }
 
-    private suspend fun prepareFlow(client: HttpClient): ProofTestFlow {
+    @Test
+    fun `standalone W3C attestation verifies holder DIDs and permits retry after a mismatched key`() = testApplication {
+        val attester = JWKKey.generate(KeyType.secp256r1)
+        val attesterJwk = attester.getPublicKey().exportJWKObject()
+        installIssuer2WithConfigFiles(configureServiceConfig = { it.copy(
+            keyAttestationConfig = KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(attesterJwk)),
+            clientAuthenticationConfig = ClientAuthenticationConfig(listOf(ClientAuthenticationMethodConfig.PreAuthAnonymous)),
+        ) })
+        val flow = prepareFlow(apiClient(), Issuer2CredentialScenarios.openBadgeCredential)
+        val holders = List(2) { JWKKey.generate(KeyType.secp256r1) }
+        val dids = holders.map { DidJwkRegistrar().registerByKey(it, DidJwkCreateOptions(KeyType.secp256r1)).did }
+        val nonce = flow.nonce()
+        for (valid in listOf(false, true)) {
+            val jwt = attester.signJws(buildJsonObject {
+                put("iat", Clock.System.now().epochSeconds)
+                put("nonce", nonce)
+                put("attested_keys", JsonArray(holders.mapIndexed { index, holder ->
+                    val did = if (!valid && index == 1) dids[0] else dids[index]
+                    JsonObject(holder.getPublicKey().exportJWKObject() + ("kid" to JsonPrimitive("$did#0")))
+                }))
+            }.toString().encodeToByteArray(), mapOf("typ" to JsonPrimitive("key-attestation+jwt")))
+            val example = Issuer2RequestExamples.W3C_CREDENTIAL_REQUEST_WITH_ATTESTATION_PROOF
+            val response = flow.client.post(flow.resolvedOffer.issuerMetadata.credentialEndpoint) {
+                bearerAuth(flow.accessToken)
+                contentType(ContentType.Application.Json)
+                setBody(JsonObject(example + ("proofs" to buildJsonObject {
+                    put(ProofType.ATTESTATION.value, JsonArray(listOf(JsonPrimitive(jwt))))
+                })))
+            }
+            if (!valid) {
+                assertRejectedCredentialRequest(response)
+                assertEquals(IssuanceSessionStatus.ACTIVE, flow.client.getSession(flow.sessionId).status)
+            } else {
+                assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+                val credentials = response.body<JsonObject>().getValue("credentials").jsonArray
+                assertEquals(dids, credentials.map {
+                    val encoded = it.jsonObject.getValue("credential").jsonPrimitive.content.split('.')[1]
+                    kotlinx.serialization.json.Json.parseToJsonElement(Base64.UrlSafe.decode(encoded).decodeToString())
+                        .jsonObject.getValue("sub").jsonPrimitive.content
+                })
+            }
+        }
+    }
+
+    private suspend fun prepareFlow(
+        client: HttpClient,
+        scenario: Issuer2CredentialScenario = Issuer2CredentialScenarios.identitySdJwt,
+    ): ProofTestFlow {
         val walletFlow = Issuer2WalletFlowDriver(client)
         val createdOffer = client.createWalletFlowCredentialOffer(
-            scenario = Issuer2CredentialScenarios.identitySdJwt,
+            scenario = scenario,
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
             txCodeMode = Issuer2TxCodeMode.NONE,
         )
