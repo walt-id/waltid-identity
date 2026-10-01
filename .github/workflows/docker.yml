@@ -36,6 +36,9 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
+    # Multi-arch Node/Alpine builds can deadlock under QEMU and otherwise sit until
+    # the 6h default job timeout. Successful images here finish in well under 15m.
+    timeout-minutes: 40
     needs: docker-matrix
     strategy:
       fail-fast: false
