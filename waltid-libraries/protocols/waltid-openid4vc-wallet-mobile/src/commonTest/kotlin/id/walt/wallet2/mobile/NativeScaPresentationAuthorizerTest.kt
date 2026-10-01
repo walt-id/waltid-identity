@@ -8,6 +8,7 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.wallet2.persistence.keys.*
+import id.walt.wallet2.consent.PaymentConsentException
 import io.ktor.http.URLBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -42,6 +43,52 @@ class NativeScaPresentationAuthorizerTest {
             assertEquals(1, fixture.signatures)
             assertFails { fixture.submit(preview) } // Successful reviewed request is single-use.
         }
+    }
+
+    @Test
+    fun platformConfirmedDcApiStillEnforcesNativeAuthorizationAndSingleUse() = test {
+        for (policy in listOf(KeyUseAuthorizationPolicy.BiometricCurrentSet, KeyUseAuthorizationPolicy.None)) {
+            val fixture = fixture()
+            fixture.provider.policy = policy
+            val preview = fixture.preview()
+            val selections = preview.credentialOptions.map {
+                MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+            }
+            suspend fun submit() = fixture.wallet.submitDigitalCredentialPresentation(preview.requestId, selections)
+            if (policy == KeyUseAuthorizationPolicy.None) {
+                assertFailsWith<KeyUseAuthorizationException> { submit() }
+                assertEquals(0, fixture.provider.inspections)
+                assertEquals(0, fixture.signatures)
+            } else {
+                val response = submit()
+                val vp = Json.parseToJsonElement(response.dataJson).jsonObject.getValue("vp_token")
+                    .jsonObject.getValue("payment").jsonArray.single().jsonPrimitive.content
+                val verified = CompactJws.verify(vp.substringAfterLast('~'), fixture.key, JwsAlgorithm.ES256)
+                val claims = Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject
+                assertEquals("origin:https://verifier.example", claims["aud"]?.jsonPrimitive?.content)
+                assertEquals("dc_api", claims["response_mode"]?.jsonPrimitive?.content)
+                assertEquals(1, claims.getValue("transaction_data_hashes").jsonArray.size)
+                assertEquals(1, fixture.provider.inspections)
+                assertEquals(1, fixture.signatures)
+                assertFails { submit() }
+                assertEquals(1, fixture.signatures)
+            }
+        }
+    }
+
+    @Test
+    fun appReviewedDcApiRejectsAnInvalidRevisionBeforeNativeAuthorization() = test {
+        val fixture = fixture()
+        val preview = fixture.preview()
+        val selections = preview.credentialOptions.map {
+            MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+        }
+        assertNotNull(fixture.wallet.prepareDigitalCredentialPaymentConsent(preview.requestId, selections))
+        assertFailsWith<PaymentConsentException> {
+            fixture.wallet.submitDigitalCredentialPresentation(preview.requestId, selections, paymentConsentRevision = "wrong")
+        }
+        assertEquals(0, fixture.provider.inspections)
+        assertEquals(0, fixture.signatures)
     }
 
     @Test

@@ -2,7 +2,7 @@
 
 The demo issues a synthetic payment card and presents one nested
 `urn:eudi:sca:payment:1` transaction using the existing TS-12 proof and native
-signing support with authoritative, localized consent. This is not a registered banking attestation, certified wallet
+signing support with authoritative, localized app review when enabled. This is not a registered banking attestation, certified wallet
 or complete regulated SCA implementation.
 
 ## Service setup
@@ -44,14 +44,20 @@ authorizations. Display normalization must not change either proof's input.
 The selected credential designates its SCA type metadata; verifier profile allowlists
 remain admission controls, not the authority for payment instructions. The demos
 independently pin the issuer's public key. A different deployment requires matching
-issuer URL, VCT and key configuration. Missing trust configuration blocks payment.
+issuer URL, VCT and key configuration. Missing trust configuration blocks authoritative app review.
 
 Shared Kotlin authenticates the credential and prepares one localized consent snapshot.
 Compose Android/iOS and SwiftUI render that model before submitting its opaque revision.
 The revision binds the request, selected credentials/disclosures, signing key and locales;
-missing or changed consent blocks the whole selection before signing. Failed attempts
-require fresh review; URL submissions also require a new preview. The immediate
-presentation shortcut cannot bypass consent. Dismissal/expiry cancels in-flight work.
+invalid or stale revisions block app-reviewed submissions before signing. URL payments
+also reject missing revisions. Failed app-reviewed attempts require fresh review;
+URL submissions also require a new preview. The immediate
+URL presentation shortcut cannot bypass consent. Dismissal/expiry cancels in-flight work.
+
+Android DC-API submissions without an app-review revision rely on platform confirmation,
+including when **Show wallet review** is disabled. They do not resolve the authoritative
+display metadata. Native SCA authorization and transaction-byte binding remain enforced;
+Credential Manager's payment summary does not establish TS-12 display conformance.
 
 This slice supports one SD-JWT authorizing credential plus ordinary disclosures:
 
@@ -75,7 +81,7 @@ This slice supports one SD-JWT authorizing credential plus ordinary disclosures:
 
 Unknown payment fields, unsupported currencies, scheduling/recurrence, arbitrary JSON
 Schema and inherited metadata block consent. PaSO, offline metadata caching and Wallet2
-HTTP-service consent are outside this slice. Legacy mdoc retains generic mandatory review.
+HTTP-service consent are outside this slice. Legacy mdoc uses generic review when enabled.
 
 The contract pins [TS-12 v1.0.1](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/blob/ee91a294c833af5188726fd8c302c641212192aa/docs/technical-specifications/ts12-electronic-payments-SCA-implementation-with-wallet.md)
 and [SD-JWT VC draft 16 metadata](https://www.ietf.org/archive/id/draft-ietf-oauth-sd-jwt-vc-16.html#section-4).
@@ -127,7 +133,7 @@ case require the service configuration described above.
 For a local service deployment, this Gradle task accepts explicit
 `-Ppayment.issuerUrl=https://...` and `-Ppayment.verifierUrl=https://...` overrides.
 The app fixtures use their configured demo endpoints. Missing required issuer
-instructions prevent payment authorization and signing.
+instructions prevent app-reviewed payment authorization and signing.
 
 ## Physical acceptance
 

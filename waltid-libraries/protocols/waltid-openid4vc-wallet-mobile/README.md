@@ -146,7 +146,7 @@ does not establish verifier trust and does not expose verifier key material.
 
 Configure `MobileWalletConfig.paymentCredentialIssuers` with independently trusted
 issuer URLs and public JWKs, and set `preferredLocales`. An empty trust list blocks
-SD-JWT payments. After preview and selection, prepare the authoritative review:
+authoritative payment review. After preview and selection, prepare the review:
 
 ```kotlin
 val consent = wallet.preparePaymentConsent(
@@ -165,8 +165,10 @@ wallet.submitPresentation(
 
 A null result means no SD-JWT TS-12 payment requires review. A
 `PaymentConsentException` blocks submission; do not fall back to generic labels.
-Android DC API uses `prepareDigitalCredentialPaymentConsent` and passes the same
-revision to `submitDigitalCredentialPresentation`. Discard abandoned previews.
+For app-reviewed Android DC API payments, use `prepareDigitalCredentialPaymentConsent`
+and pass its revision to `submitDigitalCredentialPresentation`. Hosts relying on platform
+confirmation instead omit the revision; this does not qualify the platform's display as
+TS-12 conformant. Native SCA authorization is enforced on both paths. Discard abandoned previews.
 After changing selections, prepare/display a new review. Reusing an acknowledgment
 after failure or cancellation is rejected. The immediate `present` API cannot
 satisfy payment consent. See [supported scope and rollout](../../../docs/ts12-sca-payment-demo.md).

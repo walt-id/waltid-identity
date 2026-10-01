@@ -631,6 +631,9 @@ public class MobileWallet internal constructor(
 
     /**
      * Builds a response for a retained Digital Credentials preview. No network transport is performed.
+     * Without [paymentConsentRevision], the host is responsible for platform-confirmed payment consent.
+     * A supplied revision is checked against the prepared app review. Native SCA authorization applies
+     * to both paths.
      */
     public suspend fun submitDigitalCredentialPresentation(
         requestId: String,
@@ -656,7 +659,7 @@ public class MobileWallet internal constructor(
             transactionDataTypeRegistry = transactionDataProfiles.toTransactionDataTypeRegistry(),
             onEvent = ::emitSessionEvent,
             scaAuthorizer = scaAuthorizer,
-            paymentConsentPolicy = paymentConsentPolicy,
+            paymentConsentPolicy = paymentConsentPolicy.takeIf { paymentConsentRevision != null },
         )
         return response.toMobileDigitalCredentialResponse()
     }
