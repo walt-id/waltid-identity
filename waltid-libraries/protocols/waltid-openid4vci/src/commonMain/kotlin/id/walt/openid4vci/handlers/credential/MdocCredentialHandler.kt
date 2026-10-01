@@ -86,7 +86,6 @@ class MdocCredentialHandler(
                 configuration = configuration,
                 issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                     MdocCredentialSigner.generateMdocCredential(
-                        credentialRequest = request,
                         credentialData = instance.input.credentialData,
                         issuerKey = issuerKey,
                         issuerCertificate = certificateChain,
@@ -139,7 +138,6 @@ class MdocCredentialHandler(
             validUntil = validUntil,
             issue = { certificateChain, docType, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                 MdocCredentialSigner.generateMdocCredential(
-                    credentialRequest = request,
                     credentialData = instance.input.credentialData,
                     issuerKey = issuerKey.key,
                     signatureAlgorithm = issuerKey.requireCoseAlgorithm(),

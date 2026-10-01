@@ -11,9 +11,7 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.objects.document.IssuerSigned
-import id.walt.openid4vci.DefaultClient
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
-import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
+import id.walt.openid4vci.proofs.VerifiedJwtProof
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
@@ -77,7 +75,6 @@ class MdocCredentialSignerKeyAuthorizationsTest {
 
     private suspend fun issueMdoc(authorizedTransactionDataTypes: List<String>?) =
         MdocCredentialSigner.generateMdocCredential(
-            credentialRequest = credentialRequest(),
             credentialData = buildJsonObject {
                 putJsonObject(SCA_DOC_TYPE) {
                     put("card_scheme", "visa")
@@ -97,22 +94,8 @@ class MdocCredentialSignerKeyAuthorizationsTest {
                 .keyAuthorizations
         }
 
-    private fun credentialRequest() = DefaultCredentialRequest(
-        client = DefaultClient(
-            id = "test-client",
-            redirectUris = emptyList(),
-            grantTypes = emptySet(),
-            responseTypes = emptySet(),
-        ),
-        credentialIdentifier = null,
-        credentialConfigurationId = SCA_DOC_TYPE,
-        proofs = null,
-        credentialResponseEncryption = null,
-    )
-
     // Supplying the verified proof directly keeps the test on the signer, not on proof validation.
-    private suspend fun verifiedProof() = VerifiedCredentialProof(
-        proofType = "jwt",
+    private suspend fun verifiedProof() = VerifiedJwtProof(
         jwt = "",
         algorithm = "ES256",
         header = buildJsonObject { },
