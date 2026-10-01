@@ -266,6 +266,22 @@ internal class MobileDemoWallet(
     override suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome =
         mobileWallet.cancelIssuance(sessionId).toDemoIssuanceOutcome()
 
+    override suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String?,
+        notificationEndpoint: String?,
+        eventDescription: String?,
+    ) {
+        mobileWallet.rejectIssuedCredential(
+            notificationId = notificationId,
+            accessToken = accessToken,
+            credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+            notificationEndpoint = notificationEndpoint,
+            eventDescription = eventDescription,
+        )
+    }
+
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome =
         mobileWallet.resumeDeferredIssuance(deferredCredentialId).toDemoIssuanceOutcome()
 
