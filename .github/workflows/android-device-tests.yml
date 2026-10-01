@@ -92,7 +92,7 @@ jobs:
             ~/.android/avd/dc-api-api37-pixel7-google-apis.avd
             ~/.android/adbkey
             ~/.android/adbkey.pub
-          key: dc-api-avd-v6-minimal-${{ runner.os }}-api37-x86_64-pixel7-disk6g-emulator-37.1.11-platform-tools-37.0.1-system-image-6.5.11-${{ hashFiles('waltid-identity/.github/workflows/android-device-tests.yml', 'waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
+          key: dc-api-avd-v6-minimal-${{ runner.os }}-api37-x86_64-pixel7-disk6g-emulator-37.1.11-platform-tools-37.0.1-system-image-6.5.11-${{ hashFiles('waltid-identity/.github/workflows/android-device-tests.yml', 'waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/install-android-dc-api-emulator.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
 
       - name: Report DC API AVD cache state
         if: matrix.phase == 'dc-api-compose'
@@ -149,6 +149,7 @@ jobs:
           disk-size: 6G
           emulator-options: ${{ steps.android-device-phase.outputs.emulator_options }}
           disable-animations: true
+          pre-emulator-launch-script: bash ./waltid-identity/.github/scripts/mobile-ci/install-android-dc-api-emulator.sh
           script: ./waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh
 
       - name: Save configured DC API AVD baseline
@@ -160,7 +161,7 @@ jobs:
             ~/.android/avd/dc-api-api37-pixel7-google-apis.avd
             ~/.android/adbkey
             ~/.android/adbkey.pub
-          key: dc-api-avd-v6-minimal-${{ runner.os }}-api37-x86_64-pixel7-disk6g-emulator-37.1.11-platform-tools-37.0.1-system-image-6.5.11-${{ hashFiles('waltid-identity/.github/workflows/android-device-tests.yml', 'waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
+          key: dc-api-avd-v6-minimal-${{ runner.os }}-api37-x86_64-pixel7-disk6g-emulator-37.1.11-platform-tools-37.0.1-system-image-6.5.11-${{ hashFiles('waltid-identity/.github/workflows/android-device-tests.yml', 'waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh', 'waltid-identity/.github/scripts/mobile-ci/install-android-dc-api-emulator.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-device.sh', 'waltid-identity/.github/scripts/mobile-ci/prepare-android-dc-api-avd.sh') }}
 
       - name: Run Android device tests
         if: matrix.phase != 'dc-api-compose'
@@ -188,6 +189,7 @@ jobs:
           disk-size: 6G
           emulator-options: ${{ steps.android-device-phase.outputs.emulator_options }}
           disable-animations: true
+          pre-emulator-launch-script: bash ./waltid-identity/.github/scripts/mobile-ci/install-android-dc-api-emulator.sh
           script: ${{ steps.android-device-phase.outputs.script }}
 
       - name: Publish Android device test report
