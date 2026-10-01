@@ -4,8 +4,8 @@ import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.KeyAttestationsRequired
-import id.walt.openid4vci.metadata.issuer.ProofType
-import id.walt.openid4vci.prooftypes.ProofTypeId
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
+import id.walt.openid4vci.proofs.ProofType
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
@@ -17,7 +17,7 @@ class CredentialConfigurationProofTypesTest {
             CredentialConfiguration(
                 format = CredentialFormat.SD_JWT_VC,
                 proofTypesSupported = mapOf(
-                    ProofTypeId.JWT.value to ProofType(proofSigningAlgValuesSupported = emptySet()),
+                    ProofType.JWT.value to ProofTypeMetadata(proofSigningAlgValuesSupported = emptySet()),
                 ),
             )
         }
@@ -40,7 +40,7 @@ class CredentialConfigurationProofTypesTest {
             CredentialConfiguration(
                 format = CredentialFormat.SD_JWT_VC,
                 proofTypesSupported = mapOf(
-                    ProofTypeId.JWT.value to ProofType(proofSigningAlgValuesSupported = setOf("ES256")),
+                    ProofType.JWT.value to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256")),
                 ),
                 cryptographicBindingMethodsSupported = null,
             )
@@ -65,7 +65,7 @@ class CredentialConfigurationProofTypesTest {
                 format = CredentialFormat.SD_JWT_VC,
                 cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
                 proofTypesSupported = mapOf(
-                    "" to ProofType(proofSigningAlgValuesSupported = setOf("ES256")),
+                    "" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256")),
                 ),
             )
         }
@@ -77,7 +77,7 @@ class CredentialConfigurationProofTypesTest {
             format = CredentialFormat.SD_JWT_VC,
             cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
             proofTypesSupported = mapOf(
-                ProofTypeId.JWT.value to ProofType(
+                ProofType.JWT.value to ProofTypeMetadata(
                     proofSigningAlgValuesSupported = setOf("ES256"),
                     keyAttestationsRequired = KeyAttestationsRequired(
                         keyStorage = setOf("iso_18045_moderate"),
