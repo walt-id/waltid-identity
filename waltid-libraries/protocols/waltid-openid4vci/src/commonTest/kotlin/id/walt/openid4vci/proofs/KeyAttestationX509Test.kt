@@ -12,7 +12,7 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
-import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.proofs.attestation.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
@@ -32,6 +32,44 @@ class KeyAttestationX509Test {
         put("exp", Clock.System.now().epochSeconds + 7200)
         put("attested_keys", JsonArray(listOf(key.exportPublicJwkObject())))
     }.toString().encodeToByteArray()
+
+    @Test
+    fun `trusted chain with more than eight certificates is accepted`() = runTest {
+        val rootKey = key("root")
+        val leafKey = key("leaf")
+        val signatureAlgorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
+        val root = X509CertificateUtil.createSelfSignedCertificate(rootKey, signatureAlgorithm) {
+            subjectDn = "CN=Long Chain Root"
+            extensionBasicConstraints { cA = true }
+            extensionKeyUsage { addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign) }
+        }
+        val chain = mutableListOf(root)
+        var issuerKey = rootKey
+        repeat(7) { index ->
+            val intermediateKey = key("intermediate-$index")
+            chain += X509CertificateUtil.createCertificate(issuerKey, chain.last(), signatureAlgorithm) {
+                subjectDn = "CN=Intermediate $index"
+                subjectPublicKey(intermediateKey)
+                extensionBasicConstraints { cA = true }
+                extensionKeyUsage { addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign) }
+            }
+            issuerKey = intermediateKey
+        }
+        chain += X509CertificateUtil.createCertificate(issuerKey, chain.last(), signatureAlgorithm) {
+            subjectDn = "CN=Long Chain Attester"
+            subjectPublicKey(leafKey)
+            extensionKeyUsage { addKeyUsage(KeyUsageExtension.KeyUsage.digitalSignature) }
+        }
+        val header = buildJsonObject {
+            put("typ", "key-attestation+jwt")
+            put("x5c", JsonArray(chain.asReversed().map { JsonPrimitive(Base64.encode(it.encodedDer.toByteArray())) }))
+        }
+        val jwt = CompactJws.sign(payload(leafKey), leafKey, JwsAlgorithm.ES256, header)
+        val options = KeyAttestationConfig(KeyAttestationVerificationMethod.X509Chain(listOf(root.encodedPem))).toVerificationOptions()
+        val evidence = KeyAttestationVerifier().verify(jwt, ProofTypeMetadata(setOf("ES256")), context, configuration, options)
+        assertEquals(9, chain.size)
+        assertEquals(Jwk.sha256Thumbprint(leafKey.exportPublicJwk()), Jwk.sha256Thumbprint(evidence.attesterKey.exportPublicJwk()))
+    }
 
     @Test
     fun `duplicate subject cannot substitute an untrusted leaf`() = runTest {
@@ -60,7 +98,7 @@ class KeyAttestationX509Test {
         val jwt = CompactJws.sign(payload(attackerKey), attackerKey, JwsAlgorithm.ES256, header)
         val options = KeyAttestationConfig(KeyAttestationVerificationMethod.X509Chain(listOf(root.encodedPem))).toVerificationOptions()
         assertFailsWith<CredentialProofValidationException> {
-            KeyAttestationVerifier().verify(jwt, ProofType(setOf("ES256")), context, configuration, options)
+            KeyAttestationVerifier().verify(jwt, ProofTypeMetadata(setOf("ES256")), context, configuration, options)
         }
     }
 
@@ -90,6 +128,7 @@ class KeyAttestationX509Test {
             put("iat", Clock.System.now().epochSeconds)
             put("exp", Clock.System.now().epochSeconds + 300)
             put("iss", "untrusted-hint")
+            put("nonce", "test-nonce")
             put("attested_keys", JsonArray(listOf(attackerKey.exportPublicJwkObject())))
         }.toString().encodeToByteArray()
         val jwt = CompactJws.sign(payload, leafKey, JwsAlgorithm.ES256, header)
@@ -97,8 +136,18 @@ class KeyAttestationX509Test {
         val verifier = KeyAttestationVerifier()
         val context = CredentialProofValidationContext("https://issuer.example")
         val configuration = CredentialConfiguration(CredentialFormat.SD_JWT_VC, vct = "identity")
-        val evidence = verifier.verify(jwt, ProofType(setOf("ES256")), context, configuration, options)
+        val evidence = verifier.verify(jwt, ProofTypeMetadata(setOf("ES256")), context, configuration, options)
         assertEquals(Jwk.sha256Thumbprint(leafKey.exportPublicJwk()), Jwk.sha256Thumbprint(evidence.attesterKey.exportPublicJwk()))
+        val nonceService = object : CredentialNonceService {
+            override suspend fun issue(binding: CredentialNonceBinding) = IssuedCredentialNonce("test-nonce")
+            override suspend fun validate(nonce: String, binding: CredentialNonceBinding) =
+                if (nonce == "test-nonce") CredentialNonceValidationResult.VALID else CredentialNonceValidationResult.INVALID
+        }
+        val standaloneContext = context.copy(nonceValidation = CredentialNonceValidationContext(nonceService,
+            CredentialNonceBinding(context.credentialIssuer, "https://issuer.example/credential", "https://issuer.example/nonce")))
+        val standalone = verifier.verify(jwt, ProofTypeMetadata(setOf("ES256")), standaloneContext, configuration, options,
+            KeyAttestationUsage.STANDALONE_PROOF)
+        assertEquals(Jwk.sha256Thumbprint(attackerKey.exportPublicJwk()), Jwk.sha256Thumbprint(standalone.attestedKeys.single().exportPublicJwk()))
         // The shared builder can omit a disconnected cycle. The attestation
         // adapter must reject it even when the remaining leaf/root path is trusted.
         val keyA = key("cycle-a")
@@ -114,7 +163,7 @@ class KeyAttestationX509Test {
             subjectDn = "CN=Cycle A"
             subjectPublicKey(keyA)
         }
-        for (certificates in listOf(listOf(root, leaf), listOf(leaf, root, leaf), listOf(leaf, root, certificateA, certificateB))) {
+        for (certificates in listOf(emptyList(), listOf(root, leaf), listOf(leaf, root, leaf), listOf(leaf, root, certificateA, certificateB))) {
             val malformedHeader = JsonObject(header + ("x5c" to JsonArray(certificates.map {
                 JsonPrimitive(Base64.encode(it.encodedDer.toByteArray()))
             })))
@@ -123,6 +172,9 @@ class KeyAttestationX509Test {
         }
         val forged = CompactJws.sign(payload, attackerKey, JwsAlgorithm.ES256, header)
         assertFailsWith<CredentialProofValidationException> { verifier.verify(forged, null, context, configuration, options) }
+        assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(forged, null, standaloneContext, configuration, options, KeyAttestationUsage.STANDALONE_PROOF)
+        }
         val untrusted = KeyAttestationConfig(KeyAttestationVerificationMethod.X509Chain(listOf(root(attackerKey).encodedPem))).toVerificationOptions()
         assertFailsWith<CredentialProofValidationException> { verifier.verify(jwt, null, context, configuration, untrusted) }
     }

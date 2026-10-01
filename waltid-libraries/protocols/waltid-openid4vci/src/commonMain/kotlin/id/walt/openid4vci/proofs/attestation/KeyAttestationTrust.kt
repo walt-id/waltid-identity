@@ -84,8 +84,8 @@ internal suspend fun createKeyAttestationTrustResolver(
             attestationInput {
                 val certificates = header["x5c"] as? JsonArray
                     ?: throw invalidCredentialProof("Key attestation x5c chain is required")
-                if (certificates.isEmpty() || certificates.size > 8) {
-                    throw invalidCredentialProof("Key attestation certificate chain must contain 1 to 8 certificates")
+                if (certificates.isEmpty()) {
+                    throw invalidCredentialProof("Key attestation certificate chain must not be empty")
                 }
                 val chain = certificates.map { element ->
                     val encoded = (element as? JsonPrimitive)?.takeIf { it.isString }?.content
