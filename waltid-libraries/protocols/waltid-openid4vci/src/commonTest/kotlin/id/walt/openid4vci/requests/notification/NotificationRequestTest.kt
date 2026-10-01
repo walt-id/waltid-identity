@@ -1,5 +1,6 @@
 package id.walt.openid4vci.requests.notification
 
+import id.walt.openid4vci.json.jsonHasDuplicateMembers
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
