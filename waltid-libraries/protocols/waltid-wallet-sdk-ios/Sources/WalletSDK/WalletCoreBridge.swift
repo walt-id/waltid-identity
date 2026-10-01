@@ -14,6 +14,13 @@ protocol WalletCoreBridge: Sendable {
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
+    func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL?,
+        notificationEndpoint: URL?,
+        eventDescription: String?
+    ) async throws
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
     func credentials() async throws -> [Credential]
     func deleteCredential(id: String) async throws -> Bool
@@ -109,6 +116,16 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     }
 
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
+        throw unavailableError()
+    }
+
+    func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL?,
+        notificationEndpoint: URL?,
+        eventDescription: String?
+    ) async throws {
         throw unavailableError()
     }
 

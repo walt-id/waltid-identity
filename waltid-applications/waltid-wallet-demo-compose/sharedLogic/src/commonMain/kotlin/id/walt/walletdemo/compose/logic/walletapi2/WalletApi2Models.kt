@@ -365,3 +365,71 @@ internal data class PollDeferredRequestDto(
     val credentialConfigurationId: String? = null,
     val keyId: String? = null,
 )
+
+@Serializable
+internal data class RequestTokenRequestDto(
+    val tokenEndpoint: String,
+    val preAuthorizedCode: String,
+    val credentialIssuer: String? = null,
+    val txCode: String? = null,
+    val clientId: String = WalletApi2DefaultClientId,
+    val redirectUri: String? = null,
+)
+
+@Serializable
+internal data class RequestTokenResultDto(
+    val accessToken: String,
+    val expiresIn: Long? = null,
+    val tokenType: String? = null,
+)
+
+@Serializable
+internal data class RequestNonceRequestDto(
+    val credentialIssuer: String,
+)
+
+@Serializable
+internal data class RequestNonceResultDto(
+    val nonce: String? = null,
+)
+
+@Serializable
+internal data class SignProofRequestDto(
+    val issuerUrl: String,
+    val credentialConfigurationId: String,
+    val nonce: String? = null,
+    val keyId: String? = null,
+    val did: String? = null,
+    val clientId: String? = null,
+)
+
+@Serializable
+internal data class SignProofResultDto(
+    val proofJwt: String,
+)
+
+@Serializable
+internal data class FetchCredentialRequestDto(
+    val credentialEndpoint: String,
+    val accessToken: String,
+    val credentialConfigurationId: String,
+    val proofJwt: String? = null,
+    val storeInWallet: Boolean = false,
+    val credentialIssuerBaseUrl: String? = null,
+    val keyId: String? = null,
+)
+
+@Serializable
+internal data class FetchCredentialResultDto(
+    val rawCredentials: List<String> = emptyList(),
+    val notificationId: String? = null,
+)
+
+@Serializable
+internal data class RejectIssuedCredentialRequestDto(
+    val notificationId: String,
+    val accessToken: String,
+    val credentialIssuerBaseUrl: String? = null,
+    val notificationEndpoint: String? = null,
+    val eventDescription: String? = null,
+)

@@ -103,6 +103,12 @@ val credentialIds = (outcome as? WalletIssuanceOutcome.Stored)?.credentialIds
     ?: error("Issuance did not store credentials: $outcome")
 ```
 
+Continuing a session posts OpenID4VCI `credential_accepted` when the issuer
+advertised a notification endpoint. After an isolated fetch that left
+`storeInWallet` false, call `wallet.rejectIssuedCredential(...)` to post
+`credential_deleted` instead of storing the credential. Offer-level
+`cancelIssuance` has no `notification_id` yet.
+
 `MobileWalletCredentialOffer.Uri` is used for deep-link / QR offers.
 `MobileWalletCredentialOffer.InlineJson` is the Credential Offer object from an
 OpenID4VCI Digital Credentials create request (`openid4vci-v1`, plus historical

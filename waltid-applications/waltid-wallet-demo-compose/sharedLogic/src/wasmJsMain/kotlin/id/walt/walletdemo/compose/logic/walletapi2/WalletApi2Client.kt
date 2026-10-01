@@ -144,6 +144,46 @@ internal class WalletApi2Client(
             post("/wallet/$walletId/credentials/receive/authorized") { jsonBody(request) }
         }.body()
 
+    suspend fun requestToken(
+        walletId: String,
+        request: RequestTokenRequestDto,
+    ): RequestTokenResultDto =
+        request {
+            post("/wallet/$walletId/credentials/receive/request-token") { jsonBody(request) }
+        }.body()
+
+    suspend fun requestNonce(walletId: String, credentialIssuer: String): RequestNonceResultDto =
+        request {
+            post("/wallet/$walletId/credentials/receive/request-nonce") {
+                jsonBody(RequestNonceRequestDto(credentialIssuer = credentialIssuer))
+            }
+        }.body()
+
+    suspend fun signProof(
+        walletId: String,
+        request: SignProofRequestDto,
+    ): SignProofResultDto =
+        request {
+            post("/wallet/$walletId/credentials/receive/sign-proof") { jsonBody(request) }
+        }.body()
+
+    suspend fun fetchCredential(
+        walletId: String,
+        request: FetchCredentialRequestDto,
+    ): FetchCredentialResultDto =
+        request {
+            post("/wallet/$walletId/credentials/receive/fetch-credential") { jsonBody(request) }
+        }.body()
+
+    suspend fun rejectIssuedCredential(
+        walletId: String,
+        request: RejectIssuedCredentialRequestDto,
+    ) {
+        request(HttpStatusCode.NoContent) {
+            post("/wallet/$walletId/credentials/receive/reject") { jsonBody(request) }
+        }
+    }
+
     suspend fun previewPresentation(
         walletId: String,
         requestUrl: String,

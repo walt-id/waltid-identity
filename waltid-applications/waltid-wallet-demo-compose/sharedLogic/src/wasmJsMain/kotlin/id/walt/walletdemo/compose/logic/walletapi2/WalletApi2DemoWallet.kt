@@ -81,6 +81,9 @@ private class WalletApi2DemoWallet(
             credentialIssuer = resolved.credentialIssuer,
             credentialEndpoint = resolved.credentialEndpoint,
             nonceEndpoint = resolved.nonceEndpoint,
+            tokenEndpoint = resolved.tokenEndpoint,
+            preAuthorizedCode = resolved.preAuthorizedCode,
+            credentialConfigurationId = resolved.credentialConfigurationIds.firstOrNull(),
         )
         issuanceSessions[session.id] = session
         return WalletDemoIssuanceSession(
@@ -110,16 +113,17 @@ private class WalletApi2DemoWallet(
         transactionCode: String?,
     ): WalletDemoIssuanceOutcome {
         val session = requireIssuance(sessionId)
-        val result = client.receivePreAuthorized(
-            walletId = walletId,
-            offerUrl = session.offerUrl,
-            txCode = transactionCode,
-            did = session.did,
-            redirectUri = session.redirectUri,
-        )
+        val outcome = receivePreAuthorizedIsolated(session, transactionCode)
+            ?: client.receivePreAuthorized(
+                walletId = walletId,
+                offerUrl = session.offerUrl,
+                txCode = transactionCode,
+                did = session.did,
+                redirectUri = session.redirectUri,
+            ).toOutcome()
         issuanceSessions.remove(sessionId)
         WalletApi2BrowserSessionStore.clearPendingIssuance()
-        return result.toOutcome()
+        return outcome
     }
 
     override suspend fun continueAuthorizationIssuance(
@@ -167,6 +171,25 @@ private class WalletApi2DemoWallet(
         issuanceSessions.remove(sessionId)
         WalletApi2BrowserSessionStore.clearPendingIssuance()
         return WalletDemoIssuanceOutcome.Cancelled
+    }
+
+    override suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String?,
+        notificationEndpoint: String?,
+        eventDescription: String?,
+    ) {
+        client.rejectIssuedCredential(
+            walletId,
+            RejectIssuedCredentialRequestDto(
+                notificationId = notificationId,
+                accessToken = accessToken,
+                credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+                notificationEndpoint = notificationEndpoint,
+                eventDescription = eventDescription,
+            ),
+        )
     }
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome =
@@ -294,6 +317,52 @@ private class WalletApi2DemoWallet(
                 ?.also { issuanceSessions[it.id] = it }
             ?: error("Issuance session is missing")
 
+    private suspend fun receivePreAuthorizedIsolated(
+        session: Api2IssuanceSession,
+        transactionCode: String?,
+    ): WalletDemoIssuanceOutcome? {
+        val tokenEndpoint = session.tokenEndpoint ?: return null
+        val preAuthorizedCode = session.preAuthorizedCode ?: return null
+        val credentialConfigurationId = session.credentialConfigurationId ?: return null
+        val holderKeyId = keyId ?: return null
+        val before = client.listCredentialMetadata(walletId).map { it.id }.toSet()
+        val token = client.requestToken(
+            walletId,
+            RequestTokenRequestDto(
+                tokenEndpoint = tokenEndpoint,
+                preAuthorizedCode = preAuthorizedCode,
+                credentialIssuer = session.credentialIssuer,
+                txCode = transactionCode,
+                redirectUri = session.redirectUri,
+            ),
+        )
+        val nonce = session.nonceEndpoint?.let { client.requestNonce(walletId, session.credentialIssuer).nonce }
+        val proof = client.signProof(
+            walletId,
+            SignProofRequestDto(
+                issuerUrl = session.credentialIssuer,
+                credentialConfigurationId = credentialConfigurationId,
+                nonce = nonce,
+                keyId = holderKeyId,
+                did = session.did,
+            ),
+        )
+        client.fetchCredential(
+            walletId,
+            FetchCredentialRequestDto(
+                credentialEndpoint = session.credentialEndpoint,
+                accessToken = token.accessToken,
+                credentialConfigurationId = credentialConfigurationId,
+                proofJwt = proof.proofJwt,
+                storeInWallet = true,
+                credentialIssuerBaseUrl = session.credentialIssuer,
+                keyId = holderKeyId,
+            ),
+        )
+        val storedIds = client.listCredentialMetadata(walletId).map { it.id }.filter { it !in before }
+        return WalletDemoIssuanceOutcome.Stored(storedIds)
+    }
+
     private fun ReceiveCredentialResultDto.toOutcome(): WalletDemoIssuanceOutcome =
         if (deferredTransactionIds.isNotEmpty()) {
             WalletDemoIssuanceOutcome.Deferred(storedCredentialIds = credentialIds)
@@ -322,6 +391,8 @@ private data class Api2IssuanceSession(
     val credentialIssuer: String,
     val credentialEndpoint: String,
     val nonceEndpoint: String?,
+    val tokenEndpoint: String? = null,
+    val preAuthorizedCode: String? = null,
     val codeVerifier: String? = null,
     val authorizationState: String? = null,
     val credentialConfigurationId: String? = null,

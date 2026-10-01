@@ -176,6 +176,122 @@ class WalletIssuanceNotificationTest {
         assertEquals(listOf("credential_deleted"), notifications)
     }
 
+    @Test
+    fun isolatedFetchWithoutStoreDoesNotNotify() = runTest {
+        val notifications = mutableListOf<String>()
+        val result = WalletIssuanceHandler.fetchCredential(
+            wallet = wallet(),
+            request = FetchCredentialRequest(
+                credentialEndpoint = Url("$ISSUER/credential"),
+                accessToken = "access-token",
+                credentialConfigurationId = "pid",
+            ),
+            httpClient = issuanceClient(notifications),
+        )
+
+        assertEquals("notification-id", result.notificationId)
+        assertEquals(emptyList(), notifications)
+    }
+
+    @Test
+    fun isolatedFetchStoreInWalletPostsCredentialAccepted() = runTest {
+        val notifications = mutableListOf<String>()
+        val result = WalletIssuanceHandler.fetchCredential(
+            wallet = wallet(),
+            request = FetchCredentialRequest(
+                credentialEndpoint = Url("$ISSUER/credential"),
+                accessToken = "access-token",
+                credentialConfigurationId = "pid",
+                storeInWallet = true,
+                credentialIssuerBaseUrl = ISSUER,
+            ),
+            httpClient = issuanceClient(notifications),
+        )
+
+        assertEquals(1, result.rawCredentials.size)
+        assertEquals("notification-id", result.notificationId)
+        assertEquals("credential_accepted", notifications.single())
+    }
+
+    @Test
+    fun rejectIssuedCredentialPostsDeletedEvent() = runTest {
+        val notifications = mutableListOf<String>()
+        val client = issuanceClient(notifications)
+
+        WalletIssuanceHandler.rejectIssuedCredential(
+            request = RejectIssuedCredentialRequest(
+                notificationId = "notification-id",
+                accessToken = "access-token",
+                notificationEndpoint = "$ISSUER/notification",
+            ),
+            httpClient = client,
+        )
+
+        assertEquals(listOf("credential_deleted"), notifications)
+    }
+
+    @Test
+    fun rejectIssuedCredentialResolvesNotificationEndpointFromIssuerMetadata() = runTest {
+        val notifications = mutableListOf<String>()
+        val client = issuanceClient(notifications)
+
+        WalletIssuanceHandler.rejectIssuedCredential(
+            request = RejectIssuedCredentialRequest(
+                notificationId = "notification-id",
+                accessToken = "access-token",
+                credentialIssuerBaseUrl = ISSUER,
+            ),
+            httpClient = client,
+        )
+
+        assertEquals(listOf("credential_deleted"), notifications)
+    }
+
+    @Test
+    fun rejectIssuedCredentialIsNoOpWhenIssuerHasNoNotificationEndpoint() = runTest {
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    when (request.url.toString()) {
+                        "$ISSUER/.well-known/openid-credential-issuer" -> respondJson(
+                            """
+                            {
+                              "credential_issuer": "$ISSUER",
+                              "credential_endpoint": "$ISSUER/credential",
+                              "credential_configurations_supported": {
+                                "pid": { "format": "jwt_vc_json" }
+                              }
+                            }
+                            """
+                        )
+                        else -> error("Unexpected request: ${request.method.value} ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+
+        WalletIssuanceHandler.rejectIssuedCredential(
+            request = RejectIssuedCredentialRequest(
+                notificationId = "notification-id",
+                accessToken = "access-token",
+                credentialIssuerBaseUrl = ISSUER,
+            ),
+            httpClient = client,
+        )
+    }
+
+    @Test
+    fun rejectIssuedCredentialRequiresEndpointOrIssuerBaseUrl() {
+        val error = assertFails {
+            RejectIssuedCredentialRequest(
+                notificationId = "notification-id",
+                accessToken = "access-token",
+            )
+        }
+        assertTrue(error is IllegalArgumentException)
+    }
+
     private suspend fun wallet(store: WalletCredentialStore = RecordingCredentialStore()): Wallet =
         Wallet(
             id = "notification-wallet",
