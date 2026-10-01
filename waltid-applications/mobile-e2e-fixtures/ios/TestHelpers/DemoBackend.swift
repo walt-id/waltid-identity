@@ -110,11 +110,28 @@ public final class DemoBackend {
     // This independent pin must not be learned from the signed metadata JWT.
     private static let issuerMetadataSigningKeyThumbprint = "DOiRtPhc0Hre1XZwBVjx_YoGugtAEtWNrKCZ4zerXs4"
     private static let verifierBaseURL = URL(string: "https://verifier2.demo.walt.id")!
-    /// The public verifier requires this explicit client ID for signed request objects.
+    /// Pre-registered client ID trusted by the signed-request integration tests.
     public static let verifierClientID = "verifier2"
-    /// Pre-registered metadata for the ES256 request-object signing key currently served by verifier2.
-    /// This key is an independent trust anchor and must not be learned from the request object.
-    public static let verifierRequestObjectClientMetadataJSON = #"{"jwks":{"keys":[{"kty":"EC","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}]}}"#
+    // Independent public trust anchor; never learn this key from the request object.
+    private static let verifierRequestObjectSigningJWK: [String: String] = [
+        "kty": "EC",
+        "crv": "P-256",
+        "kid": "_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug",
+        "x": "G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0",
+        "y": "VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4",
+    ]
+    /// Pre-registered metadata for the demo's ES256 request-object signing key.
+    public static let verifierRequestObjectClientMetadataJSON = String(
+        // This fixed dictionary contains only JSON-encodable strings.
+        decoding: try! JSONEncoder().encode(["jwks": ["keys": [verifierRequestObjectSigningJWK]]]),
+        as: UTF8.self
+    )
+    // Public test key from verifier-service.conf; never use for production signing.
+    private static let verifierRequestSigningKey: [String: Any] = {
+        var jwk = verifierRequestObjectSigningJWK
+        jwk["d"] = "AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA"
+        return ["type": "jwk", "jwk": jwk]
+    }()
 
     private let client: WalletE2EClient
 
@@ -291,6 +308,7 @@ public final class DemoBackend {
         ]
         if signedRequest {
             coreFlow["clientId"] = Self.verifierClientID
+            coreFlow["key"] = Self.verifierRequestSigningKey
         }
         if let requestedSessionID {
             let responseURI = Self.verifierBaseURL
