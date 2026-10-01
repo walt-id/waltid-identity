@@ -14,6 +14,8 @@ actor MockWalletClient: WalletClient {
     private let transactionCodeRequired: Bool
     private let issuanceGrant: IssuanceGrant
     private let presentationPreviewResultOverride: PresentationPreviewResult?
+    private let paymentConsent: @Sendable () async throws -> PaymentConsent?
+    private(set) var submittedPaymentConsentRevisions: [String?] = []
     private let rejectionResult: PresentationResult
     private let responseEncryptionRequired: Bool
     private let mdocMetadata: Bool
@@ -32,6 +34,7 @@ actor MockWalletClient: WalletClient {
         transactionCodeRequired: Bool = false,
         issuanceGrant: IssuanceGrant = .preAuthorizedCode,
         presentationPreviewResult: PresentationPreviewResult? = nil,
+        paymentConsent: @escaping @Sendable () async throws -> PaymentConsent? = { nil },
         rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}")),
         responseEncryptionRequired: Bool = true,
         mdocMetadata: Bool = false,
@@ -47,6 +50,7 @@ actor MockWalletClient: WalletClient {
         self.transactionCodeRequired = transactionCodeRequired
         self.issuanceGrant = issuanceGrant
         self.presentationPreviewResultOverride = presentationPreviewResult
+        self.paymentConsent = paymentConsent
         self.rejectionResult = rejectionResult
         self.responseEncryptionRequired = responseEncryptionRequired
         self.mdocMetadata = mdocMetadata
@@ -156,12 +160,21 @@ actor MockWalletClient: WalletClient {
         )
     }
 
-    func submitPresentation(
+    func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
+    ) async throws -> PaymentConsent? { try await paymentConsent() }
+
+    func submitPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection],
+        did: String?,
+        paymentConsentRevision: String?
     ) async throws -> PresentationResult {
+        submittedPaymentConsentRevisions.append(paymentConsentRevision)
         try await delayOperation()
         return .transmitted(.succeeded(verifierResponseJSON: "{}"))
     }

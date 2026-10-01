@@ -54,13 +54,21 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult =
         wallet().previewPresentation(requestUrl)
 
+    override suspend fun preparePaymentConsent(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        did: String?,
+    ): WalletDemoPaymentConsent? = wallet().preparePaymentConsent(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did)
+
     override suspend fun submitPresentation(
         previewHandle: WalletDemoPresentationPreviewHandle,
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String?,
+        paymentConsentRevision: String?,
     ): WalletDemoOperationResult =
-        wallet().submitPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did)
+        wallet().submitPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did, paymentConsentRevision)
 
     override suspend fun rejectPresentation(previewHandle: WalletDemoPresentationPreviewHandle) =
         wallet().rejectPresentation(previewHandle)

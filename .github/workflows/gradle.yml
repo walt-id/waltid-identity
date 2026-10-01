@@ -26,6 +26,11 @@ on:
         required: false
         type: boolean
         default: false
+      run-payment-demo:
+        description: "Require deployed SD-JWT payment issuance and presentation acceptance"
+        required: false
+        type: boolean
+        default: false
       run-conformance:
         description: "Run the live OpenID4VP and OpenID4VCI conformance suites"
         required: false
@@ -83,6 +88,7 @@ jobs:
         run: test -f "$KLOGGING_CONFIG_PATH"
 
       - name: Configure gradle
+        id: gradle-setup
         uses: ./waltid-identity/.github/actions/gradle-setup-action
         with:
           # Restricted to pushes to main because Dependabot only consumes the default-branch
@@ -169,6 +175,17 @@ jobs:
           CI: "true"
           SKIP_LIVE_CONFORMANCE: "true"
           PLAYWRIGHT_INSTALL_WITH_DEPS: "false"
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
+      - name: Require public SD-JWT payment acceptance
+        if: ${{ !cancelled() && inputs.run-payment-demo && steps.gradle-setup.outcome == 'success' }}
+        timeout-minutes: 20
+        run: >-
+          ./gradlew :waltid-services:waltid-issuer-api2:paymentDemoTest
+          --max-workers=2 --console=plain
+        env:
+          CI: "true"
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 

@@ -148,7 +148,7 @@ object CredentialDisplayNormalizer {
                 }
             }
 
-            ClaimGroup(title = title, items = claimItems)
+            ClaimGroup(title = title, items = claimItems, transactionType = item.type)
         }
     }
 

@@ -48,10 +48,13 @@ internal fun SigningProtectionChoice(
 internal fun WalletDemoSigningProtection.title(): String = when (this) {
     WalletDemoSigningProtection.None -> "No biometric signing"
     WalletDemoSigningProtection.Biometric -> "Biometric signing"
+    WalletDemoSigningProtection.BiometricPerUse -> "Biometrics for every signature"
 }
 
 internal fun WalletDemoSigningProtection.description(): String = when (this) {
     WalletDemoSigningProtection.None -> "Private-key operations do not require biometric authorization."
     WalletDemoSigningProtection.Biometric ->
         "Strong biometric authorization can be reused for signing for 10 seconds."
+    WalletDemoSigningProtection.BiometricPerUse ->
+        "Approve every signature with current biometrics. Changing enrolled biometrics invalidates this key."
 }

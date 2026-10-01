@@ -1,26 +1,19 @@
-# -------- Stage 1: Build --------
-FROM node:20-alpine AS builder
+# Build on the runner's native arch. The Vite dist is platform-independent, and
+# Node/npm under QEMU on Alpine/ARM64 deadlocks in GitHub Actions.
+FROM --platform=$BUILDPLATFORM node:20-slim AS builder
 
 WORKDIR /app
 
-# Install dependencies first (better caching)
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# Copy source code
 COPY . .
-
-# Build the app
 RUN npm run build
 
+# 1.27-alpine matches the other frontend images. alpine3.23 + QEMU is a known hang.
+FROM nginxinc/nginx-unprivileged:1.27-alpine
 
-# -------- Stage 2: Production Server --------
-FROM nginxinc/nginx-unprivileged:alpine3.23-perl
-
-# Copy built files from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Copy custom nginx config (recommended for SPA routing)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 8080
