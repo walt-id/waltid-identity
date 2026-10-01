@@ -20,7 +20,7 @@ fun interface CredentialProofVerifier {
 /** Evidence is counted per submitted proof; bindings are counted per credential to issue. */
 data class CredentialProofVerificationResult(
     val proofs: List<VerifiedCredentialProof>,
-    val bindings: List<VerifiedCredentialBinding> = proofs.mapIndexed { index, proof -> proof.binding(index) },
+    val bindings: List<VerifiedCredentialBinding>,
 )
 
 /** A selected credential key. Identifiers belong to this key, never to the attester. */
@@ -45,8 +45,12 @@ data class CredentialProofValidationContext(
     }
 }
 
-data class VerifiedCredentialProof(
-    val proofType: String,
+/** Proof-specific evidence is extensible and is never used to infer issuance keys. */
+interface VerifiedCredentialProof {
+    val proofType: ProofType
+}
+
+data class VerifiedJwtProof(
     val jwt: String,
     val algorithm: String,
     val header: JsonObject,
@@ -56,10 +60,20 @@ data class VerifiedCredentialProof(
     val holderDid: String?,
     val nonce: String?,
     val keyAttestation: VerifiedKeyAttestation? = null,
-) {
+) : VerifiedCredentialProof {
+    override val proofType: ProofType = ProofType.JWT
     fun binding(proofIndex: Int = 0): VerifiedCredentialBinding =
         VerifiedCredentialBinding(holderKey, holderKid, holderDid, setOf(proofIndex))
 }
+
+data class VerifiedAttestationProof(
+    val attestation: VerifiedKeyAttestation
+) : VerifiedCredentialProof {
+    override val proofType: ProofType = ProofType.ATTESTATION
+}
+
+open class CredentialProofServiceException(message: String, cause: Throwable? = null) :
+    IllegalStateException(message, cause)
 
 class CredentialProofValidationException(
     val errorCode: String,
