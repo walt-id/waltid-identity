@@ -1,9 +1,17 @@
 package id.walt.issuer2.notifications
 
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
-import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
+import id.walt.did.dids.registrar.local.jwk.Crypto2DidJwkRegistrar
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.repository.IssuanceSessionStorageCodec
 import id.walt.issuer2.domain.IssuanceSessionStatus
@@ -730,12 +738,15 @@ class IssuanceNotificationRouteTest {
             assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
         }.body<JsonObject>()
         val nonce = assertNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull)
-        val proofKey = JWKKey.generate(KeyType.secp256r1)
-        val holderDid = DidJwkRegistrar()
-            .registerByKey(proofKey, DidJwkCreateOptions(KeyType.secp256r1))
+        val proofKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(GenerateSoftwareKeyRequest(
+            KeyId("holder-proof"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+        ))
+        val holderDid = Crypto2DidJwkRegistrar()
+            .createByKey(proofKey, DidJwkCreateOptions(KeyType.secp256r1))
             .did
         val validProofs = JwtProofBuilder().buildProof(
             key = proofKey,
+            algorithm = JwsAlgorithm.ES256,
             audience = issuerMetadata.credentialIssuer,
             nonce = nonce,
             binding = ProofKeyBinding.KeyId("$holderDid#0"),
