@@ -222,6 +222,12 @@ object OpenId4VciRoutesDocs {
                 example("[mdoc][jwt + key_attestation][two attested keys]") {
                     value = Issuer2RequestExamples.MDOC_CREDENTIAL_REQUEST_WITH_KEY_ATTESTATION
                 }
+                example("[SD-JWT][attestation][two attested keys]") {
+                    value = Issuer2RequestExamples.SD_JWT_CREDENTIAL_REQUEST_WITH_ATTESTATION_PROOF
+                }
+                example("[mdoc][attestation][two attested keys]") {
+                    value = Issuer2RequestExamples.MDOC_CREDENTIAL_REQUEST_WITH_ATTESTATION_PROOF
+                }
                 example("[batch][credential_configuration_id][two JWT proofs]") {
                     value = Issuer2RequestExamples.BATCH_CREDENTIAL_REQUEST_BY_CONFIGURATION_ID
                 }

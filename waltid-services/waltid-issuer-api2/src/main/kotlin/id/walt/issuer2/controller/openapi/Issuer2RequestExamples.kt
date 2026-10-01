@@ -448,6 +448,14 @@ object Issuer2RequestExamples {
         MDOC_CREDENTIAL_CONFIGURATION_ID, ProofType.JWT, EXAMPLE_JWT_WITH_KEY_ATTESTATION,
     )
 
+    val SD_JWT_CREDENTIAL_REQUEST_WITH_ATTESTATION_PROOF = credentialProofExample(
+        IDENTITY_SD_JWT_CONFIGURATION_ID, ProofType.ATTESTATION, EXAMPLE_KEY_ATTESTATION,
+    )
+
+    val MDOC_CREDENTIAL_REQUEST_WITH_ATTESTATION_PROOF = credentialProofExample(
+        MDOC_CREDENTIAL_CONFIGURATION_ID, ProofType.ATTESTATION, EXAMPLE_KEY_ATTESTATION,
+    )
+
     private fun credentialProofExample(configurationId: String, proofType: ProofType, jwt: String) = buildJsonObject {
         put("credential_configuration_id", configurationId)
         putJsonObject("proofs") {
