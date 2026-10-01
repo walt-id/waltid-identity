@@ -18,3 +18,5 @@ fi
   "-Pandroid.testInstrumentationRunnerArguments.notAnnotation=id.walt.mobile.test.PhysicalDeviceTest${ANDROID_TEST_NOT_ANNOTATION:+,$ANDROID_TEST_NOT_ANNOTATION}" \
   -PtransactionDataProfiles.url=https://wallet.demo.walt.id/wallet-api/transaction-data-profiles \
   --info
+
+"$script_dir/run-android-compose-cold-restart-test.sh" "$(adb get-serialno)"

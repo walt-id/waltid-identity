@@ -176,6 +176,8 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
     deleteDatabase: (databaseName: String) -> Unit,
     registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
 ): MobileWallet {
+    // Resolver state belongs to this process, including when all wallet keys already exist.
+    MobileDidSupport.ensureInitialized()
     val databaseName = "wallet_${config.walletId}"
     val databaseKeyProvider = when (val databaseKey = config.persistence.databaseKey) {
         is MobileWalletDatabaseKey.Managed -> managedDatabaseKeyProvider

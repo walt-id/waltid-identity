@@ -228,6 +228,21 @@ Run public-backend tests serially on iOS. The tests depend on public network
 services, so a transient simulator networking failure should be retried before
 treating it as a product regression.
 
+For signed DID presentation after a process restart, both iOS demos' `testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2`
+terminate and relaunch the app before previewing a signed `did:key` request and sharing the saved credential.
+Android instrumentation runs inside the app process, so its restart test requires two separate invocations.
+From the Identity repository root, pass an explicit emulator or device serial:
+
+```bash
+bash .github/scripts/mobile-ci/run-android-compose-cold-restart-test.sh emulator-5554
+```
+
+The script installs Production Debug once, force-stops the app between seed and presentation phases,
+and retains the wallet data. Both phases must report one successful test; the presentation phase also
+asserts cold resolver state, unchanged identity and credential IDs, and verifier success.
+CI runs these phases in the Android Compose demo lane; the native and Compose iOS lanes run
+the corresponding receive-and-present tests.
+
 Identity document provider configuration is checked on the built products rather than on the source
 `.entitlements` and `Info.plist` files, because the interesting values contain `$(AppIdentifierPrefix)`
 or come from `INFOPLIST_KEY_` build settings and can silently resolve to nothing. Run the same script

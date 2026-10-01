@@ -36,7 +36,7 @@ case "$phase" in
     script="ANDROID_TEST_NOT_CLASS=$compose_demo_excluded_classes ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
     emulator_options="-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
     report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**/*.xml"
-    artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**'
+    artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**\nwaltid-identity/build/cold-restart/**'
     emulator_target="default"
     ;;
   dc-api-compose)
