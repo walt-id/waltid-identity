@@ -46,9 +46,6 @@ internal suspend fun selectCredentialBindings(
             }
             val previous = bindings[thumbprint]
             bindings[thumbprint] = binding.copy(proofIndexes = previous?.proofIndexes.orEmpty() + index)
-            if (bindings.size > options.limits.maxCredentials) {
-                throw invalidCredentialProof("Attested credential count exceeds the configured limit")
-            }
         }
     }
     return bindings.values.toList()

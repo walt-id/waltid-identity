@@ -6,7 +6,7 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
-import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.proofs.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
@@ -30,12 +30,11 @@ class KeyAttestationVerifier(
 
     suspend fun verify(
         jwt: String,
-        proofType: ProofType?,
+        proofType: ProofTypeMetadata?,
         context: CredentialProofValidationContext,
         configuration: CredentialConfiguration,
         options: KeyAttestationVerificationOptions,
     ): VerifiedKeyAttestation {
-        if (jwt.length > options.limits.maxJwtLength) throw invalidCredentialProof("Key attestation is too large")
         val decoded = attestationInput { CompactJws.decodeUnverified(jwt) }
         val header = decoded.protectedHeader
         if (header.string("typ") != "key-attestation+jwt") throw invalidCredentialProof("Invalid key attestation type")
@@ -113,8 +112,8 @@ class KeyAttestationVerifier(
         }
         val attestedKeys = payload["attested_keys"] as? JsonArray
             ?: throw invalidCredentialProof("Key attestation attested_keys must be an array")
-        if (attestedKeys.isEmpty() || attestedKeys.size > options.limits.maxAttestedKeys) {
-            throw invalidCredentialProof("Key attestation key count is outside the configured limits")
+        if (attestedKeys.isEmpty()) {
+            throw invalidCredentialProof("Key attestation attested_keys must not be empty")
         }
         val verified = VerifiedKeyAttestation(jwt, header, payload, signer, attestedKeys.map {
             restoreAttestedKey(it as? JsonObject ?: throw invalidCredentialProof("Attested keys must be JWK objects"))

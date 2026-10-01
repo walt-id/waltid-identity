@@ -43,7 +43,6 @@ fun interface KeyAttestationPolicy {
 
 data class KeyAttestationVerificationOptions(
     val trustResolver: KeyAttestationTrustResolver,
-    val limits: KeyAttestationLimits = KeyAttestationLimits(),
     val policy: KeyAttestationPolicy? = null,
 )
 

@@ -11,21 +11,7 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class KeyAttestationConfig(
     val verificationMethod: KeyAttestationVerificationMethod,
-    val limits: KeyAttestationLimits = KeyAttestationLimits(),
 )
-
-@Serializable
-data class KeyAttestationLimits(
-    val maxAttestedKeys: Int = 32,
-    val maxCredentials: Int = 32,
-    val maxJwtLength: Int = 65_536,
-) {
-    init {
-        require(maxAttestedKeys > 0 && maxCredentials > 0 && maxJwtLength > 0) {
-            "Key attestation limits must be positive"
-        }
-    }
-}
 
 @Serializable
 sealed class KeyAttestationVerificationMethod {
@@ -59,5 +45,4 @@ suspend fun KeyAttestationConfig.toVerificationOptions(
     keyReferenceResolver: KeyAttestationKeyReferenceResolver? = null,
 ): KeyAttestationVerificationOptions = KeyAttestationVerificationOptions(
     createKeyAttestationTrustResolver(verificationMethod, keyReferenceResolver),
-    limits,
 )
