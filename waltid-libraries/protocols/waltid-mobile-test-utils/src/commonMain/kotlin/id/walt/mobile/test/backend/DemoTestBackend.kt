@@ -49,10 +49,10 @@ object DemoTestBackend {
     private const val ISSUER_BASE_URL = "https://issuer2.demo.walt.id"
     private const val ISSUER_IDENTIFIER = "$ISSUER_BASE_URL/openid4vci"
     // RFC 7638 thumbprint of the issuer2 metadata signing key published at
-    // https://issuer2.demo.walt.id/openid4vci/jwks (verified 2026-09-29). This is an independent trust anchor;
+    // https://issuer2.demo.walt.id/openid4vci/jwks (verified 2026-10-01). This is an independent trust anchor;
     // it must not be learned from the signed metadata JWT itself.
     private const val ISSUER_METADATA_SIGNING_KEY_THUMBPRINT =
-        "2iEFnGUV5WKiB1JWV8pBeqEDzqJJJ7-7m65b5NRFdOo"
+        "DOiRtPhc0Hre1XZwBVjx_YoGugtAEtWNrKCZ4zerXs4"
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
     // The demo verifier only accepts signed requests for an explicitly configured client ID.
     const val PUBLIC_DEMO_VERIFIER_CLIENT_ID = "verifier2"
