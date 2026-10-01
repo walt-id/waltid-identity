@@ -453,11 +453,19 @@ between evaluations. The default revocation policy remains `NotChecked`; demo
 trust settings do not configure a CRL client. OCSP needs a separate request and
 signed-response verifier and is not implemented by this evaluator.
 
+The configured evaluator does not infer IACA roles or enforce conditional issuer-contact requirements.
+Applications requiring IACA-specific profile checks or a restriction to a particular issuer must supply
+an application-owned `ProximityReaderTrustEvaluator` that validates the certificate path and applies
+that policy. Contact information alone establishes neither issuer identity nor trust.
+Use the shared `X509CertificateHasIaCaContactInformationValidator(true)` to require
+`issuerAlternativeName` email/URI contact after path validation when application policy requires it.
+The reader profile enforces extension criticality; the contact rule does not identify an IACA or establish trust.
+
 Configuration snapshots detach collection data while retaining provider/evaluator service
 references. Providers and revocation sources are queried at evaluation time. Persisted
 settings decoding checks structure; import checks current CA usage and RICAL material;
 session evaluation establishes current trust. `applyTo` replaces the supplied trust evaluator,
-so applications needing CRL/IACA/custom policy must configure that evaluator after applying
+so applications needing CRL or custom policy must configure that evaluator after applying
 holder-managed settings. Imports do not add network services or infer issuer roles.
 
 Wallet applications that let holders manage this policy can persist a canonical

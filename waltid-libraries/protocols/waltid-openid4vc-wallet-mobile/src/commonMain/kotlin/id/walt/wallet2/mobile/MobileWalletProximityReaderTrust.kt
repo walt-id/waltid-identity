@@ -8,8 +8,6 @@ import id.walt.certificate.x509.dn.DistinguishedName
 import id.walt.certificate.x509.profile.IsoMdocReaderAuthenticationX509CertificateProfile
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
-import id.walt.certificate.x509.validation.X509SingleCertificateValidator
-import id.walt.certificate.x509.validation.validator.X509CertificateHasIaCaContactInformationValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.proximity.MdocX509CertificateUtil.modocReaderAuthentication
@@ -250,14 +248,6 @@ public data class ProximityReaderTrustConfiguration(
     /** Revocation behavior for a reader chain trusted by a direct Reader CA anchor. */
     public val revocationPolicy: ProximityReaderRevocationPolicy =
         ProximityReaderRevocationPolicy.NotChecked,
-    /**
-     * Optional application-identified IACA direct issuer, encoded as unpadded Base64URL DER.
-     * When set, require that exact direct issuer on the validated path and an issuer-alternative-name
-     * email or URI contact in the reader certificate. The application identifies the issuer's IACA
-     * role; this restriction does not add trust. Invalid DER is reported as an invalid certificate
-     * path during evaluation, including through Swift.
-     */
-    public val requiredIacaIssuerCertificateDerBase64Url: String? = null,
 ) {
     init {
         require(trustAnchors.isNotEmpty() || ricalProviders.isNotEmpty()) {
@@ -508,20 +498,6 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
         rical: ProximityRicalState,
         establishesTrust: Boolean,
     ): ProximityReaderTrustDecision {
-        ownedConfiguration.requiredIacaIssuerCertificateDerBase64Url?.let { issuer ->
-            runCatching {
-                val requiredIssuer = issuer.toX509Certificate()
-                if (path.getOrNull(1)?.encodedDer != requiredIssuer.encodedDer) {
-                    //issuer is not equal to the required issuer
-                    return invalidPathDecision("Issuer certificate doesn't equal to requiredIacaIssuerCertificate")
-                }
-                if (!iaCaContactInformationValidator.validate(path.first()).valid) {
-                    //reader certificate lacks the issuing CA's contact information (IssuerAltName with email or URI)
-                    return invalidPathDecision("Reader certificate doesn't contain issuing CA's contact information")
-                }
-            }.getOrElse { return invalidPathDecision(null) }
-        }
-        //issuer is required issuer, or no required issuer is set
         return when (val revocation = evaluateRevocation(evidence, path)) {
             is EvaluatedRevocation.Good -> ProximityReaderTrustDecision(
                 state = if (establishesTrust) ProximityReaderTrustState.Trusted
@@ -628,14 +604,6 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
             certificatePath = ProximityReaderCertificatePathState.Invalid,
             reason = reason ?: "Reader authentication certificate path or profile is invalid",
         )
-
-    private companion object {
-        private val iaCaContactInformationValidator = X509SingleCertificateValidator(
-            listOf(
-                X509CertificateHasIaCaContactInformationValidator(true)
-            )
-        )
-    }
 }
 
 private fun ProximityReaderEvidence.toRicalEvidence(): ReaderAuthenticationEvidence =
