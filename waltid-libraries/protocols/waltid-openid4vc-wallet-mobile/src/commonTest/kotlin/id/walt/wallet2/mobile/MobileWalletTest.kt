@@ -79,6 +79,7 @@ import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResul
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.RequestObjectAuthentication
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
+import io.ktor.client.HttpClient
 import io.ktor.client.request.HttpRequestData
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.content.TextContent
