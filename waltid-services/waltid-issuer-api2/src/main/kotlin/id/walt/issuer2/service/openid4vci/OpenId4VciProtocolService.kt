@@ -48,7 +48,7 @@ import id.walt.openid4vci.proofs.CredentialNonceBinding
 import id.walt.openid4vci.proofs.CredentialNonceService
 import id.walt.openid4vci.proofs.CredentialNonceValidationContext
 import id.walt.openid4vci.proofs.attestation.KeyAttestationVerificationOptions
-import id.walt.openid4vci.proofs.attestation.KeyAttestationServiceException
+import id.walt.openid4vci.proofs.CredentialProofServiceException
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.proofs.CredentialProofValidationException
 import id.walt.openid4vci.proofs.CredentialProofVerifier
@@ -1016,8 +1016,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 resolveCredentialProofPublicKeyJwks(requestWithSession, configuration, nonceBinding)
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: KeyAttestationServiceException) {
-                logger.error(e) { "Key attestation verification unavailable (requestId=$requestId)" }
+            } catch (e: CredentialProofServiceException) {
+                logger.error(e) { "Credential proof verification unavailable (requestId=$requestId)" }
                 return oauth2Provider.writeCredentialError(OAuthError(OAuthErrorCodes.SERVER_ERROR, "Credential proof verification unavailable"))
             } catch (e: CredentialProofValidationException) {
                 return rejectCredentialRequest(
