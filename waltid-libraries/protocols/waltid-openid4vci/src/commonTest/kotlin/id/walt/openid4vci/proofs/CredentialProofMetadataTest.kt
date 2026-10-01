@@ -126,8 +126,8 @@ class CredentialProofMetadataTest {
                 credentials = batch.instances.map { IssuedCredential(JsonPrimitive("issued")) },
             ))
         }
-        val legacy = CredentialEndpointHandler { _, _, _, _, batch, _, _, _, _, _, _, _, _, _ -> sign(batch) }
-        val crypto2 = Crypto2CredentialEndpointHandler { _, _, _, _, batch, _, _, _, _, _, _, _, _, _ -> sign(batch) }
+        val legacy = CredentialEndpointHandler { _, _, _, _, batch, _, _, _, _, _, _, _, _, _, _ -> sign(batch) }
+        val crypto2 = Crypto2CredentialEndpointHandler { _, _, _, _, batch, _, _, _, _, _, _, _, _, _, _ -> sign(batch) }
         val providerConfig = createTestConfig(credentialProofVerifier = verifier)
         providerConfig.credentialEndpointHandlers.register(CredentialFormat.SD_JWT_VC,
             object : CredentialEndpointHandler by legacy, Crypto2CredentialEndpointHandler by crypto2 {})
