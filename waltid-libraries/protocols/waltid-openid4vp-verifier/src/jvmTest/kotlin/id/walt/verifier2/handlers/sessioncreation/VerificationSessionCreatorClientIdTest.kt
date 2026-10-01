@@ -64,6 +64,22 @@ class VerificationSessionCreatorClientIdTest {
     }
 
     @Test
+    fun `bare redirect_uri prefix is completed from response_uri`() = runTest {
+        val urlPrefix = "https://verifier.example.com/verification-session"
+        val session = VerificationSessionCreator.createVerificationSession(
+            setup = unsignedCrossDevice("session-bare"),
+            clientId = "redirect_uri",
+            urlPrefix = urlPrefix,
+            urlHost = "openid4vp://authorize",
+        )
+
+        assertEquals(
+            "redirect_uri:$urlPrefix/session-bare/response",
+            session.authorizationRequest.clientId,
+        )
+    }
+
+    @Test
     fun `explicit clientId is preserved`() = runTest {
         val session = VerificationSessionCreator.createVerificationSession(
             setup = unsignedCrossDevice(),
