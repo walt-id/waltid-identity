@@ -922,7 +922,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                             event = result.request.event.toIssuanceSessionEvent(),
                         )
                     }
-                    oauth2Provider.writeNotificationResponse(oauth2Provider.createNotificationResponse())
+                    return oauth2Provider.writeNotificationResponse(oauth2Provider.createNotificationResponse())
                 } catch (error: CancellationException) {
                     restoreClaimedSession(claimed)
                     throw error
@@ -932,6 +932,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 }
             }
         }
+    }
     }
 
     suspend fun processCredentialRequest(
