@@ -216,6 +216,12 @@ object OpenId4VciRoutesDocs {
             body<JsonObject> {
                 description = "Credential request"
                 mediaTypes(ContentType.Application.Json)
+                example("[SD-JWT][jwt + key_attestation][two attested keys]") {
+                    value = Issuer2RequestExamples.SD_JWT_CREDENTIAL_REQUEST_WITH_KEY_ATTESTATION
+                }
+                example("[mdoc][jwt + key_attestation][two attested keys]") {
+                    value = Issuer2RequestExamples.MDOC_CREDENTIAL_REQUEST_WITH_KEY_ATTESTATION
+                }
                 example("[batch][credential_configuration_id][two JWT proofs]") {
                     value = Issuer2RequestExamples.BATCH_CREDENTIAL_REQUEST_BY_CONFIGURATION_ID
                 }
