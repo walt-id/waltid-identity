@@ -93,6 +93,38 @@ internal object TestCertificates {
         return Chain(rootKeyPair, root, leafKeyPair, leaf)
     }
 
+    /**
+     * A leaf certificate signed by [chain]'s root but with no Authority Key Identifier extension
+     * at all, unlike the leaves [createChain] produces. For exercising narrowing's handling of
+     * certificates that carry no AKI - some root/legacy certificates omit it - without needing a
+     * malformed DER payload to do it.
+     */
+    fun leafWithoutAuthorityKeyIdentifier(chain: Chain, commonName: String = "WAL-1186"): X509Certificate {
+        val leafKeyPair = keyPair()
+        val extensions = JcaX509ExtensionUtils()
+        val builder = JcaX509v3CertificateBuilder(
+            // X500Name.getInstance on the raw encoded bytes, not X500Name(principal.name) - round
+            // tripping through the RFC 2253 string form can re-encode the DN differently (RDN
+            // order, attribute encoding), and PKIX issuer/subject chaining requires an exact DER
+            // match against chain.root's own subject encoding.
+            X500Name.getInstance(chain.root.subjectX500Principal.encoded),
+            BigInteger(128, SecureRandom()),
+            Date.from(Instant.now().minusSeconds(60)),
+            Date.from(Instant.now().plusSeconds(86_400)),
+            X500Name("CN=$commonName Leaf (no AKI),O=walt.id,C=AT"),
+            leafKeyPair.public
+        )
+        builder.addExtension(Extension.basicConstraints, true, BasicConstraints(false))
+        builder.addExtension(Extension.keyUsage, true, KeyUsage(KeyUsage.digitalSignature))
+        builder.addExtension(
+            Extension.subjectKeyIdentifier,
+            false,
+            extensions.createSubjectKeyIdentifier(leafKeyPair.public)
+        )
+        val signer = JcaContentSignerBuilder("SHA256withECDSA").build(chain.rootKeyPair.private)
+        return JcaX509CertificateConverter().getCertificate(builder.build(signer))
+    }
+
     fun derBase64(certificate: X509Certificate): String =
         Base64.getEncoder().encodeToString(certificate.encoded)
 
