@@ -35,6 +35,7 @@ import id.walt.openid4vci.mdoc.MsoValidityResolver
 import id.walt.w3c.issuance.InstantClock
 import id.walt.w3c.issuance.IssuanceClock
 import id.walt.openid4vci.core.OAuth2Provider
+import id.walt.openid4vci.core.OpenId4VciEndpointPaths
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
@@ -47,6 +48,7 @@ import id.walt.openid4vci.requests.credential.resolveCredentialAuthorization
 import id.walt.openid4vci.requests.credential.toAuthorizationDetails
 import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.openid4vci.requests.notification.NotificationRequestResult
+import id.walt.issuer2.service.applyWalletNotification
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
@@ -103,7 +105,6 @@ private val logger = KotlinLogging.logger {}
 private const val INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER = "_issuer2_session_id"
 private const val TOKEN_ENDPOINT_PATH = "token"
 private const val CREDENTIAL_ENDPOINT_PATH = "credential"
-private const val NOTIFICATION_ENDPOINT_PATH = "notification"
 
 private fun NotificationEvent.toIssuanceSessionEvent(): IssuanceSessionEvent = when (this) {
     NotificationEvent.CREDENTIAL_ACCEPTED -> IssuanceSessionEvent.WALLET_CREDENTIAL_ACCEPTED
@@ -822,7 +823,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     authorization = authorization,
                     expectedIssuer = metadataService.issuerBaseUrl(),
                     dpopProofHeaderValues = dpopProofHeaderValues,
-                    credentialEndpointUri = endpointUri(NOTIFICATION_ENDPOINT_PATH),
+                    targetUri = endpointUri(OpenId4VciEndpointPaths.NOTIFICATION),
                 ),
             )
         ) {
@@ -838,22 +839,62 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         OAuthError(OAuthErrorCodes.INVALID_TOKEN, "Access token has no session id"),
                         authorization.scheme,
                     )
-                val update = sessionService.updateWalletNotificationEvent(
-                    sessionId = sessionId,
-                    notificationId = result.request.notificationId,
-                    event = result.request.event,
-                    eventDescription = result.request.eventDescription,
-                ) ?: return oauth2Provider.writeNotificationError(
-                    NotificationError(NotificationErrorCodes.INVALID_NOTIFICATION_ID),
-                )
-                if (update.changed) {
-                    notificationService.notify(
-                        requestId = requestId,
-                        session = update.session,
-                        event = result.request.event.toIssuanceSessionEvent(),
+                sessionService.getSessionOrNull(sessionId)
+                    ?: return oauth2Provider.writeNotificationError(
+                        NotificationError(NotificationErrorCodes.INVALID_NOTIFICATION_ID),
                     )
+                val claimed = sessionService.claimSession(sessionId)
+                    ?: return oauth2Provider.writeNotificationError(
+                        OAuthError(OAuthErrorCodes.TEMPORARILY_UNAVAILABLE, "Issuance session is being processed"),
+                        authorization.scheme,
+                    )
+                try {
+                    val authorizedIdentifiers = claimed.issuanceRequests
+                        .map { it.toCredentialAuthorization() }
+                        .authorizedByVerifiedToken(
+                            result.tokenClaims,
+                            claimed.authorizedCredentialIdentifiers,
+                            metadataService.credentialConfigurationIdsForScopes(
+                                result.tokenClaims.stringClaim("scope").orEmpty()
+                                    .split(' ')
+                                    .filter(String::isNotBlank)
+                                    .toSet(),
+                            ),
+                        )
+                        .map { it.credentialIdentifier }
+                        .toSet()
+                    val update = claimed.applyWalletNotification(
+                        notificationId = result.request.notificationId,
+                        event = result.request.event,
+                        eventDescription = result.request.eventDescription,
+                        authorizedCredentialIdentifiers = authorizedIdentifiers,
+                    ) ?: run {
+                        restoreClaimedSession(claimed)
+                        return oauth2Provider.writeNotificationError(
+                            NotificationError(NotificationErrorCodes.INVALID_NOTIFICATION_ID),
+                        )
+                    }
+                    val saved = if (update.changed) {
+                        sessionService.saveSession(update.session)
+                    } else {
+                        restoreClaimedSession(claimed)
+                        claimed
+                    }
+                    if (update.changed) {
+                        notificationService.notify(
+                            requestId = requestId,
+                            session = saved,
+                            event = result.request.event.toIssuanceSessionEvent(),
+                        )
+                    }
+                    oauth2Provider.writeNotificationResponse(oauth2Provider.createNotificationResponse())
+                } catch (error: CancellationException) {
+                    restoreClaimedSession(claimed)
+                    throw error
+                } catch (error: Exception) {
+                    restoreClaimedSession(claimed)
+                    throw error
                 }
-                return oauth2Provider.writeNotificationResponse(oauth2Provider.createNotificationResponse())
             }
         }
     }
@@ -874,7 +915,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     authorization = authorization,
                     expectedIssuer = metadataService.issuerBaseUrl(),
                     dpopProofHeaderValues = dpopProofHeaderValues,
-                    credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
+                    targetUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
                 ),
             )
         }
@@ -895,7 +936,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     authorization = authorization,
                     expectedIssuer = metadataService.issuerBaseUrl(),
                     dpopProofHeaderValues = dpopProofHeaderValues,
-                    credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
+                    targetUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
                 ),
             )
         }
@@ -1271,6 +1312,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     )
                 }
             }
+            val notificationId = UUID.randomUUID().toString()
             val credentialResponseResult = withContext(IssuanceClock(issuedAt)) {
                 if (crypto2IssuerKey != null) {
                     oauth2Provider.createCredentialResponse(
@@ -1288,7 +1330,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         validUntil = resolvedMsoValidity?.validUntil,
                         expectedUpdate = resolvedMsoValidity?.expectedUpdate,
                         proofValidationContext = proofValidationContext,
-                        issueNotificationId = true,
+                        notificationId = notificationId,
                     )
                 } else {
                     oauth2Provider.createCredentialResponse(
@@ -1306,7 +1348,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         validUntil = resolvedMsoValidity?.validUntil,
                         expectedUpdate = resolvedMsoValidity?.expectedUpdate,
                         proofValidationContext = proofValidationContext,
-                        issueNotificationId = true,
+                        notificationId = notificationId,
                     )
                 }
             }
@@ -1391,6 +1433,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             val issuanceResults = session.issuanceResults + (
                 issuanceRequest.credentialIdentifier to IssuanceResult(
                     issuedCredentialFormat = configuration.format.value,
+                    walletNotificationId = credentialResponse.notificationId,
                 )
             )
             val establishedSelection = session.authorizedCredentialIdentifiers ?: session.issuanceRequests
@@ -1412,7 +1455,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                             },
                             statusReason = if (issuanceComplete) "Credentials issued successfully" else null,
                             isClosed = false,
-                            walletNotificationId = credentialResponse.notificationId,
                         )
                     )
                 }

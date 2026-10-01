@@ -17,6 +17,7 @@ import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
+import id.walt.openid4vci.core.OpenId4VciEndpointPaths
 import id.walt.openid4vci.metadata.issuer.*
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
@@ -93,7 +94,7 @@ class MetadataService(
                 credentialRequestEncryption = credentialRequestEncryption,
                 batchCredentialIssuance = batchCredentialIssuance,
                 display = issuerDisplay,
-                notificationEndpointPath = NOTIFICATION_ENDPOINT_PATH,
+                notificationEndpointPath = OpenId4VciEndpointPaths.NOTIFICATION_FROM_BASE,
             )
         }
 
@@ -287,6 +288,5 @@ class MetadataService(
 
     companion object {
         private const val INTERNAL_VCT_BASE_URL = "vctBaseUrl"
-        private const val NOTIFICATION_ENDPOINT_PATH = "/notification"
     }
 }

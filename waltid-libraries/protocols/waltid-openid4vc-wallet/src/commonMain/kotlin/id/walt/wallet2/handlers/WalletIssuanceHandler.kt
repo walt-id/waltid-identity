@@ -38,6 +38,7 @@ import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
+import id.waltid.openid4vci.wallet.dpop.postWithDpopNonceRetry
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
@@ -515,6 +516,11 @@ data class PollDeferredRequest(
      * stores an mdoc; it must identify the exact key used for the original credential request.
      */
     val keyId: String? = null,
+    /**
+     * OAuth `token_type` from the original token response, `Bearer` or `DPoP`.
+     * A DPoP token must be presented with [WalletIssuanceHandler.pollDeferredFlow]'s proof factory.
+     */
+    val tokenType: String = "Bearer",
 )
 
 // Auth-code grant isolated steps
@@ -858,7 +864,21 @@ object WalletIssuanceHandler {
                 continue
             }
 
-            try {
+            storeAndNotify(
+                httpClient = httpClient,
+                target = IssuerNotificationTarget(
+                    notificationEndpoint = issuerMetadata.notificationEndpoint,
+                    notificationId = credentialResponse.notificationId,
+                    accessToken = tokenResponse.access_token,
+                    tokenType = tokenResponse.token_type,
+                    dpopProofFactory = dpopProofFactoryFor(
+                        tokenType = tokenResponse.token_type,
+                        dpopAlgorithms = dpopAlgorithms,
+                        keyMaterial = keyMaterial,
+                        accessToken = tokenResponse.access_token,
+                    ),
+                ),
+            ) {
                 if (rawCredentials.isNotEmpty()) beforeCredentialsStored(rawCredentials.size)
                 for (issuedCredential in rawCredentials) {
                     val entry = wallet.parseAndStore(
@@ -875,38 +895,6 @@ object WalletIssuanceHandler {
                     onEvent(WalletSessionEvent.issuance_credential_stored)
                     send(entry)
                 }
-                deliverCredentialNotification(
-                    httpClient = httpClient,
-                    notificationEndpoint = issuerMetadata.notificationEndpoint,
-                    notificationId = credentialResponse.notificationId,
-                    accessToken = tokenResponse.access_token,
-                    tokenType = tokenResponse.token_type,
-                    event = NotificationEvent.CREDENTIAL_ACCEPTED,
-                    dpopProofFactory = dpopProofFactoryFor(
-                        tokenType = tokenResponse.token_type,
-                        dpopAlgorithms = dpopAlgorithms,
-                        keyMaterial = keyMaterial,
-                        accessToken = tokenResponse.access_token,
-                    ),
-                )
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                deliverCredentialNotification(
-                    httpClient = httpClient,
-                    notificationEndpoint = issuerMetadata.notificationEndpoint,
-                    notificationId = credentialResponse.notificationId,
-                    accessToken = tokenResponse.access_token,
-                    tokenType = tokenResponse.token_type,
-                    event = NotificationEvent.CREDENTIAL_FAILURE,
-                    dpopProofFactory = dpopProofFactoryFor(
-                        tokenType = tokenResponse.token_type,
-                        dpopAlgorithms = dpopAlgorithms,
-                        keyMaterial = keyMaterial,
-                        accessToken = tokenResponse.access_token,
-                    ),
-                )
-                throw error
             }
         }
 
@@ -1387,7 +1375,15 @@ object WalletIssuanceHandler {
             wallet.resolveKeyMaterial(keyId, setOf(KeyUsage.SIGN))
                 ?: error("Holder key '$keyId' is unavailable while storing an issued credential")
         }
-        try {
+        storeAndNotify(
+            httpClient = httpClient,
+            target = IssuerNotificationTarget(
+                notificationEndpoint = issuerMetadata?.notificationEndpoint,
+                notificationId = result.notificationId,
+                accessToken = request.accessToken,
+                tokenType = "Bearer",
+            ),
+        ) {
             if (result.rawCredentials.isNotEmpty()) beforeCredentialsStored(result.rawCredentials.size)
             result.rawCredentials.forEach { raw ->
                 onCredentialStored(
@@ -1399,26 +1395,6 @@ object WalletIssuanceHandler {
                     )
                 )
             }
-            deliverCredentialNotification(
-                httpClient = httpClient,
-                notificationEndpoint = issuerMetadata?.notificationEndpoint,
-                notificationId = result.notificationId,
-                accessToken = request.accessToken,
-                tokenType = "Bearer",
-                event = NotificationEvent.CREDENTIAL_ACCEPTED,
-            )
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: Exception) {
-            deliverCredentialNotification(
-                httpClient = httpClient,
-                notificationEndpoint = issuerMetadata?.notificationEndpoint,
-                notificationId = result.notificationId,
-                accessToken = request.accessToken,
-                tokenType = "Bearer",
-                event = NotificationEvent.CREDENTIAL_FAILURE,
-            )
-            throw error
         }
         return result
     }
@@ -2101,6 +2077,9 @@ object WalletIssuanceHandler {
      * or with an `issuance_pending` error if not yet available.
      *
      * On success the credential is stored in the wallet's credential store.
+     *
+     * RFC 9449: a DPoP-typed access token must be presented with a fresh per-request proof.
+     * Pass [dpopProofFactory] when [PollDeferredRequest.tokenType] is `DPoP`.
      */
     fun pollDeferredFlow(
         wallet: Wallet,
@@ -2110,9 +2089,15 @@ object WalletIssuanceHandler {
         /** Called with the exact response batch size before any credential of that batch is persisted. */
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
+        dpopProofFactory: DPoPProofFactory? = null,
     ): Flow<StoredCredential> = channelFlow {
-        val response = httpClient.post(request.deferredCredentialEndpoint.toString()) {
-            header(HttpHeaders.Authorization, "Bearer ${request.accessToken}")
+        val deferredDpopFactory = dpopProofFactory.takeIf { request.tokenType.equals("DPoP", ignoreCase = true) }
+        val response = httpClient.postWithDpopNonceRetry(
+            endpoint = request.deferredCredentialEndpoint.toString(),
+            accessToken = request.accessToken,
+            authorizationScheme = authorizationScheme(request.tokenType),
+            dpopProofFactory = deferredDpopFactory,
+        ) {
             contentType(ContentType.Application.Json)
             setBody(buildJsonObject {
                 put("transaction_id", JsonPrimitive(request.transactionId))
@@ -2153,7 +2138,16 @@ object WalletIssuanceHandler {
                 ?: error("Holder key '$keyId' is unavailable while storing a deferred credential")
         }
 
-        try {
+        storeAndNotify(
+            httpClient = httpClient,
+            target = IssuerNotificationTarget(
+                notificationEndpoint = issuerMetadata?.notificationEndpoint,
+                notificationId = credentialResponse.notificationId,
+                accessToken = request.accessToken,
+                tokenType = request.tokenType,
+                dpopProofFactory = deferredDpopFactory,
+            ),
+        ) {
             if (rawCredentials.isNotEmpty()) beforeCredentialsStored(rawCredentials.size)
 
             for (issuedCredential in rawCredentials) {
@@ -2167,26 +2161,6 @@ object WalletIssuanceHandler {
                 onEvent(WalletSessionEvent.issuance_credential_stored)
                 send(entry)
             }
-            deliverCredentialNotification(
-                httpClient = httpClient,
-                notificationEndpoint = issuerMetadata?.notificationEndpoint,
-                notificationId = credentialResponse.notificationId,
-                accessToken = request.accessToken,
-                tokenType = "Bearer",
-                event = NotificationEvent.CREDENTIAL_ACCEPTED,
-            )
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: Exception) {
-            deliverCredentialNotification(
-                httpClient = httpClient,
-                notificationEndpoint = issuerMetadata?.notificationEndpoint,
-                notificationId = credentialResponse.notificationId,
-                accessToken = request.accessToken,
-                tokenType = "Bearer",
-                event = NotificationEvent.CREDENTIAL_FAILURE,
-            )
-            throw error
         }
         onEvent(WalletSessionEvent.issuance_completed)
     }
@@ -2342,7 +2316,16 @@ object WalletIssuanceHandler {
         )
 
         val tokenType = tokenResult.tokenType ?: "Bearer"
-        try {
+        storeAndNotify(
+            httpClient = httpClient,
+            target = IssuerNotificationTarget(
+                notificationEndpoint = issuerMetadata.notificationEndpoint,
+                notificationId = credentialResponse.notificationId,
+                accessToken = tokenResult.accessToken,
+                tokenType = tokenType,
+                dpopProofFactory = credentialDpop?.toProofFactory(tokenResult.accessToken),
+            ),
+        ) {
             if (rawCredentials.isNotEmpty()) beforeCredentialsStored(rawCredentials.size)
 
             for (rawString in rawCredentials) {
@@ -2356,48 +2339,6 @@ object WalletIssuanceHandler {
                 onEvent(WalletSessionEvent.issuance_credential_stored)
                 send(entry)
             }
-            deliverCredentialNotification(
-                httpClient = httpClient,
-                notificationEndpoint = issuerMetadata.notificationEndpoint,
-                notificationId = credentialResponse.notificationId,
-                accessToken = tokenResult.accessToken,
-                tokenType = tokenType,
-                event = NotificationEvent.CREDENTIAL_ACCEPTED,
-                dpopProofFactory = credentialDpop?.let { context ->
-                    { endpoint, nonce ->
-                        buildDpopProof(
-                            keyMaterial = context.keyMaterial,
-                            algorithms = context.algorithms,
-                            endpoint = endpoint,
-                            accessToken = tokenResult.accessToken,
-                            nonce = nonce,
-                        )
-                    }
-                },
-            )
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: Exception) {
-            deliverCredentialNotification(
-                httpClient = httpClient,
-                notificationEndpoint = issuerMetadata.notificationEndpoint,
-                notificationId = credentialResponse.notificationId,
-                accessToken = tokenResult.accessToken,
-                tokenType = tokenType,
-                event = NotificationEvent.CREDENTIAL_FAILURE,
-                dpopProofFactory = credentialDpop?.let { context ->
-                    { endpoint, nonce ->
-                        buildDpopProof(
-                            keyMaterial = context.keyMaterial,
-                            algorithms = context.algorithms,
-                            endpoint = endpoint,
-                            accessToken = tokenResult.accessToken,
-                            nonce = nonce,
-                        )
-                    }
-                },
-            )
-            throw error
         }
         onEvent(WalletSessionEvent.issuance_completed)
     }

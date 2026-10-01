@@ -108,6 +108,50 @@ class WalletIssuanceNotificationTest {
     }
 
     @Test
+    fun deferredPollPresentsDpopAccessTokenAndProof() = runTest {
+        val authorizations = mutableListOf<String?>()
+        val proofs = mutableListOf<String?>()
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    when (request.url.toString()) {
+                        "$ISSUER/.well-known/openid-credential-issuer" -> respondJson(ISSUER_METADATA)
+                        "$ISSUER/deferred", "$ISSUER/notification" -> {
+                            authorizations += request.headers[HttpHeaders.Authorization]
+                            proofs += request.headers["DPoP"]
+                            if (request.url.toString().endsWith("/notification")) {
+                                respond(content = "", status = HttpStatusCode.NoContent)
+                            } else {
+                                respondJson(credentialResponse(1))
+                            }
+                        }
+                        else -> error("Unexpected request: ${request.method.value} ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+
+        val stored = WalletIssuanceHandler.pollDeferredFlow(
+            wallet = wallet(),
+            request = PollDeferredRequest(
+                deferredCredentialEndpoint = Url("$ISSUER/deferred"),
+                transactionId = "transaction-1",
+                accessToken = "access-token",
+                credentialIssuerBaseUrl = ISSUER,
+                credentialConfigurationId = "pid",
+                tokenType = "DPoP",
+            ),
+            httpClient = client,
+            dpopProofFactory = { _, _ -> "dpop-proof" },
+        ).toList()
+
+        assertEquals(1, stored.size)
+        assertEquals(listOf("DPoP access-token", "DPoP access-token"), authorizations)
+        assertEquals(listOf("dpop-proof", "dpop-proof"), proofs)
+    }
+
+    @Test
     fun reportCredentialDeletedPostsDeletedEvent() = runTest {
         val notifications = mutableListOf<String>()
         val client = HttpClient(MockEngine) {
