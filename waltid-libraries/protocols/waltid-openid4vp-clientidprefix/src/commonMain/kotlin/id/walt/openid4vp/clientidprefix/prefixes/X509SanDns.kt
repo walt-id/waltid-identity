@@ -54,7 +54,7 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
 
         val x5cHeader = decodedJws.protectedHeader["x5c"] as? JsonArray
             ?: return ClientValidationResult.Failure(ClientIdError.MissingX5cHeader)
-        if (!trustConfiguration.trustAlreadyEstablished && trustConfiguration.x509TrustAnchors.isMissing()) {
+        if (trustConfiguration.x509TrustAnchors.isMissing()) {
             return ClientValidationResult.Failure(ClientIdError.MissingX509TrustAnchors)
         }
 
@@ -67,10 +67,8 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
             ?: return ClientValidationResult.Failure(ClientIdError.EmptyX5cHeader)
 
         // 1. Validate the certificate path, trust anchor, validity, constraints, and client-auth usage.
-        if (!trustConfiguration.trustAlreadyEstablished) {
-            ClientIdCrypto2.validateCertificateChain(certificates, trustConfiguration.x509TrustStore)?.let { error ->
-                return error
-            }
+        ClientIdCrypto2.validateCertificateChain(certificates, trustConfiguration.x509TrustStore)?.let { error ->
+            return error
         }
 
         // 2. Verify JWS signature using the leaf certificate's public key.

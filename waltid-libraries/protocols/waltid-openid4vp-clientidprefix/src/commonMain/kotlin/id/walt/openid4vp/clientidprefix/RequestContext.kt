@@ -35,20 +35,6 @@ data class ClientIdTrustConfiguration(
     val x509TrustAnchors: X509CertificateTrustStore? = null,
     val trustedVerifierAttestationIssuers: Set<String> = emptySet(),
     val preRegisteredClients: Map<String, ClientMetadata> = emptyMap(),
-    /**
-     * Skips PKIX trust-anchor validation for `x509_hash` / `x509_san_dns` Request Objects, while
-     * still verifying the JWS signature and the client_id binding (hash/SAN match against the
-     * presented leaf certificate). Everything else about the client id authentication is
-     * unaffected.
-     *
-     * For a continuation step of a presentation that was already authenticated against the same
-     * Request Object at an earlier resolve/preview step - trust in the client_id was decided then,
-     * against the caller's full (e.g. registry-backed) anchor set, and re-running that check on a
-     * continuation step would either repeat that cost or fail closed for want of anchors the
-     * continuation step deliberately does not load. Never set this on the step that first
-     * authenticates a request.
-     */
-    val trustAlreadyEstablished: Boolean = false,
 ) {
     val x509TrustStore: X509CertificateTrustStore
         get() = x509TrustAnchors ?: InMemoryTrustStore()
