@@ -411,6 +411,14 @@ object Issuer2RequestExamples {
         listOf(EXAMPLE_ATTESTED_HOLDER_JWK, EXAMPLE_SECOND_ATTESTED_HOLDER_JWK),
     )
 
+    private val EXAMPLE_DID_ATTESTED_KEYS = listOf(EXAMPLE_ATTESTED_HOLDER_JWK, EXAMPLE_SECOND_ATTESTED_HOLDER_JWK).map { jwk ->
+        // Encode the public key without kid, then attach its DID verification method reference.
+        val did = "did:jwk:" + Base64.UrlSafe.encode(jwk.toString().encodeToByteArray()).trimEnd('=')
+        JsonObject(jwk + ("kid" to JsonPrimitive("$did#0")))
+    }
+
+    private val EXAMPLE_DID_KEY_ATTESTATION = illustrativeKeyAttestation(EXAMPLE_DID_ATTESTED_KEYS)
+
     private fun illustrativeKeyAttestation(keys: List<JsonObject>) = illustrativeJwt(
         header = buildJsonObject {
             put("alg", "ES256")
@@ -454,6 +462,26 @@ object Issuer2RequestExamples {
 
     val MDOC_CREDENTIAL_REQUEST_WITH_ATTESTATION_PROOF = credentialProofExample(
         MDOC_CREDENTIAL_CONFIGURATION_ID, ProofType.ATTESTATION, EXAMPLE_KEY_ATTESTATION,
+    )
+
+    val W3C_CREDENTIAL_REQUEST_WITH_KEY_ATTESTATION = credentialProofExample(
+        W3C_CREDENTIAL_CONFIGURATION_ID, ProofType.JWT, illustrativeJwt(
+            header = buildJsonObject {
+                put("alg", "ES256")
+                put("typ", "openid4vci-proof+jwt")
+                put("kid", EXAMPLE_DID_ATTESTED_KEYS.first().getValue("kid"))
+                put("key_attestation", EXAMPLE_DID_KEY_ATTESTATION)
+            },
+            payload = buildJsonObject {
+                put("aud", EXAMPLE_CREDENTIAL_ISSUER)
+                put("iat", 1_800_000_000)
+                put("nonce", "c_nonce-from-issuer-nonce-endpoint")
+            },
+        ),
+    )
+
+    val W3C_CREDENTIAL_REQUEST_WITH_ATTESTATION_PROOF = credentialProofExample(
+        W3C_CREDENTIAL_CONFIGURATION_ID, ProofType.ATTESTATION, EXAMPLE_DID_KEY_ATTESTATION,
     )
 
     private fun credentialProofExample(configurationId: String, proofType: ProofType, jwt: String) = buildJsonObject {
