@@ -48,6 +48,9 @@ data class IssuanceRequest(
 @Serializable
 data class IssuanceResult(
     val issuedCredentialFormat: String,
+    val walletNotificationId: String? = null,
+    val walletNotificationEvent: NotificationEvent? = null,
+    val walletNotificationEventDescription: String? = null,
 )
 
 @Serializable
@@ -68,14 +71,6 @@ data class IssuanceSession(
     val failure: IssuanceSessionFailure? = null,
     /** Established issuance selection; independent of any later token narrowing. */
     val authorizedCredentialIdentifiers: List<String>? = null,
-    /**
-     * One notification id for the credential response stored on this session.
-     * A later credential response on the same session replaces it.
-     * [walletNotificationEvent] keeps only the latest event for that id.
-     */
-    val walletNotificationId: String? = null,
-    val walletNotificationEvent: NotificationEvent? = null,
-    val walletNotificationEventDescription: String? = null,
 ) {
     init {
         require(issuanceRequests.isNotEmpty()) { "issuanceRequests must not be empty" }

@@ -10,42 +10,63 @@ import id.waltid.openid4vci.wallet.token.DPoPProofFactory
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.seconds
 
 private val notificationLog = KotlinLogging.logger {}
+private val NOTIFICATION_DELIVERY_TIMEOUT = 5.seconds
 
-internal suspend inline fun <T> withIssuedCredentialNotification(
+internal data class IssuerNotificationTarget(
+    val notificationEndpoint: String?,
+    val notificationId: String?,
+    val accessToken: String,
+    val tokenType: String,
+    val dpopProofFactory: DPoPProofFactory? = null,
+)
+
+internal suspend inline fun <T> storeAndNotify(
     httpClient: HttpClient,
-    notificationEndpoint: String?,
-    notificationId: String?,
-    accessToken: String,
-    tokenType: String,
-    dpopProofFactory: DPoPProofFactory? = null,
-    crossinline block: suspend () -> T,
+    target: IssuerNotificationTarget,
+    eventDescription: String? = null,
+    block: () -> T,
 ): T = try {
-    val result = block()
+    val stored = block()
     deliverCredentialNotification(
         httpClient = httpClient,
-        notificationEndpoint = notificationEndpoint,
-        notificationId = notificationId,
-        accessToken = accessToken,
-        tokenType = tokenType,
+        target = target,
         event = NotificationEvent.CREDENTIAL_ACCEPTED,
-        dpopProofFactory = dpopProofFactory,
+        eventDescription = eventDescription,
     )
-    result
+    stored
 } catch (error: CancellationException) {
     throw error
 } catch (error: Exception) {
     deliverCredentialNotification(
         httpClient = httpClient,
-        notificationEndpoint = notificationEndpoint,
-        notificationId = notificationId,
-        accessToken = accessToken,
-        tokenType = tokenType,
+        target = target,
         event = NotificationEvent.CREDENTIAL_FAILURE,
-        dpopProofFactory = dpopProofFactory,
+        eventDescription = eventDescription,
     )
     throw error
+}
+
+internal suspend fun deliverCredentialNotification(
+    httpClient: HttpClient,
+    target: IssuerNotificationTarget,
+    event: NotificationEvent,
+    eventDescription: String? = null,
+) {
+    deliverCredentialNotification(
+        httpClient = httpClient,
+        notificationEndpoint = target.notificationEndpoint,
+        notificationId = target.notificationId,
+        accessToken = target.accessToken,
+        tokenType = target.tokenType,
+        event = event,
+        eventDescription = eventDescription,
+        dpopProofFactory = target.dpopProofFactory,
+    )
 }
 
 /**
@@ -65,13 +86,9 @@ internal suspend fun deliverCredentialNotification(
 ) {
     val endpoint = notificationEndpoint ?: return
     val id = notificationId ?: return
-    val accessTokenType = when {
-        tokenType.equals("DPoP", ignoreCase = true) -> NotificationAccessTokenType.DPOP
-        tokenType.equals("Bearer", ignoreCase = true) -> NotificationAccessTokenType.BEARER
-        else -> {
-            notificationLog.warn { "Skipping issuer notification for unsupported token type, event=$event" }
-            return
-        }
+    val accessTokenType = NotificationAccessTokenType.fromTokenType(tokenType) ?: run {
+        notificationLog.warn { "Skipping issuer notification for unsupported token type, event=$event" }
+        return
     }
     if (accessTokenType == NotificationAccessTokenType.DPOP && dpopProofFactory == null) {
         notificationLog.warn { "Skipping issuer notification because the DPoP access token has no proof, event=$event" }
@@ -79,17 +96,19 @@ internal suspend fun deliverCredentialNotification(
     }
 
     try {
-        val result = NotificationRequestBuilder(httpClient).send(
-            notificationEndpoint = endpoint,
-            accessToken = accessToken,
-            accessTokenType = accessTokenType,
-            request = NotificationRequest(
-                notificationId = id,
-                event = event,
-                eventDescription = eventDescription,
-            ),
-            dpopProofFactory = dpopProofFactory,
-        )
+        val result = withTimeout(NOTIFICATION_DELIVERY_TIMEOUT) {
+            NotificationRequestBuilder(httpClient).send(
+                notificationEndpoint = endpoint,
+                accessToken = accessToken,
+                accessTokenType = accessTokenType,
+                request = NotificationRequest(
+                    notificationId = id,
+                    event = event,
+                    eventDescription = eventDescription,
+                ),
+                dpopProofFactory = dpopProofFactory,
+            )
+        }
         when (result) {
             is NotificationDeliveryResult.Success -> Unit
             is NotificationDeliveryResult.Failure -> notificationLog.warn {
@@ -98,12 +117,27 @@ internal suspend fun deliverCredentialNotification(
             is NotificationDeliveryResult.OAuthFailure -> notificationLog.warn {
                 "Issuer notification authorization failed: status=${result.statusCode}, error=${result.error?.error}, event=$event"
             }
+            is NotificationDeliveryResult.TransportFailure -> notificationLog.warn {
+                "Issuer notification transport failed: error=${result.error}, status=${result.statusCode}, event=$event"
+            }
         }
+    } catch (error: TimeoutCancellationException) {
+        notificationLog.warn { "Issuer notification timed out, event=$event" }
     } catch (error: CancellationException) {
         throw error
     } catch (error: Exception) {
         notificationLog.warn(error) { "Issuer notification delivery failed for event=$event" }
     }
+}
+
+internal fun DpopRequestContext.toProofFactory(accessToken: String): DPoPProofFactory = { endpoint, nonce ->
+    buildDpopProof(
+        keyMaterial = keyMaterial,
+        algorithms = algorithms,
+        endpoint = endpoint,
+        accessToken = accessToken,
+        nonce = nonce,
+    )
 }
 
 internal fun dpopProofFactoryFor(
@@ -113,13 +147,5 @@ internal fun dpopProofFactoryFor(
     accessToken: String,
 ): DPoPProofFactory? {
     val algorithms = dpopAlgorithmsForToken(tokenType, dpopAlgorithms) ?: return null
-    return { endpoint, nonce ->
-        buildDpopProof(
-            keyMaterial = keyMaterial,
-            algorithms = algorithms,
-            endpoint = endpoint,
-            accessToken = accessToken,
-            nonce = nonce,
-        )
-    }
+    return DpopRequestContext(algorithms, keyMaterial).toProofFactory(accessToken)
 }

@@ -7,6 +7,7 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.notifications.IssuanceNotifications
@@ -399,3 +400,9 @@ class Issuer2NotificationEndpointTest {
         val notificationId: String,
     )
 }
+
+private val IssuanceSession.walletNotificationEvent
+    get() = issuanceResults.values.singleOrNull()?.walletNotificationEvent
+
+private val IssuanceSession.walletNotificationEventDescription
+    get() = issuanceResults.values.singleOrNull()?.walletNotificationEventDescription

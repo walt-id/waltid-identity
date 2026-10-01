@@ -108,6 +108,54 @@ class WalletIssuanceNotificationTest {
     }
 
     @Test
+    fun deferredPollPresentsDpopAccessTokenAndProof() = runTest {
+        val authorizations = mutableListOf<String?>()
+        val proofs = mutableListOf<String?>()
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    when (request.url.toString()) {
+                        "$ISSUER/.well-known/openid-credential-issuer" -> respondJson(ISSUER_METADATA)
+                        "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
+                        "$ISSUER/deferred", "$ISSUER/notification" -> {
+                            authorizations += request.headers[HttpHeaders.Authorization]
+                            proofs += request.headers["DPoP"]
+                            if (request.url.toString().endsWith("/notification")) {
+                                respond(content = "", status = HttpStatusCode.NoContent)
+                            } else {
+                                respondJson(credentialResponse(1))
+                            }
+                        }
+                        else -> error("Unexpected request: ${request.method.value} ${request.url}")
+                    }
+                }
+            }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+        }
+
+        val wallet = wallet()
+        val stored = WalletIssuanceHandler.pollDeferredFlow(
+            wallet = wallet,
+            request = PollDeferredRequest(
+                deferredCredentialEndpoint = Url("$ISSUER/deferred"),
+                transactionId = "transaction-1",
+                accessToken = "access-token",
+                credentialIssuerBaseUrl = ISSUER,
+                credentialConfigurationId = "pid",
+                tokenType = "DPoP",
+                dpopKeyId = wallet.staticKey!!.getKeyId(),
+            ),
+            httpClient = client,
+        ).toList()
+
+        assertEquals(1, stored.size)
+        assertEquals(2, authorizations.size)
+        assertTrue(authorizations.all { it?.startsWith("DPoP ") == true })
+        assertEquals(2, proofs.size)
+        assertTrue(proofs.all { !it.isNullOrBlank() })
+    }
+
+    @Test
     fun reportCredentialDeletedPostsDeletedEvent() = runTest {
         val notifications = mutableListOf<String>()
         val client = HttpClient(MockEngine) {
@@ -221,7 +269,8 @@ class WalletIssuanceNotificationTest {
               "issuer": "$ISSUER",
               "authorization_endpoint": "$ISSUER/authorize",
               "token_endpoint": "$ISSUER/token",
-              "response_types_supported": ["code"]
+              "response_types_supported": ["code"],
+              "dpop_signing_alg_values_supported": ["EdDSA"]
             }
         """
         const val CREDENTIAL = """
