@@ -12,8 +12,8 @@ RUN npm run build
 
 FROM node:22-slim
 
-RUN groupadd --system --gid 10001 appgroup && \
-    useradd --system --uid 10001 --gid appgroup --no-create-home --home-dir /app --shell /usr/sbin/nologin appuser
+RUN groupadd --gid 10001 appgroup && \
+    useradd --uid 10001 --gid appgroup --no-create-home --home-dir /app --shell /usr/sbin/nologin appuser
 
 COPY --from=buildstage --chown=appuser:appgroup /build/.output/ /app
 WORKDIR /app
