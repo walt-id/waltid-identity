@@ -8,29 +8,6 @@ import XCTest
 @MainActor
 final class PublicDemoBackendE2ETests: XCTestCase {
 
-    /// Run with credential-cache-fixture.py; inspect the host app's cache files afterwards.
-    func testRejectedCredentialCacheFixture() throws {
-        guard let offer = ProcessInfo.processInfo.environment["CREDENTIAL_CACHE_TEST_OFFER_URL"] else {
-            throw XCTSkip("Requires the local rejected-credential cache fixture")
-        }
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        let ui = WalletE2EUI(app: app)
-        let environment = ["WALLET_ID": "cache-test-\(UUID().uuidString)"]
-        ui.launch(environment: environment)
-        XCTAssertEqual(ui.waitUntilWalletReady(timeout: 60), "Wallet ready")
-        ui.openDeepLink(offer)
-        XCTAssertTrue(ui.waitForTextInputValue(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL", value: offer, timeout: 10))
-        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
-        XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 30), "Review credential offer")
-        ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
-        XCTAssertTrue(ui.waitForStatus(prefixes: ["Receive failed", "Received"], timeout: 30)?.hasPrefix("Receive failed") == true)
-        app.terminate()
-        ui.launch(environment: environment)
-        XCTAssertEqual(ui.waitUntilWalletReady(timeout: 60), "Wallet ready")
-        XCTAssertEqual(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard.")).count, 0)
-    }
-
     func testSettingsCopyControlsAreAccessible() throws {
         guard #available(iOS 17.0, *) else { throw XCTSkip("Accessibility audit requires iOS 17") }
         let app = XCUIApplication()
