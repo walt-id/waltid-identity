@@ -231,15 +231,19 @@ class KeyAttestationProofTest {
     }
 
     @Test
-    fun `attested keys without a verified DID cannot produce W3C credentials`() = runTest {
+    fun `attested keys without a DID can produce W3C credentials when JWK binding is advertised`() = runTest {
         val attester = key()
         val holder = key()
         val provider = buildOAuth2Provider(createTestConfig(credentialProofVerifier = verifier))
+        val issuerKey = key()
         val response = provider.createCredentialResponse(
             request(proof(holder, attestation(attester, listOf(holder, key())))), configuration.copy(format = CredentialFormat.JWT_VC_JSON),
-            key(), issuer, CredentialIssuanceInputProvider { error("Must not allocate") }, proofValidationContext = context(attester),
+            issuerKey, issuer, CredentialIssuanceInputProvider { count -> List(count) { CredentialIssuanceInput(w3cData()) } },
+            proofValidationContext = context(attester),
         )
-        assertEquals(CredentialErrorCodes.INVALID_PROOF, assertIs<CredentialResponseResult.Failure>(response).error.error)
+        val credentials = assertNotNull(assertIs<CredentialResponseResult.Success>(response).response.credentials)
+        assertEquals(2, credentials.size)
+        credentials.forEach { assertTrue(issuerKey.verifyJws(it.credential.jsonPrimitive.content).isSuccess) }
     }
 
     @Test
@@ -283,22 +287,33 @@ class KeyAttestationProofTest {
                 var allocated = 0
                 val inputs = CredentialIssuanceInputProvider { count ->
                     allocated += count
-                    List(count) { CredentialIssuanceInput(buildJsonObject { put("name", "Alice") }) }
+                    List(count) { CredentialIssuanceInput(w3cData()) }
                 }
                 val response = if (useCrypto2) provider.createCredentialResponse(
                     request, w3c, Crypto2CredentialSigningKey.select(crypto2IssuerKey, w3c), issuer, inputs, proofValidationContext = context,
                 ) else provider.createCredentialResponse(request, w3c, issuerKey, issuer, inputs, proofValidationContext = context)
-                if (useCustom) {
-                    assertEquals(2, assertIs<CredentialResponseResult.Success>(response).response.credentials!!.size)
-                    assertEquals(2, allocated)
-                } else {
-                    assertEquals(CredentialErrorCodes.INVALID_PROOF, assertIs<CredentialResponseResult.Failure>(response).error.error)
-                    assertEquals(0, allocated)
+                val credentials = assertNotNull(assertIs<CredentialResponseResult.Success>(response).response.credentials)
+                assertEquals(2, credentials.size)
+                assertEquals(2, allocated)
+                if (!useCustom) credentials.forEach { credential ->
+                    val jwt = credential.credential.jsonPrimitive.content
+                    if (useCrypto2) CompactJws.verify(jwt, crypto2IssuerKey, JwsAlgorithm.ES256)
+                    else assertTrue(issuerKey.verifyJws(jwt).isSuccess)
+                    val payload = Json.parseToJsonElement(CompactJws.decodeUnverified(jwt).payload.decodeToString()).jsonObject
+                    assertEquals(issuer, payload["iss"]?.jsonPrimitive?.content)
+                    assertTrue(payload["sub"]?.jsonPrimitive?.content.isNullOrEmpty())
+                    assertEquals("Alice", payload.getValue("vc").jsonObject.getValue("credentialSubject").jsonObject["name"]?.jsonPrimitive?.content)
                 }
             }
         }
         assertEquals(2, validations)
         assertEquals(2, signatures)
+    }
+
+    private fun w3cData() = buildJsonObject {
+        put("@context", JsonArray(listOf(JsonPrimitive("https://www.w3.org/2018/credentials/v1"))))
+        put("type", JsonArray(listOf(JsonPrimitive("VerifiableCredential"))))
+        putJsonObject("credentialSubject") { put("name", "Alice") }
     }
 
     @Test

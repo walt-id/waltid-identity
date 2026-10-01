@@ -220,7 +220,8 @@ class StandaloneAttestationProofTest {
                     List(count) { CredentialIssuanceInput(buildJsonObject { put("name", "Alice") }) }
                 }, proofValidationContext = context,
             )
-        for (invalid in listOf(configuration.copy(format = CredentialFormat.JWT_VC_JSON),
+        for (invalid in listOf(configuration.copy(format = CredentialFormat.JWT_VC_JSON,
+                cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.DidJwk)),
             configuration.copy(cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Did("jwk"))))) {
             assertIs<CredentialResponseResult.Failure>(issue(invalid))
             assertEquals(0, allocated)
