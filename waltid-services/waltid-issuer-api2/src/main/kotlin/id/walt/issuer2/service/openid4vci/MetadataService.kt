@@ -68,7 +68,7 @@ class MetadataService(
         }
 
     init {
-        validateKeyAttestationConfiguration(credentialConfigurations.values, serviceConfig.keyAttestationConfig)
+        validateKeyAttestationConfiguration(credentialConfigurations.values, serviceConfig.keyAttestationConfig, nonceValidationConfigured = true)
     }
 
     private val configuredTypeMetadata: Map<String, SdJwtVcTypeMetadataDraft04> = buildMap {
