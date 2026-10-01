@@ -1,5 +1,6 @@
 name: Release candidate on manual push
-# release-evidence.yml in waltid-identity-enterprise finds this run by its name to collect the test results.
+# release-evidence.yml in waltid-identity-enterprise finds this run by its name to collect the test results,
+# and the release-sonar-snapshot.yml run dispatched by the sonar-snapshot job by the tag.
 run-name: Release candidate ${{ inputs.release_version }}
 
 on:
@@ -163,6 +164,25 @@ jobs:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           wait-for-completion: true
           sync-status: true
+  sonar-snapshot:
+    name: SonarCloud snapshot
+    runs-on: ubuntu-latest
+    needs: [ version, tag ]
+    steps:
+      # SonarCloud only reports on the latest analysis of main, so record it for the release evidence
+      # now, while main still points at the tagged commits. Waits up to 30 minutes for the analysis.
+      - name: Dispatch release-sonar-snapshot.yml and wait
+        uses: benc-uk/workflow-dispatch@v1.3.2
+        with:
+          workflow: release-sonar-snapshot.yml
+          repo: walt-id/waltid-identity-enterprise
+          ref: ${{ needs.tag.outputs.tag }}
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          wait-for-completion: true
+          wait-timeout-seconds: 2700
+          wait-interval-seconds: 30
+          sync-status: true
+          inputs: '{"version": "${{ needs.version.outputs.release_version }}"}'
   docker:
     uses: ./.github/workflows/docker.yml
     secrets: inherit
