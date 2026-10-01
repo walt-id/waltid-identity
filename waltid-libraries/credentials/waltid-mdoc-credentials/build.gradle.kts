@@ -35,7 +35,7 @@ kotlin {
             //implementation("at.asitplus.wallet:mobiledrivinglicence:1.2.0")
         }
         jsMain.dependencies {
-            implementation(npm("cose-js", "0.9.0"))
+            implementation(npm("cose-js", identityLibs.versions.cose.js.get()))
         }
     }
 }

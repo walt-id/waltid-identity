@@ -5,10 +5,6 @@ plugins {
 
 group = "id.walt.etsi"
 
-object Versions {
-    const val HOPLITE_VERSION = "2.9.0"
-}
-
 dependencies {
     // walt.id libraries
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -31,8 +27,8 @@ dependencies {
     implementation(identityLibs.clikt.core)
 
     // Config (HOCON)
-    implementation("com.sksamuel.hoplite:hoplite-core:${Versions.HOPLITE_VERSION}")
-    implementation("com.sksamuel.hoplite:hoplite-hocon:${Versions.HOPLITE_VERSION}")
+    implementation(identityLibs.hoplite.core)
+    implementation(identityLibs.hoplite.hocon)
 
     // Logging
     implementation(identityLibs.oshai.kotlinlogging)

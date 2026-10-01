@@ -76,8 +76,8 @@ kotlin {
         jsMain.dependencies {
             implementation(identityLibs.ktor.client.js)
 
-            implementation(npm("canonicalize", "2.0.0"))
-            implementation(npm("uuid", "9.0.1"))
+            implementation(npm("canonicalize", identityLibs.versions.canonicalize.npm.get()))
+            implementation(npm("uuid", identityLibs.versions.uuid.npm.get()))
         }
     }
 }
