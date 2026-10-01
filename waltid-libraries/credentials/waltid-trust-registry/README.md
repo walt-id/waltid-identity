@@ -179,7 +179,7 @@ when (decision.decision) {
 }
 ```
 
-Certificate-chain resolution can build a path from a presented leaf to a registry-owned trust anchor; the presented chain does not need to contain that anchor. Candidate anchors are narrowed by exact SHA-256 pin and by Authority/Subject Key Identifier match before PKIX validation runs, falling back to a full scan only if narrowing finds nothing - so a registry with unrelated cross-signed anchors for the same chain may report a single match via narrowing instead of `MULTIPLE_MATCHES`.
+Certificate-chain resolution can build a path from a presented leaf to a registry-owned trust anchor; the presented chain does not need to contain that anchor. Candidate anchors are narrowed by exact SHA-256 pin and by Authority/Subject Key Identifier match before PKIX validation runs, falling back to a full scan only if narrowing finds nothing. This never misses a match: the JDK's PKIX path builder only completes a path to an anchor whose Subject Key Identifier matches the presented chain's Authority Key Identifier, so narrowing's own Subject Key Identifier lookup already finds every anchor that could validate — including a registry with the same anchor registered more than once, which still reports `MULTIPLE_MATCHES` correctly.
 
 ## Source lifecycle
 

@@ -48,17 +48,9 @@ class CertificateChainNarrowingTest {
 
     @Test
     fun `narrowing still reports MULTIPLE_MATCHES when the same anchor is registered under two entities`() = runTest {
-        // The same root certificate registered twice (e.g. imported from two overlapping trust
-        // lists), under two different entities. Both copies share the real root's Subject Key
-        // Identifier, so narrowing's lookup finds both, not just one - the documented
-        // narrowed-candidates trade-off (README: "a registry with unrelated cross-signed anchors
-        // ... may report a single match via narrowing instead of MULTIPLE_MATCHES") does not
-        // apply here, and this is the realistic shape that trade-off's name suggests: the JDK's
-        // own PKIX path builder refuses to complete a path to any candidate whose Subject Key
-        // Identifier does not match the presented chain's Authority Key Identifier, so the only
-        // registry anchors narrowing could even miss are ones that would never independently
-        // validate in the first place - the full scan it falls back from could not have found
-        // them either.
+        // The same root certificate registered twice, under two different entities. Both copies
+        // share the real root's Subject Key Identifier, so narrowing's lookup finds both, not
+        // just one, and MULTIPLE_MATCHES still fires correctly.
         val chain = TestCertificates.createChain("Duplicate Registration")
         val service = DefaultTrustRegistryService(InMemoryTrustStore())
         assertTrue(

@@ -117,11 +117,11 @@ class DefaultTrustRegistryService(
 
         // Falls back to the exhaustive scan only when narrowing found no valid path - e.g. the
         // stored certificate has no Subject Key Identifier, or the presented chain has no
-        // Authority Key Identifier - so no valid path is ever missed. The one behavior narrowing
-        // does not preserve: if a *second*, cryptographically unrelated anchor elsewhere in the
-        // registry would also validate this exact chain (cross-signed/bridge CAs, or a duplicate
-        // identity stored under different key material), only the narrowed match is reported and
-        // MULTIPLE_MATCHES will not be raised for it. Trust correctness is unaffected.
+        // Authority Key Identifier - so no valid path is ever missed. This also loses nothing for
+        // MULTIPLE_MATCHES: the JDK's own PKIX path builder only completes a path to an anchor
+        // whose Subject Key Identifier matches the presented chain's Authority Key Identifier, so
+        // every anchor that could validate this chain is one the Subject Key Identifier lookup
+        // above already finds.
         val pathMatches = narrowedMatches.ifEmpty {
             val identitiesByAnchor = decodeIdentityAnchors(store.listCertificateIdentities().toList())
             identitiesByAnchor.filter { (_, anchor) ->
