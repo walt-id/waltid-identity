@@ -295,24 +295,24 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
         val ownedEvidence = evidence.snapshot()
         val chain =
             runCatching { ownedEvidence.certificateChainDerBase64Url.map(String::toX509Certificate) }
-                .getOrElse { return invalidPathDecision() }
+                .getOrElse { return invalidPathDecision("Failed to parse certificate: ${it.message}") }
         val leaf = chain.first()
         val readerName = runCatching {
             leaf.mdocReaderAuthenticationCommonName
-        }.getOrElse { return invalidPathDecision() }
+        }.getOrElse { return invalidPathDecision("Failed to evaluate reader name from leaf certificate") }
 
         val previewValidationResult =
             mdocReaderAuthenticationX509CertificateUtil.validateCertificateChain(
                 chain,
                 InMemoryTrustStore()
             )
-        val hasNonSignatureRelatedErrors = previewValidationResult.log.any {
+        val nonSignatureRelatedErrors = previewValidationResult.log.filter {
             it.severity == ValidationResult.Severity.ERROR &&
                     it.validatorId != X509CertificateSignatureValidator.ID &&
                     it.validatorId != "${IsoMdocReaderAuthenticationX509CertificateProfile.ID}.chain-length" //chain-length can also not be valuated without trust
         }
-        if (hasNonSignatureRelatedErrors) {
-            return invalidPathDecision()
+        if (nonSignatureRelatedErrors.isNotEmpty()) {
+            return invalidPathDecision("Certificate chain errors: ${nonSignatureRelatedErrors.joinToString { it.message }}")
         }
 
         for (anchor in ownedConfiguration.trustAnchors) {
@@ -513,13 +513,13 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
                 val requiredIssuer = issuer.toX509Certificate()
                 if (path.getOrNull(1)?.encodedDer != requiredIssuer.encodedDer) {
                     //issuer is not equal to the required issuer
-                    return invalidPathDecision()
+                    return invalidPathDecision("Issuer certificate doesn't equal to requiredIacaIssuerCertificate")
                 }
                 if (!iaCaContactInformationValidator.validate(path.first()).valid) {
                     //reader certificate lacks the issuing CA's contact information (IssuerAltName with email or URI)
-                    return invalidPathDecision()
+                    return invalidPathDecision("Reader certificate doesn't contain issuing CA's contact information")
                 }
-            }.getOrElse { return invalidPathDecision() }
+            }.getOrElse { return invalidPathDecision(null) }
         }
         //issuer is required issuer, or no required issuer is set
         return when (val revocation = evaluateRevocation(evidence, path)) {
@@ -622,11 +622,11 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
         return if (candidate.state.priority() > state.priority()) candidate else this
     }
 
-    private fun invalidPathDecision(): ProximityReaderTrustDecision =
+    private fun invalidPathDecision(reason: String?): ProximityReaderTrustDecision =
         ProximityReaderTrustDecision(
             state = ProximityReaderTrustState.ValidButUntrusted,
             certificatePath = ProximityReaderCertificatePathState.Invalid,
-            reason = "Reader authentication certificate path or profile is invalid",
+            reason = reason ?: "Reader authentication certificate path or profile is invalid",
         )
 
     private companion object {
