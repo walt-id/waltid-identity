@@ -86,9 +86,9 @@ public final class DemoBackend {
 
     private static let issuerBaseURL = URL(string: "https://issuer2.demo.walt.id")!
     public static let issuerIdentifier = "https://issuer2.demo.walt.id/openid4vci"
-    // RFC 7638 thumbprint of the public issuer2 signing key from /openid4vci/jwks (verified 2026-09-15).
+    // RFC 7638 thumbprint of the public issuer2 signing key from /openid4vci/jwks (verified 2026-09-29).
     // This independent pin must not be learned from the signed metadata JWT.
-    private static let issuerMetadataSigningKeyThumbprint = "Tq0T3ytmPJnXFBBrP2-7c_5R_eSV5T0pMtPPuWcArac"
+    private static let issuerMetadataSigningKeyThumbprint = "2iEFnGUV5WKiB1JWV8pBeqEDzqJJJ7-7m65b5NRFdOo"
     private static let verifierBaseURL = URL(string: "https://verifier2.demo.walt.id")!
     /// The public verifier requires this explicit client ID for signed request objects.
     public static let verifierClientID = "verifier2"
@@ -214,8 +214,7 @@ public final class DemoBackend {
     public func createResponseBoundVerifierSession(scenario: DemoCredentialScenario) async throws -> DemoVerifierSession {
         try await createVerifierSession(
             scenario: scenario,
-            transactionData: [],
-            bindClientIDToResponseURI: true
+            transactionData: []
         )
     }
 
@@ -258,24 +257,19 @@ public final class DemoBackend {
     private func createVerifierSession(
         scenario: DemoCredentialScenario,
         transactionData: [[String: Any]],
-        bindClientIDToResponseURI: Bool = false,
         signedRequest: Bool = false
     ) async throws -> DemoVerifierSession {
-        precondition(
-            !(bindClientIDToResponseURI && signedRequest),
-            "A signed verifier request cannot use a response-bound redirect_uri client ID"
-        )
         let endpoint = Self.verifierBaseURL
             .appendingPathComponent("verification-session")
             .appendingPathComponent("create")
-        let requestedSessionID = bindClientIDToResponseURI ? UUID().uuidString.lowercased() : nil
+        let requestedSessionID = signedRequest ? nil : UUID().uuidString.lowercased()
         var coreFlow: [String: Any] = [
+            "signed_request": signedRequest,
             "dcql_query": [
                 "credentials": [scenario.verifierCredentialQuery],
             ],
         ]
         if signedRequest {
-            coreFlow["signed_request"] = true
             coreFlow["clientId"] = Self.verifierClientID
         }
         if let requestedSessionID {
@@ -334,7 +328,7 @@ public final class DemoBackend {
 
         let inlineQuery = inlineComponents.queryItems ?? []
         let bootstrapQuery = bootstrapComponents.queryItems ?? []
-        if bindClientIDToResponseURI {
+        if !signedRequest {
             let expectedResponseURI = Self.verifierBaseURL
                 .appendingPathComponent("verification-session")
                 .appendingPathComponent(sessionID)

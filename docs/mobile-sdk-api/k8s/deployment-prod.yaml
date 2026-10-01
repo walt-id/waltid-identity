@@ -55,9 +55,20 @@ spec:
   tls:
     - hosts:
         - sdk.docs.walt.id
+        - ios-sdk.docs.walt.id
       secretName: sdk-docs-tls-secret
   rules:
     - host: sdk.docs.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sdk-docs
+                port:
+                  name: http
+    - host: ios-sdk.docs.walt.id
       http:
         paths:
           - path: /

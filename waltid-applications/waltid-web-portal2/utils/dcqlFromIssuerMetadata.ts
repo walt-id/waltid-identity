@@ -81,6 +81,31 @@ export function isMdocConfiguration(
   return configuration?.format === "mso_mdoc";
 }
 
+/** PID claims that wallets typically accept; extra metadata claims stay optional. */
+export const DEFAULT_PID_CLAIM_NAMES = new Set([
+  "family_name",
+  "given_name",
+  "birth_date",
+]);
+
+export function defaultSelectedClaimIds(
+  configuration?: IssuerMetadataForDcql,
+  configurationId?: string,
+): string[] {
+  const claims = claimsFromIssuerMetadata(configuration);
+  if (!isPidConfiguration(configuration, configurationId)) {
+    return claims.map((claim) => claim.id);
+  }
+
+  const defaults = claims.filter((claim) => {
+    const name = claim.path[claim.path.length - 1];
+    return name !== undefined && DEFAULT_PID_CLAIM_NAMES.has(name);
+  });
+  return defaults.length > 0
+    ? defaults.map((claim) => claim.id)
+    : claims.map((claim) => claim.id);
+}
+
 export function claimsFromIssuerMetadata(
   configuration?: IssuerMetadataForDcql,
 ): MetadataClaimOption[] {
