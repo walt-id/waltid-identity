@@ -26,12 +26,14 @@ class AttestationCredentialProofHandler(
     ) {
         require(capabilities.keyAttestation) { "Standalone attestation requires keyAttestationConfig trust material" }
         require(capabilities.issuerBoundNonce) { "Standalone attestation requires issuer-bound nonce validation" }
-        require(configuration.format in setOf(CredentialFormat.SD_JWT_VC, CredentialFormat.MSO_MDOC)) {
+        val w3c = configuration.format in setOf(CredentialFormat.JWT_VC_JSON, CredentialFormat.JWT_VC)
+        require(w3c || configuration.format in setOf(CredentialFormat.SD_JWT_VC, CredentialFormat.MSO_MDOC)) {
             "Standalone attestation requires a credential handler supporting attested key bindings"
         }
         require(configuration.cryptographicBindingMethodsSupported?.any {
-            it == CryptographicBindingMethod.Jwk || it == CryptographicBindingMethod.CoseKey
-        } != false) { "Standalone attestation has no compatible binding method" }
+            it is CryptographicBindingMethod.Did ||
+                !w3c && (it == CryptographicBindingMethod.Jwk || it == CryptographicBindingMethod.CoseKey)
+        } != false) { "Standalone attestation has no compatible binding method; W3C JWT credentials require DID binding" }
     }
 
     override suspend fun verify(

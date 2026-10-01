@@ -257,4 +257,102 @@ class StandaloneAttestationProofTest {
         assertEquals(setOf(ProofType.JWT.value), jwtOnly.proofTypesSupported!!.keys)
         assertNull(jwtOnly.proofTypesSupported[ProofType.JWT.value]!!.keyAttestationsRequired)
     }
+
+    @Test
+    fun `standalone and nested attestations issue W3C credentials for each verified DID in both signing APIs`() = runTest {
+        DidService.minimalInit()
+        val attester = key()
+        val holders = listOf(key(), key())
+        val dids = listOf(DidService.registerByKey("jwk", holders[0]).did, DidService.registerByKey("key", holders[1]).did)
+        val kids = dids.map { did -> DidService.resolveToCrypto2Keys(did).getOrThrow().single().id.value }
+        val jwks = holders.mapIndexed { index, holder -> JsonObject(holder.exportPublicJwkObject() + ("kid" to JsonPrimitive(kids[index]))) }
+        val issuerKey = key()
+        val legacyIssuerKey = JWKKey.generate(KeyType.secp256r1)
+        val service = nonceService(issuerKey)
+        val nonce = service.issue(binding).nonce
+        val context = context(attester, service)
+        val attestation = token(attester, holders, nonce, mapOf("attested_keys" to JsonArray(jwks + jwks[0])))
+        val nested = CompactJws.sign(buildJsonObject {
+            put("aud", issuer); put("iat", now.epochSeconds); put("nonce", nonce)
+        }.toString().encodeToByteArray(), holders[0], JwsAlgorithm.ES256, buildJsonObject {
+            put("typ", "openid4vci-proof+jwt"); put("kid", kids[0]); put("key_attestation", attestation)
+        })
+        val provider = buildOAuth2Provider(createTestConfig(credentialProofVerifier = verifier))
+        for (format in listOf(CredentialFormat.JWT_VC_JSON, CredentialFormat.JWT_VC)) {
+            val w3c = configuration.copy(format = format, vct = null,
+                cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.DidJwk, CryptographicBindingMethod.DidKey),
+                proofTypesSupported = mapOf(ProofType.JWT.value to ProofTypeMetadata(setOf("ES256")),
+                    ProofType.ATTESTATION.value to ProofTypeMetadata(setOf("ES256"))))
+            for (proofs in listOf(Proofs(attestation = listOf(attestation)), Proofs(jwt = listOf(nested)))) {
+                val request = request(attestation).copy(proofs = proofs)
+                val verified = verifier.verify(request, w3c, context)
+                assertEquals(dids, verified.bindings.map { it.holderDid })
+                assertEquals(kids, verified.bindings.map { it.holderKid })
+                assertTrue(verified.bindings.all { it.proofIndexes == setOf(0) })
+                for (crypto2 in listOf(false, true)) {
+                    var allocated = 0
+                    val inputs = CredentialIssuanceInputProvider { count ->
+                        allocated += count
+                        List(count) { CredentialIssuanceInput(buildJsonObject {
+                            put("@context", JsonArray(listOf(JsonPrimitive("https://www.w3.org/2018/credentials/v1"))))
+                            put("type", JsonArray(listOf(JsonPrimitive("VerifiableCredential"))))
+                            put("credentialSubject", buildJsonObject { put("name", "Alice") })
+                        }) }
+                    }
+                    val response = if (crypto2) provider.createCredentialResponse(request, w3c,
+                        Crypto2CredentialSigningKey.select(issuerKey, w3c), issuer, inputs, proofValidationContext = context)
+                    else provider.createCredentialResponse(request, w3c, legacyIssuerKey, issuer, inputs, proofValidationContext = context)
+                    val credentials = assertIs<CredentialResponseResult.Success>(response).response.credentials!!
+                    assertEquals(2, allocated)
+                    assertEquals(dids, credentials.map {
+                        val payload = Json.parseToJsonElement(CompactJws.decodeUnverified(it.credential.jsonPrimitive.content).payload.decodeToString()).jsonObject
+                        payload.getValue("sub").jsonPrimitive.content
+                    })
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `invalid or missing attested DID bindings fail before W3C input allocation`() = runTest {
+        DidService.minimalInit()
+        val attester = key()
+        val holder = key()
+        val otherHolder = key()
+        val did = DidService.registerByKey("jwk", holder).did
+        val kid = "$did#0"
+        val holderJwk = holder.exportPublicJwkObject()
+        val didJwk = JsonObject(holderJwk + ("kid" to JsonPrimitive(kid)))
+        val issuerKey = key()
+        val service = nonceService(issuerKey)
+        val nonce = service.issue(binding).nonce
+        val context = context(attester, service)
+        val w3c = configuration.copy(format = CredentialFormat.JWT_VC_JSON,
+            cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.DidJwk))
+        val provider = buildOAuth2Provider(createTestConfig(credentialProofVerifier = verifier))
+        val invalidKeys = listOf(
+            listOf(JsonObject(otherHolder.exportPublicJwkObject() + ("kid" to JsonPrimitive(kid)))),
+            listOf(JsonObject(holderJwk + ("kid" to JsonPrimitive("$did#missing")))),
+            listOf(JsonObject(holderJwk + ("kid" to JsonPrimitive("did:key:unsupported#key")))),
+            listOf(JsonObject(holderJwk + ("kid" to JsonPrimitive("did:jwk:not-a-jwk#0")))),
+            listOf(JsonObject(holderJwk + ("kid" to JsonPrimitive("did: :invalid#0")))),
+            listOf(JsonObject(holderJwk + ("kid" to JsonPrimitive(123)))),
+            listOf(JsonObject(holderJwk + ("kid" to JsonPrimitive("ordinary-key-id")))),
+            listOf(holderJwk),
+            listOf(didJwk, otherHolder.exportPublicJwkObject()),
+        )
+        for (keys in invalidKeys) {
+            // Even a DID in the trusted attester's header must never become a holder DID.
+            val jwt = token(attester, listOf(holder), nonce, mapOf("attested_keys" to JsonArray(keys)),
+                header = buildJsonObject { put("typ", "key-attestation+jwt"); put("kid", kid) })
+            val response = provider.createCredentialResponse(request(jwt), w3c,
+                Crypto2CredentialSigningKey.select(issuerKey, w3c), issuer,
+                CredentialIssuanceInputProvider { error("Invalid binding must not allocate inputs") }, proofValidationContext = context)
+            assertEquals(CredentialErrorCodes.INVALID_PROOF, assertIs<CredentialResponseResult.Failure>(response).error.error)
+        }
+        val jwt = token(attester, listOf(holder), nonce, mapOf("attested_keys" to JsonArray(listOf(didJwk))))
+        assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(request(jwt), w3c.copy(cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.DidWeb)), context)
+        }
+    }
 }
