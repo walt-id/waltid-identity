@@ -1,4 +1,6 @@
 name: Release candidate on manual push
+# release-evidence.yml in waltid-identity-enterprise finds this run by its name to collect the test results.
+run-name: Release candidate ${{ inputs.release_version }}
 
 on:
   workflow_dispatch:
@@ -132,6 +134,7 @@ jobs:
       run-haip-conformance: true
       report-check-name: 'gradle / gradle (ubuntu-22.04)'
       conformance-report-check-name: 'gradle / conformance (ubuntu-22.04)'
+      upload-test-results: true
   integration-test-aws:
     name: Integration Tests - AWS
     runs-on: ubuntu-latest
