@@ -54,6 +54,7 @@ class IssuerConformanceTestRunner(
     private val keyAttesterJwks: JsonObject? = null,
     private val requireKeyAttestationPass: Boolean = System.getenv("OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS")
         ?.toBooleanStrict() ?: false,
+    private val proofModes: List<String> = parseIssuerProofModes(System.getenv("OPENID4VCI_CONFORMANCE_PROOF_MODES")),
 ) {
     suspend fun run(): List<TestPlanResult> {
         val conformance = ConformanceInterface(conformanceHost, conformancePort)
@@ -85,7 +86,8 @@ class IssuerConformanceTestRunner(
     ): List<TestPlanResult> {
         val resolvedIds = resolveCredentialConfigurationIds(metadata)
         val allVariants = IssuerVariantMatrix.all()
-        val selectedVariants = variantSelection.select(allVariants)
+        val selectedVariants = variantSelection.select(expandIssuerProofModes(allVariants, proofModes))
+        val protocolVariants = selectedVariants.map { it.copy(credentialProofType = null) }.distinct()
 
         require(selectedVariants.isNotEmpty()) {
             "No OpenID4VCI issuer variants selected. Check OPENID4VCI_CONFORMANCE_VARIANTS and filter environment variables."
@@ -102,7 +104,7 @@ class IssuerConformanceTestRunner(
         println("  mdoc      -> ${resolvedIds.mdoc ?: "<not found>"}")
         println("  haip sd-jwt-vc -> ${resolvedIds.haipSdJwt ?: "<not found>"}")
         println("  haip mdoc      -> ${resolvedIds.haipMdoc ?: "<not found>"}")
-        println("Selected OpenID4VCI issuer variants: ${selectedVariants.size}/${allVariants.size}")
+        println("Selected OpenID4VCI issuer variants: ${protocolVariants.size}/${allVariants.size}; ${selectedVariants.size} proof-mode runs")
 
         if (variantSelection.discoveryOnly) {
             val discoveryResults = selectedVariants.map { variant ->
@@ -147,7 +149,7 @@ class IssuerConformanceTestRunner(
                         clientAttesterJwks = clientAttesterJwks,
                         keyAttesterJwks = keyAttesterJwks,
                         authorizationServer = authorizationServer,
-                        credentialProofTypeHint = credentialProofTypeHint,
+                        credentialProofTypeHint = variant.credentialProofType ?: credentialProofTypeHint,
                         staticTxCode = staticTxCode,
                         credentialTrustAnchorPem = credentialTrustAnchorPem,
                         statusListTrustAnchorPem = statusListTrustAnchorPem,
@@ -262,7 +264,7 @@ class IssuerConformanceTestRunner(
         "sd_jwt_vc" -> if (variant.isHaip) resolvedIds.haipSdJwt else resolvedIds.sdJwt
         "mdoc" -> if (variant.isHaip) resolvedIds.haipMdoc else resolvedIds.mdoc
         else -> null
-    }
+    }?.let { id -> if (variant.credentialProofType == "attestation") "$id.attestation" else id }
 
     private fun blockedResult(variant: IssuerVariant, error: String): IssuerVariantRunResult =
         IssuerVariantRunResult(

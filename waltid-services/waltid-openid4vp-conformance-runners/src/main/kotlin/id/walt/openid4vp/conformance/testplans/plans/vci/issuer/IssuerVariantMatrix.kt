@@ -24,6 +24,8 @@ data class IssuerVariant(
     val authorizationRequestType: String,
     val requestMethod: String,
     val credentialEncryption: String,
+    // Runner coverage dimension, not a conformance-suite variant parameter.
+    val credentialProofType: String? = null,
 ) {
     val isHaip: Boolean
         get() = fapiProfile == "vci_haip"
@@ -46,7 +48,7 @@ data class IssuerVariant(
             authorizationRequestType.toIdPart(),
             requestMethod.toIdPart(),
             credentialEncryption.toIdPart(),
-        ).joinToString("-")
+        ).joinToString("-") + (credentialProofType?.let { "-proof-$it" } ?: "")
 
     val credentialOfferAuthMethod: CredentialOfferAuthMethod?
         get() = when {
@@ -87,6 +89,7 @@ data class IssuerVariant(
         put("fapi_request_method", requestMethod)
         put("vci_grant_type", grantType)
         put("vci_credential_encryption", credentialEncryption)
+        credentialProofType?.let { put("credential_proof_type", it) }
     }
 
     fun testPlanCreationVariant(): JsonObject =
@@ -96,7 +99,7 @@ data class IssuerVariant(
                 put("credential_format", credentialFormat)
             }
         } else {
-            toJsonObject()
+            JsonObject(toJsonObject().filterKeys { it != "credential_proof_type" })
         }
 
     private fun String.toIdPart(): String = when (this) {
@@ -205,7 +208,7 @@ data class IssuerVariantSelection(
 ) {
     fun select(variants: List<IssuerVariant>): List<IssuerVariant> {
         if (explicitVariantIds.isNotEmpty()) {
-            return variants.filter { it.id in explicitVariantIds }
+            return variants.filter { it.id in explicitVariantIds || it.copy(credentialProofType = null).id in explicitVariantIds }
         }
 
         return variants.filter {
