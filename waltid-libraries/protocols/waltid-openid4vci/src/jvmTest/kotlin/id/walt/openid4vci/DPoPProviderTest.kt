@@ -155,7 +155,7 @@ class DPoPProviderTest {
                     ),
                     expectedIssuer = ISSUER,
                     dpopProofHeaderValues = listOf(proof),
-                    credentialEndpointUri = CREDENTIAL_ENDPOINT_URI,
+                    targetUri = CREDENTIAL_ENDPOINT_URI,
                 ),
             ),
         )
@@ -202,7 +202,7 @@ class DPoPProviderTest {
                 ),
                 expectedIssuer = ISSUER,
                 dpopProofHeaderValues = listOf(proof),
-                credentialEndpointUri = CREDENTIAL_ENDPOINT_URI,
+                targetUri = CREDENTIAL_ENDPOINT_URI,
             ),
         )
 

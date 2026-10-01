@@ -92,7 +92,8 @@ internal suspend fun executeCredentialTargets(
                             access.dpop?.algorithms, access.senderKey, access.persistable, label, metadata,
                             sessionId = sessionId ?: public.id, dpopNonce = access.dpop?.nonce,
                             credentialIssuer = issuerMetadata.credentialIssuer,
-                            issuerMetadataSnapshot = issuerMetadata)
+                            issuerMetadataSnapshot = issuerMetadata,
+                            notificationEndpoint = issuerMetadata.notificationEndpoint)
                     } finally {
                         // Keep accepted progress during a storage outage, but not after terminal closure.
                         sessions.ensureOpen()
@@ -103,15 +104,15 @@ internal suspend fun executeCredentialTargets(
                 onEvent.emitSafely(WalletSessionEvent.issuance_deferred)
             } else {
                 onEvent.emitSafely(WalletSessionEvent.issuance_credential_received)
-                withIssuedCredentialNotification(
+                storeAndNotify(
                     httpClient = httpClient,
-                    notificationEndpoint = issuerMetadata.notificationEndpoint,
-                    notificationId = response.notificationId,
-                    accessToken = access.accessToken,
-                    tokenType = access.tokenType,
-                    dpopProofFactory = access.dpop?.let {
-                        dpopProofFactoryFor(access.tokenType, it.algorithms, access.senderKey, access.accessToken)
-                    },
+                    target = IssuerNotificationTarget(
+                        notificationEndpoint = issuerMetadata.notificationEndpoint,
+                        notificationId = response.notificationId,
+                        accessToken = access.accessToken,
+                        tokenType = access.tokenType,
+                        dpopProofFactory = access.dpop?.toProofFactory(access.accessToken),
+                    ),
                 ) {
                     val prepared = wallet.prepareIssuedCredentials(rawCredentials.map {
                         val value = it.credential

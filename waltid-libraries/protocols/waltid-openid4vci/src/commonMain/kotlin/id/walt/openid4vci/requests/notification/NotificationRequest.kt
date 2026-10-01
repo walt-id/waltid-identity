@@ -3,6 +3,7 @@ package id.walt.openid4vci.requests.notification
 import id.walt.openid4vci.errors.NotificationError
 import id.walt.openid4vci.errors.NotificationErrorCodes
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.json.jsonHasDuplicateMembers
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

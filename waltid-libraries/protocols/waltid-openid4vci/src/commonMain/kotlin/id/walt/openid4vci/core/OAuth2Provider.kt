@@ -198,7 +198,7 @@ interface OAuth2Provider {
         validUntil: Instant? = null,
         expectedUpdate: Instant? = null,
         proofValidationContext: CredentialProofValidationContext? = null,
-        issueNotificationId: Boolean = false,
+        notificationId: String? = null,
     ): CredentialResponseResult
 
     suspend fun createCredentialResponse(
@@ -218,7 +218,7 @@ interface OAuth2Provider {
         validUntil: Instant? = null,
         expectedUpdate: Instant? = null,
         proofValidationContext: CredentialProofValidationContext? = null,
-        issueNotificationId: Boolean = false,
+        notificationId: String? = null,
     ): CredentialResponseResult
 
     fun writeCredentialError(error: CredentialError): CredentialResponseHttp

@@ -22,6 +22,7 @@ import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
+import id.walt.openid4vci.core.OpenId4VciEndpointPaths
 import id.walt.openid4vci.metadata.issuer.*
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.pkce.PkceServiceConfig
@@ -97,7 +98,7 @@ class MetadataService @JvmOverloads constructor(
                 credentialRequestEncryption = credentialRequestEncryption,
                 batchCredentialIssuance = batchCredentialIssuance,
                 display = issuerDisplay,
-                notificationEndpointPath = NOTIFICATION_ENDPOINT_PATH,
+                notificationEndpointPath = OpenId4VciEndpointPaths.NOTIFICATION_FROM_BASE,
             )
         }
 
@@ -253,7 +254,4 @@ class MetadataService @JvmOverloads constructor(
         )
     }
 
-    companion object {
-        private const val NOTIFICATION_ENDPOINT_PATH = "/notification"
-    }
 }

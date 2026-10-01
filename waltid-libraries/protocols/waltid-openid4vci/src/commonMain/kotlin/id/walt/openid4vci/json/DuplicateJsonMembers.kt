@@ -1,8 +1,8 @@
-package id.walt.openid4vci.requests.notification
+package id.walt.openid4vci.json
 
 /**
  * Returns true when [raw] is a JSON text whose objects contain a repeated member name.
- * Malformed JSON returns false so the notification parser can report `invalid_notification_request`.
+ * Malformed JSON returns false so callers can report a protocol-level invalid request.
  */
 internal fun jsonHasDuplicateMembers(raw: String): Boolean = try {
     JsonMemberScanner(raw).hasDuplicateMembers()
