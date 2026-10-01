@@ -2059,16 +2059,15 @@ object WalletIssuanceHandler {
         request.effectiveProofs?.let { validateIsolatedStorageBindings(it, bindings) }
         val result = fetchCredentials(request, httpClient, dpop)
         if (result.deferredCredential != null) return result
-        val notificationProofFactory = dpop?.let {
-            dpopProofFactoryFor(request.tokenType, it.algorithms, it.keyMaterial, request.accessToken)
-        }
-        withIssuedCredentialNotification(
+        storeAndNotify(
             httpClient = httpClient,
-            notificationEndpoint = storage.notificationEndpoint,
-            notificationId = result.notificationId,
-            accessToken = request.accessToken,
-            tokenType = request.tokenType,
-            dpopProofFactory = notificationProofFactory,
+            target = IssuerNotificationTarget(
+                notificationEndpoint = storage.notificationEndpoint,
+                notificationId = result.notificationId,
+                accessToken = request.accessToken,
+                tokenType = request.tokenType,
+                dpopProofFactory = dpop?.toProofFactory(request.accessToken),
+            ),
         ) {
             val prepared = wallet.prepareIssuedCredentials(result.rawCredentials, bindings, storage.label, storage.metadata,
                 proofRequired = request.effectiveProofs != null,
@@ -2792,16 +2791,15 @@ object WalletIssuanceHandler {
         val rawCredentials = credentialResponse.credentials
             ?: error("Deferred credential response contained no credentials")
 
-        val notificationProofFactory = dpop?.let {
-            dpopProofFactoryFor(request.tokenType, it.algorithms, it.keyMaterial, request.accessToken)
-        }
-        withIssuedCredentialNotification(
+        storeAndNotify(
             httpClient = httpClient,
-            notificationEndpoint = storage.notificationEndpoint,
-            notificationId = credentialResponse.notificationId,
-            accessToken = request.accessToken,
-            tokenType = request.tokenType,
-            dpopProofFactory = notificationProofFactory,
+            target = IssuerNotificationTarget(
+                notificationEndpoint = storage.notificationEndpoint,
+                notificationId = credentialResponse.notificationId,
+                accessToken = request.accessToken,
+                tokenType = request.tokenType,
+                dpopProofFactory = dpop?.toProofFactory(request.accessToken),
+            ),
         ) {
             val prepared = wallet.prepareIssuedCredentials(rawCredentials.map {
                 val value = it.credential

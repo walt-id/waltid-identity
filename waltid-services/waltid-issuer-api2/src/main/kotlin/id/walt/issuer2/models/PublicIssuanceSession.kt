@@ -83,5 +83,9 @@ fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
     if (format != null) fields["issuedCredentialFormat"] = JsonPrimitive(format)
     else if (json.configuration.encodeDefaults && json.configuration.explicitNulls) fields["issuedCredentialFormat"] =
         JsonNull
+    val result = issuanceResults[request.credentialIdentifier]
+    result?.walletNotificationId?.let { fields["walletNotificationId"] = JsonPrimitive(it) }
+    result?.walletNotificationEvent?.let { fields["walletNotificationEvent"] = JsonPrimitive(it.wireValue) }
+    result?.walletNotificationEventDescription?.let { fields["walletNotificationEventDescription"] = JsonPrimitive(it) }
     return JsonObject(fields)
 }

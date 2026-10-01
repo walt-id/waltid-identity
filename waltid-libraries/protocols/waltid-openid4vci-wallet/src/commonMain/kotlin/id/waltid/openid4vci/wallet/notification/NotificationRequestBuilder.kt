@@ -3,15 +3,13 @@ package id.waltid.openid4vci.wallet.notification
 import id.walt.openid4vci.errors.NotificationError
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.notification.NotificationRequest
-import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
-import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
+import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
+import id.waltid.openid4vci.wallet.dpop.postWithDpopNonceRetry
 import id.waltid.openid4vci.wallet.token.DPoPProofFactory
 import io.ktor.client.HttpClient
 import io.ktor.client.request.accept
-import io.ktor.client.request.header
-import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
@@ -27,6 +25,22 @@ import kotlinx.serialization.json.Json
 enum class NotificationAccessTokenType {
     BEARER,
     DPOP,
+    ;
+
+    val authorizationScheme: String
+        get() = when (this) {
+            BEARER -> "Bearer"
+            DPOP -> "DPoP"
+        }
+
+    companion object {
+        fun fromTokenType(tokenType: String): NotificationAccessTokenType? =
+            when (AccessTokenAuthorizationScheme.fromValue(tokenType)) {
+                AccessTokenAuthorizationScheme.BEARER -> BEARER
+                AccessTokenAuthorizationScheme.DPOP -> DPOP
+                null -> null
+            }
+    }
 }
 
 /** Stable failure categories for an OpenID4VCI Notification Endpoint request. */
@@ -35,18 +49,6 @@ enum class NotificationRequestError {
     NETWORK,
     ISSUER_RESPONSE,
 }
-
-/** Sanitized notification-endpoint failure that never retains token, proof, or response body material. */
-class NotificationRequestException internal constructor(
-    val error: NotificationRequestError,
-    val statusCode: Int? = null,
-) : Exception(
-    buildString {
-        append("Notification request failed: ")
-        append(error.name.lowercase())
-        statusCode?.let { append(" (HTTP ").append(it).append(')') }
-    },
-)
 
 sealed class NotificationDeliveryResult {
     data class Success(val request: NotificationRequest) : NotificationDeliveryResult()
@@ -58,6 +60,11 @@ sealed class NotificationDeliveryResult {
     data class OAuthFailure(
         val statusCode: Int,
         val error: OAuthError?,
+    ) : NotificationDeliveryResult()
+
+    data class TransportFailure(
+        val error: NotificationRequestError,
+        val statusCode: Int? = null,
     ) : NotificationDeliveryResult()
 
     fun isSuccess(): Boolean = this is Success
@@ -76,22 +83,34 @@ class NotificationRequestBuilder(
         request: NotificationRequest,
         dpopProofFactory: DPoPProofFactory? = null,
     ): NotificationDeliveryResult {
-        validateEndpoint(notificationEndpoint)
-        require(accessToken.isNotBlank()) { "Access token cannot be blank" }
+        validateEndpoint(notificationEndpoint)?.let { return it }
+        if (accessToken.isBlank()) {
+            return NotificationDeliveryResult.TransportFailure(NotificationRequestError.INVALID_ENDPOINT)
+        }
         when (accessTokenType) {
             NotificationAccessTokenType.BEARER ->
-                require(dpopProofFactory == null) { "Bearer notification requests must not include a DPoP proof" }
+                if (dpopProofFactory != null) {
+                    return NotificationDeliveryResult.TransportFailure(NotificationRequestError.INVALID_ENDPOINT)
+                }
             NotificationAccessTokenType.DPOP ->
-                requireNotNull(dpopProofFactory) { "DPoP notification requests require a proof factory" }
+                if (dpopProofFactory == null) {
+                    return NotificationDeliveryResult.TransportFailure(NotificationRequestError.INVALID_ENDPOINT)
+                }
         }
 
-        return executeNotificationRequest(
-            notificationEndpoint = notificationEndpoint,
-            accessToken = accessToken,
-            accessTokenType = accessTokenType,
-            request = request,
-            dpopProofFactory = dpopProofFactory,
-        )
+        return try {
+            executeNotificationRequest(
+                notificationEndpoint = notificationEndpoint,
+                accessToken = accessToken,
+                accessTokenType = accessTokenType,
+                request = request,
+                dpopProofFactory = dpopProofFactory,
+            )
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            NotificationDeliveryResult.TransportFailure(NotificationRequestError.NETWORK)
+        }
     }
 
     private suspend fun executeNotificationRequest(
@@ -101,81 +120,39 @@ class NotificationRequestBuilder(
         request: NotificationRequest,
         dpopProofFactory: DPoPProofFactory?,
     ): NotificationDeliveryResult {
-        var dpopNonce: String? = null
-        repeat(DPOP_NONCE_ATTEMPTS) { attempt ->
-            val response = postNotification(
-                notificationEndpoint = notificationEndpoint,
+        val response = try {
+            httpClient.postWithDpopNonceRetry(
+                endpoint = notificationEndpoint,
                 accessToken = accessToken,
-                accessTokenType = accessTokenType,
-                request = request,
+                authorizationScheme = accessTokenType.authorizationScheme,
                 dpopProofFactory = dpopProofFactory,
-                dpopNonce = dpopNonce,
-            )
-
-            if (response.status.isSuccess()) {
-                return NotificationDeliveryResult.Success(request)
-            }
-
-            when (response.status.value) {
-                400 -> return NotificationDeliveryResult.Failure(
-                    statusCode = response.status.value,
-                    error = response.notificationError(),
-                )
-
-                401 -> {
-                    val oauthError = response.oauthError()
-                    val suppliedNonce = response.headers[DPOP_NONCE_HEADER]
-                    if (
-                        attempt == 0 &&
-                        dpopProofFactory != null &&
-                        oauthError?.error == USE_DPOP_NONCE &&
-                        !suppliedNonce.isNullOrBlank()
-                    ) {
-                        dpopNonce = suppliedNonce
-                        return@repeat
-                    }
-                    return NotificationDeliveryResult.OAuthFailure(
-                        statusCode = response.status.value,
-                        error = oauthError,
-                    )
-                }
-
-                else -> throw NotificationRequestException(
-                    error = NotificationRequestError.ISSUER_RESPONSE,
-                    statusCode = response.status.value,
-                )
-            }
-        }
-        error("DPoP nonce retry exhausted for the notification endpoint")
-    }
-
-    private suspend fun postNotification(
-        notificationEndpoint: String,
-        accessToken: String,
-        accessTokenType: NotificationAccessTokenType,
-        request: NotificationRequest,
-        dpopProofFactory: DPoPProofFactory?,
-        dpopNonce: String?,
-    ): HttpResponse {
-        return try {
-            val dpopProof = dpopProofFactory?.invoke(notificationEndpoint, dpopNonce)
-            val authorizationScheme = when (accessTokenType) {
-                NotificationAccessTokenType.BEARER -> "Bearer"
-                NotificationAccessTokenType.DPOP -> "DPoP"
-            }
-            httpClient.post(notificationEndpoint) {
+            ) {
                 accept(ContentType.Application.Json)
                 contentType(ContentType.Application.Json)
-                header(HttpHeaders.Authorization, "$authorizationScheme $accessToken")
-                dpopProof?.let { header(DPOP_HEADER, it) }
                 setBody(json.encodeToString(request))
             }
         } catch (error: CancellationException) {
             throw error
-        } catch (error: NotificationRequestException) {
-            throw error
         } catch (_: Exception) {
-            throw NotificationRequestException(NotificationRequestError.NETWORK)
+            return NotificationDeliveryResult.TransportFailure(NotificationRequestError.NETWORK)
+        }
+
+        if (response.status.isSuccess()) {
+            return NotificationDeliveryResult.Success(request)
+        }
+        return when (response.status.value) {
+            400 -> NotificationDeliveryResult.Failure(
+                statusCode = response.status.value,
+                error = response.notificationError(),
+            )
+            401 -> NotificationDeliveryResult.OAuthFailure(
+                statusCode = response.status.value,
+                error = response.oauthError(),
+            )
+            else -> NotificationDeliveryResult.TransportFailure(
+                error = NotificationRequestError.ISSUER_RESPONSE,
+                statusCode = response.status.value,
+            )
         }
     }
 
@@ -198,19 +175,19 @@ class NotificationRequestBuilder(
             null
         }
 
-    private fun validateEndpoint(endpoint: String) {
+    private fun validateEndpoint(endpoint: String): NotificationDeliveryResult.TransportFailure? {
         if (endpoint.isBlank()) {
-            throw NotificationRequestException(NotificationRequestError.INVALID_ENDPOINT)
+            return NotificationDeliveryResult.TransportFailure(NotificationRequestError.INVALID_ENDPOINT)
         }
-        try {
+        return try {
             val url = Url(endpoint)
             if (url.host.isBlank()) {
-                throw NotificationRequestException(NotificationRequestError.INVALID_ENDPOINT)
+                NotificationDeliveryResult.TransportFailure(NotificationRequestError.INVALID_ENDPOINT)
+            } else {
+                null
             }
-        } catch (error: NotificationRequestException) {
-            throw error
         } catch (_: Exception) {
-            throw NotificationRequestException(NotificationRequestError.INVALID_ENDPOINT)
+            NotificationDeliveryResult.TransportFailure(NotificationRequestError.INVALID_ENDPOINT)
         }
     }
 }

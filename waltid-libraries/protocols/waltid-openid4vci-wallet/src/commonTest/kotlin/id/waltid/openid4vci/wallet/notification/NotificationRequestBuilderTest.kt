@@ -24,7 +24,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
@@ -71,35 +70,37 @@ class NotificationRequestBuilderTest {
     fun rejectsBearerRequestThatIncludesDpopProofFactory() = runTest {
         val client = client { error("Request must not be sent") }
 
-        assertFailsWith<IllegalArgumentException> {
-            NotificationRequestBuilder(client).send(
-                notificationEndpoint = "https://issuer.example/notification",
-                accessToken = "access-token",
-                accessTokenType = NotificationAccessTokenType.BEARER,
-                request = NotificationRequest(
-                    notificationId = "notification-id",
-                    event = NotificationEvent.CREDENTIAL_ACCEPTED,
-                ),
-                dpopProofFactory = { _, _ -> "proof" },
-            )
-        }
+        val result = NotificationRequestBuilder(client).send(
+            notificationEndpoint = "https://issuer.example/notification",
+            accessToken = "access-token",
+            accessTokenType = NotificationAccessTokenType.BEARER,
+            request = NotificationRequest(
+                notificationId = "notification-id",
+                event = NotificationEvent.CREDENTIAL_ACCEPTED,
+            ),
+            dpopProofFactory = { _, _ -> "proof" },
+        )
+
+        val failure = assertIs<NotificationDeliveryResult.TransportFailure>(result)
+        assertEquals(NotificationRequestError.INVALID_ENDPOINT, failure.error)
     }
 
     @Test
     fun rejectsDpopRequestWithoutProofFactory() = runTest {
         val client = client { error("Request must not be sent") }
 
-        assertFailsWith<IllegalArgumentException> {
-            NotificationRequestBuilder(client).send(
-                notificationEndpoint = "https://issuer.example/notification",
-                accessToken = "access-token",
-                accessTokenType = NotificationAccessTokenType.DPOP,
-                request = NotificationRequest(
-                    notificationId = "notification-id",
-                    event = NotificationEvent.CREDENTIAL_ACCEPTED,
-                ),
-            )
-        }
+        val result = NotificationRequestBuilder(client).send(
+            notificationEndpoint = "https://issuer.example/notification",
+            accessToken = "access-token",
+            accessTokenType = NotificationAccessTokenType.DPOP,
+            request = NotificationRequest(
+                notificationId = "notification-id",
+                event = NotificationEvent.CREDENTIAL_ACCEPTED,
+            ),
+        )
+
+        val failure = assertIs<NotificationDeliveryResult.TransportFailure>(result)
+        assertEquals(NotificationRequestError.INVALID_ENDPOINT, failure.error)
     }
 
     @Test
