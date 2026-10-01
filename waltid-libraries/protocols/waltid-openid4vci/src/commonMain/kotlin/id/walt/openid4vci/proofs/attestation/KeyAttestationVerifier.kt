@@ -21,7 +21,9 @@ data class VerifiedKeyAttestation(
     val attestedKeys: List<Key>,
 )
 
-/** Shared attestation verification. This entry point currently applies the nested-JWT rules. */
+enum class KeyAttestationUsage { JWT_HEADER, STANDALONE_PROOF }
+
+/** Common attestation validation with explicit rules for its proof carrier. */
 class KeyAttestationVerifier(
     private val clockSkewSeconds: Long = 60,
     private val now: () -> Instant = { Clock.System.now() },
@@ -34,7 +36,15 @@ class KeyAttestationVerifier(
         context: CredentialProofValidationContext,
         configuration: CredentialConfiguration,
         options: KeyAttestationVerificationOptions,
+        usage: KeyAttestationUsage = KeyAttestationUsage.JWT_HEADER,
     ): VerifiedKeyAttestation {
+        if (usage == KeyAttestationUsage.STANDALONE_PROOF) {
+            val nonce = context.nonceValidation
+                ?: throw KeyAttestationServiceException("Standalone attestation requires issuer-bound nonce validation")
+            if (nonce.binding.credentialIssuer != context.credentialIssuer) {
+                throw KeyAttestationServiceException("Credential nonce validation is configured for another issuer")
+            }
+        }
         val decoded = attestationInput { CompactJws.decodeUnverified(jwt) }
         val header = decoded.protectedHeader
         if (header.string("typ") != "key-attestation+jwt") throw invalidCredentialProof("Invalid key attestation type")
@@ -84,10 +94,11 @@ class KeyAttestationVerifier(
                 ?: throw invalidCredentialProof("Key attestation payload must be an object")
         }
         val issuedAt = payload.integer("iat")
-        val expiresAt = payload.integer("exp")
+        val expiresAt = if (usage == KeyAttestationUsage.JWT_HEADER || "exp" in payload) payload.integer("exp") else null
         val currentInstant = now()
         val currentTime = currentInstant.epochSeconds
-        if (issuedAt > currentTime + clockSkewSeconds || expiresAt <= currentTime - clockSkewSeconds || expiresAt <= issuedAt) {
+        if (issuedAt > currentTime + clockSkewSeconds ||
+            expiresAt != null && (expiresAt <= currentTime - clockSkewSeconds || expiresAt <= issuedAt)) {
             throw invalidCredentialProof("Key attestation is outside its valid lifetime")
         }
         payload["nbf"]?.let { value ->
