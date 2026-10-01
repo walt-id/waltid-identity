@@ -303,10 +303,8 @@ standalone raw evidence returns indeterminate for this scope. The separately exp
 `.readerCertificateAndIssuingAuthorities` scope retains terminal-authority status checking.
 
 Set `requiredIACAIssuerCertificateDER` to require an exact application-identified IACA direct
-issuer on the validated path. This restriction does not add trust or validate the conditional
-issuer-contact extension. Applications requiring IACA-specific contact validation must apply
-that policy through an application-owned `ProximityReaderTrustEvaluator` after validating
-the certificate path.
+issuer on the validated path and an `issuerAlternativeName` email or URI contact in the reader
+certificate. The application identifies the issuer's IACA role; this restriction does not add trust.
 
 `ProximityCRLFetcher` receives a Foundation `URL` and byte limit and returns
 `ProximityCRLFetchResult.available(der:)` or `.unavailable`. The application owns timeouts,

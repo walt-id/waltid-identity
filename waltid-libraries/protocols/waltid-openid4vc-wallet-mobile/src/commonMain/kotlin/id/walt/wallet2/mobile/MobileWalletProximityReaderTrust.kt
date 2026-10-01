@@ -252,10 +252,10 @@ public data class ProximityReaderTrustConfiguration(
         ProximityReaderRevocationPolicy.NotChecked,
     /**
      * Optional application-identified IACA direct issuer, encoded as unpadded Base64URL DER.
-     * When set, require that exact direct issuer on the validated path. This restriction does not
-     * add trust or check conditional issuer-contact requirements; applications must apply their
-     * own contact policy. Invalid DER is reported as an invalid certificate path during evaluation,
-     * including through Swift.
+     * When set, require that exact direct issuer on the validated path and an issuer-alternative-name
+     * email or URI contact in the reader certificate. The application identifies the issuer's IACA
+     * role; this restriction does not add trust. Invalid DER is reported as an invalid certificate
+     * path during evaluation, including through Swift.
      */
     public val requiredIacaIssuerCertificateDerBase64Url: String? = null,
 ) {

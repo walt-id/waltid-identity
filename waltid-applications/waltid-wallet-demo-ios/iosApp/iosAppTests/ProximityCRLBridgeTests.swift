@@ -12,7 +12,7 @@ final class ProximityCRLBridgeTests: XCTestCase {
         XCTAssertEqual(result.certificatePath, .invalid)
     }
 
-    func testRequiredIssuerDoesNotRequireContactThroughSwiftBridge() async throws {
+    func testRequiredIacaIssuerRequiresContactThroughSwiftBridge() async throws {
         let root = ProximityCRLFixtures.issuerWithoutCdp
         let anchor = ProximityReaderTrustAnchor(certificateDER: root)
         let fetcher = RecordingCRLFetcher(.available(der: ProximityCRLFixtures.good))
@@ -23,9 +23,9 @@ final class ProximityCRLBridgeTests: XCTestCase {
         XCTAssertEqual(valid.state, .trusted)
         XCTAssertEqual(valid.revocation, .good)
         let missingContact = try await evaluator.evaluate(.init(scope: .wholeRequest, certificateChainDER: [ProximityCRLFixtures.profileReaderWithoutContact]))
-        XCTAssertEqual(missingContact.certificatePath, .valid)
+        XCTAssertEqual(missingContact.certificatePath, .invalid)
         let requests = await fetcher.requests
-        XCTAssertEqual(requests.count, 2) // One reader CRL lookup per evaluation; no anchor lookup.
+        XCTAssertEqual(requests.count, 1) // Missing contact is rejected before revocation; no anchor lookup.
     }
 
     func testConfiguredScopeAndFoundationTransportReachSharedVerifier() async throws {
