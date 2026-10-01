@@ -20,7 +20,7 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandle
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
-import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
@@ -111,7 +111,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
 
     // Tell the wallet to build a JWT proof for ES256 and Ed25519 keys
     private val jwtProofTypesSupported = mapOf(
-        "jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA"))
+        "jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA"))
     )
 
     // -----------------------------------------------------------------------
