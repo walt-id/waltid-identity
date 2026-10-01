@@ -84,7 +84,7 @@ kotlin {
 
         if (enableWalletDemoComposeWeb) {
             getByName("wasmJsMain").dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-browser:0.3")
+                implementation(identityLibs.kotlinx.browser)
                 implementation(identityLibs.kotlinx.coroutines.core)
             }
         }

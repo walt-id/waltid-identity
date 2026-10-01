@@ -1,7 +1,7 @@
 plugins {
-    kotlin("jvm") version "2.0.0"
-    id("io.ktor.plugin") version "3.3.3"
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.0"
+    alias(identityLibs.plugins.kotlin.web3login.jvm)
+    alias(identityLibs.plugins.ktor.web3login)
+    alias(identityLibs.plugins.kotlin.web3login.serialization)
     id("io.github.ben-manes.versions")
 }
 
@@ -31,7 +31,7 @@ dependencies {
     testImplementation(kotlin("test-junit"))
 
     // nftkit
-    implementation("id.walt:waltid-nftkit:1.2311291144.0") {
+    implementation(identityLibs.nftkit.web3login) {
         exclude("com.sksamuel.hoplite", "hoplite-core")
         exclude("com.sksamuel.hoplite", "hoplite-yaml")
         exclude("com.sksamuel.hoplite", "hoplite-hikaricp")

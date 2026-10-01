@@ -113,7 +113,7 @@ kotlin {
                     implementation(identityLibs.junit)
                     implementation(identityLibs.robolectric)
                     // Independent reader oracle; never part of the published wallet runtime.
-                    implementation("org.multipaz:multipaz-jvm:0.100.0")
+                    implementation(identityLibs.multipaz.jvm)
                 }
             }
             named("androidHostTest") {
@@ -146,7 +146,7 @@ kotlin {
                     kotlin.srcDir("src/physicalDeviceTest/kotlin")
                     kotlin.srcDir("src/physicalTestFixtures/kotlin")
                     kotlin.srcDir("src/androidHostTest/kotlin/id/walt/wallet2/mobile/peer")
-                    dependencies { implementation("org.multipaz:multipaz-android:0.100.0") }
+                    dependencies { implementation(identityLibs.multipaz.android) }
                 }
                 kotlin.srcDir("src/recoveryTest/kotlin")
                 dependencies {

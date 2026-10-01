@@ -144,6 +144,41 @@ smiley4-schema-kenerator = "2.7.2"
 signum = "3.24.0"
 supreme = "0.15.0"
 
+# Catalog inputs and separately pinned service consumers
+versions = "0.64.0"
+foojay-resolver = "1.0.0"
+dependency-license-report = "3.1.4"
+maven-xml = "4.0.0-rc-7"
+mordant = "3.0.2"
+clikt-testkit = "3.1.1"
+password4j = "1.8.4"
+cose-js = "0.9.0"
+multipaz = "0.100.0"
+sqlcipher-swift = "4.16.0"
+kotlinx-browser = "0.3"
+canonicalize-npm = "2.0.0"
+uuid-npm = "9.0.1"
+hoplite = "2.9.0"
+playwright = "1.60.0"
+argon2-jvm = "2.11"
+jedis = "5.2.0"
+mysql = "9.7.0"
+mssql = "13.4.0.jre11"
+webpush = "1.3.0"
+coroutines-service-tests = "1.10.2"
+nimbus-e2e = "10.6"
+ktor-conformance-encoding = "3.2.2"
+smiley4-service-openapi = "5.6.0"
+exposed-wallet = "1.0.0-rc-1"
+sqlite-wallet = "3.53.1.0"
+hikaricp-wallet = "6.2.1"
+mockk-wallet = "1.14.9"
+sqlite-migration = "3.47.0.0"
+postgres-migration = "42.7.3"
+kotlin-web3login = "2.0.0"
+ktor-web3login = "3.3.3"
+nftkit-web3login = "1.2311291144.0"
+
 [libraries]
 google-blockstore = { module = "com.google.android.gms:play-services-auth-blockstore", version = "16.4.0" }
 
@@ -153,7 +188,7 @@ binary-compatibility-validator = { module = "org.jetbrains.kotlinx:binary-compat
 
 kotlin-plugin-serialization = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
 ktor-gradle-plugin = { module = "io.ktor.plugin:plugin", version.ref = "ktor" }
-benmanes-versions = { module = "io.github.ben-manes:gradle-versions-plugin", version = "0.64.0" }
+benmanes-versions = { module = "io.github.ben-manes:gradle-versions-plugin", version.ref = "versions" }
 owasp-dependencycheck = { module = "org.owasp.dependencycheck:org.owasp.dependencycheck.gradle.plugin", version = "12.2.2" }
 jib-gradle-plugin = { module = "com.google.cloud.tools:jib-gradle-plugin", version.ref = "jib" }
 vanniktech-publish-plugin = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "vanniktech-publish" }
@@ -404,6 +439,45 @@ cryptography-provider-optimal = { module = "dev.whyoleg.cryptography:cryptograph
 cryptography-provider-jdk = { module = "dev.whyoleg.cryptography:cryptography-provider-jdk", version.ref = "whyoleg-cryptography" }
 cryptography-provider-openssl3-prebuilt = { module = "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt", version.ref = "whyoleg-cryptography" }
 
+# Additional dependency aliases
+dependency-license-report-gradle-plugin = { module = "com.github.jk1.dependency-license-report:com.github.jk1.dependency-license-report.gradle.plugin", version.ref = "dependency-license-report" }
+maven-xml = { module = "org.apache.maven:maven-xml", version.ref = "maven-xml" }
+mordant = { module = "com.github.ajalt.mordant:mordant", version.ref = "mordant" }
+mordant-markdown = { module = "com.github.ajalt.mordant:mordant-markdown", version.ref = "mordant" }
+clikt-testkit = { module = "com.wolpl.clikt-testkit:clikt-testkit", version.ref = "clikt-testkit" }
+password4j = { module = "com.password4j:password4j", version.ref = "password4j" }
+multipaz-jvm = { module = "org.multipaz:multipaz-jvm", version.ref = "multipaz" }
+multipaz-android = { module = "org.multipaz:multipaz-android", version.ref = "multipaz" }
+kotlinx-browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version.ref = "kotlinx-browser" }
+playwright = { module = "com.microsoft.playwright:playwright", version.ref = "playwright" }
+argon2-jvm = { module = "de.mkammerer:argon2-jvm", version.ref = "argon2-jvm" }
+jedis = { module = "redis.clients:jedis", version.ref = "jedis" }
+mysql-connector = { module = "com.mysql:mysql-connector-j", version.ref = "mysql" }
+mssql-jdbc = { module = "com.microsoft.sqlserver:mssql-jdbc", version.ref = "mssql" }
+webpush = { module = "com.interaso:webpush", version.ref = "webpush" }
+kotlinx-coroutines-service-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines-service-tests" }
+kotlinx-coroutines-service-test-jvm = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm", version.ref = "coroutines-service-tests" }
+nimbus-e2e = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbus-e2e" }
+ktor-conformance-encoding = { module = "io.ktor:ktor-client-encoding", version.ref = "ktor-conformance-encoding" }
+sqlite-wallet = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-wallet" }
+hikaricp-wallet = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp-wallet" }
+mockk-wallet = { module = "io.mockk:mockk", version.ref = "mockk-wallet" }
+sqlite-migration = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-migration" }
+postgres-migration = { module = "org.postgresql:postgresql", version.ref = "postgres-migration" }
+nftkit-web3login = { module = "id.walt:waltid-nftkit", version.ref = "nftkit-web3login" }
+hoplite-core = { module = "com.sksamuel.hoplite:hoplite-core", version.ref = "hoplite" }
+hoplite-hocon = { module = "com.sksamuel.hoplite:hoplite-hocon", version.ref = "hoplite" }
+hoplite-yaml = { module = "com.sksamuel.hoplite:hoplite-yaml", version.ref = "hoplite" }
+hoplite-hikaricp = { module = "com.sksamuel.hoplite:hoplite-hikaricp", version.ref = "hoplite" }
+exposed-wallet-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed-wallet" }
+exposed-wallet-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "exposed-wallet" }
+exposed-wallet-dao = { module = "org.jetbrains.exposed:exposed-dao", version.ref = "exposed-wallet" }
+exposed-wallet-java-time = { module = "org.jetbrains.exposed:exposed-java-time", version.ref = "exposed-wallet" }
+exposed-wallet-json = { module = "org.jetbrains.exposed:exposed-json", version.ref = "exposed-wallet" }
+smiley4-service-openapi = { module = "io.github.smiley4:ktor-openapi", version.ref = "smiley4-service-openapi" }
+smiley4-service-swagger-ui = { module = "io.github.smiley4:ktor-swagger-ui", version.ref = "smiley4-service-openapi" }
+smiley4-service-redoc = { module = "io.github.smiley4:ktor-redoc", version.ref = "smiley4-service-openapi" }
+
 [bundles]
 waltid-ktor-client = [
     "ktor-client-core",
@@ -446,9 +520,13 @@ buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 shadow = { id = "com.gradleup.shadow", version.ref = "gradle-shadow" }
-versions = { id = "io.github.ben-manes.versions", version = "0.64.0" }
-license = { id = "com.github.jk1.dependency-license-report", version = "3.1.4" }
+versions = { id = "io.github.ben-manes.versions", version.ref = "versions" }
+license = { id = "com.github.jk1.dependency-license-report", version.ref = "dependency-license-report" }
 licensee = { id = "app.cash.licensee", version.ref = "licensee" }
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
 skie = { id = "co.touchlab.skie", version.ref = "skie" }
 google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }
+
+kotlin-web3login-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin-web3login" }
+kotlin-web3login-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin-web3login" }
+ktor-web3login = { id = "io.ktor.plugin", version.ref = "ktor-web3login" }
