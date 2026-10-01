@@ -10,7 +10,9 @@ import id.waltid.openid4vci.wallet.token.DPoPProofFactory
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.seconds
 
@@ -96,18 +98,23 @@ internal suspend fun deliverCredentialNotification(
     }
 
     try {
-        val result = withTimeout(NOTIFICATION_DELIVERY_TIMEOUT) {
-            NotificationRequestBuilder(httpClient).send(
-                notificationEndpoint = endpoint,
-                accessToken = accessToken,
-                accessTokenType = accessTokenType,
-                request = NotificationRequest(
-                    notificationId = id,
-                    event = event,
-                    eventDescription = eventDescription,
-                ),
-                dpopProofFactory = dpopProofFactory,
-            )
+        // Bound delivery on a wall-clock dispatcher. Coroutine `withTimeout` on a
+        // virtual-time scheduler expires before an HTTP engine parked on another
+        // dispatcher can complete.
+        val result = withContext(Dispatchers.Default) {
+            withTimeout(NOTIFICATION_DELIVERY_TIMEOUT) {
+                NotificationRequestBuilder(httpClient).send(
+                    notificationEndpoint = endpoint,
+                    accessToken = accessToken,
+                    accessTokenType = accessTokenType,
+                    request = NotificationRequest(
+                        notificationId = id,
+                        event = event,
+                        eventDescription = eventDescription,
+                    ),
+                    dpopProofFactory = dpopProofFactory,
+                )
+            }
         }
         when (result) {
             is NotificationDeliveryResult.Success -> Unit
