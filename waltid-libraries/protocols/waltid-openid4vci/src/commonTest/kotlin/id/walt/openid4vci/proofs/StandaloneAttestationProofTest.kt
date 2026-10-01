@@ -5,8 +5,6 @@ import id.walt.crypto2.jose.*
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.openid4vci.*
 import id.walt.openid4vci.core.buildOAuth2Provider
@@ -268,7 +266,7 @@ class StandaloneAttestationProofTest {
         val kids = dids.map { did -> DidService.resolveToCrypto2Keys(did).getOrThrow().single().id.value }
         val jwks = holders.mapIndexed { index, holder -> JsonObject(holder.exportPublicJwkObject() + ("kid" to JsonPrimitive(kids[index]))) }
         val issuerKey = key()
-        val legacyIssuerKey = JWKKey.generate(KeyType.secp256r1)
+        val legacyIssuerKey = LegacyP256TestKey(issuerKey)
         val service = nonceService(issuerKey)
         val nonce = service.issue(binding).nonce
         val context = context(attester, service)
@@ -306,7 +304,9 @@ class StandaloneAttestationProofTest {
                     val credentials = assertIs<CredentialResponseResult.Success>(response).response.credentials!!
                     assertEquals(2, allocated)
                     assertEquals(dids, credentials.map {
-                        val payload = Json.parseToJsonElement(CompactJws.decodeUnverified(it.credential.jsonPrimitive.content).payload.decodeToString()).jsonObject
+                        val payload = Json.parseToJsonElement(CompactJws.verify(
+                            it.credential.jsonPrimitive.content, issuerKey, JwsAlgorithm.ES256,
+                        ).payload.decodeToString()).jsonObject
                         payload.getValue("sub").jsonPrimitive.content
                     })
                 }
