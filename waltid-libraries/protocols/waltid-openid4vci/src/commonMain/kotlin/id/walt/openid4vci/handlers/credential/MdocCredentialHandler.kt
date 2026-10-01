@@ -1,5 +1,9 @@
 package id.walt.openid4vci.handlers.credential
 
+import id.walt.openid4vci.proofs.invalidCredentialProof
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
+import id.walt.crypto2.jose.exportPublicJwk
+import id.walt.cose.toCoseKey
 import id.walt.certificate.x509.X509Certificate
 import id.walt.cose.CoseCertificate
 import id.walt.crypto.keys.Key
@@ -37,6 +41,20 @@ class MdocCredentialHandler(
     private val roundValidityToTwelveHours: Boolean = false,
     private val now: () -> Instant = { Clock.System.now() },
 ) : CredentialEndpointHandler, Crypto2CredentialEndpointHandler {
+    override suspend fun validateBindings(configuration: CredentialConfiguration, bindings: List<VerifiedCredentialBinding>) {
+        bindings.forEach { binding ->
+            // Export failures are operational; only an unsupported representation is invalid input.
+            val publicJwk = binding.holderKey.exportPublicJwk()
+            try {
+                publicJwk.toCoseKey()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                throw invalidCredentialProof("A selected key cannot be represented by the mdoc credential handler", e)
+            }
+        }
+    }
+
     override suspend fun sign(
         request: CredentialRequest,
         configuration: CredentialConfiguration,

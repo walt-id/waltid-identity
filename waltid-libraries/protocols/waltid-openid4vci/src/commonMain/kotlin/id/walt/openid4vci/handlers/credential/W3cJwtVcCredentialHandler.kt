@@ -1,5 +1,7 @@
 package id.walt.openid4vci.handlers.credential
 
+import id.walt.openid4vci.proofs.invalidCredentialProof
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.certificate.x509.X509Certificate
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.CredentialFormat
@@ -26,6 +28,12 @@ import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdoc
  * Supports JWT VC formats (jwt_vc_json, jwt_vc).
  */
 class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEndpointHandler {
+    override suspend fun validateBindings(configuration: CredentialConfiguration, bindings: List<VerifiedCredentialBinding>) {
+        if (bindings.any { it.holderDid == null }) {
+            throw invalidCredentialProof("The W3C JWT credential handler requires a verified DID for each selected key")
+        }
+    }
+
     private companion object {
         val supportedFormats = setOf(
             CredentialFormat.JWT_VC_JSON,
