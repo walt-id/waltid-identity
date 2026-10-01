@@ -883,7 +883,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             }
         }
     }
-    }
 
     suspend fun processCredentialRequest(
         authorizationHeaders: List<String>,
