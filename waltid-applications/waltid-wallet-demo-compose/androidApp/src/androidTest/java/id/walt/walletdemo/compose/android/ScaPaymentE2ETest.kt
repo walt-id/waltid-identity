@@ -14,7 +14,6 @@ import id.walt.wallet2.mobile.identity.SigningIdentityState
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyProtectionLevel
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
-import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import kotlinx.coroutines.runBlocking
@@ -42,7 +41,6 @@ internal class ScaPaymentE2ETest : DigitalCredentialSharingE2E() {
     @Test
     fun sharesScaSdJwtWithNativeAuthorization() = runBlocking {
         val fixture = fixture()
-        createAndroidDemoSharingSettingsStore(fixture.context).setShowDcApiPresentationPreview(false)
         val scenario = DemoTestBackend.scaPaymentSdJwtScenario
         val session = DemoTestBackend.createDcApiVerifierSession(
             credentialQueries = listOf(scenario.verifierCredentialQuery),
@@ -79,7 +77,7 @@ internal class ScaPaymentE2ETest : DigitalCredentialSharingE2E() {
         assertEquals(Json.parseToJsonElement("""[{"possession":"other"},{"inherence":"other"}]"""), claims["amr"])
         assertVerifierAccepted(session.sessionId, credential.credentialJson, "sca_payment",
             SD_JWT_REQUIRED_POLICIES + "dc+sd-jwt/transaction-data-hash-check")
-        println("SCA_DEVICE_E2E nativeApproved=true mandatoryReview=true exactEncodedHash=true verifier=SUCCESSFUL")
+        println("SCA_DEVICE_E2E nativeApproved=true walletReview=true exactEncodedHash=true verifier=SUCCESSFUL")
     }
 
     companion object {

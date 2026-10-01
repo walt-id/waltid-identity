@@ -53,6 +53,11 @@ Android uses Credential Manager. Compose iOS and native SwiftUI use the existing
 OpenID4VP URL/deep-link route with a `cross_device` verifier session. Apple's mdoc-only
 Identity Document provider extensions are outside this SD-JWT route.
 
+Android's **Show wallet review** setting applies to payments too. When disabled,
+the demo relies on Credential Manager confirmation and submits without an app review.
+Native SCA authorization and transaction-byte binding remain enforced; the platform
+summary does not establish complete TS-12 display compliance.
+
 ## Coverage
 
 | Existing suite | Payment coverage | Boundary |
@@ -60,7 +65,7 @@ Identity Document provider extensions are outside this SD-JWT route.
 | Protocol SCA tests | Exact hashes, KB-JWT claims, transport variants and authorization failures | Synthetic authorization |
 | Issuer2 integration tests | Configured issuer → wallet → verifier, exact hashes and required policies | Local services and synthetic authorization |
 | `paymentDemoTest` | Same successful scenario against public issuer2/verifier2 | Deployment acceptance; no native authentication |
-| Android DC-API suite | Payment issuance, registration, selection, mandatory review and rejection of unprotected signing | Ordinary emulator keys cannot authorize SCA |
+| Android DC-API suite | Payment issuance, registration, selection, both preview settings and rejection of unprotected signing | Ordinary emulator keys cannot authorize SCA |
 | Physical Android test | App setup/issuance, Credential Manager, review, native signing and verifier acceptance | Explicit operator interaction |
 | Existing iOS app suites | Corresponding physical URL-payment flow in both demos | Explicit operator interaction |
 
@@ -90,8 +95,8 @@ and a fresh preview installation (`id.walt.wallet.compose.test`):
   -Pandroid.testInstrumentationRunnerArguments.wallet.sca=approve
 ```
 
-The test refuses existing wallet material. It checks holder binding, mandatory review
-with ordinary previews disabled, native authorization, KB-JWT claims/exact hashes
+The test refuses existing wallet material. It checks holder binding, wallet review
+with previews enabled, native authorization, KB-JWT claims/exact hashes
 and required verifier policies. It uses a signed request with a clear response so
 it can inspect the proof; the OpenAPI example demonstrates response encryption.
 

@@ -251,9 +251,9 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
         )
     }
 
-    /** Real payment profile and platform review; ordinary fixture keys must never authorize SCA. */
+    /** Both preview settings retain native SCA authorization; ordinary fixture keys must never sign. */
     @Test
-    fun reviewsScaSdJwtButRejectsUnprotectedSigning() = runBlocking {
+    fun scaSdJwtRespectsPreviewSettingAndRejectsUnprotectedSigning() = runBlocking {
         val fixture = fixture()
         val scenario = DemoTestBackend.scaPaymentSdJwtScenario
         val paymentIds = issueFromDemoIssuer(wallet, scenario)
@@ -261,34 +261,43 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
             val registration = wallet.refreshDigitalCredentialRegistration()
             assertTrue("Payment registration unavailable: ${registration.reason}", registration.available)
             assertEquals(issuedCredentialIds.size + paymentIds.size, registration.registeredEntryCount)
-            createAndroidDemoSharingSettingsStore(fixture.context).setShowDcApiPresentationPreview(false)
-            val session = DemoTestBackend.createDcApiVerifierSession(
-                credentialQueries = listOf(scenario.verifierCredentialQuery),
-                expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
-                transactionData = listOf(DemoTestBackend.scaPaymentTransactionData("sca_payment")),
-            )
-            val request = fixture.startCredentialRequest(session.requestJson)
-            fixture.enterProviderReview(request, scenario.credentialConfigurationId)
-            listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, "merchant-001", "EUR", SCA_AMOUNT_TEXT).forEach { value ->
-                assertTextContainingVisibleAfterScrolling(fixture.device, value, "Payment review is missing '$value'")
+            for (showPreview in listOf(true, false)) {
+                createAndroidDemoSharingSettingsStore(fixture.context).setShowDcApiPresentationPreview(showPreview)
+                val session = DemoTestBackend.createDcApiVerifierSession(
+                    credentialQueries = listOf(scenario.verifierCredentialQuery),
+                    expectedOrigins = listOf(nativeAppOrigin(fixture.context)),
+                    transactionData = listOf(DemoTestBackend.scaPaymentTransactionData("sca_payment")),
+                )
+                val request = fixture.startCredentialRequest(session.requestJson)
+                val confirmationStarted = System.currentTimeMillis() / 1000.0
+                val outcome = if (showPreview) {
+                    fixture.enterProviderReview(request, scenario.credentialConfigurationId)
+                    listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, "merchant-001", "EUR", SCA_AMOUNT_TEXT).forEach { value ->
+                        assertTextContainingVisibleAfterScrolling(fixture.device, value, "Payment review is missing '$value'")
+                    }
+                    clickByTag(fixture.device, WALLET_SHARE_BUTTON_TAG)
+                    withTimeout(CREDENTIAL_OPERATION_TIMEOUT) { request.await() }
+                } else {
+                    fixture.completeWithoutWalletReview(request, scenario.credentialConfigurationId) { device ->
+                        listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, SCA_AMOUNT_TEXT).forEach { value ->
+                            assertTextContainingVisibleInForegroundWindow(device, value, "Platform payment prompt is missing '$value'")
+                        }
+                    }
+                }
+                assertTrue("Unprotected payment signing must fail (showPreview=$showPreview), got $outcome",
+                    outcome.exceptionOrNull() is GetCredentialUnknownException)
+                // The generic platform failure must come from native SCA policy, not another error.
+                val rejectedByNativePolicy = fixture.device.executeShellCommand(
+                    "logcat -d -v epoch -s WaltDigitalCredentials:E",
+                ).lineSequence().any { line ->
+                    val timestamp = line.trimStart().substringBefore(' ').toDoubleOrNull()
+                    timestamp != null && timestamp >= confirmationStarted &&
+                        "TS12 authentication evidence is unavailable:" in line
+                }
+                assertTrue("Submission did not reach the native SCA key-policy rejection", rejectedByNativePolicy)
+                assertFalse("Rejected signing must not reach the verifier",
+                    DemoTestBackend.verifierSessionInfo(session.sessionId).getValue("attempted").jsonPrimitive.boolean)
             }
-            // The provider deliberately returns a generic platform error. Check its existing log
-            // as well, so an unrelated submission failure cannot satisfy the negative assertion.
-            val confirmationStarted = System.currentTimeMillis() / 1000.0
-            clickByTag(fixture.device, WALLET_SHARE_BUTTON_TAG)
-            val outcome = withTimeout(CREDENTIAL_OPERATION_TIMEOUT) { request.await() }
-            assertTrue("Unprotected payment signing must fail, got $outcome",
-                outcome.exceptionOrNull() is GetCredentialUnknownException)
-            val rejectedByNativePolicy = fixture.device.executeShellCommand(
-                "logcat -d -v epoch -s WaltDigitalCredentials:E",
-            ).lineSequence().any { line ->
-                val timestamp = line.trimStart().substringBefore(' ').toDoubleOrNull()
-                timestamp != null && timestamp >= confirmationStarted &&
-                    "TS12 authentication evidence is unavailable:" in line
-            }
-            assertTrue("Submission did not reach the native SCA key-policy rejection", rejectedByNativePolicy)
-            assertFalse("Rejected signing must not reach the verifier",
-                DemoTestBackend.verifierSessionInfo(session.sessionId).getValue("attempted").jsonPrimitive.boolean)
         } finally {
             paymentIds.forEach { id -> check(wallet.deleteCredential(id)) { "Failed to delete temporary payment credential $id" } }
             val registration = wallet.refreshDigitalCredentialRegistration()

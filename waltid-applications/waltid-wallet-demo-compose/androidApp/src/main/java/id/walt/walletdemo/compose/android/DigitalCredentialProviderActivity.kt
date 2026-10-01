@@ -102,7 +102,7 @@ class DigitalCredentialProviderActivity : FragmentActivity() {
         showPreview: Boolean,
         onSubmit: (WalletDemoSharingSelection) -> Unit,
     ) {
-        if (showPreview || review.request.requiresExplicitReview) {
+        if (showPreview) {
             showReview(review, title, onSubmit)
             return
         }

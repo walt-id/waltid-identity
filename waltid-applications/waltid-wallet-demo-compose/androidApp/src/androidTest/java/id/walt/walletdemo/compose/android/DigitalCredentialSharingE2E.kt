@@ -123,12 +123,25 @@ internal abstract class DigitalCredentialSharingE2E {
         request: DigitalCredentialRequestHandle,
         candidateText: String,
     ): DigitalCredential {
+        val response = completeWithoutWalletReview(request, candidateText).getOrThrow()
+        return requireNotNull(response.credential as? DigitalCredential) {
+            "Caller did not receive a digital credential: ${response.credential}"
+        }
+    }
+
+    /** Also returns submission failures so native authorization can be checked without an app review. */
+    protected suspend fun Fixture.completeWithoutWalletReview(
+        request: DigitalCredentialRequestHandle,
+        candidateText: String,
+        onCredentialManagerPrompt: (UiDevice) -> Unit = {},
+    ): Result<GetCredentialResponse> {
         val deadline = System.currentTimeMillis() + CREDENTIAL_OPERATION_TIMEOUT
         var candidateSelected = false
 
         while (!request.isComplete && System.currentTimeMillis() < deadline) {
             assertFalse("Wallet review appeared while preview was disabled", walletReviewVisible())
             if (!candidateSelected && device.findCredentialManagerText(candidateText) != null) {
+                onCredentialManagerPrompt(device)
                 assertTrue(
                     "Could not click the '$candidateText' candidate",
                     device.clickCredentialManagerCandidate(candidateText),
@@ -151,10 +164,7 @@ internal abstract class DigitalCredentialSharingE2E {
         }
         assertFalse("Wallet review appeared while preview was disabled", walletReviewVisible())
 
-        val response = request.await().getOrThrow()
-        return requireNotNull(response.credential as? DigitalCredential) {
-            "Caller did not receive a digital credential: ${response.credential}"
-        }
+        return request.await()
     }
 
     /** Candidate selection, optional confirmation and provider transition share one deadline. */
