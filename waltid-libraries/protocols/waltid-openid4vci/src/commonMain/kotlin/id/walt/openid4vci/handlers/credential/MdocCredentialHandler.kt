@@ -1,12 +1,10 @@
 package id.walt.openid4vci.handlers.credential
 
-import id.walt.openid4vci.proofs.invalidCredentialProof
-import id.walt.openid4vci.proofs.VerifiedCredentialBinding
-import id.walt.crypto2.jose.exportPublicJwk
-import id.walt.cose.toCoseKey
 import id.walt.certificate.x509.X509Certificate
 import id.walt.cose.CoseCertificate
+import id.walt.cose.toCoseKey
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
@@ -20,6 +18,9 @@ import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.requests.credential.CredentialRequest
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
+import id.walt.openid4vci.proofs.CredentialProofValidationException
+import id.walt.openid4vci.proofs.invalidCredentialProof
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.sdjwt.SDMap
 import kotlinx.coroutines.CancellationException
@@ -105,10 +106,8 @@ class MdocCredentialHandler(
                 validFrom = validFrom,
                 validUntil = validUntil,
             )
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            CredentialResponseResult.Failure(e.toCredentialHandlerError())
+        } catch (e: CredentialProofValidationException) {
+            CredentialResponseResult.Failure(CredentialError(e.errorCode, e.message))
         }
     }
 
@@ -153,10 +152,8 @@ class MdocCredentialHandler(
                 )
             },
         )
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        CredentialResponseResult.Failure(e.toCredentialHandlerError())
+    } catch (e: CredentialProofValidationException) {
+        CredentialResponseResult.Failure(CredentialError(e.errorCode, e.message))
     }
 
     @OptIn(ExperimentalSerializationApi::class)
