@@ -1,7 +1,6 @@
 package id.walt.openid4vp.conformance
 
 import id.walt.openid4vp.conformance.config.ConformanceConfig
-import id.walt.openid4vp.conformance.report.ConformanceCiFlags
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.VerifierConformanceTestRunner
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
@@ -150,7 +149,6 @@ open class VerifierConformanceTests {
             ConformanceReportWriter.failIfNeededFromTestPlanResults(
                 role = ConformanceReportWriter.Role.VP_VERIFIER,
                 results = results,
-                allowFailure = ConformanceCiFlags.allowFailure(),
             )
         } finally {
             runner.close()

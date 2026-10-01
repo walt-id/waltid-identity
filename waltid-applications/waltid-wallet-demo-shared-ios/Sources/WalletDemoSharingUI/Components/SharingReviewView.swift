@@ -19,6 +19,7 @@ public struct SharingReviewView: View {
     private let onCancel: () -> Void
     private let compact: Bool
     private let showActions: Bool
+    private let paymentReview: PaymentReviewState
     @State private var compactClaimsOption: PresentationCredentialOption?
     @State private var credentialDetails: [CredentialDetails] = []
 
@@ -46,7 +47,8 @@ public struct SharingReviewView: View {
         onReject: (() -> Void)? = nil,
         onCancel: @escaping () -> Void,
         compact: Bool = false,
-        showActions: Bool = true
+        showActions: Bool = true,
+        paymentReview: PaymentReviewState = .notRequired
     ) {
         self.review = review
         self.selection = selection
@@ -60,11 +62,13 @@ public struct SharingReviewView: View {
         self.onCancel = onCancel
         self.compact = compact
         self.showActions = showActions
+        self.paymentReview = paymentReview
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SharingRequestSections(request: review.request)
+            SharingRequestSections(request: review.request, replacesGenericPayment: paymentReview.replacesGenericPayment)
+            PaymentConsentView(state: paymentReview)
 
             if !review.credentialOptions.isEmpty && credentialDetails.isEmpty {
                 ProgressView("Loading credentials…")
@@ -130,7 +134,8 @@ public struct SharingReviewView: View {
                     isLoading: isLoading,
                     onSubmit: onSubmit,
                     onReject: onReject,
-                    onCancel: onCancel
+                    onCancel: onCancel,
+                    paymentReview: paymentReview
                 )
             }
         }
@@ -420,6 +425,7 @@ public struct ReviewActions: View {
     let onReject: (() -> Void)?
     let onCancel: () -> Void
     let presentation: ReviewActionPresentation
+    let paymentReview: PaymentReviewState
 
     public init(
         selectionComplete: Bool,
@@ -427,7 +433,8 @@ public struct ReviewActions: View {
         onSubmit: @escaping () -> Void,
         onReject: (() -> Void)?,
         onCancel: @escaping () -> Void,
-        presentation: ReviewActionPresentation = .sharing
+        presentation: ReviewActionPresentation = .sharing,
+        paymentReview: PaymentReviewState = .notRequired
     ) {
         self.selectionComplete = selectionComplete
         self.isLoading = isLoading
@@ -435,31 +442,37 @@ public struct ReviewActions: View {
         self.onReject = onReject
         self.onCancel = onCancel
         self.presentation = presentation
+        self.paymentReview = paymentReview
     }
 
     public var body: some View {
-        HStack(spacing: 10) {
-            actionButtons
+        if #available(iOS 16.0, *) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) { actionButtons }
+                VStack(alignment: .leading, spacing: 10) { actionButtons }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 10) { actionButtons }
         }
     }
 
     @ViewBuilder
     private var actionButtons: some View {
-        Button(presentation.submitTitle, action: onSubmit)
+        Button(paymentReview.consent?.affirmativeAction ?? presentation.submitTitle, action: onSubmit)
             .buttonStyle(.borderedProminent)
             .tint(branding.primary)
-            .disabled(isLoading || !selectionComplete)
+            .disabled(isLoading || !selectionComplete || !paymentReview.canConfirm)
             .accessibilityIdentifier(presentation.submitAccessibilityIdentifier)
 
         // By default this says String(localized: "Cancel review", bundle: .module) where a protocol-level Reject also exists, so the two
         // ways of declining cannot be mistaken for each other. Transports may supply a more precise label.
-        Button(presentation.cancelTitle ?? (onReject == nil ? String(localized: "Cancel", bundle: .module) : String(localized: "Cancel review", bundle: .module)), action: onCancel)
+        Button((onReject == nil ? paymentReview.consent?.denialAction : nil) ?? presentation.cancelTitle ?? (onReject == nil ? String(localized: "Cancel", bundle: .module) : String(localized: "Cancel review", bundle: .module)), action: onCancel)
             .buttonStyle(.bordered)
             .disabled(isLoading && presentation != .proximity)
             .accessibilityIdentifier(presentation.cancelAccessibilityIdentifier)
 
         if let onReject {
-            Button(presentation.rejectTitle, action: onReject)
+            Button(paymentReview.consent?.denialAction ?? presentation.rejectTitle, action: onReject)
                 .buttonStyle(.bordered)
                 .disabled(isLoading)
                 .accessibilityIdentifier(presentation.rejectAccessibilityIdentifier)

@@ -129,7 +129,7 @@ struct SettingsView: View {
                 .disabled(
                     viewModel.isChangingSigningProtection ||
                         viewModel.isLoading ||
-                        (viewModel.selectedSigningProtection == .biometric &&
+                        (viewModel.selectedSigningProtection.requiresBiometrics &&
                             !viewModel.isBiometricSigningAvailable)
                 )
                 .accessibilityIdentifier(WalletAccessibilityID.signingProtectionRetry)
@@ -158,7 +158,7 @@ struct SettingsView: View {
             enabled: !managed &&
                 !viewModel.isChangingSigningProtection &&
                 !viewModel.isLoading &&
-                (protection != .biometric || viewModel.isBiometricSigningAvailable),
+                (!protection.requiresBiometrics || viewModel.isBiometricSigningAvailable),
             action: { viewModel.requestSigningProtectionChange(protection) }
         )
         .accessibilityIdentifier(

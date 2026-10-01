@@ -128,9 +128,15 @@ class IssuerModuleSelectionTest {
         assertEquals(16, results.count { it.batchCoverage == IssuerBatchCoverageStatus.PASSED })
         assertEquals(4, results.count { it.batchCoverage == IssuerBatchCoverageStatus.NOT_OFFERED_BY_PINNED_SUITE })
         val summary = IssuerVariantReportWriter.buildSummary(results)
+        assertTrue(summary.contains("- Total: 20"))
+        assertTrue(summary.contains("- Passed: 20"))
+        assertTrue(summary.contains("- Failed: 0"))
         assertTrue(summary.contains("16 passed; 0 missing; 0 not_passed; 4 not_offered_by_pinned_suite"))
         assertTrue(summary.contains("it is not batch coverage"))
         assertTrue(summary.contains("| Batch coverage |"))
+        assertTrue(summary.indexOf("- Total: 20") < summary.indexOf("<details>"))
+        assertTrue(summary.indexOf("16 passed; 0 missing; 0 not_passed; 4 not_offered_by_pinned_suite") < summary.indexOf("<details>"))
+        assertTrue(summary.indexOf("| Variant | Status | Plan | Modules | Batch coverage | Error |") > summary.indexOf("<details>"))
         results.filter { it.batchCoverage == IssuerBatchCoverageStatus.PASSED }.forEach { result ->
             val missing = result.copy(modules = emptyList())
             val error = assertFailsWith<IllegalArgumentException> {

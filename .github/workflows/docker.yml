@@ -7,6 +7,11 @@ on:
         description: "release version"
         required: true
         type: string
+      checkout-refs:
+        description: "Exact commits to check out, as a JSON object of unified, identity, enterprise and enterprise_license SHAs (defaults to the branch with main fallback)"
+        required: false
+        type: string
+        default: ''
       tags:
         description: 'JSON array of extra tags to apply, e.g. ["stable", "latest"]. The version tag is always applied.'
         required: false
@@ -31,6 +36,9 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
+    # Multi-arch Node/Alpine builds can deadlock under QEMU and otherwise sit until
+    # the 6h default job timeout. Successful images here finish in well under 15m.
+    timeout-minutes: 40
     needs: docker-matrix
     strategy:
       fail-fast: false
@@ -44,6 +52,7 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
+          resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Set up Docker
         if: ${{ inputs.artifact }}

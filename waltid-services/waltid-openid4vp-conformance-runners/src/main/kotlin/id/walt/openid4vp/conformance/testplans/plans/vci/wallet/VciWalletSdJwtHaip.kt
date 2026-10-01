@@ -1,6 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.plans.vci.wallet
 
 import id.walt.openid4vp.conformance.config.ConformanceConfig
+import id.walt.openid4vp.conformance.config.ConformanceSuiteAlias
 import id.walt.openid4vp.conformance.testplans.keys.ClientAttestationTestAuthority
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -101,7 +102,7 @@ class VciWalletSdJwtHaip(
     )
 
     override val configuration: JsonObject = buildJsonObject {
-        put("alias", "vci_wallet_sdjwt_haip_full_target")
+        put("alias", ConformanceSuiteAlias.unique("vci_wallet_sdjwt_haip_full_target"))
         put("description", "Wallet VCI - SD-JWT VC + client_attestation + authorization_code (HAIP full target)")
 
         putJsonObject("server") {

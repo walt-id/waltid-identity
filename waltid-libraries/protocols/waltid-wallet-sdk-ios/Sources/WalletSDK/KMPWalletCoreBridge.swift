@@ -210,12 +210,29 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return try value.toSwiftPreviewResult()
     }
 
+    func preparePaymentConsent(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?
+    ) async throws -> PaymentConsent? {
+        let result = try await bridge.preparePaymentConsent(
+            previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value),
+            selectedCredentialOptions: selectedCredentialOptions.map { MobileWalletPresentationCredentialSelection(queryId: $0.queryID, credentialId: $0.credentialID) },
+            selectedDisclosureOptions: selectedDisclosureOptions?.map { MobileWalletPresentationDisclosureSelection(queryId: $0.queryID, credentialId: $0.credentialID, path: $0.path) },
+            did: did
+        )
+        return try Self.successValue(result, as: WalletBridgePaymentConsentPreparation.self, operation: "prepare payment consent")
+            .consent?.toSwiftPaymentConsent()
+    }
+
     func submitPresentation(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?,
-        runPolicies: Bool?
+        runPolicies: Bool?,
+        paymentConsentRevision: String?
     ) async throws -> PresentationResult {
         let result = try await bridge.submitPresentation(
             previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value),
@@ -233,7 +250,8 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
                 )
             },
             did: did,
-            runPolicies: runPolicies.map { KotlinBoolean(bool: $0) }
+            runPolicies: runPolicies.map { KotlinBoolean(bool: $0) },
+            paymentConsentRevision: paymentConsentRevision
         )
         let value = try Self.successValue(
             result,
@@ -1182,6 +1200,7 @@ private extension WalletConfiguration {
             },
             preferredLocales: preferredLocales,
             transactionDataProfiles: transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
+            paymentCredentialIssuers: paymentCredentialIssuers.map { WalletBridgePaymentCredentialIssuer(issuer: $0.issuer, publicJwkJson: $0.publicJWKJSON, algorithm: $0.algorithm) },
             clientIdTrustConfiguration: clientIDTrustConfiguration.toKMPClientIDTrustConfiguration(),
             appGroupIdentifier: crossProcessAccess?.appGroupIdentifier,
             keychainAccessGroup: crossProcessAccess?.keychainAccessGroup,
@@ -2005,6 +2024,11 @@ private extension WalletBridgeError {
             return .crypto(message)
         case .credentialNotFound:
             return .credentialNotFound(message)
+        case .paymentConsent:
+            guard let paymentConsentFailure else {
+                return .internalFailure("Payment consent error did not include a failure reason")
+            }
+            return .paymentConsent(paymentConsentFailure.toSwiftPaymentFailure(), message: message)
         case .authorization:
             guard let authorizationFailure else {
                 return .internalFailure("Authorization error did not include a failure reason")
@@ -2728,6 +2752,41 @@ private func swiftSet<T: Hashable>(_ value: Any, of type: T.Type) -> Set<T> {
         return Set(values.compactMap { $0 as? T })
     }
     return []
+}
+
+private extension Waltid_openid4vc_walletPreparedPaymentConsent {
+    func toSwiftPaymentConsent() -> PaymentConsent {
+        PaymentConsent(revision: revision, locale: payment.locale, title: payment.title, securityHint: payment.securityHint,
+            affirmativeAction: payment.affirmativeAction, denialAction: payment.denialAction,
+            requiresUnsignedRequestWarning: requiresUnsignedRequestWarning,
+            fields: swiftArray(payment.fields, of: Waltid_openid4vc_walletPaymentConsentField.self).map { field in
+                let placement: PaymentConsentFieldPlacement
+                switch field.placement {
+                case .prominent: placement = .prominent
+                case .main: placement = .main
+                case .details: placement = .details
+                case .omitted: placement = .omitted
+                }
+                return PaymentConsentField(label: field.label, description: field.descriptionText, value: field.value, placement: placement)
+            })
+    }
+}
+
+private extension Waltid_openid4vc_walletPaymentConsentFailure {
+    func toSwiftPaymentFailure() -> PaymentConsentFailure {
+        switch self {
+        case .untrustedCredential: return .untrustedCredential
+        case .metadataUnavailable: return .metadataUnavailable
+        case .invalidMetadata: return .invalidMetadata
+        case .integrityMismatch: return .integrityMismatch
+        case .unsupportedSchema: return .unsupportedSchema
+        case .unsupportedPayment: return .unsupportedPayment
+        case .invalidPayment: return .invalidPayment
+        case .missingTranslation: return .missingTranslation
+        case .consentRequired: return .consentRequired
+        case .staleConsent: return .staleConsent
+        }
+    }
 }
 
 #endif

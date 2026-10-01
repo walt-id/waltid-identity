@@ -50,6 +50,7 @@ class SdJwtVcCredentialHandler(
         authorizedTransactionDataTypes: List<String>?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
     ): CredentialResponseResult = sign(configuration, issuanceBatch, dataMapping) { vct, instance, effectiveMapping ->
         SdJwtVcCredentialSigner.generateSdJwtVC(
             credentialData = instance.input.credentialData,
@@ -80,6 +81,7 @@ class SdJwtVcCredentialHandler(
         authorizedTransactionDataTypes: List<String>?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
     ): CredentialResponseResult = sign(configuration, issuanceBatch, dataMapping) { vct, instance, effectiveMapping ->
         SdJwtVcCredentialSigner.generateSdJwtVC(
             credentialData = instance.input.credentialData,

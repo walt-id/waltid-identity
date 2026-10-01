@@ -53,15 +53,16 @@ public object LocalizedMetadata {
                 ?.let { locale -> entry to locale }
         }
         normalizedPreferences(preferredLocales).forEach { preference ->
-            progressiveTags(preference.lowercase()).forEach { candidate ->
+            lookupRanges(preference).forEach { candidate ->
                 normalizedEntries.firstOrNull { (_, locale) -> locale == candidate }?.let { return it.first }
             }
         }
         return available.firstOrNull { localeOf(it) == null } ?: available.first()
     }
 
-    private fun progressiveTags(tag: String): Sequence<String> = sequence {
-        var candidate = tag
+    /** RFC 4647 lookup ranges for a normalized language tag, most specific first. */
+    public fun lookupRanges(tag: String): Sequence<String> = sequence {
+        var candidate = tag.lowercase()
         while (true) {
             yield(candidate)
             val separator = candidate.lastIndexOf('-')

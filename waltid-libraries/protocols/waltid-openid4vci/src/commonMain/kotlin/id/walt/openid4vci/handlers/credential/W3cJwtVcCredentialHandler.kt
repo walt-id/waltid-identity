@@ -56,6 +56,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         authorizedTransactionDataTypes: List<String>?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
     ): CredentialResponseResult = sign(configuration, issuanceBatch) { instance ->
         W3cJwtVcCredentialSigner.generateW3CJwtVC(
             credentialData = instance.input.credentialData,
@@ -85,6 +86,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         authorizedTransactionDataTypes: List<String>?,
         validFrom: Instant?,
         validUntil: Instant?,
+        expectedUpdate: Instant?,
     ): CredentialResponseResult = sign(configuration, issuanceBatch) { instance ->
         W3cJwtVcCredentialSigner.generateW3CJwtVC(
             credentialData = instance.input.credentialData,
