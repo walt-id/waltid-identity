@@ -34,6 +34,8 @@ import id.walt.crypto.keys.Key as Crypto1Key
  * Annex B
  * Section 1.7 mdoc reader authentication
  *
+ * This profile validates the unconditional reader-certificate fields. Conditional IACA
+ * issuer-contact validation is outside its scope and requires application policy.
  * Certificate-path validation remains a separate check, done by
  * [id.walt.x509.validatedMdocReaderAuthenticationCertificatePath].
  */

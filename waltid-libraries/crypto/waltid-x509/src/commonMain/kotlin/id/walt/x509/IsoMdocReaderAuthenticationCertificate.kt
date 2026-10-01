@@ -28,9 +28,9 @@ const val MdocReaderAuthentication23220EkuOid: String = "1.0.23220.4.1.6"
 /**
  * Validates an mdoc reader-authentication leaf certificate against the ISO/IEC 18013-5 profile.
  *
- * This validates the unconditional certificate fields only. For an application-identified IACA issuer,
- * also call [validateIacaIssuedMdocReaderCertificateContact]. Call [validateMdocReaderAuthenticationCertificateChain]
- * to additionally establish an RFC 5280-style path to an explicit application trust anchor.
+ * This validates the unconditional certificate fields only. Conditional IACA issuer-contact validation
+ * is outside this helper's scope. Call [validateMdocReaderAuthenticationCertificateChain] to additionally
+ * establish an RFC 5280-style path to an explicit application trust anchor.
  */
 @Deprecated("Replaced with IsoMdocReaderAuthenticationX509CertificateProfile")
 @Throws(X509ValidationException::class)
