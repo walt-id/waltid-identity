@@ -24,6 +24,7 @@ import id.walt.openid4vci.proofs.ProofType
 import id.walt.openid4vci.proofs.VerifiedCredentialBindingCandidate
 import id.walt.openid4vci.proofs.VerifiedJwtProof
 import id.walt.openid4vci.proofs.attestation.KeyAttestationVerifier
+import id.walt.openid4vci.proofs.attestation.resolveBindings
 import id.walt.openid4vci.proofs.invalidCredentialProof
 import id.walt.openid4vci.proofs.validateCredentialNonce
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
@@ -76,9 +77,9 @@ class JwtCredentialProofHandler(
         val signingThumbprint = Jwk.sha256Thumbprint(evidence.holderKey.exportPublicJwk())
         return CredentialProofHandlerResult(
             evidence,
-            attestation.attestedKeys.map { key ->
-                if (Jwk.sha256Thumbprint(key.exportPublicJwk()) == signingThumbprint) signer
-                else VerifiedCredentialBindingCandidate(key)
+            attestation.resolveBindings(configuration).map { candidate ->
+                if (signer.holderDid != null && Jwk.sha256Thumbprint(candidate.holderKey.exportPublicJwk()) == signingThumbprint) signer
+                else candidate
             },
             CredentialBindingMultiplicity.DISTINCT_KEYS,
         )
