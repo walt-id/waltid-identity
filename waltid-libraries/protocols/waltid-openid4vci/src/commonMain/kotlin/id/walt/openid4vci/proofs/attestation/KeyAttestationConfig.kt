@@ -1,6 +1,8 @@
 package id.walt.openid4vci.proofs.attestation
 
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
+import id.walt.openid4vci.proofs.CredentialProofCapabilities
+import id.walt.openid4vci.proofs.CredentialProofHandlers
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -47,15 +49,10 @@ sealed class KeyAttestationVerificationMethod {
 fun validateKeyAttestationConfiguration(
     configurations: Iterable<CredentialConfiguration>,
     config: KeyAttestationConfig?,
+    nonceValidationConfigured: Boolean = false,
+    handlers: CredentialProofHandlers = CredentialProofHandlers.defaults(),
 ) {
-    configurations.forEach { credential ->
-        credential.proofTypesSupported?.forEach { (type, proof) ->
-            if (proof.keyAttestationsRequired != null) {
-                require(type == "jwt") { "Key attestation requirements are currently supported only for JWT proofs" }
-                require(config != null) { "Required key attestations need keyAttestationConfig trust material" }
-            }
-        }
-    }
+    handlers.validateConfiguration(configurations, CredentialProofCapabilities(config != null, nonceValidationConfigured))
 }
 
 suspend fun KeyAttestationConfig.toVerificationOptions(
