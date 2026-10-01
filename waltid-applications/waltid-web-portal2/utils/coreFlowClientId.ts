@@ -12,8 +12,45 @@ export type CoreFlowClientIdType =
  */
 export const REDIRECT_URI_CLIENT_ID_PREFIX = "redirect_uri";
 
+export const DEFAULT_CLIENT_ID_TYPE: CoreFlowClientIdType = "redirect_uri";
+
+/** Signable fallback when signed_request is enabled on the unsigned-only redirect_uri type. */
+export const SIGNED_REQUEST_DEFAULT_CLIENT_ID_TYPE: CoreFlowClientIdType =
+  "x509_hash";
+
+export function clientIdTypeForSignedRequest(
+  signedRequest: boolean,
+  current: CoreFlowClientIdType,
+): CoreFlowClientIdType {
+  if (!signedRequest) return DEFAULT_CLIENT_ID_TYPE;
+  return isClientIdAllowedForSignedRequest(current)
+    ? current
+    : SIGNED_REQUEST_DEFAULT_CLIENT_ID_TYPE;
+}
+
 export function requiresClientIdValue(type: CoreFlowClientIdType): boolean {
   return type !== "x509_hash" && type !== "redirect_uri";
+}
+
+export function isClientIdAllowedForSignedRequest(
+  type: CoreFlowClientIdType,
+): boolean {
+  return type !== "redirect_uri";
+}
+
+export function clientIdRequiresX5c(type: CoreFlowClientIdType): boolean {
+  return type === "x509_hash" || type === "x509_san_dns";
+}
+
+export function signedRequestClientIdError(
+  type: CoreFlowClientIdType,
+  signedRequest: boolean,
+): string | null {
+  if (!signedRequest) return null;
+  if (type === "redirect_uri") {
+    return "Signed requests cannot use the redirect_uri client_id prefix";
+  }
+  return null;
 }
 
 export function prefixedCoreFlowClientId(
@@ -21,13 +58,14 @@ export function prefixedCoreFlowClientId(
   value: string,
   options?: { signedRequest?: boolean },
 ): string {
+  const signedError = signedRequestClientIdError(
+    type,
+    options?.signedRequest === true,
+  );
+  if (signedError) throw new Error(signedError);
+
   const trimmed = value.trim();
   if (type === "redirect_uri" && !trimmed) {
-    if (options?.signedRequest) {
-      throw new Error(
-        "Signed requests cannot auto-generate a redirect_uri client ID.",
-      );
-    }
     return REDIRECT_URI_CLIENT_ID_PREFIX;
   }
 

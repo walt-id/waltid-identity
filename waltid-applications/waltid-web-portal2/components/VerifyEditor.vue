@@ -15,8 +15,13 @@ import {
   stringifyTransactionFieldValue,
 } from "~/utils/transactionDataFields";
 import {
+  DEFAULT_CLIENT_ID_TYPE,
+  clientIdRequiresX5c,
+  clientIdTypeForSignedRequest,
+  isClientIdAllowedForSignedRequest,
   prefixedCoreFlowClientId,
   requiresClientIdValue,
+  signedRequestClientIdError,
   type CoreFlowClientIdType,
 } from "~/utils/coreFlowClientId";
 
@@ -94,9 +99,6 @@ function parseX5cPreset(value: unknown): string[] {
 
 const verifierKeyJwkPreset = config.public.verifierKeyJwk;
 const verifierX5cPreset = config.public.verifierX5c;
-const verifierClientIdPreset = runtimeConfigValueToString(
-  config.public.verifierClientId,
-);
 
 const keyJson = ref(formatJsonPreset(verifierKeyJwkPreset));
 const x5cValues = ref(parseX5cPreset(verifierX5cPreset));
@@ -107,9 +109,8 @@ const dcApiSupport = ref<DcApiPresentationSupport>(
   getDcApiPresentationSupport(),
 );
 const optionsError = ref<string | null>(null);
-const clientIdType = ref<ClientIdType>("x509_hash");
+const clientIdType = ref<ClientIdType>(DEFAULT_CLIENT_ID_TYPE);
 const clientIdInput = ref("");
-const x509HashClientIdPreset = ref("");
 const isWritingJson = ref(false);
 const transactionDataProfiles = useTransactionDataProfiles(
   config.public.verifierBase as string,
@@ -129,6 +130,11 @@ type TransactionDataEntry = {
 
 const clientIdOptions = [
   {
+    value: "redirect_uri",
+    label: "redirect_uri (blank = auto from response_uri)",
+    placeholder: "Leave blank to auto-generate from the session response_uri",
+  },
+  {
     value: "x509_hash",
     label: "x509_hash (auto from first x5c cert)",
     placeholder: "",
@@ -137,11 +143,6 @@ const clientIdOptions = [
     value: "x509_san_dns",
     label: "x509_san_dns",
     placeholder: "verifier.example.com",
-  },
-  {
-    value: "redirect_uri",
-    label: "redirect_uri (blank = auto from response_uri)",
-    placeholder: "Leave blank to auto-generate from the session response_uri",
   },
   {
     value: "decentralized_identifier",
@@ -164,10 +165,6 @@ const selectedClientIdOption = computed(() =>
   clientIdOptions.find((option) => option.value === clientIdType.value)!,
 );
 const clientIdNeedsInput = computed(() => clientIdType.value !== "x509_hash");
-const autoRedirectUri = computed(
-  () =>
-    clientIdType.value === "redirect_uri" && !clientIdInput.value.trim(),
-);
 const parsedPayload = computed<Record<string, unknown> | null>(() => {
   try {
     const parsed = JSON.parse(json.value || "{}");
@@ -203,8 +200,16 @@ const missingRequiredClientId = computed(
   () =>
     requiresClientIdValue(clientIdType.value) && !clientIdInput.value.trim(),
 );
-const signedRequestNeedsClientId = computed(
-  () => signedRequest.value && autoRedirectUri.value,
+const signedRequestClientIdConflict = computed(
+  () => signedRequestClientIdError(clientIdType.value, signedRequest.value),
+);
+const missingX5cForClientId = computed(
+  () =>
+    clientIdRequiresX5c(clientIdType.value) &&
+    !x5cValues.value.some((value) => value.trim().length > 0),
+);
+const missingKeyForSignedRequest = computed(
+  () => signedRequest.value && !keyJson.value.trim(),
 );
 const transactionDataUnavailable = computed(
   () =>
@@ -222,11 +227,46 @@ const submitDisabled = computed(
     !canSubmit.value ||
     !!optionsError.value ||
     missingRequiredClientId.value ||
-    signedRequestNeedsClientId.value ||
+    !!signedRequestClientIdConflict.value ||
+    missingKeyForSignedRequest.value ||
+    missingX5cForClientId.value ||
     transactionDataUnavailable.value ||
     props.session.loading.value ||
     (isDcApiPayload.value && !dcApiSupport.value.supported),
 );
+const submitBlockReason = computed(() => {
+  if (props.session.loading.value) return null;
+  if (isDcApiPayload.value && !dcApiSupport.value.supported) {
+    return dcApiSupport.value.reason;
+  }
+  if (!canSubmit.value) return "Request body must be valid JSON.";
+  if (missingRequiredClientId.value) {
+    return `${selectedClientIdOption.value.label} requires a value.`;
+  }
+  if (signedRequestClientIdConflict.value) {
+    return signedRequestClientIdConflict.value;
+  }
+  if (missingKeyForSignedRequest.value && missingX5cForClientId.value) {
+    return "Signed requests require a request-signing key and an x5c certificate. Expand Request security options to add them.";
+  }
+  if (missingKeyForSignedRequest.value) {
+    return "Signed requests require a request-signing key. Expand Request security options to add it.";
+  }
+  if (missingX5cForClientId.value) {
+    return "An x5c certificate chain is required for this client ID. Expand Request security options to add it.";
+  }
+  if (optionsError.value) return optionsError.value;
+  if (transactionDataUnavailable.value) {
+    if (transactionDataProfiles.loading.value) {
+      return "Loading transaction data profiles…";
+    }
+    if (transactionDataProfiles.error.value) {
+      return transactionDataProfiles.error.value;
+    }
+    return "Transaction data is incomplete.";
+  }
+  return null;
+});
 
 function readPayload(): Record<string, unknown> {
   const parsed = JSON.parse(json.value || "{}");
@@ -271,9 +311,7 @@ function removeX5cInput(index: number) {
 
 async function buildClientId(x5c: string[]): Promise<string | null> {
   if (clientIdType.value === "x509_hash") {
-    return x5c.length > 0
-      ? await computeX509HashClientId(x5c[0]!)
-      : x509HashClientIdPreset.value || null;
+    return x5c.length > 0 ? await computeX509HashClientId(x5c[0]!) : null;
   }
 
   return prefixedCoreFlowClientId(
@@ -283,36 +321,15 @@ async function buildClientId(x5c: string[]): Promise<string | null> {
   );
 }
 
-function applyClientIdPreset(clientId: string) {
-  const trimmed = clientId.trim();
-  if (!trimmed) return;
-
-  if (trimmed === "redirect_uri") {
-    clientIdType.value = "redirect_uri";
-    clientIdInput.value = "";
-    return;
-  }
-
-  const prefixedOption = clientIdOptions
-    .filter((option) => option.value !== "pre_registered")
-    .find((option) => trimmed.startsWith(`${option.value}:`));
-
-  if (prefixedOption) {
-    clientIdType.value = prefixedOption.value;
-    if (prefixedOption.value === "x509_hash") {
-      x509HashClientIdPreset.value = trimmed;
-      return;
-    }
-
-    clientIdInput.value = trimmed.slice(prefixedOption.value.length + 1);
-    return;
-  }
-
-  clientIdType.value = "pre_registered";
-  clientIdInput.value = trimmed;
+function applySignedRequestClientIdRule() {
+  const nextType = clientIdTypeForSignedRequest(
+    signedRequest.value,
+    clientIdType.value,
+  );
+  if (nextType === clientIdType.value) return;
+  clientIdType.value = nextType;
+  clientIdInput.value = "";
 }
-
-applyClientIdPreset(verifierClientIdPreset);
 
 function getDcqlCredentialObjects(
   coreFlow: Record<string, unknown>,
@@ -487,12 +504,14 @@ function hydrateControlsFromPayload() {
     const coreFlow = getCoreFlowObject(payload);
     signedRequest.value = coreFlow.signed_request === true;
     encryptedResponse.value = coreFlow.encrypted_response === true;
+    applySignedRequestClientIdRule();
     hydrateTransactionDataFromPayload(payload);
   } catch {
     // Invalid JSON — leave controls unchanged until the payload parses.
   } finally {
     nextTick(() => {
       isHydrating.value = false;
+      void applySecurityOverridesToJson();
     });
   }
 }
@@ -589,6 +608,9 @@ async function applySecurityOverridesToJson() {
   }
 
   const coreFlow = getCoreFlowObject(payload);
+  if (signedRequest.value) {
+    applySignedRequestClientIdRule();
+  }
   coreFlow.signed_request = signedRequest.value;
   coreFlow.encrypted_response = encryptedResponse.value;
 
@@ -606,6 +628,11 @@ async function applySecurityOverridesToJson() {
 
   try {
     const x5c = parseVerifierX5c(x5cValues.value);
+    if (clientIdRequiresX5c(clientIdType.value) && x5c.length === 0) {
+      optionsError.value =
+        "An x5c certificate chain is required when clientId uses the 'x509_san_dns:' or 'x509_hash:' prefix, but none was provided.";
+      return null;
+    }
     if (x5c.length > 0) {
       coreFlow.x5c = x5c;
     } else {
@@ -649,6 +676,11 @@ watch(
   },
   { deep: true },
 );
+
+watch(signedRequest, () => {
+  if (isHydrating.value) return;
+  applySignedRequestClientIdRule();
+});
 
 watch(selectedIndex, () =>
   nextTick(() => {
@@ -973,6 +1005,10 @@ async function submit() {
                 v-for="option in clientIdOptions"
                 :key="option.value"
                 :value="option.value"
+                :disabled="
+                  signedRequest &&
+                  !isClientIdAllowedForSignedRequest(option.value)
+                "
               >
                 {{ option.label }}
               </option>
@@ -992,7 +1028,7 @@ async function submit() {
                 <code>core_flow.clientId</code> as
                 <code>redirect_uri</code> so the verifier binds it to this
                 session's <code>response_uri</code>. Signed requests cannot
-                use a blank redirect_uri.
+                use this prefix.
               </template>
               <template v-else>
                 The selected prefix will be added automatically in
@@ -1000,17 +1036,23 @@ async function submit() {
               </template>
             </p>
             <p
-              v-if="signedRequestNeedsClientId"
+              v-if="signedRequestClientIdConflict"
               class="text-xs text-amber-800 mt-1"
             >
-              Enable an explicit client ID, or turn off signed_request, to
-              create this session.
+              {{ signedRequestClientIdConflict }}
             </p>
           </div>
 
           <p v-else class="text-xs text-[--color-text-muted]">
             The <code>x509_hash</code> client ID is generated automatically from
             the first x5c certificate.
+          </p>
+          <p
+            v-if="missingX5cForClientId"
+            class="text-xs text-amber-800"
+          >
+            An x5c certificate chain is required when clientId uses the
+            x509_san_dns or x509_hash prefix.
           </p>
         </div>
 
@@ -1024,6 +1066,12 @@ async function submit() {
             encrypted_response
           </label>
         </div>
+        <p class="text-xs text-[--color-text-muted] -mt-2">
+          Signed requests cannot use <code>redirect_uri</code> and switch to
+          <code>x509_hash</code> when needed. Unsigned examples and unchecking
+          <code>signed_request</code> switch back to
+          <code>redirect_uri</code>.
+        </p>
 
         <div>
           <label class="form-label">Key (JWK JSON)</label>
@@ -1067,7 +1115,7 @@ async function submit() {
       </div>
     </details>
 
-    <div class="flex items-center gap-3">
+    <div class="flex flex-wrap items-center gap-3">
       <button
         class="btn btn-primary"
         :disabled="submitDisabled"
@@ -1098,6 +1146,10 @@ async function submit() {
       <span v-if="session.error.value" class="text-sm text-red-600">{{
         session.error.value
       }}</span>
+      <span
+        v-else-if="submitBlockReason"
+        class="text-sm text-red-600"
+      >{{ submitBlockReason }}</span>
     </div>
   </div>
 </template>
