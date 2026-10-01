@@ -117,14 +117,14 @@ class ProviderCredentialPreparationTest {
             assertEquals(1, batch.inputs.size)
             return CredentialResponseResult.Success(CredentialResponse(credentials = listOf(IssuedCredential(JsonPrimitive("issued")))))
         }
-        val legacy = CredentialEndpointHandler { _, _, _, _, batch, _, _, _, _, _, _, _, _, _ -> sign(batch) }
+        val legacy = CredentialEndpointHandler { _, _, _, _, batch, _, _, _, _, _, _, _, _, _, _ -> sign(batch) }
         val legacyWithValidation = object : CredentialEndpointHandler by legacy {
             override suspend fun validateBindings(configuration: CredentialConfiguration, bindings: List<VerifiedCredentialBinding>) {
                 step("bindings")
                 assertEquals(listOf(binding), bindings)
             }
         }
-        val crypto2Handler = Crypto2CredentialEndpointHandler { _, _, _, _, batch, _, _, _, _, _, _, _, _, _ -> sign(batch) }
+        val crypto2Handler = Crypto2CredentialEndpointHandler { _, _, _, _, batch, _, _, _, _, _, _, _, _, _, _ -> sign(batch) }
         val handler = if (supportsCrypto2) {
             object : CredentialEndpointHandler by legacyWithValidation, Crypto2CredentialEndpointHandler by crypto2Handler {}
         } else legacyWithValidation
