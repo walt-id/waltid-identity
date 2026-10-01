@@ -40,6 +40,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
 import kotlin.test.*
+import kotlin.time.Instant
 
 class CredentialHandlerErrorTest {
     private val formats = listOf(CredentialFormat.SD_JWT_VC, CredentialFormat.JWT_VC_JSON, CredentialFormat.MSO_MDOC)
@@ -184,7 +185,8 @@ class CredentialHandlerErrorTest {
     private fun msoHandler(issue: () -> String) = object : MsoMdocCredentialHandler() {
         override suspend fun issueMdoc(
             docType: String, namespaceData: Map<String, JsonObject>, holderKey: Key,
-            issuerKey: LegacyKey, x5Chain: List<X509Certificate>?, validityDays: Int,
+            issuerKey: LegacyKey, x5Chain: List<X509Certificate>?, validFrom: Instant?, validUntil: Instant?,
+            expectedUpdate: Instant?, validityDays: Int,
         ): String = issue()
     }
 
@@ -242,7 +244,7 @@ class CredentialHandlerErrorTest {
                     request, configuration, Crypto2CredentialSigningKey.select(key, configuration), "https://issuer.example", batch,
                     dataMapping = null, selectiveDisclosure = null, x5Chain = listOf(certificate), display = null,
                     w3cVersion = null, mDocNameSpacesDataMappingConfig = null, authorizedTransactionDataTypes = null,
-                    validFrom = null, validUntil = null,
+                    validFrom = null, validUntil = null, expectedUpdate = null,
                 )
             }
             return handler.sign(
@@ -250,7 +252,7 @@ class CredentialHandlerErrorTest {
                 "https://issuer.example", batch,
                 dataMapping = null, selectiveDisclosure = null, x5Chain = listOf(certificate), display = null,
                 w3cVersion = null, mDocNameSpacesDataMappingConfig = null, authorizedTransactionDataTypes = null,
-                validFrom = null, validUntil = null,
+                validFrom = null, validUntil = null, expectedUpdate = null,
             )
         }
     }
