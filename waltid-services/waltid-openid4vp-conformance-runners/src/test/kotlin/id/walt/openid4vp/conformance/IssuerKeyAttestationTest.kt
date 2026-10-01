@@ -53,10 +53,12 @@ class IssuerKeyAttestationTest {
         assertFalse(publicKey.isPrivate)
         assertEquals(ECKey.parse(attesterText).computeThumbprint(), publicKey.computeThumbprint())
         val catalog = fixture("credential-issuer-metadata-key-attestation.conf").getObject("credentialConfigurations")
-        assertEquals(4, catalog.size)
-        catalog.values.forEach {
-            assertTrue((it as com.typesafe.config.ConfigObject).toConfig()
-                .hasPath("proof_types_supported.jwt.key_attestations_required"))
+        assertEquals(8, catalog.size)
+        catalog.forEach { (id, value) ->
+            val config = (value as com.typesafe.config.ConfigObject).toConfig()
+            val proofType = if (id.endsWith(".attestation")) "attestation" else "jwt"
+            assertEquals(setOf(proofType), config.getObject("proof_types_supported").keys)
+            if (proofType == "jwt") assertTrue(config.hasPath("proof_types_supported.jwt.key_attestations_required"))
         }
     }
 

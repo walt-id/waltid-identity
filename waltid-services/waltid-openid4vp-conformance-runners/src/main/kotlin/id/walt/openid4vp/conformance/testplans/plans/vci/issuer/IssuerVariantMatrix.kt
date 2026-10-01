@@ -429,6 +429,10 @@ object IssuerVariantReportWriter {
 }
 
 internal fun deriveIssuerCredentialProfileId(credentialConfigurationId: String): String = when {
+    credentialConfigurationId == "identity_credential.attestation" -> "identityCredentialSdJwtAttestation"
+    credentialConfigurationId == "identity_credential_haip.attestation" -> "identityCredentialHaipSdJwtAttestation"
+    credentialConfigurationId == "org.iso.18013.5.1.mDL.attestation" -> "isoMdlAttestation"
+    credentialConfigurationId == "org.iso.18013.5.1.mDL.haip.attestation" -> "isoMdlHaipAttestation"
     credentialConfigurationId.contains("identity_credential_haip") -> "identityCredentialHaipSdJwt"
     credentialConfigurationId.contains("org.iso.18013.5.1.mDL.haip") -> "isoMdlHaip"
     credentialConfigurationId.contains("photoID_credential") -> "photoIdCredentialSdJwt"

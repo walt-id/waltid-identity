@@ -20,7 +20,7 @@ class IssuerCiConfigurationTest {
     private val configurationIds = setOf(
         "identity_credential", "org.iso.18013.5.1.mDL",
         "identity_credential_haip", "org.iso.18013.5.1.mDL.haip",
-    )
+    ).let { ids -> ids + ids.map { "$it.attestation" } }
 
     @Test
     fun ciEnablesBatchAndUsesTheRunnerAttesterTrust() {
@@ -40,29 +40,32 @@ class IssuerCiConfigurationTest {
     }
 
     @Test
-    fun profilesExactlyMatchTheFourAdvertisedConfigurations() {
+    fun profilesExactlyMatchTheEightAdvertisedConfigurations() {
         val metadata = fixture("credential-issuer-metadata-ci.conf").getObject("credentialConfigurations")
         assertEquals(configurationIds, metadata.keys)
         val profiles = fixture("issuer2-profiles-ci.conf").getConfig("profiles")
         val configurations = profiles.root().keys.map { profiles.getConfig(it) }
         assertEquals(configurationIds, configurations.map { it.getString("credentialConfigurationId") }.toSet())
-        assertEquals(4, configurations.size)
+        assertEquals(8, configurations.size)
         configurations.forEach { profile ->
             assertFalse(profile.hasPath("credentialStatus"), "Do not use preconfigured-status batch fixtures")
             assertFalse(profile.getConfig("credentialData").hasPath("id"), "Do not introduce a stable SD-JWT dataset ID")
         }
         metadata.values.forEach { value ->
             val config = (value as com.typesafe.config.ConfigObject).toConfig()
-            assertTrue("ES256" in config.getStringList("proof_types_supported.jwt.proof_signing_alg_values_supported"))
-            assertTrue(config.hasPath("proof_types_supported.jwt.key_attestations_required"))
-            assertTrue(config.getObject("proof_types_supported.jwt.key_attestations_required").isEmpty())
+            val proofType = if (config.getString("scope").endsWith(".attestation")) "attestation" else "jwt"
+            assertEquals(setOf(proofType), config.getObject("proof_types_supported").keys)
+            assertTrue("ES256" in config.getStringList("proof_types_supported.$proofType.proof_signing_alg_values_supported"))
+            if (proofType == "jwt") {
+                assertTrue(config.getObject("proof_types_supported.jwt.key_attestations_required").isEmpty())
+            }
         }
     }
 
     @Test
     fun sdJwtProfilesDoNotAddDatasetIdsThroughDataOrMapping() {
         val profiles = fixture("issuer2-profiles-ci.conf").getConfig("profiles")
-        listOf("identityCredentialSdJwt", "identityCredentialHaipSdJwt").forEach { name ->
+        listOf("identityCredentialSdJwt", "identityCredentialHaipSdJwt", "identityCredentialSdJwtAttestation", "identityCredentialHaipSdJwtAttestation").forEach { name ->
             val profile = profiles.getConfig(name)
             assertFalse(profile.getConfig("credentialData").hasPath("id"), "$name must not include a dataset ID")
             // Mapping runs for each credential; a generated UUID makes batch datasets differ.
@@ -78,7 +81,7 @@ class IssuerCiConfigurationTest {
             .openStream().use { factory.generateCertificate(it) as X509Certificate }
         profiles.root().keys.forEach { name ->
             val profile = profiles.getConfig(name)
-            if (profile.getString("credentialConfigurationId") == "identity_credential") {
+            if (profile.getString("credentialConfigurationId").removeSuffix(".attestation") == "identity_credential") {
                 // Basic SD-JWT uses its DID; HAIP and mdoc use the certificate chains.
                 assertTrue(profile.getString("issuerDid").startsWith("did:jwk:"))
                 return@forEach
