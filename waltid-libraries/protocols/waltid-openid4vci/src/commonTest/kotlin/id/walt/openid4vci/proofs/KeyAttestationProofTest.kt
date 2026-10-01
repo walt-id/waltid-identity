@@ -259,11 +259,11 @@ class KeyAttestationProofTest {
         ))
         var validations = 0
         var signatures = 0
-        val legacy = CredentialEndpointHandler { _, _, _, _, batch, _, _, _, _, _, _, _, _, _ ->
+        val legacy = CredentialEndpointHandler { _, _, _, _, batch, _, _, _, _, _, _, _, _, _, _ ->
             signatures++
             CredentialResponseResult.Success(CredentialResponse(credentials = batch.instances.map { IssuedCredential(JsonPrimitive("custom")) }))
         }
-        val crypto2 = Crypto2CredentialEndpointHandler { _, _, _, _, batch, _, _, _, _, _, _, _, _, _ ->
+        val crypto2 = Crypto2CredentialEndpointHandler { _, _, _, _, batch, _, _, _, _, _, _, _, _, _, _ ->
             signatures++
             CredentialResponseResult.Success(CredentialResponse(credentials = batch.instances.map { IssuedCredential(JsonPrimitive("custom")) }))
         }
