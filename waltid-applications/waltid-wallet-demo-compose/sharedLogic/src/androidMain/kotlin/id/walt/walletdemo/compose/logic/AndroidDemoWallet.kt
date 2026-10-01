@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.os.LocaleList
 import id.walt.wallet2.mobile.MobileWallet
 import androidx.fragment.app.FragmentActivity
@@ -80,7 +81,12 @@ suspend fun createAndroidDemoMobileWallet(
                 ),
             ),
             DemoClientIdTrust.configuration,
-        ),
+        ).also { wallet ->
+            syntheticWebuildAttesterFor(
+                context.packageName,
+                isDebuggable = context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
+            )?.let(wallet::attachKeyAttestationProvider)
+        },
         transactionDataProfilesWarning = transactionDataProfiles.warning,
     )
 }
