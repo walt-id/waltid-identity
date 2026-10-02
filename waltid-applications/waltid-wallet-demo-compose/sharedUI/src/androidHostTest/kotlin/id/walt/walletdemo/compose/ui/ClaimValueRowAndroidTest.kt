@@ -54,12 +54,12 @@ class ClaimValueRowAndroidTest {
         val item = deferredInvalidImage()
         setContent {
             WalletDemoTheme {
-                ClaimGroupSection(ClaimGroup("Images", listOf(item), initiallyExpanded = false))
+                ClaimGroupSection(ClaimGroup("images", "Images", listOf(item), initiallyExpanded = false))
             }
         }
         waitForIdle()
         onNodeWithText(unavailable).assertDoesNotExist()
-        onNodeWithText("1 entry").performClick()
+        onNodeWithText("Images").performClick()
         waitUntil(timeoutMillis = 5_000) { onAllNodesWithText(unavailable).fetchSemanticsNodes().isNotEmpty() }
     }
 
@@ -74,9 +74,10 @@ class ClaimValueRowAndroidTest {
     private val unavailable = "Image unavailable or unsupported"
 
     @Test
-    fun largeListRendersABoundedPreview() = runComposeUiTest {
+    fun largeListRendersABoundedPreviewAndCanRevealTheRest() = runComposeUiTest {
         setContent {
             WalletDemoTheme {
+                Column(Modifier.height(600.dp).verticalScroll(rememberScrollState())) {
                 ClaimValueRow(
                     item = ClaimItem(
                         path = ClaimItemPath.topLevel("unknown_binary"),
@@ -86,11 +87,15 @@ class ClaimValueRowAndroidTest {
                         ),
                     ),
                 )
+                }
             }
         }
 
         onNodeWithText("item 24").assertExists()
         onNodeWithText("item 25").assertDoesNotExist()
         onNodeWithText("Showing first 25 of 30 items").assertExists()
+        onNodeWithText("Show 5 more").performScrollTo().performClick()
+        onNodeWithText("item 29").assertExists()
+        onNodeWithText("Show 5 more").assertDoesNotExist()
     }
 }

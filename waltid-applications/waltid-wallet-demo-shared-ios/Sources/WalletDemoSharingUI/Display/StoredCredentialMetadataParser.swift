@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 import WalletSDK
 
 /// Parses sidecar credential metadata JSON written by the wallet on receive.
@@ -18,6 +19,27 @@ public enum StoredCredentialMetadataParser {
         preferredLocales: [String] = []
     ) -> MetadataDisplay? {
         parseDisplay(from: metadataJSON, key: "credentialDisplay", preferredLocales: preferredLocales)
+    }
+
+    /// These are definitions advertised by the issuer, never values not yet received.
+    public static func claims(from metadataJSON: String?, preferredLocales: [String] = []) -> [CredentialClaimMetadata] {
+        guard let data = metadataJSON?.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let entries = root["credentialClaims"] as? [[String: Any]] else { return [] }
+        var seen = Set<[String]>()
+        var result: [CredentialClaimMetadata] = []
+        for entry in entries {
+            guard let path = entry["path"] as? [String], !path.isEmpty,
+                  path.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
+                  seen.insert(path).inserted else { return [] }
+            let displays = entry["display"] as? [[String: Any]] ?? []
+            let display = DisplayLocales.select(displays, preferredLocales: preferredLocales) { stringValue($0["locale"]) }
+            let mandatory = (entry["mandatory"] as? NSNumber).flatMap { value -> Bool? in
+                CFGetTypeID(value) == CFBooleanGetTypeID() ? value.boolValue : nil
+            }
+            result.append(CredentialClaimMetadata(path: path, mandatory: mandatory, name: stringValue(display?["name"])))
+        }
+        return result
     }
 
     private static func parseDisplay(
@@ -62,6 +84,7 @@ public enum StoredCredentialMetadataParser {
         let textColor = stringValue(selected["text_color"]) ?? stringValue(selected["textColor"])
 
         guard name != nil
+            || description != nil
             || logoURI != nil
             || backgroundColor != nil
             || backgroundImageURI != nil

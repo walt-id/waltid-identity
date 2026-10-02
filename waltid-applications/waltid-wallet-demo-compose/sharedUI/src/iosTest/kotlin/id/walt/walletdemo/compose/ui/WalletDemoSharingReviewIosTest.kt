@@ -6,6 +6,10 @@ class WalletDemoSharingReviewIosTest {
     private val scenarios = WalletDemoSharingReviewTestScenarios()
 
     @Test
+    fun inspectingAllCredentialInformationDoesNotChangeDisclosureConsent() =
+        scenarios.inspectingAllCredentialInformationDoesNotChangeDisclosureConsent()
+
+    @Test
     fun paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements() =
         scenarios.paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements()
 

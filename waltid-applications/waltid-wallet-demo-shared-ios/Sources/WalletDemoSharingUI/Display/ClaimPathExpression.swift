@@ -78,14 +78,12 @@ private struct ClaimPathExpressionParser {
     private mutating func addBracketSegment() {
         index += 1
         skipWhitespace()
-        let segment: String
         if index < characters.count, characters[index].isQuote {
-            segment = readQuotedSegment(quote: characters[index])
+            segments.append(.key(readQuotedSegment(quote: characters[index])))
         } else {
-            segment = readUnquotedBracketSegment()
+            addToken(readUnquotedBracketSegment())
         }
         skipUntilBracketEnd()
-        addToken(segment)
     }
 
     private mutating func addToken(_ rawSegment: String) {
@@ -141,6 +139,7 @@ private struct ClaimPathExpressionParser {
     }
 
     private mutating func readQuotedSegment(quote: Character) -> String {
+        let start = index
         index += 1
         var segment = ""
         while index < characters.count {
@@ -151,6 +150,10 @@ private struct ClaimPathExpressionParser {
                 index += 1
             } else if character == quote {
                 index += 1
+                if quote == "\"", let data = String(characters[start..<index]).data(using: .utf8),
+                   let decoded = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) as? String {
+                    return decoded
+                }
                 return segment
             } else {
                 segment.append(character)

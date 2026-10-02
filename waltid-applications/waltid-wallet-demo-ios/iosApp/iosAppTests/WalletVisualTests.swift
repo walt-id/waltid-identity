@@ -73,6 +73,12 @@ final class WalletVisualTests: XCTestCase {
         try capture(ScrollView { CredentialDetailsView(details: details).padding(20) }, id: "credential.details.identity")
     }
 
+    func testLocalizedCredentialDetails() throws {
+        let details = try WalletVisualFixtures().localizedCredentialDetails()
+        XCTAssertEqual(details.groups.flatMap(\.items).prefix(4).map(\.label), ["Familienname", "Vorname", "Name im Namensraum", "Straße"])
+        try capture(ScrollView { CredentialDetailsView(details: details).padding(20) }, id: "credential.details.localized_metadata")
+    }
+
     func testBatchOffer() async throws {
         try await batchOffer(noneSelected: false)
     }
@@ -94,16 +100,14 @@ final class WalletVisualTests: XCTestCase {
             guard case .image(_, let data, _, _) = item.value else { return XCTFail("Expected a resolved image") }
             XCTAssertNotNil(UIImage(data: data))
         }
-        var heights: [String: CGFloat] = [:]
+        var readyImages: Set<String> = []
         let content = ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 ForEach(items) { item in
-                    ClaimValueRow(item: item).background(GeometryReader { geometry in
-                        Color.clear.preference(key: ImageRowHeightKey.self, value: [item.path.id: geometry.size.height])
-                    })
+                    ClaimValueRow(item: item)
                 }
             }.padding(20)
-        }.onPreferenceChange(ImageRowHeightKey.self) { heights = $0 }
+        }.onPreferenceChange(CredentialImageReadinessKey.self) { readyImages = $0 }
             .environment(\.locale, Locale(identifier: "en_US"))
             .environment(\.colorScheme, .light)
             .environment(\.sizeCategory, .large)
@@ -115,14 +119,13 @@ final class WalletVisualTests: XCTestCase {
         window.rootViewController = host
         window.makeKeyAndVisible()
         defer { window.isHidden = true; window.rootViewController = nil; originalKeyWindow?.makeKey() }
-        // Each row has a short label; only its decoded 112pt thumbnail makes it this tall.
-        // The pixel assertion below then verifies the actual portrait/signature content.
+        // A placeholder has the same dimensions as a thumbnail. Wait for actual decoded views.
         let deadline = Date().addingTimeInterval(5)
-        while Date() < deadline && !items.allSatisfy({ (heights[$0.path.id] ?? 0) >= 120 }) {
+        while Date() < deadline && !items.allSatisfy({ readyImages.contains($0.path.id) }) {
             try await Task.sleep(nanoseconds: 10_000_000)
         }
-        guard items.allSatisfy({ (heights[$0.path.id] ?? 0) >= 120 }) else {
-            return XCTFail("Image rows did not render their thumbnails: \(heights)")
+        guard items.allSatisfy({ readyImages.contains($0.path.id) }) else {
+            return XCTFail("Image rows did not render their thumbnails: \(readyImages)")
         }
         try capture(host, id: "credential.media.loaded")
     }
@@ -255,13 +258,6 @@ final class WalletVisualTests: XCTestCase {
 
 private func visualDigest(_ data: Data) -> String {
     SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-}
-
-private struct ImageRowHeightKey: PreferenceKey {
-    static let defaultValue: [String: CGFloat] = [:]
-    static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
-        value.merge(nextValue(), uniquingKeysWith: { _, next in next })
-    }
 }
 
 /// Every channel must stay within the measured iOS 27 SF Symbol edge noise (6/255); dimensions must match.

@@ -26,6 +26,14 @@ internal object WalletVisualFixtures {
 
     val credentialDetails: CredentialDetails get() = CredentialDisplayNormalizer.toDetails(credentialSummary, listOf("en"))
 
+    val localizedCredentialDetails: CredentialDetails get() {
+        val contract = Json.parseToJsonElement(SyntheticCredentialImageFiles.read("credential-information.json").decodeToString()).jsonObject
+        return CredentialDisplayNormalizer.toDetails(credentialSummary.copy(
+            credentialDataJson = contract.getValue("credentialData").toString(),
+            metadataJson = contract.getValue("metadata").toString(),
+        ), contract.getValue("preferredLocales").jsonArray.map { it.jsonPrimitive.content })
+    }
+
     val credentialWithImages: CredentialDetails get() = CredentialDisplayNormalizer.toDetails(
         credentialSummary.copy(credentialDataJson = buildJsonObject {
             credential.getValue("data").jsonObject.forEach { (key, value) -> put(key, value) }
@@ -99,6 +107,7 @@ internal object WalletVisualFixtures {
         val base = WalletDemoSharingReviewFixtures.digitalCredentialReview(listOf(ordinary, paymentCredential))
         return base.copy(
             request = base.request.copy(transactionData = listOf(ClaimGroup(
+                id = "transaction:0",
                 title = "Payment", items = emptyList(), transactionType = "urn:eudi:sca:payment:1",
             ))),
             credentialRequirements = listOf(ordinary, paymentCredential).map {

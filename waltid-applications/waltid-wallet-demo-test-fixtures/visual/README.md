@@ -28,6 +28,8 @@ For custom orchestration, call `report.py begin` first and pass the generated `n
 
 Native failed comparisons export their actual/difference images from the test xcresult bundle; they are included beside expected images in the report. The native renderer permits a maximum difference of 5/255 in every sRGB channel, measured from identical SF Symbol edge rendering. Image dimensions must match and no percentage of pixels is ignored. PNG normalization keeps the encoded reference and actual in the same color representation; the pinned Core Image perceptual comparator produced inconsistent color results.
 
+Settled-state captures advance the Compose virtual clock before capture. Android's native RenderThread ripple is excluded in the snapshot adapter using test-only `LocalRippleConfiguration`; it is not governed by that clock. Production interaction feedback and behavior tests remain unchanged. This follows the [Material ripple subtree override](https://developer.android.com/develop/ui/compose/touch-input/user-interactions/migrate-indication-ripple). These images do not assert animation timing.
+
 The wallet module defaults ordinary Gradle tests to verification from both Identity and coordinated build roots, with mode and baselines tracked as test inputs. The `roborazzi.test.verify` project property remains an explicit override; CI rejects disabled verification and recording or compare-only modes. SwiftUI defaults to `.never` recording. Missing baselines fail. Do not enable verify-and-record in CI.
 
 ## Deliberate baseline updates

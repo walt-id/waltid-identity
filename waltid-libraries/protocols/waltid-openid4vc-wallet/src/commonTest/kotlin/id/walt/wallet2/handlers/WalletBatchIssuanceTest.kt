@@ -56,6 +56,52 @@ class WalletBatchIssuanceTest {
         return resumeDeferred(id, beforeCredentialsStored, onCredentialStored)
     }
 
+    @Test fun batchReviewAndEveryStoredCopyKeepTheSameLocalizedClaimDefinitions() = runTest {
+        for (deferred in listOf(false, true)) {
+        val fixture = batchTestFixture(true)
+        val claims = Json.parseToJsonElement("""[
+            {"path":["given_name"],"mandatory":true,"display":[{"name":"First name","locale":"en"},{"name":"Vorname","locale":"de"}]},
+            {"path":["family_name"],"display":[{"name":"Surname","locale":"en"}]}
+        ]""")
+        val metadata = Json.parseToJsonElement(batchTestMetadata()).jsonObject.let { root ->
+            val configurations = root.getValue("credential_configurations_supported").jsonObject
+            val identity = configurations.getValue("identity").jsonObject
+            JsonObject(root + ("credential_configurations_supported" to JsonObject(configurations +
+                ("identity" to JsonObject(identity + ("credential_metadata" to buildJsonObject { put("claims", claims) }))))))
+        }
+        var tokenCalls = 0
+        var proofs = emptyList<String>()
+        var credentialCalls = 0
+        val records = MemorySessionStore()
+        val http = batchTestClient(metadata = metadata.toString(), token = { tokenCalls++; BATCH_TEST_TOKEN },
+            credentialStatus = if (deferred) HttpStatusCode.Accepted else HttpStatusCode.OK,
+            credential = {
+                credentialCalls++
+                proofs = it.batchProofs()
+                if (deferred) """{"transaction_id":"metadata-continuation","interval":2}""" else batchTestResponse(proofs)
+            }, deferred = { batchTestResponse(proofs) })
+        val service = newSessionService(fixture.wallet, http, records)
+        val review = service.startBatch(WalletIssuanceSessionRequest(offerJson = batchTestOffer()), listOf("de-AT"))
+        val display = Json.parseToJsonElement(review.credentialDisplayMetadata.getValue("identity")).jsonObject
+        assertEquals(claims, display["credentialClaims"])
+        assertEquals(0, tokenCalls)
+        assertTrue(fixture.store.listCredentials().toList().isEmpty())
+        val outcome = service.continuePreAuthorized(review.id, null, listOf(fixture.selection(2)))
+        if (deferred) {
+            val pending = assertIs<WalletIssuanceOutcome.Deferred>(outcome).credentials.single()
+            val restored = newSessionService(fixture.wallet, http, records)
+            assertIs<WalletIssuanceOutcome.Stored>(restored.resumeWhenDue(pending.id))
+            restored.closeSessions()
+        } else assertIs<WalletIssuanceOutcome.Stored>(outcome)
+        assertEquals(1, tokenCalls)
+        assertEquals(1, credentialCalls)
+        val stored = fixture.store.listCredentials().toList()
+        assertEquals(2, stored.size)
+        stored.forEach { assertEquals(claims, it.metadata?.get("credentialClaims")) }
+        service.closeSessions()
+        }
+    }
+
     @Test fun preparedHolderOwnershipTransfersOnlyAfterValidationAndBeforeRemoteWork() = runTest {
         for (authorized in listOf(false, true)) for (valid in listOf(false, true)) {
             val fixture = batchTestFixture(true)
