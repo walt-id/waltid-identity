@@ -1047,26 +1047,32 @@ class WalletBatchIssuanceTest {
     }
 
     @Test fun deferredPendingUpdatesIntervalAndRetainsTransactionAcrossRestart() = runTest {
-        val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
-        var proofs = emptyList<String>()
-        var pendingResponse = true
-        val http = batchTestClient(credentialStatus = HttpStatusCode.Accepted, credential = {
-            proofs = it.batchProofs()
-            """{"transaction_id":"same-transaction","interval":1}"""
-        }, deferredStatus = { if (pendingResponse) HttpStatusCode.Accepted else HttpStatusCode.OK }, deferred = {
-            assertEquals("same-transaction", it["transaction_id"]?.jsonPrimitive?.content)
-            if (pendingResponse) """{"transaction_id":"same-transaction","interval":7}""" else batchTestResponse(proofs)
-        })
-        val service = newSessionService(fixture.wallet, httpClient = http, sessionStore = records)
-        val preview = service.start(WalletIssuanceSessionRequest(offerJson = batchTestOffer()))
-        val pending = assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(preview.id)).credentials.single()
-        val next = assertIs<WalletIssuanceOutcome.Deferred>(service.resumeWhenDue(pending.id)).credentials.single()
-        assertEquals(pending.id, next.id)
-        assertEquals(7, next.intervalSeconds)
-        pendingResponse = false
-        val restored = newSessionService(fixture.wallet, httpClient = http, sessionStore = records)
-        assertEquals(1, assertIs<WalletIssuanceOutcome.Stored>(restored.resumeWhenDue(next.id)).credentialIds.size)
+        for ((pendingStatus, pendingBody, expectedInterval) in listOf(
+            Triple(HttpStatusCode.Accepted, """{"transaction_id":"same-transaction","interval":7}""", 7L),
+            Triple(HttpStatusCode.BadRequest, """{"error":"issuance_pending","interval":7}""", 7L),
+            Triple(HttpStatusCode.BadRequest, """{"error":"issuance_pending"}""", 5L),
+        )) {
+            val fixture = batchTestFixture(true)
+            val records = MemorySessionStore()
+            var proofs = emptyList<String>()
+            var pendingResponse = true
+            val http = batchTestClient(credentialStatus = HttpStatusCode.Accepted, credential = {
+                proofs = it.batchProofs()
+                """{"transaction_id":"same-transaction","interval":1}"""
+            }, deferredStatus = { if (pendingResponse) pendingStatus else HttpStatusCode.OK }, deferred = {
+                assertEquals("same-transaction", it["transaction_id"]?.jsonPrimitive?.content)
+                if (pendingResponse) pendingBody else batchTestResponse(proofs)
+            })
+            val service = newSessionService(fixture.wallet, httpClient = http, sessionStore = records)
+            val preview = service.start(WalletIssuanceSessionRequest(offerJson = batchTestOffer()))
+            val pending = assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(preview.id)).credentials.single()
+            val next = assertIs<WalletIssuanceOutcome.Deferred>(service.resumeWhenDue(pending.id)).credentials.single()
+            assertEquals(pending.id, next.id)
+            assertEquals(expectedInterval, next.intervalSeconds)
+            pendingResponse = false
+            val restored = newSessionService(fixture.wallet, httpClient = http, sessionStore = records)
+            assertEquals(1, assertIs<WalletIssuanceOutcome.Stored>(restored.resumeWhenDue(next.id)).credentialIds.size)
+        }
     }
 
     @Test fun deferredFailureRetainsTransientContinuationButConsumesExplicitDenial() = runTest {
