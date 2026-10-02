@@ -291,6 +291,50 @@
       ],
       "composeTest": "compactBatchOffer",
       "note": "Same compact viewport scrolled to final target. Copy controls and actions remain visible."
+    },
+    {
+      "id": "batch.result.local_save_pending",
+      "requirements": [
+        "R04",
+        "R06",
+        "R18"
+      ],
+      "composeTest": "localSaveResult",
+      "swiftTest": "testLocalSaveResult",
+      "note": "Production receiving content. Retained SDK state controls recovery actions; fixtures do not poll an issuer or save credentials."
+    },
+    {
+      "id": "batch.result.remote_uncertain",
+      "requirements": [
+        "R04",
+        "R06",
+        "R18"
+      ],
+      "composeTest": "remoteUncertainResult",
+      "swiftTest": "testRemoteUncertainResult",
+      "note": "Production receiving content. Retained SDK state controls recovery actions; fixtures do not poll an issuer or save credentials."
+    },
+    {
+      "id": "batch.result.storage_uncertain",
+      "requirements": [
+        "R04",
+        "R06",
+        "R18"
+      ],
+      "composeTest": "storageUncertainResult",
+      "swiftTest": "testStorageUncertainResult",
+      "note": "Production receiving content. Retained SDK state controls recovery actions; fixtures do not poll an issuer or save credentials."
+    },
+    {
+      "id": "batch.result.partial_failure",
+      "requirements": [
+        "R04",
+        "R06",
+        "R18"
+      ],
+      "composeTest": "partialFailureResult",
+      "swiftTest": "testPartialFailureResult",
+      "note": "Production receiving content. Retained SDK state controls recovery actions; fixtures do not poll an issuer or save credentials."
     }
   ]
 }

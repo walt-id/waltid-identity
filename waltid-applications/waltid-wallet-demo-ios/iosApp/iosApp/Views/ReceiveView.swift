@@ -14,6 +14,8 @@ struct ReceiveView: View {
             Group {
                 if let preview = viewModel.offerPreview {
                     reviewContent(preview: preview)
+                } else if viewModel.issuanceReceipt != nil || !viewModel.deferredCredentials.isEmpty {
+                    resultContent
                 } else {
                     entryContent
                 }
@@ -56,7 +58,6 @@ struct ReceiveView: View {
                 .disabled(!viewModel.receiveActionEnabled)
                 .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
 
-                deferredCredentials
             }
             .padding()
         }
@@ -84,7 +85,6 @@ struct ReceiveView: View {
                     WarningBannerView(message: warning)
                 }
 
-                deferredCredentials
             }
             .padding()
         }
@@ -102,18 +102,25 @@ struct ReceiveView: View {
         }
     }
 
-    @ViewBuilder
-    private var deferredCredentials: some View {
-        if !viewModel.deferredCredentials.isEmpty {
-            Text("Pending credentials")
-                .font(.subheadline.weight(.semibold))
-            ForEach(viewModel.deferredCredentials, id: \.id) { credential in
-                Button("Check \(credential.credentialConfigurationID ?? "credential")") {
-                    viewModel.resumeDeferredCredential(credential)
-                }
-                .buttonStyle(.bordered)
-                .disabled(viewModel.isLoading)
-            }
+    private var pendingCredentials: [DeferredCredential] {
+        viewModel.deferredCredentials.filter { viewModel.issuanceReceipt?.pendingIDs.contains($0.id) ?? true }
+    }
+
+    private var resultContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
+                IssuanceResultContent(receipt: viewModel.issuanceReceipt, saved: viewModel.receivedCredentials,
+                    pending: pendingCredentials,
+                    busy: viewModel.isLoading, onResume: viewModel.resumeDeferredCredential)
+            }.padding()
+        }
+        .safeAreaInset(edge: .bottom) {
+            WalletActions(primary: WalletAction("Done", enabled: !viewModel.isLoading, identifier: "issuance-done") {
+                viewModel.selectedTab = .credentials
+            }, secondary: pendingCredentials.isEmpty ? nil : WalletAction("Refresh status",
+                enabled: !viewModel.isLoading, identifier: "issuance-refresh", perform: viewModel.refreshIssuanceStatus))
+                .padding().background(.bar)
         }
     }
 }

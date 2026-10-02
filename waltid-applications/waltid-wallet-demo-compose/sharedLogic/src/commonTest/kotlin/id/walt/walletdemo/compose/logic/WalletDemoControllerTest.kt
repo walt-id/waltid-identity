@@ -1634,6 +1634,64 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun continuationRefreshUsesRetainedStateAndResumeKeepsEarlierSavedIds() = runTest {
+        val pending = WalletDemoDeferredCredential("pending", "pid", 5)
+        val metadata = """{"credentialDisplay":[{"name":"Resident card"}]}"""
+        val retained = pending.copy(status = WalletDemoContinuationStatus.AwaitingLocalSave, displayMetadataJson = metadata)
+        val wallet = FakeDemoWallet(preAuthorizedOutcome = WalletDemoIssuanceOutcome.Deferred(listOf("cred-1"), listOf(pending)),
+            deferredOutcome = WalletDemoIssuanceOutcome.Stored(listOf("cred-1", "cred-2")))
+        val controller = unlockedControllerWith(wallet, this)
+        controller.updateOfferUrl("openid-credential-offer://partial")
+        controller.previewOffer()
+        runCurrent()
+        wallet.pendingCredentials = listOf(retained)
+        wallet.credentials = listOf(sampleCredential)
+        controller.acceptOffer()
+        runCurrent()
+        assertEquals(listOf(retained), controller.state.value.deferredCredentials)
+        assertEquals(setOf("pending"), controller.state.value.issuanceReceipt?.pendingIds)
+        wallet.credentials += sampleCredential.copy(id = "cred-2")
+        controller.resumeDeferredCredential("pending")
+        runCurrent()
+        assertEquals(listOf("cred-1", "cred-2"), controller.state.value.lastReceivedCredentialIds)
+        assertEquals(emptySet(), controller.state.value.issuanceReceipt?.pendingIds)
+    }
+
+    @Test
+    fun uncertainContinuationCannotResumeAndRefreshOnlyReadsLocalState() = runTest {
+        for (status in listOf(WalletDemoContinuationStatus.RemoteOutcomeUncertain, WalletDemoContinuationStatus.StorageOutcomeUncertain)) {
+            val pending = WalletDemoDeferredCredential("pending", "pid", null, status = status)
+            val wallet = FakeDemoWallet(pendingCredentials = listOf(pending))
+            val controller = unlockedControllerWith(wallet, this)
+            controller.resumeDeferredCredential(pending.id)
+            runCurrent()
+            assertTrue(wallet.resumedDeferredCredentialIds.isEmpty())
+            wallet.pendingCredentials = listOf(pending.copy(status = WalletDemoContinuationStatus.AwaitingLocalSave))
+            controller.refreshIssuanceStatus()
+            runCurrent()
+            assertEquals(WalletDemoContinuationStatus.AwaitingLocalSave, controller.state.value.deferredCredentials.single().status)
+            assertTrue(wallet.resumedDeferredCredentialIds.isEmpty())
+        }
+    }
+
+    @Test
+    fun failedStatusReadPreservesUncertainOutcomeAndDoesNotEnableASecondResume() = runTest {
+        val pending = WalletDemoDeferredCredential("pending", "pid", null)
+        val wallet = FakeDemoWallet(pendingCredentials = listOf(pending),
+            deferredOutcome = WalletDemoIssuanceOutcome.Failed("Response lost", deferredCredentials = listOf(pending),
+                kind = WalletDemoIssuanceFailureKind.RemoteOutcomeUncertain))
+        val controller = unlockedControllerWith(wallet, this)
+        wallet.listDeferredError = IllegalStateException("Status unavailable")
+        controller.resumeDeferredCredential(pending.id)
+        runCurrent()
+        assertEquals(WalletDemoContinuationStatus.RemoteOutcomeUncertain, controller.state.value.deferredCredentials.single().status)
+        controller.resumeDeferredCredential(pending.id)
+        runCurrent()
+        assertEquals(listOf(pending.id), wallet.resumedDeferredCredentialIds)
+        assertTrue(controller.state.value.issuanceReceipt?.problem?.message == "Response lost")
+    }
+
+    @Test
     fun deferredFailureReplacesHandleWithLatestIntervalAndPreservesStoredProgress() = runTest {
         val pending = WalletDemoDeferredCredential("pending", "pid", 5)
         val updated = pending.copy(intervalSeconds = 15)
@@ -3049,6 +3107,7 @@ private class FakeDemoWallet(
     ),
     private val presentationError: WalletDemoPresentationError? = null,
 ) : DemoWallet {
+    var listDeferredError: Throwable? = null
     var bootstrapCalls = 0
     var bootstrapError: Throwable? = null
     var reportedSigningProtection: WalletDemoSigningProtection? = null
@@ -3156,7 +3215,10 @@ private class FakeDemoWallet(
     }
 
 
-    override suspend fun listDeferredIssuance() = pendingCredentials
+    override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> {
+        listDeferredError?.let { throw it }
+        return pendingCredentials
+    }
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome {
         resumedDeferredCredentialIds += deferredCredentialId

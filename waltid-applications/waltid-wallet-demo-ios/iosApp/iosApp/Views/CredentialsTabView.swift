@@ -34,6 +34,14 @@ struct CredentialsTabView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     if selectedDetailsID == nil {
                         WalletTabStatusBanner(viewModel: viewModel, tab: .credentials)
+                        if !viewModel.deferredCredentials.isEmpty {
+                            WalletSection {
+                                WalletNavigationRow(String(format: String(localized: "Pending · %d"), viewModel.deferredCredentials.count)) {
+                                    viewModel.startNewReceiveFlow()
+                                    viewModel.selectedTab = .receive
+                                }.accessibilityIdentifier("issuance-pending-work")
+                            }
+                        }
 
                         if let warning = viewModel.transactionDataProfilesWarning {
                             WarningBannerView(message: warning)

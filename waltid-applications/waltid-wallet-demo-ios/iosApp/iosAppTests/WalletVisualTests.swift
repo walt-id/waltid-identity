@@ -156,7 +156,13 @@ final class WalletVisualTests: XCTestCase {
         try capture(host, id: "credential.media.loaded")
     }
 
-    func testPartialBatchResult() async throws {
+    func testPartialBatchResult() async throws { try await batchResult() }
+    func testLocalSaveResult() async throws { try await batchResult(status: .awaitingLocalSave, id: "local_save_pending") }
+    func testRemoteUncertainResult() async throws { try await batchResult(status: .remoteOutcomeUncertain, id: "remote_uncertain") }
+    func testStorageUncertainResult() async throws { try await batchResult(status: .storageOutcomeUncertain, id: "storage_uncertain") }
+    func testPartialFailureResult() async throws { try await batchResult(id: "partial_failure", failure: true) }
+
+    private func batchResult(status: IssuanceContinuationStatus = .awaitingIssuer, id: String = "saved_and_deferred", failure: Bool = false) async throws {
         let fixtures = try WalletVisualFixtures()
         let model = makeModel()
         await model.readerTrustSettings.awaitPendingOperations()
@@ -165,10 +171,18 @@ final class WalletVisualTests: XCTestCase {
         model.statusMessage = try fixtures.partialResultStatus()
         model.credentials = [try fixtures.credential()]
         model.lastReceivedCredentialIDs = model.credentials.map(\.id)
-        model.deferredCredentials = [try fixtures.deferredCredential()]
+        let pending = try fixtures.deferredCredential()
+        model.deferredCredentials = failure ? [] : [DeferredCredential(id: pending.id,
+            credentialConfigurationID: pending.credentialConfigurationID, intervalSeconds: pending.intervalSeconds,
+            status: status, displayMetadataJSON: pending.displayMetadataJSON)]
+        let problem: IssuanceFailure? = failure ? .init(code: .issuerResponse, message: "The issuer could not finish this request.",
+            targetFailure: .init(target: .init(configurationID: "failed"), stage: .request,
+                notAttempted: [.init(configurationID: "unattempted-1"), .init(configurationID: "unattempted-2")])) : nil
+        model.issuanceReceipt = IssuanceReceipt(issuer: try fixtures.offer().issuer, pendingIDs: Set(model.deferredCredentials.map(\.id)), problem: problem)
+        if failure { model.statusMessage = problem?.message ?? ""; model.isError = true }
         XCTAssertEqual(model.credentials.count, 1)
-        XCTAssertEqual(model.deferredCredentials.count, 1)
-        try capture(ReceiveView(viewModel: model, onOpenSettings: {}), id: "batch.result.saved_and_deferred")
+        XCTAssertEqual(model.deferredCredentials.count, failure ? 0 : 1)
+        try capture(ReceiveView(viewModel: model, onOpenSettings: {}), id: "batch.result.\(id)")
     }
 
     func testNearbyReady() async throws {

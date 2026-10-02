@@ -1,8 +1,6 @@
 package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -71,18 +69,6 @@ private fun CopySelection(id: String, title: String, count: Int, limit: Int, ena
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(Res.string.issuance_copies, count), Modifier.weight(1f).testTag("issuance-copies-$id"),
             style = MaterialTheme.typography.bodyMedium)
-        Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { onChange(count - 1) }, enabled = enabled && count > 1,
-                    modifier = Modifier.testTag("issuance-fewer-$id").semantics { contentDescription = fewer }) {
-                    Icon(org.jetbrains.compose.resources.painterResource(Res.drawable.action_remove), null)
-                }
-                VerticalDivider(Modifier.height(24.dp))
-                IconButton(onClick = { onChange(count + 1) }, enabled = enabled && count < limit,
-                    modifier = Modifier.testTag("issuance-more-$id").semantics { contentDescription = more }) {
-                    Icon(Icons.Filled.Add, null)
-                }
-            }
-        }
+        WalletCountControl(count, 1..limit, enabled, fewer, more, "issuance-fewer-$id", "issuance-more-$id", onChange)
     }
 }

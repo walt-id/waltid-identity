@@ -9,6 +9,8 @@ import kotlin.test.Test
 
 @OptIn(InternalComposeUiApi::class)
 class WalletDemoAppIosTest {
+    @Test fun pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt() = scenarios.pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt()
+
     @Test fun pinSetupRequiresFourDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresFourDigitsAndMatchingConfirmation()
     @Test fun pinSetupAuthenticatesBiometricChoiceWithoutLeavingForm() = scenarios.pinSetupAuthenticatesBiometricChoiceWithoutLeavingForm()
 

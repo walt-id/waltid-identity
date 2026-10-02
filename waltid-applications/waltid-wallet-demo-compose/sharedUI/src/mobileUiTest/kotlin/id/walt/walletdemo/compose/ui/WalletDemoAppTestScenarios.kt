@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.ui
 
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialHolders
+import id.walt.walletdemo.compose.logic.WalletDemoContinuationStatus
 import id.walt.walletdemo.compose.logic.WalletDemoDeferredCredential
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
@@ -337,6 +338,33 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsNotEnabled()
     }
 
+    fun pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt() = runComposeUiTest {
+        val wallet = WalletUiTestWallet(credentials = listOf(sampleCredential), deferredCredentials = listOf(
+            WalletDemoDeferredCredential("local", intervalSeconds = null, status = WalletDemoContinuationStatus.AwaitingLocalSave),
+            WalletDemoDeferredCredential("uncertain", intervalSeconds = null, status = WalletDemoContinuationStatus.RemoteOutcomeUncertain),
+        ))
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+        setWalletContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
+        onNodeWithText("Pending · 2").performClick()
+        onNodeWithTag("issuance-resume-local").performScrollTo().assertIsEnabled()
+        onAllNodesWithTag("issuance-resume-uncertain").assertCountEquals(0)
+        val reads = wallet.continuationReads
+        onNodeWithTag("issuance-refresh").performClick()
+        waitUntil { wallet.continuationReads > reads }
+        assertEquals(emptyList(), wallet.resumedContinuations)
+        onNodeWithTag("issuance-resume-local").performScrollTo().performClick()
+        awaitTaggedNode("issuance-saved-cred-1")
+        onNodeWithTag("issuance-saved-cred-1").performScrollTo().performClick()
+        onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
+        onNodeWithTag("wallet-detail-close").performClick()
+        onNodeWithTag("issuance-done").performClick()
+        onNodeWithText("Pending · 1").assertIsDisplayed()
+        assertEquals(listOf("local"), wallet.resumedContinuations)
+    }
+
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() = runComposeUiTest {
         val wallet = WalletUiTestWallet(credentials = listOf(sampleCredential))
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
@@ -494,7 +522,7 @@ class WalletDemoAppTestScenarios(
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
 
-        runOnIdle { controller.selectTab(WalletDemoTab.Receive) }
+        runOnIdle { controller.startNewReceiveFlow(); controller.selectTab(WalletDemoTab.Receive) }
         onNodeWithTag("wallet.offerInput").assertIsEnabled()
         onNodeWithTag("wallet.offerInput").assertTextContains("")
         assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
@@ -517,7 +545,7 @@ class WalletDemoAppTestScenarios(
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
 
-        runOnIdle { controller.selectTab(WalletDemoTab.Receive) }
+        runOnIdle { controller.startNewReceiveFlow(); controller.selectTab(WalletDemoTab.Receive) }
         onNodeWithTag("wallet.offerInput").assertIsEnabled()
         onNodeWithTag("wallet.offerInput").assertTextContains("")
         onNodeWithTag("wallet.receiveButton").assertIsNotEnabled()
@@ -544,7 +572,7 @@ class WalletDemoAppTestScenarios(
         awaitTaggedNode(WalletUiTestTags.claim("given_name"))
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
 
-        runOnIdle { controller.selectTab(WalletDemoTab.Receive) }
+        runOnIdle { controller.startNewReceiveFlow(); controller.selectTab(WalletDemoTab.Receive) }
         onNodeWithTag("wallet.offerInput").assertIsEnabled()
         onAllNodesWithTag("wallet.credentialDetailsScreen").assertCountEquals(0)
     }
@@ -2179,6 +2207,7 @@ private class RecoverableDemoPinStore : DemoPinStore {
 internal class WalletUiTestWallet(
     var credentials: List<WalletDemoCredential> = emptyList(),
     private val receivedCredentialIds: List<String> = listOf("cred-1"),
+    var deferredCredentials: List<WalletDemoDeferredCredential> = emptyList(),
     private val credentialsAfterReceive: List<WalletDemoCredential>? = null,
     private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult.Success("Presentation sent"),
     private val presentationPreview: WalletDemoPresentationPreview = WalletDemoAppTestScenarios.samplePresentationPreview,
@@ -2296,10 +2325,18 @@ internal class WalletUiTestWallet(
         return WalletDemoIssuanceOutcome.Cancelled
     }
 
-    override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> = emptyList()
+    var continuationReads = 0
+    val resumedContinuations = mutableListOf<String>()
+    override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> {
+        continuationReads++
+        return deferredCredentials
+    }
 
-    override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome =
-        WalletDemoIssuanceOutcome.Failed("Deferred issuance is not configured")
+    override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome {
+        resumedContinuations += deferredCredentialId
+        deferredCredentials = deferredCredentials.filterNot { it.id == deferredCredentialId }
+        return WalletDemoIssuanceOutcome.Stored(receivedCredentialIds)
+    }
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult {
         presentedRequestUrl = requestUrl
