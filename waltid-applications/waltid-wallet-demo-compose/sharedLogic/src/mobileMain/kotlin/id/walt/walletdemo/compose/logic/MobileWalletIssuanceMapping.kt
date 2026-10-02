@@ -12,7 +12,8 @@ import id.walt.wallet2.mobile.MobileWalletCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletHolderBinding
 import id.walt.wallet2.mobile.MobileWalletCredentialHolders
 
-internal fun List<WalletDemoCredentialSelection>.toMobileSelections() = map { selection ->
+/** Keeps in-app and platform-provider acceptance on the same SDK batch-selection contract. */
+fun List<WalletDemoCredentialSelection>.toMobileSelections(): List<MobileWalletCredentialSelection> = map { selection ->
     MobileWalletCredentialSelection(
         credentialConfigurationId = selection.credentialConfigurationId,
         holders = when (val holders = selection.holders) {

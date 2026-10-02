@@ -106,22 +106,35 @@ internal object WalletVisualFixtures {
         )
     }
 
+    val sharingCredentials: List<WalletDemoPresentationCredentialOption> get() =
+        data.getValue("sharing").jsonObject.getValue("credentials").jsonArray.map { item ->
+            val credential = item.jsonObject
+            WalletDemoPresentationCredentialOption(
+                queryId = credential.text("queryId"), credentialId = credential.text("credentialId"),
+                label = credential.text("title"), issuer = credential.text("issuer"), format = credential.text("format"),
+                credentialDataJson = "{}",
+                disclosures = credential.getValue("disclosures").jsonArray.map {
+                    val claim = it.jsonObject
+                    WalletDemoPresentationDisclosure(label = claim.text("label"), path = claim.text("path"),
+                        valueJson = JsonPrimitive(claim.text("value")).toString(), displayValue = claim.text("value"),
+                        selectivelyDisclosable = false)
+                },
+            )
+        }
+
+    val providerReview: WalletDemoSharingReview get() =
+        WalletDemoSharingReviewFixtures.annexCReview(WalletDemoReaderTrust.PendingVerification,
+            listOf(sharingCredentials.first()))
+
     val paymentReview: WalletDemoSharingReview get() {
-        val ordinary = WalletDemoSharingReviewFixtures.credentialOption()
-        val paymentCredential = WalletDemoSharingReviewFixtures.credentialOption(
-            queryId = "payment", credentialId = "visual-payment-credential", label = "Payment authorisation",
-            disclosures = listOf(WalletDemoPresentationDisclosure(
-                label = "Account reference", path = "account_reference", valueJson = "\"Example account\"",
-                displayValue = "Example account", selectivelyDisclosable = false,
-            )),
-        ).copy(format = "dc+sd-jwt")
-        val base = WalletDemoSharingReviewFixtures.digitalCredentialReview(listOf(ordinary, paymentCredential))
+        val options = sharingCredentials
+        val base = WalletDemoSharingReviewFixtures.digitalCredentialReview(options)
         return base.copy(
             request = base.request.copy(transactionData = listOf(ClaimGroup(
                 id = "transaction:0",
                 title = "Payment", items = emptyList(), transactionType = "urn:eudi:sca:payment:1",
             ))),
-            credentialRequirements = listOf(ordinary, paymentCredential).map {
+            credentialRequirements = options.map {
                 WalletDemoPresentationCredentialRequirement(options = listOf(listOf(it.queryId)))
             },
         )
