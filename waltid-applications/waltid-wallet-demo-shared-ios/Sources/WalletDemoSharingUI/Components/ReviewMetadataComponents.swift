@@ -39,6 +39,7 @@ public struct ExpandableMetadataCard<Summary: View, Details: View>: View {
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .foregroundStyle(.secondary)
                 }
+                .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -71,28 +72,9 @@ public struct ReviewMetadataSection<Content: View>: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            titleView
-
-            VStack(alignment: .leading, spacing: 8) {
-                content
-            }
-            .padding(contentInsets)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-    }
-
-    @ViewBuilder
-    private var titleView: some View {
-        let styledTitle = Text(title)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.tint)
-        if let titleAccessibilityIdentifier {
-            styledTitle.accessibilityIdentifier(titleAccessibilityIdentifier)
-        } else {
-            styledTitle
+        WalletSection(title, titleIdentifier: titleAccessibilityIdentifier) {
+            VStack(alignment: .leading, spacing: 12) { content }
+                .padding(contentInsets)
         }
     }
 }
@@ -127,7 +109,7 @@ public struct MetadataDisclosure<Content: View>: View {
 
     @ViewBuilder
     private var disclosureLabel: some View {
-        let label = Text(title).font(.caption.weight(.medium))
+        let label = Text(title).font(.subheadline.weight(.medium))
         if let accessibilityIdentifier {
             label.accessibilityIdentifier(accessibilityIdentifier)
         } else {
@@ -192,13 +174,11 @@ public struct MetadataIdentityView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
                     .font(.body.weight(.semibold))
-                    .lineLimit(2)
                 if let supportingText, !supportingText.isEmpty {
                     Text(supportingText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
+                    }
             }
         }
     }
@@ -268,13 +248,13 @@ private struct MetadataDetailLine: View {
     var body: some View {
         if let value = item.value, !value.isEmpty {
             VStack(alignment: .leading, spacing: 1) {
-                Text(item.label).font(.caption2).foregroundStyle(.secondary)
+                Text(item.label).font(.caption).foregroundStyle(.secondary)
                 if let linkURL {
                     Link(value, destination: linkURL)
-                        .font(.caption)
+                        .font(.body)
                         .accessibilityIdentifier(value)
                 } else {
-                    Text(value).font(.caption)
+                    Text(value).font(.body)
                 }
             }
         }

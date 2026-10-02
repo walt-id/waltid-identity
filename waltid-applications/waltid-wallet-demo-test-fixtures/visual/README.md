@@ -2,7 +2,7 @@
 
 The catalogue connects the existing Compose Android, Compose iOS and native SwiftUI test lanes. Fixtures render production content with synthetic inputs from `resources/files/wallet-visual-data.json`; they never create wallet keys, fetch issuer metadata or start real proximity sessions. Existing semantic and lifecycle tests remain separate.
 
-`catalogue.json` lists each captured state, its test, renderer and requirements. It is the current deterministic catalogue, not a claim that every wallet screen, system prompt or physical flow is covered. Native payment consent is currently a component capture; Compose payment fixtures include the ordinary and payment credential groups. Native media rows wait for decoded thumbnail layout and compare actual pixels. Compose media waits for successful image-loader completion. Nothing uses a fixed capture delay.
+`catalogue.json` lists each captured state, its test, renderer and requirements. It is the current deterministic catalogue, not a claim that every wallet screen, system prompt or physical flow is covered. Native payment consent is currently a component capture; Compose payment fixtures include the ordinary and payment credential groups. Home content uses the real normalized card input; asynchronous app loading and navigation remain in the behavior/UI suites. Native media rows wait for decoded thumbnail layout and compare actual pixels. Compose media waits for successful image-loader completion. Nothing uses a fixed capture delay. PIN setup captures seed the same presentation steps with synthetic in-memory PIN state and a fixed unavailable biometric adapter; separate UI tests drive creation, mismatch, keyboard dismissal and completion.
 
 ## Compare
 
@@ -13,12 +13,14 @@ python3 waltid-applications/waltid-wallet-demo-test-fixtures/visual/report.py be
 
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:verifyRoborazziAndroidHostTest --tests '*WalletVisualAndroidTest' :waltid-applications:waltid-wallet-demo-compose:sharedUI:verifyRoborazziIosSimulatorArm64 :waltid-applications:waltid-wallet-demo-compose:sharedUI:iosSimulatorArm64Test --device "$WALLET_VISUAL_SIMULATOR_ID" --tests '*WalletVisualIosTest' -PenableAndroidBuild=true -PenableIosBuild=true --max-workers=2
 
-xcodebuildmcp simulator test --project-path "$PWD/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp.xcodeproj" --scheme iosApp --configuration Debug --simulator-id "$WALLET_VISUAL_SIMULATOR_ID" --derived-data-path /tmp/wallet-visual-derived --extra-args '-only-testing:iosAppTests/WalletVisualTests' 'CODE_SIGNING_ALLOWED=NO' --json '{"testRunnerEnv":{"E2E_USE_MOCK_WALLET":"1"}}' --output json > build/reports/wallet-visual/native-results.json
+xcodebuildmcp simulator test --project-path "$PWD/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp.xcodeproj" --scheme iosApp --configuration Debug --simulator-id "$WALLET_VISUAL_SIMULATOR_ID" --derived-data-path /tmp/wallet-visual-derived --extra-args '-only-testing:iosAppTests/WalletVisualTests' 'CODE_SIGNING_ALLOWED=YES' 'CODE_SIGN_IDENTITY=-' --json '{"testRunnerEnv":{"E2E_USE_MOCK_WALLET":"1"}}' --output json > build/reports/wallet-visual/native-results.json
 
 python3 waltid-applications/waltid-wallet-demo-test-fixtures/visual/report.py finish --output build/reports/wallet-visual --native-results build/reports/wallet-visual/native-results.json
 ```
 
 The native app requires the existing release WalletCore XCFramework build first; follow its README. Use `--renderers android`, `--renderers compose-ios`, or `--renderers swiftui` on `begin` for a scoped report. Only selected renderers are claimed. The report refuses stale test results, missing tests, unlisted baselines, record-only results, and source/baseline changes after `begin`. Force the selected test task to execute when Gradle would otherwise reuse old results; do not rerun all dependency compilation just to refresh a report. `index.html` contains the contact sheet and `manifest.json` its machine-readable evidence.
+
+Native failed comparisons export their actual/difference images from the test xcresult bundle; they are included beside expected images in the report. The native renderer permits a maximum difference of 5/255 in every sRGB channel, measured from identical SF Symbol edge rendering. Image dimensions must match and no percentage of pixels is ignored. PNG normalization keeps the encoded reference and actual in the same color representation; the pinned Core Image perceptual comparator produced inconsistent color results.
 
 Ordinary Gradle runs verify through the `roborazzi.test.verify` project property; the plugin tracks its mode as a test input. SwiftUI defaults to `.never` recording. Missing baselines fail. Do not enable verify-and-record in CI.
 

@@ -8,6 +8,49 @@ import XCTest
 
 @MainActor
 final class WalletVisualTests: XCTestCase {
+    func testPinCreate() async throws { try await pin(.create) }
+    func testPinConfirm() async throws { try await pin(.confirm) }
+    func testPinBiometrics() async throws { try await pin(.biometrics) }
+
+    private func pin(_ page: PinView.SetupPage) async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        if page != .create { model.pin = "123456" }
+        if page == .biometrics { model.pinConfirmation = "123456" }
+        XCTAssertEqual(model.auth, .setup)
+        XCTAssertFalse(model.isBiometricUnlockAvailable)
+        let name = page == .create ? "create" : page == .confirm ? "confirm" : "biometrics"
+        try capture(PinView(viewModel: model, initialPage: page), id: "onboarding.pin.\(name)")
+    }
+
+    func testHomeEmpty() async throws { try await home(empty: true) }
+    func testHomeCredential() async throws { try await home(empty: false) }
+
+    func testScanEmpty() throws {
+        try capture(WalletScanView(onBack: {}, onOpen: { _, _ in }), id: "wallet.scan.empty")
+    }
+
+    func testScanUnsupported() throws {
+        try capture(WalletScanView(input: "FIDO:/0123456789", onBack: {}, onOpen: { _, _ in }), id: "wallet.scan.unsupported")
+    }
+
+    func testScanWebLink() throws {
+        try capture(WalletScanView(input: "https://example.test/request", onBack: {}, onOpen: { _, _ in }), id: "wallet.scan.link")
+    }
+
+    private func home(empty: Bool) async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        model.isReady = true
+        model.statusMessage = ""
+        model.credentials = empty ? [] : [try WalletVisualFixtures().credential()]
+        let cards = await CredentialDisplayNormalizer.cards(for: model.credentials)
+        XCTAssertEqual(cards.count, model.credentials.count)
+        try capture(CredentialsTabView(viewModel: model, selectedDetailsID: .constant(nil), cards: cards,
+            onOpenSettings: {}, onScan: {}, onShareNearby: {}),
+            id: empty ? "wallet.home.empty" : "wallet.home.credential")
+    }
+
     func testSettingsRoot() async throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: IdentityDocumentSharedConfiguration.appGroupIdentifier))
         let keys = [DemoSharingSettings.showDcApiPresentationPreviewKey, DemoSharingSettings.proximityTransportProfileKey,
@@ -71,13 +114,13 @@ final class WalletVisualTests: XCTestCase {
         window.rootViewController = host
         window.makeKeyAndVisible()
         defer { window.isHidden = true; window.rootViewController = nil; originalKeyWindow?.makeKey() }
-        // Each row has three short text lines; only its decoded 112pt thumbnail makes it this tall.
+        // Each row has a short label; only its decoded 112pt thumbnail makes it this tall.
         // The pixel assertion below then verifies the actual portrait/signature content.
         let deadline = Date().addingTimeInterval(5)
-        while Date() < deadline && !items.allSatisfy({ (heights[$0.path.id] ?? 0) >= 150 }) {
+        while Date() < deadline && !items.allSatisfy({ (heights[$0.path.id] ?? 0) >= 120 }) {
             try await Task.sleep(nanoseconds: 10_000_000)
         }
-        guard items.allSatisfy({ (heights[$0.path.id] ?? 0) >= 150 }) else {
+        guard items.allSatisfy({ (heights[$0.path.id] ?? 0) >= 120 }) else {
             return XCTFail("Image rows did not render their thumbnails: \(heights)")
         }
         try capture(host, id: "credential.media.loaded")
@@ -125,7 +168,8 @@ final class WalletVisualTests: XCTestCase {
             walletClient: MockWalletClient(),
             readerTrustSettingsPersistence: InMemoryDemoReaderTrustSettingsPersistence(),
             identityDocumentRegistrationUpdate: {},
-            pinStore: InMemoryDemoPinStore()
+            pinStore: InMemoryDemoPinStore(),
+            biometricAuthenticator: FakeDemoBiometricAuthenticator(isAvailable: false)
         )
     }
 
@@ -134,6 +178,7 @@ final class WalletVisualTests: XCTestCase {
         .environment(\.colorScheme, .light)
         .environment(\.sizeCategory, .large)
         .environment(\.walletDemoBranding, .default)
+        .background(Color(.systemGroupedBackground))
 
         try capture(UIHostingController(rootView: content), id: id, file: file, line: line)
     }
