@@ -1,6 +1,7 @@
 import CryptoKit
 import SwiftUI
 import WalletSDK
+import WalletDemoSharingUI
 
 @MainActor
 final class WalletIdentityScreenModel: ObservableObject {
@@ -30,16 +31,17 @@ final class WalletIdentityScreenModel: ObservableObject {
     }
 
     enum Step: Int, CaseIterable {
-        case recovery, storage, approval
+        case recovery, storage, approval, review
         var title: String {
-            switch self { case .recovery: "Recovery"; case .storage: "Key storage"; case .approval: "Signing approval" }
+            switch self { case .recovery: "Recovery"; case .storage: "Key storage"; case .approval: "Signing approval"; case .review: "Review" }
         }
-        func choice(_ option: SetupOption) -> Selection {
-            switch self { case .recovery: option.recovery; case .storage: option.storage; case .approval: option.approval }
+        func choice(_ option: SetupOption) -> Selection? {
+            switch self { case .recovery: option.recovery; case .storage: option.storage; case .approval: option.approval; case .review: nil }
         }
         func options(_ all: [SetupOption], selected: SetupOption) -> [SetupOption] {
             all.filter { option in
                 switch self {
+                case .review: false
                 case .recovery: true
                 case .storage: option.recovery.id == selected.recovery.id
                 case .approval: option.recovery.id == selected.recovery.id && option.storage.id == selected.storage.id
@@ -47,7 +49,7 @@ final class WalletIdentityScreenModel: ObservableObject {
             }
         }
         func select(_ all: [SetupOption], selected: SetupOption, choiceID: String) -> SetupOption {
-            let candidates = options(all, selected: selected).filter { choice($0).id == choiceID }
+            let candidates = options(all, selected: selected).filter { choice($0)?.id == choiceID }
             return candidates.first { $0.storage.id == selected.storage.id && $0.approval.id == selected.approval.id }
                 ?? candidates.first { $0.approval.id == selected.approval.id } ?? candidates.first ?? selected
         }
@@ -60,7 +62,7 @@ final class WalletIdentityScreenModel: ObservableObject {
     var selected: SetupOption? { setupOptions.first { $0.id == selectedID } ?? setupOptions.first }
     var selections: [Selection] {
         guard let selected else { return [] }
-        return step.options(setupOptions, selected: selected).map(step.choice).reduce(into: []) { values, next in
+        return step.options(setupOptions, selected: selected).compactMap(step.choice).reduce(into: []) { values, next in
             if !values.contains(where: { $0.id == next.id }) { values.append(next) }
         }
     }
@@ -72,7 +74,7 @@ final class WalletIdentityScreenModel: ObservableObject {
 
     func continueSetup() {
         guard let selected, !busy else { return }
-        if step == .approval { perform(selected.restoring ? "Restoring key…" : "Creating key…", selected.perform) }
+        if step == .review { perform(selected.restoring ? "Restoring key…" : "Creating key…", selected.perform) }
         else if let next = Step(rawValue: step.rawValue + 1) { step = next }
     }
 
@@ -305,7 +307,7 @@ struct WalletIdentityView: View {
                     Section {
                         VStack(alignment: .leading, spacing: 12) {
                             if model.step == .recovery { Text("Your wallet uses a signing key to prove that you hold your credentials.") }
-                            Text("\(model.step.rawValue + 1) of 3 · \(model.step.title)").font(.title3.weight(.semibold))
+                            Text("\(model.step.rawValue + 1) of 4 · \(model.step.title)").font(.title3.weight(.semibold))
                             Text(stepDescription).font(.callout).foregroundStyle(.secondary)
                             if model.step == .storage && selected.recovery.id != "new" {
                                 Text("The Secure Enclave cannot restore a key. Recoverable keys use Keychain or the encrypted wallet database.").font(.callout)
@@ -319,10 +321,10 @@ struct WalletIdentityView: View {
                         if model.selections.contains(where: { $0.id.hasPrefix("restore:") }) {
                             Section("Restore an existing key") { selectionRows(restoring: true) }
                         }
-                    } else {
+                    } else if model.step != .review {
                         Section(model.step.title) { selectionRows() }
                     }
-                    if model.step == .approval {
+                    if model.step == .review {
                         Section {
                             detailRow("Recovery", selected.recovery.id == "new" ? String(localized: "No key backup") : selected.recovery.title)
                             detailRow("Key storage", selected.storage.title)
@@ -368,21 +370,18 @@ struct WalletIdentityView: View {
             .onChange(of: model.step) { _ in proxy.scrollTo("setup-top", anchor: .top) }
             .safeAreaInset(edge: .bottom) {
                 if let selected = model.selected {
-                    HStack(spacing: 12) {
-                        if model.step != .recovery {
-                            Button("Back") { model.step = WalletIdentityScreenModel.Step(rawValue: model.step.rawValue - 1) ?? .recovery }
-                        }
-                        Button {
-                            model.continueSetup()
-                        } label: {
-                            Text(model.step != .approval ? "Continue" : selected.restoring ? "Restore signing key" : "Create signing key")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .accessibilityIdentifier("wallet.keySetupContinue")
-                    }
-                    .disabled(model.busy || model.refreshing)
-                    .padding().background(.bar)
+                    WalletActionBar(
+                        primary: WalletAction(
+                            model.step != .review ? String(localized: "Continue")
+                                : selected.restoring ? String(localized: "Restore signing key") : String(localized: "Create signing key"),
+                            enabled: !model.busy && !model.refreshing, identifier: "wallet.keySetupContinue",
+                            perform: model.continueSetup
+                        ),
+                        secondary: model.step == .recovery ? nil : WalletAction(String(localized: "Back"),
+                            enabled: !model.busy && !model.refreshing) {
+                                model.step = WalletIdentityScreenModel.Step(rawValue: model.step.rawValue - 1) ?? .recovery
+                            }
+                    )
                 }
             }
         }
@@ -405,6 +404,7 @@ struct WalletIdentityView: View {
         case .recovery: "Create a new signing key or restore an existing one. New keys can be created with or without a backup."
         case .storage: "Choose how to store and protect your signing key. Only options compatible with your recovery choice are shown."
         case .approval: "Choose how to approve signing. This is separate from unlocking the app."
+        case .review: "Review how your signing key will be stored, recovered and used before continuing."
         }
     }
 
@@ -420,14 +420,14 @@ struct WalletIdentityView: View {
             restoring == nil || choice.id.hasPrefix("restore:") == restoring
         }, id: \.element.id) { index, choice in
             VStack(alignment: .leading, spacing: 8) {
-                selectionCard(choice, selected: model.selected.map { model.step.choice($0).id == choice.id } ?? false)
+                selectionCard(choice, selected: model.selected.map { model.step.choice($0)?.id == choice.id } ?? false)
                     .accessibilityIdentifier("wallet.keySetupChoice.\(model.step).\(index)")
                 if let identifier = choice.identifier {
                     SettingsCopyContent(title: "Wallet DID", value: identifier, copyLabel: "Copy wallet DID", copyAnnouncement: String(localized: "Wallet DID copied"),
                         valueID: "wallet.recoveryDid.\(choice.id)", copyID: "wallet.recoveryDidCopy.\(choice.id)", disclosureLabels: ("Show full DID", "Hide full DID"))
                 }
             }
-            .listRowBackground(model.selections.count > 1 && model.selected.map { model.step.choice($0).id == choice.id } == true
+            .listRowBackground(model.selections.count > 1 && model.selected.map { model.step.choice($0)?.id == choice.id } == true
                 ? Color.accentColor.opacity(0.08) : Color(uiColor: .secondarySystemGroupedBackground))
         }
     }

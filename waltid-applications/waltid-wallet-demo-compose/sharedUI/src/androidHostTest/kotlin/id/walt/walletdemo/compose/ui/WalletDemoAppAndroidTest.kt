@@ -10,6 +10,12 @@ import org.robolectric.RobolectricTestRunner
 class WalletDemoAppAndroidTest {
     private val scenarios = WalletDemoAppTestScenarios()
 
+    @Test fun pinSetupRequiresSixDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresSixDigitsAndMatchingConfirmation()
+
+    @Test fun scannerResolvesWebLinksAndKeepsFailureRecoverable() = scenarios.scannerResolvesWebLinksAndKeepsFailureRecoverable()
+
+    @Test fun scannerBackCancelsLinkResolution() = scenarios.scannerBackCancelsLinkResolution()
+
     @Test
     fun batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit() =
         scenarios.batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit()
@@ -22,8 +28,8 @@ class WalletDemoAppAndroidTest {
         scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
 
     @Test
-    fun pinSetupShowsDisabledBiometricToggleWhenUnavailable() =
-        scenarios.pinSetupShowsDisabledBiometricToggleWhenUnavailable()
+    fun pinSetupOffersPINOnlyWhenBiometricsAreUnavailable() =
+        scenarios.pinSetupOffersPINOnlyWhenBiometricsAreUnavailable()
 
     @Test
     fun pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable() =
@@ -76,8 +82,14 @@ class WalletDemoAppAndroidTest {
         scenarios.offerClaimsUseSemanticGroupsAndInclusionLabels()
 
     @Test
-    fun receiveAndPresentTabsExposeQrScanActions() =
-        scenarios.receiveAndPresentTabsExposeQrScanActions()
+    fun scannerRoutesOfferWithoutAcceptingAndBackDiscardsReview() = scenarios.scannerRoutesOfferWithoutAcceptingAndBackDiscardsReview()
+
+    @Test
+    fun scannerBlocksUnsupportedCodesAndRecognizesInlineWebRequests() = scenarios.scannerBlocksUnsupportedCodesAndRecognizesInlineWebRequests()
+
+    @Test
+    fun walletHomeExposesUnifiedScanAndNearby() =
+        scenarios.walletHomeExposesUnifiedScanAndNearby()
 
     @Test
     fun embeddedPresentationJourneyKeepsWalletChrome() =

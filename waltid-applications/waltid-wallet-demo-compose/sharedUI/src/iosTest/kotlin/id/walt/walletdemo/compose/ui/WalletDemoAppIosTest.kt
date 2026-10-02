@@ -9,6 +9,12 @@ import kotlin.test.Test
 
 @OptIn(InternalComposeUiApi::class)
 class WalletDemoAppIosTest {
+    @Test fun pinSetupRequiresSixDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresSixDigitsAndMatchingConfirmation()
+
+    @Test fun scannerResolvesWebLinksAndKeepsFailureRecoverable() = scenarios.scannerResolvesWebLinksAndKeepsFailureRecoverable()
+
+    @Test fun scannerBackCancelsLinkResolution() = scenarios.scannerBackCancelsLinkResolution()
+
     @Test
     fun batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit() =
         scenarios.batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit()
@@ -30,8 +36,8 @@ class WalletDemoAppIosTest {
         scenarios.pinStorageFailureStaysLockedUntilRetrySucceeds()
 
     @Test
-    fun pinSetupShowsDisabledBiometricToggleWhenUnavailable() =
-        scenarios.pinSetupShowsDisabledBiometricToggleWhenUnavailable()
+    fun pinSetupOffersPINOnlyWhenBiometricsAreUnavailable() =
+        scenarios.pinSetupOffersPINOnlyWhenBiometricsAreUnavailable()
 
     @Test
     fun pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable() =
@@ -84,8 +90,14 @@ class WalletDemoAppIosTest {
         scenarios.offerClaimsUseSemanticGroupsAndInclusionLabels()
 
     @Test
-    fun receiveAndPresentTabsExposeQrScanActions() =
-        scenarios.receiveAndPresentTabsExposeQrScanActions()
+    fun scannerRoutesOfferWithoutAcceptingAndBackDiscardsReview() = scenarios.scannerRoutesOfferWithoutAcceptingAndBackDiscardsReview()
+
+    @Test
+    fun scannerBlocksUnsupportedCodesAndRecognizesInlineWebRequests() = scenarios.scannerBlocksUnsupportedCodesAndRecognizesInlineWebRequests()
+
+    @Test
+    fun walletHomeExposesUnifiedScanAndNearby() =
+        scenarios.walletHomeExposesUnifiedScanAndNearby()
 
     @Test
     fun embeddedPresentationJourneyKeepsWalletChrome() =

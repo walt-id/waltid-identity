@@ -5,6 +5,54 @@ import XCTest
 final class MockWalletUITests: XCTestCase {
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
+    func testPinCreationRequiresSixDigitsAndSeparateMatchingConfirmation() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        app.launchEnvironment = ["E2E_WALLET_ID": "pin-steps-\(UUID().uuidString)", "E2E_MOCK_WALLET": "1",
+            "WALLET_SIGNING_PROTECTION_MODE": "disabled"]
+        app.launch()
+        let input = ui.textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.secureTextFields["wallet.pinConfirmationInput"].exists)
+        ui.replaceText(in: input, value: "1234")
+        XCTAssertFalse(app.buttons["wallet.pinSubmitButton"].isEnabled)
+        ui.replaceText(in: input, value: "123456")
+        ui.tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Continue")
+        let confirmation = ui.textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+        XCTAssertFalse(input.exists)
+        ui.replaceText(in: confirmation, value: "654321")
+        ui.tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Continue")
+        XCTAssertTrue(app.staticTexts["The PINs do not match. Try again."].waitForExistence(timeout: 5))
+        ui.replaceText(in: confirmation, value: "123456")
+        ui.tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Continue")
+        XCTAssertTrue(app.staticTexts["A quicker way to unlock"].waitForExistence(timeout: 5))
+        let skip = app.buttons["wallet.pinSkipBiometrics"]
+        if skip.exists { skip.tap() } else { app.buttons["wallet.pinSubmitButton"].tap() }
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10), "Wallet ready")
+    }
+
+    func testWalletHomeScannerRoutesOfferAndBackCancelsReview() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10), "Wallet ready")
+        XCTAssertFalse(app.tabBars.firstMatch.exists)
+        XCTAssertTrue(app.buttons["wallet.proximityStartButton"].exists)
+        ui.tapButton(identifier: "wallet.scanButton", fallbackLabel: "Scan or paste a link")
+        let input = ui.textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request")
+        ui.replaceText(in: input, value: "FIDO:/0123456789")
+        XCTAssertFalse(app.buttons["wallet.scanContinue"].isEnabled)
+        ui.replaceText(in: input, value: "openid-credential-offer://mock")
+        ui.tapButton(identifier: "wallet.scanContinue", fallbackLabel: "Continue")
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10), "Review credential offer")
+        ui.assertExists(identifier: "wallet.offerAcceptButton")
+        XCTAssertFalse(app.textFields["wallet.offerInput"].exists)
+        ui.tapButton(identifier: "wallet.flowBack", fallbackLabel: "Back to wallet")
+        XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No credentials yet"].exists)
+    }
+
     func testCredentialsStayLoadingUntilTheInitialReadCompletes() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
@@ -1095,11 +1143,14 @@ final class WalletIdentitySetupUITests: XCTestCase {
         XCTAssertTrue(next.waitForExistence(timeout: 30))
         ui.tapButton(identifier: "wallet.keySetupChoice.recovery.1", fallbackLabel: "Back up with iCloud Keychain")
         next.tap()
-        XCTAssertTrue(app.staticTexts["2 of 3 · Key storage"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["2 of 4 · Key storage"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Secure Enclave")).count, 0)
         capture("recoverable-key-storage", app: app)
         next.tap()
-        XCTAssertTrue(app.staticTexts["3 of 3 · Signing approval"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["3 of 4 · Signing approval"].waitForExistence(timeout: 10))
+        next.tap()
+        XCTAssertTrue(app.staticTexts["4 of 4 · Review"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["wallet.settingsButton"].exists)
         next.tap()
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
         app.buttons["wallet.settingsTechnicalDetails"].tap()
@@ -1144,9 +1195,11 @@ final class WalletIdentitySetupUITests: XCTestCase {
         XCTAssertTrue(restore.isSelected)
         capture("selected-recovery-record", app: app)
         next.tap()
-        XCTAssertTrue(app.staticTexts["2 of 3 · Key storage"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["2 of 4 · Key storage"].waitForExistence(timeout: 10))
         next.tap()
-        XCTAssertTrue(app.staticTexts["3 of 3 · Signing approval"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["3 of 4 · Signing approval"].waitForExistence(timeout: 10))
+        next.tap()
+        XCTAssertTrue(app.staticTexts["4 of 4 · Review"].waitForExistence(timeout: 10))
         XCTAssertEqual(next.label, "Restore signing key")
         next.tap()
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
@@ -1193,7 +1246,7 @@ final class WalletIdentitySetupUITests: XCTestCase {
         setup.name = "wal749-native-ios-identity-setup"
         setup.lifetime = .keepAlways
         add(setup)
-        for (index, heading) in ["1 of 3 · Recovery", "2 of 3 · Key storage", "3 of 3 · Signing approval"].enumerated() {
+        for (index, heading) in ["1 of 4 · Recovery", "2 of 4 · Key storage", "3 of 4 · Signing approval", "4 of 4 · Review"].enumerated() {
             XCTAssertTrue(app.staticTexts[heading].waitForExistence(timeout: 10))
             let screen = XCTAttachment(screenshot: app.screenshot())
             screen.name = "wal749-key-setup-step-\(index + 1)"

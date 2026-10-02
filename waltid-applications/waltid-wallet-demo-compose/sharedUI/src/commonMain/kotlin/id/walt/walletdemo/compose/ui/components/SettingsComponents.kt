@@ -32,28 +32,6 @@ import org.jetbrains.compose.resources.stringResource
 private val readableJson = Json { prettyPrint = true }
 
 @Composable
-internal fun SettingsSection(
-    title: String? = null,
-    footer: String? = null,
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        title?.let {
-            Text(it, Modifier.padding(horizontal = 16.dp).semantics { heading() },
-                style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
-            Column(Modifier.fillMaxWidth(), content = content)
-        }
-        footer?.let {
-            Text(it, Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
 internal fun SettingsDivider() = HorizontalDivider(
     Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant,
 )
@@ -214,7 +192,7 @@ internal fun SettingsCopyRow(
     var expanded by rememberSaveable { mutableStateOf(disclosureLabels == null) }
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) { if (copied) { delay(2_000); copied = false } }
-    SettingsSection {
+    WalletSection {
         ListItem(
             headlineContent = { Text(title) },
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),

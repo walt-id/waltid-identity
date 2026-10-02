@@ -255,29 +255,3 @@ private fun CredentialCopySelection(
         }
     }
 }
-
-@Composable
-internal fun OfferReviewActions(
-    requiresIssuerAuthentication: Boolean,
-    acceptEnabled: Boolean,
-    reviewEnabled: Boolean,
-    onAccept: () -> Unit,
-    onDecline: () -> Unit,
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(
-            onClick = onAccept,
-            enabled = acceptEnabled,
-            modifier = Modifier.testTag(WalletUiTestTags.OfferAcceptButton),
-        ) {
-            Text(if (requiresIssuerAuthentication) "Continue to sign in" else "Accept")
-        }
-        TextButton(
-            onClick = onDecline,
-            enabled = reviewEnabled,
-            modifier = Modifier.testTag(WalletUiTestTags.OfferDeclineButton),
-        ) {
-            Text("Decline")
-        }
-    }
-}
