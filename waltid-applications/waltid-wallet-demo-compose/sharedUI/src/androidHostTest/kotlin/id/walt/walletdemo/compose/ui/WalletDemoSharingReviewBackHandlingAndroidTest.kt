@@ -54,7 +54,7 @@ class WalletDemoSharingReviewBackHandlingAndroidTest {
                 )
             }
 
-            onNodeWithTag(WalletUiTestTags.credentialCard(option.selection.id))
+            onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id))
                 .performScrollTo()
                 .performClick()
             onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()

@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui
 
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -45,6 +46,36 @@ import kotlin.test.assertNull
  */
 @OptIn(ExperimentalTestApi::class)
 class WalletDemoSharingReviewTestScenarios {
+
+    fun changingHostPreservesDisclosureChoicesAndConsentRevision() = runComposeUiTest {
+        val option = credentialOption(disclosures = listOf(requiredDisclosure(), optionalDisclosure()))
+        val optional = disclosureSelection(option, OPTIONAL_DISCLOSURE_PATH)
+        val presentation = mutableStateOf(WalletReviewPresentation.FullScreen)
+        var prepared = 0
+        var submitted: WalletDemoSharingSelection? = null
+        setContent {
+            WalletDemoSharingReviewScreen(review = digitalCredentialReview(listOf(option)), title = "Review request",
+                compact = false, presentation = presentation.value, onSubmit = { submitted = it }, onCancel = {},
+                onBackAtRoot = {}, preparePaymentConsent = {
+                    prepared++
+                    WalletDemoPaymentConsent("revision-$prepared", "en", "Payment", null, "Approve", "Cancel", false, emptyList())
+                })
+        }
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
+        waitForIdle()
+        val revision = prepared
+        assertEquals(2, revision) // Initial selection and the explicit optional disclosure.
+        runOnIdle { presentation.value = WalletReviewPresentation.Sheet }
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOn()
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
+        onNodeWithText("Approve").performClick()
+        assertEquals(revision, prepared)
+        assertEquals(setOf(optional), submitted?.disclosures)
+        assertEquals("revision-$revision", submitted?.paymentConsentRevision)
+    }
 
     fun inspectingAllCredentialInformationDoesNotChangeDisclosureConsent() = runComposeUiTest {
         var submitted: WalletDemoSharingSelection? = null
@@ -352,7 +383,7 @@ class WalletDemoSharingReviewTestScenarios {
         )
         setContent {
             WalletDemoSharingReviewScreen(
-                compact = false,
+                compact = true,
                 review = annexCReview(
                     readerTrust = WalletDemoReaderTrust.NotAuthenticated,
                     credentialOptions = listOf(first, second),

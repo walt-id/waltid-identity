@@ -169,7 +169,9 @@
         "T05",
         "T10"
       ],
-      "composeTest": "paymentReview"
+      "composeTest": "paymentReview",
+      "swiftTest": "testMixedPaymentReview",
+      "note": "Complete review with ordinary and payment credentials and pinned SDK-labelled actions. Compose uses expanded review rows; native captures the compact provider review."
     },
     {
       "id": "payment.mixed_credentials.details",
@@ -198,7 +200,7 @@
         "T05"
       ],
       "swiftTest": "testPaymentConsent",
-      "note": "Native consent component; mixed-credential host coverage is still required."
+      "note": "Native consent component; mixed-credential review also has its own bounded host capture."
     },
     {
       "id": "nearby.ready.qr",
@@ -383,6 +385,132 @@
         "R16"
       ],
       "note": "SDK-shaped synthetic options; summary-first setup and focused customization. Real key creation and compatibility have separate behavior tests."
+    },
+    {
+      "id": "sharing.provider.review",
+      "requirements": [
+        "R04",
+        "R08",
+        "R09",
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "providerSharingReview",
+      "swiftTest": "testProviderSharingReview",
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome."
+    },
+    {
+      "id": "sharing.provider.compact_dark_large_text",
+      "requirements": [
+        "R04",
+        "R08",
+        "R09",
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "compactProviderSharingReview",
+      "swiftTest": "testCompactProviderSharingReview",
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome. 320x568, dark, Compose font scale 1.5 / SwiftUI accessibilityMedium."
+    },
+    {
+      "id": "receiving.provider.review",
+      "requirements": [
+        "R04",
+        "R08",
+        "R09",
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "providerOfferReview",
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome."
+    },
+    {
+      "id": "sharing.provider.preparing",
+      "requirements": [
+        "R04",
+        "R08",
+        "R09",
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "swiftTest": "testProviderPreparing",
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome."
+    },
+    {
+      "id": "sharing.provider.failure",
+      "requirements": [
+        "R04",
+        "R08",
+        "R09",
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "swiftTest": "testProviderFailure",
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome."
+    },
+    {
+      "id": "payment.sheet.main",
+      "requirements": [
+        "R09",
+        "R14",
+        "T01",
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T10",
+        "T12"
+      ],
+      "composeTest": "paymentSheet",
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome."
+    },
+    {
+      "id": "payment.sheet.details",
+      "requirements": [
+        "R09",
+        "R14",
+        "T01",
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T10",
+        "T12"
+      ],
+      "composeTest": "paymentSheet",
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome."
+    },
+    {
+      "id": "payment.sheet.requested_data",
+      "requirements": [
+        "R09",
+        "R14",
+        "T01",
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T10",
+        "T12"
+      ],
+      "composeTest": "paymentSheet",
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome."
+    },
+    {
+      "id": "sharing.provider.compact_dark_large_text.last",
+      "swiftTest": "testCompactProviderSharingReview",
+      "requirements": [
+        "R09",
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "note": "Native 320x568 dark accessibilityMedium review scrolled to its final credential row; confirmation stays pinned. Bounded provider content, not the Apple system container."
     }
   ]
 }

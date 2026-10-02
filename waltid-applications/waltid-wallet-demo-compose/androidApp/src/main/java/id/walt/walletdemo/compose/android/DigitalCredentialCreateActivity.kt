@@ -15,11 +15,15 @@ import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.AndroidDigitalCredentialCreateResponse
 import id.walt.wallet2.mobile.MobileWalletCredentialOffer
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
+import id.walt.walletdemo.compose.logic.WalletDemoHolderBinding
+import id.walt.walletdemo.compose.logic.credentialSelections
+import id.walt.walletdemo.compose.logic.toMobileSelections
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceSession
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.toDemoIssuanceSession
-import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateSheet
+import id.walt.walletdemo.compose.ui.WalletReviewPresentation
+import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateScreen
 import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateUiState
 import id.walt.walletdemo.compose.ui.prefetchOfferCardArt
 import kotlinx.coroutines.CoroutineScope
@@ -43,6 +47,7 @@ class DigitalCredentialCreateActivity : FragmentActivity() {
     private var wallet: MobileWallet? = null
     private var session: WalletDemoIssuanceSession? = null
     private var requestProtocol: String? = null
+    private var defaultHolder: WalletDemoHolderBinding? = null
     private var uiState by mutableStateOf<WalletDemoOfferCreateUiState>(
         WalletDemoOfferCreateUiState.Loading,
     )
@@ -50,13 +55,15 @@ class DigitalCredentialCreateActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            WalletDemoOfferCreateSheet(
+            WalletDemoOfferCreateScreen(
                 state = uiState,
-                onAccept = { txCode ->
-                    val review = uiState as? WalletDemoOfferCreateUiState.Review ?: return@WalletDemoOfferCreateSheet
-                    val started = session ?: return@WalletDemoOfferCreateSheet
+                presentation = WalletReviewPresentation.Sheet,
+                onAccept = { txCode, copies ->
+                    val review = uiState as? WalletDemoOfferCreateUiState.Review ?: return@WalletDemoOfferCreateScreen
+                    val started = session ?: return@WalletDemoOfferCreateScreen
+                    if (review.submitting) return@WalletDemoOfferCreateScreen
                     uiState = review.copy(submitting = true)
-                    acceptOffer(started, txCode)
+                    acceptOffer(started, txCode, copies)
                 },
                 onDecline = {
                     val sessionId = session?.id
@@ -93,7 +100,8 @@ class DigitalCredentialCreateActivity : FragmentActivity() {
                 )
                 val mobileWallet = created.wallet
                 wallet = mobileWallet
-                created.bootstrap(config.selectedSigningProtection(applicationContext))
+                val identity = created.bootstrap(config.selectedSigningProtection(applicationContext))
+                defaultHolder = WalletDemoHolderBinding(identity.keyId, identity.did)
                 val started = mobileWallet.startIssuance(
                     MobileWalletIssuanceRequest(
                         offer = MobileWalletCredentialOffer.InlineJson(input.request.offerJson),
@@ -109,20 +117,22 @@ class DigitalCredentialCreateActivity : FragmentActivity() {
         }
     }
 
-    private fun acceptOffer(started: WalletDemoIssuanceSession, txCode: String?) {
+    private fun acceptOffer(started: WalletDemoIssuanceSession, txCode: String?, copies: Map<String, Int>) {
         val mobileWallet = wallet ?: return reportFailure(IllegalStateException("Wallet is missing"))
         scope.launch {
             runCatching {
+                val selection = started.preview.credentialSelections(copies, requireNotNull(defaultHolder)).toMobileSelections()
                 when (started.grant) {
                     WalletDemoIssuanceGrant.PreAuthorizedCode -> {
                         val outcome = mobileWallet.continuePreAuthorizedIssuance(
                             sessionId = started.id,
                             transactionCode = txCode,
+                            credentials = selection,
                         )
                         completeOutcome(outcome)
                     }
                     WalletDemoIssuanceGrant.AuthorizationCode -> {
-                        val authorization = mobileWallet.beginAuthorizationIssuance(started.id)
+                        val authorization = mobileWallet.beginAuthorizationIssuance(started.id, credentials = selection)
                         DigitalCredentialCreateAuthHandoff.register(
                             context = this@DigitalCredentialCreateActivity,
                             sessionId = started.id,

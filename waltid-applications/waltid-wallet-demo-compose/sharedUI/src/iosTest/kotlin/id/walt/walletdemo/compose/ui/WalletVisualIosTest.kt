@@ -11,6 +11,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import io.github.takahirom.roborazzi.captureRoboImage
@@ -19,6 +22,12 @@ import kotlin.test.Test
 /** Compose iOS/Skia content on an iOS simulator; does not imitate a UIKit provider container. */
 @OptIn(ExperimentalTestApi::class, ExperimentalRoborazziApi::class, InternalComposeUiApi::class)
 class WalletVisualIosTest {
+    @Test fun providerSharingReview() = scenario { providerSharingReview() }
+    @Test
+    fun compactProviderSharingReview() = scenario(size = Size(320f, 568f), dark = true, fontScale = 1.5f) { providerSharingReview(compact = true) }
+    @Test fun providerOfferReview() = scenario { providerOfferReview() }
+    @Test fun paymentSheet() = scenario { paymentReview(sheet = true) }
+
     @Test fun keySummary() = scenario { keySetup("summary") }
     @Test fun keyRecovery() = scenario { keySetup("recovery") }
     @Test fun keyStorage() = scenario { keySetup("storage") }
@@ -76,7 +85,11 @@ class WalletVisualIosTest {
     private fun scenario(size: Size = Size(393f, 852f), dark: Boolean = false, fontScale: Float = 1f,
                          block: WalletVisualScenarios.() -> Unit) = runSkikoComposeUiTest(size = size) {
         WalletVisualScenarios(this,
-            captureImage = { id -> onRoot().captureRoboImage(this, filePath = "compose-ios-phone-en-light/$id.png") },
+            captureImage = { id ->
+                val root = if (id.startsWith("sharing.provider") || id.startsWith("receiving.provider") || id.startsWith("payment.sheet"))
+                    onNode(isRoot() and hasAnyDescendant(hasTestTag("wallet.review.sheet"))) else onRoot()
+                root.captureRoboImage(this, filePath = "compose-ios-phone-en-light/$id.png")
+            },
             // Headless Skia tests have no UIKit window from which to read the display theme.
             platformTheme = { content -> CompositionLocalProvider(
                 LocalSystemTheme provides if (dark) SystemTheme.Dark else SystemTheme.Light,

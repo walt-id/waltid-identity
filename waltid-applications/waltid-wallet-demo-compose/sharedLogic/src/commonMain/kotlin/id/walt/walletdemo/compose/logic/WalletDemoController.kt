@@ -808,14 +808,6 @@ class WalletDemoController(
         _state.compareAndSet(current, current.copy(issuanceCopyCounts = current.issuanceCopyCounts + (configurationId to count)))
     }
 
-    private fun issuanceSelections(current: WalletDemoUiState, ready: WalletSessionState.Ready): List<WalletDemoCredentialSelection> =
-        requireNotNull(current.offerPreview).offeredCredentials.mapNotNull {
-            val count = current.issuanceCopyCounts[it.configurationId] ?: 1
-            if (count == 0) null else WalletDemoCredentialSelection(it.configurationId,
-                if (count == 1) WalletDemoCredentialHolders.Existing(listOf(WalletDemoHolderBinding(ready.keyId, ready.did)))
-                else WalletDemoCredentialHolders.NewKeys(count))
-        }.also { require(it.isNotEmpty()) { "Select at least one credential" } }
-
     fun acceptOffer() {
         val current = _state.value
         val ready = current.session as? WalletSessionState.Ready ?: return
@@ -832,7 +824,7 @@ class WalletDemoController(
 
         receiveJob = scope.launch(dispatcher) {
             try {
-                val selections = issuanceSelections(current, ready)
+                val selections = preview.credentialSelections(current.issuanceCopyCounts, WalletDemoHolderBinding(ready.keyId, ready.did))
                 when (session.grant) {
                     WalletDemoIssuanceGrant.PreAuthorizedCode -> completeIssuanceOutcome(
                         ready, request, wallet.continuePreAuthorizedIssuance(session.id, txCode, selections),

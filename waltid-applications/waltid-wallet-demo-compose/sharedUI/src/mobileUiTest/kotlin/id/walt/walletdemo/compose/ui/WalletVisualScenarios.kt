@@ -313,12 +313,34 @@ internal class WalletVisualScenarios(
         capture("nearby.ready.qr")
     }
 
-    fun paymentReview() = with(test) {
+    fun providerSharingReview(compact: Boolean = false) = with(test) {
+        content {
+            WalletDemoSharingReviewScreen(review = WalletVisualFixtures.providerReview, title = "Share documents",
+                onSubmit = {}, onCancel = {}, onBackAtRoot = {}, presentation = WalletReviewPresentation.Sheet)
+        }
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationVerifierSection).performScrollTo().assertIsDisplayed()
+        capture(if (compact) "sharing.provider.compact_dark_large_text" else "sharing.provider.review")
+    }
+
+    fun providerOfferReview() = with(test) {
+        content {
+            WalletDemoOfferCreateScreen(WalletDemoOfferCreateUiState.Review(WalletVisualFixtures.offer),
+                onAccept = { _, _ -> }, onDecline = {}, onDismiss = {}, onCancelAuthorization = {},
+                presentation = WalletReviewPresentation.Sheet)
+        }
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsEnabled().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.OfferCredentialsSection).performScrollTo().assertIsDisplayed()
+        capture("receiving.provider.review")
+    }
+
+    fun paymentReview(sheet: Boolean = false) = with(test) {
         val consent = WalletVisualFixtures.payment
         content {
             WalletDemoSharingReviewScreen(
                 review = WalletVisualFixtures.paymentReview,
-                title = "Payment", compact = false, onSubmit = {}, onCancel = {},
+                title = "Payment", compact = false, onSubmit = {}, onCancel = {}, onBackAtRoot = {},
+                presentation = if (sheet) WalletReviewPresentation.Sheet else WalletReviewPresentation.FullScreen,
                 preparePaymentConsent = { consent },
             )
         }
@@ -326,12 +348,12 @@ internal class WalletVisualScenarios(
         onNodeWithText("11.56 EUR").performScrollTo().assertIsDisplayed()
         onNodeWithText("Pay €11.56").assertIsDisplayed()
         onNodeWithText("bound-but-hidden").assertDoesNotExist()
-        capture("payment.mixed_credentials.main")
+        capture("${if (sheet) "payment.sheet" else "payment.mixed_credentials"}.main")
         onNodeWithTag("payment-details-toggle").performScrollTo().performClick()
         onNodeWithText("example-transaction-001").performScrollTo().assertIsDisplayed()
-        capture("payment.mixed_credentials.details")
+        capture("${if (sheet) "payment.sheet" else "payment.mixed_credentials"}.details")
         onNodeWithText("Payment authorisation").performScrollTo().assertIsDisplayed()
         onNodeWithText("Pay €11.56").assertIsEnabled().assertIsDisplayed()
-        capture("payment.mixed_credentials.requested_data")
+        capture("${if (sheet) "payment.sheet" else "payment.mixed_credentials"}.requested_data")
     }
 }
