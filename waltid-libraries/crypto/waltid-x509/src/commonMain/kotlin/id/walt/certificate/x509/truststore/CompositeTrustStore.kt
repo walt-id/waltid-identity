@@ -3,6 +3,10 @@ package id.walt.certificate.x509.truststore
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateTrustStore
 
+/**
+ * Combines several trust stores. A certificate present in more than one of them is returned once
+ * (identified by its SHA-256 fingerprint, not its serial number, which is only unique per issuer).
+ */
 class CompositeTrustStore(initialTrustStores: List<X509CertificateTrustStore>) : X509CertificateTrustStore {
 
     val trustStores = mutableListOf<X509CertificateTrustStore>()
@@ -18,5 +22,5 @@ class CompositeTrustStore(initialTrustStores: List<X509CertificateTrustStore>) :
             it.findCertificateBySubjectDn(
                 subjectDn
             )
-        }.distinctBy { it.data.serialNumberRaw }
+        }.distinctBy { it.fingerprintSha256 }
 }

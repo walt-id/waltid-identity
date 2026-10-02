@@ -3,6 +3,7 @@ package id.walt.certificate.x509.validation.validator
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.extension.BasicConstraintsExtension
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
+import id.walt.certificate.x509.validation.IssuerSelection
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
 
@@ -22,6 +23,12 @@ import id.walt.certificate.x509.validation.ValidationResult
  * Leaf Rejection: Confirm that an end-user or server leaf certificate does not
  * feature cA:TRUE. (this can be
  * disabled by setting leafCanBeCa to true)
+ *
+ * The path length constraints of the trusted certificates above the chain are collected by walking
+ * the trust store. Where several trusted certificates share an issuer DN, the issuer is selected by
+ * key with [ValidationContext.selectIssuer] - the same selection the signature validator makes - so
+ * the constraints of the CA that actually issued the chain are applied, not those of its same-DN
+ * sibling. If the issuer cannot be determined uniquely, validation fails closed.
  */
 class X509CertificateBasicConstraintsValidator(val leafCanBeCa: Boolean = false) : X509CertificateValidator {
 
@@ -75,7 +82,7 @@ class X509CertificateBasicConstraintsValidator(val leafCanBeCa: Boolean = false)
         }
     }
 
-    private fun checkPathLengthConstraintForParentCertificatesInChain(
+    private suspend fun checkPathLengthConstraintForParentCertificatesInChain(
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
@@ -92,20 +99,36 @@ class X509CertificateBasicConstraintsValidator(val leafCanBeCa: Boolean = false)
             }
     }
 
-    private fun pathLengthConstraintsFromTrustStore(
+    private suspend fun pathLengthConstraintsFromTrustStore(
         context: ValidationContext,
         x509Certificate: X509Certificate
     ): MutableMap<String, Int> {
         var currentCert = x509Certificate
         val trustedChain = mutableListOf<X509Certificate>()
+        var firstHop = true
         while (currentCert.data.subjectDn != currentCert.data.issuerDn) {
-            val potentialIssuers = context.findCertificateBySubjectDn(currentCert.data.issuerDn)
-            if (potentialIssuers.isEmpty()) {
-                break
+            when (val selection = context.selectIssuer(currentCert)) {
+                is IssuerSelection.NotFound, is IssuerSelection.NoMatch -> break
+
+                is IssuerSelection.Ambiguous -> {
+                    // The ambiguity of the direct issuer of the certificate under validation is reported
+                    // by the signature validator. Report the ones further up, which only this walk sees.
+                    if (!firstHop) {
+                        context.addLogEntry(
+                            ValidationResult.Severity.ERROR,
+                            "Multiple trusted certificates with subjectDn '${currentCert.data.issuerDn}' qualify as " +
+                                    "issuer of '${currentCert.data.subjectDn}'. Cannot determine path length constraints"
+                        )
+                    }
+                    break
+                }
+
+                is IssuerSelection.Selected -> {
+                    currentCert = selection.issuer
+                    trustedChain.add(currentCert)
+                }
             }
-            require(potentialIssuers.size == 1) { "Selecting issuer Certificate from multiple potential parents is not implemented" }
-            currentCert = potentialIssuers.first()
-            trustedChain.add(currentCert)
+            firstHop = false
         }
         var pathLengthConstraints = mutableMapOf<String, Int>()
         trustedChain.reversed().forEach {
