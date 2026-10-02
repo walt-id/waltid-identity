@@ -163,6 +163,7 @@ class DPoPProviderTest {
 
         assertEquals(OAuthErrorCodes.INVALID_TOKEN, failure.error.error)
         assertEquals(401, response.status)
+        assertEquals("no-store", response.headers["Cache-Control"])
         assertTrue(response.headers["WWW-Authenticate"]?.startsWith(TOKEN_TYPE_DPOP) == true)
     }
 

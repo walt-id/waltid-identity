@@ -79,6 +79,15 @@ enum class Issuer2RouteSurface {
     }
 }
 
+private val credentialResponseCacheControl = createRouteScopedPlugin("CredentialResponseCacheControl") {
+    // Set this before parsing/authentication, including responses from StatusPages or rate limiting.
+    onCall { call ->
+        if (call.response.headers[HttpHeaders.CacheControl] != "no-store") {
+            call.response.headers.append(HttpHeaders.CacheControl, "no-store")
+        }
+    }
+}
+
 private const val MISSING_CALL_ID_MESSAGE = "Missing call ID"
 
 class OpenId4VciController(
@@ -288,7 +297,7 @@ class OpenId4VciController(
                             )
                         }
                     call.respondCredentialResponse(response)
-                }
+                }.apply { install(credentialResponseCacheControl) }
             }
         }
     }
@@ -321,7 +330,9 @@ class OpenId4VciController(
     }
 
     private suspend fun ApplicationCall.respondCredentialResponse(response: CredentialResponseHttp) {
-        response.headers.forEach { (name, value) -> this.response.headers.append(name, value) }
+        response.headers.forEach { (name, value) ->
+            if (this.response.headers[name] != value) this.response.headers.append(name, value)
+        }
         val status = HttpStatusCode.fromValue(response.status)
 
         when (val body = response.body) {

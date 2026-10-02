@@ -69,6 +69,19 @@ LocalAuthentication context for the configured interval; native Keychain metadat
 verify that interval. Android reuse may cover other eligible keys. Timed reuse is recent platform or
 provider authentication, not consent for issuance, presentation, or another wallet action.
 
+## HTTP response caching
+
+The default iOS transport disables Foundation `URLCache` for SDK HTTP sessions,
+including immediate credential responses and deferred issuance polling. This
+prevents Foundation from retaining credential bodies outside wallet persistence,
+even when an external issuer omits `Cache-Control: no-store`. CMP iOS and the Swift
+WalletSDK use this transport by default.
+
+Caller-supplied HTTP clients must apply the same policy. A custom Ktor Darwin client
+should use `engine { configureSession { URLCache = null } }`; a custom `URLSession`
+should set `configuration.urlCache = nil` before creating the session. A request
+policy that ignores cached responses does not prevent storing new response bodies.
+
 ## Receiving credentials
 
 When an issuer advertises `key_attestations_required`, attach an application-supplied

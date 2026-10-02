@@ -215,7 +215,10 @@ public class MobileWallet internal constructor(
     private val proximityTransportFactory: BleProximityTransportFactory? = null,
     private val proximityNfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
     private val proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
-    /** Issuance transport override. Only tests set this; production uses the configured engine. */
+    /**
+     * Issuance transport override. The configured iOS engine disables Foundation response caching.
+     * A supplied client must also prevent automatic caching of sensitive issuance responses.
+     */
     issuanceHttpClient: HttpClient? = null,
     private val scaAuthorizer: WalletScaPresentationAuthorizer? = null,
     paymentCredentialIssuers: List<PaymentCredentialIssuer> = emptyList(),

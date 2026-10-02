@@ -87,6 +87,7 @@ class CredentialEndpointEncryptionTest {
         val http = provider.writeCredentialResponse(requestResult.request, response)
 
         assertEquals(200, http.status)
+        assertEquals("no-store", http.headers["Cache-Control"])
         assertTrue(http.body is CredentialResponseBody.EncryptedJwt)
         assertEquals(CredentialEncryptionProfile.MEDIA_TYPE_JWT, http.contentType)
 
@@ -228,6 +229,7 @@ class CredentialEndpointEncryptionTest {
         val http = provider.writeCredentialResponse(requestResult.request, response)
 
         assertEquals(200, http.status)
+        assertEquals("no-store", http.headers["Cache-Control"])
         assertTrue(http.body is CredentialResponseBody.Json)
         assertEquals(response.toJsonObject(), JsonObject(http.payload))
     }
