@@ -30,9 +30,17 @@ import id.walt.walletdemo.compose.logic.WalletOperationState
 @OptIn(ExperimentalTestApi::class)
 internal class WalletVisualScenarios(
     private val test: ComposeUiTest,
-    private val capture: (String) -> Unit,
+    private val captureImage: (String) -> Unit,
     private val platformTheme: @Composable (@Composable () -> Unit) -> Unit = { it() },
 ) {
+    private fun capture(id: String) {
+        // Capture the settled Compose state after interactions and navigation.
+        // Advancing virtual time keeps this independent of host rendering speed.
+        test.mainClock.advanceTimeBy(1_000)
+        test.waitForIdle()
+        captureImage(id)
+    }
+
     private fun content(body: @Composable () -> Unit) = test.setContent {
         platformTheme {
             WalletDemoTheme {
@@ -120,6 +128,19 @@ internal class WalletVisualScenarios(
         capture("credential.details.nested")
     }
 
+    fun localizedCredentialDetails() = with(test) {
+        content {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+                CredentialDetailsContent(WalletVisualFixtures.localizedCredentialDetails)
+            }
+        }
+        onNodeWithText("Familienname").assertIsDisplayed()
+        onNodeWithText("Vorname").assertIsDisplayed()
+        onNodeWithText("Name im Namensraum").assertIsDisplayed()
+        onNodeWithText("Straße").assertIsDisplayed()
+        capture("credential.details.localized_metadata")
+    }
+
     fun batchOffer(noneSelected: Boolean = false) = with(test) {
         val copies = WalletVisualFixtures.copies.mapValues { (_, count) -> if (noneSelected) 0 else count }
         val state = WalletDemoUiState(offerPreview = WalletVisualFixtures.offer, issuanceCopyCounts = copies)
@@ -155,6 +176,13 @@ internal class WalletVisualScenarios(
                 waitUntil { onAllNodesWithTag(WalletUiTestTags.claimImage(path)).fetchSemanticsNodes().isNotEmpty() }
                 onNodeWithTag(WalletUiTestTags.claimImage(path)).performScrollTo().assertIsDisplayed()
                 waitUntil { images.isReady(image) }
+                // Both thumbnails are visible together; neither may be captured while still loading.
+                waitUntil {
+                    listOf("portrait", "signature_usual_mark").all { visiblePath ->
+                        onAllNodes(hasTestTag(WalletUiTestTags.claimImage(visiblePath)) and isEnabled())
+                            .fetchSemanticsNodes().isNotEmpty()
+                    }
+                }
                 waitForIdle()
                 capture("credential.media.$image")
             }

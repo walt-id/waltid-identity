@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -42,6 +43,6 @@ internal fun ClaimGroupSection(
 private fun ClaimGroupItems(group: ClaimGroup) {
     group.items.forEachIndexed { index, item ->
         if (index > 0) MetadataRowDivider()
-        ClaimValueRow(item = item)
+        key(item.path.id) { ClaimValueRow(item = item) }
     }
 }

@@ -32,6 +32,9 @@ class WalletVisualIosTest {
     fun credentialDetails() = scenario { credentialDetails() }
 
     @Test
+    fun localizedCredentialDetails() = scenario { localizedCredentialDetails() }
+
+    @Test
     fun batchOffer() = scenario { batchOffer() }
 
     @Test
@@ -51,7 +54,7 @@ class WalletVisualIosTest {
 
     private fun scenario(block: WalletVisualScenarios.() -> Unit) = runSkikoComposeUiTest(size = Size(393f, 852f)) {
         WalletVisualScenarios(this,
-            capture = { id -> onRoot().captureRoboImage(this, filePath = "compose-ios-phone-en-light/$id.png") },
+            captureImage = { id -> onRoot().captureRoboImage(this, filePath = "compose-ios-phone-en-light/$id.png") },
             // Headless Skia tests have no UIKit window from which to read the display theme.
             platformTheme = { content -> CompositionLocalProvider(LocalSystemTheme provides SystemTheme.Light, content = content) },
         ).block()

@@ -65,6 +65,7 @@ object CredentialDisplayNormalizer {
             .sortedBy { it.key.order }
             .map { (group, rows) ->
                 ClaimGroup(
+                    id = group.id,
                     title = group.title,
                     items = rows
                         .sortedWith { left, right ->
@@ -77,7 +78,7 @@ object CredentialDisplayNormalizer {
 
         return CredentialDetails(
             summary = summary,
-            groups = groupedItems,
+            groups = applyClaimMetadata(groupedItems, StoredCredentialMetadataParser.claims(summary.metadataJson, preferredLocales), summary.format),
             issuerDisplay = issuerDisplay,
             credentialDisplay = credentialDisplay,
         )
@@ -148,7 +149,7 @@ object CredentialDisplayNormalizer {
                 }
             }
 
-            ClaimGroup(title = title, items = claimItems, transactionType = item.type)
+            ClaimGroup(id = "transaction:$index", title = title, items = claimItems, transactionType = item.type)
         }
     }
 
