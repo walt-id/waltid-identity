@@ -27,4 +27,3 @@ internal fun WalletNavigationRow(
         modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button, onClick = onClick),
     )
 }
-

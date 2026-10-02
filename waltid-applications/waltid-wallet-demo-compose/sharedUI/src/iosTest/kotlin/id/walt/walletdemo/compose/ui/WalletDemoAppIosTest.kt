@@ -10,6 +10,7 @@ import kotlin.test.Test
 @OptIn(InternalComposeUiApi::class)
 class WalletDemoAppIosTest {
     @Test fun pinSetupRequiresSixDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresSixDigitsAndMatchingConfirmation()
+    @Test fun pinSetupAuthenticatesBiometricChoiceWithoutLeavingForm() = scenarios.pinSetupAuthenticatesBiometricChoiceWithoutLeavingForm()
 
     @Test fun scannerResolvesWebLinksAndKeepsFailureRecoverable() = scenarios.scannerResolvesWebLinksAndKeepsFailureRecoverable()
 

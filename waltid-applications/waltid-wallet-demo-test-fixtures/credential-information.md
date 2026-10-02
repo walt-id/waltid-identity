@@ -16,6 +16,10 @@ Stored details show all readable data. Technical fields and local storage facts 
 
 An offer can show issuer-provided claim definitions and mandatory/optional facts. Values must be described as not yet received. Completion and stored details use actual returned credential IDs and values. A successful local send does not establish the verifier's result.
 
+Offer rows reuse credential thumbnails and provide separate inclusion, copy-count and information controls. Opening or closing information does not change selection. Unselected rows remain inspectable. Definitions use issuer order and labels with the same vocabulary fallback as stored details; the UI never inserts sample values. The shared batch fixture covers two selected types/three copies, no selection, and definitions. Compact dark fixtures exercise scrolling and retained actions at large text sizes.
+
+Review thumbnails show the credential logo centered on its supplied background color/image (with the existing default when absent). The title is rendered beside the thumbnail, never overlaid inside it. Supplied image pixels remain intact; any lettering already embedded in that image is not edited out. At large text sizes the thumbnail becomes smaller and the title wraps beside it; the user’s chosen text size is preserved.
+
 ## Values and media
 
 Keep null, empty text, false, zero, empty objects and empty lists distinct. Collections initially show 25 items, their total and an explicit next-page action. Preserve indices when revealing more items. Retain deferred, bounded image decoding; loading and failed images have visible placeholders. Full-screen image inspection is available after successful decoding. Credential artwork identifies the credential and stays separate from claim images and issuer/verifier logos.
