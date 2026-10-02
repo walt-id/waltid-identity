@@ -1,7 +1,6 @@
-package id.walt.w3c.issuance
+package id.walt.credentials.issuance
 
 import id.walt.crypto.utils.UuidUtils.randomUUID
-import id.walt.w3c.utils.CredentialDataMergeUtils
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import kotlinx.datetime.TimeZone
@@ -30,6 +29,14 @@ class IssuanceClock(val clock: Clock) : AbstractCoroutineContextElement(Issuance
 
 suspend fun currentIssuanceClock(): Clock =
     currentCoroutineContext()[IssuanceClock]?.clock ?: Clock.System
+
+/**
+ * The data functions for the issuance under way: every timestamp function reads the issuance clock set with
+ * [IssuanceClock], falling back to the system clock. Use this rather than [dataFunctions], whose clock is always the
+ * system clock - with it, two timestamps of one issuance could disagree.
+ */
+suspend fun issuanceDataFunctions(): Map<String, suspend (call: CredentialDataMergeUtils.FunctionCall) -> JsonElement> =
+    dataFunctionsFor(currentIssuanceClock())
 
 @OptIn(ExperimentalJsExport::class)
 fun dataFunctionsFor(clock: Clock): Map<String, suspend (call: CredentialDataMergeUtils.FunctionCall) -> JsonElement> =

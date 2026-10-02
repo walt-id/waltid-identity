@@ -1,5 +1,7 @@
 package id.walt.oid4vc
 
+import id.walt.credentials.issuance.issuanceDataFunctions
+import id.walt.credentials.issuance.issuanceTemplateContext
 import cbor.Cbor
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
@@ -37,10 +39,9 @@ import id.walt.sdjwt.SDPayload
 import id.walt.w3c.CredentialBuilder
 import id.walt.w3c.CredentialBuilderType
 import id.walt.w3c.issuance.Issuer.getKidHeader
-import id.walt.w3c.issuance.Issuer.mergingJwtIssue
-import id.walt.w3c.issuance.Issuer.mergingSdJwtIssue
-import id.walt.w3c.issuance.dataFunctions
-import id.walt.w3c.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
+import id.walt.credentials.issuance.MergingIssuer.mergingJwtIssue
+import id.walt.credentials.issuance.MergingIssuer.mergingSdJwtIssue
+import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
 import id.walt.w3c.utils.VCFormat
 import id.walt.w3c.vc.vcs.W3CV11DataModel
 import id.walt.w3c.vc.vcs.W3CV2DataModel
@@ -733,24 +734,10 @@ object OpenID4VCI {
         val sdPayload = SDPayload.createSDPayload(
             fullPayload = credentialData.mergeSDJwtVCPayloadWithMapping(
                 mapping = dataMapping ?: JsonObject(emptyMap()),
-                context = mapOf(
-                    "subjectDid" to holderDid,
-                    "issuerDid" to issuerId,
-                    "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-                ).filterValues {
-                    when (it) {
-                        is JsonElement -> it !is JsonNull && (it !is JsonObject || it.jsonObject.isNotEmpty()) && (it !is JsonArray || it.jsonArray.isNotEmpty())
-                        else -> it.toString().isNotEmpty()
-                    }
-                }.mapValues { (_, value) ->
-                    when (value) {
-                        is JsonElement -> value
-                        else -> JsonPrimitive(value.toString())
-                    }
-                },
-                data = dataFunctions
+                context = issuanceTemplateContext(issuerId = issuerId, subjectDid = holderDid, display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray),
+                data = issuanceDataFunctions()
             ),
-            disclosureMap = selectiveDisclosure ?: SDMap(mapOf())
+            disclosureMap = selectiveDisclosure ?: SDMap(mapOf()),
         )
 
         val holderKeyJson = holderKey.exportJWKObject().plus(
@@ -892,21 +879,6 @@ object OpenID4VCI {
                     builder.buildW3C()
                 } ?: vc
             }
-            val context = mapOf(
-                "subjectDid" to holderDid,
-                "issuerDid" to issuerId,
-                "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-            ).filterValues {
-                when (it) {
-                    is JsonElement -> it !is JsonNull && (it !is JsonObject || it.jsonObject.isNotEmpty()) && (it !is JsonArray || it.jsonArray.isNotEmpty())
-                    else -> it != null && it.toString().isNotEmpty()
-                }
-            }.mapValues { (_, value) ->
-                when (value) {
-                    is JsonElement -> value
-                    else -> JsonPrimitive(value.toString())
-                }
-            }
             when (selectiveDisclosure.isNullOrEmpty()) {
                 true -> w3cVc.mergingJwtIssue(
                     issuerKey = issuerKey,
@@ -916,7 +888,6 @@ object OpenID4VCI {
                     additionalJwtHeader = additionalJwtHeaders,
                     display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                     additionalJwtOptions = emptyMap(),
-                    context = context
                 )
 
                 else -> w3cVc.mergingSdJwtIssue(
@@ -928,7 +899,6 @@ object OpenID4VCI {
                     additionalJwtOptions = emptyMap(),
                     display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                     disclosureMap = selectiveDisclosure,
-                    context = context,
                     type = when (builderType) {
                         CredentialBuilderType.W3CV11CredentialBuilder -> "JWT"
                         CredentialBuilderType.W3CV2CredentialBuilder -> SD_JWT_VC_TYPE_HEADER

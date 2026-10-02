@@ -59,6 +59,7 @@ dependencies {
     implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
     implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
+    implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
     implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
     implementation(project(":waltid-libraries:web:waltid-ktor-notifications"))
     api(project(":waltid-libraries:waltid-did"))

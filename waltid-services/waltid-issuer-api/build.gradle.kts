@@ -81,6 +81,7 @@ dependencies {
     api(project(":waltid-libraries:waltid-did"))
 
     api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
+    api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
     api(project(":waltid-libraries:credentials:waltid-verification-policies"))
     api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
     api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))

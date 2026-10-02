@@ -28,6 +28,9 @@ kotlin {
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
 
+            // Date functions of the issuance templates
+            implementation(identityLibs.kotlinx.datetime)
+
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
 
