@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.android
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.StaleObjectException
@@ -472,7 +473,10 @@ internal object WalletComposeE2EHelper {
             }
             ?: "UNKNOWN"
     } catch (_: StaleObjectException) {
-        // A screen transition invalidated the node; the next poll reads the new tree.
+        // Discard stale accessibility data so the next poll reads the current screen.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            InstrumentationRegistry.getInstrumentation().uiAutomation.clearCache()
+        }
         "UNKNOWN"
     }
 
