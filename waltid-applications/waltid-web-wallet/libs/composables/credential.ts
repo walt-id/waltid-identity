@@ -3,6 +3,7 @@ import {computedAsync} from "@vueuse/core";
 import {parseJwt} from "../utils/jwt.ts";
 import {computed, type Ref, ref, watchEffect} from "vue";
 import {useCurrentWallet} from "./accountWallet";
+import {useRuntimeConfig} from "nuxt/app";
 
 export type WalletCredential = {
     wallet: string;
@@ -20,15 +21,17 @@ export type WalletCredential = {
 
 export function useCredential(credential: Ref<WalletCredential | null>) {
     const currentWallet = useCurrentWallet()
+    const apiBase = useRuntimeConfig().public.walletApiBaseUrl;
     const jwtJson = computedAsync(async () => {
         if (credential.value) {
             if (credential.value.parsedDocument) return credential.value.parsedDocument;
 
             let parsed;
             if (credential.value.format && credential.value.format === "mso_mdoc") {
-                let resp = await fetch(`/wallet-api/util/parseMDoc`, {
+                let resp = await fetch(`${apiBase}/wallet-api/util/parseMDoc`, {
                     method: "POST",
                     body: credential.value.document,
+                    credentials: 'include',
                 });
                 parsed = await resp.json();
             }
@@ -52,7 +55,7 @@ export function useCredential(credential: Ref<WalletCredential | null>) {
     // Function to resolve VCT URL and fetch the name parameter
     async function fetchVctName(vct: string): Promise<String> {
         try {
-            const response = await fetch(`/wallet-api/wallet/${currentWallet.value}/exchange/resolveVctUrl?vct=${vct}`);
+            const response = await fetch(`${apiBase}/wallet-api/wallet/${currentWallet.value}/exchange/resolveVctUrl?vct=${vct}`, { credentials: 'include' });
             const data = await response.json();
             return data.name || null;
         } catch (error) {

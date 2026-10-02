@@ -48,8 +48,10 @@ import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts"
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 
 const currentWallet = useCurrentWallet();
+const apiBase = useRuntimeConfig().public.walletApiBaseUrl;
 const issuers = await useLazyFetch(
-  `/wallet-api/wallet/${currentWallet.value}/issuers`,
+  `${apiBase}/wallet-api/wallet/${currentWallet.value}/issuers`,
+  { credentials: 'include' },
 ).data;
 refreshNuxtData();
 

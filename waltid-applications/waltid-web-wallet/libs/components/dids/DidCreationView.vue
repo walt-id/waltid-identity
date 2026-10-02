@@ -101,6 +101,7 @@ const keyId = ref("");
 const alias = ref("");
 
 const currentWallet = useCurrentWallet()
+const apiBase = useRuntimeConfig().public.walletApiBaseUrl;
 
 async function createDid() {
     loading.value = true;
@@ -113,8 +114,9 @@ async function createDid() {
 
     const query = new URLSearchParams(merged).toString();
 
-    response.value = await $fetch(`/wallet-api/wallet/${currentWallet.value}/dids/create/${props.method}?${query}`, {
+    response.value = await $fetch(`${apiBase}/wallet-api/wallet/${currentWallet.value}/dids/create/${props.method}?${query}`, {
         method: "POST",
+        credentials: 'include',
     });
     loading.value = false;
 }

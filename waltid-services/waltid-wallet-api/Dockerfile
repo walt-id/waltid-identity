@@ -36,6 +36,7 @@ RUN yum install -y shadow-utils \
  && yum clean all
 
 COPY --chown=app:app --from=build /home/gradle/src/waltid-services/waltid-wallet-api/build/libs/*.jar /waltid-wallet-api/wallet-api.jar
+COPY --chown=app:app --from=build /home/gradle/src/waltid-services/waltid-wallet-api/config /waltid-wallet-api/config
 
 USER app
 EXPOSE 7001
