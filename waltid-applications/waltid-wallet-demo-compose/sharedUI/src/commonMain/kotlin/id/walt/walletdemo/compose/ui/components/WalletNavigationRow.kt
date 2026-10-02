@@ -17,6 +17,7 @@ internal fun WalletNavigationRow(
     modifier: Modifier = Modifier,
     summary: String? = null,
     icon: (@Composable () -> Unit)? = null,
+    enabled: Boolean = true,
 ) {
     ListItem(
         headlineContent = { Text(title) },
@@ -24,6 +25,6 @@ internal fun WalletNavigationRow(
         leadingContent = icon,
         trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(role = Role.Button, onClick = onClick),
+        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = enabled, role = Role.Button, onClick = onClick),
     )
 }

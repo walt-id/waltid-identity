@@ -42,6 +42,15 @@ internal object WalletVisualFixtures {
         }.toString()), listOf("en"),
     )
 
+    val keySetup: WalletDemoIdentitySetup.Choose get() = WalletDemoIdentitySetup.Choose(
+        data.getValue("keySetup").jsonObject.getValue("options").jsonArray.map { value ->
+            val item = value.jsonObject
+            fun choice(name: String) = item.getValue(name).jsonObject.let {
+                WalletDemoKeyChoice(it.text("id"), it.text("title"), it.text("detail"))
+            }
+            WalletDemoKeySetupOption(item.text("id"), choice("recovery"), choice("storage"), choice("approval"))
+        })
+
     val nearbyQrPayload: String get() = data.getValue("nearby").jsonObject.text("qrPayload")
 
     val partialResult: WalletDemoUiState get() {

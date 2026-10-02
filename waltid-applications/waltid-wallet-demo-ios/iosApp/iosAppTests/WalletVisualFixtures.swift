@@ -2,6 +2,7 @@ import Foundation
 import WalletDemoSharingUI
 import XCTest
 @testable import WalletSDK
+@testable import iosApp
 
 /// Shared, non-personal input also consumed by Compose Android and Compose iOS.
 struct WalletVisualFixtures {
@@ -16,6 +17,18 @@ struct WalletVisualFixtures {
         let url = resourceDirectory.appendingPathComponent("wallet-visual-data.json")
         root = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
         XCTAssertEqual(root["schemaVersion"] as? Int, 1)
+    }
+
+    @MainActor
+    func keySetupOptions() throws -> [WalletIdentityScreenModel.SetupOption] {
+        try array(object(root, "keySetup"), "options").map { item in
+            func choice(_ name: String) throws -> WalletIdentityScreenModel.Selection {
+                let value = try object(item, name)
+                return .init(id: try text(value, "id"), title: try text(value, "title"), detail: try text(value, "detail"))
+            }
+            return .init(recovery: try choice("recovery"), storage: try choice("storage"), approval: try choice("approval"),
+                restoring: false, perform: {})
+        }
     }
 
     func credentialDetails() throws -> CredentialDetails {

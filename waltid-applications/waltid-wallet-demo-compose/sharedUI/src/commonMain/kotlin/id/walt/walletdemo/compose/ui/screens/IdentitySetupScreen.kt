@@ -36,7 +36,7 @@ internal fun IdentitySetupScreen(
     var recoveryId by rememberSaveable { mutableStateOf<String?>(null) }
     var storageId by rememberSaveable { mutableStateOf<String?>(null) }
     var approvalId by rememberSaveable { mutableStateOf<String?>(null) }
-    var pageName by rememberSaveable { mutableStateOf(IdentitySetupPage.Recovery.name) }
+    var pageName by rememberSaveable { mutableStateOf(IdentitySetupPage.Summary.name) }
     val page = IdentitySetupPage.valueOf(pageName)
     val step = page.choiceStep
     fun select(option: WalletDemoKeySetupOption) {
@@ -48,12 +48,12 @@ internal fun IdentitySetupScreen(
         it.recovery.id == recoveryId && it.storage.id == storageId && it.approval.id == approvalId
     }
     val selected = retainedSelection ?: options.firstOrNull()
-    fun back() { pageName = IdentitySetupPage.entries[page.ordinal - 1].name }
-    SystemBackHandler(enabled = page != IdentitySetupPage.Recovery) { back() }
+    fun back() { pageName = IdentitySetupPage.Summary.name }
+    SystemBackHandler(enabled = page != IdentitySetupPage.Summary) { if (!refreshing) back() }
     LaunchedEffect(options) {
         // Empty options during refresh must not discard the saved choice.
         if (options.isNotEmpty()) {
-            if (recoveryId != null && retainedSelection == null) pageName = IdentitySetupPage.Recovery.name
+            if (recoveryId != null && retainedSelection == null) pageName = IdentitySetupPage.Summary.name
             select(selected!!)
         }
     }
@@ -64,7 +64,7 @@ internal fun IdentitySetupScreen(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Column(Modifier.weight(1f).widthIn(max = 640.dp).fillMaxWidth().verticalScroll(scroll).padding(20.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 Text(stringResource(Res.string.setup_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                if (step == WalletDemoKeySetupStep.Recovery) Text(stringResource(Res.string.setup_intro), style = MaterialTheme.typography.bodyMedium)
+                if (page == IdentitySetupPage.Summary) Text(stringResource(Res.string.setup_intro), style = MaterialTheme.typography.bodyMedium)
                 warning?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 when (setup) {
                     is WalletDemoIdentitySetup.Pending -> {
@@ -78,7 +78,7 @@ internal fun IdentitySetupScreen(
                         if (selected == null) {
                             if (!refreshing) Text(stringResource(Res.string.setup_no_options))
                         } else {
-                            Text(stringResource(Res.string.setup_step, page.ordinal + 1, step?.title ?: stringResource(Res.string.setup_review)), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            if (step != null) Text(step.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Text(when (step) {
                                 WalletDemoKeySetupStep.Recovery -> stringResource(Res.string.setup_recovery_description)
                                 WalletDemoKeySetupStep.Storage -> stringResource(Res.string.setup_storage_description)
@@ -111,14 +111,13 @@ internal fun IdentitySetupScreen(
                                     }
                                 }
                             }
-                            if (page == IdentitySetupPage.Review) {
-                                WalletSection(stringResource(Res.string.setup_summary), stringResource(Res.string.setup_summary_footer)) {
-                                    SettingsDetailRow(stringResource(Res.string.setup_recovery),
-                                        if (selected.recovery.id == "new") stringResource(Res.string.setup_no_backup) else selected.recovery.title)
-                                    SettingsDivider()
-                                    SettingsDetailRow(stringResource(Res.string.setup_storage), selected.storage.title)
-                                    SettingsDivider()
-                                    SettingsDetailRow(stringResource(Res.string.setup_approval), selected.approval.title)
+                            if (page == IdentitySetupPage.Summary) {
+                                WalletSection(stringResource(Res.string.setup_summary), selected.recovery.detail) {
+                                    SigningKeySummary(
+                                        if (selected.recovery.id == "new") stringResource(Res.string.setup_no_backup) else selected.recovery.title,
+                                        selected.storage.title, selected.approval.title, enabled = !refreshing,
+                                        onEdit = { selectedStep -> if (!refreshing) pageName = IdentitySetupPage.entries.first { it.choiceStep == selectedStep }.name },
+                                    )
                                 }
                             }
                         }
@@ -140,16 +139,16 @@ internal fun IdentitySetupScreen(
                 HorizontalDivider()
                 WalletActionBar(
                     primary = WalletAction(
-                        label = if (page != IdentitySetupPage.Review) stringResource(Res.string.setup_continue)
+                        label = if (page != IdentitySetupPage.Summary) stringResource(Res.string.issuance_done)
                             else if (selected.restoring) stringResource(Res.string.setup_restore) else stringResource(Res.string.setup_create),
                         onClick = {
-                            if (page == IdentitySetupPage.Review) onChoose(selected.id)
-                            else pageName = IdentitySetupPage.entries[page.ordinal + 1].name
+                            if (page == IdentitySetupPage.Summary) onChoose(selected.id)
+                            else back()
                         },
                         enabled = !refreshing, testTag = WalletUiTestTags.KeySetupContinue,
-                        icon = if (page == IdentitySetupPage.Review) WalletSymbol.Key else WalletSymbol.Next,
+                        icon = if (page == IdentitySetupPage.Summary) WalletSymbol.Key else WalletSymbol.Accept,
                     ),
-                    secondary = if (page != IdentitySetupPage.Recovery)
+                    secondary = if (page != IdentitySetupPage.Summary)
                         WalletAction(stringResource(Res.string.settings_back), { back() }, enabled = !refreshing, icon = WalletSymbol.Back) else null,
                     modifier = Modifier.widthIn(max = 640.dp),
                 )
@@ -159,8 +158,8 @@ internal fun IdentitySetupScreen(
 }
 
 private enum class IdentitySetupPage(val choiceStep: WalletDemoKeySetupStep?) {
-    Recovery(WalletDemoKeySetupStep.Recovery), Storage(WalletDemoKeySetupStep.Storage),
-    Approval(WalletDemoKeySetupStep.Approval), Review(null),
+    Summary(null), Recovery(WalletDemoKeySetupStep.Recovery), Storage(WalletDemoKeySetupStep.Storage),
+    Approval(WalletDemoKeySetupStep.Approval),
 }
 
 @Composable
