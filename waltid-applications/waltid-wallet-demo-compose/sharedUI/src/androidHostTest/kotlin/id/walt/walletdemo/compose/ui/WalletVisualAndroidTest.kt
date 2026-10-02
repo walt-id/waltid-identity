@@ -19,6 +19,16 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @OptIn(ExperimentalTestApi::class, ExperimentalMaterial3Api::class)
 class WalletVisualAndroidTest {
+    @Test fun pinCreate() = scenario { pin(id.walt.walletdemo.compose.ui.screens.PinSetupPage.Create) }
+    @Test fun pinConfirm() = scenario { pin(id.walt.walletdemo.compose.ui.screens.PinSetupPage.Confirm) }
+    @Test fun pinBiometrics() = scenario { pin(id.walt.walletdemo.compose.ui.screens.PinSetupPage.Biometrics) }
+
+    @Test fun homeEmpty() = scenario { walletHome(empty = true) }
+    @Test fun homeCredential() = scenario { walletHome() }
+    @Test fun scanEmpty() = scenario { scanner("empty") }
+    @Test fun scanUnsupported() = scenario { scanner("unsupported") }
+    @Test fun scanWebLink() = scenario { scanner("link") }
+
     @Test
     fun settingsRoot() = scenario { settingsRoot() }
 

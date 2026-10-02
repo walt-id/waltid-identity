@@ -1,8 +1,12 @@
 package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.ClaimGroup
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
@@ -14,20 +18,22 @@ internal fun ClaimGroupSection(
 ) {
     if (group.items.isEmpty()) return
 
-    ReviewMetadataSection(
-        title = group.title,
+    WalletSection(
+        title = if (collapsible) null else group.title,
         modifier = modifier,
     ) {
-        if (collapsible) {
-            MetadataDisclosure(
-                title = "${group.items.size} ${if (group.items.size == 1) "entry" else "entries"}",
-                initiallyExpanded = group.initiallyExpanded,
-                modifier = Modifier.testTag(WalletUiTestTags.claimGroup(group.title)),
-            ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (collapsible) {
+                MetadataDisclosure(
+                    title = group.title,
+                    initiallyExpanded = group.initiallyExpanded,
+                    modifier = Modifier.testTag(WalletUiTestTags.claimGroup(group.title)),
+                ) {
+                    ClaimGroupItems(group)
+                  }
+              } else {
                 ClaimGroupItems(group)
-            }
-        } else {
-            ClaimGroupItems(group)
+              }
         }
     }
 }

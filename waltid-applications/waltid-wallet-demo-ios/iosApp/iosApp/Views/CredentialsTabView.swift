@@ -6,7 +6,10 @@ import WalletSDK
 struct CredentialsTabView: View {
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
+    let cards: [CredentialCardItem]
     let onOpenSettings: () -> Void
+    var onScan: (() -> Void)? = nil
+    var onShareNearby: (() -> Void)? = nil
     @Environment(\.walletDemoBranding) private var branding
     @State private var othersHidden = false
     @State private var selectedAtTop = false
@@ -14,7 +17,6 @@ struct CredentialsTabView: View {
     @State private var motionGeneration = 0
     @State private var confirmDelete = false
 
-    @State private var cards: [CredentialCardItem] = []
     @State private var expanded: CredentialDetails?
 
     private var selectedCredential: Credential? {
@@ -75,6 +77,7 @@ struct CredentialsTabView: View {
                 .padding(.bottom)
                 .animation(.easeOut(duration: 0.16), value: showDetailsBody)
             }
+            .background(Color(.systemGroupedBackground))
             .animation(.easeOut(duration: 0.2), value: selectedDetailsID)
             .navigationTitle(selectedDetailsID == nil ? branding.appTitle : "")
             .accessibilityIdentifier(WalletAccessibilityID.appTitle)
@@ -94,7 +97,7 @@ struct CredentialsTabView: View {
                         }
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Group {
                         if selectedDetailsID != nil {
                             Menu {
@@ -112,6 +115,16 @@ struct CredentialsTabView: View {
                             }
                             .accessibilityIdentifier(WalletAccessibilityID.detailsMenu)
                         } else {
+                            if let onShareNearby {
+                                Button(action: onShareNearby) { Image(systemName: "dot.radiowaves.left.and.right") }
+                                    .accessibilityLabel("Share nearby")
+                                    .accessibilityIdentifier(WalletAccessibilityID.proximityStartButton)
+                            }
+                            if let onScan {
+                                Button(action: onScan) { Image(systemName: "qrcode.viewfinder") }
+                                    .accessibilityLabel("Scan or paste a link")
+                                    .accessibilityIdentifier("wallet.scanButton")
+                            }
                             Button(action: onOpenSettings) {
                                 Image(systemName: "gearshape")
                             }
@@ -146,12 +159,6 @@ struct CredentialsTabView: View {
             }
         }
         .navigationViewStyle(.stack)
-        .task(id: viewModel.credentials) {
-            cards = []
-            let snapshot = await CredentialDisplayNormalizer.cards(for: viewModel.credentials)
-            guard !Task.isCancelled else { return }
-            cards = snapshot
-        }
         .task(id: selectedCredential) {
             expanded = nil
             guard let selectedCredential else { return }

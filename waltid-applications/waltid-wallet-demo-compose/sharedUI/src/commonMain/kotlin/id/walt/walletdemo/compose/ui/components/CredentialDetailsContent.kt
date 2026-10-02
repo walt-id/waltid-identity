@@ -62,7 +62,7 @@ internal fun CredentialDetailsCloseButton(
 ) {
     Box(
         modifier = modifier
-            .size(40.dp)
+            .size(48.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surface)
             .clickable(onClick = onClose)
@@ -86,7 +86,7 @@ internal fun CredentialDetailsOverflowMenu(
     Box(modifier = modifier) {
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(48.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surface)
                 .clickable { expanded = true }

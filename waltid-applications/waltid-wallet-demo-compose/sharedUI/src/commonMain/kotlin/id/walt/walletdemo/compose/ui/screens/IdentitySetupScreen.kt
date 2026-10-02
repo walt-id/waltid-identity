@@ -36,8 +36,9 @@ internal fun IdentitySetupScreen(
     var recoveryId by rememberSaveable { mutableStateOf<String?>(null) }
     var storageId by rememberSaveable { mutableStateOf<String?>(null) }
     var approvalId by rememberSaveable { mutableStateOf<String?>(null) }
-    var stepName by rememberSaveable { mutableStateOf(WalletDemoKeySetupStep.Recovery.name) }
-    val step = WalletDemoKeySetupStep.valueOf(stepName)
+    var pageName by rememberSaveable { mutableStateOf(IdentitySetupPage.Recovery.name) }
+    val page = IdentitySetupPage.valueOf(pageName)
+    val step = page.choiceStep
     fun select(option: WalletDemoKeySetupOption) {
         recoveryId = option.recovery.id
         storageId = option.storage.id
@@ -47,17 +48,17 @@ internal fun IdentitySetupScreen(
         it.recovery.id == recoveryId && it.storage.id == storageId && it.approval.id == approvalId
     }
     val selected = retainedSelection ?: options.firstOrNull()
-    fun back() { stepName = WalletDemoKeySetupStep.entries[step.ordinal - 1].name }
-    SystemBackHandler(enabled = step != WalletDemoKeySetupStep.Recovery) { back() }
+    fun back() { pageName = IdentitySetupPage.entries[page.ordinal - 1].name }
+    SystemBackHandler(enabled = page != IdentitySetupPage.Recovery) { back() }
     LaunchedEffect(options) {
         // Empty options during refresh must not discard the saved choice.
         if (options.isNotEmpty()) {
-            if (recoveryId != null && retainedSelection == null) stepName = WalletDemoKeySetupStep.Recovery.name
+            if (recoveryId != null && retainedSelection == null) pageName = IdentitySetupPage.Recovery.name
             select(selected!!)
         }
     }
     val scroll = rememberScrollState()
-    LaunchedEffect(step) { scroll.scrollTo(0) }
+    LaunchedEffect(page) { scroll.scrollTo(0) }
 
     Surface(Modifier.fillMaxSize().safeDrawingPadding().testTag(WalletUiTestTags.IdentitySetup)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -77,38 +78,41 @@ internal fun IdentitySetupScreen(
                         if (selected == null) {
                             if (!refreshing) Text(stringResource(Res.string.setup_no_options))
                         } else {
-                            Text(stringResource(Res.string.setup_step, step.ordinal + 1, step.title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(Res.string.setup_step, page.ordinal + 1, step?.title ?: stringResource(Res.string.setup_review)), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Text(when (step) {
                                 WalletDemoKeySetupStep.Recovery -> stringResource(Res.string.setup_recovery_description)
                                 WalletDemoKeySetupStep.Storage -> stringResource(Res.string.setup_storage_description)
                                 WalletDemoKeySetupStep.Approval -> stringResource(Res.string.setup_approval_description)
+                                null -> stringResource(Res.string.setup_review_description)
                             })
                             if (step == WalletDemoKeySetupStep.Storage && selected.recovery.id != "new") {
                                 setup.recoveryStorageNotice?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                             }
-                            val choices = step.options(options, selected).map(step::choice).distinctBy { it.id }
-                            Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                                val groups = if (step == WalletDemoKeySetupStep.Recovery)
-                                    choices.groupBy { it.id.startsWith("restore:") }.values.toList()
-                                else listOf(choices)
-                                groups.forEach { group ->
-                                    SettingsSection(title = if (step == WalletDemoKeySetupStep.Recovery)
-                                        stringResource(if (group.first().id.startsWith("restore:")) Res.string.setup_restore_group else Res.string.setup_create_group)
-                                        else step.title,
-                                        footer = if (choices.size == 1) stringResource(Res.string.setup_single_option) else null) {
-                                        group.forEachIndexed { index, choice ->
-                                            if (index > 0) SettingsDivider()
-                                            SettingsChoiceRow(choice.title, choice.detail, step.choice(selected).id == choice.id,
-                                                onSelect = { select(step.select(options, selected, choice.id)) },
-                                                modifier = Modifier.testTag(WalletUiTestTags.keySetupChoice(step.name, choices.indexOf(choice))),
-                                                enabled = !refreshing, selectable = choices.size > 1,
-                                                extra = choice.identifier?.let { identifier -> { RecoveryIdentifier(identifier) } })
+                            if (step != null) {
+                                val choices = step.options(options, selected).map(step::choice).distinctBy { it.id }
+                                Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                                    val groups = if (step == WalletDemoKeySetupStep.Recovery)
+                                        choices.groupBy { it.id.startsWith("restore:") }.values.toList()
+                                    else listOf(choices)
+                                    groups.forEach { group ->
+                                        WalletSection(title = if (step == WalletDemoKeySetupStep.Recovery)
+                                            stringResource(if (group.first().id.startsWith("restore:")) Res.string.setup_restore_group else Res.string.setup_create_group)
+                                            else step.title,
+                                            footer = if (choices.size == 1) stringResource(Res.string.setup_single_option) else null) {
+                                            group.forEachIndexed { index, choice ->
+                                                if (index > 0) SettingsDivider()
+                                                SettingsChoiceRow(choice.title, choice.detail, step.choice(selected).id == choice.id,
+                                                    onSelect = { select(step.select(options, selected, choice.id)) },
+                                                    modifier = Modifier.testTag(WalletUiTestTags.keySetupChoice(step.name, choices.indexOf(choice))),
+                                                    enabled = !refreshing, selectable = choices.size > 1,
+                                                    extra = choice.identifier?.let { identifier -> { RecoveryIdentifier(identifier) } })
+                                            }
                                         }
                                     }
                                 }
                             }
-                            if (step == WalletDemoKeySetupStep.Approval) {
-                                SettingsSection(stringResource(Res.string.setup_summary), stringResource(Res.string.setup_summary_footer)) {
+                            if (page == IdentitySetupPage.Review) {
+                                WalletSection(stringResource(Res.string.setup_summary), stringResource(Res.string.setup_summary_footer)) {
                                     SettingsDetailRow(stringResource(Res.string.setup_recovery),
                                         if (selected.recovery.id == "new") stringResource(Res.string.setup_no_backup) else selected.recovery.title)
                                     SettingsDivider()
@@ -134,20 +138,29 @@ internal fun IdentitySetupScreen(
             }
             if (selected != null) {
                 HorizontalDivider()
-                Row(Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (step != WalletDemoKeySetupStep.Recovery) {
-                        TextButton(onClick = { back() }) { Text(stringResource(Res.string.settings_back)) }
-                    }
-                    Button(onClick = {
-                        if (step == WalletDemoKeySetupStep.Approval) onChoose(selected.id)
-                        else stepName = WalletDemoKeySetupStep.entries[step.ordinal + 1].name
-                    }, enabled = !refreshing, modifier = Modifier.weight(1f).testTag(WalletUiTestTags.KeySetupContinue)) {
-                        Text(if (step != WalletDemoKeySetupStep.Approval) stringResource(Res.string.setup_continue) else if (selected.restoring) stringResource(Res.string.setup_restore) else stringResource(Res.string.setup_create))
-                    }
-                }
+                WalletActionBar(
+                    primary = WalletAction(
+                        label = if (page != IdentitySetupPage.Review) stringResource(Res.string.setup_continue)
+                            else if (selected.restoring) stringResource(Res.string.setup_restore) else stringResource(Res.string.setup_create),
+                        onClick = {
+                            if (page == IdentitySetupPage.Review) onChoose(selected.id)
+                            else pageName = IdentitySetupPage.entries[page.ordinal + 1].name
+                        },
+                        enabled = !refreshing, testTag = WalletUiTestTags.KeySetupContinue,
+                        icon = if (page == IdentitySetupPage.Review) WalletSymbol.Key else WalletSymbol.Next,
+                    ),
+                    secondary = if (page != IdentitySetupPage.Recovery)
+                        WalletAction(stringResource(Res.string.settings_back), { back() }, enabled = !refreshing, icon = WalletSymbol.Back) else null,
+                    modifier = Modifier.widthIn(max = 640.dp),
+                )
             }
         }
     }
+}
+
+private enum class IdentitySetupPage(val choiceStep: WalletDemoKeySetupStep?) {
+    Recovery(WalletDemoKeySetupStep.Recovery), Storage(WalletDemoKeySetupStep.Storage),
+    Approval(WalletDemoKeySetupStep.Approval), Review(null),
 }
 
 @Composable
@@ -169,7 +182,7 @@ internal fun KeyDetailRow(label: String, value: String) {
 
 @Composable
 internal fun ProviderAvailability(reasons: List<String>, enabled: Boolean, onRefresh: () -> Unit) {
-    SettingsSection(stringResource(Res.string.setup_backup_availability)) {
+    WalletSection(stringResource(Res.string.setup_backup_availability)) {
         reasons.distinct().forEach { SettingsNotice(it) }
         SettingsActionRow(stringResource(Res.string.setup_check_again), onRefresh, enabled = enabled)
     }

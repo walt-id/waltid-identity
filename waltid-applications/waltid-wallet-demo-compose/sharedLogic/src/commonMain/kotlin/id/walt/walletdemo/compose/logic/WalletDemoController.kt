@@ -1759,6 +1759,10 @@ class WalletDemoController(
         }
     }
 
+    fun retryOpeningWallet() {
+        if (_state.value.auth == WalletAuthState.Unlocked && _state.value.session is WalletSessionState.Failed) bootstrapIfNeeded()
+    }
+
     private fun bootstrapIfNeeded() {
         if (_state.value.auth != WalletAuthState.Unlocked || walletResetJob?.isActive == true) return
         if (_state.value.session is WalletSessionState.Ready) {

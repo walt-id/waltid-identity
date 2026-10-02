@@ -1,0 +1,106 @@
+[
+  {
+    "input": "",
+    "kind": "Empty"
+  },
+  {
+    "input": " \n ",
+    "kind": "Empty"
+  },
+  {
+    "input": "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer",
+    "kind": "Offer"
+  },
+  {
+    "input": " OPENID-CREDENTIAL-OFFER://example ",
+    "kind": "Offer"
+  },
+  {
+    "input": "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest",
+    "kind": "Presentation"
+  },
+  {
+    "input": "OPENID4VP://example",
+    "kind": "Presentation"
+  },
+  {
+    "input": "https://issuer.example/?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer",
+    "kind": "Offer"
+  },
+  {
+    "input": "https://issuer.example/?credential%5Foffer=encoded",
+    "kind": "Offer"
+  },
+  {
+    "input": "https://verifier.example/?request_uri=https%3A%2F%2Fverifier.example%2Frequest",
+    "kind": "Presentation"
+  },
+  {
+    "input": "https://example.test/something",
+    "kind": "Web"
+  },
+  {
+    "input": "http://localhost:8080/request",
+    "kind": "Web"
+  },
+  {
+    "input": "openid://callback?code=synthetic",
+    "kind": "AuthorizationCallback"
+  },
+  {
+    "input": "https://wallet.example/callback?code=synthetic&request_uri=old",
+    "kind": "AuthorizationCallback"
+  },
+  {
+    "input": "https://wallet.example/callback?error=access_denied",
+    "kind": "AuthorizationCallback"
+  },
+  {
+    "input": "https://issuer.example/#credential_offer=fragment",
+    "kind": "Web"
+  },
+  {
+    "input": "FIDO:/0123456789",
+    "kind": "FidoHybrid"
+  },
+  {
+    "input": "fido://0123456789",
+    "kind": "FidoHybrid"
+  },
+  {
+    "input": "FIDO",
+    "kind": "Unsupported"
+  },
+  {
+    "input": "javascript:alert(1)",
+    "kind": "Unsupported"
+  },
+  {
+    "input": "mdoc:opaque",
+    "kind": "Unsupported"
+  },
+  {
+    "input": "https://",
+    "kind": "Unsupported"
+  },
+  {
+    "input": "https://issuer.example/has spaces",
+    "kind": "Unsupported"
+  },
+  {
+    "input": "hello",
+    "kind": "Unsupported"
+  },
+  {
+    "input": "https://verifier.example/?client_id=redirect_uri%3Ahttps%3A%2F%2Fverifier.example&dcql_query=%7B%7D",
+    "kind": "Presentation"
+  },
+  {
+    "input": "https://verifier.example/?client_id=demo&response_type=vp_token",
+    "kind": "Presentation"
+  },
+  {
+    "input": "https://example.test/?client_id=demo",
+    "kind": "Web"
+  }
+]
