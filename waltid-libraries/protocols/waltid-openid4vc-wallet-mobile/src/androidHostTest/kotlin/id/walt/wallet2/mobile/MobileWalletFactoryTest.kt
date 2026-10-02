@@ -7,6 +7,7 @@ import id.walt.wallet2.mobile.identity.*
 import id.walt.crypto2.keys.PlatformKeyFacts
 import id.walt.wallet2.persistence.keys.WalletKeyProtection
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import com.sun.net.httpserver.HttpServer
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.KeyCapabilities
@@ -44,6 +45,8 @@ import id.walt.credentials.examples.SdJwtExamples
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
+import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
+import id.walt.did.dids.resolver.local.DidWebResolver
 import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 import id.walt.mdoc.proximity.mobile.BleMdocRoleSelection
 import id.walt.mdoc.proximity.mobile.BleProximityAvailability
@@ -59,6 +62,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.coroutines.test.runTest
@@ -68,6 +72,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.net.InetSocketAddress
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -78,6 +84,54 @@ import kotlin.test.assertTrue
 class MobileWalletFactoryTest {
     @Test
     fun `cold factory reopens saved identity and authenticates DID requests without creating keys`() = runTest {
+        val verifier = JWKKey.generate(KeyType.secp256r1)
+        val did = DidKeyRegistrar().registerByKey(verifier, DidKeyCreateOptions()).did
+        assertColdFactoryAuthenticatesDidRequests(verifier, did, "$did#${did.removePrefix("did:key:")}")
+    }
+
+    @Test
+    fun `cold factory authenticates did web requests using the selected verification method`() = runTest {
+        val verifier = JWKKey.generate(KeyType.secp256r1)
+        val otherKey = JWKKey.generate(KeyType.secp256r1)
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        val did = "did:web:127.0.0.1%3A${server.address.port}:verifier"
+        val kid = "$did#request-signing-key"
+        val document = buildJsonObject {
+            put("id", did)
+            put("verificationMethod", JsonArray(listOf(
+                "$did#other-key" to otherKey.getPublicKey().exportJWKObject(),
+                kid to verifier.getPublicKey().exportJWKObject(),
+            ).map { (id, publicKey) ->
+                buildJsonObject {
+                    put("id", id)
+                    put("type", "JsonWebKey2020")
+                    put("controller", did)
+                    put("publicKeyJwk", publicKey)
+                }
+            }))
+            put("authentication", JsonArray(listOf(JsonPrimitive(kid))))
+        }.toString().encodeToByteArray()
+        val requests = AtomicInteger()
+        server.createContext("/verifier/did.json") { exchange ->
+            requests.incrementAndGet()
+            exchange.responseHeaders.set("Content-Type", "application/json")
+            exchange.sendResponseHeaders(200, document.size.toLong())
+            exchange.responseBody.use { it.write(document) }
+        }
+        val httpsEnabled = DidWebResolver.urlProtocol == "https"
+        server.start()
+        try {
+            // HTTP is scoped to this loopback fixture; restore the previous setting in finally.
+            DidWebResolver.enableHttps(false)
+            assertColdFactoryAuthenticatesDidRequests(verifier, did, kid)
+            assertTrue(requests.get() > 0)
+        } finally {
+            DidWebResolver.enableHttps(httpsEnabled)
+            server.stop(0)
+        }
+    }
+
+    private suspend fun assertColdFactoryAuthenticatesDidRequests(verifier: JWKKey, verifierDid: String, kid: String) {
         database().use { database ->
             val provider = FakePlatformManagedKeyProvider()
             val config = MobileWalletConfig()
@@ -88,8 +142,6 @@ class MobileWalletFactoryTest {
                 credential = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2).second,
             ))
             val savedCredentials = original.credentials()
-            val verifier = JWKKey.generate(KeyType.secp256r1)
-            val verifierDid = DidService.registerByKey("key", verifier, DidKeyCreateOptions()).did
             val clientId = "decentralized_identifier:$verifierDid"
 
             withColdDidSupport {
@@ -98,14 +150,14 @@ class MobileWalletFactoryTest {
                 val reopened = encryptedWallet(config, database, provider)
                 // Authenticate before initialize(): resolver setup must not depend on identity work.
                 val online = assertIs<MobileWalletPresentationPreviewResult.Ready>(reopened.previewPresentation(
-                    requestUrl(clientId, signedDidRequest(verifier, verifierDid, "direct_post")),
+                    requestUrl(clientId, signedDidRequest(verifier, verifierDid, "direct_post", kid)),
                 )).preview
                 assertEquals(clientId, online.request.clientId)
                 assertEquals("saved-pid", online.credentialOptions.single().credentialId)
                 assertIs<MobileWalletRequestAuthentication.Authenticated>(online.request.requestAuthentication)
                 val dc = reopened.previewDigitalCredentialPresentation(MobileWalletDigitalCredentialRequest(
                     protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
-                    dataJson = buildJsonObject { put("request", signedDidRequest(verifier, verifierDid, "dc_api")) }.toString(),
+                    dataJson = buildJsonObject { put("request", signedDidRequest(verifier, verifierDid, "dc_api", kid)) }.toString(),
                     verifiedOrigin = "https://verifier.example",
                 ))
                 assertEquals(clientId, dc.request.clientId)
@@ -115,7 +167,7 @@ class MobileWalletFactoryTest {
                 assertEquals(1, provider.generateCount)
                 assertEquals(0, provider.deleteCount)
 
-                val badSignature = signedDidRequest(JWKKey.generate(KeyType.secp256r1), verifierDid, "direct_post")
+                val badSignature = signedDidRequest(JWKKey.generate(KeyType.secp256r1), verifierDid, "direct_post", kid)
                 assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
                     reopened.previewPresentation(requestUrl(clientId, badSignature))
                 }
@@ -139,7 +191,7 @@ class MobileWalletFactoryTest {
             }.awaitAll()
             assertEquals(1, DidService.didResolvers.size)
             assertEquals(1, DidService.didRegistrars.size)
-            assertTrue(DidService.resolverMethods.keys.containsAll(listOf("key", "jwk")))
+            assertTrue(DidService.resolverMethods.keys.containsAll(listOf("key", "jwk", "web")))
         }
     }
 
@@ -170,7 +222,7 @@ class MobileWalletFactoryTest {
         key: JWKKey,
         did: String,
         responseMode: String,
-        kid: String = "$did#${did.removePrefix("did:key:")}",
+        kid: String,
     ): String = key.signJws(
         buildJsonObject {
             put("client_id", "decentralized_identifier:$did")
