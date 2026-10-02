@@ -18,6 +18,7 @@ struct ReceiveView: View {
                     entryContent
                 }
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Receive credentials")
             .navigationBarTitleDisplayMode(.inline)
             .walletFlowToolbar(onBack: onBack, backEnabled: !viewModel.isLoading, onOpenSettings: onOpenSettings)

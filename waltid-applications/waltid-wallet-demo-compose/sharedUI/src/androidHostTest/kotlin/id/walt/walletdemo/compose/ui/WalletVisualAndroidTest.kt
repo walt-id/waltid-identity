@@ -5,6 +5,8 @@ import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.v2.runComposeUiTest
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
@@ -19,9 +21,9 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @OptIn(ExperimentalTestApi::class, ExperimentalMaterial3Api::class)
 class WalletVisualAndroidTest {
-    @Test fun pinCreate() = scenario { pin(id.walt.walletdemo.compose.ui.screens.PinSetupPage.Create) }
-    @Test fun pinConfirm() = scenario { pin(id.walt.walletdemo.compose.ui.screens.PinSetupPage.Confirm) }
-    @Test fun pinBiometrics() = scenario { pin(id.walt.walletdemo.compose.ui.screens.PinSetupPage.Biometrics) }
+    @Test fun pinSetup() = scenario { pin("setup") }
+    @Test fun pinMismatch() = scenario { pin("mismatch") }
+    @Test fun pinBiometrics() = scenario { pin("biometrics_enabled") }
 
     @Test fun homeEmpty() = scenario { walletHome(empty = true) }
     @Test fun homeCredential() = scenario { walletHome() }
@@ -42,6 +44,13 @@ class WalletVisualAndroidTest {
     fun batchOffer() = scenario { batchOffer() }
 
     @Test
+    fun offerDefinitions() = scenario { offerDefinitions() }
+
+    @Test
+    @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
+    fun compactBatchOffer() = scenario(fontScale = 1.5f) { batchOffer(compact = true) }
+
+    @Test
     fun batchOfferWithNothingSelected() = scenario { batchOffer(noneSelected = true) }
 
     @Test
@@ -56,14 +65,15 @@ class WalletVisualAndroidTest {
     @Test
     fun nearbyReady() = scenario { nearbyReady() }
 
-    private fun scenario(block: WalletVisualScenarios.() -> Unit) = runComposeUiTest {
+    private fun scenario(fontScale: Float = 1f, block: WalletVisualScenarios.() -> Unit) = runComposeUiTest {
         WalletVisualScenarios(this, captureImage = { id ->
             val directory = checkNotNull(System.getProperty("roborazzi.output.dir")) { "Roborazzi output directory is not configured" }
             onRoot().captureRoboImage("$directory/android-api35-phone-en-light/$id.png")
         }, platformTheme = { content ->
             // Android RenderThread ripples do not follow the Compose test clock.
             // These are settled-state screenshots; interaction feedback remains enabled in the app.
-            CompositionLocalProvider(LocalRippleConfiguration provides null, content = content)
+            CompositionLocalProvider(LocalRippleConfiguration provides null,
+                LocalDensity provides Density(LocalDensity.current.density, fontScale), content = content)
         }).block()
     }
 }

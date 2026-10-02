@@ -110,13 +110,12 @@ internal fun CredentialCardArt(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(Id1AspectRatio)
-            .shadow(if (compact) 10.dp else 16.dp, shape, clip = false)
+            .shadow(if (compact) 4.dp else 16.dp, shape, clip = false)
             .clip(shape)
             .testTag(WalletUiTestTags.credentialCard(art.id)),
     ) {
-        val logoSize = if (compact) 22.dp else 36.dp
-        val namePadding = if (compact) 10.dp else 16.dp
-        val nameSize = if (compact) 13.sp else 18.sp
+        val logoSize = if (compact) minOf(28.dp, maxHeight - 8.dp) else 36.dp
+        val namePadding = if (compact) 4.dp else 16.dp
 
         Box(modifier = Modifier.fillMaxSize().background(constructedColor))
         if (backgroundImageUri != null) {
@@ -151,9 +150,9 @@ internal fun CredentialCardArt(
             )
         }
 
-        if (showConstructedCardArtOverlay(metadataArtState)) {
+        if (compact || showConstructedCardArtOverlay(metadataArtState)) {
             val logoModifier = Modifier
-                .align(Alignment.BottomEnd)
+                .align(if (compact) Alignment.Center else Alignment.BottomEnd)
                 .padding(namePadding)
                 .size(logoSize)
                 .testTag(WalletUiTestTags.CredentialCardConstructedArt)
@@ -176,11 +175,11 @@ internal fun CredentialCardArt(
                 )
                 CredentialCardLogoSource.BundledWalt -> DefaultWaltLogo(logoModifier)
             }
-            Text(
+            if (!compact) Text(
                 text = art.name,
                 color = labelColor,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = nameSize,
+                fontSize = 18.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
@@ -221,4 +220,3 @@ internal fun parseCssColor(value: String?): Color? {
         alpha = parsed.alpha,
     )
 }
-

@@ -39,13 +39,12 @@ public struct CredentialCardArtView: View {
 
     public var body: some View {
         let corner: CGFloat = compact ? 10 : 14
-        let padding: CGFloat = compact ? 10 : 16
-        let nameSize: CGFloat = compact ? 13 : 18
+        let padding: CGFloat = compact ? 4 : 16
         let background = Color(css: summary.backgroundColor) ?? defaultWaltCardBlue
         let label = Color(css: summary.textColor) ?? .white
-        let logoSize: CGFloat = compact ? 22 : 36
 
         GeometryReader { proxy in
+            let logoSize: CGFloat = compact ? min(28, max(0, proxy.size.height - 8)) : 36
             ZStack(alignment: .topLeading) {
                 background
                 if let loadedMetadataArt {
@@ -54,24 +53,26 @@ public struct CredentialCardArtView: View {
                         .scaledToFill()
                         .frame(width: proxy.size.width, height: proxy.size.height)
                         .clipped()
-                } else if showsConstructedCardArtOverlay(
+                }
+                if compact || showsConstructedCardArtOverlay(
                     backgroundImageURI: summary.backgroundImageURI,
-                    hasLoadedMetadataArt: false,
+                    hasLoadedMetadataArt: loadedMetadataArt != nil,
                     metadataArtFailed: metadataArtFailed
                 ) {
-                    Text(summary.title)
-                        .font(.system(size: nameSize, weight: .semibold))
+                    if !compact { Text(summary.title)
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(label)
                         .lineLimit(2)
                         .padding(padding)
+                    }
                     credentialLogo()
                         .frame(width: logoSize, height: logoSize)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: compact ? .center : .bottomTrailing)
                         .padding(padding)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
-            .shadow(color: .black.opacity(compact ? 0.22 : 0.34), radius: compact ? 10 : 16, y: 6)
+            .shadow(color: .black.opacity(compact ? 0.22 : 0.34), radius: compact ? 4 : 16, y: compact ? 2 : 6)
         }
         .aspectRatio(id1AspectRatio, contentMode: .fit)
         .task(id: summary.backgroundImageURI) {
