@@ -1,6 +1,6 @@
 package id.walt.walletdemo.compose.ui
 
-import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
+import id.walt.walletdemo.compose.logic.*
 
 /** Provider issuance states; the host decides full-screen or sheet presentation. */
 sealed interface WalletDemoOfferCreateUiState {
@@ -10,6 +10,7 @@ sealed interface WalletDemoOfferCreateUiState {
         val preview: WalletDemoOfferPreview,
         val title: String = "Accept digital credential?",
         val submitting: Boolean = false,
+        val errorMessage: String? = null,
     ) : WalletDemoOfferCreateUiState
 
     /**
@@ -20,5 +21,15 @@ sealed interface WalletDemoOfferCreateUiState {
     data class WaitingForAuthorization(
         val completing: Boolean = false,
     ) : WalletDemoOfferCreateUiState
+
+    data class Receipt(
+        val receipt: WalletDemoIssuanceReceipt,
+        val saved: List<WalletDemoCredential>,
+        val pending: List<WalletDemoDeferredCredential>,
+        val busy: Boolean = false,
+        val refreshError: String? = null,
+    ) : WalletDemoOfferCreateUiState
+
+    data class Failure(val message: String) : WalletDemoOfferCreateUiState
 }
 

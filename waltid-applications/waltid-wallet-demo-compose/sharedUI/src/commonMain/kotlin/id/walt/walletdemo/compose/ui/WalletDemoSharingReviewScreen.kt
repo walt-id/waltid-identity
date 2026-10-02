@@ -4,23 +4,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.text.font.FontWeight
 import id.walt.walletdemo.compose.logic.WalletDemoPaymentConsent
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
-import id.walt.walletdemo.compose.logic.consent
-import id.walt.walletdemo.compose.logic.defaultCredentialSelection
+import id.walt.walletdemo.compose.logic.WalletDemoSharingReviewController
 import id.walt.walletdemo.compose.logic.hasCompleteCredentialSelection
-import id.walt.walletdemo.compose.logic.toggleCredential
-import id.walt.walletdemo.compose.logic.toggleDisclosure
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
-import id.walt.walletdemo.compose.ui.components.rememberPaymentReview
 
 /**
  * One sharing review for full-screen and platform-invoked sheet hosts.
@@ -46,12 +43,16 @@ fun WalletDemoSharingReviewScreen(
     compact: Boolean = true,
     presentation: WalletReviewPresentation = WalletReviewPresentation.FullScreen,
     preparePaymentConsent: (suspend (WalletDemoSharingSelection) -> WalletDemoPaymentConsent?)? = null,
+    controller: WalletDemoSharingReviewController? = null,
 ) {
-    var selection by remember(review) {
-        mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
-    }
-    val paymentReview = rememberPaymentReview(review, selection, preparePaymentConsent)
-    val submit = { onSubmit(selection.copy(paymentConsentRevision = paymentReview.consent?.revision)) }
+    val scope = rememberCoroutineScope()
+    val owner = controller ?: remember(review) { WalletDemoSharingReviewController(review, scope, preparePaymentConsent) }
+    require(owner.review == review) { "The review controller belongs to another request" }
+    DisposableEffect(owner) { onDispose { if (controller == null) owner.close() } }
+    val state by owner.state.collectAsState()
+    val selection = state.selection
+    val paymentReview = state.payment
+    val submit = { owner.selectionForSubmission()?.let(onSubmit); Unit }
     val selectionComplete = review.hasCompleteCredentialSelection(selection.credentials)
 
     WalletReviewHost(presentation, dismissEnabled = enabled, onDismiss = onBackAtRoot) { fillViewport ->
@@ -78,13 +79,8 @@ fun WalletDemoSharingReviewScreen(
                 enabled = enabled,
                 compact = compact,
                 showActions = false,
-                onToggleCredential = { credential ->
-                    selection = selection.toggleCredential(
-                        selection = credential,
-                        option = review.credentialOptions.firstOrNull { it.selection == credential },
-                    )
-                },
-                onToggleDisclosure = { disclosure -> selection = selection.toggleDisclosure(disclosure) },
+                onToggleCredential = owner::toggleCredential,
+                onToggleDisclosure = owner::toggleDisclosure,
                 onSubmit = submit,
                 onCancel = onCancel,
                 onReject = onReject,
