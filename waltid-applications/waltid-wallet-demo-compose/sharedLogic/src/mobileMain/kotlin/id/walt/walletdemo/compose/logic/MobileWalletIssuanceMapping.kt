@@ -53,7 +53,7 @@ fun WalletIssuanceBatchSession.toDemoIssuanceSession(): WalletDemoIssuanceSessio
                         backgroundImageUri = credential.backgroundImageUri,
                         textColor = credential.textColor,
                     ),
-                    claims = emptyList(),
+                    claims = StoredCredentialMetadataParser.claims(credentialDisplayMetadata[credential.configurationId], platformPreferredLocales()),
                 )
             },
             transactionCode = offer.transactionCode?.toDemoRequirement(),

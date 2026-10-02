@@ -1,16 +1,17 @@
 package id.walt.walletdemo.compose.logic
 
 internal enum class ClaimGroupKind(
+    val id: String,
     val title: String,
     val order: Int,
     val initiallyExpanded: Boolean = true,
 ) {
-    Personal(title = "Personal details", order = 0),
-    AgeAttestations(title = "Age attestations", order = 1, initiallyExpanded = false),
-    Address(title = "Address", order = 2),
-    Other(title = "Credential data", order = 3),
-    TravelDocumentData(title = "Travel document data", order = 4, initiallyExpanded = false),
-    Technical(title = "Credential metadata", order = 5, initiallyExpanded = false),
+    Personal(id = "personal", title = "Personal details", order = 0),
+    AgeAttestations(id = "age", title = "Age attestations", order = 1, initiallyExpanded = false),
+    Address(id = "address", title = "Address", order = 2),
+    Other(id = "data", title = "Credential data", order = 3),
+    TravelDocumentData(id = "travel", title = "Travel document data", order = 4, initiallyExpanded = false),
+    Technical(id = "technical", title = "Credential metadata", order = 5, initiallyExpanded = false),
 }
 
 enum class ClaimRole {
@@ -350,9 +351,9 @@ internal object CredentialDisplayVocabulary {
     private const val unknownClaimDisplayOrder = 10_000
 }
 
-internal enum class MdocClaimGroup(val title: String, val order: Int) {
-    AgeAttestations(title = "Age attestations", order = 1),
-    TravelDocumentData(title = "Travel document data", order = 2),
+internal enum class MdocClaimGroup(val id: String, val title: String, val order: Int) {
+    AgeAttestations(id = "age", title = "Age attestations", order = 1),
+    TravelDocumentData(id = "travel", title = "Travel document data", order = 2),
 }
 
 internal enum class MdocClaimValueKind {

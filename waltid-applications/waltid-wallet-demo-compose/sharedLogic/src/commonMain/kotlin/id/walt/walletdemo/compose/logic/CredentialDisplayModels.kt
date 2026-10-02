@@ -10,6 +10,8 @@ data class CredentialDetails(
 )
 
 data class ClaimGroup(
+    /** Stable semantic identity, independent of localized headings. */
+    val id: String,
     val title: String,
     val items: List<ClaimItem>,
     val initiallyExpanded: Boolean = true,
@@ -34,7 +36,7 @@ class ClaimItemPath private constructor(
     companion object {
         fun root(): ClaimItemPath = ClaimItemPath(renderedId = RenderedClaimPath.raw(ClaimPathRoot.Root.id))
 
-        fun topLevel(name: String): ClaimItemPath = ClaimItemPath(renderedId = RenderedClaimPath.raw(name))
+        fun topLevel(name: String): ClaimItemPath = ClaimItemPath(renderedId = RenderedClaimPath.raw(claimPathKey(name)))
     }
 
     override fun equals(other: Any?): Boolean {
@@ -60,7 +62,11 @@ private data class RenderedClaimPath(
             append(root)
             operations.forEach { operation ->
                 when (operation) {
-                    is PathOperation.Child -> append('.').append(operation.name)
+                    is PathOperation.Child -> {
+                        val key = claimPathKey(operation.name)
+                        if (!key.startsWith("[")) append('.')
+                        append(key)
+                    }
                     is PathOperation.Index -> append('[').append(operation.value).append(']')
                 }
             }
@@ -82,6 +88,8 @@ private sealed interface PathOperation {
     data class Index(val value: Int) : PathOperation
 }
 
+enum class ClaimLabelSource { Wallet, IssuerMetadata, Request }
+
 data class ClaimItem(
     val path: ClaimItemPath,
     val pathComponents: List<String> = emptyList(),
@@ -89,6 +97,8 @@ data class ClaimItem(
     val value: DisplayValue,
     val rawValue: String? = null,
     val roles: Set<ClaimRole> = emptySet(),
+    val labelSource: ClaimLabelSource = ClaimLabelSource.Wallet,
+    val displayOrder: Int? = null,
 )
 
 sealed interface DisplayValue {
@@ -130,3 +140,7 @@ sealed interface DisplayValue {
     data class Raw(val value: String) : DisplayValue
     data object NullValue : DisplayValue
 }
+
+private fun claimPathKey(name: String): String =
+    if (name.matches(Regex("[A-Za-z_][A-Za-z0-9_]*"))) name
+    else "[${kotlinx.serialization.json.JsonPrimitive(name)}]"

@@ -1050,18 +1050,18 @@ private extension Waltid_openid4vc_walletWalletIssuanceBatchSession {
     func toSwiftIssuanceSession() throws -> IssuanceSession {
         IssuanceSession(
             id: id,
-            offer: try offer.toSwiftIssuanceOfferPreview(batchSize: batchSize?.intValue)
+            offer: try offer.toSwiftIssuanceOfferPreview(batchSize: batchSize?.intValue, displayMetadata: credentialDisplayMetadata)
         )
     }
 }
 
 private extension Waltid_openid4vc_walletWalletIssuanceOfferPreview {
-    func toSwiftIssuanceOfferPreview(batchSize: Int?) throws -> IssuanceOfferPreview {
+    func toSwiftIssuanceOfferPreview(batchSize: Int?, displayMetadata: [String: String]) throws -> IssuanceOfferPreview {
         IssuanceOfferPreview(
             grant: grant == .authorizationCode ? .authorizationCode : .preAuthorizedCode,
             issuer: issuer.toSwiftIssuanceIssuerPreview(),
             credentials: swiftArray(credentials, of: Waltid_openid4vc_walletWalletIssuanceCredentialPreview.self)
-                .map { $0.toSwiftIssuanceCredentialPreview() },
+                .map { $0.toSwiftIssuanceCredentialPreview(metadataJSON: displayMetadata[$0.configurationId]) },
             transactionCode: transactionCode?.toSwiftIssuanceTransactionCode(),
             batchSize: batchSize
         )
@@ -1102,7 +1102,7 @@ private extension Waltid_openid4vc_walletWalletIssuanceMetadataProvenance {
 }
 
 private extension Waltid_openid4vc_walletWalletIssuanceCredentialPreview {
-    func toSwiftIssuanceCredentialPreview() -> IssuanceCredentialPreview {
+    func toSwiftIssuanceCredentialPreview(metadataJSON: String?) -> IssuanceCredentialPreview {
         IssuanceCredentialPreview(
             configurationID: configurationId,
             format: format,
@@ -1114,7 +1114,8 @@ private extension Waltid_openid4vc_walletWalletIssuanceCredentialPreview {
             backgroundImageURI: backgroundImageUri.flatMap(URL.init(string:)),
             textColor: textColor,
             vct: vct,
-            doctype: doctype
+            doctype: doctype,
+            metadataJSON: metadataJSON
         )
     }
 }

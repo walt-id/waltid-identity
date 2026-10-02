@@ -22,6 +22,16 @@ struct WalletVisualFixtures {
         CredentialDisplayNormalizer.details(for: try credential())
     }
 
+    func localizedCredentialDetails() throws -> CredentialDetails {
+        let data = try Data(contentsOf: resourceDirectory.appendingPathComponent("credential-information.json"))
+        let contract = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let stored = try credential()
+        let value = Credential(id: stored.id, format: stored.format, issuer: stored.issuer, subject: nil,
+            label: stored.label, addedAt: stored.addedAt,
+            credentialDataJSON: try json(object(contract, "credentialData")), metadataJSON: try json(object(contract, "metadata")))
+        return CredentialDisplayNormalizer.details(for: value, preferredLocales: try XCTUnwrap(contract["preferredLocales"] as? [String]))
+    }
+
     func credential() throws -> Credential {
         let value = try object(root, "credential")
         let issuer = try object(root, "issuer")

@@ -196,16 +196,27 @@ final class WalletE2EUI {
         button.tap()
     }
 
-    func tapTab(label: String) {
-        let tab = app.tabBars.buttons[label]
+    func returnToWallet() {
         dismissKeyboardIfPresent()
-        makeHittable(tab)
-        if tab.exists && tab.isHittable {
-            tab.tap()
-        } else {
-            tapTabCoordinate(label: label)
+        // Close only known wallet destinations, starting with the innermost sheet.
+        for identifier in ["wallet-detail-close", "wallet.presentationClaimsClose", "wallet.detailsBack", "wallet.flowBack"] {
+            let button = app.buttons[identifier]
+            if button.exists && button.isHittable { button.tap() }
         }
-        XCTAssertTrue(waitForTabContent(label: label, timeout: 5), "Tab content did not become visible: \(label)")
+        XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 10), "Wallet home did not appear")
+    }
+
+    func openScanner() {
+        returnToWallet()
+        tapButton(identifier: "wallet.scanButton", fallbackLabel: "Scan or paste")
+        XCTAssertTrue(textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request").waitForExistence(timeout: 10))
+    }
+
+    /// Exercise the same automatic routing as a pasted or scanned user link.
+    func openWalletLink(_ value: String) {
+        openScanner()
+        replaceText(in: textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request"), value: value)
+        tapButton(identifier: "wallet.scanContinue", fallbackLabel: "Continue")
     }
 
     func replaceText(in element: XCUIElement, value: String) {
@@ -269,57 +280,6 @@ final class WalletE2EUI {
         RunLoop.current.run(until: Date().addingTimeInterval(0.3))
     }
 
-    private func tapTabCoordinate(label: String) {
-        let xOffset: CGFloat
-        switch label {
-        case "Credentials":
-            xOffset = 1.0 / 6.0
-        case "Receive":
-            xOffset = 3.0 / 6.0
-        case "Present":
-            xOffset = 5.0 / 6.0
-        default:
-            XCTFail("Unknown tab: \(label)")
-            return
-        }
-        let tabBar = app.tabBars.firstMatch
-        if tabBar.exists {
-            tabBar.coordinate(withNormalizedOffset: CGVector(dx: xOffset, dy: 0.5)).tap()
-        } else {
-            app.coordinate(withNormalizedOffset: CGVector(dx: xOffset, dy: 0.95)).tap()
-        }
-    }
-
-    private func waitForTabContent(label: String, timeout: TimeInterval) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if tabContentVisible(label: label) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        }
-        return tabContentVisible(label: label)
-    }
-
-    private func tabContentVisible(label: String) -> Bool {
-        switch label {
-        case "Credentials":
-            return app.staticTexts["No credentials yet"].exists
-                || app.otherElements["wallet.credentialDetailsScreen"].exists
-                || firstHittableElement(identifierPrefix: "wallet.credentialCard.") != nil
-        case "Receive":
-            return textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL").isHittable
-                || app.staticTexts["Received credentials"].exists
-                || app.otherElements["wallet.credentialDetailsScreen"].exists
-        case "Present":
-            return textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL").isHittable
-                || app.staticTexts["Review presentation request"].exists
-                || app.otherElements["wallet.credentialDetailsScreen"].exists
-        default:
-            return false
-        }
-    }
-
     private func firstElement(identifierPrefix: String) -> XCUIElement {
         let predicate = NSPredicate(format: "identifier BEGINSWITH %@", identifierPrefix)
         return app.descendants(matching: .any).matching(predicate).firstMatch
@@ -345,7 +305,7 @@ final class WalletE2EUI {
             .matching(predicate)
             .allElementsBoundByIndex
             .first { element in
-                guard element.exists, element.isHittable else { return false }
+                guard element.exists, element.isHittable, element.isEnabled else { return false }
                 // XCTest considers a partly visible card hittable even when its center is
                 // covered by the pinned review actions. Scroll before tapping that card.
                 if element.identifier.hasPrefix("wallet.presentationClaimsToggle.") {

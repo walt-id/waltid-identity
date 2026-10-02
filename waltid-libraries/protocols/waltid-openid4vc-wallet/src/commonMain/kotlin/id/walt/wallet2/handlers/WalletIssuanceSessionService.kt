@@ -178,6 +178,8 @@ data class WalletIssuanceBatchSession(
     val id: String,
     val offer: WalletIssuanceOfferPreview,
     val batchSize: Int? = null,
+    /** Ordered/localized display metadata by configuration ID, using the stored credential sidecar shape. */
+    val credentialDisplayMetadata: Map<String, String> = emptyMap(),
 )
 
 /** Input used to start either supported grant from one offer. */
@@ -436,6 +438,10 @@ class WalletIssuanceSessionService(
 
     private fun ActiveSession.toBatchSession(): WalletIssuanceBatchSession = WalletIssuanceBatchSession(
         public.id, public.offer, resolved.issuerMetadata.metadata.batchCredentialIssuance?.batchSize,
+        credentialDisplayMetadata = resolved.offeredCredentials.mapNotNull { credential ->
+            storedCredentialDisplayMetadata(resolved.issuerMetadata.metadata, credential.credentialConfigurationId)
+                ?.let { credential.credentialConfigurationId to it.toString() }
+        }.toMap(),
     )
 
     private suspend fun startSession(

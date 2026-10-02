@@ -18,9 +18,7 @@ final class BatchIssuanceE2ETests: XCTestCase {
         ui.launch(environment: ["ATTESTATION_BASE_URL": "", "TRANSACTION_DATA_PROFILES_URL": ""])
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 60), "Wallet ready")
 
-        ui.tapTab(label: "Receive")
-        ui.replaceText(in: ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL"), value: offer.offerUrl)
-        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        ui.openWalletLink(offer.offerUrl)
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 60), "Review credential offer")
         let copies = app.steppers["issuance-copies-org.iso.18013.5.1.mDL"]
         XCTAssertTrue(copies.waitForExistence(timeout: 10))
@@ -47,7 +45,7 @@ final class BatchIssuanceE2ETests: XCTestCase {
 
         app.terminate()
         ui.launch(environment: ["ATTESTATION_BASE_URL": "", "TRANSACTION_DATA_PROFILES_URL": ""])
-        ui.tapTab(label: "Credentials")
+        ui.returnToWallet()
         ui.assertExists(identifierPrefix: "wallet.credentialCard.", timeout: 60)
         XCTAssertEqual(Set(cards.allElementsBoundByIndex.map(\.identifier)), storedIDs)
         attachScreenshot(app, name: "Same credentials after relaunch")
