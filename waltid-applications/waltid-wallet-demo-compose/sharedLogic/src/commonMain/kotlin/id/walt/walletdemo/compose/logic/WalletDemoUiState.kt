@@ -23,6 +23,7 @@ data class WalletDemoUiState(
     val issuanceCopyCounts: Map<String, Int> = emptyMap(),
     val authorizationRequestUrl: String? = null,
     val deferredCredentials: List<WalletDemoDeferredCredential> = emptyList(),
+    val issuanceReceipt: WalletDemoIssuanceReceipt? = null,
     val lastReceivedCredentialIds: List<String> = emptyList(),
     val receiveCompleted: Boolean = false,
     val receiveNavigationResetKey: Int = 0,

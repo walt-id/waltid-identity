@@ -1,10 +1,65 @@
 import Foundation
 import WalletSDK
+import WalletDemoSharingUI
 import XCTest
 @testable import iosApp
 
 @MainActor
 final class WalletViewModelReceiveTests: XCTestCase {
+    func testUncertainContinuationCannotResumeAndStatusRefreshOnlyReads() async throws {
+        for status in [IssuanceContinuationStatus.remoteOutcomeUncertain, .storageOutcomeUncertain] {
+            let client = TransactionCodeWalletClient(transactionCode: nil)
+            let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+            model.unlockForTests()
+            try await waitUntil { model.isReady }
+            let pending = DeferredCredential(id: "pending", credentialConfigurationID: nil, intervalSeconds: nil, status: status)
+            model.deferredCredentials = [pending]
+            model.resumeDeferredCredential(pending)
+            await Task.yield()
+            XCTAssertFalse(model.isLoading)
+            let before = await client.resumedDeferredCredentialIDs
+            XCTAssertTrue(before.isEmpty)
+            model.refreshIssuanceStatus()
+            try await waitUntil { !model.isLoading }
+            XCTAssertTrue(model.deferredCredentials.isEmpty)
+            let after = await client.resumedDeferredCredentialIDs
+            XCTAssertTrue(after.isEmpty)
+        }
+    }
+
+    func testReceiptKeepsEarlierSavedIdsAcrossContinuation() async throws {
+        let client = TransactionCodeWalletClient(transactionCode: nil, deferWithProgress: true)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+        model.unlockForTests()
+        try await waitUntil { model.isReady }
+        let pending = DeferredCredential(id: "pending", credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)
+        model.deferredCredentials = [pending]
+        model.issuanceReceipt = IssuanceReceipt(pendingIDs: ["pending"])
+        model.lastReceivedCredentialIDs = ["earlier-saved"]
+        model.resumeDeferredCredential(pending)
+        try await waitUntil { !model.isLoading }
+        XCTAssertEqual(model.lastReceivedCredentialIDs, ["earlier-saved", "credential-1"])
+        XCTAssertEqual(model.issuanceReceipt?.pendingIDs, ["pending"])
+        model.resumeDeferredCredential(pending)
+        try await waitUntil { !model.isLoading }
+        XCTAssertEqual(model.lastReceivedCredentialIDs, ["earlier-saved", "credential-1"])
+    }
+
+    func testRetainedPresentationDoesNotEraseNewIntervalOrUncertainFailure() {
+        let pending = DeferredCredential(id: "pending", credentialConfigurationID: "pid", intervalSeconds: 15)
+        let lost = IssuanceOutcome.failed(sessionID: "session", error: .init(code: .remoteOutcomeUncertain, message: "Response lost"),
+            storedCredentialIDs: ["saved"], deferredCredentials: [pending])
+        guard case let .failed(_, _, saved, blocked) = lost.withContinuations([], resumingID: pending.id) else { return XCTFail() }
+        XCTAssertEqual(saved, ["saved"])
+        XCTAssertEqual(blocked.first?.status, .remoteOutcomeUncertain)
+        let retained = DeferredCredential(id: pending.id, credentialConfigurationID: "pid", intervalSeconds: 5,
+            status: .awaitingLocalSave, displayMetadataJSON: "{}")
+        guard case let .failed(_, _, _, latest) = lost.withContinuations([retained], resumingID: pending.id) else { return XCTFail() }
+        XCTAssertEqual(latest.first?.intervalSeconds, 15)
+        XCTAssertEqual(latest.first?.status, .awaitingLocalSave)
+        XCTAssertEqual(latest.first?.displayMetadataJSON, "{}")
+    }
+
     func testCopySelectionIsExplicitBoundedAndForwardedForBothGrants() async throws {
         for grant in [IssuanceGrant.preAuthorizedCode, .authorizationCode] {
             let client = TransactionCodeWalletClient(transactionCode: nil, issuanceGrant: grant, batchSize: 3)
@@ -639,6 +694,7 @@ private actor TransactionCodeWalletClient: WalletClient {
     private let failWithProgress: Bool
     private let deferWithProgress: Bool
     private(set) var receivedIssuanceSelections: [[IssuanceCredentialSelection]?] = []
+    private(set) var resumedDeferredCredentialIDs: [String] = []
     private let issuanceGrant: IssuanceGrant
     private let startsWithCredential: Bool
     private let presentationPreviewDelayNanoseconds: UInt64
@@ -781,6 +837,7 @@ private actor TransactionCodeWalletClient: WalletClient {
     }
 
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
+        resumedDeferredCredentialIDs.append(deferredCredentialID)
         if deferWithProgress {
             credentialIssued = true
             return .deferred(sessionID: "session", storedCredentialIDs: [Self.credential.id],
