@@ -4,6 +4,11 @@ The catalogue connects the existing Compose Android, Compose iOS and native Swif
 
 `catalogue.json` lists each captured state, its test, renderer and requirements. It is the current deterministic catalogue, not a claim that every wallet screen, system prompt or physical flow is covered. Payment fixtures include ordinary and payment credentials, authoritative consent and pinned actions; the native consent component also has a focused capture. Compose provider fixtures capture the actual modal window, while native provider fixtures render its shared content at a bounded device size. These are wallet-owned surfaces, not system picker evidence. Home content uses the real normalized card input; asynchronous app loading and navigation remain in the behavior/UI suites. Native media rows wait for decoded thumbnail layout and compare actual pixels. Compose media waits for successful image-loader completion. Nothing uses a fixed capture delay. PIN setup captures show the single form with empty, mismatched and biometric-enabled synthetic in-memory state; separate UI tests drive creation, authentication failure, keyboard dismissal and completion.
 
+Provider states include preparing, browser authorization, failure and a partial issuance receipt with
+saved, pending and unattempted targets. Compose iOS captures that reusable content without claiming
+an Apple issuance-provider integration. Request-model and UI tests separately prove selection and
+transaction-code retention, stale-consent rejection, correlated callbacks and no implicit remote retry.
+
 ## Compare
 
 Run from the identity repository. Android uses Robolectric API 35 at mdpi; Compose iOS uses a 393×852 headless Skia surface. SwiftUI uses a hosted iPhone 13 layout at scale 3 on iOS 26.5. Choose a test-owned iOS 26.5 simulator; the native baselines were generated with Xcode 27. Do not reuse baselines on another runtime without an explicit environment review.

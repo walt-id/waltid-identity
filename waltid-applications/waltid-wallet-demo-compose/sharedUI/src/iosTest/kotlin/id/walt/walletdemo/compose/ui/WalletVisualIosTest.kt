@@ -28,6 +28,13 @@ class WalletVisualIosTest {
     @Test fun providerOfferReview() = scenario { providerOfferReview() }
     @Test fun paymentSheet() = scenario { paymentReview(sheet = true) }
 
+    @Test fun providerReceivingPreparing() = scenario() { providerReceivingState("preparing") }
+    @Test fun providerReceivingAuthorization() = scenario() { providerReceivingState("authorization") }
+    @Test fun providerReceivingFailure() = scenario() { providerReceivingState("failure") }
+    @Test fun providerReceivingPartialResult() = scenario() { providerReceivingState("partial_result") }
+    @Test fun providerPreparing() = scenario() { providerSharingStatus() }
+    @Test fun providerFailure() = scenario() { providerSharingStatus(failure = true) }
+
     @Test fun keySummary() = scenario { keySetup("summary") }
     @Test fun keyRecovery() = scenario { keySetup("recovery") }
     @Test fun keyStorage() = scenario { keySetup("storage") }

@@ -334,6 +334,45 @@ internal class WalletVisualScenarios(
         capture("receiving.provider.review")
     }
 
+    fun providerReceivingState(kind: String) = with(test) {
+        val base = WalletVisualFixtures.partialResult
+        val state = when (kind) {
+            "preparing" -> WalletDemoOfferCreateUiState.Loading
+            "authorization" -> WalletDemoOfferCreateUiState.WaitingForAuthorization()
+            "failure" -> WalletDemoOfferCreateUiState.Failure("The credential offer could not be verified.")
+            "partial_result" -> WalletDemoOfferCreateUiState.Receipt(
+                receipt = requireNotNull(base.issuanceReceipt).copy(problem = WalletDemoIssuanceProblem(
+                    "The issuer could not finish this request.", failedTargetCount = 1, notAttemptedTargetCount = 2)),
+                saved = (base.session as WalletSessionState.Ready).credentials, pending = base.deferredCredentials)
+            else -> error("Unknown receiving state: $kind")
+        }
+        content {
+            WalletDemoOfferCreateScreen(state, onAccept = { _, _ -> }, onDecline = {}, onDismiss = {},
+                onCancelAuthorization = {}, presentation = WalletReviewPresentation.Sheet)
+        }
+        when (state) {
+            is WalletDemoOfferCreateUiState.Receipt -> {
+                onNodeWithTag("wallet.provider.done").assertIsDisplayed().assertIsEnabled()
+                onNodeWithTag("issuance-saved-${WalletVisualFixtures.credentialSummary.id}").assertIsDisplayed()
+                onNodeWithText("Check with issuer").assertIsDisplayed()
+                onNodeWithText("Not attempted: 2").performScrollTo().assertIsDisplayed()
+                onNodeWithTag("wallet.provider.done").assertIsDisplayed()
+            }
+            is WalletDemoOfferCreateUiState.Failure -> onNodeWithText("Close").assertIsDisplayed()
+            else -> onNodeWithText("Cancel").assertIsDisplayed()
+        }
+        capture("receiving.provider.$kind")
+    }
+
+    fun providerSharingStatus(failure: Boolean = false) = with(test) {
+        content {
+            WalletProviderStatusScreen(title = if (failure) "Unable to share" else "Preparing request…",
+                message = if (failure) "The request could not be verified." else null, onClose = {}, onDismiss = {})
+        }
+        onNodeWithText(if (failure) "Close" else "Cancel").assertIsDisplayed()
+        capture(if (failure) "sharing.provider.failure" else "sharing.provider.preparing")
+    }
+
     fun paymentReview(sheet: Boolean = false) = with(test) {
         val consent = WalletVisualFixtures.payment
         content {

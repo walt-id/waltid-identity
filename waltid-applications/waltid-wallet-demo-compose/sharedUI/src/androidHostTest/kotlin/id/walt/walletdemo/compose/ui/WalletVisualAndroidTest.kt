@@ -34,6 +34,13 @@ class WalletVisualAndroidTest {
     @Test fun providerOfferReview() = scenario(sheetHost = true) { providerOfferReview() }
     @Test fun paymentSheet() = scenario(sheetHost = true) { paymentReview(sheet = true) }
 
+    @Test fun providerReceivingPreparing() = scenario(sheetHost = true) { providerReceivingState("preparing") }
+    @Test fun providerReceivingAuthorization() = scenario(sheetHost = true) { providerReceivingState("authorization") }
+    @Test fun providerReceivingFailure() = scenario(sheetHost = true) { providerReceivingState("failure") }
+    @Test fun providerReceivingPartialResult() = scenario(sheetHost = true) { providerReceivingState("partial_result") }
+    @Test fun providerPreparing() = scenario(sheetHost = true) { providerSharingStatus() }
+    @Test fun providerFailure() = scenario(sheetHost = true) { providerSharingStatus(failure = true) }
+
     @Test fun keySummary() = scenario { keySetup("summary") }
     @Test fun keyRecovery() = scenario { keySetup("recovery") }
     @Test fun keyStorage() = scenario { keySetup("storage") }

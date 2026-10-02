@@ -392,7 +392,6 @@
         "R04",
         "R08",
         "R09",
-        "R10",
         "R11",
         "R15"
       ],
@@ -406,7 +405,6 @@
         "R04",
         "R08",
         "R09",
-        "R10",
         "R11",
         "R15"
       ],
@@ -420,7 +418,6 @@
         "R04",
         "R08",
         "R09",
-        "R10",
         "R11",
         "R15"
       ],
@@ -433,12 +430,12 @@
         "R04",
         "R08",
         "R09",
-        "R10",
         "R11",
         "R15"
       ],
       "swiftTest": "testProviderPreparing",
-      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome."
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome.",
+      "composeTest": "providerPreparing"
     },
     {
       "id": "sharing.provider.failure",
@@ -446,12 +443,12 @@
         "R04",
         "R08",
         "R09",
-        "R10",
         "R11",
         "R15"
       ],
       "swiftTest": "testProviderFailure",
-      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome."
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome.",
+      "composeTest": "providerFailure"
     },
     {
       "id": "payment.sheet.main",
@@ -506,11 +503,62 @@
       "swiftTest": "testCompactProviderSharingReview",
       "requirements": [
         "R09",
-        "R10",
         "R11",
         "R15"
       ],
       "note": "Native 320x568 dark accessibilityMedium review scrolled to its final credential row; confirmation stays pinned. Bounded provider content, not the Apple system container."
+    },
+    {
+      "id": "receiving.provider.preparing",
+      "requirements": [
+        "R07",
+        "R08",
+        "R09",
+        "R11",
+        "R15",
+        "R18"
+      ],
+      "composeTest": "providerReceivingPreparing",
+      "note": "Shared Compose content in a modal window; Android supplies the issuance provider. A Compose iOS render does not imply an Apple issuance-provider capability."
+    },
+    {
+      "id": "receiving.provider.authorization",
+      "requirements": [
+        "R07",
+        "R08",
+        "R09",
+        "R11",
+        "R15",
+        "R18"
+      ],
+      "composeTest": "providerReceivingAuthorization",
+      "note": "Shared Compose content in a modal window; Android supplies the issuance provider. A Compose iOS render does not imply an Apple issuance-provider capability."
+    },
+    {
+      "id": "receiving.provider.failure",
+      "requirements": [
+        "R07",
+        "R08",
+        "R09",
+        "R11",
+        "R15",
+        "R18"
+      ],
+      "composeTest": "providerReceivingFailure",
+      "note": "Shared Compose content in a modal window; Android supplies the issuance provider. A Compose iOS render does not imply an Apple issuance-provider capability."
+    },
+    {
+      "id": "receiving.provider.partial_result",
+      "requirements": [
+        "R07",
+        "R08",
+        "R09",
+        "R11",
+        "R15",
+        "R18"
+      ],
+      "composeTest": "providerReceivingPartialResult",
+      "note": "Shared Compose content in a modal window; Android supplies the issuance provider. A Compose iOS render does not imply an Apple issuance-provider capability."
     }
   ]
 }
