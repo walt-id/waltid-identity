@@ -54,7 +54,9 @@ internal object WalletVisualFixtures {
             operation = WalletOperationState.Succeeded(outcome.text("status"), WalletDemoTab.Receive),
             lastReceivedCredentialIds = listOf(credentialSummary.id),
             deferredCredentials = listOf(WalletDemoDeferredCredential(outcome.text("pendingId"),
-                outcome.text("pendingConfigurationId"), 5)),
+                outcome.text("pendingConfigurationId"), 5, status = WalletDemoContinuationStatus.AwaitingIssuer,
+                displayMetadataJson = outcome.getValue("pendingMetadata").toString())),
+            issuanceReceipt = WalletDemoIssuanceReceipt(offer.issuer, setOf(outcome.text("pendingId"))),
         )
     }
 

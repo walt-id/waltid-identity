@@ -2,6 +2,8 @@
 
 package id.walt.walletdemo.compose.ui
 
+import id.walt.walletdemo.compose.logic.WalletDemoContinuationStatus
+
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.LocalSystemTheme
@@ -59,6 +61,12 @@ class WalletVisualIosTest {
 
     @Test
     fun partialBatchResult() = scenario { partialBatchResult() }
+
+    @Test fun localSaveResult() = scenario { partialBatchResult(WalletDemoContinuationStatus.AwaitingLocalSave) }
+    @Test fun remoteUncertainResult() = scenario { partialBatchResult(WalletDemoContinuationStatus.RemoteOutcomeUncertain) }
+    @Test fun storageUncertainResult() = scenario { partialBatchResult(WalletDemoContinuationStatus.StorageOutcomeUncertain) }
+    @Test fun partialFailureResult() = scenario { partialBatchResult(failure = true) }
+
 
     @Test
     fun nearbyReady() = scenario { nearbyReady() }

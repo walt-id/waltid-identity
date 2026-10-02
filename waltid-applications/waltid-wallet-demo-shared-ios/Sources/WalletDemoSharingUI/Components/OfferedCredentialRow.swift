@@ -36,13 +36,16 @@ public struct OfferedCredentialRow: View {
             }.padding(16)
             if copies.wrappedValue > 0 {
                 if limit > 1 {
-                    Stepper(String(format: String(localized: "Copies: %d", bundle: .module), copies.wrappedValue),
-                            value: copies, in: 1...limit)
-                        .font(.subheadline)
-                        .disabled(!enabled)
-                        .accessibilityIdentifier("issuance-copies-\(credential.configurationID)")
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 4)
+                    HStack {
+                        Text(String(format: String(localized: "Copies: %d", bundle: .module), copies.wrappedValue))
+                            .font(.subheadline).frame(maxWidth: .infinity, alignment: .leading)
+                        WalletCountControl(value: copies, range: 1...limit, enabled: enabled,
+                            decreaseLabel: String(format: String(localized: "Fewer copies of %@", bundle: .module), CredentialCardSummary.offered(from: credential).title),
+                            increaseLabel: String(format: String(localized: "More copies of %@", bundle: .module), CredentialCardSummary.offered(from: credential).title),
+                            identifier: "issuance-copies-\(credential.configurationID)")
+                    }
+                    .accessibilityIdentifier("issuance-copies-\(credential.configurationID)")
+                    .padding(.horizontal, 16)
                 } else {
                     Text(String(localized: "1 copy", bundle: .module))
                         .font(.footnote).foregroundStyle(.secondary).padding(.horizontal, 16)

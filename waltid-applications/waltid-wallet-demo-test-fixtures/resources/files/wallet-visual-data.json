@@ -46,7 +46,8 @@
   "batchOutcome": {
     "status": "Saved credentials: 1. Pending targets: 1.",
     "pendingId": "visual-deferred-library",
-    "pendingConfigurationId": "library-card"
+    "pendingConfigurationId": "library-card",
+    "pendingMetadata": {"credentialDisplay": [{"name": "Library membership", "locale": "en", "background_color": "#664373"}]}
   },
   "payment": {
     "revision": "visual-consent-revision-1",

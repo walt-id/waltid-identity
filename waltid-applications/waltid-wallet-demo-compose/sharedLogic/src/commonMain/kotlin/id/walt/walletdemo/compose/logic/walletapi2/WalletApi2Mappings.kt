@@ -6,6 +6,8 @@ import id.walt.walletdemo.compose.logic.CredentialDisplayVocabulary
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialClaimMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoDeferredCredential
+import id.walt.walletdemo.compose.logic.WalletDemoContinuationStatus
+import id.walt.walletdemo.compose.logic.WalletDemoIssuanceFailureKind
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceOutcome
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
 import id.walt.walletdemo.compose.logic.WalletDemoIssuerMetadata
@@ -322,18 +324,27 @@ private fun jsonElementAsString(value: JsonElement?): String? = when (value) {
 internal fun DeferredCredentialHandleDto.toDemoDeferred() = WalletDemoDeferredCredential(
     id = id, credentialConfigurationId = credentialConfigurationId,
     intervalSeconds = intervalSeconds, credentialIdentifier = credentialIdentifier,
+    status = when (status) {
+        "AWAITING_ISSUER" -> WalletDemoContinuationStatus.AwaitingIssuer
+        "AWAITING_LOCAL_SAVE" -> WalletDemoContinuationStatus.AwaitingLocalSave
+        "REMOTE_OUTCOME_UNCERTAIN" -> WalletDemoContinuationStatus.RemoteOutcomeUncertain
+        "STORAGE_OUTCOME_UNCERTAIN" -> WalletDemoContinuationStatus.StorageOutcomeUncertain
+        else -> WalletDemoContinuationStatus.Unresolved
+    },
+    displayMetadataJson = displayMetadataJson,
 )
 
 internal fun ReceiveCredentialResultDto.toOutcome(): WalletDemoIssuanceOutcome {
     val pending = deferredCredentials.map {
         WalletDemoDeferredCredential(it.deferredCredentialId, it.credentialConfigurationId,
-            it.intervalSeconds, it.credentialIdentifier)
+            it.intervalSeconds, it.credentialIdentifier, status = WalletDemoContinuationStatus.AwaitingIssuer)
     } + storageOutcome?.deferredCredentials.orEmpty().map { it.toDemoDeferred() }
     return when {
-        failure != null -> WalletDemoIssuanceOutcome.Failed(
-            message = "Credential issuance stopped during ${failure.stage.lowercase()}",
+        failure != null || storageOutcome != null -> WalletDemoIssuanceOutcome.Failed(
+            message = storageOutcome?.error?.message ?: "Credential issuance stopped during ${requireNotNull(failure).stage.lowercase()}",
             storedCredentialIds = credentialIds, deferredCredentials = pending, offerConsumed = true,
-            failedTargetCount = 1, notAttemptedTargetCount = failure.notAttempted.size,
+            failedTargetCount = if (failure == null) 0 else 1, notAttemptedTargetCount = failure?.notAttempted?.size ?: 0,
+            kind = storageOutcome?.error?.code.toFailureKind(),
         )
         pending.isNotEmpty() -> WalletDemoIssuanceOutcome.Deferred(credentialIds, pending)
         else -> WalletDemoIssuanceOutcome.Stored(credentialIds)
@@ -349,6 +360,13 @@ internal fun DeferredIssuanceOutcomeDto.toOutcome(): WalletDemoIssuanceOutcome =
         failedTargetCount = if (failure == null) 0 else 1,
         notAttemptedTargetCount = failure?.notAttempted?.size ?: 0,
         deferredCredentials = deferredCredentials.map { it.toDemoDeferred() }, offerConsumed = true,
+        kind = error.code.toFailureKind(),
     )
     DeferredIssuanceOutcomeDto.Cancelled -> WalletDemoIssuanceOutcome.Cancelled
+}
+
+private fun String?.toFailureKind() = when (this) {
+    "REMOTE_OUTCOME_UNCERTAIN" -> WalletDemoIssuanceFailureKind.RemoteOutcomeUncertain
+    "STORAGE_OUTCOME_UNCERTAIN" -> WalletDemoIssuanceFailureKind.StorageOutcomeUncertain
+    else -> WalletDemoIssuanceFailureKind.General
 }
