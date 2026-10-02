@@ -71,12 +71,12 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
         is DisplayValue.BooleanValue -> Text(
             if (value.value) "Yes" else "No",
             modifier = modifier,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
         )
         is DisplayValue.DecodedText -> Text(
             value.value,
             modifier = modifier,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
         )
         is DisplayValue.DeferredImage -> DeferredImageValue(value, path, modifier)
         is DisplayValue.Image -> ImageValue(value, path, modifier)
@@ -86,7 +86,7 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
         ) {
             value.values.take(MaxListPreviewItems).forEachIndexed { index, child ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("${index + 1}.", style = MaterialTheme.typography.bodyMedium)
+                    Text("${index + 1}.", style = MaterialTheme.typography.bodyLarge)
                     ClaimValue(child, path.indexedChild(index), Modifier.weight(1f))
                 }
             }
@@ -101,13 +101,13 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
         DisplayValue.NullValue -> Text(
             "Not provided",
             modifier = modifier,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         is DisplayValue.NumberValue -> Text(
             value.value,
             modifier = modifier,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
         )
         is DisplayValue.ObjectValue -> Column(
             modifier = modifier,
@@ -126,7 +126,7 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
         is DisplayValue.Text -> Text(
             value.value,
             modifier = modifier,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
         )
     }
 }
@@ -187,16 +187,7 @@ private fun ImageValue(value: DisplayValue.Image, path: ClaimItemPath, modifier:
                 contentScale = ContentScale.Fit,
             )
         }
-        Text(
-            value.mimeType,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Medium,
-        )
-        Text(
-            "${value.byteCount} bytes",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+
     }
 
     if (viewerOpen) {
@@ -232,6 +223,9 @@ private fun CredentialImageViewer(
                     .padding(horizontal = 24.dp, vertical = 64.dp),
                 contentScale = ContentScale.Fit,
             )
+            Text("${value.mimeType} · ${value.byteCount} bytes",
+                modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
+                color = Color.White, style = MaterialTheme.typography.bodySmall)
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier

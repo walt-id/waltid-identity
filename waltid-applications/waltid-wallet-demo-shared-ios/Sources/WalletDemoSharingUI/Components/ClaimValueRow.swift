@@ -30,10 +30,10 @@ private struct ClaimValueView: View {
         switch value {
         case .bool(let value):
             Text(value ? "Yes" : "No")
-                .font(.caption)
+                .font(.body)
         case .decodedText(let value), .text(let value), .number(let value):
             Text(value)
-                .font(.caption)
+                .font(.body)
         case .deferredImage(let source):
             DeferredImageValue(source: source, path: path)
         case .image(_, let data, let mimeType, let byteCount):
@@ -44,7 +44,7 @@ private struct ClaimValueView: View {
                 ForEach(Array(preview.values.enumerated()), id: \.offset) { index, value in
                     HStack(alignment: .top, spacing: 4) {
                         Text("\(index + 1).")
-                            .font(.caption)
+                            .font(.body)
                         ClaimValueView(value: value, path: path.indexedChild(index))
                     }
                 }
@@ -56,7 +56,7 @@ private struct ClaimValueView: View {
             }
         case .null:
             Text("Not provided")
-                .font(.caption)
+                .font(.body)
                 .foregroundStyle(.secondary)
         case .object(let entries):
             LazyVStack(alignment: .leading, spacing: 6) {
@@ -66,7 +66,7 @@ private struct ClaimValueView: View {
             }
         case .raw(let value):
             Text(value)
-                .font(.caption.monospaced())
+                .font(.footnote.monospaced())
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
@@ -177,17 +177,15 @@ private struct ImageValue: View {
                 .accessibilityHint("Opens the image full screen")
                 .accessibilityIdentifier(WalletAccessibilityID.claimImage(path.id))
             }
-            Text(mimeType)
-                .font(.caption.weight(.medium))
-            Text("\(byteCount) bytes")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+
         }
         .fullScreenCover(isPresented: $viewerOpen) {
             if let image {
                 CredentialImageViewer(
                     data: data,
                     preview: image,
+                    mimeType: mimeType,
+                    byteCount: byteCount,
                     path: path,
                     onDismiss: { viewerOpen = false }
                 )
@@ -201,6 +199,8 @@ private struct ImageValue: View {
 private struct CredentialImageViewer: View {
     let data: Data
     let preview: UIImage
+    let mimeType: String
+    let byteCount: Int
     let path: ClaimItemPath
     let onDismiss: () -> Void
     @State private var image: UIImage?
@@ -233,6 +233,7 @@ private struct CredentialImageViewer: View {
                     .accessibilityIdentifier(WalletAccessibilityID.claimImageViewerClose(path.id))
                 }
                 Spacer()
+                Text("\(mimeType) · \(byteCount) bytes").font(.footnote).foregroundStyle(.white)
             }
             .padding(16)
         }

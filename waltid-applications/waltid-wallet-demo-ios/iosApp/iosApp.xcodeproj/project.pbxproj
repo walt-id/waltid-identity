@@ -18,6 +18,7 @@
 		71E100022FDAE00000000002 /* TestHelpers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; };
 		A1000001AAAA000100000001 /* WalletViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001AAAA000000000001 /* WalletViewModel.swift */; };
 		A1000002AAAA000100000002 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002AAAA000000000002 /* HomeView.swift */; };
+		13330001AAAA000100000001 /* WalletScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330001AAAA000000000001 /* WalletScanView.swift */; };
 		A1000003AAAA000100000003 /* ReceiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000003AAAA000000000003 /* ReceiveView.swift */; };
 		A1000004AAAA000100000004 /* PresentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000004AAAA000000000004 /* PresentView.swift */; };
 		A1000006AAAA000100000006 /* StatusBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006AAAA000000000006 /* StatusBannerView.swift */; };
@@ -26,6 +27,7 @@
 		A1000422AAAA000100000022 /* CredentialsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000422AAAA000000000022 /* CredentialsTabView.swift */; };
 		A1000424AAAA000100000024 /* EmptyCredentialsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000424AAAA000000000024 /* EmptyCredentialsView.swift */; };
 		A1000425AAAA000100000025 /* UrlEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000425AAAA000000000025 /* UrlEditor.swift */; };
+		13330002AAAA000100000002 /* ScanCodeButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330002AAAA000000000002 /* ScanCodeButton.swift */; };
 		A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000430AAAA000000000030 /* OfferReviewView.swift */; };
 		A1000440AAAA000100000040 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000440AAAA000000000040 /* SettingsView.swift */; };
 		A1000441AAAA000100000041 /* WalletTabChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000441AAAA000000000041 /* WalletTabChrome.swift */; };
@@ -150,6 +152,7 @@
 		71E100052FDAE00000000005 /* iosAppEnterpriseTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppEnterpriseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000001AAAA000000000001 /* WalletViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletViewModel.swift; sourceTree = "<group>"; };
 		A1000002AAAA000000000002 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		13330001AAAA000000000001 /* WalletScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletScanView.swift; sourceTree = "<group>"; };
 		A1000003AAAA000000000003 /* ReceiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiveView.swift; sourceTree = "<group>"; };
 		A1000004AAAA000000000004 /* PresentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentView.swift; sourceTree = "<group>"; };
 		A1000006AAAA000000000006 /* StatusBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBannerView.swift; sourceTree = "<group>"; };
@@ -158,6 +161,7 @@
 		A1000422AAAA000000000022 /* CredentialsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialsTabView.swift; sourceTree = "<group>"; };
 		A1000424AAAA000000000024 /* EmptyCredentialsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyCredentialsView.swift; sourceTree = "<group>"; };
 		A1000425AAAA000000000025 /* UrlEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UrlEditor.swift; sourceTree = "<group>"; };
+		13330002AAAA000000000002 /* ScanCodeButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanCodeButton.swift; sourceTree = "<group>"; };
 		A1000430AAAA000000000030 /* OfferReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfferReviewView.swift; sourceTree = "<group>"; };
 		A1000440AAAA000000000040 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1000441AAAA000000000041 /* WalletTabChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletTabChrome.swift; sourceTree = "<group>"; };
@@ -293,6 +297,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000002AAAA000000000002 /* HomeView.swift */,
+				13330001AAAA000000000001 /* WalletScanView.swift */,
 				A1000461AAAA000000000061 /* ProximityPresentationView.swift */,
                 A74900000000000000000004 /* WalletIdentityView.swift */,
 				A1000422AAAA000000000022 /* CredentialsTabView.swift */,
@@ -313,6 +318,7 @@
 				A1000006AAAA000000000006 /* StatusBannerView.swift */,
 				A1000441AAAA000000000041 /* WalletTabChrome.swift */,
 				A1000425AAAA000000000025 /* UrlEditor.swift */,
+				13330002AAAA000000000002 /* ScanCodeButton.swift */,
 				A1000424AAAA000000000024 /* EmptyCredentialsView.swift */,
 				A1000430AAAA000000000030 /* OfferReviewView.swift */,
 			);
@@ -702,6 +708,7 @@
 				A1000420AAAA000100000020 /* WalletClient.swift in Sources */,
 				A1000421AAAA000100000021 /* MockWalletClient.swift in Sources */,
 				A1000002AAAA000100000002 /* HomeView.swift in Sources */,
+				13330001AAAA000100000001 /* WalletScanView.swift in Sources */,
                 A74900000000000000000003 /* WalletIdentityView.swift in Sources */,
 				A1000422AAAA000100000022 /* CredentialsTabView.swift in Sources */,
 				A1000003AAAA000100000003 /* ReceiveView.swift in Sources */,
@@ -709,6 +716,7 @@
 				A1000461AAAA000100000061 /* ProximityPresentationView.swift in Sources */,
 				A1000006AAAA000100000006 /* StatusBannerView.swift in Sources */,
 				A1000425AAAA000100000025 /* UrlEditor.swift in Sources */,
+				13330002AAAA000100000002 /* ScanCodeButton.swift in Sources */,
 				A1000424AAAA000100000024 /* EmptyCredentialsView.swift in Sources */,
 				A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */,
 				A1000440AAAA000100000040 /* SettingsView.swift in Sources */,

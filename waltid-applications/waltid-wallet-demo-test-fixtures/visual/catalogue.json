@@ -58,6 +58,61 @@
   },
   "states": [
     {
+      "id": "wallet.home.empty",
+      "requirements": [
+        "R01",
+        "R10",
+        "R15"
+      ],
+      "composeTest": "homeEmpty",
+      "swiftTest": "testHomeEmpty",
+      "note": "Production home content with normalized card inputs. App loading and routing have separate behavior/UI tests."
+    },
+    {
+      "id": "wallet.home.credential",
+      "requirements": [
+        "R01",
+        "R06",
+        "R10"
+      ],
+      "composeTest": "homeCredential",
+      "swiftTest": "testHomeCredential",
+      "note": "Production home content with normalized card inputs. App loading and routing have separate behavior/UI tests."
+    },
+    {
+      "id": "wallet.scan.empty",
+      "requirements": [
+        "R02",
+        "R07",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "scanEmpty",
+      "swiftTest": "testScanEmpty"
+    },
+    {
+      "id": "wallet.scan.unsupported",
+      "requirements": [
+        "R02",
+        "R07",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "scanUnsupported",
+      "swiftTest": "testScanUnsupported"
+    },
+    {
+      "id": "wallet.scan.link",
+      "requirements": [
+        "R02",
+        "R07",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "scanWebLink",
+      "swiftTest": "testScanWebLink"
+    },
+    {
       "id": "settings.root.default",
       "requirements": [
         "R03",
@@ -183,6 +238,42 @@
       "composeTest": "nearbyReady",
       "swiftTest": "testNearbyReady",
       "title": "Nearby sharing"
+    },
+    {
+      "id": "onboarding.pin.create",
+      "composeTest": "pinCreate",
+      "swiftTest": "testPinCreate",
+      "requirements": [
+        "R01",
+        "R11",
+        "R12",
+        "R13"
+      ],
+      "note": "Synthetic app-unlock setup. Existing PIN-store and OS biometric behavior have separate flow/model tests."
+    },
+    {
+      "id": "onboarding.pin.confirm",
+      "composeTest": "pinConfirm",
+      "swiftTest": "testPinConfirm",
+      "requirements": [
+        "R01",
+        "R11",
+        "R12",
+        "R13"
+      ],
+      "note": "Synthetic app-unlock setup. Existing PIN-store and OS biometric behavior have separate flow/model tests."
+    },
+    {
+      "id": "onboarding.pin.biometrics",
+      "composeTest": "pinBiometrics",
+      "swiftTest": "testPinBiometrics",
+      "requirements": [
+        "R01",
+        "R11",
+        "R12",
+        "R13"
+      ],
+      "note": "Synthetic app-unlock setup. Existing PIN-store and OS biometric behavior have separate flow/model tests."
     }
   ],
   "galleryPreview": [

@@ -145,7 +145,6 @@ struct OfferReviewView: View {
 }
 
 struct OfferReviewActions: View {
-    @Environment(\.walletDemoBranding) private var branding
     let requiresIssuerAuthentication: Bool
     let isAcceptEnabled: Bool
     let isReviewEnabled: Bool
@@ -153,18 +152,12 @@ struct OfferReviewActions: View {
     let onDecline: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            Button(requiresIssuerAuthentication ? "Continue to sign in" : "Accept", action: onAccept)
-                .buttonStyle(.borderedProminent)
-                .tint(branding.primary)
-                .disabled(!isAcceptEnabled)
-                .accessibilityIdentifier(WalletAccessibilityID.offerAcceptButton)
-
-            Button("Decline", action: onDecline)
-                .buttonStyle(.bordered)
-                .disabled(!isReviewEnabled)
-                .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
-        }
+        WalletActions(
+            primary: WalletAction(requiresIssuerAuthentication ? "Continue to sign in" : "Accept",
+                enabled: isAcceptEnabled, identifier: WalletAccessibilityID.offerAcceptButton, perform: onAccept),
+            secondary: WalletAction("Decline", enabled: isReviewEnabled,
+                identifier: WalletAccessibilityID.offerDeclineButton, perform: onDecline)
+        )
     }
 }
 

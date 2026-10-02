@@ -15,7 +15,7 @@ public struct CredentialDetailsView: View {
 
             if details.groups.isEmpty && systemInfoGroup == nil {
                 Text("No credential details available")
-                    .font(.caption)
+                     .font(.body)
                     .foregroundStyle(.secondary)
             }
 
@@ -57,14 +57,13 @@ private struct CredentialOverviewView: View {
                 )
             } else {
                 Text("Issuer: \(issuerFallback)")
-                    .font(.caption)
+                     .font(.body)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
         .accessibilityIdentifier(WalletAccessibilityID.credentialOverview(details.id))
     }
 }

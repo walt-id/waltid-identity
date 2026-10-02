@@ -34,7 +34,7 @@ internal fun DemoReaderTrustSettings(controller: DemoReaderTrustSettingsControll
     DisposableEffect(controller) { onDispose { controller.cancelImport() } }
     Column(Modifier.fillMaxWidth().testTag(WalletUiTestTags.SettingsReaderAuthentication),
         verticalArrangement = Arrangement.spacedBy(24.dp)) {
-        SettingsSection(stringResource(Res.string.reader_trust_policy)) {
+        WalletSection(stringResource(Res.string.reader_trust_policy)) {
             Column(Modifier.selectableGroup()) {
                 SettingsChoiceRow(stringResource(Res.string.reader_trust_allow_anonymous_or_untrusted_readers),
                     stringResource(Res.string.reader_trust_allow_description),
@@ -53,7 +53,7 @@ internal fun DemoReaderTrustSettings(controller: DemoReaderTrustSettingsControll
                 SettingsNotice(stringResource(Res.string.reader_trust_no_trust_material_is_configured_so_all_readers_will_be_rejected))
             }
         }
-        SettingsSection(stringResource(Res.string.reader_trust_reader_ca_trust_anchors)) {
+        WalletSection(stringResource(Res.string.reader_trust_reader_ca_trust_anchors)) {
             if (state.settings.trustAnchors.isEmpty()) SettingsNotice(stringResource(Res.string.reader_trust_no_cas))
             state.settings.trustAnchors.forEachIndexed { index, anchor ->
                 if (index > 0) SettingsDivider()
@@ -62,7 +62,7 @@ internal fun DemoReaderTrustSettings(controller: DemoReaderTrustSettingsControll
                 }
             }
         }
-        SettingsSection(stringResource(Res.string.reader_trust_qualification_rical_providers)) {
+        WalletSection(stringResource(Res.string.reader_trust_qualification_rical_providers)) {
             if (state.settings.ricalProviders.isEmpty()) SettingsNotice(stringResource(Res.string.reader_trust_no_providers))
             state.settings.ricalProviders.forEachIndexed { index, provider ->
                 if (index > 0) SettingsDivider()
@@ -72,7 +72,7 @@ internal fun DemoReaderTrustSettings(controller: DemoReaderTrustSettingsControll
                 }
             }
         }
-        SettingsSection(footer = stringResource(Res.string.reader_trust_formats)) {
+        WalletSection(footer = stringResource(Res.string.reader_trust_formats)) {
             SettingsActionRow(stringResource(Res.string.reader_trust_import_reader_ca_or_trust_bundle), picker::launch,
                 Modifier.testTag(WalletUiTestTags.SettingsReaderTrustImport), enabled = enabled,
                 icon = { SettingsSymbol(Res.drawable.settings_import) })
@@ -117,7 +117,7 @@ private fun ReaderTrustImportReview(preview: ProximityReaderTrustImportPreview, 
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(Res.string.reader_trust_review_reader_trust_import), style = MaterialTheme.typography.titleLarge)
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                SettingsSection {
+                WalletSection {
                     SettingsDetailRow(stringResource(Res.string.reader_trust_file), preview.sourceName)
                     SettingsDetailRow(stringResource(Res.string.reader_trust_kind), stringResource(
                         if (preview.kind == ProximityReaderTrustImportKind.ReaderCa) Res.string.reader_trust_configured_reader_ca
@@ -127,7 +127,7 @@ private fun ReaderTrustImportReview(preview: ProximityReaderTrustImportPreview, 
                             Res.string.reader_trust_require_a_trusted_reader else Res.string.reader_trust_allow_anonymous_or_untrusted_readers))
                 }
                 preview.readerAuthorities.forEach { authority ->
-                    SettingsSection(authority.displayName) {
+                    WalletSection(authority.displayName) {
                         SettingsDetailRow(stringResource(Res.string.reader_trust_type), authority.profile)
                         SettingsDetailRow(stringResource(Res.string.reader_trust_role), stringResource(Res.string.reader_trust_anchor))
                         SettingsDetailRow(stringResource(Res.string.reader_trust_subject), authority.subject)
@@ -141,7 +141,7 @@ private fun ReaderTrustImportReview(preview: ProximityReaderTrustImportPreview, 
                         stringResource(Res.string.reader_trust_fingerprint_copied, authority.displayName))
                 }
                 preview.ricalProviders.forEach { provider ->
-                    SettingsSection(provider.providerName) {
+                    WalletSection(provider.providerName) {
                         SettingsDetailRow(stringResource(Res.string.reader_trust_provider_id), provider.providerId)
                         SettingsDetailRow(stringResource(Res.string.reader_trust_type), provider.type)
                         SettingsDetailRow(stringResource(Res.string.reader_trust_issued), provider.issuedAt.toString())

@@ -1745,20 +1745,18 @@ class WalletDemoController(
         }
     }
 
+    fun retryOpeningWallet() {
+        if (_state.value.auth == WalletAuthState.Unlocked && _state.value.session is WalletSessionState.Failed) bootstrapIfNeeded()
+    }
+
     private fun bootstrapIfNeeded() {
-        if (_state.value.session is WalletSessionState.Ready ||
-            _state.value.session is WalletSessionState.Bootstrapping
-        ) {
-            return
+        val previous = getAndUpdateState {
+            if (it.session is WalletSessionState.Ready || it.session is WalletSessionState.Bootstrapping) it
+            else it.copy(session = WalletSessionState.Bootstrapping, operation = WalletOperationState.Idle)
         }
+        if (previous.session is WalletSessionState.Ready || previous.session is WalletSessionState.Bootstrapping) return
 
         scope.launch(dispatcher) {
-            _state.update {
-                it.copy(
-                    session = WalletSessionState.Bootstrapping,
-                    operation = WalletOperationState.Idle,
-                )
-            }
             val setup = runCatching { wallet.identitySetup() }.getOrElse { error ->
                 if (error is CancellationException) throw error
                 _state.update { it.copy(session = WalletSessionState.Failed(keyOperationFailure(error))) }
