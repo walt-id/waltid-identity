@@ -216,18 +216,7 @@ internal class MobileDemoWallet(
     }
 
     override suspend fun listCredentials(): List<WalletDemoCredential> =
-        mobileWallet.credentials().map { credential ->
-            WalletDemoCredential(
-                id = credential.id,
-                format = credential.format,
-                issuer = credential.issuer,
-                subject = credential.subject,
-                label = credential.label ?: credential.format,
-                addedAt = credential.addedAt,
-                credentialDataJson = credential.credentialDataJson,
-                metadataJson = credential.metadataJson,
-            )
-        }
+        mobileWallet.credentials().map { it.toDemoCredential() }
 
     override suspend fun startIssuance(
         offerUrl: String,

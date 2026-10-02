@@ -104,6 +104,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation(identityLibs.junit)
     testImplementation(identityLibs.robolectric)
+    testImplementation(identityLibs.kotlinx.coroutines.test)
 
     androidTestImplementation(identityLibs.androidx.test.ext.junit)
     androidTestImplementation(identityLibs.androidx.test.runner)

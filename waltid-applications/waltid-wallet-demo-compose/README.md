@@ -39,6 +39,24 @@ it also shows the failed and not-attempted target counts. A target can yield mul
 copies, so pending/failed counts are not credential-copy counts. Mixed deferred-resume
 outcomes refresh saved credentials and retain the remaining handles.
 
+### Android Digital Credentials providers
+
+The create and share activities use the same compact review content as the app. A retained request
+model owns the SDK session, selection and consent preparation across activity recreation. Browser
+returns are matched against the registered state and redirect before being claimed; an unrelated or
+duplicate callback cannot consume another request. Process restoration does not automatically replay
+an interrupted remote operation.
+
+Create shows a receipt before returning to the caller. Saved credentials, pending work and failures
+remain distinct; **Refresh** reads retained state, while a pending action resumes only when the SDK
+reports it is safe. **Done** acknowledges the provider result. An issuance acknowledgment is not proof
+that every offered credential was saved. If the host is lost after an operation starts, retained SDK
+continuations are preserved for recovery in the wallet.
+
+Provider tests combine deterministic request/lifecycle checks with a Google Play services emulator
+lane. The latter exercises real activity recreation during transaction-code review and receipt display.
+Use an isolated test wallet: the sharing E2E fixture provisions and replaces its own credentials.
+
 
 ## In-person presentation
 

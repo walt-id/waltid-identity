@@ -17,6 +17,7 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.credentialCardTags
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.relaunchAndUnlock
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.recreateActivity
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.scrollDown
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.scrollUp
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.setTextByTag
@@ -80,6 +81,8 @@ class DigitalCredentialIssuanceE2ETest {
         clickByTag(fixture.device, "wallet.offerAcceptButton")
 
         DemoTestBackend.waitForIssuerIssuanceSuccess(portalOffer.offerId)
+        assertNotNull("Provider receipt did not open", waitForResource(fixture.device, "wallet.provider.done", UI_ELEMENT_TIMEOUT))
+        clickByTag(fixture.device, "wallet.provider.done")
         fixture.awaitCreateProviderCompletion()
         fixture.assertStoredCredentialIs(scenario)
     }
@@ -114,6 +117,10 @@ class DigitalCredentialIssuanceE2ETest {
         clickByTag(fixture.device, "wallet.offerAcceptButton")
 
         DemoTestBackend.waitForIssuerIssuanceSuccess(offer.offerId)
+        assertNotNull("Provider receipt did not open", waitForResource(fixture.device, "wallet.provider.done", UI_ELEMENT_TIMEOUT))
+        recreateActivity(DigitalCredentialCreateActivity::class.java, fixture.device)
+        assertNotNull("Provider receipt was lost during recreation", waitForResource(fixture.device, "wallet.provider.done", UI_ELEMENT_TIMEOUT))
+        clickByTag(fixture.device, "wallet.provider.done")
         fixture.awaitCreateProviderCompletion()
         fixture.assertStoredCredentialIs(scenario)
     }
@@ -155,9 +162,13 @@ class DigitalCredentialIssuanceE2ETest {
             waitForResource(fixture.device, "wallet.txCodeInput", UI_ELEMENT_TIMEOUT),
         )
         setTextByTag(fixture.device, "wallet.txCodeInput", txCode)
+        recreateActivity(DigitalCredentialCreateActivity::class.java, fixture.device)
+        assertNotNull("Offer review was lost during recreation", waitForResource(fixture.device, "wallet.offerReview", UI_ELEMENT_TIMEOUT))
         clickByTag(fixture.device, "wallet.offerAcceptButton")
 
         DemoTestBackend.waitForIssuerIssuanceSuccess(offer.offerId)
+        assertNotNull("Provider receipt did not open", waitForResource(fixture.device, "wallet.provider.done", UI_ELEMENT_TIMEOUT))
+        clickByTag(fixture.device, "wallet.provider.done")
         fixture.awaitCreateProviderCompletion()
         fixture.assertStoredCredentialIs(scenario)
     }
@@ -224,7 +235,6 @@ class DigitalCredentialIssuanceE2ETest {
      */
     private fun Fixture.assertStoredCredentialIs(scenario: DemoTestBackend.CredentialScenario) {
         relaunchAndUnlock(context, device)
-        clickByTag(device, "wallet.tab.credentials")
 
         // Multiple tests in this class issue the same doctype, so the card must be new to
         // distinguish this run from credentials already stored in the wallet.
@@ -294,7 +304,7 @@ class DigitalCredentialIssuanceE2ETest {
      */
     private fun Fixture.awaitCreateProviderCompletion() {
         val completed = device.wait(
-            Until.gone(By.res("wallet.offerReview")),
+            Until.gone(By.res("wallet.provider.done")),
             UI_ELEMENT_TIMEOUT,
         )
         if (!completed) {
@@ -313,7 +323,6 @@ class DigitalCredentialIssuanceE2ETest {
         launchAndUnlock(context, device)
         // Recorded before issuance so the post-flow assertion can tell this run's credential apart
         // from one an earlier test method in the same class already stored.
-        clickByTag(device, "wallet.tab.credentials")
         return Fixture(context, device, device.credentialCardTags())
     }
 

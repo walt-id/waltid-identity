@@ -9,15 +9,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import id.walt.walletdemo.compose.ui.components.IssuanceResultContent
 import id.walt.walletdemo.compose.ui.components.OfferReviewActions
 import id.walt.walletdemo.compose.ui.components.OfferReviewSection
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
@@ -38,23 +36,33 @@ fun WalletDemoOfferCreateScreen(
     onDismiss: () -> Unit,
     onCancelAuthorization: () -> Unit,
     presentation: WalletReviewPresentation = WalletReviewPresentation.FullScreen,
+    draft: WalletDemoOfferDraft? = null,
+    onDone: () -> Unit = onDismiss,
+    onResumeDeferred: (String) -> Unit = {},
+    onRefresh: () -> Unit = {},
 ) {
     val preview = (state as? WalletDemoOfferCreateUiState.Review)?.preview
-    var txCode by remember(preview) { mutableStateOf("") }
-    var copies by remember(preview) { mutableStateOf(emptyMap<String, Int>()) }
+    val choices = draft ?: remember(preview) { WalletDemoOfferDraft() }
+    val txCode = choices.transactionCode
+    val copies = choices.copies
     val dismissEnabled = when (state) {
         is WalletDemoOfferCreateUiState.Review -> !state.submitting
         WalletDemoOfferCreateUiState.Loading -> true
         is WalletDemoOfferCreateUiState.WaitingForAuthorization -> !state.completing
+        is WalletDemoOfferCreateUiState.Receipt -> !state.busy
+        is WalletDemoOfferCreateUiState.Failure -> true
     }
     WalletReviewHost(presentation, dismissEnabled, onDismiss = {
         when (state) {
-            is WalletDemoOfferCreateUiState.WaitingForAuthorization -> onCancelAuthorization()
+            is WalletDemoOfferCreateUiState.Receipt -> onDone()
             else -> onDismiss()
         }
     }) { fillViewport ->
         when (state) {
-            WalletDemoOfferCreateUiState.Loading -> OfferCreateLoadingContent()
+            WalletDemoOfferCreateUiState.Loading -> ReviewScaffold(fillViewport = fillViewport,
+                actions = { WalletActions(WalletAction("Cancel", onDecline, icon = WalletSymbol.Decline)) }) {
+                OfferCreateLoadingContent()
+            }
             is WalletDemoOfferCreateUiState.Review -> {
                 val offer = state.preview
                 val requirement = offer.transactionCode
@@ -73,16 +81,17 @@ fun WalletDemoOfferCreateScreen(
                     },
                 ) {
                     Text(state.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    state.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     OfferReviewSection(
                         preview = offer,
                         acceptEnabled = acceptEnabled,
                         reviewEnabled = enabled,
                         txCode = txCode,
-                        onTxCodeChange = { txCode = requirement?.normalizeInput(it) ?: it },
+                        onTxCodeChange = { choices.transactionCode = requirement?.normalizeInput(it) ?: it },
                         copies = copies,
                         onCopiesChange = { id, count ->
                             if (enabled && offer.offeredCredentials.any { it.configurationId == id }) {
-                                copies = copies + (id to count.coerceIn(0, (offer.batchSize ?: 1).coerceAtLeast(1)))
+                                choices.copies = copies + (id to count.coerceIn(0, (offer.batchSize ?: 1).coerceAtLeast(1)))
                             }
                         },
                         onAccept = accept,
@@ -90,6 +99,26 @@ fun WalletDemoOfferCreateScreen(
                         showActions = false,
                     )
                 }
+            }
+            is WalletDemoOfferCreateUiState.Receipt -> ReviewScaffold(
+                fillViewport = fillViewport,
+                actions = {
+                    WalletActions(
+                        WalletAction("Done", onDone, enabled = !state.busy, icon = WalletSymbol.Accept, testTag = "wallet.provider.done"),
+                        if (state.pending.isEmpty()) null else WalletAction("Refresh", onRefresh, enabled = !state.busy, icon = WalletSymbol.Retry),
+                    )
+                },
+            ) {
+                Text("Receiving result", style = MaterialTheme.typography.titleLarge)
+                IssuanceResultContent(state.receipt, state.saved, state.pending, state.busy, onResumeDeferred)
+                state.refreshError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            }
+            is WalletDemoOfferCreateUiState.Failure -> ReviewScaffold(
+                fillViewport = fillViewport,
+                actions = { WalletActions(WalletAction("Close", onDecline, icon = WalletSymbol.Decline)) },
+            ) {
+                Text("Unable to receive credentials", style = MaterialTheme.typography.titleLarge)
+                Text(state.message, color = MaterialTheme.colorScheme.error)
             }
             is WalletDemoOfferCreateUiState.WaitingForAuthorization -> ReviewScaffold(
                 fillViewport = fillViewport,
