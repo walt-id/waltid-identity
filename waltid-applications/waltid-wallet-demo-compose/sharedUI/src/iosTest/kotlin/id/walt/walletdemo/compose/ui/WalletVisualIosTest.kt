@@ -19,6 +19,11 @@ import kotlin.test.Test
 /** Compose iOS/Skia content on an iOS simulator; does not imitate a UIKit provider container. */
 @OptIn(ExperimentalTestApi::class, ExperimentalRoborazziApi::class, InternalComposeUiApi::class)
 class WalletVisualIosTest {
+    @Test fun keySummary() = scenario { keySetup("summary") }
+    @Test fun keyRecovery() = scenario { keySetup("recovery") }
+    @Test fun keyStorage() = scenario { keySetup("storage") }
+    @Test fun keyApproval() = scenario { keySetup("approval") }
+
     @Test fun pinSetup() = scenario { pin("setup") }
     @Test fun pinMismatch() = scenario { pin("mismatch") }
     @Test fun pinBiometrics() = scenario { pin("biometrics_enabled") }

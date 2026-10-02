@@ -31,17 +31,19 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ui.launch(environment: publicDemoEnvironment().merging(["WALLET_SIGNING_PROTECTION_MODE": "required"]) { _, new in new },
                   initializeSigningIdentity: false)
         let next = app.buttons["wallet.keySetupContinue"]
-        XCTAssertTrue(app.staticTexts["1 of 4 · Recovery"].waitForExistence(timeout: 20))
-        next.tap() // Default: no recovery, so Secure Enclave remains eligible.
+        XCTAssertTrue(app.buttons["wallet.keySetupEdit.storage"].waitForExistence(timeout: 20))
+        // Default: no recovery, so Secure Enclave remains eligible.
+        ui.tapButton(identifier: "wallet.keySetupEdit.storage", fallbackLabel: "Key storage")
         let storage = app.staticTexts["Secure Enclave"]
         XCTAssertTrue(storage.waitForExistence(timeout: 10))
         storage.tap()
         next.tap()
+        ui.tapButton(identifier: "wallet.keySetupEdit.approval", fallbackLabel: "Signing approval")
         let approval = app.staticTexts["Current biometrics only"]
         XCTAssertTrue(approval.waitForExistence(timeout: 10))
         approval.tap()
         next.tap()
-        XCTAssertTrue(app.staticTexts["4 of 4 · Review"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["wallet.keySetupEdit.approval"].waitForExistence(timeout: 10))
         print("SCA_OPERATOR: approve iPhone key setup and issuance prompts")
         next.tap()
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 180), "Wallet ready")
