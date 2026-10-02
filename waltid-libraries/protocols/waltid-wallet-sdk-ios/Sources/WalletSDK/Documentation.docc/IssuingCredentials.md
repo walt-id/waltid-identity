@@ -82,5 +82,81 @@ let issuedCredentials = credentials.filter { credentialIDs.contains($0.id) }
 
 If the user closes the review without accepting it, call
 ``Wallet/cancelIssuance(sessionID:)``. Authorization-code issuance creates its
-browser URL only after ``Wallet/beginAuthorizationIssuance(sessionID:)`` is
+browser URL only after ``Wallet/beginAuthorizationIssuance(sessionID:credentials:)`` is
 called following acceptance.
+
+
+### Select Configurations and Copies
+
+Omitting selections requests one instance of each offered configuration. The issuer's
+``IssuanceOfferPreview/batchSize`` is a maximum, not a requested count. Different
+configurations or issuer-granted datasets use separate requests; explicit holder
+bindings request copies of one target. The core matches each received credential to
+its holder key, independently of response order. Each copy requires a distinct stored
+holder key; different IDs for the same public key are rejected before grant redemption.
+
+After review, request new keys inside acceptance or select existing wallet keys:
+
+```swift
+guard let configuration = session.offer.credentials.first,
+      (session.offer.batchSize ?? 1) >= 2 else { return }
+let selections = [try IssuanceCredentialSelection(
+    configurationID: configuration.configurationID,
+    holders: .newKeys(count: 2)
+)]
+let result = try await wallet.continuePreAuthorizedIssuance(
+    sessionID: session.id,
+    transactionCode: transactionCode,
+    credentials: selections
+)
+```
+
+Use `.existing(bindings)` to select existing keys. Newly prepared keys are removed
+when preparation or validation fails before acceptance. Once accepted, they remain
+wallet-owned through persistence errors and uncertain issuer outcomes. Retries reuse
+the accepted bindings, including after restart; changing holders or copy counts then
+requires a new session. Preview never generates keys.
+
+For authorization-code issuance, pass the same `credentials` argument to
+``Wallet/beginAuthorizationIssuance(sessionID:credentials:)``. The retained session
+preserves those bindings through the browser callback and deferred polling.
+``IssuanceCredentialSelection/credentialIdentifier`` may select an identifier already
+granted by the issuer. Do not invent dataset identifiers or infer them from offer order.
+
+### Keep Partial and Deferred Progress
+
+A failed operation can still contain stored credentials and accepted deferred targets.
+``IssuanceFailure/targetFailure`` identifies the stopped target, processing stage and
+unattempted targets. A request-stage transport failure may leave remote processing
+unknown; do not blindly redeem the original single-use grant again.
+
+```swift
+switch result {
+case let .stored(_, ids):
+    showStoredCredentials(ids)
+case let .deferred(_, storedIDs, pending):
+    showStoredCredentials(storedIDs)
+    showDeferredCredentials(pending)
+case let .failed(_, failure, storedIDs, pending):
+    showStoredCredentials(storedIDs)
+    showDeferredCredentials(pending)
+    showIssuanceError(failure)
+case .cancelled:
+    dismissIssuance()
+}
+```
+
+After recreating the wallet, recover pending work with ``Wallet/listDeferredIssuance()``.
+Wait at least ``DeferredCredential/intervalSeconds`` before polling with
+``Wallet/resumeDeferredIssuance(deferredCredentialID:)``. A still-pending outcome retains
+the handle and updates the interval. The wallet persists the earliest permitted poll time
+across restarts. An early resume returns a deferred outcome with the rounded-up remaining
+wait, without contacting the issuer. A received batch awaiting local storage has no polling
+interval and can be resumed immediately. Transient failures retain recoverable handles;
+terminal denial consumes them. Listing handles exposes no access token or private key.
+
+
+``IssuanceErrorCode/remoteOutcomeUncertain`` and ``IssuanceErrorCode/storageOutcomeUncertain``
+retain ownership; neither permits automatic retry or takeover by another runtime. Preserve
+handles and stored IDs. A recoverable local-save handle resumes only missing saves and
+never repeats the issuer request. Its configuration ID may be nil for isolated calls.

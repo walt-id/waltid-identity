@@ -18,6 +18,8 @@ import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import io.ktor.server.plugins.NotFoundException
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -31,6 +33,14 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class Issuer2MetadataServiceTest {
+
+    @Test
+    fun `authorization metadata advertises credential authorization details`() {
+        val metadata = metadataService().getAuthorizationServerMetadata()
+        assertEquals(setOf("openid_credential"), metadata.authorizationDetailsTypesSupported)
+        assertEquals("openid_credential", Json.encodeToJsonElement(metadata).jsonObject["authorization_details_types_supported"]
+            ?.jsonArray?.single()?.jsonPrimitive?.content)
+    }
 
     @Test
     fun `configured type metadata preserves extensions and resolves its associated VCT`() {

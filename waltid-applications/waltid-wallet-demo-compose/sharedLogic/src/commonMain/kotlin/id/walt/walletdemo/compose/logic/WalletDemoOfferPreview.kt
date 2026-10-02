@@ -5,4 +5,5 @@ data class WalletDemoOfferPreview(
     val offeredCredentials: List<WalletDemoOfferedCredentialMetadata>,
     val transactionCode: WalletDemoTransactionCodeRequirement?,
     val requiresIssuerAuthentication: Boolean = false,
+    val batchSize: Int? = null,
 )

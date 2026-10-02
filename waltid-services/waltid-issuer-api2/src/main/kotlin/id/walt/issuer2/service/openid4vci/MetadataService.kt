@@ -123,7 +123,7 @@ class MetadataService(
                 if (supportsClientAttestation) ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS else null,
             preAuthorizedGrantAnonymousAccessSupported = preAuthorizedGrantAnonymousAccessSupported,
             authorizationResponseIssParameterSupported = true,
-        )
+        ).copy(authorizationDetailsTypesSupported = setOf("openid_credential"))
 
     fun getJwtVcIssuerMetadata(): JWTVCIssuerMetadata =
         getAuthorizationServerMetadata().let { metadata ->

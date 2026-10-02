@@ -6,6 +6,7 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.wallet2.data.*
+import id.walt.wallet2.handlers.WalletIssuanceSessionState
 import id.walt.wallet2.stores.WalletStore
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
@@ -82,7 +83,12 @@ interface WalletResolver {
      * [Wallet] by resolving each store ID via [resolveKeyStore]/[resolveCredentialStore]/[resolveDidStore].
      */
     suspend fun resolveWallet(walletId: String): Wallet? =
-        walletStore.loadWallet(walletId) ?: walletStore.loadDescriptor(walletId)?.let { assembleWallet(it) }
+        (walletStore.loadWallet(walletId) ?: walletStore.loadDescriptor(walletId)?.let { assembleWallet(it) })?.also { wallet ->
+            resolveIssuanceSessionState(walletId)?.let { wallet.attachIssuanceSessionState(it) }
+        }
+
+    /** Private state shared across requests for one wallet; includes its optional continuation store. */
+    suspend fun resolveIssuanceSessionState(walletId: String): WalletIssuanceSessionState? = null
 
     /**
      * Persists a newly created [Wallet].
@@ -114,7 +120,11 @@ interface WalletResolver {
         walletStore.saveDescriptor(descriptor)
     }
 
-    suspend fun deleteWallet(walletId: String) = walletStore.deleteWallet(walletId)
+    suspend fun deleteWallet(walletId: String) {
+        val wallet = resolveWallet(walletId)
+        if (wallet == null) walletStore.deleteWallet(walletId)
+        else wallet.issuanceSessions().closeSessions { walletStore.deleteWallet(walletId) }
+    }
     suspend fun listWalletIds(): Flow<String> = walletStore.listWalletIds()
     suspend fun linkWalletToAccount(accountId: String, walletId: String) =
         walletStore.linkWalletToAccount(accountId, walletId)
@@ -137,6 +147,10 @@ interface WalletResolver {
     fun listKeyStoreIds(): Flow<String> = emptyFlow()
 
     suspend fun resolveCredentialStore(storeId: String): WalletCredentialStore? = null
+
+    /** Binds wallet writes to the backend's lifecycle while leaving named-store access independent. */
+    suspend fun resolveCredentialStoreForWallet(walletId: String, storeId: String): WalletCredentialStore? =
+        resolveCredentialStore(storeId)
     suspend fun storeCredentialStore(storeId: String, store: WalletCredentialStore) { /* no-op: default has no persistent store registry */ }
     suspend fun createCredentialStore(storeId: String): WalletCredentialStore =
         InMemoryCredentialStore().also { storeCredentialStore(storeId, it) }
@@ -162,7 +176,7 @@ interface WalletResolver {
             requireNotNull(resolveKeyStore(storeId)) { "Wallet '${descriptor.id}' references missing key store '$storeId'" }
         }
         val credentialStores = descriptor.credentialStoreIds.map { storeId ->
-            requireNotNull(resolveCredentialStore(storeId)) {
+            requireNotNull(resolveCredentialStoreForWallet(descriptor.id, storeId)) {
                 "Wallet '${descriptor.id}' references missing credential store '$storeId'"
             }
         }

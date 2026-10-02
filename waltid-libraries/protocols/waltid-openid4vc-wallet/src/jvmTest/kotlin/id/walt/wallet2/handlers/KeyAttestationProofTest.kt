@@ -65,6 +65,44 @@ class KeyAttestationProofTest {
     }
 
     @Test
+    fun `batch proofs attest each selected key and preserve client identity`() = runTest {
+        val keys = listOf(newKey("first-holder"), newKey("second-holder"))
+        val attester = newKey("attester")
+        val attestationRequests = mutableListOf<KeyAttestationRequest>()
+        val store = InMemoryKeyStore().also { store -> keys.forEach { store.addCrypto2Key(it) } }
+        val wallet = Wallet(id = "batch-wallet", keyStores = listOf(store))
+            .attachKeyAttestationProvider(TestProvider(attester, payload = { request ->
+                attestationRequests += request
+                claims(request)
+            }))
+        val result = WalletIssuanceHandler.signProofs(
+            wallet = wallet,
+            request = SignProofsRequest(
+                issuerUrl = Url(ISSUER), credentialConfigurationId = CONFIG_ID,
+                nonce = "batch-nonce", clientId = "batch-client",
+                holderBindings = listOf(CredentialHolderBinding("first-holder"), CredentialHolderBinding("second-holder")),
+            ),
+            httpClient = issuerMetadataClient(requiresKeyAttestation = true, batchSize = 2),
+        )
+        val proofs = assertNotNull(result.proofs.jwt)
+        assertEquals(2, proofs.size)
+        assertEquals(2, attestationRequests.size)
+        keys.zip(proofs).forEach { (key, proof) ->
+            val verified = CompactJws.verify(proof, key, JwsAlgorithm.ES256)
+            val proofClaims = Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject
+            assertEquals("batch-client", proofClaims["iss"]?.jsonPrimitive?.content)
+            assertEquals("batch-nonce", proofClaims["nonce"]?.jsonPrimitive?.content)
+            val attestation = verified.protectedHeader.getValue("key_attestation").jsonPrimitive.content
+            val attested = CompactJws.verify(attestation, attester, JwsAlgorithm.ES256)
+            val attestedClaims = Json.parseToJsonElement(attested.payload.decodeToString()).jsonObject
+            assertEquals("batch-nonce", attestedClaims["nonce"]?.jsonPrimitive?.content)
+            val publicKey = key.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(key.spec)
+            val request = attestationRequests.single { Jwk.sha256Thumbprint(it.proofKey) == Jwk.sha256Thumbprint(publicKey) }
+            assertEquals("batch-nonce", request.nonce)
+        }
+    }
+
+    @Test
     fun `required attestation fails without provider`() = runTest {
         assertFailsWith<IllegalArgumentException> { sign(walletWithProofKey()) }
     }
@@ -300,7 +338,7 @@ class KeyAttestationProofTest {
             nonce = { "auth-nonce" },
             credential = { proof ->
                 proofs += proof
-                HttpStatusCode.OK to """{"credentials":[{"credential":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential"],"issuer":"did:example:issuer","credentialSubject":{"id":"did:example:holder"}}}]}"""
+                HttpStatusCode.Accepted to """{"transaction_id":"deferred","interval":5}"""
             },
         )
         WalletIssuanceHandler.receiveCredentialAuthCode(
@@ -346,7 +384,7 @@ class KeyAttestationProofTest {
         })
         val proof = WalletIssuanceHandler.signProof(
             wallet = wallet,
-            request = SignProofRequest(Url(ISSUER), CONFIG_ID, "nonce"),
+            request = SignProofRequest(issuerUrl = Url(ISSUER), credentialConfigurationId = CONFIG_ID, nonce = "nonce"),
             httpClient = issuerMetadataClient(),
         ).proofJwt
         assertTrue("key_attestation" !in CompactJws.decodeUnverified(proof).protectedHeader)
@@ -354,7 +392,7 @@ class KeyAttestationProofTest {
 
     private suspend fun sign(wallet: Wallet): String = WalletIssuanceHandler.signProof(
         wallet = wallet,
-        request = SignProofRequest(Url(ISSUER), CONFIG_ID, "nonce"),
+        request = SignProofRequest(issuerUrl = Url(ISSUER), credentialConfigurationId = CONFIG_ID, nonce = "nonce"),
         httpClient = issuerMetadataClient(requiresKeyAttestation = true),
     ).proofJwt
 
@@ -388,6 +426,7 @@ class KeyAttestationProofTest {
                 "$ISSUER/.well-known/oauth-authorization-server" -> HttpStatusCode.OK to """
                     {"issuer":"$ISSUER","authorization_endpoint":"$ISSUER/authorize",
                      "token_endpoint":"$ISSUER/token","response_types_supported":["code"],
+                     "authorization_details_types_supported":["openid_credential"],
                      "grant_types_supported":["authorization_code","urn:ietf:params:oauth:grant-type:pre-authorized_code"]}
                 """.trimIndent()
                 "$ISSUER/token" -> HttpStatusCode.OK to """{"access_token":"access","token_type":"Bearer"}"""

@@ -20,6 +20,8 @@ object Wallet2Tables {
     /** Wallet descriptors — configuration without live store instances. */
     object Wallets : Table("wallet2_wallets") {
         val id = varchar("id", 128)
+        // Nullable only for pre-generation rows; initialized before a wallet-scoped adapter is used.
+        val generation = varchar("generation", 36).nullable()
         val serializedStaticKey = text("static_key").nullable()
         val crypto2StaticKey = text("crypto2_static_key").nullable()
         val staticDid = varchar("static_did", 1024).nullable()
@@ -127,12 +129,23 @@ object Wallet2Tables {
         override val primaryKey = PrimaryKey(accountId, walletId)
     }
 
+    /** Private, wallet-scoped issuance continuations; not a user-addressable named store. */
+    object IssuanceSessions : Table("wallet2_issuance_sessions") {
+        val walletId = reference("wallet_id", Wallets.id)
+        val id = varchar("id", 128)
+        val sessionId = varchar("session_id", 128)
+        val kind = varchar("kind", 32)
+        val payload = text("payload")
+        val updatedAt = long("updated_at")
+        override val primaryKey = PrimaryKey(walletId, id)
+    }
+
     /** All tables in creation order (respects foreign key constraints). */
     val ALL = arrayOf(
         Wallets,
         KeyStores, CredentialStores, DidStores,
         WalletKeyStores, WalletCredentialStores, WalletDidStores,
         Keys, Credentials, Dids,
-        AccountWallets
+        AccountWallets, IssuanceSessions
     )
 }

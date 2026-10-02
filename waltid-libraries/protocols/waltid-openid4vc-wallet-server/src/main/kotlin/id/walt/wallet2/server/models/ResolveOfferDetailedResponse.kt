@@ -29,6 +29,13 @@ data class ResolveOfferDetailedResponse(
     val transactionCode: OfferTransactionCodeRequirement? = null,
 )
 
+/** Batch capability alongside the released offer details. */
+@Serializable
+data class ResolveBatchOfferResponse(
+    val offer: ResolveOfferDetailedResponse,
+    val batchSize: Int? = null,
+)
+
 /** Typed credential issuer metadata for issuance-review UIs. */
 @Serializable
 data class OfferIssuerMetadata(
@@ -121,6 +128,9 @@ fun WalletOfferResolution.toDetailedResponse(
     },
     transactionCode = transactionCode?.toOfferRequirement(),
 )
+
+fun WalletOfferResolution.toBatchResponse(preferredLocales: List<String> = emptyList()): ResolveBatchOfferResponse =
+    ResolveBatchOfferResponse(toDetailedResponse(preferredLocales), resolvedIssuerMetadata.metadata.batchCredentialIssuance?.batchSize)
 
 private fun IssuerDisplay.toOfferDisplay(): OfferMetadataDisplay =
     OfferMetadataDisplay(
