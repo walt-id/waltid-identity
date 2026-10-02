@@ -64,9 +64,7 @@
     <string name="settings_nfc_wifi_detail">Start with NFCv2 and allow Wi-Fi Aware transfer.</string>
     <string name="setup_title">Set up your wallet</string>
     <string name="setup_intro">Your wallet uses a signing key to prove that you hold your credentials.</string>
-    <string name="setup_step">%1$d of 4 · %2$s</string>
-    <string name="setup_review">Review</string>
-    <string name="setup_review_description">Review how your signing key will be stored, recovered and used before continuing.</string>
+    <string name="setup_review_description">Use these settings or tap a row to customize your signing key.</string>
     <string name="setup_recovery">Recovery</string>
     <string name="setup_storage">Key storage</string>
     <string name="setup_approval">Signing approval</string>
@@ -75,7 +73,7 @@
     <string name="setup_approval_description">Choose how to approve signing. This is separate from unlocking the app.</string>
     <string name="setup_create_group">Create a new key</string>
     <string name="setup_restore_group">Restore an existing key</string>
-    <string name="setup_summary">Your selection</string>
+    <string name="setup_summary">Signing key</string>
     <string name="setup_summary_footer">Restoring a signing key does not restore credentials.</string>
     <string name="setup_continue">Continue</string>
     <string name="setup_create">Create signing key</string>

@@ -23,6 +23,11 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @OptIn(ExperimentalTestApi::class, ExperimentalMaterial3Api::class)
 class WalletVisualAndroidTest {
+    @Test fun keySummary() = scenario { keySetup("summary") }
+    @Test fun keyRecovery() = scenario { keySetup("recovery") }
+    @Test fun keyStorage() = scenario { keySetup("storage") }
+    @Test fun keyApproval() = scenario { keySetup("approval") }
+
     @Test fun pinSetup() = scenario { pin("setup") }
     @Test fun pinMismatch() = scenario { pin("mismatch") }
     @Test fun pinBiometrics() = scenario { pin("biometrics_enabled") }
