@@ -118,4 +118,11 @@ expect_git_fail \
   "$stacked_repo" \
   env GITHUB_BASE_REF=base-with-parity-decision "$CHECK_SCRIPT"
 
+base_sha="$(git -C "$stacked_repo" rev-parse base-with-parity-decision)"
+git -C "$stacked_repo" branch -D base-with-parity-decision >/dev/null
+expect_git_fail \
+  "deleted stacked base still requires fresh Swift evidence" \
+  "$stacked_repo" \
+  env GITHUB_BASE_REF=base-with-parity-decision "$CHECK_SCRIPT" --base-ref "$base_sha"
+
 echo "mobile Swift parity gate tests passed ($pass_count cases)"
