@@ -71,13 +71,12 @@ private class ClaimPathExpressionParser(rawValue: String) {
     private fun addBracketSegment() {
         index += 1
         skipWhitespace()
-        val segment = if (index < path.length && path[index].isQuote()) {
-            readQuotedSegment(path[index])
+        if (index < path.length && path[index].isQuote()) {
+            segments += ClaimPathExpression.Segment.Key(readQuotedSegment(path[index]))
         } else {
-            readUnquotedBracketSegment()
+            addToken(readUnquotedBracketSegment())
         }
         skipUntilBracketEnd()
-        addToken(segment)
     }
 
     private fun addToken(rawSegment: String) {
@@ -119,6 +118,7 @@ private class ClaimPathExpressionParser(rawValue: String) {
     }
 
     private fun readQuotedSegment(quote: Char): String {
+        val start = index
         index += 1
         val segment = StringBuilder()
         while (index < path.length) {
@@ -131,6 +131,9 @@ private class ClaimPathExpressionParser(rawValue: String) {
                 }
                 char == quote -> {
                     index += 1
+                    if (quote == '"') return runCatching {
+                        (Json.parseToJsonElement(path.substring(start, index)) as JsonPrimitive).content
+                    }.getOrDefault(segment.toString())
                     return segment.toString()
                 }
                 else -> {

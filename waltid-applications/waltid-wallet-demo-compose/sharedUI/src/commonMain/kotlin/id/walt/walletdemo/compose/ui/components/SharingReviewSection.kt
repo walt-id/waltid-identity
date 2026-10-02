@@ -42,7 +42,7 @@ import id.walt.walletdemo.compose.logic.toRequestedDisclosureGroup
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.exportTestTagsForPlatformAutomation
-import id.walt.walletdemo.compose.ui.resources.Res
+import id.walt.walletdemo.compose.ui.resources.*
 import id.walt.walletdemo.compose.ui.resources.proximity_approve
 import id.walt.walletdemo.compose.ui.resources.proximity_cancel
 import id.walt.walletdemo.compose.ui.resources.proximity_decline
@@ -216,66 +216,32 @@ private fun SharingClaimsDialog(
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = MaterialTheme.shapes.large,
-            tonalElevation = 6.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 560.dp)
-                .exportTestTagsForPlatformAutomation()
-                .testTag(WalletUiTestTags.PresentationClaimsDialog),
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        option.resolvedCardTitle(),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.testTag(WalletUiTestTags.PresentationClaimsClose),
-                    ) {
-                        Text("Close")
-                    }
-                }
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 460.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    CredentialOverviewSection(details)
-                    if (option.disclosures.isEmpty()) {
-                        Text(
-                            "No additional claims to review",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        SharingDisclosureList(
-                            option = option,
-                            credentialSelected = credentialSelected,
-                            selectedDisclosureOptions = selectedDisclosureOptions,
-                            requestedDisclosureItems = requestedDisclosureItems,
-                            enabled = enabled,
-                            readOnly = readOnly,
-                            onToggleDisclosure = onToggleDisclosure,
-                        )
-                    }
-                }
-            }
+    var allInformationOpen by rememberSaveable(option.selection.id) { mutableStateOf(false) }
+    WalletDetailSheet(option.resolvedCardTitle(), onDismiss,
+        modifier = Modifier.testTag(WalletUiTestTags.PresentationClaimsDialog),
+        closeTag = WalletUiTestTags.PresentationClaimsClose) {
+        CredentialOverviewSection(details)
+        if (option.disclosures.isEmpty()) {
+            Text("No additional claims to review", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            SharingDisclosureList(option, credentialSelected, selectedDisclosureOptions, requestedDisclosureItems,
+                enabled, readOnly, onToggleDisclosure)
         }
+        if (details.groups.any { it.id != "requested" }) WalletSection {
+            WalletNavigationRow(stringResource(Res.string.credential_all_information),
+                summary = stringResource(Res.string.credential_all_information_hint),
+                icon = { WalletIcon(WalletSymbol.Info, null) },
+                modifier = Modifier.testTag("review-all-credential-information"),
+                onClick = { allInformationOpen = true })
+        }
+    }
+    if (allInformationOpen) WalletDetailSheet(stringResource(Res.string.credential_all_information), { allInformationOpen = false },
+        modifier = Modifier.testTag("review-all-information-details")) {
+        Text(stringResource(Res.string.credential_all_information_hint), style = MaterialTheme.typography.bodyMedium)
+        val summary = details.toCardDisplayData()
+        CredentialSummaryRow(summary.toCardArt(), summary.issuer)
+        CredentialDetailsContent(details)
     }
 }
 
@@ -298,7 +264,7 @@ private fun SharingDisclosureList(
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
         )
-        option.disclosures.forEachIndexed { index, disclosure ->
+        option.disclosures.withIndex().sortedBy { requestedDisclosureItems.getOrNull(it.index)?.displayOrder ?: Int.MAX_VALUE }.forEach { (index, disclosure) ->
             val selection = WalletDemoPresentationDisclosureSelection(
                 queryId = option.queryId,
                 credentialId = option.credentialId,

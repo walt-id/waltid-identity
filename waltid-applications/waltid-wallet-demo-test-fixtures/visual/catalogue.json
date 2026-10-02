@@ -262,6 +262,17 @@
         "R13"
       ],
       "note": "Synthetic app-unlock setup. Existing PIN-store and OS biometric behavior have separate flow/model tests."
+    },
+    {
+      "id": "credential.details.localized_metadata",
+      "composeTest": "localizedCredentialDetails",
+      "swiftTest": "testLocalizedCredentialDetails",
+      "requirements": [
+        "R04",
+        "R05",
+        "R15"
+      ],
+      "note": "Shared German locale fallback, issuer ordering and independent namespaced claims."
     }
   ]
 }

@@ -19,7 +19,7 @@ internal fun presentationDisplayName(
 fun CredentialSummary.toCredentialDetails(): CredentialDetails =
     CredentialDisplayNormalizer.toDetails(this, platformPreferredLocales())
 
-fun WalletDemoPresentationCredentialOption.toCredentialDetails(): CredentialDetails {
+fun WalletDemoPresentationCredentialOption.toCredentialDetails(preferredLocales: List<String> = platformPreferredLocales()): CredentialDetails {
     val summary = CredentialSummary(
         id = selection.id,
         format = format,
@@ -30,15 +30,16 @@ fun WalletDemoPresentationCredentialOption.toCredentialDetails(): CredentialDeta
         credentialDataJson = credentialDataJson,
         metadataJson = metadataJson,
     )
-    val parsed = summary.toCredentialDetails()
-    val requestedGroup = toRequestedDisclosureGroup()
+    val parsed = CredentialDisplayNormalizer.toDetails(summary, preferredLocales)
+    val requestedGroup = toRequestedDisclosureGroup(preferredLocales)
 
     return parsed.copy(groups = listOfNotNull(requestedGroup) + parsed.groups)
 }
 
-fun WalletDemoPresentationCredentialOption.toRequestedDisclosureGroup(): ClaimGroup? {
+fun WalletDemoPresentationCredentialOption.toRequestedDisclosureGroup(preferredLocales: List<String> = platformPreferredLocales()): ClaimGroup? {
+    val metadata = StoredCredentialMetadataParser.claims(metadataJson, preferredLocales)
     val requestedItems = disclosures.mapIndexed { index, disclosure ->
-        val path = ClaimPath.disclosure(index = index, rawPath = disclosure.path, label = disclosure.label)
+        val path = ClaimPath.disclosure(index = index, rawPath = disclosure.path, format = format)
         ClaimItem(
             path = path.itemPath,
             pathComponents = path.components,
@@ -51,10 +52,11 @@ fun WalletDemoPresentationCredentialOption.toRequestedDisclosureGroup(): ClaimGr
             ),
             rawValue = disclosure.valueJson,
             roles = CredentialDisplayVocabulary.roles(path),
-        )
+            labelSource = ClaimLabelSource.Request,
+        ).withClaimMetadata(metadata, format, disclosurePathExpression(disclosure.path, format))
     }
 
     return requestedItems
         .takeIf { it.isNotEmpty() }
-        ?.let { ClaimGroup(title = CredentialDisplayVocabulary.RequestedDisclosuresTitle, items = it) }
+        ?.let { ClaimGroup(id = "requested", title = CredentialDisplayVocabulary.RequestedDisclosuresTitle, items = it) }
 }

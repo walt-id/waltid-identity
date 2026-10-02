@@ -43,24 +43,6 @@ internal fun SettingsSymbol(resource: DrawableResource) {
 }
 
 @Composable
-internal fun SettingsNavigationRow(
-    title: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    summary: String? = null,
-    icon: (@Composable () -> Unit)? = null,
-) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = summary?.let { { Text(it) } },
-        leadingContent = icon,
-        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(onClick = onClick),
-    )
-}
-
-@Composable
 internal fun SettingsActionRow(
     title: String,
     onClick: () -> Unit,

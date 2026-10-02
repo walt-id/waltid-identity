@@ -1,6 +1,9 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -42,6 +45,30 @@ import kotlin.test.assertNull
  */
 @OptIn(ExperimentalTestApi::class)
 class WalletDemoSharingReviewTestScenarios {
+
+    fun inspectingAllCredentialInformationDoesNotChangeDisclosureConsent() = runComposeUiTest {
+        var submitted: WalletDemoSharingSelection? = null
+        val option = credentialOption(disclosures = listOf(requiredDisclosure(), optionalDisclosure())).copy(
+            credentialDataJson = """{"org.iso.18013.5.1":{"given_name":"Ada","private_note":"For my own reference"}}""",
+        )
+        val optional = disclosureSelection(option, OPTIONAL_DISCLOSURE_PATH)
+        setContent {
+            WalletDemoSharingReviewScreen(compact = false, review = digitalCredentialReview(listOf(option)),
+                title = "Share digital credential?", onSubmit = { submitted = it }, onCancel = {})
+        }
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick()
+        onNodeWithTag("review-all-credential-information").performScrollTo().performClick()
+        onNode(hasText("Includes information outside this request.") and hasAnyAncestor(hasTestTag("review-all-information-details"))).assertIsDisplayed()
+        onNodeWithText("For my own reference").performScrollTo().assertIsDisplayed()
+        onNodeWithTag("wallet-detail-close").performClick()
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOn()
+        onNodeWithText("For my own reference").assertDoesNotExist()
+        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
+        assertEquals(setOf(option.selection), submitted?.credentials)
+        assertEquals(setOf(optional), submitted?.disclosures)
+    }
 
     fun paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements() = runComposeUiTest {
         val consent = WalletDemoPaymentConsent("revision", "de", "Zahlung prüfen", null, "Zahlen", "Ablehnen", true,

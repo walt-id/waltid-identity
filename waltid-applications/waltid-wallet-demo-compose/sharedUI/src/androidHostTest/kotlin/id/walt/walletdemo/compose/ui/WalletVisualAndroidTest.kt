@@ -1,9 +1,9 @@
 package id.walt.walletdemo.compose.ui
 
-import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.v2.runComposeUiTest
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -36,6 +36,9 @@ class WalletVisualAndroidTest {
     fun credentialDetails() = scenario { credentialDetails() }
 
     @Test
+    fun localizedCredentialDetails() = scenario { localizedCredentialDetails() }
+
+    @Test
     fun batchOffer() = scenario { batchOffer() }
 
     @Test
@@ -59,6 +62,7 @@ class WalletVisualAndroidTest {
             onRoot().captureRoboImage("$directory/android-api35-phone-en-light/$id.png")
         }, platformTheme = { content ->
             // Android RenderThread ripples do not follow the Compose test clock.
+            // These are settled-state screenshots; interaction feedback remains enabled in the app.
             CompositionLocalProvider(LocalRippleConfiguration provides null, content = content)
         }).block()
     }

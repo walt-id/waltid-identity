@@ -35,7 +35,7 @@ internal fun ReviewScaffold(
             modifier = Modifier
                 .then(
                     if (fillViewport) {
-                        Modifier.weight(1f, fill = true).heightIn(min = 240.dp)
+                        Modifier.weight(1f, fill = true)
                     } else {
                         Modifier.weight(1f, fill = false)
                     },

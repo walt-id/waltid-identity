@@ -11,6 +11,7 @@ extension CredentialDetails {
         ].compactMap { $0 }
 
         return items.isEmpty ? nil : ClaimGroup(
+            id: "system",
             title: "About this credential",
             items: items,
             initiallyExpanded: false
@@ -37,7 +38,7 @@ private extension String {
         guard !value.isEmpty else { return nil }
 
         return ClaimItem(
-            path: ClaimItemPath.topLevel(path),
+            path: ClaimItemPath.topLevel("system").child(String(path.dropFirst("system.".count))),
             label: label,
             value: .text(value),
             rawValue: value
