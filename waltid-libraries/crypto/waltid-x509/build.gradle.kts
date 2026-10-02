@@ -16,7 +16,6 @@ kotlin {
         outputModuleName = "x509"
         nodejs {
             testTask {
-                useMocha()
                 enabled = true
             }
         }
@@ -66,6 +65,10 @@ kotlin {
             }
         }
 
+        val signumTest = create("signumTest") {
+            dependsOn(commonTest.get())
+        }
+
         val jvmCommon by creating {
             dependsOn(commonMain.get())
         }
@@ -88,8 +91,7 @@ kotlin {
         }
 
         jvmTest {
-            dependsOn(jvmMain.get())
-            dependsOn(signumMain)
+            dependsOn(signumTest)
             dependsOn(jvmBouncyTest)
             dependencies {
                 // Logging
@@ -111,6 +113,7 @@ kotlin {
         }
 
         jsTest {
+            dependsOn(signumTest)
         }
 
         if (enableAndroidBuild) {
@@ -127,6 +130,9 @@ kotlin {
         if (enableIosBuild) {
             iosMain {
                 dependsOn(jvmIosMain)
+            }
+            iosTest {
+                dependsOn(signumTest)
             }
         }
     }
