@@ -335,6 +335,54 @@
       "composeTest": "partialFailureResult",
       "swiftTest": "testPartialFailureResult",
       "note": "Production receiving content. Retained SDK state controls recovery actions; fixtures do not poll an issuer or save credentials."
+    },
+    {
+      "id": "onboarding.key.summary",
+      "composeTest": "keySummary",
+      "swiftTest": "testKeySummary",
+      "requirements": [
+        "R01",
+        "R03",
+        "R11",
+        "R16"
+      ],
+      "note": "SDK-shaped synthetic options; summary-first setup and focused customization. Real key creation and compatibility have separate behavior tests."
+    },
+    {
+      "id": "onboarding.key.recovery",
+      "composeTest": "keyRecovery",
+      "swiftTest": "testKeyRecovery",
+      "requirements": [
+        "R01",
+        "R03",
+        "R11",
+        "R16"
+      ],
+      "note": "SDK-shaped synthetic options; summary-first setup and focused customization. Real key creation and compatibility have separate behavior tests."
+    },
+    {
+      "id": "onboarding.key.storage",
+      "composeTest": "keyStorage",
+      "swiftTest": "testKeyStorage",
+      "requirements": [
+        "R01",
+        "R03",
+        "R11",
+        "R16"
+      ],
+      "note": "SDK-shaped synthetic options; summary-first setup and focused customization. Real key creation and compatibility have separate behavior tests."
+    },
+    {
+      "id": "onboarding.key.approval",
+      "composeTest": "keyApproval",
+      "swiftTest": "testKeyApproval",
+      "requirements": [
+        "R01",
+        "R03",
+        "R11",
+        "R16"
+      ],
+      "note": "SDK-shaped synthetic options; summary-first setup and focused customization. Real key creation and compatibility have separate behavior tests."
     }
   ]
 }

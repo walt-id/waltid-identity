@@ -83,6 +83,23 @@ internal class WalletVisualScenarios(
         capture("onboarding.pin.$state")
     }
 
+    fun keySetup(page: String) = with(test) {
+        content {
+            id.walt.walletdemo.compose.ui.screens.IdentitySetupScreen(WalletVisualFixtures.keySetup, null,
+                onChoose = {}, onResume = {}, onCancel = {}, onRefresh = {})
+        }
+        if (page != "summary") {
+            onNodeWithTag("wallet.keySetupEdit.${page.replaceFirstChar { it.uppercase() }}").performClick()
+            onNodeWithText("Done").assertIsDisplayed()
+        } else {
+            onNodeWithText("Create signing key").assertIsDisplayed()
+            onNodeWithTag("wallet.keySetupEdit.Recovery").assertIsDisplayed()
+            onNodeWithTag("wallet.keySetupEdit.Storage").assertIsDisplayed()
+            onNodeWithTag("wallet.keySetupEdit.Approval").assertIsDisplayed()
+        }
+        capture("onboarding.key.$page")
+    }
+
     fun settingsRoot() = with(test) {
         content {
             SettingsScreen(
