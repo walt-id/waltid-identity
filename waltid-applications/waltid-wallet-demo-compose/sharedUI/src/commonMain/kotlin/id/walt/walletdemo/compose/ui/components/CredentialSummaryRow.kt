@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -9,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -20,13 +22,21 @@ internal fun CredentialSummaryRow(
     supportingText: String? = null,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        CredentialCardArt(art, compact = true, modifier = Modifier.width(88.dp).clearAndSetSemantics {})
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(art.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-            supportingText?.takeIf { it.isNotBlank() }?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+    BoxWithConstraints(modifier) {
+        val thumbnailWidth = if (LocalDensity.current.fontScale >= 1.3f || maxWidth < 180.dp) 48.dp else 64.dp
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            CredentialCardArt(art, compact = true, modifier = Modifier.width(thumbnailWidth).clearAndSetSemantics {})
+            SummaryText(art.name, supportingText, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun SummaryText(title: String, supportingText: String?, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+        supportingText?.takeIf { it.isNotBlank() }?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

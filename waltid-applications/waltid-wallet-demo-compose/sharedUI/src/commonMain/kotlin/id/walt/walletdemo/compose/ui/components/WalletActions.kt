@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.RowScope
@@ -27,17 +28,19 @@ internal fun WalletActions(
     tertiary: WalletAction? = null,
     modifier: Modifier = Modifier,
 ) {
-    FlowRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+    FlowRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         tertiary?.let { action ->
             TextButton(onClick = action.onClick, enabled = action.enabled, modifier = action.modifier()) { ActionLabel(action) }
         }
         secondary?.let { action ->
             OutlinedButton(onClick = action.onClick, enabled = action.enabled,
-                modifier = action.modifier(), shape = RoundedCornerShape(24.dp)) { ActionLabel(action) }
+                modifier = action.modifier(), shape = RoundedCornerShape(24.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) { ActionLabel(action) }
         }
         Button(onClick = primary.onClick, enabled = primary.enabled,
-            modifier = primary.modifier(), shape = RoundedCornerShape(24.dp)) { ActionLabel(primary) }
+            modifier = primary.modifier(), shape = RoundedCornerShape(24.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) { ActionLabel(primary) }
     }
 }
 

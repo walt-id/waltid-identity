@@ -142,15 +142,6 @@
       "swiftTest": "testBatchOffer"
     },
     {
-      "id": "batch.offer.two_targets_three_copies.second_target",
-      "requirements": [
-        "R11",
-        "R12",
-        "R18"
-      ],
-      "composeTest": "batchOffer"
-    },
-    {
       "id": "batch.offer.none_selected",
       "requirements": [
         "R11",
@@ -158,14 +149,6 @@
       ],
       "composeTest": "batchOfferWithNothingSelected",
       "swiftTest": "testBatchOfferWithNothingSelected"
-    },
-    {
-      "id": "batch.offer.none_selected.second_target",
-      "requirements": [
-        "R11",
-        "R18"
-      ],
-      "composeTest": "batchOfferWithNothingSelected"
     },
     {
       "id": "batch.result.saved_and_deferred",
@@ -228,31 +211,31 @@
       "swiftTest": "testNearbyReady"
     },
     {
-      "id": "onboarding.pin.create",
-      "composeTest": "pinCreate",
-      "swiftTest": "testPinCreate",
+      "id": "onboarding.pin.setup",
+      "composeTest": "pinSetup",
+      "swiftTest": "testPinSetup",
       "requirements": [
         "R01",
         "R11",
         "R12",
         "R13"
       ],
-      "note": "Synthetic app-unlock setup. Existing PIN-store and OS biometric behavior have separate flow/model tests."
+      "note": "One app-unlock form contains PIN, confirmation and optional biometrics. Synthetic in-memory state; real OS prompt and persistence use separate flow/model tests."
     },
     {
-      "id": "onboarding.pin.confirm",
-      "composeTest": "pinConfirm",
-      "swiftTest": "testPinConfirm",
+      "id": "onboarding.pin.mismatch",
+      "composeTest": "pinMismatch",
+      "swiftTest": "testPinMismatch",
       "requirements": [
         "R01",
         "R11",
         "R12",
         "R13"
       ],
-      "note": "Synthetic app-unlock setup. Existing PIN-store and OS biometric behavior have separate flow/model tests."
+      "note": "One app-unlock form contains PIN, confirmation and optional biometrics. Synthetic in-memory state; real OS prompt and persistence use separate flow/model tests."
     },
     {
-      "id": "onboarding.pin.biometrics",
+      "id": "onboarding.pin.biometrics_enabled",
       "composeTest": "pinBiometrics",
       "swiftTest": "testPinBiometrics",
       "requirements": [
@@ -261,7 +244,7 @@
         "R12",
         "R13"
       ],
-      "note": "Synthetic app-unlock setup. Existing PIN-store and OS biometric behavior have separate flow/model tests."
+      "note": "One app-unlock form contains PIN, confirmation and optional biometrics. Synthetic in-memory state; real OS prompt and persistence use separate flow/model tests."
     },
     {
       "id": "credential.details.localized_metadata",
@@ -273,6 +256,41 @@
         "R15"
       ],
       "note": "Shared German locale fallback, issuer ordering and independent namespaced claims."
+    },
+    {
+      "id": "batch.offer.definitions",
+      "requirements": [
+        "R04",
+        "R05",
+        "R18"
+      ],
+      "composeTest": "offerDefinitions",
+      "swiftTest": "testOfferDefinitions",
+      "note": "Issuer claim definitions before issuance; no values have arrived."
+    },
+    {
+      "id": "batch.offer.compact_dark_large_text",
+      "requirements": [
+        "R07",
+        "R11",
+        "R12",
+        "R13",
+        "R18"
+      ],
+      "composeTest": "compactBatchOffer",
+      "swiftTest": "testCompactBatchOffer",
+      "note": "320x568 dark viewport. Compose font scale 1.5; SwiftUI accessibilityMedium. Initial review and trailing actions."
+    },
+    {
+      "id": "batch.offer.compact_dark_large_text.last_target",
+      "requirements": [
+        "R07",
+        "R11",
+        "R12",
+        "R18"
+      ],
+      "composeTest": "compactBatchOffer",
+      "note": "Same compact viewport scrolled to final target. Copy controls and actions remain visible."
     }
   ]
 }

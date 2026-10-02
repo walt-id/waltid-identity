@@ -8,19 +8,22 @@ import XCTest
 
 @MainActor
 final class WalletVisualTests: XCTestCase {
-    func testPinCreate() async throws { try await pin(.create) }
-    func testPinConfirm() async throws { try await pin(.confirm) }
-    func testPinBiometrics() async throws { try await pin(.biometrics) }
+    func testPinSetup() async throws { try await pin("setup") }
+    func testPinMismatch() async throws { try await pin("mismatch") }
+    func testPinBiometrics() async throws { try await pin("biometrics_enabled") }
 
-    private func pin(_ page: PinView.SetupPage) async throws {
-        let model = makeModel()
+    private func pin(_ state: String) async throws {
+        let model = makeModel(biometricsAvailable: state == "biometrics_enabled")
         await model.readerTrustSettings.awaitPendingOperations()
-        if page != .create { model.pin = "123456" }
-        if page == .biometrics { model.pinConfirmation = "123456" }
+        if state != "setup" {
+            model.pin = "123456"
+            model.pinConfirmation = state == "mismatch" ? "654321" : "123456"
+        }
+        if state == "mismatch" { model.submitPin() }
+        if state == "biometrics_enabled" { model.useBiometrics = true }
         XCTAssertEqual(model.auth, .setup)
-        XCTAssertFalse(model.isBiometricUnlockAvailable)
-        let name = page == .create ? "create" : page == .confirm ? "confirm" : "biometrics"
-        try capture(PinView(viewModel: model, initialPage: page), id: "onboarding.pin.\(name)")
+        if state == "mismatch" { XCTAssertEqual(model.pinError, "PIN confirmation does not match") }
+        try capture(PinView(viewModel: model), id: "onboarding.pin.\(state)")
     }
 
     func testHomeEmpty() async throws { try await home(empty: true) }
@@ -82,8 +85,32 @@ final class WalletVisualTests: XCTestCase {
         try await batchOffer(noneSelected: false)
     }
 
+    func testOfferDefinitions() throws {
+        let offer = try WalletVisualFixtures().offer()
+        let credential = try XCTUnwrap(offer.credentials.first)
+        XCTAssertEqual(StoredCredentialMetadataParser.claims(from: credential.metadataJSON).map(\.name), ["Given name", "Family name"])
+        try capture(ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                OfferedCredentialDetails(credential: credential, issuerName: offer.issuer.name!, issuerIdentifier: offer.issuer.identifier)
+            }.padding(20)
+        }, id: "batch.offer.definitions")
+    }
+
     func testBatchOfferWithNothingSelected() async throws {
         try await batchOffer(noneSelected: true)
+    }
+
+    func testCompactBatchOffer() async throws {
+        let fixtures = try WalletVisualFixtures()
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        model.isReady = true
+        model.statusMessage = ""
+        model.offerPreview = try fixtures.offer()
+        model.issuanceCopyCounts = try fixtures.copies()
+        XCTAssertTrue(model.acceptOfferEnabled)
+        try capture(ReceiveView(viewModel: model, onOpenSettings: {}), id: "batch.offer.compact_dark_large_text",
+                    config: .iPhoneSe, colorScheme: .dark, sizeCategory: .accessibilityMedium)
     }
 
     func testPaymentConsent() throws {
@@ -164,7 +191,7 @@ final class WalletVisualTests: XCTestCase {
                     id: noneSelected ? "batch.offer.none_selected" : "batch.offer.two_targets_three_copies")
     }
 
-    private func makeModel() -> WalletViewModel {
+    private func makeModel(biometricsAvailable: Bool = false) -> WalletViewModel {
         WalletViewModel(
             walletID: "visual-settings",
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(),
@@ -172,21 +199,24 @@ final class WalletVisualTests: XCTestCase {
             readerTrustSettingsPersistence: InMemoryDemoReaderTrustSettingsPersistence(),
             identityDocumentRegistrationUpdate: {},
             pinStore: InMemoryDemoPinStore(),
-            biometricAuthenticator: FakeDemoBiometricAuthenticator(isAvailable: false)
+            biometricAuthenticator: FakeDemoBiometricAuthenticator(isAvailable: biometricsAvailable)
         )
     }
 
-    private func capture<Content: View>(_ view: Content, id: String, file: StaticString = #filePath, line: UInt = #line) throws {
+    private func capture<Content: View>(_ view: Content, id: String, config: ViewImageConfig = .iPhone13,
+                                      colorScheme: ColorScheme = .light, sizeCategory: ContentSizeCategory = .large,
+                                      file: StaticString = #filePath, line: UInt = #line) throws {
         let content = view.environment(\.locale, Locale(identifier: "en_US"))
-        .environment(\.colorScheme, .light)
-        .environment(\.sizeCategory, .large)
+        .environment(\.colorScheme, colorScheme)
+        .environment(\.sizeCategory, sizeCategory)
         .environment(\.walletDemoBranding, .default)
         .background(Color(.systemGroupedBackground))
 
-        try capture(UIHostingController(rootView: content), id: id, file: file, line: line)
+        try capture(UIHostingController(rootView: content), id: id, config: config, file: file, line: line)
     }
 
-    private func capture(_ controller: UIViewController, id: String, file: StaticString = #filePath, line: UInt = #line) throws {
+    private func capture(_ controller: UIViewController, id: String, config: ViewImageConfig = .iPhone13,
+                         file: StaticString = #filePath, line: UInt = #line) throws {
         let environment = ProcessInfo.processInfo.environment
         let record = environment["WALLET_VISUAL_RECORD"] == "1"
         let isCI = ["CI", "GITHUB_ACTIONS", "GITLAB_CI", "BUILD_BUILDID", "JENKINS_URL", "TEAMCITY_VERSION"]
@@ -194,7 +224,7 @@ final class WalletVisualTests: XCTestCase {
         XCTAssertFalse(record && isCI, "CI must only verify reviewed baselines", file: file, line: line)
         guard !(record && isCI) else { return }
         var strategy = Snapshotting<UIViewController, UIImage>.image(
-            on: .iPhone13, drawHierarchyInKeyWindow: true, precision: 1)
+            on: config, drawHierarchyInKeyWindow: true, precision: 1)
         let diffing = strategy.diffing
         // Compare the same PNG representation on both sides. Core Image's perceptual path is
         // inconsistent on the pinned simulator. Bound measured edge noise in each sRGB channel;

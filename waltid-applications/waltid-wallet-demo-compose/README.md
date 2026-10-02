@@ -30,6 +30,8 @@ The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM li
 
 The shared Android/iOS offer review lets users select credential types and request copies up to the issuer's advertised limit. Each type defaults to one copy. Additional holder keys are created only after acceptance; the same selections are forwarded to pre-authorized and browser authorization flows and reused for a supported transaction-code retry.
 
+Compact review rows keep inclusion, copy counts and credential information separate. Information shows the issuer's advertised definitions before issuance; actual values appear after receipt. Review and stored details follow the same [credential-information contract](../waltid-wallet-demo-test-fixtures/credential-information.md).
+
 Saved credentials remain visible after a later failure or deferred response. Pending handles are restored when reopening the mobile wallet or reconnecting the browser to the same Wallet2 server wallet, and can be resumed individually. The browser uses the public deferred list/resume endpoints; durable server recovery requires OSS SQL persistence and store-backed holder keys. Copy counts apply to each authorized record of a selected type; the issuer determines which records are available.
 
 The receive status summarizes saved credentials and pending targets. When a target fails,
@@ -138,7 +140,7 @@ Terminal recovery creates a new single-use session.
 
 ## Signing key setup
 
-PIN setup controls access to the app, with optional biometric unlock. Signing-key setup has three steps: choose whether to create or restore a key, choose its storage, and choose when signing requires system approval. New keys can be created with or without a backup. Each screen groups the SDK's supported options into choice rows; a single supported option is shown as read-only. Continue keeps the selection local until Create signing key or Restore signing key is pressed. The SDK revalidates the selected option before executing it.
+PIN setup keeps both six-digit inputs and the optional biometric-unlock toggle on one screen. Enabling biometrics authenticates with the OS; Create PIN remains disabled during that check. Existing unlock PINs remain supported. Signing-key setup has three steps: choose whether to create or restore a key, choose its storage, and choose when signing requires system approval. New keys can be created with or without a backup. Each screen groups the SDK's supported options into choice rows; a single supported option is shown as read-only. Continue keeps the selection local until Create signing key or Restore signing key is pressed. The SDK revalidates the selected option before executing it.
 
 Key recovery restores the original key and DID, not credentials. A local save does not prove delivery to another device. Unavailable providers show their reported reason and can be checked again; returning to the app also refreshes the choices.
 
