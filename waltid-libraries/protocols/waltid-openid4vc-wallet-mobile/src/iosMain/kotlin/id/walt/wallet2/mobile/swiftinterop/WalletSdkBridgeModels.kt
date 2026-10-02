@@ -2,6 +2,9 @@
 
 package id.walt.wallet2.mobile.swiftinterop
 
+import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
+import id.walt.wallet2.mobile.toMobileErrorCode
+import id.waltid.openid4vp.wallet.UnsafePresentationErrorResponseException
 import id.walt.wallet2.consent.PaymentConsentException
 import id.walt.wallet2.consent.PaymentConsentFailure
 import id.walt.certificate.x509.X509CertificateUtil
@@ -567,6 +570,9 @@ public enum class WalletBridgeErrorCategory {
     /** Input supplied by the caller is invalid. */
     invalidInput,
 
+    /** Request validation failed and its error response could not be sent safely. */
+    presentationValidation,
+
     /** Network communication failed. */
     network,
 
@@ -599,12 +605,26 @@ public enum class WalletBridgeErrorCategory {
 }
 
 /**
+ * An OpenID4VP validation error retained locally because remote reporting was unsafe.
+ * @property errorCode Original OpenID4VP protocol error code.
+ * @property message Original request-validation message.
+ * @property responseSafetyFailure Reason the error response was not sent.
+ */
+@Serializable
+public data class WalletBridgePresentationValidationFailure(
+    public val errorCode: MobileWalletPresentationErrorCode,
+    public val message: String,
+    public val responseSafetyFailure: String,
+)
+
+/**
  * Serializable error returned to Swift callers when a bridge operation fails.
  *
  * @property category Coarse failure category.
  * @property message Human-readable failure message.
  * @property causeClass Kotlin exception class name when available.
  * @property paymentConsentFailure Stable payment failure when paymentConsent is the category.
+ * @property presentationValidationFailure Protocol error and separate response-safety reason.
  * @property authorizationFailure Stable key-use authorization failure when authorization is the category.
  */
 @Serializable
@@ -614,8 +634,12 @@ public class WalletBridgeError internal constructor(
     public val causeClass: String? = null,
     public val authorizationFailure: KeyUseAuthorizationFailure? = null,
     public val paymentConsentFailure: PaymentConsentFailure? = null,
+    public val presentationValidationFailure: WalletBridgePresentationValidationFailure? = null,
 ) {
     init {
+        require((category == WalletBridgeErrorCategory.presentationValidation) == (presentationValidationFailure != null)) {
+            "Presentation validation bridge errors must include exactly one validation failure"
+        }
         require((category == WalletBridgeErrorCategory.paymentConsent) == (paymentConsentFailure != null)) {
             "Payment consent bridge errors must include exactly one payment failure"
         }
@@ -627,7 +651,9 @@ public class WalletBridgeError internal constructor(
         fun fromThrowable(throwable: Throwable): WalletBridgeError {
             val authorizationFailure = (throwable as? KeyUseAuthorizationException)?.failure
             val paymentFailure = (throwable as? PaymentConsentException)?.reason
+            val presentationFailure = throwable as? UnsafePresentationErrorResponseException
             val category = when {
+                presentationFailure != null -> WalletBridgeErrorCategory.presentationValidation
                 paymentFailure != null -> WalletBridgeErrorCategory.paymentConsent
                 authorizationFailure != null -> WalletBridgeErrorCategory.authorization
                 throwable is CancellationException -> WalletBridgeErrorCategory.cancelled
@@ -643,6 +669,13 @@ public class WalletBridgeError internal constructor(
                 causeClass = throwable::class.simpleName,
                 authorizationFailure = authorizationFailure,
                 paymentConsentFailure = paymentFailure,
+                presentationValidationFailure = presentationFailure?.let {
+                    WalletBridgePresentationValidationFailure(
+                        errorCode = it.error.code.toMobileErrorCode(),
+                        message = it.error.message,
+                        responseSafetyFailure = it.responseSafetyFailure.message ?: "Unsafe response channel",
+                    )
+                },
             )
         }
     }
