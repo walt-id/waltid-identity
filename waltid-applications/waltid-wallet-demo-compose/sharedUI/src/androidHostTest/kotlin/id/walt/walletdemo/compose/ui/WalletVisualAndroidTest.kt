@@ -7,9 +7,13 @@ import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.test.v2.runComposeUiTest
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.v2.runAndroidComposeUiTest
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,6 +27,13 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @OptIn(ExperimentalTestApi::class, ExperimentalMaterial3Api::class)
 class WalletVisualAndroidTest {
+    @Test fun providerSharingReview() = scenario(sheetHost = true) { providerSharingReview() }
+    @Test
+    @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
+    fun compactProviderSharingReview() = scenario(fontScale = 1.5f, sheetHost = true) { providerSharingReview(compact = true) }
+    @Test fun providerOfferReview() = scenario(sheetHost = true) { providerOfferReview() }
+    @Test fun paymentSheet() = scenario(sheetHost = true) { paymentReview(sheet = true) }
+
     @Test fun keySummary() = scenario { keySetup("summary") }
     @Test fun keyRecovery() = scenario { keySetup("recovery") }
     @Test fun keyStorage() = scenario { keySetup("storage") }
@@ -78,10 +89,14 @@ class WalletVisualAndroidTest {
     @Test
     fun nearbyReady() = scenario { nearbyReady() }
 
-    private fun scenario(fontScale: Float = 1f, block: WalletVisualScenarios.() -> Unit) = runComposeUiTest {
+    private fun scenario(fontScale: Float = 1f, sheetHost: Boolean = false, block: WalletVisualScenarios.() -> Unit) = runAndroidComposeUiTest<ComponentActivity> {
+        // A dialog capture includes the test Activity behind it. Provider activities have no action bar.
+        if (sheetHost) runOnUiThread { requireNotNull(activity).actionBar?.hide() }
         WalletVisualScenarios(this, captureImage = { id ->
             val directory = checkNotNull(System.getProperty("roborazzi.output.dir")) { "Roborazzi output directory is not configured" }
-            onRoot().captureRoboImage("$directory/android-api35-phone-en-light/$id.png")
+            val root = if (id.startsWith("sharing.provider") || id.startsWith("receiving.provider") || id.startsWith("payment.sheet"))
+                onNode(isRoot() and hasAnyDescendant(hasTestTag("wallet.review.sheet"))) else onRoot()
+            root.captureRoboImage("$directory/android-api35-phone-en-light/$id.png")
         }, platformTheme = { content ->
             // Android RenderThread ripples do not follow the Compose test clock.
             // These are settled-state screenshots; interaction feedback remains enabled in the app.

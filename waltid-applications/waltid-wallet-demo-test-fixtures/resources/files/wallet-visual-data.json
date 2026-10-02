@@ -92,7 +92,7 @@
     "revision": "visual-consent-revision-1",
     "locale": "en",
     "title": "Confirm payment",
-    "affirmativeAction": "Pay \u20ac11.56",
+    "affirmativeAction": "Pay €11.56",
     "denialAction": "Decline",
     "fields": [
       {
@@ -190,6 +190,39 @@
           "title": "Biometric approval",
           "detail": "Approve signing with biometrics. App unlock remains separate."
         }
+      }
+    ]
+  },
+  "sharing": {
+    "origin": "https://verifier.example",
+    "credentials": [
+      {
+        "queryId": "pid",
+        "credentialId": "credential-1",
+        "title": "Driving licence",
+        "issuer": "Test Issuer",
+        "format": "mso_mdoc",
+        "disclosures": [
+          {
+            "path": "org.iso.18013.5.1/given_name",
+            "label": "Given name",
+            "value": "Ada"
+          }
+        ]
+      },
+      {
+        "queryId": "payment",
+        "credentialId": "visual-payment-credential",
+        "title": "Payment authorisation",
+        "issuer": "Test Issuer",
+        "format": "dc+sd-jwt",
+        "disclosures": [
+          {
+            "path": "account_reference",
+            "label": "Account reference",
+            "value": "Example account"
+          }
+        ]
       }
     ]
   }
