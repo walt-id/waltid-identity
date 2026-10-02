@@ -32,8 +32,12 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
 
     @Test
     fun `deferred polling observes pending issued and consumed issuer transaction`() = runTest {
+        val holderKey = batchTestLegacyKey()
+        val keys = InMemoryKeyStore()
+        val request = deferredRequest().copy(holderBindings = listOf(CredentialHolderBinding(keyId = keys.addKey(holderKey))))
+        val credential = batchTestCredential(holderKey)
         val store = FailingCredentialStore(failAtAttempt = Int.MAX_VALUE)
-        val wallet = Wallet(id = "wallet", credentialStores = listOf(store))
+        val wallet = Wallet(id = "wallet", keyStores = listOf(keys), credentialStores = listOf(store))
         var requests = 0
         var transactionConsumed = false
         val client = HttpClient(MockEngine) {
@@ -47,7 +51,7 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
                         transactionConsumed -> """{"error":"invalid_transaction_id"}""" to HttpStatusCode.BadRequest
                         else -> {
                             transactionConsumed = true
-                            """{"credentials":[{"credential":$CREDENTIAL}]}""" to HttpStatusCode.OK
+                            """{"credentials":[{"credential":${Json.encodeToString(credential)}}]}""" to HttpStatusCode.OK
                         }
                     }
                     // Deliberately omit Cache-Control, as an external issuer may do.
@@ -57,15 +61,15 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
             install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
         }
         try {
-            assertTrue(WalletIssuanceHandler.pollDeferredFlow(wallet, deferredRequest(), httpClient = client).toList().isEmpty())
+            assertTrue(WalletIssuanceHandler.pollDeferredFlow(wallet, request, httpClient = client).toList().isEmpty())
             assertEquals(1, requests)
-            assertEquals(1, WalletIssuanceHandler.pollDeferredFlow(wallet, deferredRequest(), httpClient = client).toList().size)
+            assertEquals(1, WalletIssuanceHandler.pollDeferredFlow(wallet, request, httpClient = client).toList().size)
             assertEquals(2, requests)
             assertTrue(transactionConsumed)
-            val error = assertFailsWith<IllegalStateException> {
-                WalletIssuanceHandler.pollDeferredFlow(wallet, deferredRequest(), httpClient = client).toList()
+            val error = assertFailsWith<CredentialEndpointException> {
+                WalletIssuanceHandler.pollDeferredFlow(wallet, request, httpClient = client).toList()
             }
-            assertTrue(error.message.orEmpty().contains("invalid_transaction_id"))
+            assertEquals("invalid_transaction_id", error.credentialError?.error)
             assertEquals(3, requests)
             assertEquals(1, store.stored.size)
         } finally {

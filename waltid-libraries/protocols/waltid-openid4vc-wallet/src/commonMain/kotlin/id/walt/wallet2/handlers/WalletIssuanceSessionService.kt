@@ -872,9 +872,11 @@ class WalletIssuanceSessionService(
                 val updatedRequest = request.copy(dpopNonce = response.dpopNonce)
                 record = record.copy(content = DeferredContent.Remote(updatedRequest))
                 stage = WalletIssuanceErrorCode.PROTOCOL
-                if (response.response.status == HttpStatusCode.Accepted) {
-                    val pending = response.response.body<CredentialResponse>()
-                        .validateCredentialResponse(response.response.status.value, request.transactionId)
+                val legacyPending = response.response.status == HttpStatusCode.BadRequest && response.oauthError == "issuance_pending"
+                if (response.response.status == HttpStatusCode.Accepted || legacyPending) {
+                    val pendingBody = response.response.body<CredentialResponse>()
+                    val pending = if (legacyPending) pendingBody.validateLegacyDeferredPendingResponse(request.transactionId)
+                        else pendingBody.validateCredentialResponse(response.response.status.value, request.transactionId)
                     record = record.copy(
                         public = record.public.copy(intervalSeconds = pending.interval),
                         content = DeferredContent.Remote(updatedRequest.copy(

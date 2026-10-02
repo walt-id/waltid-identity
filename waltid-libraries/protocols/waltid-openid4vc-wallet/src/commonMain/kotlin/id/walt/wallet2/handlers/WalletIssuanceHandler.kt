@@ -944,6 +944,11 @@ data class DeferredCredentialPending(val transactionId: String, val intervalSeco
     }
 }
 
+// Draft-15 §9.3: preserve the released polling contract, including its default interval.
+internal fun CredentialResponse.validateLegacyDeferredPendingResponse(transactionId: String): CredentialResponse =
+    copy(transactionId = this.transactionId ?: transactionId, interval = interval ?: 5)
+        .validateCredentialResponse(HttpStatusCode.Accepted.value, transactionId)
+
 @Serializable
 data class PollDeferredResult(
     val credentialIds: List<String>,
@@ -1856,6 +1861,13 @@ object WalletIssuanceHandler {
                 return@repeat
             }
 
+            // Retain draft-15 §9.3 pending responses accepted by the released polling API.
+            if (expectedTransactionId != null && response.status == HttpStatusCode.BadRequest && oauthError == "issuance_pending") {
+                onStage(CredentialIssuanceStage.RESPONSE)
+                return lenientJson.decodeFromString<CredentialResponse>(response.bodyAsText())
+                    .validateLegacyDeferredPendingResponse(expectedTransactionId)
+            }
+
             // try-catch rather than runCatching: the body read suspends, and runCatching would
             // swallow CancellationException.
             val credentialError = try {
@@ -2576,7 +2588,7 @@ object WalletIssuanceHandler {
      *
      * Per OpenID4VCI §9, the wallet sends a POST to the deferred credential endpoint
      * with the transaction_id. The issuer responds with the credential when ready,
-     * or with an `issuance_pending` error if not yet available.
+     * or HTTP 202 while pending. Draft-15 `issuance_pending` responses remain supported.
      *
      * On success the credential is stored in the wallet's credential store.
      */
