@@ -16,7 +16,6 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeNotNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -26,9 +25,11 @@ import java.io.File
 class BatchIssuanceE2ETest {
     @Test
     fun explicitCopiesSurviveActivityRelaunch() = runBlocking {
-        val fixtureUrl = InstrumentationRegistry.getArguments().getString("enterpriseMobileFixtureBaseUrl")
-        assumeNotNull(fixtureUrl)
-        val fixture = EnterpriseMobileFixtureClient(requireNotNull(fixtureUrl))
+        val fixtureUrl = requireNotNull(InstrumentationRegistry.getArguments()
+            .getString("enterprise_fixture_base_url")?.takeIf { it.isNotBlank() }) {
+            "Run enterpriseAndroidMobileIntegrationTest or supply enterprise_fixture_base_url"
+        }
+        val fixture = EnterpriseMobileFixtureClient(fixtureUrl)
         val scenario = fixture.scenarios().first { it.id == "enterprise-mdl" }
         val offer = fixture.createOffer(scenario, EnterpriseMobilePlatform.ANDROID)
         val instrumentation = InstrumentationRegistry.getInstrumentation()
