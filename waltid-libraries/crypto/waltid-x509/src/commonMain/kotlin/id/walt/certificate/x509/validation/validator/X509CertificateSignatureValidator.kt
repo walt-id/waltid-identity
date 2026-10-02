@@ -15,12 +15,25 @@ class X509CertificateSignatureValidator(
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
-        val trustedIssuerCertificates = context.findCertificateBySubjectDn(x509Certificate.data.issuerDn)
+        val trustedIssuerCertificates =
+            context.findCertificateBySubjectDn(x509Certificate.data.issuerDn)
         if (trustedIssuerCertificates.isEmpty()) {
-            context.addLogEntry(
-                ValidationResult.Severity.ERROR,
-                "Trusted issuer certificate '${x509Certificate.data.issuerDn}' not found"
-            )
+            // issuer is not trusted, check if this certificate is trusted
+            val isCertificateTrusted =
+                context.findCertificateBySubjectDn(x509Certificate.data.subjectDn).any {
+                    it.encodedDer == x509Certificate.encodedDer
+                }
+            if (isCertificateTrusted) {
+                context.addLogEntry(
+                    ValidationResult.Severity.INFO,
+                    "Certificate in chain with subjectDn '${x509Certificate.data.issuerDn}' is trusted. Issuer DN '${x509Certificate.data.issuerDn}' not found in trust"
+                )
+            } else {
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "Trusted issuer certificate '${x509Certificate.data.issuerDn}' not found"
+                )
+            }
         } else {
             require(trustedIssuerCertificates.size == 1) { "Multiple certificates with subjectDn '${x509Certificate.data.issuerDn}' in truststore. Select CA certificate by pubic key not yet supported" }
             validateCertificate(context, trustedIssuerCertificates.first(), x509Certificate)

@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.selectCoseSignatureAlgorithm
@@ -18,7 +19,6 @@ import id.walt.mdoc.objects.elements.DeviceSignedItem
 import id.walt.mdoc.objects.elements.DeviceSignedItemList
 import id.walt.mdoc.proximity.DeviceRequestReaderAuthentication
 import id.walt.mdoc.proximity.DeviceRequestReaderAuthenticationDisplay
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocApplicationAuthorization
 import id.walt.mdoc.proximity.MdocApplicationAuthorizationDetail
 import id.walt.mdoc.proximity.MdocAuthenticationMethod
@@ -86,7 +86,7 @@ internal class ProximityRequestProcessor(
         val document: Document,
         val holderKey: ResolvedHolderKey,
         val deviceAuthentication: ProximityDeviceAuthenticationMethod,
-        val issuerAuthorityKeyIdentifiers: List<ImmutableBytes>,
+        val issuerAuthorityKeyIdentifiers: List<ByteString>,
     )
 
     private data class ApplicationProfileSnapshot(
@@ -101,7 +101,7 @@ internal class ProximityRequestProcessor(
         val selection: MdocRequestSelection,
         val inventory: Map<String, InventoryDocument>,
         val applicationProfiles: List<ApplicationProfileSnapshot>,
-        val bindingDigest: ImmutableBytes,
+        val bindingDigest: ByteString,
         val lowerPreview: MdocRequestPreview,
         val approvalScope: ProximityApprovalScope?,
     )
@@ -111,7 +111,7 @@ internal class ProximityRequestProcessor(
         val reviewId: ProximityReviewId,
         val submission: ProximitySubmission,
         val applicationProfiles: List<ApplicationProfileSnapshot>,
-        val choiceDigest: ImmutableBytes,
+        val choiceDigest: ByteString,
     )
 
     private data class ReaderTrustKey(
@@ -255,7 +255,7 @@ internal class ProximityRequestProcessor(
         val response = buildResponse(context, fresh, retained.submission, retained.applicationProfiles)
         stateMutex.withLock { check(!closed) { "The proximity processor is closed" } }
         return MdocResponseResolution.Send(
-            exactResponse = ImmutableBytes.of(
+            exactResponse = ByteString(
                 coseCompliantCbor.encodeToByteArray(DeviceResponse.serializer(), response)
             ),
             continuation = if (retained.submission.continueAfterResponse) {
@@ -487,7 +487,7 @@ internal class ProximityRequestProcessor(
             holderKey = authentication.holderKey,
             deviceAuthentication = authentication.method,
             issuerAuthorityKeyIdentifiers = issuerAuthentication.certificateChain.mapNotNull {
-                it.authorityKeyIdentifier?.let(ImmutableBytes::of)
+                it.authorityKeyIdentifier?.let({ ByteString(it) })
             }.distinct(),
         )
     }
@@ -627,7 +627,7 @@ internal class ProximityRequestProcessor(
                         details = authorization.details.map {
                             MdocApplicationAuthorizationDetail(it.id, it.label, it.value)
                         },
-                        resultBindingDigest = ImmutableBytes.of(digest),
+                        resultBindingDigest = ByteString(digest),
                     ),
                     decodedDeviceElements = decoded,
                 )
@@ -663,12 +663,12 @@ internal class ProximityRequestProcessor(
         val publicEvidence = ProximityReaderEvidence(
             scope = evidence.scope.toPublic(),
             authenticationIndex = evidence.authenticationIndex,
-            certificateChainDerBase64Url = evidence.certificateChainDer.map { it.copy().toBase64Url() },
+            certificateChainDerBase64Url = evidence.certificateChainDer.map { it.toByteArray().toBase64Url() },
         )
         val leaf = evidence.certificateChainDer.firstOrNull()
         if (leaf != null) {
             readerFingerprints[ReaderTrustKey(publicEvidence.scope, publicEvidence.authenticationIndex)] =
-                SHA256().digest(leaf.copy()).joinToString("") { byte -> (byte.toInt() and 0xff).toString(16).padStart(2, '0') }
+                SHA256().digest(leaf.toByteArray()).joinToString("") { byte -> (byte.toInt() and 0xff).toString(16).padStart(2, '0') }
         }
         val decision = configuration.readerTrustEvaluator.evaluate(publicEvidence)
         evaluatedReaderTrust[
@@ -861,9 +861,9 @@ internal class ProximityRequestProcessor(
         return ProximityApprovalScope(
             profile = configuration.profile,
             readerCertificateSha256 = fingerprint,
-            requestDigest = ImmutableBytes.of(SHA256().digest(scopeBytes)),
+            requestDigest = ByteString(SHA256().digest(scopeBytes)),
             credentials = inventory.associate { item ->
-                item.stored.id to ImmutableBytes.of(SHA256().digest(
+                item.stored.id to ByteString(SHA256().digest(
                     lengthPrefixed(requireNotNull(item.credential.signed).encodeToByteArray()) +
                         lengthPrefixed(item.deviceAuthentication.name.encodeToByteArray()),
                 ))
@@ -876,7 +876,7 @@ internal class ProximityRequestProcessor(
         reviewId: ProximityReviewId,
         submission: ProximitySubmission,
         profiles: List<ApplicationProfileSnapshot>,
-    ): ImmutableBytes {
+    ): ByteString {
         val values = buildList {
             add("walt.id/mobile-wallet-proximity-choice/v1".encodeToByteArray())
             add(reviewId.value.encodeToByteArray())
@@ -914,7 +914,7 @@ internal class ProximityRequestProcessor(
                 }
             }
         }
-        return ImmutableBytes.of(SHA256().digest(values.fold(intBytes(values.size)) { bytes, value -> bytes + lengthPrefixed(value) }))
+        return ByteString(SHA256().digest(values.fold(intBytes(values.size)) { bytes, value -> bytes + lengthPrefixed(value) }))
     }
 
     private fun snapshotDigest(
@@ -923,7 +923,7 @@ internal class ProximityRequestProcessor(
         eligible: List<SelectedDocument>,
         review: ProximityReview,
         profiles: List<ApplicationProfileSnapshot>,
-    ): ImmutableBytes {
+    ): ByteString {
         val values = buildList {
             add("walt.id/mobile-wallet-proximity-snapshot/v1".encodeToByteArray())
             add(context.request.encodedCopy())
@@ -981,7 +981,7 @@ internal class ProximityRequestProcessor(
             }
         }
         val material = values.fold(intBytes(values.size)) { bytes, value -> bytes + lengthPrefixed(value) }
-        return ImmutableBytes.of(SHA256().digest(material))
+        return ByteString(SHA256().digest(material))
     }
 }
 

@@ -49,5 +49,7 @@ class BouncyX509Certificate(val certificate: X509CertificateHolder) : X509Certif
 
     override val encodedDer: ByteString = ByteString(certificate.encoded)
 
+    override fun hashCode(): Int = encodedDer.hashCode()
 
+    override fun equals(other: Any?): Boolean = encodedDer == (other as? X509Certificate)?.encodedDer
 }

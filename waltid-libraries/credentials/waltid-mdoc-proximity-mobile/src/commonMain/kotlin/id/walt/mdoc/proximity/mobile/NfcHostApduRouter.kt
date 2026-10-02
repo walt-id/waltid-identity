@@ -1,6 +1,6 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.proximity.ProximityCloseReason
 import id.walt.mdoc.proximity.ProximityConnection
 import id.walt.mdoc.proximity.ProximityTransportKind
@@ -48,7 +48,7 @@ public class NfcHostApduRouter internal constructor(
      * Calls are serialized. A command received after deactivation is rejected with
      * `CONDITIONS_NOT_SATISFIED` and cannot revive the session.
      */
-    public suspend fun process(encodedCommand: ByteArray): ImmutableBytes = processMutex.withLock {
+    public suspend fun process(encodedCommand: ByteArray): ByteString = processMutex.withLock {
         if (isDeactivated()) {
             return@withLock status(NfcStatusWord.CONDITIONS_NOT_SATISFIED)
         }
@@ -63,7 +63,7 @@ public class NfcHostApduRouter internal constructor(
         }
         if (isDeactivated()) return@withLock status(NfcStatusWord.CONDITIONS_NOT_SATISFIED)
         val response = when (application) {
-            NfcHostApplication.ENGAGEMENT -> ImmutableBytes.of(
+            NfcHostApplication.ENGAGEMENT -> ByteString(
                 requireNotNull(engagement) { "NFC engagement application is unavailable" }.process(encodedCommand)
             )
             NfcHostApplication.RETRIEVAL -> when (
@@ -75,7 +75,7 @@ public class NfcHostApduRouter internal constructor(
                     result.identifier,
                     result.sessionMessage,
                     retrieval::cancelPendingResponse,
-                ) { identifier, message -> retrieval.completeResponse(identifier, message).copy() }
+                ) { identifier, message -> retrieval.completeResponse(identifier, message).toByteArray() }
             }
             NfcHostApplication.NFC_V2 -> when (
                 val result = requireNotNull(nfcV2) { "NFCv2 application is unavailable" }.process(encodedCommand)
@@ -85,10 +85,10 @@ public class NfcHostApduRouter internal constructor(
                     result.identifier,
                     result.sessionMessage,
                     nfcV2::cancelPendingResponse,
-                ) { identifier, message -> nfcV2.completeResponse(identifier, message).copy() }
+                ) { identifier, message -> nfcV2.completeResponse(identifier, message).toByteArray() }
             }
         }
-        if (selection != null && NfcResponseApdu.decode(response.copy()).statusWord == NfcStatusWord.SUCCESS) {
+        if (selection != null && NfcResponseApdu.decode(response.toByteArray()).statusWord == NfcStatusWord.SUCCESS) {
             if (isDeactivated()) return@withLock status(NfcStatusWord.CONDITIONS_NOT_SATISFIED)
             selectedApplication = selection
             onApplicationSelected(selection)
@@ -142,8 +142,8 @@ public class NfcHostApduRouter internal constructor(
         }
     }
 
-    private fun status(word: UShort): ImmutableBytes =
-        ImmutableBytes.of(NfcResponseApdu(statusWord = word).encode())
+    private fun status(word: UShort): ByteString =
+        ByteString(NfcResponseApdu(statusWord = word).encode())
 }
 
 /** Message-level connection backed by one NFC ENVELOPE/response exchange at a time. */
@@ -154,13 +154,13 @@ internal class NfcApduProximityConnection : ProximityConnection {
         val identifier: ULong,
         val cancel: (ULong) -> Unit,
         val complete: (ULong, ByteArray) -> ByteArray,
-        val response: CompletableDeferred<ImmutableBytes>,
+        val response: CompletableDeferred<ByteString>,
     )
 
-    private val incoming = Channel<ImmutableBytes>(capacity = 1)
+    private val incoming = Channel<ByteString>(capacity = 1)
     private val mutex = Mutex()
     private val pendingExchanges = ArrayDeque<PendingExchange>()
-    private val queuedResponses = ArrayDeque<ImmutableBytes>()
+    private val queuedResponses = ArrayDeque<ByteString>()
     private var closed = false
     private val closure = CompletableDeferred<ProximityCloseReason>()
 
@@ -168,11 +168,11 @@ internal class NfcApduProximityConnection : ProximityConnection {
 
     internal suspend fun exchange(
         identifier: ULong,
-        message: ImmutableBytes,
+        message: ByteString,
         cancel: (ULong) -> Unit,
         complete: (ULong, ByteArray) -> ByteArray,
-    ): ImmutableBytes {
-        val response = CompletableDeferred<ImmutableBytes>()
+    ): ByteString {
+        val response = CompletableDeferred<ByteString>()
         val pending = PendingExchange(identifier, cancel, complete, response)
         val queued = mutex.withLock {
             check(!closed) { "NFC connection is closed" }
@@ -182,7 +182,7 @@ internal class NfcApduProximityConnection : ProximityConnection {
             }
         }
         try {
-            incoming.send(ImmutableBytes.of(message.copy()))
+            incoming.send(ByteString(message.toByteArray()))
             queued?.let { complete(pending, it) }
             return response.await()
         } catch (cancelled: CancellationException) {
@@ -202,9 +202,9 @@ internal class NfcApduProximityConnection : ProximityConnection {
         }
     }
 
-    override suspend fun receive(): ImmutableBytes? = incoming.receiveCatching().getOrNull()
+    override suspend fun receive(): ByteString? = incoming.receiveCatching().getOrNull()
 
-    override suspend fun send(message: ImmutableBytes) {
+    override suspend fun send(message: ByteString) {
         val pending = mutex.withLock {
             check(!closed) { "NFC connection is closed" }
             requireNotNull(pendingExchanges.removeFirstOrNull()) {
@@ -215,7 +215,7 @@ internal class NfcApduProximityConnection : ProximityConnection {
     }
 
     /** Queues one response when the same NFCv2 request arrived first on the alternate bearer. */
-    internal suspend fun sendOrQueueHybridResponse(message: ImmutableBytes) {
+    internal suspend fun sendOrQueueHybridResponse(message: ByteString) {
         val pending = mutex.withLock {
             check(!closed) { "NFC connection is closed" }
             pendingExchanges.removeFirstOrNull().also {
@@ -223,7 +223,7 @@ internal class NfcApduProximityConnection : ProximityConnection {
                     check(queuedResponses.isEmpty()) {
                         "Only one NFCv2 response may wait for the reader's duplicate NFC request"
                     }
-                    queuedResponses.addLast(ImmutableBytes.of(message.copy()))
+                    queuedResponses.addLast(ByteString(message.toByteArray()))
                 }
             }
         }
@@ -247,11 +247,11 @@ internal class NfcApduProximityConnection : ProximityConnection {
         }
     }
 
-    private fun complete(pending: PendingExchange, message: ImmutableBytes) {
+    private fun complete(pending: PendingExchange, message: ByteString) {
         try {
             check(
                 pending.response.complete(
-                    ImmutableBytes.of(pending.complete(pending.identifier, message.copy()))
+                    ByteString(pending.complete(pending.identifier, message.toByteArray()))
                 )
             ) { "The NFC reader exchange was completed concurrently" }
         } catch (failure: Throwable) {

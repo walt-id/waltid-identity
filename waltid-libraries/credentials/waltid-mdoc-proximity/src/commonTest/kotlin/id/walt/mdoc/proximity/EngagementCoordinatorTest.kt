@@ -2,6 +2,7 @@
 
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
@@ -50,8 +51,8 @@ class EngagementCoordinatorTest {
         assertFailsWith<IllegalArgumentException> {
             MdocEngagedConnection(
                 engagementMode = MdocEngagementMode.Qr,
-                deviceEngagement = ImmutableBytes.of(byteArrayOf(1)),
-                sessionHandover = MdocSessionHandover.NfcConnection(ImmutableBytes.of(byteArrayOf(2))),
+                deviceEngagement = ByteString(byteArrayOf(1)),
+                sessionHandover = MdocSessionHandover.NfcConnection(ByteString(byteArrayOf(2))),
                 connection = TrackingConnection(ProximityTransportKind.NFC),
             eDeviceKey = selectedKey,
             )
@@ -61,14 +62,14 @@ class EngagementCoordinatorTest {
     @Test
     fun `first completed engagement wins and preserves its exact handover`() = runTest {
         val qr = TrackingEngagement(MdocEngagementMode.Qr, waitForever = true)
-        val handoverSelect = ImmutableBytes.of(byteArrayOf(1, 2, 3))
-        val handoverRequest = ImmutableBytes.of(byteArrayOf(4, 5, 6))
+        val handoverSelect = ByteString(byteArrayOf(1, 2, 3))
+        val handoverRequest = ByteString(byteArrayOf(4, 5, 6))
         val nfcConnection = TrackingConnection(ProximityTransportKind.NFC)
         val nfc = TrackingEngagement(
             MdocEngagementMode.Nfc,
             result = MdocEngagedConnection(
                 engagementMode = MdocEngagementMode.Nfc,
-                deviceEngagement = ImmutableBytes.of(byteArrayOf(7, 8)),
+                deviceEngagement = ByteString(byteArrayOf(7, 8)),
                 sessionHandover = MdocSessionHandover.NfcConnection(handoverSelect, handoverRequest),
                 connection = nfcConnection,
             eDeviceKey = selectedKey,
@@ -79,7 +80,7 @@ class EngagementCoordinatorTest {
 
         assertSame(nfc, winner.source)
         assertSame(nfcConnection, winner.engaged.connection)
-        assertContentEquals(byteArrayOf(7, 8), winner.engaged.deviceEngagement.copy())
+        assertContentEquals(byteArrayOf(7, 8), winner.engaged.deviceEngagement.toByteArray())
         assertEquals(MdocSessionHandover.NfcConnection(handoverSelect, handoverRequest), winner.engaged.sessionHandover)
         assertEquals(listOf(ProximityCloseReason.LOST_RACE), qr.closeReasons)
         assertEquals(emptyList(), nfc.closeReasons)
@@ -158,10 +159,10 @@ class EngagementCoordinatorTest {
             nonCancellableRelease = release,
             result = MdocEngagedConnection(
                 MdocEngagementMode.Nfc,
-                ImmutableBytes.of(byteArrayOf(9)),
+                ByteString(byteArrayOf(9)),
                 MdocSessionHandover.ProvisionalNfcV2(
-                    ImmutableBytes.of(byteArrayOf(1)),
-                    ImmutableBytes.of(byteArrayOf(2)),
+                    ByteString(byteArrayOf(1)),
+                    ByteString(byteArrayOf(2)),
                 ),
                 connection,
             eDeviceKey = selectedKey,
@@ -183,7 +184,7 @@ class EngagementCoordinatorTest {
             mode = MdocEngagementMode.Nfc,
             result = MdocEngagedConnection(
                 engagementMode = MdocEngagementMode.Qr,
-                deviceEngagement = ImmutableBytes.of(byteArrayOf(1)),
+                deviceEngagement = ByteString(byteArrayOf(1)),
                 sessionHandover = MdocSessionHandover.Qr,
                 connection = TrackingConnection(ProximityTransportKind.NFC),
             eDeviceKey = selectedKey,
@@ -345,8 +346,8 @@ class EngagementCoordinatorTest {
         val winner = TrackingEngagement(
             MdocEngagementMode.Nfc,
             result = MdocEngagedConnection(
-                MdocEngagementMode.Nfc, ImmutableBytes.of(byteArrayOf(7)),
-                MdocSessionHandover.NfcConnection(ImmutableBytes.of(byteArrayOf(8))),
+                MdocEngagementMode.Nfc, ByteString(byteArrayOf(7)),
+                MdocSessionHandover.NfcConnection(ByteString(byteArrayOf(8))),
                 TrackingConnection(ProximityTransportKind.NFC),
             eDeviceKey = selectedKey,
             ),
@@ -457,7 +458,7 @@ class EngagementCoordinatorTest {
             val winner = TrackingEngagement(
                 MdocEngagementMode.Qr,
                 result = MdocEngagedConnection(
-                    MdocEngagementMode.Qr, ImmutableBytes.of(byteArrayOf(1)), MdocSessionHandover.Qr, connection,
+                    MdocEngagementMode.Qr, ByteString(byteArrayOf(1)), MdocSessionHandover.Qr, connection,
                 eDeviceKey = selectedKey,
             ),
             )
@@ -520,8 +521,8 @@ class EngagementCoordinatorTest {
     private class TrackingConnection(override val kind: ProximityTransportKind) : ProximityConnection {
         private val closure = CompletableDeferred<ProximityCloseReason>()
         override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
-        override suspend fun receive(): ImmutableBytes? = null
-        override suspend fun send(message: ImmutableBytes) = Unit
+        override suspend fun receive(): ByteString? = null
+        override suspend fun send(message: ByteString) = Unit
         override suspend fun close(reason: ProximityCloseReason) { closure.complete(reason) }
     }
 }

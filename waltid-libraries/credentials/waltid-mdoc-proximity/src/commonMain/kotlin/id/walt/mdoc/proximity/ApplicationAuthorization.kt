@@ -1,5 +1,6 @@
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import org.kotlincrypto.hash.sha2.SHA256
 
 /**
@@ -38,7 +39,7 @@ class MdocApplicationAuthorization(
     val profileId: String,
     val displayTitle: String,
     details: List<MdocApplicationAuthorizationDetail>,
-    val resultBindingDigest: ImmutableBytes,
+    val resultBindingDigest: ByteString,
 ) {
     /** Ordered, display-safe values supplied by the wallet application profile. */
     private val ownedDetails: List<MdocApplicationAuthorizationDetail> = details.toList()
@@ -56,19 +57,19 @@ class MdocApplicationAuthorization(
         }
     }
 
-    internal fun consentBindingDigest(): ImmutableBytes {
+    internal fun consentBindingDigest(): ByteString {
         val material = buildList {
             add(PROFILE_BINDING_DOMAIN.encodeToByteArray())
             add(profileId.encodeToByteArray())
             add(displayTitle.encodeToByteArray())
-            add(resultBindingDigest.copy())
+            add(resultBindingDigest.toByteArray())
             details.forEach { detail ->
                 add(detail.id.encodeToByteArray())
                 add(detail.label.encodeToByteArray())
                 add(detail.value.encodeToByteArray())
             }
         }.fold(bindingIntBytes(details.size)) { bytes, value -> bytes + bindingLengthPrefixed(value) }
-        return ImmutableBytes.of(SHA256().digest(material))
+        return ByteString(SHA256().digest(material))
     }
 
     private companion object {

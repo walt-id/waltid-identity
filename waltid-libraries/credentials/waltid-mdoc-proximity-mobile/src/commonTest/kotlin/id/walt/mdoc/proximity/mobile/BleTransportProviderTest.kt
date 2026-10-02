@@ -5,13 +5,13 @@
 
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.objects.engagement.BleCentralMode
 import id.walt.mdoc.objects.engagement.BlePeripheralEndpoint
 import id.walt.mdoc.objects.engagement.BlePeripheralMode
 import id.walt.mdoc.objects.engagement.BlePeripheralServerOptions
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.proximity.EngagementContext
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocEngagementMode
 import id.walt.mdoc.proximity.MdocProximityProfile
 import id.walt.mdoc.proximity.ProximityCloseReason
@@ -97,7 +97,7 @@ class BleTransportProviderTest {
         val method = assertIs<DeviceRetrievalMethod.Ble>(prepared.connectionMethod)
 
         assertNull(method.centralMode)
-        assertContentEquals(peripheralUuid.encoded().copy(), method.peripheralMode!!.uuid)
+        assertContentEquals(peripheralUuid.encoded().toByteArray(), method.peripheralMode!!.uuid)
         assertEquals(0x80u, assertIs<BlePeripheralEndpoint.Mdoc>(method.peripheralEndpoint).options.psm)
     }
 
@@ -105,8 +105,8 @@ class BleTransportProviderTest {
     fun `reader-selected combined BLE offer prefers and preserves the reader peripheral endpoint`() = runTest {
         val readerUuid = BleServiceUuid.parse("12345678-1234-4abc-9234-1234567890ab")
         val offered = DeviceRetrievalMethod.Ble(
-            peripheralMode = BlePeripheralMode(peripheralUuid.encoded().copy()),
-            centralMode = BleCentralMode(readerUuid.encoded().copy()),
+            peripheralMode = BlePeripheralMode(peripheralUuid.encoded().toByteArray()),
+            centralMode = BleCentralMode(readerUuid.encoded().toByteArray()),
             peripheralEndpoint = BlePeripheralEndpoint.Reader(BlePeripheralServerOptions(psm = 0x81u)),
         )
         val platform = FakePlatform()
@@ -118,7 +118,7 @@ class BleTransportProviderTest {
         val selected = assertIs<DeviceRetrievalMethod.Ble>(prepared.connectionMethod)
 
         assertNull(selected.peripheralMode)
-        assertContentEquals(readerUuid.encoded().copy(), selected.centralMode!!.uuid)
+        assertContentEquals(readerUuid.encoded().toByteArray(), selected.centralMode!!.uuid)
         assertEquals(
             BlePeripheralServerOptions(psm = 0x81u),
             assertIs<BlePeripheralEndpoint.Reader>(selected.peripheralEndpoint).options,
@@ -131,7 +131,7 @@ class BleTransportProviderTest {
     fun `reader-selected NFC accepts an arbitrary exact 128-bit service UUID`() = runTest {
         val readerUuid = BleServiceUuid.parse("e4eaff77-2b04-2453-451a-6c2abf52f590")
         val offered = DeviceRetrievalMethod.Ble(
-            centralMode = BleCentralMode(readerUuid.encoded().copy()),
+            centralMode = BleCentralMode(readerUuid.encoded().toByteArray()),
             peripheralEndpoint = BlePeripheralEndpoint.Reader(BlePeripheralServerOptions(psm = 0xf3u)),
         )
         val platform = FakePlatform()
@@ -145,7 +145,7 @@ class BleTransportProviderTest {
 
         assertEquals(readerUuid, platform.central.serviceUuid)
         assertContentEquals(
-            readerUuid.encoded().copy(),
+            readerUuid.encoded().toByteArray(),
             assertIs<DeviceRetrievalMethod.Ble>(prepared.connectionMethod).centralMode!!.uuid,
         )
     }
@@ -161,7 +161,7 @@ class BleTransportProviderTest {
         val selected = assertIs<DeviceRetrievalMethod.Ble>(prepared.connectionMethod)
 
         assertNull(selected.centralMode)
-        assertContentEquals(peripheralUuid.encoded().copy(), selected.peripheralMode!!.uuid)
+        assertContentEquals(peripheralUuid.encoded().toByteArray(), selected.peripheralMode!!.uuid)
         assertEquals(0x80u, assertIs<BlePeripheralEndpoint.Mdoc>(selected.peripheralEndpoint).options.psm)
         assertEquals(peripheralUuid, platform.peripheral.serviceUuid)
     }
@@ -187,7 +187,7 @@ class BleTransportProviderTest {
 
         val connection = prepared.awaitConnection()
 
-        assertContentEquals(BleIdent.derive(ImmutableBytes.of(ByteArray(32) { it.toByte() })), platform.centralIdent)
+        assertContentEquals(BleIdent.derive(ByteString(ByteArray(32) { it.toByte() })), platform.centralIdent)
         assertEquals(listOf(ProximityCloseReason.LOST_RACE), platform.central.closeReasons)
         assertTrue(platform.peripheral.closeReasons.isEmpty())
         connection.close(ProximityCloseReason.COMPLETED)
@@ -289,12 +289,12 @@ class BleTransportProviderTest {
         platform.central.connection.complete(raw)
         val connection = prepared.awaitConnection()
 
-        connection.send(ImmutableBytes.of(byteArrayOf(1, 2, 3, 4, 5, 6, 7)))
+        connection.send(ByteString(byteArrayOf(1, 2, 3, 4, 5, 6, 7)))
         raw.incomingPackets.send(byteArrayOf(1, 9, 8, 7, 6))
         raw.incomingPackets.send(byteArrayOf(0, 5, 4))
 
         assertEquals(listOf(5, 4), raw.writes.map(ByteArray::size))
-        assertContentEquals(byteArrayOf(9, 8, 7, 6, 5, 4), connection.receive()!!.copy())
+        assertContentEquals(byteArrayOf(9, 8, 7, 6, 5, 4), connection.receive()!!.toByteArray())
         raw.incomingPackets.close()
         assertNull(connection.receive())
         assertEquals(listOf(ProximityCloseReason.PEER_DISCONNECTED), raw.closeReasons)
@@ -349,7 +349,7 @@ class BleTransportProviderTest {
         val connection = prepared.awaitConnection()
 
         val failure = assertFailsWith<ProximityException> {
-            connection.send(ImmutableBytes.of(byteArrayOf(1)))
+            connection.send(ByteString(byteArrayOf(1)))
         }
 
         assertEquals("ble_inactivity_timeout", failure.error.code)
@@ -366,7 +366,7 @@ class BleTransportProviderTest {
         val connection = prepared.awaitConnection()
 
         val failure = assertFailsWith<ProximityException> {
-            connection.send(ImmutableBytes.of(byteArrayOf(1)))
+            connection.send(ByteString(byteArrayOf(1)))
         }
 
         assertEquals("ble_send_failed", failure.error.code)
@@ -411,7 +411,7 @@ class BleTransportProviderTest {
         }
         platform.central.connection.complete(raw)
         val connection = prepared.awaitConnection()
-        val response = ImmutableBytes.of(ByteArray(4_574) { it.toByte() })
+        val response = ByteString(ByteArray(4_574) { it.toByte() })
 
         connection.send(response)
         connection.close(ProximityCloseReason.COMPLETED)
@@ -419,7 +419,7 @@ class BleTransportProviderTest {
         advanceUntilIdle()
 
         assertEquals(1, delivered.size, "Closing the native socket must not discard the queued response")
-        assertContentEquals(response.copy(), BleL2capMessageDecoder(8_192).feed(delivered.single()).single().copy())
+        assertContentEquals(response.toByteArray(), BleL2capMessageDecoder(8_192).feed(delivered.single()).single().toByteArray())
         assertEquals(listOf(ProximityCloseReason.COMPLETED), delegate.closeReasons)
     }
 
@@ -431,7 +431,7 @@ class BleTransportProviderTest {
             val raw = FakeRawConnection(BleRawBearer.L2CAP, null)
             platform.central.connection.complete(raw)
             val connection = prepared.awaitConnection()
-            connection.send(ImmutableBytes.of(byteArrayOf(1)))
+            connection.send(ByteString(byteArrayOf(1)))
 
             connection.close(reason)
 
@@ -459,7 +459,7 @@ class BleTransportProviderTest {
     private fun provider(roles: BleMdocRoles, platform: FakePlatform) = DefaultBleProximityTransportProvider(
         BleProximityTransportConfiguration(
             roles = roles,
-            eDeviceKeyBytes = ImmutableBytes.of(ByteArray(32) { it.toByte() }),
+            eDeviceKeyBytes = ByteString(ByteArray(32) { it.toByte() }),
         ),
         platform,
     )

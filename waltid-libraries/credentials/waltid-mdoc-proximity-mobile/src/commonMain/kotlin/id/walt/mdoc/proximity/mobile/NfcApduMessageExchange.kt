@@ -1,6 +1,7 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
+
 
 /** Shared ISO 7816 ENVELOPE/GET RESPONSE mechanism used by conventional NFC and NFCv2. */
 internal class NfcApduMessageExchange(
@@ -42,12 +43,12 @@ internal class NfcApduMessageExchange(
         }
         if (command.isChained) {
             require(command.expectedResponseDataLength == null) { "A chained ENVELOPE fragment cannot contain Le" }
-            incoming.append(command.data.copy())
+            incoming.append(command.data.toByteArray())
             return IncomingResult.Continue(NfcResponseApdu(statusWord = NfcStatusWord.SUCCESS))
         }
         val expectedResponseDataLength = command.expectedResponseDataLength
             ?: throw IllegalArgumentException("Final ENVELOPE must contain Le")
-        incoming.append(command.data.copy())
+        incoming.append(command.data.toByteArray())
         responseLength = minOf(
             expectedResponseDataLength,
             maximumResponseDataLength,
@@ -98,7 +99,7 @@ internal class NfcApduMessageExchange(
             outgoingOffset = 0
             responseLength = 0
         }
-        return NfcResponseApdu(ImmutableBytes.of(chunk), status)
+        return NfcResponseApdu(ByteString(chunk), status)
     }
 
     private companion object {
