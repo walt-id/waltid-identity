@@ -5,14 +5,30 @@ struct HomeView: View {
     @ObservedObject var viewModel: WalletViewModel
     @State private var selectedCredentialDetailsID: String?
     @State private var showingSettings = false
+    @State private var showingScanner = false
+    @State private var credentialCards: [CredentialCardItem] = []
 
     var body: some View {
         Group {
-            if !viewModel.isReady, let model = viewModel.identityScreen {
-                NavigationView {
-                    WalletSetupView(viewModel: viewModel, model: model)
-                }.navigationViewStyle(.stack)
-            } else { walletTabs }
+            if !viewModel.isReady {
+                if let model = viewModel.identityScreen {
+                    NavigationView { WalletSetupView(viewModel: viewModel, model: model) }
+                        .navigationViewStyle(.stack)
+                } else {
+                    VStack(spacing: 16) {
+                        if viewModel.isLoading {
+                            ProgressView("Opening wallet…").accessibilityIdentifier(WalletAccessibilityID.credentialsLoading)
+                        }
+                        else {
+                            Text(viewModel.statusMessage)
+                            Button("Retry opening wallet", action: viewModel.retryOpeningWallet)
+                                .buttonStyle(.borderedProminent)
+                        }
+                    }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            } else if showingScanner {
+                WalletScanView(onBack: { showingScanner = false }, onOpen: openLink)
+            } else { walletContent }
         }
         .fullScreenCover(isPresented: $showingSettings) {
             NavigationView {
@@ -28,6 +44,13 @@ struct HomeView: View {
             }.navigationViewStyle(.stack)
         }
         .onChange(of: viewModel.isReady) { ready in if !ready { showingSettings = false } }
+        .onChange(of: viewModel.selectedTab) { tab in if tab != .credentials { showingScanner = false } }
+        .task(id: viewModel.credentials) {
+            credentialCards = []
+            let cards = await CredentialDisplayNormalizer.cards(for: viewModel.credentials)
+            guard !Task.isCancelled else { return }
+            credentialCards = cards
+        }
     }
 
     private func openSettings() {
@@ -35,29 +58,53 @@ struct HomeView: View {
         showingSettings = true
     }
 
-    private var walletTabs: some View {
-        TabView(selection: $viewModel.selectedTab) {
+    @ViewBuilder private var walletContent: some View {
+        switch viewModel.selectedTab {
+        case .credentials:
             CredentialsTabView(
                 viewModel: viewModel,
                 selectedDetailsID: $selectedCredentialDetailsID,
-                onOpenSettings: openSettings
+                cards: credentialCards,
+                onOpenSettings: openSettings,
+                onScan: { showingScanner = true },
+                onShareNearby: {
+                    viewModel.startNewPresentationFlow()
+                    viewModel.selectedTab = .present
+                    viewModel.proximityPresentation.start()
+                }
             )
-            .tabItem {
-                Label("Credentials", systemImage: "wallet.pass")
-            }
-            .tag(WalletTab.credentials)
+        case .receive:
+            ReceiveView(viewModel: viewModel, onOpenSettings: openSettings, onBack: returnHome)
+        case .present:
+            PresentView(viewModel: viewModel, onOpenSettings: openSettings, onBack: returnHome)
+        }
+    }
 
-            ReceiveView(viewModel: viewModel, onOpenSettings: openSettings)
-                .tabItem {
-                    Label("Receive", systemImage: "tray.and.arrow.down")
-                }
-                .tag(WalletTab.receive)
+    private func returnHome() {
+        viewModel.startNewReceiveFlow()
+        viewModel.startNewPresentationFlow()
+        viewModel.proximityPresentation.dismiss()
+        viewModel.selectedTab = .credentials
+    }
 
-            PresentView(viewModel: viewModel, onOpenSettings: openSettings)
-                .tabItem {
-                    Label("Present", systemImage: "person.badge.key")
-                }
-                .tag(WalletTab.present)
+    private func openLink(_ value: String, kind: WalletLinkKind) {
+        showingScanner = false
+        switch kind {
+        case .offer:
+            viewModel.startNewPresentationFlow()
+            viewModel.startNewReceiveFlow()
+            viewModel.selectedTab = .receive
+            viewModel.offerUrl = value
+            viewModel.previewOffer()
+        case .presentation:
+            viewModel.startNewReceiveFlow()
+            viewModel.startNewPresentationFlow()
+            viewModel.selectedTab = .present
+            viewModel.presentationRequestUrl = value
+            viewModel.previewPresentation()
+        case .authorizationCallback:
+            if let url = URL(string: value) { viewModel.handleDeepLink(url) }
+        default: break
         }
     }
 }

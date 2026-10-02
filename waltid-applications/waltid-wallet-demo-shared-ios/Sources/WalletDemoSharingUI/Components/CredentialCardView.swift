@@ -16,8 +16,13 @@ public struct CredentialCardView: View {
     }
 
     public var body: some View {
-        CredentialCardArtView(summary: details.cardSummary, compact: compact)
-            .accessibilityIdentifier(WalletAccessibilityID.credentialCard(details.id))
+        Group {
+            if compact {
+                CredentialSummaryRow(summary: details.cardSummary)
+            } else {
+                CredentialCardArtView(summary: details.cardSummary)
+            }
+        }.accessibilityIdentifier(WalletAccessibilityID.credentialCard(details.id))
     }
 }
 
@@ -123,12 +128,18 @@ public struct CredentialCardButton: View {
     }
 
     public var body: some View {
-        CredentialCardView(details: details, compact: compact)
+        Button(action: action) {
+            HStack(spacing: 8) {
+                CredentialCardView(details: details, compact: compact)
+                if compact { Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.secondary) }
+            }
+            .frame(minHeight: 44)
             .contentShape(Rectangle())
-            .onTapGesture(perform: action)
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier(WalletAccessibilityID.credentialCard(details.id))
-            .accessibilityAddTraits(.isButton)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(WalletAccessibilityID.credentialCard(details.id))
+        .accessibilityHint("View credential details")
     }
 }
 

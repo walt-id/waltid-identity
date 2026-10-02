@@ -236,19 +236,26 @@ class KeySetupNavigationAndroidTest {
 
         runOnUiThread { setup.value = WalletDemoIdentitySetup.Choose(options.map { it.copy(id = "refreshed-${it.id}") }) }
         restoration.emulateSaveAndRestore()
-        onNodeWithText("3 of 3 · Signing approval").assertIsDisplayed()
+        onNodeWithText("3 of 4 · Signing approval").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        onNodeWithText("4 of 4 · Review").assertIsDisplayed()
+        kotlin.test.assertNull(submitted)
+        restoration.emulateSaveAndRestore()
+        onNodeWithText("4 of 4 · Review").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
         kotlin.test.assertEquals("refreshed-database", submitted)
         runOnUiThread { requireNotNull(activity).onBackPressedDispatcher.onBackPressed() }
+        onNodeWithText("3 of 4 · Signing approval").assertIsDisplayed()
+        runOnUiThread { requireNotNull(activity).onBackPressedDispatcher.onBackPressed() }
         onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).assertIsSelected()
         runOnUiThread { requireNotNull(activity).onBackPressedDispatcher.onBackPressed() }
-        onNodeWithText("1 of 3 · Recovery").assertIsDisplayed()
+        onNodeWithText("1 of 4 · Recovery").assertIsDisplayed()
         onAllNodesWithText("Refresh available options").assertCountEquals(0)
 
         onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
         onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
         runOnUiThread { setup.value = WalletDemoIdentitySetup.Choose(options.take(1)) }
-        onNodeWithText("1 of 3 · Recovery").assertIsDisplayed()
+        onNodeWithText("1 of 4 · Recovery").assertIsDisplayed()
         runOnUiThread { setup.value = WalletDemoIdentitySetup.Choose(options) }
         onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
         onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 0)).assertIsSelected()

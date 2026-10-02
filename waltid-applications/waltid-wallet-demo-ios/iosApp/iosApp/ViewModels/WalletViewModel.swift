@@ -824,7 +824,7 @@ class WalletViewModel: ObservableObject {
     func handleDeepLink(_ url: URL) {
         resetInputFocus()
         logE2E("Deep link received: \(url.scheme ?? "unknown")")
-        switch url.scheme.flatMap(WalletDeepLinkScheme.init(rawValue:)) {
+        switch (url.scheme?.lowercased()).flatMap(WalletDeepLinkScheme.init(rawValue:)) {
         case .credentialOffer:
             receiveTask?.cancel()
             paymentConsentTask?.cancel()
@@ -867,7 +867,9 @@ class WalletViewModel: ObservableObject {
         case .authorizationCallback:
             continueAuthorization(callbackURI: url)
         case nil:
-            break
+            if WalletLinkKind.classify(url.absoluteString) == .authorizationCallback {
+                continueAuthorization(callbackURI: url)
+            }
         }
     }
 
