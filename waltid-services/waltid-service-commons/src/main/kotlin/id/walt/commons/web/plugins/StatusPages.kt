@@ -1,10 +1,9 @@
 package id.walt.commons.web.plugins
 
 import id.walt.commons.web.SerializableWebException
-import id.walt.commons.web.WebException
 import id.walt.crypto.exceptions.KeyAlreadyExistsException
 import id.walt.crypto.exceptions.KeySerializationException
-import id.walt.errors.StatusException
+import id.walt.errors.HttpStatusError
 import io.klogging.logger
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -20,22 +19,17 @@ private val logger = logger("Web exception")
 
 fun Application.configureStatusPages() {
     install(StatusPages) {
-        exception<WebException> { call, cause ->
-            logger.error(cause)
-            val status = HttpStatusCode.fromValue(cause.status)
-            call.respond(status, exceptionMap(cause, status))
-        }
         exception<Throwable> { call, cause ->
             logger.error(cause)
             val status = statusCodeForException(cause)
             call.respond(status, exceptionMap(cause, status))
         }
-
-
     }
 }
 
 internal fun statusCodeForException(cause: Throwable): HttpStatusCode = when (cause) {
+    // Before the type rules below: a status error may also be, e.g., an IllegalArgumentException.
+    is HttpStatusError -> HttpStatusCode.fromValue(cause.status)
     is KeyAlreadyExistsException -> HttpStatusCode.Conflict
     is KeySerializationException -> HttpStatusCode.InternalServerError
     is NotFoundException -> HttpStatusCode.NotFound
@@ -47,9 +41,6 @@ internal fun statusCodeForException(cause: Throwable): HttpStatusCode = when (ca
     is ContentTransformationException -> HttpStatusCode.BadRequest
     is IllegalStateException -> HttpStatusCode.InternalServerError
     is JedisException -> HttpStatusCode.InternalServerError
-    is SerializableWebException -> HttpStatusCode.fromValue(cause.status)
-    is StatusException -> HttpStatusCode.fromValue(cause.status)
-    is WebException -> HttpStatusCode.fromValue(cause.status)
     else -> HttpStatusCode.InternalServerError
 }
 
