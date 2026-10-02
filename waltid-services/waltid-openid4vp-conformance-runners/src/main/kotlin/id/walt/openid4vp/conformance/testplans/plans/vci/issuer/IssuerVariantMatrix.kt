@@ -23,6 +23,8 @@ data class IssuerVariant(
     val authorizationRequestType: String,
     val requestMethod: String,
     val credentialEncryption: String,
+    // Runner coverage dimension, not a conformance-suite variant parameter.
+    val credentialProofType: String? = null,
 ) {
     val isHaip: Boolean
         get() = fapiProfile == "vci_haip"
@@ -45,7 +47,7 @@ data class IssuerVariant(
             authorizationRequestType.toIdPart(),
             requestMethod.toIdPart(),
             credentialEncryption.toIdPart(),
-        ).joinToString("-")
+        ).joinToString("-") + (credentialProofType?.let { "-proof-$it" } ?: "")
 
     val credentialOfferAuthMethod: CredentialOfferAuthMethod?
         get() = when {
@@ -86,6 +88,7 @@ data class IssuerVariant(
         put("fapi_request_method", requestMethod)
         put("vci_grant_type", grantType)
         put("vci_credential_encryption", credentialEncryption)
+        credentialProofType?.let { put("credential_proof_type", it) }
     }
 
     fun testPlanCreationVariant(): JsonObject =
@@ -95,7 +98,7 @@ data class IssuerVariant(
                 put("credential_format", credentialFormat)
             }
         } else {
-            toJsonObject()
+            JsonObject(toJsonObject().filterKeys { it != "credential_proof_type" })
         }
 
     private fun String.toIdPart(): String = when (this) {
@@ -204,7 +207,7 @@ data class IssuerVariantSelection(
 ) {
     fun select(variants: List<IssuerVariant>): List<IssuerVariant> {
         if (explicitVariantIds.isNotEmpty()) {
-            return variants.filter { it.id in explicitVariantIds }
+            return variants.filter { it.id in explicitVariantIds || it.copy(credentialProofType = null).id in explicitVariantIds }
         }
 
         return variants.filter {
@@ -354,8 +357,31 @@ data class IssuerVariantMatrixEntry(
 
 object IssuerVariantReportWriter {
     private val json = Json { prettyPrint = true }
+    private val proofModes = setOf("jwt", "attestation")
+
+    fun prepareForRun(reportDir: String) {
+        clearGeneratedFiles(Path.of(reportDir))
+        proofModes.forEach { clearGeneratedFiles(Path.of(reportDir, it)) }
+    }
+
+    private fun clearGeneratedFiles(dir: Path) {
+        listOf("matrix.json", "results.json", "summary.md").forEach { Files.deleteIfExists(dir.resolve(it)) }
+    }
 
     fun write(reportDir: String, variants: List<IssuerVariant>, results: List<IssuerVariantRunResult>, strictResults: Boolean) {
+        val selectedModes = variants.mapNotNull { it.credentialProofType }.toSet()
+        (proofModes - selectedModes).forEach { clearGeneratedFiles(Path.of(reportDir, it)) }
+        writeReport(reportDir, variants, results, strictResults)
+        // Keep an aggregate report for CI and independent evidence for each proof mode.
+        selectedModes.forEach { proofType ->
+            val selected = variants.filter { it.credentialProofType == proofType }
+            val ids = selected.map { it.id }.toSet()
+            writeReport(Path.of(reportDir, proofType).toString(), selected,
+                results.filter { it.variantId in ids }, strictResults)
+        }
+    }
+
+    private fun writeReport(reportDir: String, variants: List<IssuerVariant>, results: List<IssuerVariantRunResult>, strictResults: Boolean) {
         val dir = Path.of(reportDir)
         Files.createDirectories(dir)
 
@@ -424,6 +450,10 @@ object IssuerVariantReportWriter {
 }
 
 internal fun deriveIssuerCredentialProfileId(credentialConfigurationId: String): String = when {
+    credentialConfigurationId == "identity_credential.attestation" -> "identityCredentialSdJwtAttestation"
+    credentialConfigurationId == "identity_credential_haip.attestation" -> "identityCredentialHaipSdJwtAttestation"
+    credentialConfigurationId == "org.iso.18013.5.1.mDL.attestation" -> "isoMdlAttestation"
+    credentialConfigurationId == "org.iso.18013.5.1.mDL.haip.attestation" -> "isoMdlHaipAttestation"
     credentialConfigurationId.contains("identity_credential_haip") -> "identityCredentialHaipSdJwt"
     credentialConfigurationId.contains("org.iso.18013.5.1.mDL.haip") -> "isoMdlHaip"
     credentialConfigurationId.contains("photoID_credential") -> "photoIdCredentialSdJwt"

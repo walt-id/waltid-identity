@@ -14,12 +14,13 @@ import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
-import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.metadata.issuer.KeyAttestationsRequired
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.TxCode
-import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.proofs.ProofType
+import id.walt.openid4vci.proofs.Proofs
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.*
 import id.walt.wallet2.handlers.WalletIssuanceHandler.exchangeCode
@@ -821,7 +822,7 @@ object WalletIssuanceHandler {
                             did = did?.takeUnless { preferJwkBinding },
                             acceptedAlgorithms = jwtProofAlgorithms,
                             clientId = request.clientId.takeUnless { anonymousPreAuthorizedCode },
-                            keyAttestationsRequired = offeredCredential.configuration.proofTypesSupported?.get("jwt")?.keyAttestationsRequired,
+                            keyAttestationsRequired = offeredCredential.configuration.proofTypesSupported?.get(ProofType.JWT.value)?.keyAttestationsRequired,
                             keyAttestationProvider = wallet.attachedKeyAttestationProvider(),
                         ).jwt?.firstOrNull()
                     }
@@ -1183,7 +1184,7 @@ object WalletIssuanceHandler {
             did = request.did?.takeUnless { preferJwkBinding },
             acceptedAlgorithms = acceptedAlgorithms,
             clientId = request.clientId,
-            keyAttestationsRequired = configuration.proofTypesSupported?.get("jwt")?.keyAttestationsRequired,
+            keyAttestationsRequired = configuration.proofTypesSupported?.get(ProofType.JWT.value)?.keyAttestationsRequired,
             keyAttestationProvider = wallet.attachedKeyAttestationProvider(),
         )
         return SignProofResult(proofJwt = proofs.jwt?.firstOrNull() ?: error("Proof signing produced no JWT"))
@@ -1213,7 +1214,7 @@ object WalletIssuanceHandler {
             put("credential_configuration_id", request.credentialConfigurationId)
             request.proofJwt?.let { jwt ->
                 putJsonObject("proofs") {
-                    put("jwt", buildJsonArray { add(JsonPrimitive(jwt)) })
+                    put(ProofType.JWT.value, buildJsonArray { add(JsonPrimitive(jwt)) })
                 }
             }
         }
@@ -2181,7 +2182,7 @@ object WalletIssuanceHandler {
                     did = holderDid?.takeUnless { preferJwkBinding },
                     acceptedAlgorithms = jwtProofAlgorithms,
                     clientId = clientId,
-                    keyAttestationsRequired = credentialConfiguration?.proofTypesSupported?.get("jwt")?.keyAttestationsRequired,
+                    keyAttestationsRequired = credentialConfiguration?.proofTypesSupported?.get(ProofType.JWT.value)?.keyAttestationsRequired,
                     keyAttestationProvider = wallet.attachedKeyAttestationProvider(),
                 ).jwt?.firstOrNull()
             },
@@ -2328,11 +2329,11 @@ object WalletIssuanceHandler {
 }
 
 internal fun supportedJwtProofAlgorithms(
-    proofTypes: Map<String, ProofType>?,
+    proofTypes: Map<String, ProofTypeMetadata>?,
     keyAttestationProviderAvailable: Boolean = false,
 ): Set<String>? {
     if (proofTypes.isNullOrEmpty()) return null
-    val jwt = requireNotNull(proofTypes["jwt"]) {
+    val jwt = requireNotNull(proofTypes[ProofType.JWT.value]) {
         "Issuer requires an unsupported proof type: ${proofTypes.keys}"
     }
     require(jwt.keyAttestationsRequired == null || keyAttestationProviderAvailable) {

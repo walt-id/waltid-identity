@@ -30,6 +30,7 @@ The library includes:
 - **Authorization Endpoint** - Handles authorization requests and generates authorization codes
 - **Token Endpoint** - Issues access tokens for credential requests
 - **JWT Access Tokens** - JWT-based access token generation and signing
+- **Credential Key Attestations** - [JWT and standalone proof verification with multi-key credential binding](docs/key-attestation.md)
 - **Request Validation** - Validates authorization and token requests according to OAuth2/OpenID4VCI specs
 - **Repository Interfaces** - Pluggable storage for authorization codes and pre-authorized codes
 - **Session Management** - Session tracking for issuance flows
@@ -298,7 +299,7 @@ val inputs = CredentialIssuanceInputProvider { count ->
 ```
 
 The provider runs after the complete proof collection has passed validation. Return
-exactly one input per requested credential, in proof order; allocate independent
+exactly one input per selected credential binding, in binding order; allocate independent
 status entries there when required. Custom format handlers receive the complete
 `CredentialIssuanceBatch` and must process all ordered instances. Do not select only
 the first proof or allocate statuses before validation. There is no separate

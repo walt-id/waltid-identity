@@ -19,6 +19,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
+import id.walt.openid4vci.proofs.ProofType
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.wallet2.data.*
@@ -679,7 +680,7 @@ class WalletIssuanceSessionService(
                 put("credential_configuration_id", offered.credentialConfigurationId)
                 proofJwt?.let { jwt ->
                     putJsonObject("proofs") {
-                        put("jwt", buildJsonArray { add(JsonPrimitive(jwt)) })
+                        put(ProofType.JWT.value, buildJsonArray { add(JsonPrimitive(jwt)) })
                     }
                 }
             }.toString()
@@ -1105,7 +1106,7 @@ class WalletIssuanceSessionService(
         configuration: CredentialConfiguration,
     ): CredentialProofRequirement {
         val proofTypes = configuration.proofTypesSupported ?: return CredentialProofRequirement(null)
-        val jwt = proofTypes["jwt"] ?: error("Issuer requires an unsupported credential proof type")
+        val jwt = proofTypes[ProofType.JWT.value] ?: error("Issuer requires an unsupported credential proof type")
         require(jwt.keyAttestationsRequired == null || wallet.attachedKeyAttestationProvider() != null) {
             "Issuer requires a key-attestation JWT; the configured proof path cannot supply one"
         }
@@ -1140,7 +1141,7 @@ class WalletIssuanceSessionService(
             else -> error("Issuer requires a DID that is bound to the selected holder key")
         }
         val crypto2Key = active.keyMaterial.requireCrypto2SigningKey()
-        val jwtMetadata = configuration.proofTypesSupported?.get("jwt")
+        val jwtMetadata = configuration.proofTypesSupported?.get(ProofType.JWT.value)
         val keyAttestation = keyAttestationForProof(
             wallet.attachedKeyAttestationProvider(),
             jwtMetadata?.keyAttestationsRequired,

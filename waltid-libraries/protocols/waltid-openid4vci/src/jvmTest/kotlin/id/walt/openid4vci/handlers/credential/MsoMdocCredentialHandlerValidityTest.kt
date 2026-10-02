@@ -16,7 +16,7 @@ import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceBatch
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInput
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import kotlinx.coroutines.test.runTest
@@ -72,7 +72,7 @@ class MsoMdocCredentialHandlerValidityTest {
                         },
                     ),
                 ),
-                verifiedProofs = listOf(verifiedProof()),
+                bindings = listOf(verifiedBinding()),
             ),
             dataMapping = null,
             selectiveDisclosure = null,
@@ -119,12 +119,7 @@ class MsoMdocCredentialHandlerValidityTest {
         }
     }
 
-    private suspend fun verifiedProof() = VerifiedCredentialProof(
-        proofType = "jwt",
-        jwt = "",
-        algorithm = "ES256",
-        header = buildJsonObject { },
-        payload = buildJsonObject { },
+    private suspend fun verifiedBinding() = VerifiedCredentialBinding(
         holderKey = crypto2Runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(
                 id = KeyId("mdoc-holder"),
@@ -134,7 +129,7 @@ class MsoMdocCredentialHandlerValidityTest {
         ),
         holderKid = null,
         holderDid = null,
-        nonce = null,
+        proofIndexes = setOf(0),
     )
 
     private companion object {

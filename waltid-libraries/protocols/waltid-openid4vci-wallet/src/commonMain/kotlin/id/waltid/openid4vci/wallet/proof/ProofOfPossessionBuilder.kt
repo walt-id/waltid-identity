@@ -2,7 +2,8 @@ package id.waltid.openid4vci.wallet.proof
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.proofs.ProofType
+import id.walt.openid4vci.proofs.Proofs
 import id.walt.crypto2.keys.Key as Crypto2Key
 
 /**
@@ -54,7 +55,7 @@ interface ProofOfPossessionBuilder {
     /**
      * Gets the proof type identifier
      */
-    val proofType: String
+    val proofType: ProofType
 }
 
 /**
@@ -84,7 +85,7 @@ interface Crypto2ProofOfPossessionBuilder {
     ): Proofs
 
     /** Gets the proof type identifier */
-    val proofType: String
+    val proofType: ProofType
 }
 
 /**

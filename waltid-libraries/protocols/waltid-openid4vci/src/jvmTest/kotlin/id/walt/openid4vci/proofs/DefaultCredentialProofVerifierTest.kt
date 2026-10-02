@@ -9,8 +9,7 @@ import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
-import id.walt.openid4vci.metadata.issuer.ProofType
-import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
@@ -36,10 +35,10 @@ class DefaultCredentialProofVerifierTest {
             context = context(),
         )
 
-        assertEquals(1, verified.size)
+        assertEquals(1, verified.proofs.size)
         assertEquals(
             holderKey.getPublicKey().getThumbprint(),
-            Jwk.sha256Thumbprint(verified.single().holderKey.exportPublicJwk()),
+            Jwk.sha256Thumbprint((verified.proofs.single() as VerifiedJwtProof).holderKey.exportPublicJwk()),
         )
     }
 
@@ -56,10 +55,10 @@ class DefaultCredentialProofVerifierTest {
             context = context(),
         )
 
-        assertEquals("EdDSA", verified.single().algorithm)
+        assertEquals("EdDSA", (verified.proofs.single() as VerifiedJwtProof).algorithm)
         assertEquals(
             holderKey.getPublicKey().getThumbprint(),
-            Jwk.sha256Thumbprint(verified.single().holderKey.exportPublicJwk()),
+            Jwk.sha256Thumbprint((verified.proofs.single() as VerifiedJwtProof).holderKey.exportPublicJwk()),
         )
     }
 
@@ -220,7 +219,7 @@ class DefaultCredentialProofVerifierTest {
         vct = CREDENTIAL_CONFIGURATION_ID,
         cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
         proofTypesSupported = mapOf(
-            "jwt" to ProofType(proofSigningAlgValuesSupported = proofSigningAlgorithms),
+            ProofType.JWT.value to ProofTypeMetadata(proofSigningAlgValuesSupported = proofSigningAlgorithms),
         ),
     )
 

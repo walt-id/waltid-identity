@@ -20,7 +20,7 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandle
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
-import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
@@ -314,7 +314,7 @@ class Wallet2AdditionalUseCasesTest {
         val configuration = CredentialConfiguration(
             format = VciCredentialFormat.SD_JWT_VC, vct = pidVct,
             cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.DidKey),
-            proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))
+            proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))
         )
 
         val preAuthRepo: PreAuthorizedCodeRepository = object : PreAuthorizedCodeRepository {
@@ -642,7 +642,7 @@ class Wallet2AdditionalUseCasesTest {
         val configuration = CredentialConfiguration(
             format = VciCredentialFormat.SD_JWT_VC, vct = pidVct,
             cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
-            proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))
+            proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))
         )
 
         val preAuthRepo: PreAuthorizedCodeRepository = object : PreAuthorizedCodeRepository {
