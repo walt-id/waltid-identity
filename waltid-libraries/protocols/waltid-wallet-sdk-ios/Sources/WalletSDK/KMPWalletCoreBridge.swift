@@ -2073,6 +2073,15 @@ private extension MobileWalletEvent {
 private extension WalletBridgeError {
     func toSwiftWalletError() -> WalletError {
         switch category {
+        case .presentationValidation:
+            guard let presentationValidationFailure else {
+                return .internalFailure("Presentation validation error did not include a failure reason")
+            }
+            return .presentationValidation(
+                code: presentationValidationFailure.errorCode.toSwiftErrorCode(),
+                message: presentationValidationFailure.message,
+                responseSafetyFailure: presentationValidationFailure.responseSafetyFailure
+            )
         case .invalidInput:
             return .invalidInput(message)
         case .network:

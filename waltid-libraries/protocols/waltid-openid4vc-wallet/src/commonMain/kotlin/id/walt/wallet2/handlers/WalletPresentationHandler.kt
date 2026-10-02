@@ -711,7 +711,7 @@ object WalletPresentationHandler {
                 requirements = query.requiredCredentialRequirements(),
                 availableCredentialQueryIds = availableCredentialQueryIds,
             )?.let { throw it }
-            PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedAuthorizationRequest)
+            PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedAuthorizationRequest, availabilityError)
             return StatelessPreviewPresentationResult.Invalid(
                 authorizationRequest = authorizationRequest,
                 error = availabilityError,
@@ -808,7 +808,7 @@ object WalletPresentationHandler {
                 requirements = query.requiredCredentialRequirements(),
                 availableCredentialQueryIds = availableCredentialQueryIds,
             )?.let { throw it }
-            PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedAuthorizationRequest)
+            PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedAuthorizationRequest, availabilityError)
             val handle = rememberPreviewedAuthorizationRequest(
                 wallet = wallet,
                 preview = PreviewedPresentation.Invalid(

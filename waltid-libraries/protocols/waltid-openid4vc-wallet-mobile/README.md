@@ -187,6 +187,13 @@ Preview a presentation request before submission. The request information includ
 typed verifier metadata and the response-encryption state selected by the protocol
 implementation:
 
+An invalid request with an unsafe response channel throws
+`UnsafePresentationErrorResponseException`. Its `error` preserves the OpenID4VP
+code and request-validation message; `responseSafetyFailure` explains why remote
+reporting was blocked. The exception message includes both for demo diagnostics.
+Requests with a safe response channel return `Invalid` for review and explicit
+rejection. No protocol error is sent by preview.
+
 ```kotlin
 val preview = wallet.previewPresentation(requestUrl)
 preview.request.verifierMetadata?.display?.name?.let(::showVerifierName)

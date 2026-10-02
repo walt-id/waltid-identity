@@ -184,6 +184,7 @@ final enum class id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory :
     enum entry issuer // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.issuer|null[0]
     enum entry network // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.network|null[0]
     enum entry paymentConsent // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.paymentConsent|null[0]
+    enum entry presentationValidation // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.presentationValidation|null[0]
     enum entry storage // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.storage|null[0]
     enum entry verifier // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.verifier|null[0]
 
@@ -2668,6 +2669,8 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeError { // id.walt.w
         final fun <get-message>(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.message.<get-message>|<get-message>(){}[0]
     final val paymentConsentFailure // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.paymentConsentFailure|{}paymentConsentFailure[0]
         final fun <get-paymentConsentFailure>(): id.walt.wallet2.consent/PaymentConsentFailure? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.paymentConsentFailure.<get-paymentConsentFailure>|<get-paymentConsentFailure>(){}[0]
+    final val presentationValidationFailure // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.presentationValidationFailure|{}presentationValidationFailure[0]
+        final fun <get-presentationValidationFailure>(): id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.presentationValidationFailure.<get-presentationValidationFailure>|<get-presentationValidationFailure>(){}[0]
 
     final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.wallet2.mobile.swiftinterop/WalletBridgeError> { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.$serializer|null[0]
         final val descriptor // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.$serializer.descriptor|{}descriptor[0]
@@ -2844,6 +2847,40 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence { // id.
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence.toString|toString(){}[0]
+}
+
+final class id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure { // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure|null[0]
+    constructor <init>(id.walt.wallet2.mobile/MobileWalletPresentationErrorCode, kotlin/String, kotlin/String) // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.<init>|<init>(id.walt.wallet2.mobile.MobileWalletPresentationErrorCode;kotlin.String;kotlin.String){}[0]
+
+    final val errorCode // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.errorCode|{}errorCode[0]
+        final fun <get-errorCode>(): id.walt.wallet2.mobile/MobileWalletPresentationErrorCode // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.errorCode.<get-errorCode>|<get-errorCode>(){}[0]
+    final val message // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.message|{}message[0]
+        final fun <get-message>(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.message.<get-message>|<get-message>(){}[0]
+    final val responseSafetyFailure // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.responseSafetyFailure|{}responseSafetyFailure[0]
+        final fun <get-responseSafetyFailure>(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.responseSafetyFailure.<get-responseSafetyFailure>|<get-responseSafetyFailure>(){}[0]
+
+    final fun component1(): id.walt.wallet2.mobile/MobileWalletPresentationErrorCode // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.component2|component2(){}[0]
+    final fun component3(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.component3|component3(){}[0]
+    final fun copy(id.walt.wallet2.mobile/MobileWalletPresentationErrorCode = ..., kotlin/String = ..., kotlin/String = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.copy|copy(id.walt.wallet2.mobile.MobileWalletPresentationErrorCode;kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure> { // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.$serializer|null[0]
+        final val descriptor // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure) // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;id.walt.wallet2.mobile.swiftinterop.WalletBridgePresentationValidationFailure){}[0]
+    }
+
+    final object Companion { // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.Companion|null[0]
+        final val $childSerializers // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure> // id.walt.wallet2.mobile.swiftinterop/WalletBridgePresentationValidationFailure.Companion.serializer|serializer(){}[0]
+    }
 }
 
 final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeStoredCredential { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeStoredCredential|null[0]

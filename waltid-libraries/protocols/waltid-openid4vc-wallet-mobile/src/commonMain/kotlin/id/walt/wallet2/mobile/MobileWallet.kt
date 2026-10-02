@@ -895,7 +895,9 @@ public class MobileWallet internal constructor(
     /**
      * Resolves and previews an OpenID4VP presentation request without submitting credentials.
      * Protocol failures with a validated response destination are returned as [MobileWalletPresentationPreviewResult.Invalid].
-     * Resolution or validation failures that cannot be answered safely remain local exceptions.
+     * Validation errors that cannot be answered safely throw
+     * [id.waltid.openid4vp.wallet.UnsafePresentationErrorResponseException], preserving the protocol
+     * error and the separate response-safety failure. Resolution failures remain local exceptions.
      */
     public suspend fun previewPresentation(requestUrl: String): MobileWalletPresentationPreviewResult = lifecycle.use {
         val result = WalletPresentationHandler.previewPresentationWithTrust(
@@ -1366,7 +1368,7 @@ private fun ClientId.toMobileClientIdScheme(): MobileWalletClientIdScheme = when
     is Unsupported -> error("Unsupported client identifier cannot be authenticated: $prefix")
 }
 
-private fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {
+internal fun WalletPresentFunctionality2.OID4VPErrorCode.toMobileErrorCode(): MobileWalletPresentationErrorCode = when (this) {
     WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED -> MobileWalletPresentationErrorCode.accessDenied
     WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST -> MobileWalletPresentationErrorCode.invalidRequest
     WalletPresentFunctionality2.OID4VPErrorCode.INVALID_CLIENT -> MobileWalletPresentationErrorCode.invalidClient

@@ -1325,7 +1325,7 @@ object WalletPresentFunctionality2 {
             availableCredentialQueryIds = credentials.filterValues { it.isNotEmpty() }.keys,
         )
         availabilityError?.let { error ->
-            PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedRequest)
+            PresentationRequestValidator.requireErrorResponseCanBeSent(resolvedRequest, error)
             return walletRejectHandling(authorizationRequest, error.code)
         }
 
