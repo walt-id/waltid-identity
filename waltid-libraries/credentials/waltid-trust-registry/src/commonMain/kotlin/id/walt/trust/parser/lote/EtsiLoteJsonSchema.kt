@@ -4,7 +4,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * ETSI TS 119 602 V1.1.1 normative JSON schema.
@@ -15,7 +14,6 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * The RFC 7517 JWK definition is inlined from the schema repository so validation
  * is deterministic and never resolves schemas over the network.
  */
-@OptIn(ExperimentalEncodingApi::class)
 internal object EtsiLoteJsonSchema {
     val schema: JsonObject by lazy {
         Json.parseToJsonElement(Base64.decode(SCHEMA_BASE64).decodeToString()).jsonObject
