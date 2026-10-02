@@ -52,9 +52,13 @@ these baselines; updates with iOS disabled are rejected to preserve the iOS decl
 
 #### Dependency analysis
 
-- `waltid.licensereport.gradle.kts` - License report
+- `waltid.licensereport.gradle.kts` - Generates NOTICE / THIRD-PARTY-NOTICE attribution reports (opt-in for identity via `-PenableLicenseReport=true`; always on for enterprise-api). Does not fail the build on disallowed licenses.
+- `waltid.licensee.gradle.kts` - Licensee policy enforcement (`app.cash.licensee`). Attached to `check`. Run `./gradlew licensee` to execute every module's check. Product policy is selected by project path, or overridden with `-Pwaltid.licensee.policy=apache|binary|saas`:
+  - `apache` — identity libraries and OSS services (Apache-2.0 product). Permissive licenses plus weak copyleft (EPL, CDDL, MPL, GPL+CE).
+  - `binary` — shipped Enterprise binaries. Apache set plus LGPL.
+  - `saas` — license server. Binary set plus GPL. AGPL is never allowed.
 
 #### Misc
 
 - `waltid.base.gradle.kts` - Base for all types
-- `waltid.licensereport.gradle.kts` - Use mocking
+- `waltid.mokkery.gradle.kts` - Use mocking

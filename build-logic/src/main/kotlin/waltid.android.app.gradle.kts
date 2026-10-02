@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     id("com.android.application")
     kotlin("plugin.compose")
+    id("waltid.licensee")
 }
 
 android {
