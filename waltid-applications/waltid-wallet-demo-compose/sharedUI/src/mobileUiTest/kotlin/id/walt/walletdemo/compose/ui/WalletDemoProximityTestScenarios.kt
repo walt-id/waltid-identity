@@ -424,6 +424,7 @@ private fun proximityCredentialDetails(): Map<String, CredentialDetails> = listO
         ),
         groups = listOf(
             ClaimGroup(
+                id = "transaction:0",
                 title = "Personal details",
                 items = listOf(
                     ClaimItem(
@@ -445,6 +446,7 @@ private fun proximityCredentialDetails(): Map<String, CredentialDetails> = listO
         ),
         groups = listOf(
             ClaimGroup(
+                id = "transaction:0",
                 title = "Credential data",
                 items = listOf(
                     ClaimItem(

@@ -106,12 +106,12 @@ internal fun SettingsScreen(
                                 }
                                 WalletSection(stringResource(Res.string.settings_wallet)) {
                                     if (currentState.pinLockEnabled) {
-                                        SettingsNavigationRow(stringResource(Res.string.settings_signing_key),
+                                        WalletNavigationRow(stringResource(Res.string.settings_signing_key),
                                             { open(SettingsDestination.SigningKey) }, Modifier.testTag(WalletUiTestTags.SettingsSigningKey), summary = stringResource(Res.string.settings_key_subtitle),
                                             icon = { SettingsSymbol(Res.drawable.settings_key) })
                                         SettingsDivider()
                                     }
-                                    SettingsNavigationRow(stringResource(Res.string.settings_technical),
+                                    WalletNavigationRow(stringResource(Res.string.settings_technical),
                                         { open(SettingsDestination.Technical) }, Modifier.testTag(WalletUiTestTags.SettingsTechnicalDetails), summary = stringResource(Res.string.settings_technical_subtitle),
                                         icon = { SettingsSymbol(Res.drawable.settings_code) })
                                 }
@@ -119,14 +119,14 @@ internal fun SettingsScreen(
                                     WalletSection(stringResource(Res.string.settings_sharing),
                                         modifier = Modifier.testTag(WalletUiTestTags.SettingsCredentialSharing)) {
                                         if (onProximityTransportProfileChange != null) {
-                                            SettingsNavigationRow(stringResource(Res.string.settings_nearby),
+                                            WalletNavigationRow(stringResource(Res.string.settings_nearby),
                                                 { open(SettingsDestination.Nearby) },
                                                 Modifier.testTag(WalletUiTestTags.SettingsProximityPresentation),
                                                 summary = stringResource(currentState.proximityTransportProfile.titleResource),
                                                 icon = { SettingsSymbol(Res.drawable.settings_nearby) })
                                             SettingsDivider()
                                         }
-                                        SettingsNavigationRow(stringResource(Res.string.settings_dc_api),
+                                        WalletNavigationRow(stringResource(Res.string.settings_dc_api),
                                             { open(SettingsDestination.DigitalCredentialsApi) }, Modifier.testTag(WalletUiTestTags.SettingsDigitalCredentialsApi),
                                             summary = stringResource(if (currentState.showDcApiPresentationPreview) Res.string.settings_review_on else Res.string.settings_review_off),
                                             icon = { SettingsSymbol(Res.drawable.settings_id_card) })
@@ -205,12 +205,12 @@ internal fun SettingsScreen(
                                     }
                                 }
                                 WalletSection {
-                                    SettingsNavigationRow(stringResource(Res.string.settings_connection),
+                                    WalletNavigationRow(stringResource(Res.string.settings_connection),
                                         { open(SettingsDestination.Connection) }, Modifier.testTag(WalletUiTestTags.SettingsConnectionMethod), summary = stringResource(currentState.proximityTransportProfile.titleResource),
                                         icon = { SettingsSymbol(Res.drawable.settings_connection) })
                                     if (readerTrustSettingsContent != null) {
                                         SettingsDivider()
-                                        SettingsNavigationRow(stringResource(Res.string.settings_reader_authentication),
+                                        WalletNavigationRow(stringResource(Res.string.settings_reader_authentication),
                                             { open(SettingsDestination.ReaderAuthentication) },
                                             Modifier.testTag(WalletUiTestTags.SettingsReaderAuthentication),
                                             summary = currentReaderPolicy ?: stringResource(Res.string.settings_reader_subtitle),

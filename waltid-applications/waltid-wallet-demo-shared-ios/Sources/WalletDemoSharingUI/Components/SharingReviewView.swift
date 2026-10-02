@@ -94,7 +94,7 @@ public struct SharingReviewView: View {
                             credentialSelected: selection.credentials.contains(option.selection),
                             selectedDisclosureOptions: selection.disclosures,
                             requestedDisclosureItems: details.groups
-                                .first { $0.title == CredentialDisplayVocabulary.requestedDisclosuresTitle }?
+                                .first { $0.id == "requested" }?
                                 .items ?? [],
                             isLoading: isLoading,
                             isReadOnly: isReadOnly,
@@ -161,7 +161,7 @@ struct CredentialReviewCard: View {
 
     var body: some View {
         let requestedDisclosureItems = details.groups
-            .first { $0.title == CredentialDisplayVocabulary.requestedDisclosuresTitle }?
+            .first { $0.id == "requested" }?
             .items ?? []
         let credentialSelected = selection.credentials.contains(option.selection)
 
@@ -215,42 +215,37 @@ private struct SharingClaimsSheet: View {
     let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
     let onDismiss: () -> Void
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center, spacing: 8) {
-                Text(details.cardSummary.title)
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Button("Close", action: onDismiss)
-                    .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsClose)
-            }
-            .padding(.horizontal)
-            .padding(.top)
+    @State private var allInformationOpen = false
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    SharingClaimsIssuerRow(details: details)
-                    if option.disclosures.isEmpty {
-                        Text("No additional claims to review")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        DisclosureList(
-                            option: option,
-                            credentialSelected: credentialSelected,
-                            selectedDisclosureOptions: selectedDisclosureOptions,
-                            requestedDisclosureItems: requestedDisclosureItems,
-                            isLoading: isLoading,
-                            isReadOnly: isReadOnly,
-                            onToggleDisclosure: onToggleDisclosure
-                        )
-                    }
+    var body: some View {
+        WalletDetailSheet(details.cardSummary.title, onDismiss: onDismiss,
+            closeIdentifier: WalletAccessibilityID.presentationClaimsClose) {
+            SharingClaimsIssuerRow(details: details)
+            if option.disclosures.isEmpty {
+                Text("No additional claims to review").font(.caption).foregroundStyle(.secondary)
+            } else {
+                DisclosureList(option: option, credentialSelected: credentialSelected,
+                    selectedDisclosureOptions: selectedDisclosureOptions,
+                    requestedDisclosureItems: requestedDisclosureItems, isLoading: isLoading,
+                    isReadOnly: isReadOnly, onToggleDisclosure: onToggleDisclosure)
+            }
+            if details.groups.contains(where: { $0.id != "requested" }) {
+                WalletSection {
+                    WalletNavigationRow(String(localized: "All credential information", bundle: .module),
+                        subtitle: String(localized: "Includes information outside this request.", bundle: .module)) {
+                        allInformationOpen = true
+                    }.accessibilityIdentifier("review-all-credential-information")
                 }
-                .padding()
             }
         }
-        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsDialog)
+        .sheet(isPresented: $allInformationOpen) {
+            WalletDetailSheet(String(localized: "All credential information", bundle: .module), onDismiss: { allInformationOpen = false }) {
+                Text("Includes information outside this request.", bundle: .module).font(.body)
+                CredentialSummaryRow(summary: details.cardSummary)
+                CredentialDetailsView(details: details)
+            }
+        }
     }
 }
 
@@ -309,7 +304,10 @@ struct DisclosureList: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            ForEach(Array(option.disclosures.enumerated()), id: \.element.id) { index, disclosure in
+            ForEach(Array(option.disclosures.enumerated()).sorted {
+                (requestedDisclosureItems.indices.contains($0.offset) ? requestedDisclosureItems[$0.offset].displayOrder ?? .max : .max)
+                    < (requestedDisclosureItems.indices.contains($1.offset) ? requestedDisclosureItems[$1.offset].displayOrder ?? .max : .max)
+            }, id: \.element.id) { index, disclosure in
                 let selection = PresentationDisclosureSelection(
                     queryID: option.queryID,
                     credentialID: option.credentialID,

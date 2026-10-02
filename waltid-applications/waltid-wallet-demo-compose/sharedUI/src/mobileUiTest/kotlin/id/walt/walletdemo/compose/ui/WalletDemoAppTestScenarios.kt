@@ -348,7 +348,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithContentDescription("More").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.DetailsMenu).assertIsDisplayed()
         waitUntil(timeoutMillis = 5_000) {
-            onAllNodesWithTag(WalletUiTestTags.claimGroup("About this credential")).fetchSemanticsNodes().isNotEmpty()
+            onAllNodesWithTag("credential-technical-details").fetchSemanticsNodes().isNotEmpty()
         }
         onAllNodesWithText("Example Credential").assertCountEquals(1)
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
@@ -377,6 +377,7 @@ class WalletDemoAppTestScenarios(
             onAllNodesWithTag(WalletUiTestTags.claimImage("verification_artifact")).fetchSemanticsNodes().isNotEmpty()
         }
         val artifactPath = "verification_artifact"
+        awaitEnabledImage(artifactPath)
         onNodeWithTag(WalletUiTestTags.claimImage(artifactPath))
             .performScrollTo()
             .assertIsDisplayed()
@@ -390,15 +391,15 @@ class WalletDemoAppTestScenarios(
         onAllNodesWithTag(WalletUiTestTags.claimImageViewer(artifactPath)).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.claimImage(artifactPath)).assertIsDisplayed()
-        // Resolve the images above this disclosure before scrolling; their metadata changes row heights.
-        onNodeWithTag(WalletUiTestTags.claimGroup("About this credential"))
-            .performScrollTo()
-            .assertIsDisplayed()
+        onNodeWithTag("credential-technical-details").performScrollTo().assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.claim("system.format")).assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.claimGroup("About this credential")).performClick()
+        onNodeWithTag("credential-technical-details").performClick()
+        onNodeWithText("About this credential").performScrollTo().assertIsDisplayed()
         onNodeWithText("Example Issuer").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.claim("system.format")).performScrollTo().assertIsDisplayed()
         onAllNodesWithText("Raw credential data").assertCountEquals(0)
+        onNodeWithTag("wallet-detail-close").performClick()
+        onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
         onNodeWithTag("wallet.detailsBack").performClick()
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
@@ -1007,6 +1008,7 @@ class WalletDemoAppTestScenarios(
         onAllNodesWithText("$.portrait").assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.claim(portraitDisclosurePath)).performScrollTo().assertIsDisplayed()
         awaitTaggedNode(WalletUiTestTags.claimImage(portraitDisclosurePath))
+        awaitEnabledImage(portraitDisclosurePath)
         onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath))
             .performScrollTo()
             .assertIsDisplayed()
@@ -1896,6 +1898,13 @@ class WalletDemoAppTestScenarios(
         assertTrue(settingsOpened)
         assertTrue(!proximity.value.active)
         onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
+    }
+
+    private fun ComposeUiTest.awaitEnabledImage(path: String) {
+        waitUntil(timeoutMillis = 10_000) {
+            onAllNodes(hasTestTag(WalletUiTestTags.claimImage(path)) and isEnabled())
+                .fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     private fun ComposeUiTest.awaitTaggedNode(tag: String) {

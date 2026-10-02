@@ -25,7 +25,8 @@ public struct CredentialDetails: Equatable, Identifiable {
         metadataJSON: String? = nil,
         issuerDisplay: MetadataDisplay? = nil,
         credentialDisplay: MetadataDisplay? = nil,
-        credentialDataJSON: String? = nil
+        credentialDataJSON: String? = nil,
+        preferredLocales: [String] = Locale.preferredLanguages
     ) {
         self.id = id
         self.title = title
@@ -33,16 +34,16 @@ public struct CredentialDetails: Equatable, Identifiable {
         self.subject = subject
         self.format = format
         self.addedAt = addedAt
-        self.groups = groups
+        self.groups = applyClaimMetadata(groups, metadata: StoredCredentialMetadataParser.claims(from: metadataJSON, preferredLocales: preferredLocales), format: format)
         self.issuerDisplay = issuerDisplay
             ?? StoredCredentialMetadataParser.issuerDisplay(
                 from: metadataJSON,
-                preferredLocales: Locale.preferredLanguages
+                preferredLocales: preferredLocales
             )
         self.credentialDisplay = credentialDisplay
             ?? StoredCredentialMetadataParser.credentialDisplay(
                 from: metadataJSON,
-                preferredLocales: Locale.preferredLanguages
+                preferredLocales: preferredLocales
             )
         self.credentialDataJSON = credentialDataJSON
         self.cardTitle = CredentialTitles.displayName(
@@ -55,20 +56,24 @@ public struct CredentialDetails: Equatable, Identifiable {
 }
 
 public struct ClaimGroup: Equatable, Identifiable {
+    /// Stable semantic identity, independent of localized headings.
+    public let id: String
     public let title: String
     public let items: [ClaimItem]
     public let initiallyExpanded: Bool
     public let transactionType: String?
 
-    public init(title: String, items: [ClaimItem], initiallyExpanded: Bool = true, transactionType: String? = nil) {
+    public init(id: String, title: String, items: [ClaimItem], initiallyExpanded: Bool = true, transactionType: String? = nil) {
+        self.id = id
         self.title = title
         self.items = items
         self.initiallyExpanded = initiallyExpanded
         self.transactionType = transactionType
     }
 
-    public var id: String { title }
 }
+
+public enum ClaimLabelSource: Equatable { case wallet, issuerMetadata, request }
 
 public struct ClaimItem: Equatable, Identifiable {
     public let path: ClaimItemPath
@@ -77,6 +82,8 @@ public struct ClaimItem: Equatable, Identifiable {
     public let value: DisplayValue
     public let rawValue: String?
     public let roles: Set<ClaimRole>
+    public let labelSource: ClaimLabelSource
+    public let displayOrder: Int?
 
     public var id: String { path.id }
 
@@ -86,7 +93,9 @@ public struct ClaimItem: Equatable, Identifiable {
         label: String,
         value: DisplayValue,
         rawValue: String?,
-        roles: Set<ClaimRole> = []
+        roles: Set<ClaimRole> = [],
+        labelSource: ClaimLabelSource = .wallet,
+        displayOrder: Int? = nil
     ) {
         self.path = path
         self.pathComponents = pathComponents
@@ -94,6 +103,8 @@ public struct ClaimItem: Equatable, Identifiable {
         self.value = value
         self.rawValue = rawValue
         self.roles = roles
+        self.labelSource = labelSource
+        self.displayOrder = displayOrder
     }
 }
 
@@ -138,7 +149,7 @@ public struct ClaimItemPath: Hashable {
     }
 
     public static func topLevel(_ name: String) -> ClaimItemPath {
-        ClaimItemPath(renderedID: .raw(name))
+        ClaimItemPath(renderedID: .raw(claimPathKey(name)))
     }
 
     public static func transactionData(index: Int, field: DisplayTransactionDataField) -> ClaimItemPath {
@@ -163,7 +174,9 @@ private struct RenderedClaimPath: Hashable {
     var value: String {
         operations.reduce(root) { partial, operation in
             switch operation {
-            case .child(let name): return "\(partial).\(name)"
+            case .child(let name):
+                let key = claimPathKey(name)
+                return partial + (key.hasPrefix("[") ? "" : ".") + key
             case .index(let index): return "\(partial)[\(index)]"
             }
         }
@@ -189,6 +202,17 @@ public enum ClaimGroupKind: CaseIterable {
     case other
     case travelDocumentData
     case technical
+
+    public var id: String {
+        switch self {
+        case .personal: return "personal"
+        case .ageAttestations: return "age"
+        case .address: return "address"
+        case .other: return "data"
+        case .travelDocumentData: return "travel"
+        case .technical: return "technical"
+        }
+    }
 
     public var title: String {
         switch self {
@@ -307,4 +331,11 @@ public final class DeferredCredentialImage: Equatable {
     public static func == (lhs: DeferredCredentialImage, rhs: DeferredCredentialImage) -> Bool {
         lhs === rhs
     }
+}
+
+private func claimPathKey(_ name: String) -> String {
+    if name.range(of: "^[A-Za-z_][A-Za-z0-9_]*$", options: .regularExpression) != nil { return name }
+    // A JSON bracket segment preserves punctuation, namespace boundaries and numeric keys.
+    let encoded = try! JSONSerialization.data(withJSONObject: [name], options: .withoutEscapingSlashes)
+    return String(decoding: encoded, as: UTF8.self)
 }
