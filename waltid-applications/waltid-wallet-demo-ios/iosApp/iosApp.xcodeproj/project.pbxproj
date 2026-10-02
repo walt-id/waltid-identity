@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A13330000000000000000001 /* SnapshotTesting in Frameworks */ = {isa = PBXBuildFile; productRef = A13330000000000000000002 /* SnapshotTesting */; };
 		A14440000000000000000003 /* TestHelpers.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A74900000000000000000010 /* TestHelpers.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
         A74900000000000000000001 /* WalletSDKKeychainRecovery in Frameworks */ = {isa = PBXBuildFile; productRef = A74900000000000000000002 /* WalletSDKKeychainRecovery */; };
@@ -254,6 +255,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A13330000000000000000001 /* SnapshotTesting in Frameworks */,
 				2185E0068DD9855D00602730 /* WalletSDK in Frameworks */,
 				A75200000000000000000026 /* WalletDemoIdentityDocumentSupport in Frameworks */,
 				A75200000000000000000045 /* WalletDemoSharingUI in Frameworks */,
@@ -530,6 +532,7 @@
 			);
 			name = iosAppTests;
 			packageProductDependencies = (
+				A13330000000000000000002 /* SnapshotTesting */,
 				519D794773D1421EEC9493DE /* WalletSDK */,
 				A75200000000000000000023 /* WalletDemoIdentityDocumentSupport */,
 				A75200000000000000000042 /* WalletDemoSharingUI */,
@@ -603,6 +606,7 @@
 				8A81DD79791BBF3F1CFF90A1 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */,
 				A75200000000000000000020 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */,
 				A1000502AAAA000000000052 /* XCRemoteSwiftPackageReference "CodeScanner" */,
+				A13330000000000000000003 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */,
 			);
 			productRefGroup = B33B17E72C2C394F001A32F7 /* Products */;
 			projectDirPath = "";
@@ -1305,6 +1309,11 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A13330000000000000000003 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-snapshot-testing";
+			requirement = { kind = exactVersion; version = 1.19.6; };
+		};
 		A1000502AAAA000000000052 /* XCRemoteSwiftPackageReference "CodeScanner" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/twostraws/CodeScanner.git";
@@ -1316,6 +1325,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A13330000000000000000002 /* SnapshotTesting */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A13330000000000000000003 /* XCRemoteSwiftPackageReference "swift-snapshot-testing" */;
+			productName = SnapshotTesting;
+		};
         A74900000000000000000002 /* WalletSDKKeychainRecovery */ = {isa = XCSwiftPackageProductDependency; package = 8A81DD79791BBF3F1CFF90A1; productName = WalletSDKKeychainRecovery; };
 		256D4E3F703216DC04F0C650 /* WalletSDK */ = {
 			isa = XCSwiftPackageProductDependency;
