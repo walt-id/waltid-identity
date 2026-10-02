@@ -5,6 +5,13 @@ public enum WalletError: Error, Equatable, Sendable {
     /// The SDK input could not be parsed or validated.
     case invalidInput(String)
 
+    /// An invalid OpenID4VP request whose protocol error could not be reported safely.
+    /// - Parameters:
+    ///   - code: The original OpenID4VP error code.
+    ///   - message: The original request-validation message.
+    ///   - responseSafetyFailure: The reason the error response was not sent.
+    case presentationValidation(code: PresentationErrorCode, message: String, responseSafetyFailure: String)
+
     /// Network communication with an issuer, verifier, or wallet backend failed.
     case network(String)
 
@@ -49,6 +56,8 @@ extension WalletError: LocalizedError {
              .credentialNotFound(let message),
              .internalFailure(let message):
             return message
+        case .presentationValidation(let code, let message, let responseSafetyFailure):
+            return "\(code.errorCode): \(message). Error response was not sent: \(responseSafetyFailure)"
         case .paymentConsent(_, let message):
             return message
         case .keyUseAuthorization(let failure):
