@@ -63,7 +63,8 @@ struct WalletVisualFixtures {
     func deferredCredential() throws -> DeferredCredential {
         let value = try object(root, "batchOutcome")
         return DeferredCredential(id: try text(value, "pendingId"),
-            credentialConfigurationID: try text(value, "pendingConfigurationId"), intervalSeconds: 5)
+            credentialConfigurationID: try text(value, "pendingConfigurationId"), intervalSeconds: 5,
+            status: .awaitingIssuer, displayMetadataJSON: try json(object(value, "pendingMetadata")))
     }
 
     func offer() throws -> IssuanceOfferPreview {
