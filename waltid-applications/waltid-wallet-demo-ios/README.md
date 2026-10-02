@@ -26,6 +26,8 @@ For setup, IDE guidance, and mobile integration test commands, see the [Mobile W
 
 ## Credential issuance
 
+Compact review rows keep inclusion, copy counts and credential information separate. Information shows the issuer's advertised definitions before issuance; actual values appear after receipt. Review and stored details follow the same [credential-information contract](../waltid-wallet-demo-test-fixtures/credential-information.md).
+
 Offer review lets users select credential configurations and explicitly request copies up to the issuer's advertised limit. Every configuration defaults to one copy. Additional holder keys are created only after acceptance, and the same choices are passed to pre-authorized and browser authorization flows. The Wallet SDK retains each credential's holder-key association for presentation.
 
 Saved credentials remain visible when other targets are deferred or fail. Deferred handles are restored when reopening the wallet and can be polled individually from Receive. A failure after target processing consumes the reviewed offer; it does not offer a retry of the already spent grant.
@@ -127,7 +129,7 @@ Terminal recovery creates a new single-use session.
 
 ## Signing key setup
 
-PIN setup controls access to the app, with optional biometric unlock. Signing-key setup has three steps: choose whether to create or restore a key, choose its storage, and choose when signing requires system approval. New keys can be created with or without a backup. Each screen groups the SDK's supported options into choice rows; a single supported option is shown as read-only. Continue keeps the selection local until Create signing key or Restore signing key is pressed. The SDK revalidates the selected option before executing it.
+PIN setup keeps both six-digit inputs and the optional biometric-unlock toggle on one screen. Enabling biometrics authenticates with the OS; Create PIN remains disabled during that check. Existing unlock PINs remain supported. Signing-key setup has three steps: choose whether to create or restore a key, choose its storage, and choose when signing requires system approval. New keys can be created with or without a backup. Each screen groups the SDK's supported options into choice rows; a single supported option is shown as read-only. Continue keeps the selection local until Create signing key or Restore signing key is pressed. The SDK revalidates the selected option before executing it.
 
 Key recovery restores the original key and DID, not credentials. A local save does not prove delivery to another device. Unavailable providers show their reported reason and can be checked again; returning to the app also refreshes the choices.
 

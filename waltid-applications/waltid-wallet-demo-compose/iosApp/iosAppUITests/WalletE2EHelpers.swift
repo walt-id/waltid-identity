@@ -4,7 +4,7 @@ import XCTest
 @MainActor
 final class WalletE2EUI {
     let app: XCUIApplication
-    private let pin = "1234"
+    private let pin = "123456"
 
     init(app: XCUIApplication) {
         self.app = app
@@ -355,7 +355,7 @@ final class WalletE2EUI {
         }
 
         // Setup now includes a biometric toggle; wait for the full form before the first tap.
-        _ = button(identifier: "wallet.pinSubmitButton", fallbackLabel: "Set PIN")
+        _ = button(identifier: "wallet.pinSubmitButton", fallbackLabel: "Create PIN")
             .waitForExistence(timeout: 5)
 
         let settleDeadline = Date().addingTimeInterval(2)
@@ -371,7 +371,7 @@ final class WalletE2EUI {
             replaceText(in: confirmation, value: pin)
         }
 
-        tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Set PIN")
+        tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Create PIN")
     }
 
     private func firstExisting(_ elements: [XCUIElement]) -> XCUIElement {

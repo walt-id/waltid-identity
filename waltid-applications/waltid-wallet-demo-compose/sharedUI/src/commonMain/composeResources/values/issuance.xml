@@ -1,0 +1,21 @@
+<resources>
+    <string name="issuance_offered_credentials">Offered credentials</string>
+    <string name="issuance_information">Credential information</string>
+    <string name="issuance_receive_named">Receive %1$s</string>
+    <string name="issuance_copies">Copies: %1$d</string>
+    <string name="issuance_more_copies">More copies of %1$s</string>
+    <string name="issuance_fewer_copies">Fewer copies of %1$s</string>
+    <string name="issuance_one_copy">1 copy</string>
+    <string name="issuance_selection_summary">Selected: %1$d · Copies: %2$d</string>
+    <string name="issuance_select_one">Select at least one credential to continue.</string>
+    <string name="issuance_not_received">Values have not been received yet.</string>
+    <string name="issuance_claim_definitions">Claim definitions</string>
+    <string name="issuance_no_definitions">The issuer has not supplied claim definitions.</string>
+    <string name="issuance_definitions_hint">These definitions describe the offer. Review the actual values after receiving.</string>
+    <string name="issuance_always_included">Always included</string>
+    <string name="issuance_may_be_included">May be included</string>
+    <string name="issuance_issuer">Issuer</string>
+    <string name="issuance_format">Format</string>
+    <string name="issuance_configuration">Configuration</string>
+    <string name="issuance_type">Credential type</string>
+</resources>
