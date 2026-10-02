@@ -1,6 +1,9 @@
 {
   "schemaVersion": 1,
-  "issuer": { "identifier": "https://issuer.example", "name": "Example City" },
+  "issuer": {
+    "identifier": "https://issuer.example",
+    "name": "Example City"
+  },
   "credential": {
     "id": "visual-resident-card",
     "title": "Resident card",
@@ -9,8 +12,14 @@
     "data": {
       "given_name": "Ada",
       "family_name": "Lovelace",
-      "resident_address": { "street_address": "12 Example Street", "locality": "Vienna" },
-      "children": ["Alice", "Bob"],
+      "resident_address": {
+        "street_address": "12 Example Street",
+        "locality": "Vienna"
+      },
+      "children": [
+        "Alice",
+        "Bob"
+      ],
       "optional_note": null,
       "is_employee": false,
       "balance": 0
@@ -28,8 +37,20 @@
         "backgroundColor": "#164A61",
         "copies": 2,
         "claims": [
-          { "path": ["given_name"], "label": "Given name", "mandatory": true },
-          { "path": ["family_name"], "label": "Family name", "mandatory": true }
+          {
+            "path": [
+              "given_name"
+            ],
+            "label": "Given name",
+            "mandatory": true
+          },
+          {
+            "path": [
+              "family_name"
+            ],
+            "label": "Family name",
+            "mandatory": true
+          }
         ]
       },
       {
@@ -38,28 +59,138 @@
         "title": "Library membership",
         "backgroundColor": "#664373",
         "copies": 1,
-        "claims": [{ "path": ["member_id"], "label": "Member number", "mandatory": true }]
+        "claims": [
+          {
+            "path": [
+              "member_id"
+            ],
+            "label": "Member number",
+            "mandatory": true
+          }
+        ]
       }
     ]
   },
-  "nearby": { "qrPayload": "mdoc:visual-fixture-not-a-live-engagement" },
+  "nearby": {
+    "qrPayload": "mdoc:visual-fixture-not-a-live-engagement"
+  },
   "batchOutcome": {
     "status": "Saved credentials: 1. Pending targets: 1.",
     "pendingId": "visual-deferred-library",
     "pendingConfigurationId": "library-card",
-    "pendingMetadata": {"credentialDisplay": [{"name": "Library membership", "locale": "en", "background_color": "#664373"}]}
+    "pendingMetadata": {
+      "credentialDisplay": [
+        {
+          "name": "Library membership",
+          "locale": "en",
+          "background_color": "#664373"
+        }
+      ]
+    }
   },
   "payment": {
     "revision": "visual-consent-revision-1",
     "locale": "en",
     "title": "Confirm payment",
-    "affirmativeAction": "Pay €11.56",
+    "affirmativeAction": "Pay \u20ac11.56",
     "denialAction": "Decline",
     "fields": [
-      { "name": "Amount", "value": "11.56 EUR", "placement": "Prominent" },
-      { "name": "Payee", "value": "Example Bookshop", "placement": "Main" },
-      { "name": "Transaction identifier", "value": "example-transaction-001", "placement": "Details" },
-      { "name": "Technical reference", "value": "bound-but-hidden", "placement": "Omitted" }
+      {
+        "name": "Amount",
+        "value": "11.56 EUR",
+        "placement": "Prominent"
+      },
+      {
+        "name": "Payee",
+        "value": "Example Bookshop",
+        "placement": "Main"
+      },
+      {
+        "name": "Transaction identifier",
+        "value": "example-transaction-001",
+        "placement": "Details"
+      },
+      {
+        "name": "Technical reference",
+        "value": "bound-but-hidden",
+        "placement": "Omitted"
+      }
+    ]
+  },
+  "keySetup": {
+    "options": [
+      {
+        "id": "option-0",
+        "recovery": {
+          "id": "new",
+          "title": "Without a backup",
+          "detail": "No signing-key backup is created. Credentials may need to be issued again if this key is lost."
+        },
+        "storage": {
+          "id": "hardware",
+          "title": "Hardware-backed key",
+          "detail": "The device protects this key in secure hardware. It cannot be restored elsewhere."
+        },
+        "approval": {
+          "id": "biometric",
+          "title": "Biometric approval",
+          "detail": "Approve signing with biometrics. App unlock remains separate."
+        }
+      },
+      {
+        "id": "option-1",
+        "recovery": {
+          "id": "new",
+          "title": "Without a backup",
+          "detail": "No signing-key backup is created. Credentials may need to be issued again if this key is lost."
+        },
+        "storage": {
+          "id": "native",
+          "title": "System key store",
+          "detail": "The device stores this key. Recoverable configurations can restore it on another device."
+        },
+        "approval": {
+          "id": "biometric",
+          "title": "Biometric approval",
+          "detail": "Approve signing with biometrics. App unlock remains separate."
+        }
+      },
+      {
+        "id": "option-2",
+        "recovery": {
+          "id": "new",
+          "title": "Without a backup",
+          "detail": "No signing-key backup is created. Credentials may need to be issued again if this key is lost."
+        },
+        "storage": {
+          "id": "native",
+          "title": "System key store",
+          "detail": "The device stores this key. Recoverable configurations can restore it on another device."
+        },
+        "approval": {
+          "id": "none",
+          "title": "No signing prompt",
+          "detail": "Signing does not require system approval."
+        }
+      },
+      {
+        "id": "option-3",
+        "recovery": {
+          "id": "backup:example",
+          "title": "Back up with Example provider",
+          "detail": "Saves your signing key. Credentials are not included."
+        },
+        "storage": {
+          "id": "native",
+          "title": "System key store",
+          "detail": "The device stores this key. Recoverable configurations can restore it on another device."
+        },
+        "approval": {
+          "id": "biometric",
+          "title": "Biometric approval",
+          "detail": "Approve signing with biometrics. App unlock remains separate."
+        }
+      }
     ]
   }
 }

@@ -8,6 +8,24 @@ import XCTest
 
 @MainActor
 final class WalletVisualTests: XCTestCase {
+    func testKeySummary() throws { try keySetup(.summary) }
+    func testKeyRecovery() throws { try keySetup(.recovery) }
+    func testKeyStorage() throws { try keySetup(.storage) }
+    func testKeyApproval() throws { try keySetup(.approval) }
+
+    private func keySetup(_ step: WalletIdentityScreenModel.Step) throws {
+        let options = try WalletVisualFixtures().keySetupOptions()
+        let selected = try XCTUnwrap(options.first)
+        try capture(NavigationView {
+            List { SigningKeySetupContent(options: options, selected: selected, step: step, onSelect: { _ in }, onEdit: { _ in }) }
+                .navigationTitle("Set up your wallet").navigationBarTitleDisplayMode(.inline)
+                .safeAreaInset(edge: .bottom) {
+                    WalletActionBar(primary: WalletAction(step == .summary ? "Create signing key" : "Done", perform: {}),
+                        secondary: step == .summary ? nil : WalletAction("Back", perform: {}))
+                }
+        }.navigationViewStyle(.stack), id: "onboarding.key.\(step)")
+    }
+
     func testPinSetup() async throws { try await pin("setup") }
     func testPinMismatch() async throws { try await pin("mismatch") }
     func testPinBiometrics() async throws { try await pin("biometrics_enabled") }

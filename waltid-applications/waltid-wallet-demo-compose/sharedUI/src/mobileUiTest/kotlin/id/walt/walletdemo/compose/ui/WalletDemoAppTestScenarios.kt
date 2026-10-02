@@ -280,6 +280,22 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsDisplayed()
     }
 
+    fun keySetupDefaultNeedsOneConfirmation() = runComposeUiTest {
+        fun choice(id: String) = WalletDemoKeyChoice(id, id, "Details for $id")
+        val recommended = WalletDemoKeySetupOption("recommended", choice("new"), choice("hardware"), choice("biometric"))
+        var submitted: String? = null
+        setWalletContent {
+            IdentitySetupScreen(WalletDemoIdentitySetup.Choose(listOf(recommended)), null,
+                onChoose = { submitted = it }, onResume = {}, onCancel = {}, onRefresh = {})
+        }
+        onNodeWithTag("wallet.keySetupEdit.Recovery").performScrollTo().assertIsDisplayed()
+        onNodeWithTag("wallet.keySetupEdit.Storage").performScrollTo().assertIsDisplayed()
+        onNodeWithTag("wallet.keySetupEdit.Approval").performScrollTo().assertIsDisplayed()
+        assertEquals(null, submitted)
+        onNodeWithText("Create signing key").performClick()
+        assertEquals("recommended", submitted)
+    }
+
     fun keySetupGroupsChoicesAndConfirmsSelectedConfiguration() = runComposeUiTest {
         fun value(name: String) = WalletDemoKeyChoice(name, name, "Details for $name")
         fun option(recovery: String, storage: String, approval: String) = WalletDemoKeySetupOption(
@@ -289,33 +305,26 @@ class WalletDemoAppTestScenarios(
             option("new", "native", "none"), option("backup", "native", "biometric"), option("backup", "database", "none"))
         var submitted: String? = null
         setWalletContent {
-            IdentitySetupScreen(
-                WalletDemoIdentitySetup.Choose(options), null,
-                onChoose = { submitted = it }, onResume = {}, onCancel = {}, onRefresh = {},
-            )
+            IdentitySetupScreen(WalletDemoIdentitySetup.Choose(options), null,
+                onChoose = { submitted = it }, onResume = {}, onCancel = {}, onRefresh = {})
         }
+        onNodeWithTag("wallet.keySetupEdit.Recovery").performScrollTo().performClick()
         onAllNodesWithText("new").assertCountEquals(1)
         onNodeWithTag(WalletUiTestTags.keySetupChoice("Recovery", 1)).performScrollTo().performClick().assertIsSelected()
         onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        onNodeWithTag("wallet.keySetupEdit.Storage").performScrollTo().performClick()
         onAllNodesWithText("hardware").assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        onNodeWithTag("wallet.keySetupEdit.Approval").performScrollTo().performClick()
         onAllNodesWithText("biometric").assertCountEquals(0)
         onAllNodesWithText("Refresh available options").assertCountEquals(0)
-        if (hasSystemBackNavigation) {
-            onNodeWithText("Back").assertIsDisplayed()
-        } else {
-            onNodeWithText("Back").performClick()
-            onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).assertIsSelected()
-            onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
-        }
-        assertEquals(null, submitted)
-        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
-        onNodeWithText("4 of 4 · Review").assertIsDisplayed()
-        assertEquals(null, submitted, "Reviewing choices must not create or restore a key")
         onNodeWithText("Back").performClick()
-        onNodeWithText("3 of 4 · Signing approval").assertIsDisplayed()
+        onNodeWithTag("wallet.keySetupEdit.Storage").performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).assertIsSelected()
         onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        assertEquals(null, submitted, "Customizing choices must not create or restore a key")
+        onNodeWithTag("wallet.keySetupEdit.Approval").assertTextContains("none")
         onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
         assertEquals("backup-database-none", submitted)
     }
