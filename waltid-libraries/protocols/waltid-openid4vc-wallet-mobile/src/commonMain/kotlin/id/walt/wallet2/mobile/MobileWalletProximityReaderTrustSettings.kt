@@ -19,7 +19,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -562,11 +561,9 @@ public object ProximityReaderTrustSettingsCodec {
     private const val BundleType = "org.waltid.wallet.reader-trust"
 }
 
-@OptIn(ExperimentalEncodingApi::class)
 private fun ByteArray.encodeBase64Url(): String =
     Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(this)
 
-@OptIn(ExperimentalEncodingApi::class)
 private fun String.decodeBase64Url(): ByteArray = runCatching {
     require(isNotBlank() && !contains('='))
     Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).decode(this)
