@@ -49,14 +49,14 @@ object DemoTestBackend {
     private const val ISSUER_BASE_URL = "https://issuer2.demo.walt.id"
     private const val ISSUER_IDENTIFIER = "$ISSUER_BASE_URL/openid4vci"
     // RFC 7638 thumbprint of the issuer2 metadata signing key published at
-    // https://issuer2.demo.walt.id/openid4vci/jwks (verified 2026-09-29). This is an independent trust anchor;
+    // https://issuer2.demo.walt.id/openid4vci/jwks (verified 2026-10-01). This is an independent trust anchor;
     // it must not be learned from the signed metadata JWT itself.
     private const val ISSUER_METADATA_SIGNING_KEY_THUMBPRINT =
-        "2iEFnGUV5WKiB1JWV8pBeqEDzqJJJ7-7m65b5NRFdOo"
+        "DOiRtPhc0Hre1XZwBVjx_YoGugtAEtWNrKCZ4zerXs4"
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
-    // The demo verifier only accepts signed requests for an explicitly configured client ID.
+    // Pre-registered client ID trusted by the signed-request integration tests.
     const val PUBLIC_DEMO_VERIFIER_CLIENT_ID = "verifier2"
-    // `kid`, `x`, and `y` of the ES256 request-object signing key served by verifier2's x5c header.
+    // Public ES256 request-object key pinned by the mobile test wallets.
     // This is a pre-registered trust anchor: it must not be learned from the request object itself.
     private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_ID = "_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug"
     private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_X = "G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0"
@@ -318,6 +318,17 @@ object DemoTestBackend {
         put("y", VERIFIER_REQUEST_OBJECT_SIGNING_KEY_Y)
     }
 
+    // Public test key and certificate from verifier-service.conf; never use for production signing.
+    private val verifierRequestSigningKey = buildJsonObject {
+        put("type", "jwk")
+        putJsonObject("jwk") {
+            publicDemoVerifierRequestObjectSigningJwk.forEach { (name, value) -> put(name, value) }
+            put("d", "AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA")
+        }
+    }
+    private const val VERIFIER_REQUEST_OBJECT_SIGNING_CERTIFICATE =
+        "MIIB2DCCAX+gAwIBAgIUHM9IDlzSNPwZcKStPxhcDrQBxPEwCgYIKoZIzj0EAwIwMTEdMBsGA1UEAwwUdmVyaWZpZXIuZXhhbXBsZS5jb20xEDAOBgNVBAoMB3dhbHQuaWQwHhcNMjYwODEzMDAwMDAwWhcNMjgwODEzMDAwMDAwWjAxMR0wGwYDVQQDDBR2ZXJpZmllci5leGFtcGxlLmNvbTEQMA4GA1UECgwHd2FsdC5pZDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABBv04AXNAZJjIqYkP+oJGpiJ95pqe4XE62bsqy05pJz9VkRMZdXYXSMff5AJLrnHiN0x5MV6u/8vrAcytGUe4z6jdTBzMAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgeAMBMGA1UdJQQMMAoGCCsGAQUFBwMCMB8GA1UdEQQYMBaCFHZlcmlmaWVyLmV4YW1wbGUuY29tMB0GA1UdDgQWBBSCJZ2bjB1VuLM8lvN8e/M4MYmLvzAKBggqhkjOPQQDAgNHADBEAiAI8wYnWdTWeqNLKMVw8UU4xPPnZkR45NhD/iUNKexRdgIgCdTIULB9hbTNdm+S7nANVTuVw3Kw0tnUjF7Ihdia/dw="
+
     /** Trust resolver for signed metadata served by the public issuer2 demo. */
     val publicDemoIssuerMetadataTrustResolver = CredentialIssuerMetadataTrustResolver { compactJwt, expectedCredentialIssuer ->
         require(expectedCredentialIssuer == ISSUER_IDENTIFIER) {
@@ -469,6 +480,7 @@ object DemoTestBackend {
                 put("signed_request", signedRequest)
                 if (signedRequest) {
                     put("clientId", PUBLIC_DEMO_VERIFIER_CLIENT_ID)
+                    put("key", verifierRequestSigningKey)
                 }
                 requestedSessionId?.let { sessionId ->
                     val responseUri = "$VERIFIER_BASE_URL/verification-session/$sessionId/response"
@@ -606,6 +618,8 @@ object DemoTestBackend {
                 put("signed_request", true)
                 // Matches the certificate independently pinned by the demo wallet.
                 put("clientId", "x509_san_dns:verifier.example.com")
+                put("key", verifierRequestSigningKey)
+                putJsonArray("x5c") { add(JsonPrimitive(VERIFIER_REQUEST_OBJECT_SIGNING_CERTIFICATE)) }
             }
             putJsonObject("dcql_query") {
                 putJsonArray("credentials") {
