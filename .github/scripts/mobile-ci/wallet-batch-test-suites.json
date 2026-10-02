@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "physicalClassPrefixes": [],
+  "suites": {
+    "compose-android-batch": {
+      "requiredTests": [
+        {
+          "class": "id.walt.walletdemo.compose.android.BatchIssuanceE2ETest",
+          "name": "explicitCopiesSurviveActivityRelaunch"
+        }
+      ]
+    }
+  }
+}

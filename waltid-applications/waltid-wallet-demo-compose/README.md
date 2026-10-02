@@ -262,12 +262,16 @@ Backend E2E fixtures are intentionally shared:
 - iOS UI tests use the shared Swift `TestHelpers` backend fixtures from `../mobile-e2e-fixtures/ios/TestHelpers`.
 - Public demo UI tests run through the normal Android instrumentation and XCTest runners.
 
-`BatchIssuanceE2ETest` uses the coordinated `enterpriseMobileFixtureServer` to check default
-one-copy review, explicit two-copy issuance and stored cards after Activity relaunch. Supply
-the instrumentation argument `enterpriseMobileFixtureBaseUrl=http://10.0.2.2:33335` on the
-Android emulator; without it, the test skips. The fixture must advertise batch support.
-Forward its issuer port first with `adb -s <serial> reverse tcp:33334 tcp:33334`, because
-Android offers use loopback URLs. Remove that forwarding after the run.
+`BatchIssuanceE2ETest` checks default one-copy review, explicit two-copy issuance and stored
+cards after Activity relaunch. From the coordinated build, run
+`./gradlew :waltid-enterprise-integration-tests:enterpriseAndroidMobileIntegrationTest`.
+This starts the Enterprise fixture, forwards its ports, runs the SDK and Compose batch tests,
+and requires the named Compose case to pass in its JUnit report. CI runs it in the
+`enterprise-mobile` phase; the generic `compose-demo` phase excludes this fixture-backed case.
+For a standalone run, supply the instrumentation argument
+`enterprise_fixture_base_url=http://127.0.0.1:33335` and forward ports 33334 and 33335 with
+`adb -s <serial> reverse tcp:<port> tcp:<port>`. Missing fixture configuration fails the test.
+Remove the forwarding after the run.
 Screenshots are saved under the app's external-files `batch-evidence` directory. Use the
 preview variant for a separate test wallet data directory when preserving an existing demo
 installation. Activity relaunch does not prove recovery after process termination.
