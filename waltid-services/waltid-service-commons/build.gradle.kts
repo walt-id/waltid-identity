@@ -9,9 +9,6 @@ group = "id.walt"
 
 dependencies {
     api(project(":waltid-libraries:waltid-library-commons"))
-    // OIDC
-    api(project(":waltid-libraries:protocols:waltid-openid4vc"))
-    api(project(":waltid-libraries:protocols:waltid-openid4vp"))
 
     api(project(":waltid-libraries:web:waltid-web-data-fetching"))
 

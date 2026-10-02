@@ -36,10 +36,12 @@ One transaction data item per type per credential presentation is supported.
 
 The credential's `keyAuthorizations` must authorize either the namespace or the individual element identifiers.
 
-## Service-layer configuration
+## Profiles
 
-Concrete type sets and UI metadata (display names, field lists for discovery endpoints) live in the service layer
-(`waltid-wallet-api`, `waltid-verifier-api2`) via `TransactionDataProfilesConfig`. This protocol module only knows type strings.
+Concrete type sets and UI metadata (display names, field lists for discovery endpoints) are configured per service
+(`waltid-wallet-api`, `waltid-wallet-api2`, `waltid-verifier-api2`) with `TransactionDataProfilesConfig`, and changed
+at runtime with `TransactionDataProfileOverlay`. Both live here, next to `TransactionDataTypeRegistry` they produce;
+the matching and verification code above only knows type strings.
 
 ## Module-local responsibilities
 

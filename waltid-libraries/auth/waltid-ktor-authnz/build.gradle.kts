@@ -6,6 +6,9 @@ plugins {
 group = "id.walt"
 
 dependencies {
+    // Authentication exceptions carry their HTTP status
+    api(project(":waltid-libraries:waltid-library-commons"))
+
     // Auth methods
     // Core Web3j library
     implementation(identityLibs.web3j.core)
@@ -32,7 +35,6 @@ dependencies {
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
     implementation(project(":waltid-libraries:crypto:waltid-jose"))
-    implementation(project(":waltid-services:waltid-service-commons"))
     implementation(identityLibs.nimbus.jose.jwt)
 
     // Cryptography

@@ -75,6 +75,8 @@ data class WebService(
                         |
                         """.trimMargin()
                     }
+                    // A service without its web server must not keep running: ServiceMain exits on this.
+                    throw ex
                 }
 
                 else -> throw ex

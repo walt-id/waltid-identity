@@ -3,7 +3,7 @@ package id.walt.ktorauthnz.methods
 import com.atlassian.onetime.core.TOTP
 import com.atlassian.onetime.model.TOTPSecret
 import com.atlassian.onetime.service.DefaultTOTPService
-import id.walt.commons.web.OTPAuthException
+import id.walt.ktorauthnz.exceptions.OTPAuthException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck

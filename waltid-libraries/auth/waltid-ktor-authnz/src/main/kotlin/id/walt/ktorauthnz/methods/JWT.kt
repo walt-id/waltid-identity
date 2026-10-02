@@ -2,7 +2,7 @@ package id.walt.ktorauthnz.methods
 
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.crypto.MACVerifier
-import id.walt.commons.web.JWTVerificationException
+import id.walt.ktorauthnz.exceptions.JWTVerificationException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.JWTIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments

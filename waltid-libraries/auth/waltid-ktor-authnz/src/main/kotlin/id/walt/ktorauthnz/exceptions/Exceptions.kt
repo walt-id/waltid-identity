@@ -1,6 +1,5 @@
 package id.walt.ktorauthnz.exceptions
 
-import id.walt.commons.web.AuthException
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 
