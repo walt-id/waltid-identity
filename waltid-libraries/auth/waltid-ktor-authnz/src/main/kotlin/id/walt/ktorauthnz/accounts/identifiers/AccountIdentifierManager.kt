@@ -7,7 +7,7 @@ object AccountIdentifierManager {
     private val defaultIdentifiers =
         listOf(
             EmailIdentifier, JWTIdentifier, LDAPIdentifier, OIDCIdentifier, RADIUSIdentifier, UsernameIdentifier,
-            Web3Identifier
+            Web3Identifier, VerifiableCredentialIdentifier, PasskeyIdentifier
         )
 
     private val factories: MutableMap<String, AccountIdentifier.AccountIdentifierFactory<out AccountIdentifier>> =

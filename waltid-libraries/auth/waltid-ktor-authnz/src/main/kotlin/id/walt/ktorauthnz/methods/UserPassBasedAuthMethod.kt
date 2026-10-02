@@ -1,5 +1,7 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
+import id.walt.ktorauthnz.attempts.AttemptLimiter.attemptOnIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.sessions.AuthSession
 import io.ktor.http.*
@@ -35,7 +37,10 @@ abstract class UserPassBasedAuthMethod(
      * 2. JSON document body
      * 3. Form post
      */
-    suspend fun ApplicationCall.getUsernamePasswordFromRequest(): UserPasswordCredential {
+    suspend fun ApplicationCall.getUsernamePasswordFromRequest(): UserPasswordCredential =
+        readUsernamePassword().also { attemptOnIdentifier(id, it.name) }
+
+    private suspend fun ApplicationCall.readUsernamePassword(): UserPasswordCredential {
         val contentType = request.contentType()
         when {
             // As JSON document
@@ -76,6 +81,21 @@ abstract class UserPassBasedAuthMethod(
     }
 
     abstract suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier
+
+    /** Whether passwords of this method are kept by ktor-authnz (and so can be changed and reset here). */
+    open val managesPasswords: Boolean = false
+
+    /** The account identifier of a login name, for methods that [managesPasswords]. */
+    open fun identifierFor(name: String): AccountIdentifier =
+        throw UnsupportedOperationException("${this::class.simpleName} does not manage passwords")
+
+    /** Stored data holding [password] (hashed when saved), for methods that [managesPasswords]. */
+    open fun storedDataFor(password: String): AuthMethodStoredData =
+        throw UnsupportedOperationException("${this::class.simpleName} does not manage passwords")
+
+    /** Checks [password] of the account behind [name]; returns its identifier, or throws an authentication failure. */
+    open suspend fun verifyPassword(name: String, password: String): AccountIdentifier =
+        throw UnsupportedOperationException("${this::class.simpleName} does not manage passwords")
     open suspend fun register(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier =
         throw NotImplementedError("Register method is not implemented for this ${this::class.simpleName}")
 }

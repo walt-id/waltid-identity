@@ -1,5 +1,8 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.KtorAuthnzManager
+import kotlin.time.Duration.Companion.minutes
+import id.walt.ktorauthnz.exceptions.AuthSessionStateException
 import com.atlassian.onetime.core.TOTP
 import com.atlassian.onetime.model.TOTPSecret
 import com.atlassian.onetime.service.DefaultTOTPService
@@ -22,7 +25,9 @@ object TOTP : AuthenticationMethod("totp") {
     override val relatedAuthMethodStoredData = TOTPStoredData::class
 
     suspend fun auth(session: AuthSession, code: String) {
-        val storedData = lookupAccountStoredData<TOTPStoredData>(session.accountId ?: error("No account ID") /* context() */)
+        val accountId = session.accountId
+            ?: throw AuthSessionStateException("TOTP needs a previous step that identifies the account")
+        val storedData = lookupAccountStoredData<TOTPStoredData>(accountId)
 
         val userProvidedOtpCode = TOTP(code)
         val secret = TOTPSecret.fromBase32EncodedString(storedData.secret)
@@ -30,6 +35,11 @@ object TOTP : AuthenticationMethod("totp") {
         val service = DefaultTOTPService()
         authCheck(
             service.verify(userProvidedOtpCode, secret).isSuccess(), OTPAuthException()
+        )
+        // A code logs in once: codes stay valid for a few 30 s windows, so a seen one is refused meanwhile.
+        authCheck(
+            KtorAuthnzManager.expiringStore.putIfAbsent("totp-used:$accountId:$code", "used", 3.minutes),
+            OTPAuthException()
         )
     }
 
@@ -50,7 +60,7 @@ object TOTP : AuthenticationMethod("totp") {
             val otp = when {
                 contentType.match(ContentType.Application.Json) -> call.receive<TOTPCode>().code
                 contentType.match(ContentType.Application.FormUrlEncoded) ->
-                    call.receiveParameters()["code"] ?: error("Invalid or missing OTP code form post request.")
+                    requireNotNull(call.receiveParameters()["code"]) { "Invalid or missing OTP code form post request." }
 
                 else -> call.receiveText()
             }

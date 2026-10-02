@@ -7,8 +7,12 @@ interface SessionStore {
     /** Store the provided AuthSession */
     suspend fun storeSession(session: AuthSession)
 
-    /** Resolve an AuthSession by its id */
+    /** Resolve an AuthSession by its id; throws if there is none */
     suspend fun resolveSessionById(sessionId: String): AuthSession
+
+    /** The AuthSession with this id, or null if there is none (never created, expired, dropped) */
+    suspend fun findSessionById(sessionId: String): AuthSession? =
+        runCatching { resolveSessionById(sessionId) }.getOrNull()
 
     /** Delete an AuthSession by its id */
     suspend fun dropSession(id: String)

@@ -96,7 +96,8 @@ You should now find yourself at http://localhost:8080/admin/master/console/ - in
                   the same level of the `/oidc/callback` endpoint):
                     - `POST oidc/logout/backchannel`
                     - `GET oidc/logout/frontchannel`
-            - `Backchannel logout session requred`: `On`
+            - `Backchannel logout session requred`: `On` - IdP-initiated logout finds the session by
+              the ID token's `sid`. Logins work without `sid`; IdP-initiated logout then cannot reach them.
 
 Note down the following values shown in the Keycloak Web Interface:
 
@@ -351,3 +352,9 @@ Test: `GET http://waltid.enterprise.localhost:3000/v1/account/info`:
   }
 }
 ```
+
+## Accounts of new OIDC identities
+
+An identity (issuer + `sub`) that has no account yet is provisioned by the account store's
+`addAccountIdentifierToAccount`, with a new random account id - never the IdP's `sub`, which another IdP could also
+issue. Link an existing account to an identity instead with its `OIDCIdentifier(issuer, subject)`.

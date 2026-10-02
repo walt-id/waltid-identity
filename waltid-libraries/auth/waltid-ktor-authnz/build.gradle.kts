@@ -89,6 +89,9 @@ dependencies {
     //implementation("eu.vendeli:rethis:0.3.3")
     implementation(identityLibs.kedis)
 
+    // Passkeys (WebAuthn)
+    implementation(identityLibs.webauthn4j.core)
+
     /* --- Testing --- */
     testImplementation(identityLibs.ktor.client.logging)
     testImplementation(identityLibs.kotlinx.coroutines.test)
@@ -99,6 +102,7 @@ dependencies {
 
     // Kotlin
     testImplementation(kotlin("test"))
+    testImplementation(identityLibs.webauthn4j.test)
 }
 
 // Force-pin vulnerable transitive dependencies.

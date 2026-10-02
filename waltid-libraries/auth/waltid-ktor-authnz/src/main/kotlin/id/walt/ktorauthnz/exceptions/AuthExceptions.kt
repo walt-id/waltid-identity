@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.exceptions
 
+import id.walt.errors.HttpStatusError
 import id.walt.errors.StatusException
 import io.ktor.http.HttpStatusCode
 
@@ -32,3 +33,29 @@ class InvalidChallengeException :
 
 class AccountDataNotFoundException(methodId: String) :
     AuthException("No stored data found for authentication method: $methodId", HttpStatusCode.NotFound)
+
+/** Too many failed attempts on this session or for this account identifier; retry after the window passes. */
+class TooManyAttemptsException(override val message: String) :
+    AuthException(message, HttpStatusCode.TooManyRequests)
+
+/**
+ * The authentication session does not exist - never created, expired, or already logged out. An
+ * [IllegalArgumentException], as unknown sessions always were, answered 404.
+ */
+class AuthSessionNotFoundException(sessionId: String) :
+    IllegalArgumentException("Unknown or expired authentication session: $sessionId"), HttpStatusError {
+    override val status = HttpStatusCode.NotFound.value
+}
+
+/** The authentication session cannot take this step, e.g. it is already complete or expects another method. */
+class AuthSessionStateException(override val message: String) :
+    AuthException(message, HttpStatusCode.BadRequest)
+
+/** The identity was authenticated, but no account belongs to it. */
+class AccountNotFoundException(identifierType: String) :
+    AuthException("No account exists for this $identifierType identity", HttpStatusCode.NotFound)
+
+/** The token is not (or no longer) valid. An [IllegalStateException], as unknown tokens always were, answered 401. */
+class InvalidTokenException(message: String) : IllegalStateException(message), HttpStatusError {
+    override val status = HttpStatusCode.Unauthorized.value
+}

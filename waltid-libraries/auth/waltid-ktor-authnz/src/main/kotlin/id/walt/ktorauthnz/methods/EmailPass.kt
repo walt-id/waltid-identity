@@ -34,13 +34,19 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
 
     override val relatedAuthMethodStoredData = EmailPassStoredData::class
 
-    override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
-        val identifier = EmailIdentifier(credential.name)
+    override val managesPasswords = true
 
-        val storedData: EmailPassStoredData = lookupAccountIdentifierStoredData(identifier /*context()*/)
+    override fun identifierFor(name: String) = EmailIdentifier(name)
+
+    override fun storedDataFor(password: String) = EmailPassStoredData(password = password)
+
+    override suspend fun verifyPassword(name: String, password: String): AccountIdentifier {
+        val identifier = EmailIdentifier(name)
+
+        val storedData: EmailPassStoredData = lookupAccountIdentifierStoredData(identifier)
 
         val passwordHash = PasswordHash.fromString(storedData.passwordHash ?: error("Missing password hash"))
-        val check = PasswordHashing.check(credential.password, passwordHash)
+        val check = PasswordHashing.check(password, passwordHash)
 
         authCheck(check.valid, InvalidCredentialsException())
 
@@ -51,6 +57,9 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
 
         return identifier
     }
+
+    override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier =
+        verifyPassword(credential.name, credential.password)
 
     /*override val supportsRegistration = true
     override suspend fun register(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
@@ -66,23 +75,28 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
         authContext: ApplicationCall.() -> AuthContext,
         functionAmendments: Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>?
     ) {
-        post("emailpass", {
-            request { body<EmailPassCredentials> { required = true } }
-            response {
-                HttpStatusCode.OK to {
-                    description = "Successful authentication"
-                    body<AuthSessionInformation>()
+        // The route is the method id, like every method's, so clients can follow `next_method`; `emailpass` is the
+        // former route, kept for existing clients.
+        listOf(id, "emailpass").forEach { path ->
+            post(path, {
+                request { body<EmailPassCredentials> { required = true } }
+                response {
+                    HttpStatusCode.OK to {
+                        description = "Successful authentication"
+                        body<AuthSessionInformation>()
+                    }
                 }
+                if (path != id) deprecated = true
+            }) {
+                val session = call.getAuthSession(authContext)
+
+                val credential = call.getUsernamePasswordFromRequest()
+
+                val identifier = auth(session, credential, call)
+
+                val authContext = authContext(call)
+                call.handleAuthSuccess(session, authContext, identifier.resolveToAccountId())
             }
-        }) {
-            val session = call.getAuthSession(authContext)
-
-            val credential = call.getUsernamePasswordFromRequest()
-
-            val identifier = auth(session, credential, call)
-
-            val authContext = authContext(call)
-            call.handleAuthSuccess(session, authContext, identifier.resolveToAccountId())
         }
     }
 

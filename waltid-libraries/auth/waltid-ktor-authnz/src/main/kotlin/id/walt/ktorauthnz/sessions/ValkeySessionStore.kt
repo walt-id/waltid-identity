@@ -1,18 +1,18 @@
 package id.walt.ktorauthnz.sessions
 
-import id.walt.ktorauthnz.tokens.ktorauthnztoken.ValkeyAuthnzTokenStore
-import io.github.domgew.kedis.KedisClient
+import id.walt.ktorauthnz.exceptions.AuthSessionNotFoundException
+import id.walt.ktorauthnz.valkey.ValkeyConnection
 import io.github.domgew.kedis.arguments.value.SetOptions
 import io.github.domgew.kedis.commands.KedisHashCommands
-import io.github.domgew.kedis.commands.KedisServerCommands
 import io.github.domgew.kedis.commands.KedisValueCommands
 import io.github.domgew.kedis.commands.KedisValueCommands.del
 import io.github.domgew.kedis.commands.KedisValueCommands.get
 import io.klogging.logger
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 
 class ValkeySessionStore(
     val unixsocket: String?,
@@ -20,42 +20,25 @@ class ValkeySessionStore(
     val port: Int? = 6379,
     val username: String?,
     val password: String?,
-    val expiration: Duration = 7.days
+    val expiration: Duration = 7.days,
+    /** Lifetime of a session that has not finished its flow yet. */
+    val pendingSessionLifetime: Duration = 15.minutes,
 ) : SessionStore {
 
-    val logger = logger<ValkeyAuthnzTokenStore>()
+    val logger = logger<ValkeySessionStore>()
 
     override val name = "valkey"
 
-    val redis = KedisClient.builder {
-        if (unixsocket != null) {
-            unixSocket(unixsocket)
-        } else if (host != null) {
-            hostAndPort(
-                host = host,
-                port = port ?: 6379
-            )
-        }
+    private val connection = ValkeyConnection(unixsocket, host, port, username, password, expiration)
 
-        if (password != null) {
-            autoAuth(
-                password = password,
-                username = username, // optional
-            )
-        } else {
-            noAutoAuth()
-        }
+    val redis = connection.client
+    val option = connection.expiringWrites
 
-        connectTimeout = 250.milliseconds
-    }
-
-    val option = SetOptions(expire = SetOptions.ExpireOption.ExpiresInSeconds(expiration.inWholeSeconds))
+    override suspend fun findSessionById(sessionId: String): AuthSession? =
+        redis.execute(get("session:$sessionId"))?.let { Json.decodeFromString<AuthSession>(it) }
 
     override suspend fun resolveSessionById(sessionId: String): AuthSession =
-        Json.decodeFromString<AuthSession>(
-            redis.execute(get("session:$sessionId"))
-                ?: throw IllegalArgumentException("Unknown session id: $sessionId")
-        )
+        findSessionById(sessionId) ?: throw AuthSessionNotFoundException(sessionId)
 
     private suspend fun removeSessionIdFromAccountSessions(sessionId: String, accountId: String) {
         redis.execute(KedisHashCommands.hashDel("account-sessions:${accountId}", sessionId))
@@ -75,8 +58,17 @@ class ValkeySessionStore(
     }
 
     override suspend fun dropSession(id: String) {
-        redis.execute(del("session:$id"))
         removeSessionIdFromAccountSessions(id)
+        redis.execute(del("session:$id"))
+    }
+
+    /** Unfinished sessions live [pendingSessionLifetime]; finished ones until their expiration, at most [expiration]. */
+    private fun writeOptionFor(session: AuthSession): SetOptions {
+        val lifetime = when {
+            !session.status.isSuccess() -> pendingSessionLifetime
+            else -> session.expiration?.let { minOf(it - Clock.System.now(), expiration) } ?: expiration
+        }
+        return SetOptions(expire = SetOptions.ExpireOption.ExpiresInMilliseconds(lifetime.inWholeMilliseconds.coerceAtLeast(1)))
     }
 
 
@@ -89,15 +81,17 @@ class ValkeySessionStore(
         if (accountId != null) {
             redis.pipelined().apply {
                 enqueue(KedisHashCommands.hashSet("account-sessions:${accountId}", mapOf(session.id to "x")))
-                enqueue(KedisValueCommands.set("session:${session.id}", Json.encodeToString(session), option))
+                enqueue(KedisValueCommands.set("session:${session.id}", Json.encodeToString(session), writeOptionFor(session)))
             }.execute()
         } else {
-            redis.execute(KedisValueCommands.set("session:${session.id}", Json.encodeToString(session), option))
+            redis.execute(KedisValueCommands.set("session:${session.id}", Json.encodeToString(session), writeOptionFor(session)))
         }
     }
 
     override suspend fun invalidateAllSessionsForAccount(accountId: String) {
-        redis.execute(KedisHashCommands.hashDel("account-sessions:${accountId}"))
+        val sessionIds = redis.execute(KedisHashCommands.hashKeys("account-sessions:${accountId}")).orEmpty()
+        if (sessionIds.isNotEmpty()) redis.execute(del(*sessionIds.map { "session:$it" }.toTypedArray()))
+        redis.execute(del("account-sessions:${accountId}"))
     }
 
     // -- External id --
@@ -137,14 +131,5 @@ class ValkeySessionStore(
     }
 
 
-    suspend fun tryConnect() {
-        val pong = runCatching { redis.execute(KedisServerCommands.ping()) }.getOrElse {
-            throw IllegalArgumentException(
-                "Could not connect to valkey session store: ${it.message}",
-                it
-            )
-        }
-        require(pong.isNotBlank()) { "Valkey ping invalid" }
-        logger.info { "Connected to valkey session store at: $host:$port" }
-    }
+    suspend fun tryConnect() = connection.tryConnect("session store")
 }
