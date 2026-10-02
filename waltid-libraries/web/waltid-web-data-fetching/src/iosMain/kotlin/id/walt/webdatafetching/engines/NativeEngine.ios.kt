@@ -5,5 +5,11 @@ import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.darwin.Darwin
 
 actual object NativeEngine : WebDataFetcherHttpEngine {
-    actual override fun getHttpClient(block: HttpClientConfig<*>.() -> Unit): HttpClient = HttpClient(Darwin, block)
+    actual override fun getHttpClient(block: HttpClientConfig<*>.() -> Unit): HttpClient = HttpClient(Darwin) {
+        block()
+        engine {
+            // Request cache policies bypass reads but can still persist response bodies.
+            configureSession { URLCache = null }
+        }
+    }
 }

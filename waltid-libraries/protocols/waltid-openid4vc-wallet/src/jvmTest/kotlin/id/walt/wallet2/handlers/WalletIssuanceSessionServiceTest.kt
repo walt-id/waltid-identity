@@ -924,6 +924,7 @@ class WalletIssuanceSessionServiceTest {
         val keyStore = InMemoryKeyStore().apply { addCrypto2Key(holderKey) }
         val credential = mdocCredential(holderKey)
         val credentialStore = RecordingCredentialStore()
+        var deferredRequests = 0
         val client = client { request ->
             when (request.url.toString()) {
                 ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
@@ -933,9 +934,14 @@ class WalletIssuanceSessionServiceTest {
                     """{"transaction_id":"transaction-1","interval":1}""",
                     HttpStatusCode.Accepted,
                 )
-                DEFERRED_ENDPOINT -> jsonResponse(
-                    """{"credentials":[{"credential":${Json.encodeToString(credential)}}]}"""
-                )
+                DEFERRED_ENDPOINT -> {
+                    deferredRequests++
+                    if (deferredRequests == 1) {
+                        jsonResponse("""{"error":"issuance_pending","interval":1}""", HttpStatusCode.BadRequest)
+                    } else {
+                        jsonResponse("""{"credentials":[{"credential":${Json.encodeToString(credential)}}]}""")
+                    }
+                }
                 else -> respondError(HttpStatusCode.NotFound)
             }
         }
@@ -950,6 +956,8 @@ class WalletIssuanceSessionServiceTest {
 
         val session = service.start(preAuthorizedRequest().copy(keyId = holderKey.id.value))
         val deferred = assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+        val continuation = deferred.credentials.single().id
+        assertIs<WalletIssuanceOutcome.Deferred>(service.resumeDeferred(continuation))
         val stored = assertIs<WalletIssuanceOutcome.Stored>(
             service.resumeDeferred(deferred.credentials.single().id)
         )
@@ -959,6 +967,10 @@ class WalletIssuanceSessionServiceTest {
             HolderKeyBindingOrigin.ISSUANCE,
             credentialStore.credentials.single().holderKeyBinding?.origin,
         )
+        assertEquals(2, deferredRequests)
+        val consumed = assertIs<WalletIssuanceOutcome.Failed>(service.resumeDeferred(continuation))
+        assertEquals(WalletIssuanceErrorCode.INVALID_SESSION, consumed.error.code)
+        assertEquals(2, deferredRequests, "A consumed continuation must not replay the credential request")
     }
 
     @Test

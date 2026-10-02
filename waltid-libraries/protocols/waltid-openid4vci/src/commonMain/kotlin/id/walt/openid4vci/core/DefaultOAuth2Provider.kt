@@ -691,6 +691,7 @@ class DefaultOAuth2Provider(
                 put("error", JsonPrimitive(error.error))
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
             },
+            headers = noStoreHeaders(),
         )
 
     override fun writeCredentialError(request: CredentialRequest, error: CredentialError): CredentialResponseHttp =
@@ -700,7 +701,7 @@ class DefaultOAuth2Provider(
         CredentialResponseHttp(
             status = credentialOAuthJsonErrorStatus(error),
             payload = oauthErrorPayload(error),
-            headers = credentialOAuthErrorHeaders(error),
+            headers = noStoreHeaders() + credentialOAuthErrorHeaders(error),
         )
 
     override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
@@ -712,7 +713,7 @@ class DefaultOAuth2Provider(
     ): CredentialResponseHttp {
         val payload = response.toJsonObject()
         val encryption = request.credentialResponseEncryption
-            ?: return CredentialResponseHttp(status = 200, payload = payload)
+            ?: return CredentialResponseHttp(status = 200, payload = payload, headers = noStoreHeaders())
 
         val encrypted = try {
             config.credentialResponseEncryptor.encrypt(payload, encryption)
@@ -730,6 +731,7 @@ class DefaultOAuth2Provider(
         return CredentialResponseHttp(
             status = 200,
             body = CredentialResponseBody.EncryptedJwt(encrypted),
+            headers = noStoreHeaders(),
         )
     }
 
