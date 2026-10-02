@@ -1,239 +1,41 @@
 package id.walt.walletdemo.compose.android
 
-import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.credentials.ExperimentalDigitalCredentialApi
+import androidx.compose.runtime.LaunchedEffect
 import androidx.fragment.app.FragmentActivity
-import id.walt.wallet2.handlers.WalletIssuanceOutcome
-import id.walt.wallet2.mobile.AndroidDigitalCredentialCreateProvider
-import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.AndroidDigitalCredentialCreateResponse
-import id.walt.wallet2.mobile.MobileWalletCredentialOffer
-import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
-import id.walt.walletdemo.compose.logic.WalletDemoHolderBinding
-import id.walt.walletdemo.compose.logic.credentialSelections
-import id.walt.walletdemo.compose.logic.toMobileSelections
-import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
-import id.walt.walletdemo.compose.logic.WalletDemoIssuanceSession
-import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
-import id.walt.walletdemo.compose.logic.toDemoIssuanceSession
-import id.walt.walletdemo.compose.ui.WalletReviewPresentation
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateScreen
-import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateUiState
-import id.walt.walletdemo.compose.ui.prefetchOfferCardArt
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
+import id.walt.walletdemo.compose.ui.WalletReviewPresentation
 
-/**
- * Credential Manager create-provider entry point for OpenID4VCI issuance.
- *
- * Uses a translucent Activity + bottom sheet so receive feels in-tray (like CMWallet), while
- * Credential Manager still owns the system create-option picker before this Activity launches.
- * Authorization-code grants open the system browser; [DigitalCredentialCreateAuthHandoff]
- * returns the `openid://` callback to this Activity so the CREATE_CREDENTIAL result can finish.
- */
-@OptIn(ExperimentalDigitalCredentialApi::class)
+/** Translucent provider host. Its retained model owns the request, drafts, browser return and result. */
 class DigitalCredentialCreateActivity : FragmentActivity() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val resultIntent = Intent()
-    private var wallet: MobileWallet? = null
-    private var session: WalletDemoIssuanceSession? = null
-    private var requestProtocol: String? = null
-    private var defaultHolder: WalletDemoHolderBinding? = null
-    private var uiState by mutableStateOf<WalletDemoOfferCreateUiState>(
-        WalletDemoOfferCreateUiState.Loading,
-    )
+    private lateinit var model: DigitalCredentialCreateModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        model = ViewModelProvider(this, viewModelFactory {
+            initializer { DigitalCredentialCreateModel(applicationContext) }
+        })[DigitalCredentialCreateModel::class.java]
+        model.attach(this)
+        model.start(intent, restored = savedInstanceState != null)
         setContent {
+            LaunchedEffect(model.result) {
+                model.takeResult()?.let { setResult(it.code, it.data); finish() }
+            }
             WalletDemoOfferCreateScreen(
-                state = uiState,
-                presentation = WalletReviewPresentation.Sheet,
-                onAccept = { txCode, copies ->
-                    val review = uiState as? WalletDemoOfferCreateUiState.Review ?: return@WalletDemoOfferCreateScreen
-                    val started = session ?: return@WalletDemoOfferCreateScreen
-                    if (review.submitting) return@WalletDemoOfferCreateScreen
-                    uiState = review.copy(submitting = true)
-                    acceptOffer(started, txCode, copies)
-                },
-                onDecline = {
-                    val sessionId = session?.id
-                    scope.launch {
-                        if (sessionId != null) {
-                            runCatching { wallet?.cancelIssuance(sessionId) }
-                        }
-                        DigitalCredentialCreateAuthHandoff.clear(this@DigitalCredentialCreateActivity)
-                        AndroidDigitalCredentialCreateProvider.setCancellation(resultIntent)
-                        finishProviderResult()
-                    }
-                },
-                onDismiss = {
-                    finishWithoutProviderResult()
-                },
-                onCancelAuthorization = {
-                    cancelPendingAuthorization()
-                    DigitalCredentialCreateAuthHandoff.clear(this@DigitalCredentialCreateActivity)
-                    AndroidDigitalCredentialCreateProvider.setCancellation(resultIntent)
-                    finishProviderResult()
-                },
+                state = model.state, draft = model.draft, presentation = WalletReviewPresentation.Sheet,
+                onAccept = model::accept, onDecline = model::cancel, onDismiss = model::back,
+                onCancelAuthorization = model::cancel, onDone = model::done,
+                onResumeDeferred = model::resume, onRefresh = model::refresh,
             )
         }
-        scope.launch {
-            runCatching {
-                val allowlist = assets.open("privileged_apps.json").bufferedReader().use { it.readText() }
-                val input = AndroidDigitalCredentialCreateProvider.extract(intent, allowlist)
-                requestProtocol = input.request.protocol
-                val config = demoWalletConfig()
-                val created = createAndroidDemoMobileWallet(
-                    context = applicationContext,
-                    config = config,
-                    interactionContextProvider = { this@DigitalCredentialCreateActivity },
-                )
-                val mobileWallet = created.wallet
-                wallet = mobileWallet
-                val identity = created.bootstrap(config.selectedSigningProtection(applicationContext))
-                defaultHolder = WalletDemoHolderBinding(identity.keyId, identity.did)
-                val started = mobileWallet.startIssuance(
-                    MobileWalletIssuanceRequest(
-                        offer = MobileWalletCredentialOffer.InlineJson(input.request.offerJson),
-                        redirectUri = CREATE_REDIRECT_URI,
-                    )
-                ).toDemoIssuanceSession()
-                session = started
-                prefetchOfferCardArt(this@DigitalCredentialCreateActivity, started.preview)
-                uiState = WalletDemoOfferCreateUiState.Review(preview = started.preview)
-            }.onFailure {
-                reportFailure(it)
-            }
-        }
-    }
-
-    private fun acceptOffer(started: WalletDemoIssuanceSession, txCode: String?, copies: Map<String, Int>) {
-        val mobileWallet = wallet ?: return reportFailure(IllegalStateException("Wallet is missing"))
-        scope.launch {
-            runCatching {
-                val selection = started.preview.credentialSelections(copies, requireNotNull(defaultHolder)).toMobileSelections()
-                when (started.grant) {
-                    WalletDemoIssuanceGrant.PreAuthorizedCode -> {
-                        val outcome = mobileWallet.continuePreAuthorizedIssuance(
-                            sessionId = started.id,
-                            transactionCode = txCode,
-                            credentials = selection,
-                        )
-                        completeOutcome(outcome)
-                    }
-                    WalletDemoIssuanceGrant.AuthorizationCode -> {
-                        val authorization = mobileWallet.beginAuthorizationIssuance(started.id, credentials = selection)
-                        DigitalCredentialCreateAuthHandoff.register(
-                            context = this@DigitalCredentialCreateActivity,
-                            sessionId = started.id,
-                        ) { callbackUri ->
-                            continueAuthorizationFromRedirect(callbackUri)
-                        }
-                        uiState = WalletDemoOfferCreateUiState.WaitingForAuthorization()
-                        DigitalCredentialCreateAuthHandoff.openExternalBrowser(
-                            context = this@DigitalCredentialCreateActivity,
-                            authorizationUrl = authorization.url,
-                        )
-                    }
-                }
-            }.onFailure {
-                reportFailure(it)
-            }
-        }
-    }
-
-    private fun continueAuthorizationFromRedirect(callbackUri: String) {
-        val mobileWallet = wallet ?: return reportFailure(IllegalStateException("Wallet is missing"))
-        val sessionId = session?.id ?: return reportFailure(IllegalStateException("Issuance session is missing"))
-        val waiting = uiState as? WalletDemoOfferCreateUiState.WaitingForAuthorization
-        if (waiting?.completing == true) return
-        uiState = WalletDemoOfferCreateUiState.WaitingForAuthorization(completing = true)
-        scope.launch {
-            runCatching {
-                val outcome = mobileWallet.continueAuthorizationIssuance(
-                    sessionId = sessionId,
-                    callbackUri = callbackUri,
-                )
-                DigitalCredentialCreateAuthHandoff.clear(this@DigitalCredentialCreateActivity)
-                completeOutcome(outcome)
-            }.onFailure {
-                DigitalCredentialCreateAuthHandoff.clear(this@DigitalCredentialCreateActivity)
-                reportFailure(it)
-            }
-        }
-    }
-
-    private suspend fun completeOutcome(outcome: WalletIssuanceOutcome) {
-        when (outcome) {
-            is WalletIssuanceOutcome.Stored,
-            is WalletIssuanceOutcome.Deferred,
-            -> {
-                // MainActivity may already be resumed from the openid:// callback; nudge it after
-                // the shared DB write so the Credentials tab is not stale until the next relaunch.
-                WalletDemoCredentialStoreNotifier.notifyChanged()
-                sendSuccessAck()
-            }
-            is WalletIssuanceOutcome.Cancelled -> {
-                AndroidDigitalCredentialCreateProvider.setCancellation(resultIntent)
-                finishProviderResult()
-            }
-            is WalletIssuanceOutcome.Failed -> {
-                reportFailure(IllegalStateException(outcome.error.message))
-            }
-        }
-    }
-
-    private fun sendSuccessAck() {
-        val protocol = requestProtocol
-            ?: AndroidDigitalCredentialCreateResponse.acknowledgment().protocol
-        val response = AndroidDigitalCredentialCreateResponse.acknowledgment(protocol)
-        AndroidDigitalCredentialCreateProvider.setResponse(resultIntent, response)
-        finishProviderResult()
-    }
-
-    private fun cancelPendingAuthorization() {
-        val sessionId = session?.id ?: return
-        scope.launch {
-            runCatching { wallet?.cancelIssuance(sessionId) }
-        }
-    }
-
-    private fun reportFailure(error: Throwable) {
-        Log.e(TAG, "Digital credential issuance failed (${error::class.simpleName})", error)
-        DigitalCredentialCreateAuthHandoff.clear(this)
-        AndroidDigitalCredentialCreateProvider.setFailure(resultIntent)
-        finishProviderResult()
-    }
-
-    private fun finishProviderResult() {
-        setResult(RESULT_OK, resultIntent)
-        finish()
-    }
-
-    private fun finishWithoutProviderResult() {
-        cancelPendingAuthorization()
-        DigitalCredentialCreateAuthHandoff.clear(this)
-        setResult(RESULT_CANCELED)
-        finish()
     }
 
     override fun onDestroy() {
-        scope.cancel()
+        if (::model.isInitialized) model.detach(this)
         super.onDestroy()
-    }
-
-    private companion object {
-        private const val TAG = "WaltDigitalCredentials"
-        private const val CREATE_REDIRECT_URI = "openid://"
     }
 }

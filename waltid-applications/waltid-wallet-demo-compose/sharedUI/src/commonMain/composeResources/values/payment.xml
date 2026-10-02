@@ -1,0 +1,10 @@
+<resources>
+    <string name="payment_unsigned_title">Unsigned payment request</string>
+    <string name="payment_unsigned_confirmation">This request has no signature to verify its sender. Do you want to proceed with the payment you reviewed?</string>
+    <string name="payment_return_to_review">Back to review</string>
+    <string name="payment_loading">Loading payment instructions…</string>
+    <string name="payment_review_title">Review payment</string>
+    <string name="payment_unsigned_warning">This payment request is unsigned. Confirm only if you recognize the requester and approve the payment below.</string>
+    <string name="payment_show_details">Show payment details</string>
+    <string name="payment_hide_details">Hide payment details</string>
+</resources>

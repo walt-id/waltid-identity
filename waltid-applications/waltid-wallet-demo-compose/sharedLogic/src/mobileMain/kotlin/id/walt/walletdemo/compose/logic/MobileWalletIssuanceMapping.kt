@@ -65,7 +65,7 @@ fun WalletIssuanceBatchSession.toDemoIssuanceSession(): WalletDemoIssuanceSessio
         ),
     )
 
-internal fun WalletIssuanceOutcome.toDemoIssuanceOutcome(): WalletDemoIssuanceOutcome =
+fun WalletIssuanceOutcome.toDemoIssuanceOutcome(): WalletDemoIssuanceOutcome =
     when (this) {
         is WalletIssuanceOutcome.Stored -> WalletDemoIssuanceOutcome.Stored(credentialIds)
         is WalletIssuanceOutcome.Deferred -> WalletDemoIssuanceOutcome.Deferred(
@@ -92,7 +92,7 @@ internal fun WalletIssuanceOutcome.toDemoIssuanceOutcome(): WalletDemoIssuanceOu
 
 internal fun WalletDeferredCredential.toDemoDeferredCredential() = WalletIssuanceContinuation(this).toDemoDeferredCredential()
 
-internal fun WalletIssuanceContinuation.toDemoDeferredCredential() = WalletDemoDeferredCredential(
+fun WalletIssuanceContinuation.toDemoDeferredCredential() = WalletDemoDeferredCredential(
     id = id,
     credentialConfigurationId = credentialConfigurationId,
     credentialIdentifier = credentialIdentifier,

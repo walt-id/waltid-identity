@@ -82,10 +82,10 @@ sealed interface WalletDemoIssuanceOutcome {
     ) : WalletDemoIssuanceOutcome
 }
 
-internal fun WalletDemoIssuanceOutcome.Failed.problem() =
+fun WalletDemoIssuanceOutcome.Failed.problem() =
     WalletDemoIssuanceProblem(message, kind, failedTargetCount, notAttemptedTargetCount)
 
-internal fun WalletDemoIssuanceOutcome.withContinuations(latest: List<WalletDemoDeferredCredential>, resumingId: String? = null): WalletDemoIssuanceOutcome {
+fun WalletDemoIssuanceOutcome.withContinuations(latest: List<WalletDemoDeferredCredential>, resumingId: String? = null): WalletDemoIssuanceOutcome {
     val byId = latest.associateBy { it.id }
     fun updated(items: List<WalletDemoDeferredCredential>) = items.map { item ->
         val retained = byId[item.id]

@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui
 
+import kotlinx.coroutines.CancellationException
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.request.ImageRequest
@@ -25,8 +26,8 @@ suspend fun prefetchOfferCardArt(
         }
         .distinct()
         .forEach { uri ->
-            runCatching {
-                loader.execute(ImageRequest.Builder(context).data(uri).build())
-            }
+            try { loader.execute(ImageRequest.Builder(context).data(uri).build()) }
+            catch (cause: CancellationException) { throw cause }
+            catch (_: Exception) { /* Optional artwork falls back to its supplied color/logo. */ }
         }
 }
