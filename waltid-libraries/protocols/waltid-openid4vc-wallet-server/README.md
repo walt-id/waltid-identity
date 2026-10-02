@@ -131,6 +131,7 @@ routing {
 | `POST` | `/wallet/{walletId}/credentials/receive/request-token` | Isolated: exchange code for token |
 | `POST` | `/wallet/{walletId}/credentials/receive/sign-proof` | Isolated: sign proof-of-possession |
 | `POST` | `/wallet/{walletId}/credentials/receive/fetch-credential` | Isolated: fetch credential |
+| `POST` | `/wallet/{walletId}/credentials/receive/reject` | Isolated: reject fetched credential (`credential_deleted`) |
 | `POST` | `/wallet/{walletId}/credentials/receive/authorization-url` | Auth-code: generate redirect URL |
 | `POST` | `/wallet/{walletId}/credentials/receive/exchange-code` | Auth-code: exchange code for token |
 | `POST` | `/wallet/{walletId}/credentials/receive/deferred` | Poll deferred credential |

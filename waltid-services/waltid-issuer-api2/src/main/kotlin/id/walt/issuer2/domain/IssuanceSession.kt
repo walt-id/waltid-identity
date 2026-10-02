@@ -5,6 +5,7 @@ import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.openid4vci.mdoc.MsoData
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -47,6 +48,9 @@ data class IssuanceRequest(
 @Serializable
 data class IssuanceResult(
     val issuedCredentialFormat: String,
+    val walletNotificationId: String? = null,
+    val walletNotificationEvent: NotificationEvent? = null,
+    val walletNotificationEventDescription: String? = null,
 )
 
 @Serializable

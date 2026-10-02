@@ -4,6 +4,10 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionFailure
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.repository.IssuanceSessionRepository
+import id.walt.openid4vci.requests.notification.IssuedCredentialNotification
+import id.walt.openid4vci.requests.notification.IssuedCredentialNotificationUpdate
+import id.walt.openid4vci.requests.notification.NotificationEvent
+import id.walt.openid4vci.requests.notification.applyIssuedCredentialNotification
 import io.ktor.server.plugins.NotFoundException
 
 class IssuanceSessionService(
@@ -44,3 +48,49 @@ class IssuanceSessionService(
         return repository.save(updated)
     }
 }
+
+internal fun IssuanceSession.issuedCredentialNotifications(): List<IssuedCredentialNotification> =
+    issuanceResults.mapNotNull { (identifier, result) ->
+        val notificationId = result.walletNotificationId ?: return@mapNotNull null
+        IssuedCredentialNotification(
+            credentialIdentifier = identifier,
+            notificationId = notificationId,
+            event = result.walletNotificationEvent,
+            eventDescription = result.walletNotificationEventDescription,
+        )
+    }
+
+internal fun IssuanceSession.applyWalletNotification(
+    notificationId: String,
+    event: NotificationEvent,
+    eventDescription: String?,
+    authorizedCredentialIdentifiers: Set<String>?,
+): WalletNotificationUpdate? =
+    when (
+        val update = applyIssuedCredentialNotification(
+            issued = issuedCredentialNotifications(),
+            notificationId = notificationId,
+            event = event,
+            eventDescription = eventDescription,
+            authorizedCredentialIdentifiers = authorizedCredentialIdentifiers,
+        )
+    ) {
+        IssuedCredentialNotificationUpdate.UnknownNotificationId -> null
+        IssuedCredentialNotificationUpdate.Unchanged -> WalletNotificationUpdate(this, changed = false)
+        is IssuedCredentialNotificationUpdate.Changed -> WalletNotificationUpdate(
+            copy(
+                issuanceResults = issuanceResults + (
+                    update.credentialIdentifier to requireNotNull(issuanceResults[update.credentialIdentifier]).copy(
+                        walletNotificationEvent = update.event,
+                        walletNotificationEventDescription = update.eventDescription,
+                    )
+                )
+            ),
+            changed = true,
+        )
+    }
+
+data class WalletNotificationUpdate(
+    val session: IssuanceSession,
+    val changed: Boolean,
+)

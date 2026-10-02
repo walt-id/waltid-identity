@@ -551,19 +551,25 @@ class WalletIssuanceSessionService(
         }
 
         return try {
-            val credentials = response.response.body<CredentialResponse>().credentials
+            val credentialResponse = response.response.body<CredentialResponse>()
+            val credentials = credentialResponse.credentials
                 ?.takeIf { it.isNotEmpty() }
                 ?: run {
                     restoreDeferred(record.copy(dpopNonce = response.dpopNonce))
                     return failed(record.sessionId, WalletIssuanceErrorCode.PROTOCOL)
                 }
-            val stored = credentials.map {
-                wallet.parseAndStore(
-                    issued = it,
-                    label = record.label,
-                    metadata = record.metadata,
-                    keyMaterial = record.keyMaterial,
-                )
+            val stored = storeAndNotify(
+                httpClient = httpClient,
+                target = record.notificationTarget(credentialResponse.notificationId),
+            ) {
+                credentials.map {
+                    wallet.parseAndStore(
+                        issued = it,
+                        label = record.label,
+                        metadata = record.metadata,
+                        keyMaterial = record.keyMaterial,
+                    )
+                }
             }
             stored.forEach { emitEvent(WalletSessionEvent.issuance_credential_stored) }
             emitEvent(WalletSessionEvent.issuance_completed)
@@ -713,21 +719,37 @@ class WalletIssuanceSessionService(
                         issuerMetadata = active.resolved.issuerMetadata.metadata,
                         credentialConfigurationId = offered.credentialConfigurationId,
                     )
-                    credentials.forEach { issued ->
-                        val stored = try {
-                            wallet.parseAndStore(
-                                issued = issued,
-                                label = label,
-                                metadata = metadata,
-                                keyMaterial = active.keyMaterial,
-                            )
-                        } catch (error: CancellationException) {
-                            throw error
-                        } catch (error: Exception) {
-                            throw IssuanceStageException(WalletIssuanceErrorCode.STORAGE, error)
+                    try {
+                        storeAndNotify(
+                            httpClient = httpClient,
+                            target = IssuerNotificationTarget(
+                                notificationEndpoint = active.resolved.issuerMetadata.metadata.notificationEndpoint,
+                                notificationId = response.notificationId,
+                                accessToken = token.access_token,
+                                tokenType = token.token_type,
+                                dpopProofFactory = dpopProofFactoryFor(
+                                    tokenType = token.token_type,
+                                    dpopAlgorithms = dpopAlgorithms,
+                                    keyMaterial = active.keyMaterial,
+                                    accessToken = token.access_token,
+                                ),
+                            ),
+                        ) {
+                            credentials.forEach { issued ->
+                                val stored = wallet.parseAndStore(
+                                    issued = issued,
+                                    label = label,
+                                    metadata = metadata,
+                                    keyMaterial = active.keyMaterial,
+                                )
+                                storedIds += stored.id
+                                emitEvent(WalletSessionEvent.issuance_credential_stored)
+                            }
                         }
-                        storedIds += stored.id
-                        emitEvent(WalletSessionEvent.issuance_credential_stored)
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        throw IssuanceStageException(WalletIssuanceErrorCode.STORAGE, error)
                     }
                 }
 
@@ -773,6 +795,7 @@ class WalletIssuanceSessionService(
                             persistable = active.persistable,
                             label = label,
                             metadata = metadata,
+                            notificationEndpoint = active.resolved.issuerMetadata.metadata.notificationEndpoint,
                         ),
                     )
                 }
@@ -1214,6 +1237,19 @@ class WalletIssuanceSessionService(
         }
     }
 
+    private fun DeferredRecord.notificationTarget(notificationId: String?) = IssuerNotificationTarget(
+        notificationEndpoint = notificationEndpoint,
+        notificationId = notificationId,
+        accessToken = accessToken,
+        tokenType = tokenType,
+        dpopProofFactory = dpopProofFactoryFor(
+            tokenType = tokenType,
+            dpopAlgorithms = dpop,
+            keyMaterial = keyMaterial,
+            accessToken = accessToken,
+        ),
+    )
+
     private suspend fun postProtected(
         endpoint: String,
         accessToken: String,
@@ -1597,6 +1633,7 @@ class WalletIssuanceSessionService(
                     selectedPublicJwk = record.selectedPublicJwk,
                     label = record.label,
                     metadata = record.metadata,
+                    notificationEndpoint = record.notificationEndpoint,
                 )
                 store.put(
                     WalletIssuanceSessionRecord(
@@ -1648,6 +1685,7 @@ class WalletIssuanceSessionService(
             persistable = true,
             label = persisted.label,
             metadata = persisted.metadata,
+            notificationEndpoint = persisted.notificationEndpoint,
         )
     }
 
@@ -1824,6 +1862,7 @@ class WalletIssuanceSessionService(
         val persistable: Boolean,
         val label: String?,
         val metadata: JsonObject? = null,
+        val notificationEndpoint: String? = null,
     )
 
     private data class PendingDeferred(
@@ -1875,6 +1914,7 @@ class WalletIssuanceSessionService(
         val selectedPublicJwk: String,
         val label: String?,
         val metadata: JsonObject? = null,
+        val notificationEndpoint: String? = null,
     )
 
     private suspend fun resolveIssuanceKeyMaterial(

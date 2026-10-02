@@ -104,6 +104,23 @@ class WalletSdkBridgeTest {
     }
 
     @Test
+    fun bridgeRejectIssuedCredentialForwardsNotificationTarget() = runTest {
+        val operations = FakeWalletSdkBridgeOperations()
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        val result = bridge.rejectIssuedCredential(
+            notificationId = "notification-id",
+            accessToken = "access-token",
+            credentialIssuerBaseUrl = "https://issuer.example",
+        )
+
+        assertIs<WalletBridgeResult.Success<Unit>>(result)
+        assertEquals("notification-id", operations.rejectedIssuedCredentialNotificationId)
+        assertEquals("access-token", operations.rejectedIssuedCredentialAccessToken)
+        assertEquals("https://issuer.example", operations.rejectedIssuedCredentialIssuer)
+    }
+
+    @Test
     fun bridgeCredentialsMapToSwiftSafeDtos() = runTest {
         val operations = FakeWalletSdkBridgeOperations()
         val bridge = WalletSdkBridge.forOperations(operations)
@@ -673,6 +690,12 @@ class WalletSdkBridgeTest {
             private set
         var cancelledIssuanceSessionId: String? = null
             private set
+        var rejectedIssuedCredentialNotificationId: String? = null
+            private set
+        var rejectedIssuedCredentialAccessToken: String? = null
+            private set
+        var rejectedIssuedCredentialIssuer: String? = null
+            private set
         override suspend fun keyUseAuthorizationPreflight(
             keyType: MobileWalletKeyType,
             policy: KeyUseAuthorizationPolicy,
@@ -697,6 +720,18 @@ class WalletSdkBridgeTest {
         override suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome {
             cancelledIssuanceSessionId = sessionId
             return WalletIssuanceOutcome.Cancelled(sessionId)
+        }
+
+        override suspend fun rejectIssuedCredential(
+            notificationId: String,
+            accessToken: String,
+            credentialIssuerBaseUrl: String?,
+            notificationEndpoint: String?,
+            eventDescription: String?,
+        ) {
+            rejectedIssuedCredentialNotificationId = notificationId
+            rejectedIssuedCredentialAccessToken = accessToken
+            rejectedIssuedCredentialIssuer = credentialIssuerBaseUrl ?: notificationEndpoint
         }
 
         override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =

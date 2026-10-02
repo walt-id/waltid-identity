@@ -928,6 +928,23 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(String(describing: handle), "PresentationPreviewHandle(<redacted>)")
     }
 
+    func testRejectIssuedCredentialForwardsNotificationTarget() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+        let issuer = URL(string: "https://issuer.example")!
+
+        try await wallet.rejectIssuedCredential(
+            notificationID: "notification-id",
+            accessToken: "access-token",
+            credentialIssuerBaseURL: issuer
+        )
+
+        XCTAssertEqual(bridge.rejectedIssuedCredentialCalls.count, 1)
+        XCTAssertEqual(bridge.rejectedIssuedCredentialCalls.first?.notificationID, "notification-id")
+        XCTAssertEqual(bridge.rejectedIssuedCredentialCalls.first?.accessToken, "access-token")
+        XCTAssertEqual(bridge.rejectedIssuedCredentialCalls.first?.credentialIssuerBaseURL, issuer)
+    }
+
     func testDigitalCredentialCapabilitiesReflectBridgeRuntimeSupport() async {
         let bridge = FakeWalletCoreBridge()
         bridge.digitalCredentialCapabilitiesResult = .init(
@@ -1204,6 +1221,14 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         let errorDescription: String?
     }
 
+    struct RejectIssuedCredentialCall {
+        let notificationID: String
+        let accessToken: String
+        let credentialIssuerBaseURL: URL?
+        let notificationEndpoint: URL?
+        let eventDescription: String?
+    }
+
     struct AnnexCPreviewCall {
         let parsedRequest: AnnexCParsedRequest
         let verifiedOrigin: String
@@ -1278,6 +1303,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     private(set) var preAuthorizedIssuanceCalls: [(String, String?)] = []
     private(set) var authorizationIssuanceCalls: [(String, URL)] = []
     private(set) var cancelledIssuanceSessionIDs: [String] = []
+    private(set) var rejectedIssuedCredentialCalls: [RejectIssuedCredentialCall] = []
     private(set) var resumedDeferredCredentialIDs: [String] = []
     private(set) var credentialsCallCount = 0
     private(set) var deleteLocalDataCallCount = 0
@@ -1355,6 +1381,25 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         if let error { throw error }
         cancelledIssuanceSessionIDs.append(sessionID)
         return issuanceOutcomeResult
+    }
+
+    func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL?,
+        notificationEndpoint: URL?,
+        eventDescription: String?
+    ) async throws {
+        if let error { throw error }
+        rejectedIssuedCredentialCalls.append(
+            RejectIssuedCredentialCall(
+                notificationID: notificationID,
+                accessToken: accessToken,
+                credentialIssuerBaseURL: credentialIssuerBaseURL,
+                notificationEndpoint: notificationEndpoint,
+                eventDescription: eventDescription
+            )
+        )
     }
 
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
