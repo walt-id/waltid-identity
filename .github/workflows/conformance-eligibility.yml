@@ -53,6 +53,7 @@ jobs:
       pr-head-repo: ${{ inputs.pr-head-repo }}
       pr-labels: ${{ inputs.pr-labels }}
       pr-draft: ${{ inputs.pr-draft }}
+      pr-require-label: ${{ contains(fromJson(inputs.pr-labels), 'ci:conformance-deferred') }}
       additional-labels: '["ci:issuer-conformance"]'
       platform-name: Conformance
       platform-label: ci:conformance
