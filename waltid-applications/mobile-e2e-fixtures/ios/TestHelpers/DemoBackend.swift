@@ -112,6 +112,8 @@ public final class DemoBackend {
     private static let verifierBaseURL = URL(string: "https://verifier2.demo.walt.id")!
     /// Pre-registered client ID trusted by the signed-request integration tests.
     public static let verifierClientID = "verifier2"
+    // did:key encoding of the independently pinned P-256 request-object signing key.
+    public static let didVerifierClientID = "decentralized_identifier:did:key:zDnaeSK6d5Kha2Ac7DxCG3wQp7rY5Mm2YozvUjjVd53wzyC4t"
     // Independent public trust anchor; never learn this key from the request object.
     private static let verifierRequestObjectSigningJWK: [String: String] = [
         "kty": "EC",
@@ -194,12 +196,14 @@ public final class DemoBackend {
 
     public func createVerifierSession(
         scenario: DemoCredentialScenario,
-        signedRequest: Bool
+        signedRequest: Bool,
+        clientID: String = DemoBackend.verifierClientID
     ) async throws -> DemoVerifierSession {
         try await createVerifierSession(
             scenario: scenario,
             transactionData: [],
-            signedRequest: signedRequest
+            signedRequest: signedRequest,
+            clientID: clientID
         )
     }
 
@@ -294,7 +298,8 @@ public final class DemoBackend {
     private func createVerifierSession(
         scenario: DemoCredentialScenario,
         transactionData: [[String: Any]],
-        signedRequest: Bool = false
+        signedRequest: Bool = false,
+        clientID: String = DemoBackend.verifierClientID
     ) async throws -> DemoVerifierSession {
         let endpoint = Self.verifierBaseURL
             .appendingPathComponent("verification-session")
@@ -307,7 +312,7 @@ public final class DemoBackend {
             ],
         ]
         if signedRequest {
-            coreFlow["clientId"] = Self.verifierClientID
+            coreFlow["clientId"] = clientID
             coreFlow["key"] = Self.verifierRequestSigningKey
         }
         if let requestedSessionID {

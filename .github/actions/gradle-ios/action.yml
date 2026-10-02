@@ -254,7 +254,7 @@ runs:
           -scheme iosApp \
           -destination "${{ steps.resolve-simulator.outputs.destination }}" \
           -only-testing:iosAppTests \
-          -skip-testing:iosAppUITests \
+          -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2 \
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived \
           -enableCodeCoverage NO \
