@@ -927,6 +927,10 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     /// mdoc document type from the offered credential configuration, when present.
     public let doctype: String?
 
+    /// Issuer display metadata in the same locale-preserving shape as a stored credential sidecar.
+    /// Claim definitions are advertised metadata, not received values or proof of issuer trust.
+    public let metadataJSON: String?
+
     /// Creates a credential preview.
     ///
     /// - Parameters:
@@ -941,6 +945,7 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
     ///   - textColor: Suggested credential text color.
     ///   - vct: SD-JWT VC type from the offered configuration.
     ///   - doctype: mdoc document type from the offered configuration.
+    ///   - metadataJSON: Optional issuer display metadata and claim definitions.
     public init(
         configurationID: String,
         format: String,
@@ -952,7 +957,8 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
         backgroundImageURI: URL? = nil,
         textColor: String? = nil,
         vct: String? = nil,
-        doctype: String? = nil
+        doctype: String? = nil,
+        metadataJSON: String? = nil
     ) {
         self.configurationID = configurationID
         self.format = format
@@ -965,6 +971,7 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
         self.textColor = textColor
         self.vct = vct
         self.doctype = doctype
+        self.metadataJSON = metadataJSON
     }
 
     /// Minimal payload so `CredentialTitles` can resolve a friendly type when display omits a name.

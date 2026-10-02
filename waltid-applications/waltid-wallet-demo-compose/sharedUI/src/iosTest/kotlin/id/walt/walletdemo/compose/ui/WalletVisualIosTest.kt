@@ -35,6 +35,9 @@ class WalletVisualIosTest {
     fun credentialDetails() = scenario { credentialDetails() }
 
     @Test
+    fun localizedCredentialDetails() = scenario { localizedCredentialDetails() }
+
+    @Test
     fun batchOffer() = scenario { batchOffer() }
 
     @Test

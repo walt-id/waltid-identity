@@ -2,29 +2,38 @@ import SwiftUI
 
 public struct CredentialDetailsView: View {
     public let details: CredentialDetails
+    @State private var technicalOpen = false
 
     public init(details: CredentialDetails) {
         self.details = details
     }
 
     public var body: some View {
-        let systemInfoGroup = details.systemInfoGroup
+        let technicalGroups = details.groups.filter { $0.id == "technical" } + [details.systemInfoGroup].compactMap { $0 }
 
         VStack(alignment: .leading, spacing: 12) {
             CredentialOverviewView(details: details)
 
-            if details.groups.isEmpty && systemInfoGroup == nil {
+            if details.groups.isEmpty && technicalGroups.isEmpty {
                 Text("No credential details available")
                      .font(.body)
                     .foregroundStyle(.secondary)
             }
 
-            ForEach(details.groups) { group in
+            ForEach(details.groups.filter { $0.id != "technical" && $0.id != "requested" }) { group in
                 ClaimGroupView(group: group)
             }
 
-            if let systemInfoGroup {
-                ClaimGroupView(group: systemInfoGroup)
+            if !technicalGroups.isEmpty {
+                WalletSection {
+                    WalletNavigationRow(String(localized: "Technical details", bundle: .module)) { technicalOpen = true }
+                        .accessibilityIdentifier("credential-technical-details")
+                }
+            }
+        }
+        .sheet(isPresented: $technicalOpen) {
+            WalletDetailSheet(String(localized: "Technical details", bundle: .module), onDismiss: { technicalOpen = false }) {
+                ForEach(technicalGroups) { group in ClaimGroupView(group: group, collapsible: false) }
             }
         }
     }

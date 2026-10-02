@@ -36,7 +36,8 @@ internal class WalletVisualScenarios(
     private var layoutDirection = "ltr"
 
     private fun capture(id: String) {
-        // Capture settled state independently of host speed; shipping interactions remain animated.
+        // Capture the settled Compose state after interactions and navigation.
+        // Advancing virtual time keeps this independent of host rendering speed.
         test.mainClock.advanceTimeBy(1_000)
         test.waitForIdle()
         captureImage(id, layoutDirection)
@@ -129,6 +130,19 @@ internal class WalletVisualScenarios(
         capture("credential.details.identity")
     }
 
+    fun localizedCredentialDetails() = with(test) {
+        content {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+                CredentialDetailsContent(WalletVisualFixtures.localizedCredentialDetails)
+            }
+        }
+        onNodeWithText("Familienname").assertIsDisplayed()
+        onNodeWithText("Vorname").assertIsDisplayed()
+        onNodeWithText("Name im Namensraum").assertIsDisplayed()
+        onNodeWithText("Straße").assertIsDisplayed()
+        capture("credential.details.localized_metadata")
+    }
+
     fun batchOffer(noneSelected: Boolean = false) = with(test) {
         val copies = WalletVisualFixtures.copies.mapValues { (_, count) -> if (noneSelected) 0 else count }
         val state = WalletDemoUiState(offerPreview = WalletVisualFixtures.offer, issuanceCopyCounts = copies)
@@ -164,6 +178,13 @@ internal class WalletVisualScenarios(
                 waitUntil { onAllNodesWithTag(WalletUiTestTags.claimImage(path)).fetchSemanticsNodes().isNotEmpty() }
                 onNodeWithTag(WalletUiTestTags.claimImage(path)).performScrollTo().assertIsDisplayed()
                 waitUntil { images.isReady(image) }
+                // Both thumbnails are visible together; neither may be captured while still loading.
+                waitUntil {
+                    listOf("portrait", "signature_usual_mark").all { visiblePath ->
+                        onAllNodes(hasTestTag(WalletUiTestTags.claimImage(visiblePath)) and isEnabled())
+                            .fetchSemanticsNodes().isNotEmpty()
+                    }
+                }
                 waitForIdle()
             }
             onNodeWithTag(WalletUiTestTags.claimImage("portrait")).assertIsDisplayed()
