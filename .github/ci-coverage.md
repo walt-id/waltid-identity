@@ -15,10 +15,17 @@ eligibility still runs so `docs/mobile-sdk-api` can start `sdk-docs`.
 Release candidate Maven publish is a separate job that waits for the
 Gradle job and, when requested, the live conformance job.
 
-Labels add coverage; they are not the only way to obtain it. `ci:macos` and
-`ci:mobile` force every macOS lane. `ci:sdk-docs`, `ci:cacheless`, `ci:crypto2`,
+The following labels add coverage beyond automatic path selection. `ci:macos`
+and `ci:mobile` force every macOS lane. `ci:sdk-docs`, `ci:cacheless`, `ci:crypto2`,
 `ci:conformance` (or the older `ci:issuer-conformance` alias), and `ci:android`
 force those specific lanes.
+
+For a coordinated PR stack, `ci:conformance-deferred` temporarily makes PR
+conformance require an explicit opt-in. Label the topmost PR `ci:conformance`
+and leave it without the deferral label. Either `ci:conformance` or
+`ci:issuer-conformance` overrides deferral; main and manual runs are unchanged.
+Deferred coverage is skipped, not a conformance pass, and does not replace or
+clear earlier failed results.
 
 ## Lanes
 
