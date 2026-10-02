@@ -270,38 +270,32 @@ struct PresentView: View {
             || proximityPresentation.sessionState?.legalActions.contains(.cancel) == true
     }
 
+    @ViewBuilder
     private func presentationContent<Content: View, Actions: View>(
         showsActions: Bool,
         scrolls: Bool = true,
         @ViewBuilder content: () -> Content,
         @ViewBuilder actions: () -> Actions
     ) -> some View {
-        Group {
-            if scrolls {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        WalletTabStatusBanner(viewModel: viewModel, tab: .present)
-                        content()
-                    }
-                    .padding()
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    WalletTabStatusBanner(viewModel: viewModel, tab: .present)
-                    content()
-                }
-                .padding(.horizontal).padding(.vertical, 8)
+        if scrolls {
+            WalletReviewScaffold(showsActions: showsActions) {
+                WalletTabStatusBanner(viewModel: viewModel, tab: .present)
+                content()
+            } actions: { actions() }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                WalletTabStatusBanner(viewModel: viewModel, tab: .present)
+                content()
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            if showsActions {
-                actions()
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.bar)
+            .padding(.horizontal).padding(.vertical, 8)
+            .safeAreaInset(edge: .bottom) {
+                if showsActions {
+                    actions().padding().frame(maxWidth: .infinity, alignment: .trailing).background(.bar)
+                }
             }
         }
     }
+
 }
 
 private struct PresentationErrorView: View {

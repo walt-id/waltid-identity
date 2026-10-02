@@ -13,6 +13,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import io.github.takahirom.roborazzi.captureRoboImage
@@ -22,6 +25,12 @@ import kotlinx.cinterop.toKString
 /** Compose iOS/Skia content on an iOS simulator; does not imitate a UIKit provider container. */
 @OptIn(ExperimentalTestApi::class, ExperimentalRoborazziApi::class, InternalComposeUiApi::class)
 class WalletVisualIosTest {
+    @Test fun providerSharingReview() = scenario { providerSharingReview() }
+    @Test
+    fun compactProviderSharingReview() = scenario(size = Size(320f, 568f), dark = true, fontScale = 1.5f) { providerSharingReview(compact = true) }
+    @Test fun providerOfferReview() = scenario { providerOfferReview() }
+    @Test fun paymentSheet() = scenario { paymentReview(sheet = true) }
+
     @Test fun keySummary() = scenario { keySetup("summary") }
     @Test fun keyRecovery() = scenario { keySetup("recovery") }
     @Test fun keyStorage() = scenario { keySetup("storage") }
@@ -80,6 +89,8 @@ class WalletVisualIosTest {
                          block: WalletVisualScenarios.() -> Unit) = runSkikoComposeUiTest(size = size) {
         WalletVisualScenarios(this,
             captureImage = { id, direction ->
+                val root = if (id.startsWith("sharing.provider") || id.startsWith("receiving.provider") || id.startsWith("payment.sheet"))
+                    onNode(isRoot() and hasAnyDescendant(hasTestTag("wallet.review.sheet"))) else onRoot()
                 fun environment(key: String) = platform.posix.getenv(key)?.toKString() ?: ""
                 val metadata: Map<String, Any> = mapOf(
                     "runId" to environment("WALLET_VISUAL_RUN_ID"), "sha" to environment("WALLET_VISUAL_SHA"),
@@ -88,7 +99,7 @@ class WalletVisualIosTest {
                     "viewportWidth" to size.width.toDouble(), "viewportHeight" to size.height.toDouble(),
                     "scale" to 1.0, "fontScale" to fontScale.toDouble(), "theme" to if (dark) "dark" else "light",
                     "locale" to "en-US", "timezone" to environment("TZ"), "layoutDirection" to direction)
-                onRoot().captureRoboImage(this, filePath = "compose-ios-phone-en-light/$id.png",
+                root.captureRoboImage(this, filePath = "compose-ios-phone-en-light/$id.png",
                     roborazziOptions = com.github.takahirom.roborazzi.RoborazziOptions(contextData = metadata))
             },
             // Headless Skia tests have no UIKit window from which to read the display theme.

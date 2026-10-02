@@ -11,6 +11,10 @@ class WalletDemoSharingReviewAndroidTest {
     private val scenarios = WalletDemoSharingReviewTestScenarios()
 
     @Test
+    fun changingHostPreservesDisclosureChoicesAndConsentRevision() =
+        scenarios.changingHostPreservesDisclosureChoicesAndConsentRevision()
+
+    @Test
     fun inspectingAllCredentialInformationDoesNotChangeDisclosureConsent() =
         scenarios.inspectingAllCredentialInformationDoesNotChangeDisclosureConsent()
 
