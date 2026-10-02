@@ -34,6 +34,18 @@ struct WalletTabStatusBanner: View {
 }
 
 extension View {
+    func walletFlowToolbar(onBack: (() -> Void)?, backEnabled: Bool, onOpenSettings: @escaping () -> Void) -> some View {
+        walletSettingsToolbar(onOpenSettings: onOpenSettings).toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                if let onBack {
+                    Button(action: onBack) { Label("Back to wallet", systemImage: "chevron.backward") }
+                        .disabled(!backEnabled)
+                        .accessibilityIdentifier("wallet.flowBack")
+                }
+            }
+        }
+    }
+
     func walletSettingsToolbar(onOpenSettings: @escaping () -> Void) -> some View {
         toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {

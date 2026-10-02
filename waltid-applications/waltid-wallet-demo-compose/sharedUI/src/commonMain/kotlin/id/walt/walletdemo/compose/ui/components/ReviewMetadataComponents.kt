@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -48,29 +49,9 @@ internal fun ReviewMetadataSection(
     contentPadding: PaddingValues = PaddingValues(16.dp),
     content: @Composable () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(modifier),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                modifier = Modifier.padding(contentPadding),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                content()
-            }
+    WalletSection(title = title, modifier = modifier) {
+        Column(Modifier.padding(contentPadding), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            content()
         }
     }
 }
@@ -95,7 +76,7 @@ internal fun ExpandableMetadataCard(
                 .then(if (toggleTestTag != null) Modifier.testTag(toggleTestTag) else Modifier)
                 .clickable(role = Role.Button, onClick = onToggle)
                 .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
-                .padding(vertical = 2.dp),
+                .heightIn(min = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -166,16 +147,12 @@ internal fun MetadataIdentityRow(
                 text = name,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
             supportingText?.takeIf { it.isNotBlank() }?.let {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -229,7 +206,7 @@ private fun MetadataDetailLine(item: MetadataDetailItem) {
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = if (linkUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             textDecoration = if (linkUri != null) TextDecoration.Underline else TextDecoration.None,
             modifier = if (linkUri != null) Modifier.clickable { uriHandler.openUri(linkUri) } else Modifier,
@@ -260,7 +237,7 @@ internal fun MetadataDisclosure(
                 .fillMaxWidth()
                 .clickable(role = Role.Button) { expanded = !expanded }
                 .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
-                .padding(vertical = 2.dp),
+                .heightIn(min = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

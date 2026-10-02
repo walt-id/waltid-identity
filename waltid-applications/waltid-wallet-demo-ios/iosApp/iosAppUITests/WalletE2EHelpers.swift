@@ -5,7 +5,7 @@ import TestHelpers
 @MainActor
 final class WalletE2EUI {
     let app: XCUIApplication
-    private let pin = "1234"
+    private let pin = "123456"
 
     init(app: XCUIApplication) {
         self.app = app
@@ -14,7 +14,7 @@ final class WalletE2EUI {
     func completeKeySetupIfNeeded() {
         let button = app.buttons["wallet.keySetupContinue"]
         guard button.waitForExistence(timeout: 10) else { return }
-        for heading in ["1 of 3 · Recovery", "2 of 3 · Key storage", "3 of 3 · Signing approval"] {
+        for heading in ["1 of 4 · Recovery", "2 of 4 · Key storage", "3 of 4 · Signing approval", "4 of 4 · Review"] {
             XCTAssertTrue(app.staticTexts[heading].waitForExistence(timeout: 10), "Missing setup step: \(heading)")
             button.tap()
         }
@@ -373,18 +373,17 @@ final class WalletE2EUI {
 
         replaceText(in: pinInput, value: pin)
 
+        let submit = app.buttons["wallet.pinSubmitButton"]
+        XCTAssertTrue(submit.waitForExistence(timeout: 10), "PIN submit button not found")
+        submit.tap()
         let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
         if confirmation.waitForExistence(timeout: 2) {
             replaceText(in: confirmation, value: pin)
+            submit.tap()
+            XCTAssertTrue(app.staticTexts["A quicker way to unlock"].waitForExistence(timeout: 5))
+            let skip = app.buttons["wallet.pinSkipBiometrics"]
+            if skip.exists { skip.tap() } else { submit.tap() }
         }
-
-        let submit = firstExisting([
-            app.buttons["wallet.pinSubmitButton"],
-            app.buttons["Set PIN"],
-            app.buttons["Unlock"],
-        ])
-        XCTAssertTrue(submit.waitForExistence(timeout: 10), "PIN submit button not found")
-        submit.tap()
     }
 }
 

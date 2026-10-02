@@ -23,6 +23,31 @@ private val presentationPreviewHandle = WalletDemoPresentationPreviewHandle("pre
 class WalletDemoControllerTest {
 
     @Test
+    fun failedWalletOpeningCanBeRetriedOnceWithoutDuplicateBootstrap() = runTest {
+        var unavailable = true
+        val delegate = FakeDemoWallet()
+        val wallet = object : DemoWallet by delegate {
+            override suspend fun listCredentials(): List<WalletDemoCredential> {
+                check(!unavailable) { "Credential storage unavailable" }
+                return emptyList()
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this)
+        assertIs<WalletSessionState.Failed>(controller.state.value.session)
+        assertEquals(1, delegate.bootstrapCalls)
+        unavailable = false
+        controller.retryOpeningWallet()
+        controller.retryOpeningWallet()
+        assertIs<WalletSessionState.Bootstrapping>(controller.state.value.session)
+        runCurrent()
+        assertIs<WalletSessionState.Ready>(controller.state.value.session)
+        assertEquals(2, delegate.bootstrapCalls)
+        controller.retryOpeningWallet()
+        runCurrent()
+        assertEquals(2, delegate.bootstrapCalls)
+    }
+
+    @Test
     fun cancelledKeyApprovalRetainsSetupAndReleasesBusyStateForRetry() = runTest {
         val option = WalletDemoKeySetupOption("create", WalletDemoKeyChoice("new", "No backup", ""),
             WalletDemoKeyChoice("native", "Native", ""), WalletDemoKeyChoice("approval", "Approval", ""))

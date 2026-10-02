@@ -1,6 +1,14 @@
 package id.walt.walletdemo.compose.ui
 
 internal object WalletUiTestTags {
+    val ScanButton = tag("scanButton")
+    val ScanScreen = tag("scanScreen")
+    val ScanInput = tag("scanInput")
+    val ScanCamera = tag("scanCamera")
+    val ScanContinue = tag("scanContinue")
+    val ScanReceive = tag("scanReceive")
+    val ScanPresent = tag("scanPresent")
+    val FlowBack = tag("flowBack")
     val IdentitySetup = tag("identitySetup")
     val KeySetupContinue = tag("keySetupContinue")
     fun keySetupChoice(step: String, index: Int) = tag("keySetupChoice", step, index.toString())

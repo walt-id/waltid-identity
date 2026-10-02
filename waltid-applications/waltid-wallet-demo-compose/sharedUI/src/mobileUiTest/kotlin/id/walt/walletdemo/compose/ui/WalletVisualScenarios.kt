@@ -20,6 +20,11 @@ import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
 import id.walt.walletdemo.compose.ui.screens.ReceiveTab
 import id.walt.walletdemo.compose.ui.screens.SettingsScreen
 import id.walt.walletdemo.compose.ui.screens.WalletHeader
+import id.walt.walletdemo.compose.ui.screens.WalletScanScreen
+import id.walt.walletdemo.compose.ui.screens.CredentialsTab
+import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.logic.WalletDemoTab
+import id.walt.walletdemo.compose.logic.WalletOperationState
 
 /** Content and readiness are shared; the platform adapter owns the renderer and baseline path. */
 @OptIn(ExperimentalTestApi::class)
@@ -36,6 +41,23 @@ internal class WalletVisualScenarios(
         }
     }
 
+    fun pin(page: id.walt.walletdemo.compose.ui.screens.PinSetupPage) = with(test) {
+        val controller = id.walt.walletdemo.compose.logic.WalletDemoController(
+            WalletUiTestWallet(),
+            id.walt.walletdemo.compose.logic.InMemoryDemoPinStore())
+        if (page != id.walt.walletdemo.compose.ui.screens.PinSetupPage.Create) controller.updatePin("123456")
+        if (page == id.walt.walletdemo.compose.ui.screens.PinSetupPage.Biometrics) controller.updatePinConfirmation("123456")
+        val auth = controller.state.value.auth as id.walt.walletdemo.compose.logic.WalletAuthState.Setup
+        content { id.walt.walletdemo.compose.ui.screens.PinScreen(controller, auth, false, false, initialPage = page) }
+        onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsDisplayed()
+        when (page) {
+            id.walt.walletdemo.compose.ui.screens.PinSetupPage.Create -> onNodeWithTag(WalletUiTestTags.PinInput).assertIsDisplayed()
+            id.walt.walletdemo.compose.ui.screens.PinSetupPage.Confirm -> onNodeWithTag(WalletUiTestTags.PinConfirmationInput).assertIsDisplayed()
+            id.walt.walletdemo.compose.ui.screens.PinSetupPage.Biometrics -> onNodeWithText("Use PIN only").assertIsDisplayed()
+        }
+        capture("onboarding.pin.${page.name.lowercase()}")
+    }
+
     fun settingsRoot() = with(test) {
         content {
             SettingsScreen(
@@ -49,6 +71,39 @@ internal class WalletVisualScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsSigningKey).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsDigitalCredentialsApi).assertIsDisplayed()
         capture("settings.root.default")
+    }
+
+    fun walletHome(empty: Boolean = false) = with(test) {
+        val ready = WalletVisualFixtures.partialResult.session as WalletSessionState.Ready
+        val state = WalletVisualFixtures.partialResult.copy(
+            selectedTab = WalletDemoTab.Credentials, operation = WalletOperationState.Idle,
+            session = ready.copy(credentials = if (empty) emptyList() else ready.credentials),
+        )
+        content {
+            Column(Modifier.fillMaxSize()) {
+                WalletHeader(state, onSettings = {}, onDismissStatus = {}, onToggleStatusExpanded = {}, onScan = {}, onShareNearby = {})
+                CredentialsTab(state.session, modifier = Modifier.weight(1f))
+            }
+        }
+        if (empty) onNodeWithTag(WalletUiTestTags.CredentialsEmpty).assertIsDisplayed()
+        else {
+            waitUntil { onAllNodesWithTag(WalletUiTestTags.credentialCard(ready.credentials.single().id)).fetchSemanticsNodes().isNotEmpty() }
+            onNodeWithTag(WalletUiTestTags.credentialCard(ready.credentials.single().id)).assertIsDisplayed()
+        }
+        onNodeWithTag(WalletUiTestTags.ScanButton).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.ProximityStartButton).assertIsDisplayed()
+        capture(if (empty) "wallet.home.empty" else "wallet.home.credential")
+    }
+
+    fun scanner(state: String) = with(test) {
+        val input = when (state) { "link" -> "https://example.test/request"; "unsupported" -> "FIDO:/0123456789"; else -> "" }
+        content { WalletScanScreen(onBack = {}, onOpen = { _, _ -> }, initialInput = input) }
+        if (state == "link") {
+            onNodeWithTag(WalletUiTestTags.ScanContinue).assertIsDisplayed().assertIsEnabled()
+            onNodeWithText("Receive credentials").assertDoesNotExist()
+            onNodeWithText("Share credentials").assertDoesNotExist()
+        } else onNodeWithTag(WalletUiTestTags.ScanContinue).assertIsDisplayed().assertIsNotEnabled()
+        capture("wallet.scan.$state")
     }
 
     fun credentialDetails() = with(test) {

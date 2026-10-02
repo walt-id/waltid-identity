@@ -38,15 +38,40 @@ def fresh(path, started):
     return path.is_file() and path.stat().st_mtime >= started
 
 
-def native_tests(path, started):
+def native_tests(path, started, output):
     if path is None or not fresh(path, started):
-        return {}, "Native result missing or older than this run"
+        return {}, {}, "Native result missing or older than this run"
     data = json.loads(path.read_text())
     if data.get("schema") != "xcodebuildmcp.output.test-result" or str(data.get("schemaVersion")) != "3":
-        return {}, "Unsupported native test-result schema"
+        return {}, {}, "Unsupported native test-result schema"
     tests = {t["test"].removesuffix("()"): t for t in data["data"].get("testCases", [])
              if t["suite"] == CATALOGUE["renderers"]["swiftui"]["suite"]}
-    return tests, None
+    results = {}
+    if any(case["status"] == "failed" for case in tests.values()):
+        bundle = Path(data["data"].get("artifacts", {}).get("xcresultPath", "")).expanduser()
+        if not bundle.is_dir():
+            return tests, results, "Failed native run has no accessible xcresult bundle"
+        export = output / "native-attachments"
+        try:
+            # SnapshotTesting attachments are test activities, not isAssociatedWithFailure items.
+            subprocess.run(["xcrun", "xcresulttool", "export", "attachments", "--path", str(bundle),
+                            "--output-path", str(export), "--test-id", CATALOGUE["renderers"]["swiftui"]["suite"]],
+                           check=True, capture_output=True, text=True)
+            for case in json.loads((export / "manifest.json").read_text()):
+                test = case["testIdentifier"].split("/")[-1].removesuffix("()")
+                result = {}
+                for attachment in case["attachments"]:
+                    name = attachment["suggestedHumanReadableName"]
+                    key = ("actual_file_path" if name.startswith("failure_") else
+                           "compare_file_path" if name.startswith("difference_") else None)
+                    if key:
+                        if key in result:
+                            return tests, results, f"Multiple native snapshots in {test}; catalogue needs separate test IDs"
+                        result[key] = str(export / attachment["exportedFileName"])
+                results[test] = result
+        except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+            return tests, results, f"Could not export native comparison artifacts: {type(error).__name__}"
+    return tests, results, None
 
 
 def compose_tests(renderer, started):
@@ -76,8 +101,7 @@ def finish(args, run):
     for name in run["renderers"]:
         renderer = CATALOGUE["renderers"][name]
         if name == "swiftui":
-            tests, error = native_tests(args.native_results, run["started"])
-            results = {}
+            tests, results, error = native_tests(args.native_results, run["started"], args.output)
         else:
             tests, results, error = compose_tests(renderer, run["started"])
         if error:
@@ -91,7 +115,7 @@ def finish(args, run):
             expected.add(filename)
             baseline = ROOT / renderer["baselineDirectory"] / filename
             case = tests.get(test, {})
-            result = results.get(filename, {})
+            result = results.get(test if name == "swiftui" else filename, {})
             status = "missing"
             if baseline.is_file() and case:
                 status = "passed" if case["status"] == "passed" and (name == "swiftui" or result.get("type") == "unchanged") else "failed"
