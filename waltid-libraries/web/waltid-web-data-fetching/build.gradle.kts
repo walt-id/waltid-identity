@@ -34,6 +34,7 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
+            implementation(identityLibs.ktor.client.mock)
         }
 
         jvmMain.dependencies {
