@@ -26,7 +26,7 @@ android {
         sourceCompatibility = javaVersion
         targetCompatibility = javaVersion
     }
-    sourceSets["main"].kotlin.srcDir("../androidTestFixtures/kotlin")
+    sourceSets["main"].kotlin.directories.add("../androidTestFixtures/kotlin")
 }
 
 dependencies {
