@@ -3,8 +3,7 @@ package id.walt.walletdemo.compose.android
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.util.Log
-import java.util.concurrent.atomic.AtomicReference
+import org.json.JSONObject
 
 /**
  * Durable handoff for authorization-code issuance started from [DigitalCredentialCreateActivity].
@@ -19,58 +18,57 @@ import java.util.concurrent.atomic.AtomicReference
  */
 internal object DigitalCredentialCreateAuthHandoff {
     private const val PREFS = "digital_credential_create_auth"
-    private const val KEY_SESSION_ID = "session_id"
-    private const val TAG = "WaltDigitalCredentials"
+    private const val PREFIX = "pending:"
+    private val live = mutableMapOf<String, (String) -> Unit>()
+    private val claimed = mutableSetOf<String>()
 
-    private val pendingContinuation = AtomicReference<((String) -> Unit)?>(null)
-
-    fun register(context: Context, sessionId: String, onCallback: (String) -> Unit) {
-        context.applicationContext
-            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_SESSION_ID, sessionId)
-            .apply()
-        pendingContinuation.set(onCallback)
+    @Synchronized
+    fun register(context: Context, sessionId: String, state: String, redirectUri: String, onCallback: (String) -> Unit) {
+        require(sessionId.isNotBlank() && state.isNotBlank()) { "Authorization correlation is missing" }
+        val entry = JSONObject().put("state", state).put("redirect", redirectUri).toString()
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(PREFIX + sessionId, entry).apply()
+        live[sessionId] = onCallback
     }
 
-    fun clear(context: Context) {
-        pendingContinuation.set(null)
-        context.applicationContext
-            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .remove(KEY_SESSION_ID)
-            .apply()
+    /** Cleanup is scoped to one owner, including when another provider invocation is active. */
+    @Synchronized
+    fun clear(context: Context, sessionId: String) {
+        live.remove(sessionId)
+        claimed.remove(sessionId)
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .remove(PREFIX + sessionId).apply()
     }
 
-    /** Test-only: drop the in-memory continuation while leaving the persisted session id. */
-    internal fun dropLiveContinuation() {
-        pendingContinuation.set(null)
-    }
+    /** Test-only process-loss simulation: persisted correlation remains available. */
+    @Synchronized
+    internal fun dropLiveContinuation() { live.clear(); claimed.clear() }
 
-    fun pendingSessionId(context: Context): String? =
-        context.applicationContext
-            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_SESSION_ID, null)
-            ?.takeIf { it.isNotBlank() }
-
-    /** @return true when this URI was consumed as a create-flow authorization callback. */
+    /** SDK validation still applies. This correlation only decides which flow owns the URI. */
+    @Synchronized
     fun deliver(context: Context, uri: Uri): Boolean {
-        if (!isOpenIdCallback(uri)) return false
-        val callback = uri.toString()
-        val continuation = pendingContinuation.getAndSet(null)
-        if (continuation != null) {
-            Log.i(TAG, "Delivering authorization callback to create Activity")
-            continuation(callback)
-            return true
-        }
-        val sessionId = pendingSessionId(context) ?: return false
-        Log.i(TAG, "Create Activity gone; queuing orphan authorization callback for session=$sessionId")
-        OrphanAuthorizationCallback.queue(sessionId, callback)
+        if (!uri.isHierarchical || uri.fragment != null) return false
+        val state = uri.getQueryParameters("state").singleOrNull()?.takeIf { it.isNotBlank() } ?: return false
+        val codes = uri.getQueryParameters("code")
+        val errors = uri.getQueryParameters("error")
+        if (!((codes.size == 1 && codes.single().isNotBlank() && errors.isEmpty()) ||
+                (errors.size == 1 && errors.single().isNotBlank() && codes.isEmpty()))) return false
+        val matches = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).all
+            .filter { (key, value) ->
+                if (!key.startsWith(PREFIX) || value !is String) return@filter false
+                val entry = runCatching { JSONObject(value) }.getOrNull() ?: return@filter false
+                val redirect = Uri.parse(entry.optString("redirect"))
+                entry.optString("state") == state && uri.scheme.equals(redirect.scheme, ignoreCase = true) &&
+                    uri.encodedAuthority.orEmpty() == redirect.encodedAuthority.orEmpty() &&
+                    uri.encodedPath.orEmpty() == redirect.encodedPath.orEmpty()
+            }
+        val sessionId = matches.keys.singleOrNull()?.removePrefix(PREFIX) ?: return false
+        if (!claimed.add(sessionId)) return true
+        val continuation = live.remove(sessionId)
+        if (continuation != null) continuation(uri.toString())
+        else OrphanAuthorizationCallback.queue(sessionId, uri.toString())
         return true
     }
-
-    fun isOpenIdCallback(uri: Uri): Boolean =
-        uri.scheme.equals("openid", ignoreCase = true)
 
     fun openExternalBrowser(context: Context, authorizationUrl: String) {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(authorizationUrl)).apply {
@@ -86,13 +84,13 @@ internal object DigitalCredentialCreateAuthHandoff {
  * credential is still stored even when the CREATE_CREDENTIAL result can no longer be returned.
  */
 internal object OrphanAuthorizationCallback {
-    private val pending = AtomicReference<Pair<String, String>?>(null)
+    private val pending = java.util.concurrent.ConcurrentLinkedQueue<Pair<String, String>>()
 
     fun queue(sessionId: String, callbackUri: String) {
-        pending.set(sessionId to callbackUri)
+        pending.add(sessionId to callbackUri)
     }
 
-    fun take(): Pair<String, String>? = pending.getAndSet(null)
+    fun take(): Pair<String, String>? = pending.poll()
 }
 
 /**

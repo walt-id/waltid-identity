@@ -28,11 +28,13 @@ class WalletDemoOfferReviewTestScenarios {
             batchSize = 3,
         )
         val state = mutableStateOf(WalletDemoOfferCreateUiState.Review(preview))
+        val visible = mutableStateOf(true)
+        val draft = WalletDemoOfferDraft()
         val presentation = mutableStateOf(WalletReviewPresentation.FullScreen)
         val accepted = mutableListOf<Pair<String?, Map<String, Int>>>()
         var dismissed = 0
         setContent {
-            WalletDemoOfferCreateScreen(state.value,
+            if (visible.value) WalletDemoOfferCreateScreen(state.value, draft = draft,
                 onAccept = { code, counts ->
                     accepted += code to counts
                     state.value = state.value.copy(submitting = true)
@@ -47,6 +49,11 @@ class WalletDemoOfferReviewTestScenarios {
         onNodeWithTag("issuance-select-pid").performScrollTo().performClick()
         repeat(2) { onNodeWithTag("issuance-more-pid").performScrollTo().performClick() }
         onNodeWithTag("issuance-more-pid").assertIsNotEnabled()
+        runOnIdle { visible.value = false }
+        waitForIdle()
+        runOnIdle { visible.value = true }
+        onNodeWithTag(WalletUiTestTags.TxCodeInput).performScrollTo().assertIsDisplayed()
+        assertEquals("1234", draft.transactionCode)
         runOnIdle { presentation.value = WalletReviewPresentation.Sheet }
         onNodeWithTag("issuance-copies-pid").performScrollTo().assertTextEquals("Copies: 3")
         onNodeWithTag("issuance-select-mdl").performScrollTo().assertIsOff()
