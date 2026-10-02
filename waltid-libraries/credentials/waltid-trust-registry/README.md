@@ -25,25 +25,23 @@ Kotlin/JVM library for loading trust lists and resolving certificates, certifica
 Supported inputs:
 
 - ETSI TS 119 612 Trust List and List of Trusted Lists XML
-- ETSI TS 119 602 V1.1.1 JSON, validated against the ETSI Annex A.1 schema
-- ETSI TS 119 602 V1.1.1 XML, validated against the ETSI Annex A.2.1 XSD
+- ETSI TS 119 602 V1.1.1 JSON, Lists of Trusted Entities (validated against the ETSI Annex A.1 schema)
+- ETSI TS 119 602 V1.1.1 XML, Lists of Trusted Entities (validated against the ETSI Annex A.2.1 XSD)
 - TS 119 602 JSON in a compact-JWS envelope
 
 Other JSON/XML shapes are rejected.
 
 ## Standards status
 
-| Area | Status |
-|---|---|
+| Area | Status                                                    |
+|---|-----------------------------------------------------------|
 | TS 119 602 Annex A.1 JSON syntax | ETSI JSON Schema validation and normalization implemented |
 | TS 119 602 Annex A.2.1 XML syntax | Offline ETSI XSD validation and normalization implemented |
-| TS 119 602 Annex A.2.2 / TS 119 612 XML | Ingestion implemented |
-| RFC 7515 compact JWS integrity | Implemented for embedded ECDSA payloads |
-| TS 119 602 profile rules, annexes D–I | Conformance test expansion required |
-| JAdES Baseline B / XAdES-B-B profile validation | Not complete; cryptographic signature validation alone is not a conformance claim |
+| TS 119 602 Annex A.2.2 / TS 119 612 XML | Ingestion implemented                                     |
+| RFC 7515 compact JWS integrity | Implemented for embedded ECDSA payloads                   |
+| TS 119 602 profile rules, annexes D–I | Conformance test expansion required                       |
+| JAdES Baseline B / XAdES-B-B profile validation | Not complete; Required by ETSI TS 119 602                                 |
 
-The library must not be described as fully ETSI-conformant until the remaining profile rules and AdES validation are
-implemented and verified against an independent conformance suite.
 
 ## Security model
 
@@ -133,10 +131,16 @@ check(result.assurance?.authenticityState == AuthenticityState.INTEGRITY_VERIFIE
 
 For `AUTHENTICATED`, use `REQUIRE_AUTHENTICATED` and configure independently trusted TSL signer certificates.
 
-The parser distinguishes a national trust list from the EU List of Trusted Lists (LoTL):
+XMLDSig validation accepts both plain PKCS#1 v1.5 and RSASSA-PSS signer certificates (the explicit id-RSASSA-PSS
+SubjectPublicKeyInfo OID, not just the generic rsaEncryption OID) - Germany's national list
+(`tl.bundesnetzagentur.de/TL-DE.xml`) is signed this way.
+
+The parser distinguishes a national trust list from the EU List of Trusted Lists (LoTL). `format` is on the
+persisted `TrustSource`, not the `RefreshResult`:
 
 ```kotlin
-check(result.format == TrustListFormat.ETSI_TS_119_612_TRUST_LIST_XML)
+val source = registry.listSources().first { it.sourceId == "at-tsl" }
+check(source.format == TrustListFormat.ETSI_TS_119_612_TRUST_LIST_XML)
 ```
 
 For the EU LoTL, `result.format` is `ETSI_TS_119_612_LIST_OF_TRUST_LISTS_XML` and
@@ -175,7 +179,7 @@ when (decision.decision) {
 }
 ```
 
-Certificate-chain resolution can build a path from a presented leaf to a registry-owned trust anchor; the presented chain does not need to contain that anchor.
+Certificate-chain resolution can build a path from a presented leaf to a registry-owned trust anchor; the presented chain does not need to contain that anchor. Candidate anchors are narrowed by exact SHA-256 pin and by Authority/Subject Key Identifier match before PKIX validation runs, falling back to a full scan only if narrowing finds nothing. This never misses a match: the JDK's PKIX path builder only completes a path to an anchor whose Subject Key Identifier matches the presented chain's Authority Key Identifier, so narrowing's own Subject Key Identifier lookup already finds every anchor that could validate — including a registry with the same anchor registered more than once, which still reports `MULTIPLE_MATCHES` correctly.
 
 ## Source lifecycle
 
@@ -186,18 +190,38 @@ fetch → detect format → verify envelope/signature → parse
 
 Failed refreshes do not replace the active source snapshot. `RefreshResult` provides an `errorCode`, details, and source assurance where available.
 
-## Compatibility and scope
+## Notes for future development
 
 - Boolean `validateSignature` loading methods remain temporarily available but are deprecated. New integrations should use `SourceLoadOptions`.
 - Persisted sources created before the assurance model must be refreshed or migrated; missing assurance is treated as not admitted.
 - Compact JWS support validates embedded payloads and pinned X.509 signers; it is not full JAdES support.
 - `InMemoryTrustStore` is thread-safe but not persistent. Production deployments should provide a persistent `TrustStore` implementation.
+- WE BUILD WP4's published WRPAC list (below) wraps its `LoTE` body in a top-level `signature: {protected, signature}`
+  property and is rejected by schema validation. This is **not an ETSI TS 119 602 format**: the normative Annex A.1
+  JSON Schema's root object allows only `LoTE` (`additionalProperties: false`, no `signature` property defined at
+  all), and TS 119 602 clause on the WRPAC list's `Signature` requires "a compact JAdES Baseline B signature as
+  specified in ETSI TS 119 182-1" - i.e. one JWS Compact Serialization string, not a JSON object. WE BUILD's own
+  signer (`tools/lotl/jades_signer.py`) builds a real compact JWS internally, then splits it into this two-field
+  object and discards the payload segment (relying on the sibling `LoTE` content instead) - a project-specific
+  convention with no ETSI basis, not a gap in this library's conformance. Treat it as a WE BUILD-specific quirk, not
+  something to add support for.
+- Only `PID_PROVIDER`, `WALLET_PROVIDER`, `ACCESS_CERTIFICATE_PROVIDER`, `RELYING_PARTY_PROVIDER`, and
+  `ATTESTATION_PROVIDER` come from LoTE - a TSL is always read as `TRUST_SERVICE_PROVIDER`, regardless of the
+  services it actually lists. As of this writing, most national authorities (including WE BUILD's own PID/Wallet
+  Provider lists) still publish those two specific roles as TSLs, not LoTE.
 
 Useful public test sources:
 
 - Austria TSL: `https://www.signatur.rtr.at/vertrauensliste.xml`
 - Italy TSL: `https://eidas.agid.gov.it/TL/TSL-IT.xml`
+- Germany TSL (RSASSA-PSS-signed): `https://tl.bundesnetzagentur.de/TL-DE.xml`
 - EU LoTL: `https://ec.europa.eu/tools/lotl/eu-lotl.xml`
+- WRPAC / WRPRC LoTE (WE BUILD WP4 Trust Infrastructure pilot; served from `raw.githubusercontent.com`, not the
+  project's GitHub Pages site, which only publishes the top-level `list_of_trusted_lists.*`):
+  `https://raw.githubusercontent.com/webuild-consortium/wp4-trust-group/main/lotl/wrpac-providers-lote.json` /
+  `https://raw.githubusercontent.com/webuild-consortium/wp4-trust-group/main/lotl/wrprc-providers-lote.json` -
+  real `ACCESS_CERTIFICATE_PROVIDER` / `RELYING_PARTY_PROVIDER` entities, but see the signature-envelope caveat
+  above before loading the WRPAC one directly
 
 ## Tests
 

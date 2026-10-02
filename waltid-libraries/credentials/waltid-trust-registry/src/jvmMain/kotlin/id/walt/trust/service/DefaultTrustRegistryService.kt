@@ -105,16 +105,29 @@ class DefaultTrustRegistryService(
             )
         }
 
-        val identitiesByAnchor = store.listCertificateIdentities().toList().mapNotNull { identity ->
-            val encoded = identity.certificateDerBase64 ?: return@mapNotNull null
-            runCatching { identity to parseCertificate(encoded) }
-                .onFailure { log.warn(it) { "Ignoring invalid stored certificate for identity ${identity.identityId}" } }
-                .getOrNull()
-        }
-
-        val pathMatches = identitiesByAnchor.filter { (_, anchor) ->
+        // Narrow candidate anchors by Authority/Subject Key Identifier before running PKIX
+        // validation, instead of validating the presented chain against every stored certificate.
+        // A registry-stored anchor can only complete the path if it either *is* the leaf (pinned
+        // exact-match) or directly issued one of the presented certificates, which means its own
+        // Subject Key Identifier equals that presented certificate's Authority Key Identifier.
+        val narrowedCandidates = narrowAnchorCandidates(certificateChainPemOrDer.first(), presentedCertificates)
+        val narrowedMatches = decodeIdentityAnchors(narrowedCandidates).filter { (_, anchor) ->
             validateCertificatePath(presentedCertificates, anchor, instant)
         }.map { it.first }
+
+        // Falls back to the exhaustive scan only when narrowing found no valid path - e.g. the
+        // stored certificate has no Subject Key Identifier, or the presented chain has no
+        // Authority Key Identifier - so no valid path is ever missed. This also loses nothing for
+        // MULTIPLE_MATCHES: the JDK's own PKIX path builder only completes a path to an anchor
+        // whose Subject Key Identifier matches the presented chain's Authority Key Identifier, so
+        // every anchor that could validate this chain is one the Subject Key Identifier lookup
+        // above already finds.
+        val pathMatches = narrowedMatches.ifEmpty {
+            val identitiesByAnchor = decodeIdentityAnchors(store.listCertificateIdentities().toList())
+            identitiesByAnchor.filter { (_, anchor) ->
+                validateCertificatePath(presentedCertificates, anchor, instant)
+            }.map { it.first }
+        }
 
         if (pathMatches.isNotEmpty()) {
             val decision = buildDecisionFromIdentities(
@@ -813,6 +826,13 @@ class DefaultTrustRegistryService(
             TrustStatus.SUPERVISED
         )
 
+        private const val AUTHORITY_KEY_IDENTIFIER_OID = "2.5.29.35"
+        private const val DER_TAG_OCTET_STRING = 0x04
+        private const val DER_TAG_SEQUENCE = 0x30
+
+        // [0] IMPLICIT keyIdentifier - context-specific class (0x80) + primitive + tag number 0.
+        private const val AKI_KEY_IDENTIFIER_TAG = 0x80
+
         private fun now(): Instant = Clock.System.now()
     }
 
@@ -839,6 +859,81 @@ class DefaultTrustRegistryService(
         val der = Base64.decode(encoded)
         return CertificateFactory.getInstance("X.509")
             .generateCertificate(ByteArrayInputStream(der)) as X509Certificate
+    }
+
+    private suspend fun narrowAnchorCandidates(
+        leafPemOrDer: String,
+        presentedCertificates: List<X509Certificate>
+    ): List<ServiceIdentity> {
+        val exactLeafPin = computeCertificateSha256(leafPemOrDer)
+            ?.let { store.findIdentitiesByCertificateSha256(it).toList() }
+            .orEmpty()
+
+        val akiHexes = presentedCertificates.mapNotNull(::extractAuthorityKeyIdentifierHex).distinct()
+        val byIssuerSki = akiHexes.flatMap { store.findIdentitiesBySkiHex(it).toList() }
+
+        return (exactLeafPin + byIssuerSki).distinctBy { it.identityId }
+    }
+
+    private fun decodeIdentityAnchors(identities: List<ServiceIdentity>): List<Pair<ServiceIdentity, X509Certificate>> =
+        identities.mapNotNull { identity ->
+            val encoded = identity.certificateDerBase64 ?: return@mapNotNull null
+            runCatching { identity to parseCertificate(encoded) }
+                .onFailure { log.warn(it) { "Ignoring invalid stored certificate for identity ${identity.identityId}" } }
+                .getOrNull()
+        }
+
+    /**
+     * The raw key identifier octets from a certificate's Authority Key Identifier extension
+     * (RFC 5280 4.2.1.1), hex-encoded to match [id.walt.trust.model.ServiceIdentity.subjectKeyIdentifierHex]'s
+     * format. Parsed by hand rather than pulling in a dependency for it - see [readDerTlv].
+     */
+    private fun extractAuthorityKeyIdentifierHex(cert: X509Certificate): String? {
+        val extensionValue = cert.getExtensionValue(AUTHORITY_KEY_IDENTIFIER_OID) ?: return null
+        return runCatching {
+            // getExtensionValue wraps the extension's DER bytes in an outer OCTET STRING.
+            val (outerTag, outerContentOffset, outerLength) = readDerTlv(extensionValue, 0)
+            require(outerTag == DER_TAG_OCTET_STRING) { "Expected OCTET STRING, got tag $outerTag" }
+            val akiSequence = extensionValue.copyOfRange(outerContentOffset, outerContentOffset + outerLength)
+
+            val (seqTag, seqContentOffset, seqLength) = readDerTlv(akiSequence, 0)
+            require(seqTag == DER_TAG_SEQUENCE) { "Expected AuthorityKeyIdentifier SEQUENCE, got tag $seqTag" }
+
+            var pos = seqContentOffset
+            val end = seqContentOffset + seqLength
+            var keyIdentifierHex: String? = null
+            while (pos < end && keyIdentifierHex == null) {
+                val (fieldTag, fieldContentOffset, fieldLength) = readDerTlv(akiSequence, pos)
+                if (fieldTag == AKI_KEY_IDENTIFIER_TAG) {
+                    keyIdentifierHex = akiSequence
+                        .copyOfRange(fieldContentOffset, fieldContentOffset + fieldLength)
+                        .joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
+                }
+                pos = fieldContentOffset + fieldLength
+            }
+            keyIdentifierHex
+        }.getOrElse {
+            log.debug { "Could not parse Authority Key Identifier from presented certificate: ${it.message}" }
+            null
+        }
+    }
+
+    /** Reads one DER tag-length-value header. Returns (tag, contentOffset, contentLength). */
+    private fun readDerTlv(bytes: ByteArray, offset: Int): Triple<Int, Int, Int> {
+        val tag = bytes[offset].toInt() and 0xFF
+        var pos = offset + 1
+        val firstLengthByte = bytes[pos].toInt() and 0xFF
+        pos++
+        var length = firstLengthByte
+        if (firstLengthByte >= 0x80) {
+            val lengthByteCount = firstLengthByte and 0x7F
+            length = 0
+            repeat(lengthByteCount) {
+                length = (length shl 8) or (bytes[pos].toInt() and 0xFF)
+                pos++
+            }
+        }
+        return Triple(tag, pos, length)
     }
 
     private fun validateCertificatePath(
