@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package id.walt.androidSample.app.features.walkthrough
 
 import android.content.Intent
@@ -18,7 +16,6 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -33,7 +30,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -61,7 +57,6 @@ import id.walt.androidSample.utils.collectImmediatelyAsStateWithLifecycle
 import kotlinx.coroutines.launch
 
 
-@OptIn(ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun StepFourScreen(
     viewModel: WalkthroughViewModel,
@@ -70,6 +65,9 @@ fun StepFourScreen(
 ) {
 
     val ctx = LocalContext.current
+    val biometricAuthenticationFailure = stringResource(R.string.biometric_authentication_failure)
+    val biometricsUnavailable = stringResource(R.string.biometric_unavailable)
+    val enrollNow = stringResource(R.string.label_enroll_now)
     val systemKeyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
 
@@ -88,13 +86,13 @@ fun StepFourScreen(
 
             WalkthroughEvent.Biometrics.BiometricAuthenticationFailure -> Toast.makeText(
                 ctx,
-                ctx.getString(R.string.biometric_authentication_failure),
+                biometricAuthenticationFailure,
                 Toast.LENGTH_SHORT
             ).show()
 
             WalkthroughEvent.Biometrics.BiometricsUnavailable -> Toast.makeText(
                 ctx,
-                ctx.getString(R.string.biometric_unavailable),
+                biometricsUnavailable,
                 Toast.LENGTH_SHORT
             ).show()
 
@@ -102,7 +100,7 @@ fun StepFourScreen(
                 scope.launch {
                     val snackbarResult = snackbarHostState.showSnackbar(
                         message = event.msg,
-                        actionLabel = ctx.getString(R.string.label_enroll_now),
+                        actionLabel = enrollNow,
                         withDismissAction = false,
                         duration = SnackbarDuration.Short
                     )
