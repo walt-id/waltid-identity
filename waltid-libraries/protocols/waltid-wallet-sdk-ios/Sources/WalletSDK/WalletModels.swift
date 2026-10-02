@@ -1122,6 +1122,15 @@ public struct IssuanceSession: Equatable, Sendable {
 
 }
 
+/// Current retained state, refreshed by listing issuance continuations.
+public enum IssuanceContinuationStatus: Equatable, Sendable {
+    case unresolved
+    case awaitingIssuer
+    case awaitingLocalSave
+    case remoteOutcomeUncertain
+    case storageOutcomeUncertain
+}
+
 /// Issuance continuation awaiting issuer processing or local credential storage.
 public struct DeferredCredential: Equatable, Sendable {
     /// Opaque identifier used to resume this deferred operation.
@@ -1136,6 +1145,11 @@ public struct DeferredCredential: Equatable, Sendable {
     /// Issuer-recommended minimum polling interval in seconds.
     public let intervalSeconds: Int64?
 
+    public let status: IssuanceContinuationStatus
+
+    /// Issuer display metadata only, without credential values or protocol secrets.
+    public let displayMetadataJSON: String?
+
     /// Creates a deferred credential continuation.
     ///
     /// - Parameters:
@@ -1143,11 +1157,14 @@ public struct DeferredCredential: Equatable, Sendable {
     ///   - credentialConfigurationID: Credential configuration, if supplied by the original request.
     ///   - intervalSeconds: Issuer-recommended polling interval.
     ///   - credentialIdentifier: Optional issuer-granted dataset identifier.
-    public init(id: String, credentialConfigurationID: String?, intervalSeconds: Int64?, credentialIdentifier: String? = nil) {
+    public init(id: String, credentialConfigurationID: String?, intervalSeconds: Int64?, credentialIdentifier: String? = nil,
+                status: IssuanceContinuationStatus = .unresolved, displayMetadataJSON: String? = nil) {
         self.id = id
         self.credentialConfigurationID = credentialConfigurationID
         self.intervalSeconds = intervalSeconds
         self.credentialIdentifier = credentialIdentifier
+        self.status = status
+        self.displayMetadataJSON = displayMetadataJSON
     }
 }
 

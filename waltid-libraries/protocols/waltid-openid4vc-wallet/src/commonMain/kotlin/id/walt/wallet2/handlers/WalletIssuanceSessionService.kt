@@ -279,16 +279,33 @@ data class WalletDeferredCredential(
 }
 
 /** Retained issuance work, including local-save recovery whose original configuration may be unknown. */
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 data class WalletIssuanceContinuation(
     val id: String,
     val credentialConfigurationId: String? = null,
     val intervalSeconds: Long? = null,
     val credentialIdentifier: String? = null,
+    /** Current retained state when returned by [WalletIssuanceSessionService.listIssuanceContinuations]. */
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    val status: WalletIssuanceContinuationStatus = WalletIssuanceContinuationStatus.UNRESOLVED,
+    /** Issuer display metadata only; never credential values or protocol continuation secrets. */
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    val displayMetadataJson: String? = null,
 ) {
     constructor(deferred: WalletDeferredCredential) : this(
         deferred.id, deferred.credentialConfigurationId, deferred.intervalSeconds, deferred.credentialIdentifier,
     )
+}
+
+/** A presentation hint, not permission to bypass the checks performed by resumeDeferred. */
+@Serializable
+enum class WalletIssuanceContinuationStatus {
+    UNRESOLVED,
+    AWAITING_ISSUER,
+    AWAITING_LOCAL_SAVE,
+    REMOTE_OUTCOME_UNCERTAIN,
+    STORAGE_OUTCOME_UNCERTAIN,
 }
 
 /** The released configured-only listing cannot describe every retained local-save handle. */
@@ -785,17 +802,50 @@ class WalletIssuanceSessionService(
                 require(record.id == deferredRecordId(persisted.public.id) && record.sessionId == persisted.sessionId) {
                     "Stored deferred credential binding is invalid"
                 }
-                results[persisted.public.id] = persisted.public
+                results[persisted.public.id] = persisted.public.withPresentation(
+                    remote = persisted.content is PersistedDeferredContent.Remote,
+                    claimed = persisted.claimed,
+                    metadata = when (val content = persisted.content) {
+                        is PersistedDeferredContent.Remote -> content.request.metadata?.displayMetadata()
+                        is PersistedDeferredContent.Received -> content.credentials.commonDisplayMetadata()
+                    },
+                )
             }
         // Unsaved progress remains valid only while its durable predecessor is still current.
         mutex.withLock {
             deferred.values.filter { record ->
                 sessionStore == null || !record.persistable ||
                     persistedRecords[deferredRecordId(record.public.id)] == record.persistedSnapshot
-            }.forEach { results[it.public.id] = it.public }
+            }.forEach { record ->
+                results[record.public.id] = record.public.withPresentation(
+                    remote = record.content is DeferredContent.Remote,
+                    claimed = record.claimed,
+                    metadata = when (val content = record.content) {
+                        is DeferredContent.Remote -> content.request.metadata?.displayMetadata()
+                        is DeferredContent.Received -> content.credentials.commonDisplayMetadata()
+                    },
+                )
+            }
         }
         return results.values.toList()
     }
+
+    private fun WalletIssuanceContinuation.withPresentation(remote: Boolean, claimed: Boolean, metadata: JsonObject?) = copy(
+        status = when {
+            remote && claimed -> WalletIssuanceContinuationStatus.REMOTE_OUTCOME_UNCERTAIN
+            remote -> WalletIssuanceContinuationStatus.AWAITING_ISSUER
+            claimed -> WalletIssuanceContinuationStatus.STORAGE_OUTCOME_UNCERTAIN
+            else -> WalletIssuanceContinuationStatus.AWAITING_LOCAL_SAVE
+        },
+        displayMetadataJson = metadata?.toString(),
+    )
+
+    private fun JsonObject.displayMetadata(): JsonObject? =
+        JsonObject(filterKeys { it in setOf("issuerDisplay", "credentialDisplay", "credentialClaims") }).takeIf { it.isNotEmpty() }
+
+    // A retained local response can contain multiple kinds. Do not attribute the first one's art to all of them.
+    private fun List<StoredCredential>.commonDisplayMetadata(): JsonObject? =
+        map { it.metadata?.displayMetadata() }.distinct().singleOrNull()
 
     /**
      * Polls one deferred result, or finishes saving an already received response.
@@ -1846,7 +1896,8 @@ class WalletIssuanceSessionService(
                     }
                 },
                 claimed = record.claimed,
-                public = record.public,
+                // Presentation fields are derived from retained content, not a second persisted source of truth.
+                public = record.public.copy(status = WalletIssuanceContinuationStatus.UNRESOLVED, displayMetadataJson = null),
                 sessionId = record.sessionId,
             )
             val replacement = WalletIssuanceSessionRecord(

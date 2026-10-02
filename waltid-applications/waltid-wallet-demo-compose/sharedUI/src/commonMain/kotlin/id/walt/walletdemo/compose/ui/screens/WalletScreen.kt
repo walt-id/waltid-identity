@@ -3,6 +3,13 @@ package id.walt.walletdemo.compose.ui.screens
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.unit.dp
+import id.walt.walletdemo.compose.ui.components.WalletSection
+import id.walt.walletdemo.compose.ui.components.WalletNavigationRow
+import id.walt.walletdemo.compose.ui.components.WalletIcon
+import id.walt.walletdemo.compose.ui.components.WalletSymbol
+import id.walt.walletdemo.compose.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import id.walt.walletdemo.compose.ui.components.SettingsNotice
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -163,12 +170,19 @@ internal fun WalletScreen(
             .padding(contentPadding)
 
         when (state.selectedTab) {
-            WalletDemoTab.Credentials -> CredentialsTab(
+            WalletDemoTab.Credentials -> Column(modifier) {
+                if (state.deferredCredentials.isNotEmpty() && detailsChrome == null) WalletSection(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                    WalletNavigationRow(stringResource(Res.string.issuance_pending_count, state.deferredCredentials.size),
+                        onClick = { controller.startNewReceiveFlow(); controller.selectTab(WalletDemoTab.Receive) },
+                        icon = { WalletIcon(WalletSymbol.Receive, null) })
+                }
+                CredentialsTab(
                 session = state.session,
                 onDeleteCredential = controller::deleteCredential,
                 onDetailsChromeChange = { detailsChrome = it },
-                modifier = modifier,
-            )
+                modifier = Modifier.weight(1f),
+                )
+            }
             WalletDemoTab.Receive -> {
                 ReceiveTab(
                     state = state,
@@ -180,6 +194,8 @@ internal fun WalletScreen(
                     onAcceptOffer = controller::acceptOffer,
                     onDeclineOffer = controller::declineOffer,
                     onResumeDeferred = controller::resumeDeferredCredential,
+                    onDone = { controller.selectTab(WalletDemoTab.Credentials) },
+                    onRefresh = controller::refreshIssuanceStatus,
                     modifier = modifier,
                 )
             }

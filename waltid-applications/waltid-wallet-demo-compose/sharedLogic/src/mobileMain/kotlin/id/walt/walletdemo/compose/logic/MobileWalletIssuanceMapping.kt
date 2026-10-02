@@ -6,6 +6,8 @@ import id.walt.wallet2.handlers.WalletIssuanceBatchSession
 import id.walt.wallet2.handlers.WalletIssuanceTransactionCode
 import id.walt.wallet2.handlers.WalletDeferredCredential
 import id.walt.wallet2.handlers.WalletIssuanceContinuation
+import id.walt.wallet2.handlers.WalletIssuanceContinuationStatus
+import id.walt.wallet2.handlers.WalletIssuanceErrorCode
 import id.walt.wallet2.mobile.MobileWalletCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletHolderBinding
 import id.walt.wallet2.mobile.MobileWalletCredentialHolders
@@ -76,7 +78,14 @@ internal fun WalletIssuanceOutcome.toDemoIssuanceOutcome(): WalletDemoIssuanceOu
             deferredCredentials = deferredCredentials.map { it.toDemoDeferredCredential() },
             failedTargetCount = if (failure == null) 0 else 1,
             notAttemptedTargetCount = failure?.notAttempted?.size ?: 0,
-            offerConsumed = failure != null || storedCredentialIds.isNotEmpty() || deferredCredentials.isNotEmpty(),
+            offerConsumed = failure != null || storedCredentialIds.isNotEmpty() || deferredCredentials.isNotEmpty() ||
+                error.code in setOf(WalletIssuanceErrorCode.INVALID_SESSION, WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN,
+                    WalletIssuanceErrorCode.STORAGE_OUTCOME_UNCERTAIN),
+            kind = when (error.code) {
+                WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN -> WalletDemoIssuanceFailureKind.RemoteOutcomeUncertain
+                WalletIssuanceErrorCode.STORAGE_OUTCOME_UNCERTAIN -> WalletDemoIssuanceFailureKind.StorageOutcomeUncertain
+                else -> WalletDemoIssuanceFailureKind.General
+            },
         )
     }
 
@@ -87,6 +96,14 @@ internal fun WalletIssuanceContinuation.toDemoDeferredCredential() = WalletDemoD
     credentialConfigurationId = credentialConfigurationId,
     credentialIdentifier = credentialIdentifier,
     intervalSeconds = intervalSeconds,
+    status = when (status) {
+        WalletIssuanceContinuationStatus.UNRESOLVED -> WalletDemoContinuationStatus.Unresolved
+        WalletIssuanceContinuationStatus.AWAITING_ISSUER -> WalletDemoContinuationStatus.AwaitingIssuer
+        WalletIssuanceContinuationStatus.AWAITING_LOCAL_SAVE -> WalletDemoContinuationStatus.AwaitingLocalSave
+        WalletIssuanceContinuationStatus.REMOTE_OUTCOME_UNCERTAIN -> WalletDemoContinuationStatus.RemoteOutcomeUncertain
+        WalletIssuanceContinuationStatus.STORAGE_OUTCOME_UNCERTAIN -> WalletDemoContinuationStatus.StorageOutcomeUncertain
+    },
+    displayMetadataJson = displayMetadataJson,
 )
 
 private fun WalletIssuanceTransactionCode.toDemoRequirement(): WalletDemoTransactionCodeRequirement =

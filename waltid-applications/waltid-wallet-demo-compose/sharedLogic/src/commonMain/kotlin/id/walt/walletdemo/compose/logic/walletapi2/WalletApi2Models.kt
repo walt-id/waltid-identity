@@ -151,6 +151,8 @@ internal data class DeferredCredentialHandleDto(
     val credentialConfigurationId: String? = null,
     val intervalSeconds: Long? = null,
     val credentialIdentifier: String? = null,
+    val status: String? = null,
+    val displayMetadataJson: String? = null,
 )
 
 @Serializable

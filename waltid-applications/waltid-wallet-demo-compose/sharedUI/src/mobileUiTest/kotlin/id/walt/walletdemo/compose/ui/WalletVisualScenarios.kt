@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletDemoContinuationStatus
+import id.walt.walletdemo.compose.logic.WalletDemoIssuanceProblem
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
 import id.walt.wallet2.mobile.ProximityEngagement
@@ -163,7 +165,7 @@ internal class WalletVisualScenarios(
             ReceiveTab(
                 state = state, requestDrafts = state.requestDrafts,
                 onOfferUrlChange = {}, onTxCodeChange = {}, onCopiesChange = { _, _ -> },
-                onPreviewOffer = {}, onAcceptOffer = {}, onDeclineOffer = {}, onResumeDeferred = {},
+                onPreviewOffer = {}, onAcceptOffer = {}, onDeclineOffer = {}, onResumeDeferred = {}, onDone = {}, onRefresh = {},
             )
         }
         onNodeWithTag(WalletUiTestTags.OfferIssuerSection).assertIsDisplayed()
@@ -240,19 +242,41 @@ internal class WalletVisualScenarios(
         }
     }
 
-    fun partialBatchResult() = with(test) {
-        val state = WalletVisualFixtures.partialResult
+    fun partialBatchResult(status: WalletDemoContinuationStatus = WalletDemoContinuationStatus.AwaitingIssuer, failure: Boolean = false) = with(test) {
+        val base = WalletVisualFixtures.partialResult
+        val state = base.copy(
+            deferredCredentials = if (failure) emptyList() else base.deferredCredentials.map { it.copy(status = status) },
+            issuanceReceipt = base.issuanceReceipt?.let { if (failure) it.copy(pendingIds = emptySet(),
+                problem = WalletDemoIssuanceProblem("The issuer could not finish this request.", failedTargetCount = 1, notAttemptedTargetCount = 2)) else it },
+            operation = if (failure) WalletOperationState.Failed("The issuer could not finish this request.", WalletDemoTab.Receive) else base.operation,
+        )
         content {
             Column(Modifier.fillMaxSize()) {
                 WalletHeader(state, onSettings = {}, onDismissStatus = {}, onToggleStatusExpanded = {})
                 ReceiveTab(state, state.requestDrafts, onOfferUrlChange = {}, onTxCodeChange = {},
                     onCopiesChange = { _, _ -> }, onPreviewOffer = {}, onAcceptOffer = {}, onDeclineOffer = {},
-                    onResumeDeferred = {}, modifier = Modifier.weight(1f))
+                    onResumeDeferred = {}, onDone = {}, onRefresh = {}, modifier = Modifier.weight(1f))
             }
         }
-        onNodeWithText("Saved credentials: 1. Pending targets: 1.").assertIsDisplayed()
-        onNodeWithText("Check library-card").assertIsDisplayed()
-        capture("batch.result.saved_and_deferred")
+        if (failure) {
+            onNodeWithText("Failed targets: 1").performScrollTo().assertIsDisplayed()
+            onNodeWithText("Not attempted: 2").assertIsDisplayed()
+        } else if (status.canResume) {
+            onNodeWithText(if (status == WalletDemoContinuationStatus.AwaitingLocalSave) "Finish saving" else "Check with issuer")
+                .performScrollTo().assertIsDisplayed()
+        } else {
+            onNodeWithTag("issuance-resume-visual-deferred-library").assertDoesNotExist()
+            onNodeWithTag("issuance-refresh").assertIsDisplayed()
+        }
+        onNodeWithTag(WalletUiTestTags.OfferInput).assertDoesNotExist()
+        onNodeWithTag("issuance-saved-${WalletVisualFixtures.credentialSummary.id}").assertExists()
+        val id = if (failure) "partial_failure" else when (status) {
+            WalletDemoContinuationStatus.AwaitingLocalSave -> "local_save_pending"
+            WalletDemoContinuationStatus.RemoteOutcomeUncertain -> "remote_uncertain"
+            WalletDemoContinuationStatus.StorageOutcomeUncertain -> "storage_uncertain"
+            else -> "saved_and_deferred"
+        }
+        capture("batch.result.$id")
     }
 
     fun nearbyReady() = with(test) {
