@@ -1,7 +1,4 @@
-@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
-
 import io.ktor.plugin.features.*
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import java.security.KeyStore
 import java.security.cert.CertificateFactory
 
@@ -129,7 +126,7 @@ val conformanceTruststorePassword = providers.environmentVariable("CONFORMANCE_T
     .orElse("changeit")
 
 val skipLiveConformance = (
-    (findProperty("skipLiveConformance") as String?) ?: System.getenv("SKIP_LIVE_CONFORMANCE")
+    (providers.gradleProperty("skipLiveConformance").orNull) ?: System.getenv("SKIP_LIVE_CONFORMANCE")
 ).equals("true", ignoreCase = true)
 
 // The committed truststore matches the docker-compose flow, where
@@ -201,7 +198,7 @@ tasks.withType<Test>().configureEach {
     systemProperty("javax.net.ssl.trustStorePassword", conformanceTruststorePassword.get())
     // Gradle's test JVM is a separate process, so the selector has to be forwarded explicitly.
     // See VpWalletConformanceTests.selectedVariants.
-    ((findProperty("conformance.wallet.variants") as String?)
+    ((providers.gradleProperty("conformance.wallet.variants").orNull)
         ?: System.getProperty("conformance.wallet.variants"))
         ?.let { systemProperty("conformance.wallet.variants", it) }
     if (skipLiveConformance) {
@@ -219,7 +216,7 @@ tasks.withType<Test>().configureEach {
 }
 
 fun selectedPlaywrightBrowser(): String = when (
-    ((findProperty("playwright.browser") as String?) ?: System.getProperty("playwright.browser")
+    ((providers.gradleProperty("playwright.browser").orNull) ?: System.getProperty("playwright.browser")
     ?: System.getenv("PLAYWRIGHT_BROWSER"))
         ?.trim()
         ?.lowercase()
@@ -232,7 +229,7 @@ fun selectedPlaywrightBrowser(): String = when (
 }
 
 fun playwrightInstallWithDeps(): Boolean = when (
-    ((findProperty("playwright.installWithDeps") as String?) ?: System.getenv("PLAYWRIGHT_INSTALL_WITH_DEPS"))
+    ((providers.gradleProperty("playwright.installWithDeps").orNull) ?: System.getenv("PLAYWRIGHT_INSTALL_WITH_DEPS"))
         ?.trim()
         ?.lowercase()
 ) {

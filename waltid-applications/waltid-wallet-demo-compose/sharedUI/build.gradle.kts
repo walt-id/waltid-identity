@@ -45,7 +45,7 @@ kotlin {
             implementation(identityLibs.coil.compose)
             implementation(identityLibs.coil.network.ktor3)
             implementation(identityLibs.coil.svg)
-            implementation(compose.components.resources)
+            implementation(identityLibs.compose.resources)
             implementation(identityLibs.kotlinx.serialization.json)
         }
 

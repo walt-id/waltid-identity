@@ -8,7 +8,6 @@ import io.github.optimumcode.json.schema.JsonSchema
 import io.github.optimumcode.json.schema.ValidationError
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Instant
 
 /**
@@ -137,7 +136,6 @@ object LoteJsonParser {
         return ParsedLoteSource(source, entities, services, identities)
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     private fun parseIdentities(
         digitalIdentity: JsonObject,
         sourceId: String,

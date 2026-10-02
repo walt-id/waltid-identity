@@ -102,7 +102,7 @@ fun selectedPlaywrightBrowser(): String = when (System.getenv("PLAYWRIGHT_BROWSE
 }
 
 fun playwrightInstallWithDeps(): Boolean = when (
-    ((findProperty("playwright.installWithDeps") as String?) ?: System.getenv("PLAYWRIGHT_INSTALL_WITH_DEPS"))
+    ((providers.gradleProperty("playwright.installWithDeps").orNull) ?: System.getenv("PLAYWRIGHT_INSTALL_WITH_DEPS"))
         ?.trim()
         ?.lowercase()
 ) {
