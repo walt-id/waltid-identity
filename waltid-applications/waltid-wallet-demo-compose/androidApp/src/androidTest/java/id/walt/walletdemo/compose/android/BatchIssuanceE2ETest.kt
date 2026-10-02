@@ -6,6 +6,7 @@ import androidx.test.uiautomator.UiDevice
 import id.walt.mobile.test.backend.EnterpriseMobileFixtureClient
 import id.walt.mobile.test.backend.EnterpriseMobilePlatform
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceTextEquals
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.credentialCardTags
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
@@ -44,6 +45,7 @@ class BatchIssuanceE2ETest {
             device, 60_000, { it == "Review credential offer" }, listOf("Receive failed"),
         ))
         val configurationId = "org.iso.18013.5.1.mDL"
+        assertResourceVisibleAfterScrolling(device, "issuance-copies-$configurationId", "Copy selection missing", 10_000)
         assertResourceTextEquals(device, "issuance-copies-$configurationId", "Copies: 1", 10_000,
             "Advertised batch support must not request extra copies")
         clickByTag(device, "issuance-more-$configurationId")
