@@ -1405,6 +1405,12 @@ class WalletDemoAppTestScenarios(
         assertEquals("CN=WAL-1349 Local Reader Test CA", preview.readerAuthorities.single().subject)
         assertEquals(TestReaderCaSha256, preview.readerAuthorities.single().sha256Fingerprint)
         assertTrue(store.load().trustAnchors.isEmpty())
+        // The controller preview can be ready before the modal joins the UI tree on iOS.
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag(WalletUiTestTags.SettingsReaderTrustImportReview)
+                .fetchSemanticsNodes().size == 1
+        }
+        waitForIdle()
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportReview).assertIsDisplayed()
         onNodeWithText("Review import").assertIsDisplayed()
         onNodeWithText("wal-1349-local-reader-ca.der").assertIsDisplayed()
@@ -1453,6 +1459,12 @@ class WalletDemoAppTestScenarios(
             )
         }
         waitUntil(timeoutMillis = 5_000) { controller.state.value.pendingImport != null }
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag(WalletUiTestTags.SettingsReaderTrustImportReview)
+                .fetchSemanticsNodes().size == 1
+        }
+        waitForIdle()
+        onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportReview).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportConfirm).performClick()
         waitForIdle()
 
