@@ -131,7 +131,7 @@ jobs:
   wallet-core-framework:
     if: ${{ inputs.run-native || inputs.run-compose || inputs.run-enterprise || inputs.run-sdk-docs }}
     runs-on: macos-26
-    timeout-minutes: 50
+    timeout-minutes: 70
     outputs:
       checkout-refs: ${{ steps.revisions.outputs.refs }}
       artifact-name: wallet-core-release-${{ github.run_attempt }}
@@ -168,7 +168,7 @@ jobs:
             konan-${{ runner.os }}-${{ runner.arch }}-
       # Concurrent device/simulator links cause heavy swapping on the hosted runner.
       - name: Build the full release WalletCore
-        timeout-minutes: 40
+        timeout-minutes: 60
         working-directory: waltid-identity
         run: |
           exec python3 .github/scripts/mobile-ci/run-ios-phase.py \
