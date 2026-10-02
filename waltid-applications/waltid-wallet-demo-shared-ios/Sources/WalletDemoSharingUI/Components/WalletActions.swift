@@ -5,7 +5,6 @@ public struct WalletActions: View {
     private let primary: WalletAction
     private let secondary: WalletAction?
     private let tertiary: WalletAction?
-    @Environment(\.sizeCategory) private var sizeCategory
 
     public init(primary: WalletAction, secondary: WalletAction? = nil, tertiary: WalletAction? = nil) {
         self.primary = primary
@@ -15,15 +14,13 @@ public struct WalletActions: View {
 
     public var body: some View {
         Group {
-            if sizeCategory.isAccessibilityCategory {
-                stacked
-            } else if #available(iOS 16, *) {
+            if #available(iOS 16, *) {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) { actions }.fixedSize(horizontal: true, vertical: false)
                     stacked
                 }
             } else {
-                stacked
+                LegacyWalletActionLayout { actions }
             }
         }.frame(maxWidth: .infinity, alignment: .trailing)
     }
@@ -48,6 +45,46 @@ public struct WalletActions: View {
         .disabled(!action.enabled)
         .accessibilityIdentifier(action.identifier ?? "")
     }
+}
+
+/// iOS 15 keeps the same fit-based behavior without changing the app's deployment target.
+private struct LegacyWalletActionLayout<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+    @State private var availableWidth: CGFloat = 0
+    @State private var intrinsicWidth: CGFloat = .infinity
+
+    var body: some View {
+        Group {
+            if intrinsicWidth <= availableWidth {
+                HStack(spacing: 12, content: content)
+            } else {
+                VStack(alignment: .trailing, spacing: 8, content: content)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .background(GeometryReader { geometry in
+            Color.clear.preference(key: ActionAvailableWidth.self, value: geometry.size.width)
+        })
+        .overlay(alignment: .trailing) {
+            HStack(spacing: 12, content: content).fixedSize(horizontal: true, vertical: false)
+                .background(GeometryReader { geometry in
+                    Color.clear.preference(key: ActionIntrinsicWidth.self, value: geometry.size.width)
+                })
+                .hidden().accessibilityHidden(true).allowsHitTesting(false)
+        }
+        .onPreferenceChange(ActionAvailableWidth.self) { availableWidth = $0 }
+        .onPreferenceChange(ActionIntrinsicWidth.self) { intrinsicWidth = $0 }
+    }
+}
+
+private struct ActionAvailableWidth: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+private struct ActionIntrinsicWidth: PreferenceKey {
+    static let defaultValue: CGFloat = .infinity
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
 private enum WalletActionProminence { case primary, secondary, tertiary }

@@ -136,22 +136,41 @@ class WalletDemoAppTestScenarios(
         val pinStore = InMemoryDemoPinStore()
         val controller = WalletDemoController(WalletUiTestWallet(), pinStore)
         setWalletContent { WalletDemoApp(controller) }
-        onNodeWithTag(WalletUiTestTags.PinConfirmationInput).assertDoesNotExist()
-        onNodeWithTag(WalletUiTestTags.PinInput).performTextInput("1234")
+        onNodeWithTag(WalletUiTestTags.PinInput).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PinConfirmationInput).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PinBiometricToggle).performScrollTo().assertIsDisplayed().assertIsOff().assertIsNotEnabled()
+        onNodeWithTag(WalletUiTestTags.PinInput).performScrollTo().performTextInput("1234")
         onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsNotEnabled()
         onNodeWithTag(WalletUiTestTags.PinInput).performTextInput("56")
+        onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsNotEnabled()
+        onNodeWithTag(WalletUiTestTags.PinConfirmationInput).performScrollTo().performTextInput("654321")
         onNodeWithTag(WalletUiTestTags.PinSubmitButton).performClick()
-        onNodeWithTag(WalletUiTestTags.PinInput).assertDoesNotExist()
-        onNodeWithTag(WalletUiTestTags.PinConfirmationInput).performTextInput("654321")
-        onNodeWithTag(WalletUiTestTags.PinSubmitButton).performClick()
-        onNodeWithText("The PINs do not match. Try again.").assertIsDisplayed()
+        onNodeWithText("PIN confirmation does not match").performScrollTo().assertIsDisplayed()
         assertFalse(pinStore.hasPin())
-        onNodeWithTag("wallet.pinBack").performClick()
+        onNodeWithTag(WalletUiTestTags.PinConfirmationInput).performScrollTo().performTextReplacement("123456")
         onNodeWithTag(WalletUiTestTags.PinSubmitButton).performClick()
-        onNodeWithTag(WalletUiTestTags.PinConfirmationInput).performTextReplacement("123456")
-        onNodeWithTag(WalletUiTestTags.PinSubmitButton).performClick()
-        onNodeWithText("A quicker way to unlock").assertIsDisplayed()
-        assertFalse(pinStore.hasPin())
+        waitUntil { pinStore.hasPin() }
+        assertFalse(pinStore.isBiometricUnlockEnabled())
+    }
+
+    fun pinSetupAuthenticatesBiometricChoiceWithoutLeavingForm() = runComposeUiTest {
+        val pinStore = InMemoryDemoPinStore()
+        val gate = CompletableDeferred<DemoBiometricResult>()
+        val biometrics = object : DemoBiometricAuthenticator {
+            override fun isAvailable() = true
+            override suspend fun authenticate(reason: String) = gate.await()
+        }
+        val controller = WalletDemoController(WalletUiTestWallet(), pinStore, biometrics)
+        setWalletContent { WalletDemoApp(controller) }
+        confirmNewPin()
+        onNodeWithTag(WalletUiTestTags.PinBiometricToggle).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsNotEnabled()
+        assertFalse(pinStore.hasPin(), "Authenticating the choice must not create a PIN")
+        gate.complete(DemoBiometricResult.Failed)
+        waitUntil { !controller.state.value.isAuthenticating }
+        onNodeWithTag(WalletUiTestTags.PinBiometricToggle).assertIsOff().assertIsEnabled()
+        onNodeWithTag(WalletUiTestTags.PinConfirmationInput).performScrollTo().assertIsDisplayed()
+        assertEquals("123456", (controller.state.value.auth as WalletAuthState.Setup).confirmation)
         onNodeWithTag(WalletUiTestTags.PinSubmitButton).performClick()
         waitUntil { pinStore.hasPin() }
         assertFalse(pinStore.isBiometricUnlockEnabled())
@@ -456,7 +475,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag("wallet.receiveButton").performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
         onNodeWithText("Example Issuer").performScrollTo().assertIsDisplayed()
-        onNodeWithTag("wallet.credentialCard.ExampleCredential").assertExists()
+        onNodeWithTag("issuance-identity-ExampleCredential").assertExists()
         onAllNodesWithText("vc+sd-jwt").assertCountEquals(0)
         assertIssuerDetailsCollapsedUntilRequested()
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
@@ -601,6 +620,11 @@ class WalletDemoAppTestScenarios(
         repeat(2) { onNodeWithTag("issuance-more-ExampleCredential").performClick() }
         onNodeWithTag("issuance-copies-ExampleCredential").assertTextEquals("Copies: 3")
         onNodeWithTag("issuance-more-ExampleCredential").assertIsNotEnabled()
+        onNodeWithTag("issuance-details-ExampleCredential").performScrollTo().performClick()
+        onNodeWithText("Values have not been received yet.").assertIsDisplayed()
+        onNodeWithText("The issuer has not supplied claim definitions.").assertIsDisplayed()
+        onNodeWithTag("wallet-detail-close").performClick()
+        onNodeWithTag("issuance-copies-ExampleCredential").performScrollTo().assertTextEquals("Copies: 3")
         onNodeWithTag("issuance-select-ExampleCredential").performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsNotEnabled()
         onNodeWithTag("issuance-select-ExampleCredential").performClick()
@@ -691,10 +715,19 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.ReceiveButton).performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
 
-        onNodeWithTag("wallet.credentialCard.org.iso.23220.photoid.1").assertExists()
+        onNodeWithTag("issuance-identity-org.iso.23220.photoid.1").assertExists()
         onAllNodesWithTag(WalletUiTestTags.OfferSupportedClaims).assertCountEquals(0)
         onAllNodesWithText("mso_mdoc").assertCountEquals(0)
         onAllNodesWithText("18 or older").assertCountEquals(0)
+        onNodeWithTag("issuance-details-org.iso.23220.photoid.1").performScrollTo().performClick()
+        onNodeWithText("Values have not been received yet.").assertIsDisplayed()
+        onNodeWithText("Given name").assertIsDisplayed()
+        onNodeWithText("18 or older").performScrollTo().assertIsDisplayed()
+        onNodeWithText("65 or older").performScrollTo().assertIsDisplayed()
+        onAllNodesWithText("Always included").assertCountEquals(3)
+        onAllNodesWithText("May be included").assertCountEquals(2)
+        onNodeWithTag("wallet-detail-close").performClick()
+        onNodeWithTag("issuance-select-org.iso.23220.photoid.1").assertIsOn()
     }
 
     fun walletHomeExposesUnifiedScanAndNearby() = runComposeUiTest {
@@ -1861,10 +1894,8 @@ class WalletDemoAppTestScenarios(
     }
 
     private fun ComposeUiTest.confirmNewPin() {
-        onNodeWithTag("wallet.pinInput").performClick().performTextInput("123456")
-        onNodeWithTag("wallet.pinSubmitButton").performClick()
-        onNodeWithTag("wallet.pinConfirmationInput").performClick().performTextInput("123456")
-        onNodeWithTag("wallet.pinSubmitButton").performClick()
+        onNodeWithTag("wallet.pinInput").performScrollTo().performTextInput("123456")
+        onNodeWithTag("wallet.pinConfirmationInput").performScrollTo().performTextInput("123456")
         waitForIdle()
     }
 

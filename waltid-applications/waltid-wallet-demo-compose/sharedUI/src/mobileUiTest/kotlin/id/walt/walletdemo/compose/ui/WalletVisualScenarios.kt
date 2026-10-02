@@ -17,6 +17,7 @@ import id.walt.wallet2.mobile.ProximityEngagement
 import id.walt.wallet2.mobile.ProximityHostActionResult
 import id.walt.wallet2.mobile.ProximityState
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
+import id.walt.walletdemo.compose.ui.components.OfferedCredentialDetails
 import id.walt.walletdemo.compose.ui.screens.ReceiveTab
 import id.walt.walletdemo.compose.ui.screens.SettingsScreen
 import id.walt.walletdemo.compose.ui.screens.WalletHeader
@@ -49,21 +50,35 @@ internal class WalletVisualScenarios(
         }
     }
 
-    fun pin(page: id.walt.walletdemo.compose.ui.screens.PinSetupPage) = with(test) {
-        val controller = id.walt.walletdemo.compose.logic.WalletDemoController(
-            WalletUiTestWallet(),
-            id.walt.walletdemo.compose.logic.InMemoryDemoPinStore())
-        if (page != id.walt.walletdemo.compose.ui.screens.PinSetupPage.Create) controller.updatePin("123456")
-        if (page == id.walt.walletdemo.compose.ui.screens.PinSetupPage.Biometrics) controller.updatePinConfirmation("123456")
-        val auth = controller.state.value.auth as id.walt.walletdemo.compose.logic.WalletAuthState.Setup
-        content { id.walt.walletdemo.compose.ui.screens.PinScreen(controller, auth, false, false, initialPage = page) }
-        onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsDisplayed()
-        when (page) {
-            id.walt.walletdemo.compose.ui.screens.PinSetupPage.Create -> onNodeWithTag(WalletUiTestTags.PinInput).assertIsDisplayed()
-            id.walt.walletdemo.compose.ui.screens.PinSetupPage.Confirm -> onNodeWithTag(WalletUiTestTags.PinConfirmationInput).assertIsDisplayed()
-            id.walt.walletdemo.compose.ui.screens.PinSetupPage.Biometrics -> onNodeWithText("Use PIN only").assertIsDisplayed()
+    fun pin(state: String) = with(test) {
+        val biometrics = object : id.walt.walletdemo.compose.logic.DemoBiometricAuthenticator {
+            override fun isAvailable() = state == "biometrics_enabled"
+            override suspend fun authenticate(reason: String) = id.walt.walletdemo.compose.logic.DemoBiometricResult.Succeeded
         }
-        capture("onboarding.pin.${page.name.lowercase()}")
+        val controller = id.walt.walletdemo.compose.logic.WalletDemoController(
+            WalletUiTestWallet(), id.walt.walletdemo.compose.logic.InMemoryDemoPinStore(), biometrics)
+        if (state != "setup") {
+            controller.updatePin("123456")
+            controller.updatePinConfirmation(if (state == "mismatch") "654321" else "123456")
+        }
+        if (state == "mismatch") controller.submitPin()
+        if (state == "biometrics_enabled") {
+            controller.updateUseBiometrics(true)
+            waitUntil { !controller.state.value.isAuthenticating }
+        }
+        val auth = controller.state.value.auth as id.walt.walletdemo.compose.logic.WalletAuthState.Setup
+        content { id.walt.walletdemo.compose.ui.screens.PinScreen(controller, auth, false, biometrics.isAvailable()) }
+        onNodeWithTag(WalletUiTestTags.PinInput).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PinConfirmationInput).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PinBiometricToggle).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsDisplayed()
+        when (state) {
+            "setup" -> onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsNotEnabled()
+            "mismatch" -> onNodeWithText("PIN confirmation does not match").assertIsDisplayed()
+            "biometrics_enabled" -> onNodeWithTag(WalletUiTestTags.PinBiometricToggle).assertIsOn()
+            else -> error("Unknown PIN fixture: $state")
+        }
+        capture("onboarding.pin.$state")
     }
 
     fun settingsRoot() = with(test) {
@@ -141,7 +156,7 @@ internal class WalletVisualScenarios(
         capture("credential.details.localized_metadata")
     }
 
-    fun batchOffer(noneSelected: Boolean = false) = with(test) {
+    fun batchOffer(noneSelected: Boolean = false, compact: Boolean = false) = with(test) {
         val copies = WalletVisualFixtures.copies.mapValues { (_, count) -> if (noneSelected) 0 else count }
         val state = WalletDemoUiState(offerPreview = WalletVisualFixtures.offer, issuanceCopyCounts = copies)
         content {
@@ -153,13 +168,47 @@ internal class WalletVisualScenarios(
         }
         onNodeWithTag(WalletUiTestTags.OfferIssuerSection).assertIsDisplayed()
         val action = onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsDisplayed()
+        val primaryBounds = action.getUnclippedBoundsInRoot()
+        val secondaryBounds = onNodeWithTag(WalletUiTestTags.OfferDeclineButton).getUnclippedBoundsInRoot()
+        val rootBounds = onRoot().getUnclippedBoundsInRoot()
+        val availableWidth = rootBounds.right - rootBounds.left - 40.dp
+        val requiredWidth = primaryBounds.right - primaryBounds.left + secondaryBounds.right - secondaryBounds.left + 8.dp
+        if (requiredWidth <= availableWidth) {
+            kotlin.test.assertEquals(secondaryBounds.top, primaryBounds.top,
+                "Actions that fit must share one row, including at large text sizes")
+        } else {
+            kotlin.test.assertTrue(primaryBounds.top >= secondaryBounds.bottom,
+                "Actions that need more space must remain separately reachable")
+        }
         if (noneSelected) action.assertIsNotEnabled() else action.assertIsEnabled()
+        if (compact) {
+            onNodeWithTag("issuance-select-resident-card").assertIsDisplayed()
+            capture("batch.offer.compact_dark_large_text")
+            onNodeWithText("Selected: 2 · Copies: 3").performScrollTo().assertIsDisplayed()
+            onNodeWithTag("issuance-more-library-card").assertIsDisplayed()
+            action.assertIsDisplayed().assertIsEnabled()
+            capture("batch.offer.compact_dark_large_text.last_target")
+            return@with
+        }
         val scenario = if (noneSelected) "none_selected" else "two_targets_three_copies"
+        onNodeWithTag("issuance-select-library-card").assertIsDisplayed()
+        if (!noneSelected) onNodeWithText("Copies: 1").assertIsDisplayed()
         capture("batch.offer.$scenario")
-        onNodeWithText("Receive Library membership").performScrollTo().assertIsDisplayed()
-        if (!noneSelected) onNodeWithText("Copies: 1").performScrollTo().assertIsDisplayed()
-        action.assertIsDisplayed()
-        capture("batch.offer.$scenario.second_target")
+    }
+
+    fun offerDefinitions() = with(test) {
+        val offer = WalletVisualFixtures.offer
+        content {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)) {
+                OfferedCredentialDetails(offer.offeredCredentials.first(), offer.issuer.display!!.name!!, offer.issuer.credentialIssuer)
+            }
+        }
+        onNodeWithText("Values have not been received yet.").assertIsDisplayed()
+        onNodeWithText("Given name").assertIsDisplayed()
+        onNodeWithText("Family name").assertIsDisplayed()
+        onNodeWithText("Ada").assertDoesNotExist()
+        capture("batch.offer.definitions")
     }
 
     fun credentialImages() = with(test) {

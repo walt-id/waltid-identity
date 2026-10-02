@@ -335,15 +335,11 @@ final class WalletE2EUI {
 
         let submit = app.buttons["wallet.pinSubmitButton"]
         XCTAssertTrue(submit.waitForExistence(timeout: 10), "PIN submit button not found")
-        submit.tap()
         let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
         if confirmation.waitForExistence(timeout: 2) {
             replaceText(in: confirmation, value: pin)
-            submit.tap()
-            XCTAssertTrue(app.staticTexts["A quicker way to unlock"].waitForExistence(timeout: 5))
-            let skip = app.buttons["wallet.pinSkipBiometrics"]
-            if skip.exists { skip.tap() } else { submit.tap() }
         }
+        submit.tap()
     }
 }
 

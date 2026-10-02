@@ -11,6 +11,7 @@ class WalletDemoAppAndroidTest {
     private val scenarios = WalletDemoAppTestScenarios()
 
     @Test fun pinSetupRequiresSixDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresSixDigitsAndMatchingConfirmation()
+    @Test fun pinSetupAuthenticatesBiometricChoiceWithoutLeavingForm() = scenarios.pinSetupAuthenticatesBiometricChoiceWithoutLeavingForm()
 
     @Test fun scannerResolvesWebLinksAndKeepsFailureRecoverable() = scenarios.scannerResolvesWebLinksAndKeepsFailureRecoverable()
 
