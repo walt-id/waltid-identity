@@ -378,7 +378,7 @@ private val hostActions = WalletDemoProximityHostActionExecutor {
     ProximityHostActionResult.Completed
 }
 
-private val permissionBlockedCapabilities = ProximityCapabilities(
+internal val permissionBlockedCapabilities = ProximityCapabilities(
     session = ProximitySessionConfiguration.Qr(),
     profile = ProximityProfile.Iso180135Edition2Dis2026,
     qrEngagement = ProximityTransportCapability(
