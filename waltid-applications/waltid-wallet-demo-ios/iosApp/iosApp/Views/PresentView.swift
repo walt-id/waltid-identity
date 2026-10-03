@@ -19,6 +19,7 @@ struct PresentView: View {
     @ObservedObject private var readerTrustSettings: DemoReaderTrustSettingsController
     @ObservedObject private var proximityPresentation: ProximityPresentationViewModel
     @StateObject private var proximityScreenPolicy = ProximityScreenPolicy()
+    @State private var credentialDetailsByID: [String: CredentialDetails] = [:]
 
     init(viewModel: WalletViewModel, onOpenSettings: @escaping () -> Void, onBack: (() -> Void)? = nil) {
         self.onOpenSettings = onOpenSettings
@@ -71,6 +72,9 @@ struct PresentView: View {
                 .accessibilityHidden(true)
             }
         }
+        .task(id: ProximityCredentialLoadKey(credentials: viewModel.credentials, active: proximityPresentation.active)) {
+            await refreshProximityCredentialDetails()
+        }
         .onAppear(perform: updateProximityScreenPolicy)
         .onDisappear { proximityScreenPolicy.restore() }
         .onChange(of: proximityPresentation.displayedEngagement == .qr) { _ in
@@ -99,6 +103,15 @@ struct PresentView: View {
         }
     }
 
+    private func refreshProximityCredentialDetails() async {
+        credentialDetailsByID = [:]
+        guard proximityPresentation.active else { return }
+        let credentials = viewModel.credentials
+        let details = await CredentialDisplayNormalizer.details(for: credentials)
+        guard !Task.isCancelled, proximityPresentation.active, viewModel.credentials == credentials else { return }
+        credentialDetailsByID = Dictionary(details.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
     private func updateProximityScreenPolicy() {
         let foreground = scenePhase == .active
         let qrVisible = foreground && viewModel.selectedTab == .present
@@ -107,13 +120,6 @@ struct PresentView: View {
             active: foreground && proximityPresentation.active && (!proximityPresentation.isTerminal || proximityPresentation.preparingApproval),
             qrVisible: qrVisible
         )
-    }
-
-    private var credentialDetailsByID: [String: CredentialDetails] {
-        viewModel.credentials.reduce(into: [:]) { result, credential in
-            let details = CredentialDisplayNormalizer.details(for: credential)
-            result[details.id] = details
-        }
     }
 
     private var entryContent: some View {
@@ -195,7 +201,8 @@ struct PresentView: View {
                   reviewedPayment == viewModel.paymentReview else { return }
             viewModel.submitPresentation()
         }
-        return presentationContent(showsActions: true) {
+        return WalletReviewScaffold(showsActions: true) {
+            WalletTabStatusBanner(viewModel: viewModel, tab: .present)
             if let warning = viewModel.transactionDataProfilesWarning {
                 WarningBannerView(message: warning)
             }
@@ -228,83 +235,9 @@ struct PresentView: View {
     }
 
     private var proximityContent: some View {
-        presentationContent(
-            showsActions: proximityPresentation.review != nil || canCancelProximityPresentation,
-            scrolls: !proximityEngagementReady
-        ) {
-            ProximityPresentationView(
-                viewModel: proximityPresentation,
-                approvalMode: $viewModel.proximityApprovalMode,
-                credentialDetailsByID: credentialDetailsByID
-            )
-        } actions: {
-            if proximityPresentation.preparingApproval {
-                let expired = proximityPresentation.recentPlan?.isExpired == true
-                VStack(spacing: 8) {
-                    Button {
-                        if expired { proximityPresentation.restart() } else { proximityPresentation.approve() }
-                    } label: {
-                        Text(expired ? String(localized: "Get a new request") : String(localized: "Approve and get ready"))
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                        .buttonStyle(.borderedProminent).disabled(!expired && !proximityPresentation.canApprove)
-                        .accessibilityIdentifier(WalletAccessibilityID.proximityApproveButton)
-                    Button("Cancel", action: proximityPresentation.cancel).frame(minHeight: 44)
-                        .accessibilityIdentifier(WalletAccessibilityID.proximityCancelButton)
-                }
-            } else if proximityPresentation.review != nil {
-                ReviewActions(
-                    selectionComplete: proximityPresentation.canApprove,
-                    isLoading: proximityPresentation.pendingReviewID != nil,
-                    onSubmit: { proximityPresentation.approve() },
-                    onReject: proximityPresentation.decline,
-                    onCancel: proximityPresentation.cancel,
-                    presentation: .proximity
-                )
-            } else if canCancelProximityPresentation {
-                Button("Cancel", action: proximityPresentation.cancel)
-                    .buttonStyle(.bordered)
-                    .frame(maxWidth: .infinity)
-                    .accessibilityIdentifier(WalletAccessibilityID.proximityCancelButton)
-            }
-        }
-        .id(proximityPresentation.review?.reviewID)
-    }
-
-    private var proximityEngagementReady: Bool {
-        proximityPresentation.showsEngagement
-    }
-
-    private var canCancelProximityPresentation: Bool {
-        guard !proximityPresentation.isTerminal else { return false }
-        return proximityPresentation.sessionState == nil
-            || proximityPresentation.sessionState?.legalActions.contains(.cancel) == true
-    }
-
-    @ViewBuilder
-    private func presentationContent<Content: View, Actions: View>(
-        showsActions: Bool,
-        scrolls: Bool = true,
-        @ViewBuilder content: () -> Content,
-        @ViewBuilder actions: () -> Actions
-    ) -> some View {
-        if scrolls {
-            WalletReviewScaffold(showsActions: showsActions) {
-                WalletTabStatusBanner(viewModel: viewModel, tab: .present)
-                content()
-            } actions: { actions() }
-        } else {
-            VStack(alignment: .leading, spacing: 8) {
-                WalletTabStatusBanner(viewModel: viewModel, tab: .present)
-                content()
-            }
-            .padding(.horizontal).padding(.vertical, 8)
-            .safeAreaInset(edge: .bottom) {
-                if showsActions {
-                    actions().padding().frame(maxWidth: .infinity, alignment: .trailing).background(.bar)
-                }
-            }
-        }
+        ProximityPresentationView(viewModel: proximityPresentation, approvalMode: $viewModel.proximityApprovalMode,
+            credentialDetailsByID: credentialDetailsByID)
+            .id(proximityPresentation.review?.reviewID)
     }
 
 }
@@ -372,4 +305,9 @@ private struct PresentationFormPostWebView: UIViewRepresentable {
             onFailed(error.localizedDescription)
         }
     }
+}
+
+private struct ProximityCredentialLoadKey: Equatable {
+    let credentials: [Credential]
+    let active: Bool
 }

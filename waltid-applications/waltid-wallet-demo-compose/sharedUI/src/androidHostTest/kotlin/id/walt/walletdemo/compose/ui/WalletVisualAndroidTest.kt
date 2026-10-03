@@ -27,6 +27,12 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @OptIn(ExperimentalTestApi::class, ExperimentalMaterial3Api::class)
 class WalletVisualAndroidTest {
+    @Test fun nearbyPermission() = scenario { nearbyState("permission") }
+    @Test
+    @Config(qualifiers = "en-rUS-w320dp-h568dp-notnight-mdpi")
+    fun nearbyReview() = scenario(fontScale = 1.5f) { nearbyState("review") }
+    @Test fun nearbyExpired() = scenario { nearbyState("expired") }
+    @Test fun nearbyReceipt() = scenario { nearbyState("receipt") }
     @Test fun externalReceiving() = scenario(sheetHost = true) { externalReceiving() }
     @Test fun externalUnavailableCallback() = scenario(sheetHost = true) { externalReceiving(unavailable = true) }
     @Test fun providerSharingReview() = scenario(sheetHost = true) { providerSharingReview() }

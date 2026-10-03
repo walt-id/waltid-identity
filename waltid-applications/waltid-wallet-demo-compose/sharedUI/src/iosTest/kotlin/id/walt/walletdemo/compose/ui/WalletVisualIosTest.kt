@@ -25,6 +25,10 @@ import kotlinx.cinterop.toKString
 /** Compose iOS/Skia content on an iOS simulator; does not imitate a UIKit provider container. */
 @OptIn(ExperimentalTestApi::class, ExperimentalRoborazziApi::class, InternalComposeUiApi::class)
 class WalletVisualIosTest {
+    @Test fun nearbyPermission() = scenario { nearbyState("permission") }
+    @Test fun nearbyReview() = scenario(size = Size(320f, 568f), fontScale = 1.5f) { nearbyState("review") }
+    @Test fun nearbyExpired() = scenario { nearbyState("expired") }
+    @Test fun nearbyReceipt() = scenario { nearbyState("receipt") }
     @Test fun externalReceiving() = scenario() { externalReceiving() }
     @Test fun externalUnavailableCallback() = scenario() { externalReceiving(unavailable = true) }
     @Test fun providerSharingReview() = scenario { providerSharingReview() }

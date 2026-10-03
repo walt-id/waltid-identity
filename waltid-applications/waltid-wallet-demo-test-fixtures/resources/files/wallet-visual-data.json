@@ -72,7 +72,23 @@
     ]
   },
   "nearby": {
-    "qrPayload": "mdoc:visual-fixture-not-a-live-engagement"
+    "qrPayload": "mdoc:visual-fixture-not-a-live-engagement",
+    "review": {
+      "id": "5c93e12c-35e8-4a8b-87ae-c9859e760174",
+      "credentialId": "visual-nearby-credential",
+      "docType": "org.iso.18013.5.1.mDL",
+      "namespace": "org.iso.18013.5.1",
+      "element": "given_name",
+      "label": "Given name",
+      "value": "Alex",
+      "title": "Mobile Driving Licence",
+      "issuer": "Example licensing authority",
+      "reader": "City service desk",
+      "backgroundColor": "#174F64",
+      "completedAt": "2026-10-02T12:00:00Z",
+      "permissionMessage": "Bluetooth permission is required",
+      "expiredMessage": "Prepared sharing expired. Review the request again before sharing."
+    }
   },
   "batchOutcome": {
     "status": "Saved credentials: 1. Pending targets: 1.",
