@@ -33,6 +33,12 @@ class WalletVisualAndroidTest {
     fun compactProviderSharingReview() = scenario(fontScale = 1.5f, sheetHost = true) { providerSharingReview(compact = true) }
     @Test fun providerOfferReview() = scenario(sheetHost = true) { providerOfferReview() }
     @Test fun paymentSheet() = scenario(sheetHost = true) { paymentReview(sheet = true) }
+    @Test fun paymentLoading() = scenario { paymentState(blocked = false) }
+    @Test fun paymentBlocked() = scenario { paymentState(blocked = true) }
+    @Test
+    @Config(qualifiers = "en-rUS-w320dp-h568dp-notnight-mdpi")
+    fun paymentLocalizedCompact() = scenario(fontScale = 1.5f) { localizedPayment() }
+
 
     @Test fun providerReceivingPreparing() = scenario(sheetHost = true) { providerReceivingState("preparing") }
     @Test fun providerReceivingAuthorization() = scenario(sheetHost = true) { providerReceivingState("authorization") }
@@ -79,7 +85,7 @@ class WalletVisualAndroidTest {
     fun batchOfferWithNothingSelected() = scenario { batchOffer(noneSelected = true) }
 
     @Test
-    fun paymentReview() = scenario { paymentReview() }
+    fun paymentReview() = scenario(sheetHost = true) { paymentReview() }
 
     @Test
     fun credentialImages() = scenario { credentialImages() }
@@ -97,11 +103,13 @@ class WalletVisualAndroidTest {
     fun nearbyReady() = scenario { nearbyReady() }
 
     private fun scenario(fontScale: Float = 1f, sheetHost: Boolean = false, block: WalletVisualScenarios.() -> Unit) = runAndroidComposeUiTest<ComponentActivity> {
-        // A dialog capture includes the test Activity behind it. Provider activities have no action bar.
+        // Dialog captures include the test Activity behind them. Demo hosts have no action bar.
         if (sheetHost) runOnUiThread { requireNotNull(activity).actionBar?.hide() }
         WalletVisualScenarios(this, captureImage = { id ->
             val directory = checkNotNull(System.getProperty("roborazzi.output.dir")) { "Roborazzi output directory is not configured" }
-            val root = if (id.startsWith("sharing.provider") || id.startsWith("receiving.provider") || id.startsWith("payment.sheet"))
+            val root = if (id.endsWith(".unsigned_confirmation"))
+                onNode(isRoot() and hasAnyDescendant(hasTestTag("payment-unsigned-confirm")))
+            else if (id.startsWith("sharing.provider") || id.startsWith("receiving.provider") || id.startsWith("payment.sheet"))
                 onNode(isRoot() and hasAnyDescendant(hasTestTag("wallet.review.sheet"))) else onRoot()
             root.captureRoboImage("$directory/android-api35-phone-en-light/$id.png")
         }, platformTheme = { content ->

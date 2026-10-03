@@ -559,6 +559,63 @@
       ],
       "composeTest": "providerReceivingPartialResult",
       "note": "Shared Compose content in a modal window; Android supplies the issuance provider. A Compose iOS render does not imply an Apple issuance-provider capability."
+    },
+    {
+      "id": "payment.loading",
+      "composeTest": "paymentLoading",
+      "swiftTest": "testPaymentLoading",
+      "requirements": [
+        "R12",
+        "R14",
+        "T02",
+        "T08",
+        "T10"
+      ],
+      "note": "SDK-shaped payment state; local labels do not replace missing issuer instructions. Compact localized state uses 320x568 and large text."
+    },
+    {
+      "id": "payment.blocked",
+      "composeTest": "paymentBlocked",
+      "swiftTest": "testPaymentBlocked",
+      "requirements": [
+        "R12",
+        "R14",
+        "T02",
+        "T08",
+        "T10"
+      ],
+      "note": "SDK-shaped payment state; local labels do not replace missing issuer instructions. Compact localized state uses 320x568 and large text."
+    },
+    {
+      "id": "payment.localized.compact_large_text",
+      "composeTest": "paymentLocalizedCompact",
+      "swiftTest": "testPaymentLocalizedCompact",
+      "requirements": [
+        "R12",
+        "R14",
+        "T02",
+        "T08",
+        "T10"
+      ],
+      "note": "SDK-shaped payment state; local labels do not replace missing issuer instructions. Compact localized state uses 320x568 and large text."
+    },
+    {
+      "id": "payment.sheet.unsigned_confirmation",
+      "composeTest": "paymentSheet",
+      "requirements": [
+        "T01",
+        "T12"
+      ],
+      "note": "Explicit unsigned confirmation after reviewing the payment. Native alert interaction is covered by MockWalletUITests; this image is a Compose dialog."
+    },
+    {
+      "id": "payment.mixed_credentials.unsigned_confirmation",
+      "composeTest": "paymentReview",
+      "requirements": [
+        "T01",
+        "T12"
+      ],
+      "note": "Explicit unsigned confirmation after reviewing the payment. Native alert interaction is covered by MockWalletUITests; this image is a Compose dialog."
     }
   ]
 }

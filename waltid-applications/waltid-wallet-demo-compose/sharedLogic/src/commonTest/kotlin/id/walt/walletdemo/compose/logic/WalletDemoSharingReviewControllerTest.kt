@@ -19,6 +19,18 @@ class WalletDemoSharingReviewControllerTest {
     private val name = WalletDemoPresentationDisclosureSelection("pid", "one", "name")
     private fun consent(revision: String) = WalletDemoPaymentConsent(revision, "en", null, null, "Pay", null, false, emptyList())
 
+    @Test fun aStaleRenderedActionCannotAuthorizeANewerResolvedSelection() = runTest {
+        var revision = 0
+        val owner = WalletDemoSharingReviewController(review, backgroundScope) { consent("revision-${++revision}") }
+        runCurrent()
+        val rendered = owner.state.value
+        owner.toggleDisclosure(name)
+        runCurrent()
+        assertNull(owner.selectionForSubmission(rendered))
+        assertEquals("revision-2", owner.selectionForSubmission(owner.state.value)?.paymentConsentRevision)
+        owner.close()
+    }
+
     @Test fun currentSelectionInvalidatesConsentAndLatePreparationCannotReplaceTheNewRevision() = runTest {
         val responses = mutableListOf<CompletableDeferred<WalletDemoPaymentConsent?>>()
         val owner = WalletDemoSharingReviewController(review, backgroundScope) {

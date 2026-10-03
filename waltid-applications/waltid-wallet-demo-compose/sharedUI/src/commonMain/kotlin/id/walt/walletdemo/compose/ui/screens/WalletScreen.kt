@@ -212,7 +212,15 @@ internal fun WalletScreen(
                     onPreview = controller::previewPresentation,
                     onToggleCredential = controller::togglePresentationCredential,
                     onToggleDisclosure = controller::togglePresentationDisclosure,
-                    onSubmit = controller::submitPresentation,
+                    onSubmit = {
+                        val current = controller.state.value
+                        if (current.presentationReview == state.presentationReview &&
+                            current.paymentReview == state.paymentReview &&
+                            current.selectedPresentationCredentialOptions == state.selectedPresentationCredentialOptions &&
+                            current.selectedPresentationDisclosureOptions == state.selectedPresentationDisclosureOptions) {
+                            controller.submitPresentation()
+                        }
+                    },
                     onReject = controller::rejectPresentation,
                     onCancel = controller::cancelPresentationReview,
                     onStartProximityPresentation = onStartProximityPresentation,
