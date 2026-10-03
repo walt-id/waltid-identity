@@ -44,7 +44,8 @@ internal class MobileDigitalCredentialCreateClient(
         val identity = created.bootstrap(config.selectedSigningProtection(context))
         currentCoroutineContext().ensureActive()
         val session = created.wallet.startIssuance(MobileWalletIssuanceRequest(
-            offer = MobileWalletCredentialOffer.InlineJson(input.request.offerJson), redirectUri = "openid://",
+            offer = MobileWalletCredentialOffer.InlineJson(input.request.offerJson),
+            redirectUri = DigitalCredentialCreateAuthHandoff.REDIRECT_URI,
         )).toDemoIssuanceSession()
         return DigitalCredentialCreateClient.Offer(input.request.protocol, session, WalletDemoHolderBinding(identity.keyId, identity.did))
     }

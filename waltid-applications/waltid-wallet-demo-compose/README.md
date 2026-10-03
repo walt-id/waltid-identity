@@ -316,7 +316,7 @@ Android builds register with Credential Manager for:
 - **Presentation (`GET_CREDENTIAL`)** — OpenID4VP unsigned and ISO 18013-7 Annex C, via `DigitalCredentialProviderActivity` and the shared review in a modal sheet.
 - **Issuance (`CREATE_CREDENTIAL`)** — OpenID4VCI (`openid4vci-v1` and historical aliases), via `DigitalCredentialCreateActivity`.
 
-Issuance uses a translucent create Activity and a Material bottom sheet for offer review, credential inclusion, supported copy counts and transaction-code entry. Both pre-authorized and authorization-code grants forward the same explicit batch selection as in-app receiving. Authorization-code offers use the same external-browser + `openid://` path as in-app receiving; `DigitalCredentialCreateAuthHandoff` returns the callback to the still-running create Activity (or completes wallet-side issuance if that Activity was destroyed). The Credential Manager create-option picker remains system-owned; the sheet is wallet fulfillment UI after the user selects this wallet.
+Issuance uses a translucent create Activity and a Material bottom sheet for offer review, credential inclusion, supported copy counts and transaction-code entry. Both pre-authorized and authorization-code grants forward the same explicit batch selection as in-app receiving. Authorization-code offers open the external browser and return through the dedicated `walt-wallet-create://authorize` callback, keeping browser `CLEAR_TOP` flags away from the provider request stack. `DigitalCredentialCreateAuthHandoff` correlates the callback and resumes the original create Activity (or queues wallet-side recovery after process loss). Issuers that require pre-registered redirect URIs must allow `walt-wallet-create://authorize` for provider authorization-code issuance; ordinary in-app receiving retains its existing redirect. The Credential Manager create-option picker remains system-owned; the sheet is wallet fulfillment UI after the user selects this wallet.
 
 `WalletReviewPresentation` selects a full-screen or modal-sheet container around the same content. Choices, transaction-code drafts and payment-consent revisions live above that container. Changing presentation does not re-prepare consent or authorize anything. Busy reviews block Back, swipe and outside-tap dismissal. Explicit Cancel/Decline and returning to Credential Manager's selector remain separate host callbacks. Ordinary app links still enter the app's full flow; the provider sheet is not evidence of cross-app transparency for those links.
 
@@ -330,6 +330,18 @@ Chrome 143+ on Android can exercise create issuance with the Digital Credentials
 4. Select the walt.id wallet, accept the offer, and confirm the credential appears under Credentials.
 
 iOS Identity Document providers currently cover presentation only; create/issuance is Android-first.
+
+The optional `DigitalCredentialIssuanceE2ETest.authorizationCodeRetainsCopiesThroughBrowserReturn`
+case uses the coordinated Enterprise fixture's unattended test IdP. It checks a two-copy selection
+through Credential Manager, browser authorization, the provider receipt, and stored credential details.
+Start the fixture and forward ports as described above, finish Chrome's first-run setup on the test
+emulator, then run `connectedPreviewDebugAndroidTest` with
+`-Pandroid.testInstrumentationRunnerArguments.class=id.walt.walletdemo.compose.android.DigitalCredentialIssuanceE2ETest#authorizationCodeRetainsCopiesThroughBrowserReturn`
+and `-Pandroid.testInstrumentationRunnerArguments.enterprise_fixture_base_url=http://127.0.0.1:33335`.
+For unattended emulator runs, build with `-PwalletSigningProtectionMode=disabled`: the provider is
+launched independently and does not inherit the main Activity's test override. This case is skipped
+without the fixture argument. It does not establish protected-signing or Chrome DC API caller proof;
+Chrome acts as the authorization browser and the test Activity calls Credential Manager.
 
 ## Related modules
 

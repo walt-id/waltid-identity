@@ -104,7 +104,9 @@ class MobileWalletRestartTest {
         assertTrue("Wallet DID must be available", did.startsWith("did:"))
         assertTrue("Wallet key ID must be available", keyId.isNotBlank() && keyId != "Unavailable")
         clickByTag(device, "wallet.settingsBack")
+        assertReview("wallet.settingsSigningKey")
         clickByTag(device, "wallet.settingsBack")
+        assertReview("wallet.scanButton")
         return did to keyId
     }
 }
