@@ -15,6 +15,7 @@ actor MockWalletClient: WalletClient {
     private let operationDelayNanoseconds: UInt64
     private let verifierStyle: VerifierStyle
     private let duplicatePresentationOptions: Bool
+    private let emptyPresentationOptions: Bool
     private let transactionCodeRequired: Bool
     private let issuanceGrant: IssuanceGrant
     private let presentationPreviewResultOverride: PresentationPreviewResult?
@@ -35,6 +36,7 @@ actor MockWalletClient: WalletClient {
         operationDelayMilliseconds: UInt64 = 0,
         verifierStyle: VerifierStyle = .named,
         duplicatePresentationOptions: Bool = false,
+        emptyPresentationOptions: Bool = false,
         transactionCodeRequired: Bool = false,
         issuanceGrant: IssuanceGrant = .preAuthorizedCode,
         presentationPreviewResult: PresentationPreviewResult? = nil,
@@ -51,6 +53,7 @@ actor MockWalletClient: WalletClient {
         self.operationDelayNanoseconds = operationDelayMilliseconds * 1_000_000
         self.verifierStyle = verifierStyle
         self.duplicatePresentationOptions = duplicatePresentationOptions
+        self.emptyPresentationOptions = emptyPresentationOptions
         self.transactionCodeRequired = transactionCodeRequired
         self.issuanceGrant = issuanceGrant
         self.presentationPreviewResultOverride = presentationPreviewResult
@@ -173,7 +176,7 @@ actor MockWalletClient: WalletClient {
             PresentationPreview(
                 previewHandle: PresentationPreviewHandle(value: "mock-presentation-preview"),
                 request: previewRequestInfo,
-                credentialOptions: duplicatePresentationOptions ? duplicateOptions : [defaultOption],
+                credentialOptions: emptyPresentationOptions ? [] : (duplicatePresentationOptions ? duplicateOptions : [defaultOption]),
                 credentialRequirements: [
                     PresentationCredentialRequirement(options: [duplicatePresentationOptions ? ["identity", "age"] : ["pid"]])
                 ]

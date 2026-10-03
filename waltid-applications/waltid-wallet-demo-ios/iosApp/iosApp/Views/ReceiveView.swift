@@ -57,13 +57,8 @@ struct ReceiveView: View {
                     focusResetKey: viewModel.inputFocusResetKey
                 )
 
-                Button("Receive") {
-                    viewModel.previewOffer()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(branding.primary)
-                .disabled(!viewModel.receiveActionEnabled)
-                .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
+                WalletActions(primary: WalletAction("Receive", enabled: viewModel.receiveActionEnabled,
+                    identifier: WalletAccessibilityID.receiveButton, perform: viewModel.previewOffer))
 
             }
             .padding()

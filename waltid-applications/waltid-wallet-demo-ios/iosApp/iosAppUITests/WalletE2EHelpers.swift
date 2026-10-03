@@ -122,6 +122,13 @@ final class WalletE2EUI {
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10), safari.debugDescription)
     }
 
+    /// First-use simulator registration is an OS-owned step, separate from wallet receipt rendering.
+    func allowIdentityDocumentRegistrationIfRequested() {
+        let alert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts
+            .containing(NSPredicate(format: "label CONTAINS %@", "Identity Verification")).firstMatch
+        if alert.waitForExistence(timeout: 15) { alert.buttons["Allow"].tap() }
+    }
+
     func waitForTextInputValue(identifier: String, fallbackLabel: String, value: String, timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
@@ -206,12 +213,21 @@ final class WalletE2EUI {
 
     func returnToWallet() {
         dismissKeyboardIfPresent()
+        // Automatic issuance completion may already have returned home. Avoid
+        // tapping a disappearing back button from the previous navigation frame.
+        let home = app.buttons["wallet.scanButton"]
+        if home.exists && home.isHittable { return }
         // Close only known wallet destinations, starting with the innermost sheet.
         for identifier in ["wallet-detail-close", "wallet.presentationClaimsClose", "wallet.detailsBack", "wallet.flowBack"] {
             let button = app.buttons[identifier]
-            if button.exists && button.isHittable { button.tap() }
+            if home.exists && home.isHittable { break }
+            if button.exists && button.isHittable {
+                button.tap()
+                let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: button)
+                XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 5), .completed)
+            }
         }
-        XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 10), "Wallet home did not appear")
+        XCTAssertTrue(home.waitForExistence(timeout: 10), "Wallet home did not appear")
     }
 
     func openScanner() {

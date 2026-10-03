@@ -1277,6 +1277,32 @@ class WalletDemoAppTestScenarios(
         onAllNodesWithTag("wallet.external.flow").assertCountEquals(0)
     }
 
+    fun externalOfferFailureRemainsVisibleAndCanBeCorrected() = runComposeUiTest {
+        val backing = WalletUiTestWallet(transactionCodeRequired = true, credentialsAfterReceive = listOf(sampleCredential))
+        val wallet = object : DemoWallet by backing {
+            override suspend fun continuePreAuthorizedIssuance(
+                sessionId: String, transactionCode: String?, credentials: List<WalletDemoCredentialSelection>,
+            ): WalletDemoIssuanceOutcome {
+                check(transactionCode == "123456") { "The transaction code is incorrect" }
+                return backing.continuePreAuthorizedIssuance(sessionId, transactionCode, credentials)
+            }
+        }
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+        controller.handleDeepLink("openid-credential-offer://example")
+        setWalletContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+        onNodeWithTag(WalletUiTestTags.TxCodeInput).performScrollTo().performTextInput("000000")
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.operation is WalletOperationState.Failed }
+        onNodeWithTag(WalletUiTestTags.Status).performScrollTo().assertIsDisplayed()
+            .assertTextContains("The transaction code is incorrect", substring = true)
+        onNodeWithTag(WalletUiTestTags.TxCodeInput).performScrollTo().performTextReplacement("123456")
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsEnabled().performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.issuanceReceipt != null }
+        onNodeWithTag("issuance-done").assertIsDisplayed()
+    }
+
     fun duplicateExternalLinksPreserveReviewUntilExplicitlyClosed() = runComposeUiTest {
         val url = "openid-credential-offer://example"
         val wallet = WalletUiTestWallet(credentialsAfterReceive = listOf(sampleCredential), presentationPreview = samplePresentationPreview)

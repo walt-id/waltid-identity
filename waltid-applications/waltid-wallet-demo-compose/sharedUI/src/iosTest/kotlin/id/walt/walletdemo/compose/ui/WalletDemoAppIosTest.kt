@@ -9,6 +9,8 @@ import kotlin.test.Test
 
 @OptIn(InternalComposeUiApi::class)
 class WalletDemoAppIosTest {
+    @Test fun externalOfferFailureRemainsVisibleAndCanBeCorrected() = scenarios.externalOfferFailureRemainsVisibleAndCanBeCorrected()
+
     @Test fun keySetupDefaultNeedsOneConfirmation() = scenarios.keySetupDefaultNeedsOneConfirmation()
 
     @Test fun pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt() = scenarios.pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt()

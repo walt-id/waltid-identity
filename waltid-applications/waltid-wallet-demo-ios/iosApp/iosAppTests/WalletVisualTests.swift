@@ -8,6 +8,34 @@ import XCTest
 
 @MainActor
 final class WalletVisualTests: XCTestCase {
+    private var previousTimeZone: String?
+    private var savedSharingPreferences: [(String, Any?)] = []
+    override func setUp() {
+        super.setUp()
+        previousTimeZone = ProcessInfo.processInfo.environment["TZ"]
+        setenv("TZ", "UTC", 1)
+        tzset()
+        NSTimeZone.resetSystemTimeZone()
+        let defaults = UserDefaults(suiteName: IdentityDocumentSharedConfiguration.appGroupIdentifier)!
+        savedSharingPreferences = [DemoSharingSettings.showDcApiPresentationPreviewKey,
+            DemoSharingSettings.proximityTransportProfileKey, DemoSharingSettings.proximityApprovalModeKey]
+            .map { ($0, defaults.object(forKey: $0)) }
+        savedSharingPreferences.forEach { defaults.removeObject(forKey: $0.0) }
+    }
+    override func tearDown() {
+        let defaults = UserDefaults(suiteName: IdentityDocumentSharedConfiguration.appGroupIdentifier)!
+        savedSharingPreferences.forEach { defaults.set($0.1, forKey: $0.0) }
+        if let previousTimeZone { setenv("TZ", previousTimeZone, 1) } else { unsetenv("TZ") }
+        tzset()
+        NSTimeZone.resetSystemTimeZone()
+        super.tearDown()
+    }
+
+    func testControls() throws { try capture(WalletControlsPreview(), id: "components.controls.default") }
+    func testControlsRtl() throws {
+        try capture(WalletControlsPreview().environment(\.layoutDirection, .rightToLeft), id: "components.controls.rtl")
+    }
+
     func testExternalReceiving() async throws { try await externalReceiving(unavailable: false) }
     func testExternalUnavailableCallback() async throws { try await externalReceiving(unavailable: true) }
 
@@ -105,6 +133,47 @@ final class WalletVisualTests: XCTestCase {
         XCTAssertTrue(model.showDcApiPresentationPreview)
         XCTAssertEqual(model.proximityTransportProfile, .defaultProfile)
         try capture(NavigationView { SettingsView(viewModel: model) }.navigationViewStyle(.stack), id: "settings.root.default")
+    }
+
+    func testSettingsReader() async throws { try await readerSettings(required: false) }
+    func testSettingsReaderRequired() async throws { try await readerSettings(required: true) }
+    private func readerSettings(required: Bool) async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        model.readerTrustSettings.setReaderPolicy(required ? .requireTrusted : .allowAnonymousOrUntrusted)
+        await model.readerTrustSettings.awaitPendingOperations()
+        try capture(NavigationView { ReaderTrustSettingsView(controller: model.readerTrustSettings) }.navigationViewStyle(.stack),
+            id: required ? "settings.reader_required.default" : "settings.reader.default")
+    }
+    func testReaderTrustImport() throws {
+        try capture(ReaderTrustImportReviewView(preview: WalletVisualFixtures().readerTrustImport(), confirm: {}, cancel: {}),
+            id: "settings.reader.import_review")
+    }
+
+    func testSettingsDcApiEnabled() throws { try dcApiSettings(enabled: true) }
+    func testSettingsDcApiDisabled() throws { try dcApiSettings(enabled: false) }
+
+    private func dcApiSettings(enabled: Bool) throws {
+        try capture(NavigationView { DigitalCredentialsSettingsView(showWalletReview: .constant(enabled)) }
+            .navigationViewStyle(.stack), id: enabled ? "settings.dc_api.enabled" : "settings.dc_api.disabled")
+    }
+
+    func testSettingsNearby() async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        try capture(NavigationView { NearbySettingsView(viewModel: model) }.navigationViewStyle(.stack), id: "settings.nearby.default")
+    }
+
+    func testSettingsConnection() async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        try capture(NavigationView { ConnectionSettingsView(viewModel: model) }.navigationViewStyle(.stack), id: "settings.connection.default")
+    }
+
+    func testSettingsTechnical() async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        try capture(NavigationView { TechnicalDetailsView(viewModel: model) }.navigationViewStyle(.stack), id: "settings.technical.unavailable")
     }
 
     func testCredentialDetails() throws {

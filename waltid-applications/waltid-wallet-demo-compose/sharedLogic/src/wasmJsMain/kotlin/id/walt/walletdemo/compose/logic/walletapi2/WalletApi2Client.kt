@@ -33,7 +33,17 @@ internal class WalletApi2Client(
     private val baseUrl: String,
     private val token: String,
     private val http: HttpClient = authenticatedHttpClient(baseUrl, token),
+    private val onSessionExpired: () -> Unit = {},
 ) {
+    private var expiryReported = false
+
+    private fun checkSession(response: HttpResponse) {
+        if (response.status == HttpStatusCode.Unauthorized && !expiryReported) {
+            expiryReported = true
+            onSessionExpired()
+        }
+    }
+
     suspend fun listWallets(): List<String> =
         request { get("/wallet") }.body()
 
@@ -95,6 +105,7 @@ internal class WalletApi2Client(
 
     suspend fun deleteCredential(walletId: String, credentialId: String): Boolean {
         val response = http.delete("/wallet/$walletId/credentials/$credentialId")
+        checkSession(response)
         return when (response.status) {
             HttpStatusCode.NoContent -> true
             HttpStatusCode.NotFound -> false
@@ -167,6 +178,7 @@ internal class WalletApi2Client(
 
     private suspend fun receiveResult(block: suspend HttpClient.() -> HttpResponse): ReceiveCredentialResultDto {
         val response = http.block()
+        checkSession(response)
         if (response.status.isSuccess()) return response.body()
         val body = response.bodyAsText()
         if (response.status.value in setOf(422, 500, 502)) {
@@ -222,6 +234,7 @@ internal class WalletApi2Client(
         block: suspend HttpClient.() -> HttpResponse,
     ): HttpResponse {
         val response = http.block()
+        checkSession(response)
         val ok = expected?.let { response.status == it } ?: response.status.isSuccess()
         if (!ok) throw response.toApiException()
         return response
