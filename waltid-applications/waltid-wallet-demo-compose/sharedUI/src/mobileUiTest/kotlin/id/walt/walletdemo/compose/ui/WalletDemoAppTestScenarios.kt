@@ -1247,82 +1247,61 @@ class WalletDemoAppTestScenarios(
     fun deepLinksRouteToReceiveAndPresentTabs() = runComposeUiTest {
         val offerUrl = "openid-credential-offer://example"
         val requestUrl = "openid4vp://example"
-        val wallet = WalletUiTestWallet(
-            credentialsAfterReceive = listOf(sampleCredential),
-            presentationResult = WalletDemoOperationResult.Success("Presentation sent"),
-            presentationPreview = samplePresentationPreview,
-        )
+        val wallet = WalletUiTestWallet(credentialsAfterReceive = listOf(sampleCredential),
+            presentationResult = WalletDemoOperationResult.Success("Presentation sent"), presentationPreview = samplePresentationPreview)
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
-
+        // Cold external entry must survive the one-screen PIN setup before preparing anything.
+        controller.handleDeepLink(offerUrl)
         setWalletContent { WalletDemoApp(controller) }
         unlockWithPin()
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
-
-        controller.handleDeepLink(offerUrl)
-        waitForIdle()
-        onNodeWithTag("wallet.receiveTabContent").assertIsDisplayed()
-        onNodeWithTag("wallet.offerInput").assertTextContains(offerUrl)
-
-        onNodeWithTag("wallet.receiveButton").performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
-        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
-        onNodeWithTag("wallet.status").assertTextContains("Received 1 credential(s)")
+        onNodeWithTag("wallet.external.flow").assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.OfferInput).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.issuanceReceipt != null }
+        onNodeWithTag("issuance-done").assertIsDisplayed().performClick()
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
 
+        // Warm entry uses the same owner and automatically resolves the other protocol.
         controller.handleDeepLink(requestUrl)
-        waitForIdle()
-        onNodeWithTag("wallet.presentTabContent").assertIsDisplayed()
-        onNodeWithTag("wallet.presentationInput").assertTextContains(requestUrl)
-
-        onNodeWithTag("wallet.presentButton").performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
-        onNodeWithTag("wallet.presentationSubmitButton").performSemanticsAction(SemanticsActions.OnClick)
+        onAllNodesWithTag(WalletUiTestTags.PresentationInput).assertCountEquals(0)
+        onNodeWithTag("wallet.presentationSubmitButton").performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText == "Presentation sent" }
         onNodeWithTag("wallet.status").assertTextContains("Presentation sent")
         assertEquals(offerUrl, wallet.receivedOfferUrl)
         assertEquals(requestUrl, wallet.previewedRequestUrl)
         assertEquals(requestUrl, wallet.submittedRequestUrl)
+        onNodeWithTag("wallet.external.close").performClick()
+        onAllNodesWithTag("wallet.external.flow").assertCountEquals(0)
     }
 
-    fun deepLinksResetReceiveAndPresentDetailStacksEvenWhenUrlIsUnchanged() = runComposeUiTest {
-        val offerUrl = "openid-credential-offer://example"
-        val requestUrl = "openid4vp://example"
-        val wallet = WalletUiTestWallet(
-            credentialsAfterReceive = listOf(sampleCredential),
-            presentationPreview = samplePresentationPreview,
-        )
+    fun duplicateExternalLinksPreserveReviewUntilExplicitlyClosed() = runComposeUiTest {
+        val url = "openid-credential-offer://example"
+        val wallet = WalletUiTestWallet(credentialsAfterReceive = listOf(sampleCredential), presentationPreview = samplePresentationPreview)
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
-
         setWalletContent { WalletDemoApp(controller) }
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
-
-        controller.handleDeepLink(offerUrl)
-        onNodeWithTag("wallet.receiveButton").performSemanticsAction(SemanticsActions.OnClick)
+        controller.handleDeepLink(url)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
-        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
-        awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
-        onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
-
-        controller.handleDeepLink(offerUrl)
+        val originalPreview = controller.state.value.offerPreview
+        controller.handleDeepLink(url)
         waitForIdle()
-        onNodeWithTag("wallet.receiveTabContent").assertIsDisplayed()
-        onNodeWithTag("wallet.offerInput").assertTextContains(offerUrl)
-        onNodeWithTag("wallet.receiveButton").assertIsEnabled()
-
-        controller.handleDeepLink(requestUrl)
-        onNodeWithTag("wallet.presentButton").performSemanticsAction(SemanticsActions.OnClick)
+        assertEquals(originalPreview, controller.state.value.offerPreview)
+        onAllNodesWithTag(WalletUiTestTags.OfferInput).assertCountEquals(0)
+        onNodeWithTag("wallet.external.close").performClick()
+        onAllNodesWithTag("wallet.external.flow").assertCountEquals(0)
+        controller.handleDeepLink("openid4vp://example")
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
-        onNodeWithTag(WalletUiTestTags.PresentationReview).assertIsDisplayed()
-
-        controller.handleDeepLink(requestUrl)
+        val review = controller.state.value.presentationReview
+        controller.handleDeepLink("openid4vp://example")
         waitForIdle()
-        onNodeWithTag("wallet.presentTabContent").assertIsDisplayed()
-        onNodeWithTag("wallet.presentationInput").assertTextContains(requestUrl)
-        onNodeWithTag("wallet.presentButton").assertIsEnabled()
+        assertEquals(review, controller.state.value.presentationReview)
+        onNodeWithTag(WalletUiTestTags.PresentationReview).assertIsDisplayed()
+        onNodeWithTag("wallet.external.close").performClick()
+        onAllNodesWithTag(WalletUiTestTags.PresentationReview).assertCountEquals(0)
     }
 
     fun credentialsPersistAcrossControllerRecreation() = runComposeUiTest {
@@ -1336,10 +1315,10 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { firstController.state.value.session is WalletSessionState.Ready }
 
         firstController.handleDeepLink("openid-credential-offer://example")
-        onNodeWithTag("wallet.receiveButton").performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { firstController.state.value.offerPreview != null }
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
-        waitUntil(timeoutMillis = 5_000) { firstController.state.value.statusText.startsWith("Received") }
+        waitUntil(timeoutMillis = 5_000) { firstController.state.value.issuanceReceipt != null }
+        onNodeWithTag("issuance-done").performClick()
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
 

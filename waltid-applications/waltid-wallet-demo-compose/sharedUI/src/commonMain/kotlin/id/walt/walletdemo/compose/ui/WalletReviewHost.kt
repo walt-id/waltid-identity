@@ -51,6 +51,7 @@ internal fun WalletReviewHost(
                     modifier = Modifier.testTag("wallet.review.sheet"),
                     onDismissRequest = { if (canDismiss) dismiss?.invoke() },
                     sheetState = sheetState,
+                    containerColor = MaterialTheme.colorScheme.background,
                     sheetGesturesEnabled = canDismiss,
                     properties = ModalBottomSheetProperties(
                         shouldDismissOnBackPress = canDismiss,

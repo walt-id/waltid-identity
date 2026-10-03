@@ -50,6 +50,7 @@ internal fun PresentTab(
     onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
+    fillViewport: Boolean = true,
 ) {
     val credentials = (state.session as? WalletSessionState.Ready)?.credentials.orEmpty()
     val preview = state.presentationPreview
@@ -68,6 +69,7 @@ internal fun PresentTab(
 
     if (preview != null) {
         ReviewScaffold(
+            fillViewport = fillViewport,
             modifier = modifier.testTag(WalletUiTestTags.PresentTabContent),
             actions = {
                 SharingActionsRow(
@@ -97,6 +99,14 @@ internal fun PresentTab(
                 showActions = false,
             )
         }
+        return
+    }
+
+    if (state.externalFlow != null) {
+        if (error != null) ReviewScaffold(modifier, fillViewport) {
+            PresentationErrorSection(error, enabled = state.presentationReviewEnabled,
+                onNotifyVerifier = onReject, onDismiss = onCancel)
+        } else ExternalFlowStatus(state, onRetry = onPreview, modifier = modifier, fillViewport = fillViewport)
         return
     }
 

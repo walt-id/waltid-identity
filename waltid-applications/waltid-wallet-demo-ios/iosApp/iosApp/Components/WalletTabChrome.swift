@@ -6,7 +6,7 @@ struct WalletTabStatusBanner: View {
     let tab: WalletTab
 
     var body: some View {
-        if viewModel.isStatusVisible(for: tab) {
+        if viewModel.isStatusVisible(for: tab) && (viewModel.externalFlow == nil || viewModel.statusIsLoading(for: tab) || viewModel.statusIsError(for: tab)) {
             StatusBannerView(
                 message: viewModel.statusMessage(for: tab),
                 isLoading: viewModel.statusIsLoading(for: tab),
@@ -34,26 +34,26 @@ struct WalletTabStatusBanner: View {
 }
 
 extension View {
-    func walletFlowToolbar(onBack: (() -> Void)?, backEnabled: Bool, onOpenSettings: @escaping () -> Void) -> some View {
+    func walletFlowToolbar(onBack: (() -> Void)?, backEnabled: Bool, onOpenSettings: (() -> Void)?, external: Bool = false) -> some View {
         walletSettingsToolbar(onOpenSettings: onOpenSettings).toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 if let onBack {
-                    Button(action: onBack) { Label("Back to wallet", systemImage: "chevron.backward") }
+                    Button(action: onBack) { Label(external ? "Close request" : "Back to wallet", systemImage: external ? "xmark" : "chevron.backward") }
                         .disabled(!backEnabled)
-                        .accessibilityIdentifier("wallet.flowBack")
+                        .accessibilityIdentifier(external ? "wallet.external.close" : "wallet.flowBack")
                 }
             }
         }
     }
 
-    func walletSettingsToolbar(onOpenSettings: @escaping () -> Void) -> some View {
+    func walletSettingsToolbar(onOpenSettings: (() -> Void)?) -> some View {
         toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: onOpenSettings) {
+                if let onOpenSettings { Button(action: onOpenSettings) {
                     Image(systemName: "gearshape")
                 }
                 .accessibilityLabel("Settings")
-                .accessibilityIdentifier(WalletAccessibilityID.settingsButton)
+                .accessibilityIdentifier(WalletAccessibilityID.settingsButton) }
             }
         }
     }

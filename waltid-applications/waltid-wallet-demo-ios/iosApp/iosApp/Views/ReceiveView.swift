@@ -12,10 +12,16 @@ struct ReceiveView: View {
     var body: some View {
         NavigationView {
             Group {
-                if let preview = viewModel.offerPreview {
+                if case .unavailableCallback = viewModel.externalFlow {
+                    Text("The original receiving session is no longer available. Check your wallet before starting again.")
+                        .padding(20).accessibilityIdentifier("wallet.external.unavailable")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                } else if let preview = viewModel.offerPreview {
                     reviewContent(preview: preview)
                 } else if viewModel.issuanceReceipt != nil || !viewModel.deferredCredentials.isEmpty {
                     resultContent
+                } else if viewModel.externalFlow != nil {
+                    WalletExternalFlowStatus(viewModel: viewModel, onRetry: viewModel.previewOffer)
                 } else {
                     entryContent
                 }
@@ -23,7 +29,8 @@ struct ReceiveView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Receive credentials")
             .navigationBarTitleDisplayMode(.inline)
-            .walletFlowToolbar(onBack: onBack, backEnabled: !viewModel.isLoading, onOpenSettings: onOpenSettings)
+            .walletFlowToolbar(onBack: onBack, backEnabled: viewModel.externalFlow != nil ? viewModel.canDismissExternalFlow : !viewModel.isLoading,
+                onOpenSettings: viewModel.externalFlow == nil ? onOpenSettings : nil, external: viewModel.externalFlow != nil)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
         }
@@ -117,7 +124,7 @@ struct ReceiveView: View {
         }
         .safeAreaInset(edge: .bottom) {
             WalletActions(primary: WalletAction("Done", enabled: !viewModel.isLoading, identifier: "issuance-done") {
-                viewModel.selectedTab = .credentials
+                if viewModel.externalFlow != nil { viewModel.closeExternalFlow() } else { viewModel.selectedTab = .credentials }
             }, secondary: pendingCredentials.isEmpty ? nil : WalletAction("Refresh status",
                 enabled: !viewModel.isLoading, identifier: "issuance-refresh", perform: viewModel.refreshIssuanceStatus))
                 .padding().background(.bar)

@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -22,6 +23,9 @@ import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationContinuation
 import id.walt.walletdemo.compose.logic.isBusy
+import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.logic.canDismissExternalFlow
+import id.walt.walletdemo.compose.ui.screens.WalletExternalFlowScreen
 import id.walt.walletdemo.compose.ui.screens.PinScreen
 import id.walt.walletdemo.compose.ui.screens.PinStorageUnavailableScreen
 import id.walt.walletdemo.compose.ui.screens.WalletScreen
@@ -54,6 +58,8 @@ internal fun WalletDemoAppHost(
     branding: WalletDemoBranding = WalletDemoBranding(),
     onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
+    onExternalFlowClosed: () -> Unit = {},
+    externalBackground: WalletExternalBackground = WalletExternalBackground.Wallet,
     readerTrustSettingsContent: (@Composable () -> Unit)? = null,
     readerTrustPolicySummary: String? = null,
     onOpenSettings: () -> Unit = {},
@@ -65,6 +71,8 @@ internal fun WalletDemoAppHost(
     serverSettingsContent: (@Composable () -> Unit)? = null,
 ) {
     val state by controller.state.collectAsState()
+    LaunchedEffect(state.externalFlow, state.auth, state.session, state.isBusy) { controller.prepareExternalFlow() }
+    val closeExternalFlow = { if (controller.closeExternalFlow()) onExternalFlowClosed() }
     PresentationContinuationEffect(
         continuation = state.pendingPresentationContinuation?.continuation,
         onCompleted = controller::completePresentationContinuation,
@@ -72,100 +80,56 @@ internal fun WalletDemoAppHost(
     )
 
     WalletDemoTheme(branding) {
-        Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .exportTestTagsForPlatformAutomation(),
-            color = MaterialTheme.colorScheme.background,
-        ) {
-            Box(
+        val appContent: @Composable () -> Unit = {
+            Surface(
                 modifier = Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
-                    ),
+                    .exportTestTagsForPlatformAutomation(),
+                color = MaterialTheme.colorScheme.background,
             ) {
-                when (val auth = state.auth) {
-                    is WalletAuthState.PinEntry -> Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .safeDrawingPadding(),
-                    ) {
-                        PinScreen(
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+                        ),
+                ) {
+                    when (val auth = state.auth) {
+                        is WalletAuthState.PinEntry -> Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .safeDrawingPadding(),
+                        ) {
+                            PinScreen(
+                                controller = controller,
+                                auth = auth,
+                                isBusy = state.isBusy,
+                                biometricAvailable = state.biometricUnlockAvailable,
+                            )
+                        }
+                        is WalletAuthState.StorageUnavailable -> Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .safeDrawingPadding(),
+                        ) {
+                            PinStorageUnavailableScreen(
+                                controller = controller,
+                                message = auth.message,
+                            )
+                        }
+                        WalletAuthState.Unlocked -> WalletScreen(
                             controller = controller,
-                            auth = auth,
-                            isBusy = state.isBusy,
-                            biometricAvailable = state.biometricUnlockAvailable,
+                            state = state,
+                            onStartProximityPresentation = onStartProximityPresentation,
+                            presentationContent = presentationContent,
+                            readerTrustSettingsContent = readerTrustSettingsContent,
+                            readerTrustPolicySummary = readerTrustPolicySummary,
+                            onOpenSettings = onOpenSettings,
+                            onResetWallet = onResetWallet,
+                            onSignOut = onSignOut,
+                            resetWalletDescription = resetWalletDescription,
+                            allowWalletReset = allowWalletReset,
+                            allowCredentialDelete = allowCredentialDelete,
+                            serverSettingsContent = serverSettingsContent,
                         )
                     }
-                    is WalletAuthState.StorageUnavailable -> Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .safeDrawingPadding(),
-                    ) {
-                        PinStorageUnavailableScreen(
-                            controller = controller,
-                            message = auth.message,
-                        )
-                    }
-                    WalletAuthState.Unlocked -> WalletScreen(
-                        controller = controller,
-                        state = state,
-                        onStartProximityPresentation = onStartProximityPresentation,
-                        presentationContent = presentationContent,
-                        readerTrustSettingsContent = readerTrustSettingsContent,
-                        readerTrustPolicySummary = readerTrustPolicySummary,
-                        onOpenSettings = onOpenSettings,
-                        onResetWallet = onResetWallet,
-                        onSignOut = onSignOut,
-                        resetWalletDescription = resetWalletDescription,
-                        allowWalletReset = allowWalletReset,
-                        allowCredentialDelete = allowCredentialDelete,
-                        serverSettingsContent = serverSettingsContent,
-                    )
-                }
-            }
-        }
-        state.signingProtectionWarning?.let { warning ->
-            AlertDialog(
-                onDismissRequest = controller::dismissSigningProtectionWarning,
-                title = { Text("Biometric signing unavailable") },
-                text = {
-                    Text(
-                        warning,
-                        modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionWarning),
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = controller::dismissSigningProtectionWarning,
-                        modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionWarningDismiss),
-                    ) {
-                        Text("OK")
-                    }
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun PresentationContinuationEffect(
-    continuation: WalletDemoPresentationContinuation?,
-    onCompleted: () -> Unit,
-    onFailed: (String) -> Unit,
-) {
-    when (continuation) {
-        is WalletDemoPresentationContinuation.Url -> OpenPresentationContinuationUrlEffect(
-            url = continuation.value,
-            onCompleted = onCompleted,
-            onFailed = onFailed,
-        )
-        is WalletDemoPresentationContinuation.FormPostHtml -> PlatformFormPostEffect(
-            html = continuation.value,
-            onCompleted = onCompleted,
-            onFailed = onFailed,
-        )
-        null -> Unit
-    }
-}

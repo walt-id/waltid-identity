@@ -41,10 +41,12 @@ internal fun ReceiveTab(
     onDone: () -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    fillViewport: Boolean = true,
 ) {
     val preview = state.offerPreview
     if (preview != null) {
         ReviewScaffold(
+            fillViewport = fillViewport,
             modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent),
             actions = {
                 OfferReviewActions(
@@ -74,7 +76,7 @@ internal fun ReceiveTab(
 
     if (state.issuanceReceipt != null || state.deferredCredentials.isNotEmpty()) {
         val pending = state.deferredCredentials.filter { state.issuanceReceipt?.pendingIds?.contains(it.id) ?: true }
-        ReviewScaffold(modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent), actions = {
+        ReviewScaffold(fillViewport = fillViewport, modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent), actions = {
             WalletActions(WalletAction(stringResource(Res.string.issuance_done), onDone,
                 enabled = !state.isBusy, testTag = "issuance-done", icon = WalletSymbol.Accept),
                 secondary = pending.takeIf { it.isNotEmpty() }?.let {
@@ -84,6 +86,11 @@ internal fun ReceiveTab(
         }) {
             IssuanceResultContent(state.issuanceReceipt, state.receivedCredentials(), pending, state.isBusy, onResumeDeferred)
         }
+        return
+    }
+
+    if (state.externalFlow != null) {
+        ExternalFlowStatus(state, onRetry = onPreviewOffer, modifier = modifier, fillViewport = fillViewport)
         return
     }
 
