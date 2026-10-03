@@ -35,13 +35,16 @@ struct PresentView: View {
                     onlineReviewContent(review: review)
                 } else if proximityPresentation.active {
                     proximityContent
+                } else if viewModel.externalFlow != nil {
+                    WalletExternalFlowStatus(viewModel: viewModel, onRetry: viewModel.previewPresentation)
                 } else {
                     entryContent
                 }
             }
             .navigationTitle(proximityPresentation.active ? "Share nearby" : "Share credentials")
             .navigationBarTitleDisplayMode(.inline)
-            .walletFlowToolbar(onBack: onBack, backEnabled: !viewModel.isLoading, onOpenSettings: onOpenSettings)
+            .walletFlowToolbar(onBack: onBack, backEnabled: viewModel.externalFlow != nil ? viewModel.canDismissExternalFlow : !viewModel.isLoading,
+                onOpenSettings: viewModel.externalFlow == nil ? onOpenSettings : nil, external: viewModel.externalFlow != nil)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
         }
@@ -304,47 +307,6 @@ struct PresentView: View {
         }
     }
 
-}
-
-private struct PresentationErrorView: View {
-    @Environment(\.walletDemoBranding) private var branding
-    let error: PresentationPreviewError
-    let isEnabled: Bool
-    let onNotifyVerifier: () -> Void
-    let onDismiss: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("This request cannot be completed")
-                .font(.headline)
-            SharingRequestSections(request: error.request.sharingRequest())
-            Text(error.message)
-            Text("OpenID4VP error: \(error.code.rawValue)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("You can notify the verifier or dismiss the request without sending a response.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            HStack {
-                Button("Notify verifier", action: onNotifyVerifier)
-                    .buttonStyle(.borderedProminent)
-                    .tint(branding.primary)
-                    .disabled(!isEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.presentationErrorNotifyButton)
-
-                Button("Dismiss", action: onDismiss)
-                    .buttonStyle(.bordered)
-                    .disabled(!isEnabled)
-                    .accessibilityIdentifier(WalletAccessibilityID.presentationErrorDismissButton)
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(WalletAccessibilityID.presentationError)
-    }
 }
 
 private struct PresentationFormPostWebView: UIViewRepresentable {

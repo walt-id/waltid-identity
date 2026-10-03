@@ -370,7 +370,7 @@ final class WalletE2EUI {
         return elements[0]
     }
 
-    private func unlockWallet() {
+    func unlockWallet() {
         let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
         guard pinInput.waitForExistence(timeout: 10) else {
             return
