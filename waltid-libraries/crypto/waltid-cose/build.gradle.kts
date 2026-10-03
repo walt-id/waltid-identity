@@ -27,6 +27,7 @@ kotlin {
             api(project(":waltid-libraries:crypto:waltid-crypto2"))
 
             implementation(identityLibs.kotlinx.coroutines.core)
+            implementation(identityLibs.okio)
         }
         commonTest.dependencies {
             implementation(identityLibs.kotlinx.serialization.json)

@@ -51,7 +51,7 @@ kotlinx-io = "0.9.1"
 # Logging
 kotlinlogging = "8.0.4"
 klogging = "0.11.8"
-slf4j-simple = "2.0.18"
+slf4j-simple = "2.0.20"
 
 # Misc
 cache4k = "0.14.0"
@@ -97,15 +97,15 @@ kedis = "0.0.12"
 # One Bouncy Castle flavour for the whole repo: the mainline jdk18on line. The lts8on line (2.7x) publishes the
 # same org.bouncycastle packages, so having both on a classpath duplicates every class - which is what broke the
 # Android device tests. jdk18on is also what Signum and web3j pull in, and it is what crypto2 needs for secp256k1.
-bouncycastle = "1.84"
-nimbus-jose = "10.9.1"
+bouncycastle = "1.86"
+nimbus-jose = "10.10"
 jose-npm = "5.10.0"
 kotlincrypto = "0.8.0"
 kotlincrypto-rand = "0.6.0"
 
 # whyoleg cryptography (multiplatform)
 whyoleg-cryptography = "0.6.0"
-tink = "1.21.0"
+tink = "1.23.0"
 
 # Persistence
 sqldelight = "2.3.2"
@@ -134,15 +134,15 @@ androidx-credentials-registry = "1.0.0-alpha05"
 androidx-credentials = "1.7.0-alpha03"
 
 # HTTP
-okio = "3.17.0"
+okio = "3.18.2"
 
 # Misc
 clikt = "5.1.0"
 smiley4-schema-kenerator = "2.7.2"
 
 # a-sit-plus signum (mobile crypto)
-signum = "3.24.0"
-supreme = "0.15.0"
+signum = "3.26.0"
+supreme = "0.16.0"
 
 # Catalog inputs and separately pinned service consumers
 versions = "0.64.0"
@@ -153,7 +153,7 @@ mordant = "3.0.2"
 clikt-testkit = "3.1.1"
 password4j = "1.8.4"
 cose-js = "0.9.0"
-multipaz = "0.100.0"
+multipaz = "0.101.0"
 sqlcipher-swift = "4.16.0"
 kotlinx-browser = "0.3"
 canonicalize-npm = "2.0.0"

@@ -5,6 +5,7 @@ import org.bouncycastle.asn1.x500.X500NameBuilder
 import org.bouncycastle.asn1.x500.style.BCStyle
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -169,9 +170,9 @@ class X500NameExtensionsTest {
     }
 
     @Test
-    fun `buildX500Name includes empty strings as values`() {
+    fun `buildX500Name preserves empty non-country attributes`() {
         val name = buildX500Name(
-            country = "",
+            country = "AT",
             commonName = "",
             stateOrProvinceName = "",
             organizationName = "",
@@ -179,7 +180,7 @@ class X500NameExtensionsTest {
         )
 
         assertEquals(
-            expected = "",
+            expected = "AT",
             actual = name.getCountryCode(),
         )
 
@@ -203,6 +204,13 @@ class X500NameExtensionsTest {
             actual = name.getLocalityName(),
         )
 
+    }
+
+    @Test
+    fun `buildX500Name rejects country attributes with invalid lengths`() {
+        listOf("", "A", "AUT", "Austria").forEach { country ->
+            assertFailsWith<IllegalArgumentException> { buildX500Name(country = country) }
+        }
     }
 
     @Test
