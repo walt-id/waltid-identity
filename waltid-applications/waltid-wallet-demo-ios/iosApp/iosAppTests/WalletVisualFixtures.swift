@@ -71,6 +71,22 @@ struct WalletVisualFixtures {
         }
     }
 
+    func nearbyReviewData() throws -> [String: String] {
+        try XCTUnwrap(object(object(root, "nearby"), "review") as? [String: String])
+    }
+
+    func nearbyCredential() throws -> Credential {
+        let value = try nearbyReviewData()
+        func field(_ name: String) throws -> String { try XCTUnwrap(value[name]) }
+        let metadata: [String: Any] = [
+            "credentialDisplay": [["name": try field("title"), "background_color": try field("backgroundColor")]],
+            "credentialClaims": [["path": [try field("namespace"), try field("element")],
+                "display": [["name": try field("label"), "locale": "en"]]]]]
+        return Credential(id: try field("credentialId"), format: "mso_mdoc", issuer: try field("issuer"), subject: nil,
+            label: try field("title"), addedAt: nil,
+            credentialDataJSON: try json([field("namespace"): [field("element"): field("value")]]), metadataJSON: try json(metadata))
+    }
+
     func nearbyQrPayload() throws -> String { try text(object(root, "nearby"), "qrPayload") }
     func partialResultStatus() throws -> String { try text(object(root, "batchOutcome"), "status") }
     func deferredCredential() throws -> DeferredCredential {

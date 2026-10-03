@@ -561,6 +561,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let client = FakeProximityWalletClient(session: session)
         let wallet = WalletViewModel(walletID: "proximity-qr-layout-fixture", walletClient: MockWalletClient(), proximityWalletClient: client)
         await wallet.readerTrustSettings.awaitPendingOperations()
+        wallet.isReady = true
         wallet.selectedTab = .present
         wallet.dismissStatus()
         let model = wallet.proximityPresentation
@@ -1410,7 +1411,8 @@ private final class FakeProximityHostActionExecutor: ProximityHostActionExecutor
 private func makeProximityCapabilities(
     bluetoothAvailable: Bool = true,
     nfcAvailable: Bool = true,
-    bluetoothRemediation: [WalletSDK.ProximityRemediationAction] = []
+    bluetoothRemediation: [WalletSDK.ProximityRemediationAction] = [],
+    unavailableMessage: String = "The selected test capability is unavailable"
 ) -> WalletSDK.ProximityCapabilities {
     func capability(
         available: Bool,
@@ -1424,7 +1426,7 @@ private func makeProximityCapabilities(
                 WalletSDK.ProximityError(
                     category: .capability,
                     code: "test_unavailable",
-                    message: "The selected test capability is unavailable",
+                    message: unavailableMessage,
                     recovery: remediation.isEmpty ? .none : .retryPrerequisites
                 ),
                 remediationActions: remediation
@@ -1520,5 +1522,54 @@ func makeWalletVisualProximityModel(qrPayload: String) async throws -> WalletVie
     try await waitUntil { client.startCount == 1 }
     await session.emit(.engagementReady([.qr(payload: qrPayload)]))
     try await waitUntil { wallet.proximityPresentation.qrPayload == qrPayload }
+    return wallet
+}
+
+@MainActor
+func makeWalletVisualProximityState(_ kind: String) async throws -> WalletViewModel {
+    let fixtures = try WalletVisualFixtures()
+    let fields = try fixtures.nearbyReviewData()
+    func text(_ key: String) throws -> String { try XCTUnwrap(fields[key]) }
+    let review = WalletSDK.ProximityReview(reviewID: try .init(value: text("id")), exchange: 1,
+        documents: [.init(requestIndex: 0, documentType: try text("docType"), credentialOptions: [
+            .init(credentialID: try text("credentialId"), label: try text("title"), issuer: try text("issuer"),
+                validUntil: Date(timeIntervalSince1970: 1_893_456_000), deviceAuthentication: .signature,
+                requestedElements: [.init(namespace: try text("namespace"), elementIdentifier: try text("element"),
+                    intentToRetain: true, satisfiesRequestedElements: [])])])],
+        readerAuthentication: [.init(scope: .wholeRequest, authenticationIndex: 0,
+            outcome: .valid(try .init(state: .trusted, certificatePath: .valid, displayName: text("reader"))))],
+        readerAuthenticationSummary: .trusted, useCases: [], applicationAuthorizations: [])
+    let session = FakeProximitySession()
+    let client = FakeProximityWalletClient(session: session, capabilityResults: [kind == "permission"
+        ? makeProximityCapabilities(bluetoothAvailable: false, nfcAvailable: false,
+            bluetoothRemediation: [.requestBluetoothPermission], unavailableMessage: try text("permissionMessage"))
+        : makeProximityCapabilities()])
+    let wallet = WalletViewModel(walletID: "visual-nearby-\(kind)", signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(),
+        walletClient: MockWalletClient(), proximityWalletClient: client,
+        readerTrustSettingsPersistence: InMemoryDemoReaderTrustSettingsPersistence(),
+        identityDocumentRegistrationUpdate: {}, pinStore: InMemoryDemoPinStore())
+    await wallet.readerTrustSettings.awaitPendingOperations()
+    wallet.isReady = true
+    wallet.statusMessage = ""
+    wallet.selectedTab = .present
+    wallet.credentials = [try fixtures.nearbyCredential()]
+    wallet.proximityPresentation.start()
+    if kind == "permission" {
+        try await waitUntil { wallet.proximityPresentation.sessionState != nil }
+        return wallet
+    }
+    try await waitUntil { client.startCount == 1 }
+    let state: WalletSDK.ProximityState
+    switch kind {
+    case "review": state = .reviewRequired(review)
+    case "expired": state = .failed(.init(category: .policy, code: "prepared_sharing_expired",
+        message: try text("expiredMessage"), recovery: .startNewSession))
+    case "receipt": state = .completed(exchanges: 1, declined: false, receipt: .init(review: review,
+        submission: try fixtureSubmission(review), approvalTiming: .beforeConnection,
+        completedAt: try XCTUnwrap(ISO8601DateFormatter().date(from: text("completedAt")))))
+    default: throw NSError(domain: "Unknown nearby fixture", code: 1)
+    }
+    await session.emit(state)
+    try await waitUntil { wallet.proximityPresentation.sessionState == state }
     return wallet
 }

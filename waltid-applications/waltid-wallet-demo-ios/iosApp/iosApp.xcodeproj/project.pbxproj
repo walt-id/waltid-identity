@@ -76,6 +76,14 @@
 		BB7491000000000000000001 /* NearbySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7490000000000000000001 /* NearbySettingsView.swift */; };
 		BB7491000000000000000002 /* ReaderTrustSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7490000000000000000002 /* ReaderTrustSettingsView.swift */; };
 		BB7491000000000000000003 /* TechnicalDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7490000000000000000003 /* TechnicalDetailsView.swift */; };
+		C25CC53977899FB4A1DFD52E /* ProximityPrerequisiteContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19080F553F8485E5BD797FE1 /* ProximityPrerequisiteContent.swift */; };
+		840A9F1B3D9706FE56A2F3F9 /* ProximityApprovalModeChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = C73BE1161BA532D3A322799E /* ProximityApprovalModeChoice.swift */; };
+		277493BB2FDE6B1E628622AA /* ProximityEngagementContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31D33F9BD6356B163E1118E9 /* ProximityEngagementContent.swift */; };
+		E32C62D962B0665227EEEE3E /* ProximityReviewContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8EDF0D7C39EB50782930334 /* ProximityReviewContent.swift */; };
+		523F6150528C5157B0C9AE37 /* ProximitySharingSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FBAB08965095A5D534750E /* ProximitySharingSummary.swift */; };
+		F2CD24C2B36AF60F7B2A6301 /* ProximityReaderDetails.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB6839D9409AAF08CC1AC680 /* ProximityReaderDetails.swift */; };
+		1CACFE637B0E59CF2642A5BF /* ProximityStatusContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A8122C18703A339DAD642D0 /* ProximityStatusContent.swift */; };
+		ACE2F185C850D1F871BA51F3 /* ProximityScreenPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43D2995C89B11C6E173D6BE7 /* ProximityScreenPolicy.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -210,6 +218,14 @@
 		BB7490000000000000000001 /* NearbySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbySettingsView.swift; sourceTree = "<group>"; };
 		BB7490000000000000000002 /* ReaderTrustSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderTrustSettingsView.swift; sourceTree = "<group>"; };
 		BB7490000000000000000003 /* TechnicalDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TechnicalDetailsView.swift; sourceTree = "<group>"; };
+		19080F553F8485E5BD797FE1 /* ProximityPrerequisiteContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityPrerequisiteContent.swift; sourceTree = "<group>"; };
+		C73BE1161BA532D3A322799E /* ProximityApprovalModeChoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityApprovalModeChoice.swift; sourceTree = "<group>"; };
+		31D33F9BD6356B163E1118E9 /* ProximityEngagementContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityEngagementContent.swift; sourceTree = "<group>"; };
+		D8EDF0D7C39EB50782930334 /* ProximityReviewContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityReviewContent.swift; sourceTree = "<group>"; };
+		C0FBAB08965095A5D534750E /* ProximitySharingSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximitySharingSummary.swift; sourceTree = "<group>"; };
+		BB6839D9409AAF08CC1AC680 /* ProximityReaderDetails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityReaderDetails.swift; sourceTree = "<group>"; };
+		7A8122C18703A339DAD642D0 /* ProximityStatusContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityStatusContent.swift; sourceTree = "<group>"; };
+		43D2995C89B11C6E173D6BE7 /* ProximityScreenPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityScreenPolicy.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -313,6 +329,14 @@
 				13330004AAAA000000000003 /* PresentationErrorView.swift */,
 				13330004AAAA000000000002 /* WalletExternalFlowStatus.swift */,
 				A1000461AAAA000000000061 /* ProximityPresentationView.swift */,
+				43D2995C89B11C6E173D6BE7 /* ProximityScreenPolicy.swift */,
+				7A8122C18703A339DAD642D0 /* ProximityStatusContent.swift */,
+				BB6839D9409AAF08CC1AC680 /* ProximityReaderDetails.swift */,
+				C0FBAB08965095A5D534750E /* ProximitySharingSummary.swift */,
+				D8EDF0D7C39EB50782930334 /* ProximityReviewContent.swift */,
+				31D33F9BD6356B163E1118E9 /* ProximityEngagementContent.swift */,
+				C73BE1161BA532D3A322799E /* ProximityApprovalModeChoice.swift */,
+				19080F553F8485E5BD797FE1 /* ProximityPrerequisiteContent.swift */,
 				13330031AAAA000000000001 /* SigningKeySetupContent.swift */,
                 A74900000000000000000004 /* WalletIdentityView.swift */,
 				A1000422AAAA000000000022 /* CredentialsTabView.swift */,
@@ -734,6 +758,14 @@
 				A1000003AAAA000100000003 /* ReceiveView.swift in Sources */,
 				A1000004AAAA000100000004 /* PresentView.swift in Sources */,
 				A1000461AAAA000100000061 /* ProximityPresentationView.swift in Sources */,
+				ACE2F185C850D1F871BA51F3 /* ProximityScreenPolicy.swift in Sources */,
+				1CACFE637B0E59CF2642A5BF /* ProximityStatusContent.swift in Sources */,
+				F2CD24C2B36AF60F7B2A6301 /* ProximityReaderDetails.swift in Sources */,
+				523F6150528C5157B0C9AE37 /* ProximitySharingSummary.swift in Sources */,
+				E32C62D962B0665227EEEE3E /* ProximityReviewContent.swift in Sources */,
+				277493BB2FDE6B1E628622AA /* ProximityEngagementContent.swift in Sources */,
+				840A9F1B3D9706FE56A2F3F9 /* ProximityApprovalModeChoice.swift in Sources */,
+				C25CC53977899FB4A1DFD52E /* ProximityPrerequisiteContent.swift in Sources */,
 				A1000006AAAA000100000006 /* StatusBannerView.swift in Sources */,
 				A1000425AAAA000100000025 /* UrlEditor.swift in Sources */,
 				13330002AAAA000100000002 /* ScanCodeButton.swift in Sources */,
