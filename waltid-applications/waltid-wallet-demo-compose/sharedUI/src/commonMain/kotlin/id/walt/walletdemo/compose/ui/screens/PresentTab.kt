@@ -10,7 +10,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,11 +26,14 @@ import id.walt.walletdemo.compose.logic.presentationPreviewActionEnabled
 import id.walt.walletdemo.compose.logic.presentationReviewEnabled
 import id.walt.walletdemo.compose.logic.presentationUrlEntryEnabled
 import id.walt.walletdemo.compose.logic.toSharingReview
+import id.walt.walletdemo.compose.logic.isError
+import id.walt.walletdemo.compose.logic.statusText
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.PresentationErrorSection
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
+import id.walt.walletdemo.compose.ui.components.SettingsNotice
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -50,6 +52,7 @@ internal fun PresentTab(
     onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
+    fillViewport: Boolean = true,
 ) {
     val credentials = (state.session as? WalletSessionState.Ready)?.credentials.orEmpty()
     val preview = state.presentationPreview
@@ -68,6 +71,7 @@ internal fun PresentTab(
 
     if (preview != null) {
         ReviewScaffold(
+            fillViewport = fillViewport,
             modifier = modifier.testTag(WalletUiTestTags.PresentTabContent),
             actions = {
                 SharingActionsRow(
@@ -80,6 +84,9 @@ internal fun PresentTab(
                 )
             },
         ) {
+            if (state.externalFlow != null && state.isError) {
+                SettingsNotice(state.statusText, error = true, modifier = Modifier.testTag(WalletUiTestTags.Status))
+            }
             SharingReviewSection(
                 paymentReview = state.paymentReview,
                 review = preview.toSharingReview(),
@@ -97,6 +104,14 @@ internal fun PresentTab(
                 showActions = false,
             )
         }
+        return
+    }
+
+    if (state.externalFlow != null) {
+        if (error != null) ReviewScaffold(modifier, fillViewport) {
+            PresentationErrorSection(error, enabled = state.presentationReviewEnabled,
+                onNotifyVerifier = onReject, onDismiss = onCancel)
+        } else ExternalFlowStatus(state, onRetry = onPreview, modifier = modifier, fillViewport = fillViewport)
         return
     }
 
@@ -141,13 +156,14 @@ internal fun PresentTab(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    OutlinedButton(
-                        onClick = start,
-                        enabled = credentials.isNotEmpty() && state.presentationUrlEntryEnabled,
-                        modifier = Modifier.testTag(WalletUiTestTags.ProximityStartButton),
-                    ) {
-                        Text(stringResource(Res.string.proximity_in_person_title))
-                    }
+                    id.walt.walletdemo.compose.ui.components.WalletActions(
+                        id.walt.walletdemo.compose.ui.components.WalletAction(
+                            stringResource(Res.string.proximity_in_person_title), start,
+                            enabled = credentials.isNotEmpty() && state.presentationUrlEntryEnabled,
+                            testTag = WalletUiTestTags.ProximityStartButton,
+                            icon = id.walt.walletdemo.compose.ui.components.WalletSymbol.Nearby,
+                        ),
+                    )
                 }
             }
         }

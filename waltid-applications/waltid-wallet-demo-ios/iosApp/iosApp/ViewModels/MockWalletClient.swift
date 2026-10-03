@@ -1,5 +1,9 @@
 import Foundation
+#if DEBUG
+@testable import WalletSDK
+#else
 import WalletSDK
+#endif
 
 actor MockWalletClient: WalletClient {
     enum VerifierStyle {
@@ -11,6 +15,7 @@ actor MockWalletClient: WalletClient {
     private let operationDelayNanoseconds: UInt64
     private let verifierStyle: VerifierStyle
     private let duplicatePresentationOptions: Bool
+    private let emptyPresentationOptions: Bool
     private let transactionCodeRequired: Bool
     private let issuanceGrant: IssuanceGrant
     private let presentationPreviewResultOverride: PresentationPreviewResult?
@@ -31,6 +36,7 @@ actor MockWalletClient: WalletClient {
         operationDelayMilliseconds: UInt64 = 0,
         verifierStyle: VerifierStyle = .named,
         duplicatePresentationOptions: Bool = false,
+        emptyPresentationOptions: Bool = false,
         transactionCodeRequired: Bool = false,
         issuanceGrant: IssuanceGrant = .preAuthorizedCode,
         presentationPreviewResult: PresentationPreviewResult? = nil,
@@ -47,6 +53,7 @@ actor MockWalletClient: WalletClient {
         self.operationDelayNanoseconds = operationDelayMilliseconds * 1_000_000
         self.verifierStyle = verifierStyle
         self.duplicatePresentationOptions = duplicatePresentationOptions
+        self.emptyPresentationOptions = emptyPresentationOptions
         self.transactionCodeRequired = transactionCodeRequired
         self.issuanceGrant = issuanceGrant
         self.presentationPreviewResultOverride = presentationPreviewResult
@@ -59,6 +66,21 @@ actor MockWalletClient: WalletClient {
         self.deleteLocalDataDelayNanoseconds = deleteLocalDataDelayMilliseconds * 1_000_000
         self.deleteLocalDataError = deleteLocalDataError
     }
+
+    #if DEBUG
+    nonisolated static func uiTestPaymentConsent(_ scenario: String?) async throws -> PaymentConsent? {
+        guard let scenario else { return nil }
+        if scenario == "blocked" { throw WalletError.internalFailure("Required issuer payment labels are missing.") }
+        return PaymentConsent(revision: "ui-test-payment", locale: "de", title: "Zahlung prüfen", securityHint: nil,
+            affirmativeAction: "Zahlen", denialAction: "Ablehnen", requiresUnsignedRequestWarning: scenario == "unsigned",
+            fields: [
+                .init(label: "Betrag", description: nil, value: "11.56 EUR", placement: .prominent),
+                .init(label: "Empfänger", description: nil, value: "Super Store", placement: .main),
+                .init(label: "Transaktions-ID", description: nil, value: "txn-1", placement: .details),
+                .init(label: "Omitted", description: nil, value: "bound-but-hidden", placement: .omitted),
+            ])
+    }
+    #endif
 
     private(set) var bootstrapCalls = 0
 
@@ -154,7 +176,7 @@ actor MockWalletClient: WalletClient {
             PresentationPreview(
                 previewHandle: PresentationPreviewHandle(value: "mock-presentation-preview"),
                 request: previewRequestInfo,
-                credentialOptions: duplicatePresentationOptions ? duplicateOptions : [defaultOption],
+                credentialOptions: emptyPresentationOptions ? [] : (duplicatePresentationOptions ? duplicateOptions : [defaultOption]),
                 credentialRequirements: [
                     PresentationCredentialRequirement(options: [duplicatePresentationOptions ? ["identity", "age"] : ["pid"]])
                 ]

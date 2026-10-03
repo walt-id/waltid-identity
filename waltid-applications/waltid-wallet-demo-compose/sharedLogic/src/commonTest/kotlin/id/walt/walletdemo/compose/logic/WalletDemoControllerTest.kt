@@ -1401,6 +1401,64 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun continuationRefreshUsesRetainedStateAndResumeKeepsEarlierSavedIds() = runTest {
+        val pending = WalletDemoDeferredCredential("pending", "pid", 5)
+        val metadata = """{"credentialDisplay":[{"name":"Resident card"}]}"""
+        val retained = pending.copy(status = WalletDemoContinuationStatus.AwaitingLocalSave, displayMetadataJson = metadata)
+        val wallet = FakeDemoWallet(preAuthorizedOutcome = WalletDemoIssuanceOutcome.Deferred(listOf("cred-1"), listOf(pending)),
+            deferredOutcome = WalletDemoIssuanceOutcome.Stored(listOf("cred-1", "cred-2")))
+        val controller = unlockedControllerWith(wallet, this)
+        controller.updateOfferUrl("openid-credential-offer://partial")
+        controller.previewOffer()
+        runCurrent()
+        wallet.pendingCredentials = listOf(retained)
+        wallet.credentials = listOf(sampleCredential)
+        controller.acceptOffer()
+        runCurrent()
+        assertEquals(listOf(retained), controller.state.value.deferredCredentials)
+        assertEquals(setOf("pending"), controller.state.value.issuanceReceipt?.pendingIds)
+        wallet.credentials += sampleCredential.copy(id = "cred-2")
+        controller.resumeDeferredCredential("pending")
+        runCurrent()
+        assertEquals(listOf("cred-1", "cred-2"), controller.state.value.lastReceivedCredentialIds)
+        assertEquals(emptySet(), controller.state.value.issuanceReceipt?.pendingIds)
+    }
+
+    @Test
+    fun uncertainContinuationCannotResumeAndRefreshOnlyReadsLocalState() = runTest {
+        for (status in listOf(WalletDemoContinuationStatus.RemoteOutcomeUncertain, WalletDemoContinuationStatus.StorageOutcomeUncertain)) {
+            val pending = WalletDemoDeferredCredential("pending", "pid", null, status = status)
+            val wallet = FakeDemoWallet(pendingCredentials = listOf(pending))
+            val controller = unlockedControllerWith(wallet, this)
+            controller.resumeDeferredCredential(pending.id)
+            runCurrent()
+            assertTrue(wallet.resumedDeferredCredentialIds.isEmpty())
+            wallet.pendingCredentials = listOf(pending.copy(status = WalletDemoContinuationStatus.AwaitingLocalSave))
+            controller.refreshIssuanceStatus()
+            runCurrent()
+            assertEquals(WalletDemoContinuationStatus.AwaitingLocalSave, controller.state.value.deferredCredentials.single().status)
+            assertTrue(wallet.resumedDeferredCredentialIds.isEmpty())
+        }
+    }
+
+    @Test
+    fun failedStatusReadPreservesUncertainOutcomeAndDoesNotEnableASecondResume() = runTest {
+        val pending = WalletDemoDeferredCredential("pending", "pid", null)
+        val wallet = FakeDemoWallet(pendingCredentials = listOf(pending),
+            deferredOutcome = WalletDemoIssuanceOutcome.Failed("Response lost", deferredCredentials = listOf(pending),
+                kind = WalletDemoIssuanceFailureKind.RemoteOutcomeUncertain))
+        val controller = unlockedControllerWith(wallet, this)
+        wallet.listDeferredError = IllegalStateException("Status unavailable")
+        controller.resumeDeferredCredential(pending.id)
+        runCurrent()
+        assertEquals(WalletDemoContinuationStatus.RemoteOutcomeUncertain, controller.state.value.deferredCredentials.single().status)
+        controller.resumeDeferredCredential(pending.id)
+        runCurrent()
+        assertEquals(listOf(pending.id), wallet.resumedDeferredCredentialIds)
+        assertTrue(controller.state.value.issuanceReceipt?.problem?.message == "Response lost")
+    }
+
+    @Test
     fun deferredFailureReplacesHandleWithLatestIntervalAndPreservesStoredProgress() = runTest {
         val pending = WalletDemoDeferredCredential("pending", "pid", 5)
         val updated = pending.copy(intervalSeconds = 15)
@@ -2283,6 +2341,109 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun externalEntryCannotReplaceAnotherMobileFlow() = runTest {
+        var available = false
+        val controller = WalletDemoController(FakeDemoWallet(), InMemoryDemoPinStore(),
+            canOpenExternalRequest = { available }, scope = backgroundScope, dispatcher = StandardTestDispatcher(testScheduler))
+        controller.handleDeepLink("openid4vp://external")
+        assertEquals(null, controller.state.value.externalFlow)
+        assertTrue(controller.state.value.incomingLinkNotice != null)
+        available = true
+        controller.dismissIncomingLinkNotice()
+        controller.handleDeepLink("openid4vp://external")
+        assertTrue(controller.state.value.externalFlow is WalletExternalFlow.Pending)
+    }
+
+    @Test
+    fun callbackWithoutOriginalSessionExplainsRecoveryWithoutReplayingAnOffer() = runTest {
+        val wallet = FakeDemoWallet()
+        val controller = controllerWith(wallet, this)
+        controller.handleDeepLink("openid://callback?code=orphan&state=lost")
+        assertTrue(controller.state.value.externalFlow is WalletExternalFlow.UnavailableCallback)
+        controller.updatePin("123456")
+        controller.updatePinConfirmation("123456")
+        controller.submitPin()
+        runCurrent()
+        controller.prepareExternalFlow()
+        runCurrent()
+        assertEquals(0, wallet.startIssuanceCalls)
+        assertEquals(0, wallet.receiveCalls)
+        assertTrue(controller.closeExternalFlow())
+    }
+
+    @Test
+    fun externalOfferWaitsForUnlockPreparesOnceAndKeepsReceiptUntilClosed() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val controller = controllerWith(wallet, this)
+        val url = "openid-credential-offer://external"
+        controller.handleDeepLink(url)
+        controller.prepareExternalFlow()
+        runCurrent()
+        assertEquals(0, wallet.startIssuanceCalls)
+        assertTrue(controller.state.value.externalFlow is WalletExternalFlow.Pending)
+        controller.updatePin("123456")
+        controller.updatePinConfirmation("123456")
+        controller.submitPin()
+        runCurrent()
+        repeat(2) { controller.prepareExternalFlow(); runCurrent() }
+        controller.handleDeepLink(url)
+        controller.prepareExternalFlow()
+        runCurrent()
+        assertEquals(1, wallet.startIssuanceCalls)
+        assertEquals(0, wallet.receiveCalls)
+        controller.acceptOffer()
+        runCurrent()
+        assertEquals(1, wallet.receiveCalls)
+        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
+        assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
+        assertTrue(controller.state.value.issuanceReceipt != null)
+        assertTrue(controller.closeExternalFlow())
+        assertFalse(controller.closeExternalFlow())
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
+    }
+
+    @Test
+    fun incomingLinkAndDismissCannotInterruptReceiving() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential), receiveGate = gate)
+        val controller = unlockedControllerWith(wallet, this)
+        val url = "openid-credential-offer://external"
+        controller.handleDeepLink(url)
+        controller.prepareExternalFlow()
+        runCurrent()
+        controller.acceptOffer()
+        runCurrent()
+        assertEquals(WalletOperationState.Receiving, controller.state.value.operation)
+        assertFalse(controller.closeExternalFlow())
+        controller.handleDeepLink("openid4vp://replacement")
+        assertEquals(url, controller.state.value.externalFlow?.url)
+        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
+        assertTrue(controller.state.value.incomingLinkNotice != null)
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(1, wallet.receiveCalls)
+        assertTrue(controller.state.value.issuanceReceipt != null)
+        assertTrue(controller.closeExternalFlow())
+    }
+
+    @Test
+    fun closingExternalPreviewDiscardsLateResolutionWithoutReceiving() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val wallet = FakeDemoWallet(startIssuanceGate = gate, ignoreStartIssuanceCancellation = true)
+        val controller = unlockedControllerWith(wallet, this)
+        controller.handleDeepLink("openid-credential-offer://external")
+        controller.prepareExternalFlow()
+        runCurrent()
+        assertTrue(controller.closeExternalFlow())
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(null, controller.state.value.offerPreview)
+        assertEquals(null, controller.state.value.externalFlow)
+        assertEquals(0, wallet.receiveCalls)
+        assertEquals(listOf("issuance-session"), wallet.cancelledIssuanceSessionIds)
+    }
+
+    @Test
     fun handleDeepLinkRoutesCredentialOffersAndPresentationRequests() = runTest {
         val controller = controllerWith(FakeDemoWallet(), this)
         val offerUrl = "openid-credential-offer://example"
@@ -2376,8 +2537,9 @@ class WalletDemoControllerTest {
 
         controller.handleDeepLink(presentationUrl)
 
-        assertEquals(receiveResetKeyBeforePresentationLink + 2, controller.state.value.receiveNavigationResetKey)
-        assertEquals(presentationResetKeyBeforePresentationLink + 2, controller.state.value.presentationNavigationResetKey)
+        // Duplicate delivery preserves the same external request and its review.
+        assertEquals(receiveResetKeyBeforePresentationLink + 1, controller.state.value.receiveNavigationResetKey)
+        assertEquals(presentationResetKeyBeforePresentationLink + 1, controller.state.value.presentationNavigationResetKey)
     }
 
     @Test
@@ -2761,6 +2923,7 @@ private class FakeDemoWallet(
     ),
     private val presentationError: WalletDemoPresentationError? = null,
 ) : DemoWallet {
+    var listDeferredError: Throwable? = null
     var bootstrapCalls = 0
     var bootstrapError: Throwable? = null
     var reportedSigningProtection: WalletDemoSigningProtection? = null
@@ -2868,7 +3031,10 @@ private class FakeDemoWallet(
     }
 
 
-    override suspend fun listDeferredIssuance() = pendingCredentials
+    override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> {
+        listDeferredError?.let { throw it }
+        return pendingCredentials
+    }
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome {
         resumedDeferredCredentialIds += deferredCredentialId

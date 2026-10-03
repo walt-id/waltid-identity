@@ -8,42 +8,22 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.*
-import kotlinx.coroutines.CancellationException
-
-@Composable
-internal fun rememberPaymentReview(
-    review: WalletDemoSharingReview,
-    selection: WalletDemoSharingSelection,
-    prepare: (suspend (WalletDemoSharingSelection) -> WalletDemoPaymentConsent?)?,
-): WalletDemoPaymentReview {
-    val latestPrepare by rememberUpdatedState(prepare)
-    val state = remember(review, selection.credentials, selection.disclosures) {
-        mutableStateOf<WalletDemoPaymentReview>(if (prepare == null) WalletDemoPaymentReview.NotRequired else WalletDemoPaymentReview.Loading)
-    }
-    LaunchedEffect(state) {
-        val resolve = latestPrepare ?: return@LaunchedEffect
-        if (!review.hasCompleteCredentialSelection(selection.credentials)) return@LaunchedEffect
-        state.value = try {
-            resolve(selection)?.let { WalletDemoPaymentReview.Ready(it) } ?: WalletDemoPaymentReview.NotRequired
-        } catch (cause: CancellationException) { throw cause
-        } catch (cause: Exception) { WalletDemoPaymentReview.Blocked(cause.message ?: "Payment instructions are unavailable.") }
-    }
-    return state.value
-}
+import id.walt.walletdemo.compose.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun PaymentConsentSection(review: WalletDemoPaymentReview) {
     when (review) {
         WalletDemoPaymentReview.NotRequired -> Unit
-        WalletDemoPaymentReview.Loading -> Text("Loading payment instructions…", modifier = Modifier.testTag("payment-consent-loading"))
+        WalletDemoPaymentReview.Loading -> Text(stringResource(Res.string.payment_loading), modifier = Modifier.testTag("payment-consent-loading"))
         is WalletDemoPaymentReview.Blocked -> Text(review.message, color = MaterialTheme.colorScheme.error,
             modifier = Modifier.testTag("payment-consent-blocked"))
         is WalletDemoPaymentReview.Ready -> {
             val consent = review.consent
             Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.testTag("payment-consent")) {
-                Text(consent.title ?: "Review payment", style = MaterialTheme.typography.headlineSmall)
+                Text(consent.title ?: stringResource(Res.string.payment_review_title), style = MaterialTheme.typography.headlineSmall)
                 if (consent.requiresUnsignedRequestWarning) Text(
-                    "This payment request is unsigned. Confirm only if you recognize the requester and approve the payment below.",
+                    stringResource(Res.string.payment_unsigned_warning),
                     color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("payment-unsigned-warning"),
                 )
                 consent.securityHint?.let { Text(it, modifier = Modifier.testTag("payment-security-hint")) }
@@ -57,7 +37,7 @@ internal fun PaymentConsentSection(review: WalletDemoPaymentReview) {
                 if (details.isNotEmpty()) {
                     var expanded by remember(consent.revision) { mutableStateOf(false) }
                     TextButton(onClick = { expanded = !expanded }, modifier = Modifier.testTag("payment-details-toggle")) {
-                        Text(if (expanded) "Hide payment details" else "Show payment details")
+                        Text(stringResource(if (expanded) Res.string.payment_hide_details else Res.string.payment_show_details))
                     }
                     if (expanded) details.forEach { PaymentField(it, false) }
                 }

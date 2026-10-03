@@ -1,4 +1,10 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package id.walt.walletdemo.compose.ui
+
+import kotlinx.cinterop.toKString
+
+import id.walt.walletdemo.compose.logic.WalletDemoContinuationStatus
 
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.InternalComposeUiApi
@@ -9,6 +15,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import io.github.takahirom.roborazzi.captureRoboImage
@@ -17,6 +26,59 @@ import kotlin.test.Test
 /** Compose iOS/Skia content on an iOS simulator; does not imitate a UIKit provider container. */
 @OptIn(ExperimentalTestApi::class, ExperimentalRoborazziApi::class, InternalComposeUiApi::class)
 class WalletVisualIosTest {
+    private var previousTimeZone: String? = null
+    @kotlin.test.BeforeTest fun pinTimeZone() {
+        previousTimeZone = platform.posix.getenv("TZ")?.toKString()
+        platform.posix.setenv("TZ", "UTC", 1)
+        platform.posix.tzset()
+    }
+    @kotlin.test.AfterTest fun restoreTimeZone() {
+        previousTimeZone?.let { platform.posix.setenv("TZ", it, 1) } ?: platform.posix.unsetenv("TZ")
+        platform.posix.tzset()
+    }
+
+    @Test fun controls() = scenario { controls() }
+    @Test fun controlsRtl() = scenario { controls(rtl = true) }
+
+    @Test fun settingsReader() = scenario { settingsRoot("reader") }
+    @Test fun settingsReaderRequired() = scenario { settingsRoot("reader_required") }
+    @Test fun readerTrustImport() = scenario { readerTrustImport() }
+    @Test fun settingsDcApiEnabled() = scenario { settingsRoot("dc_api") }
+    @Test fun settingsDcApiDisabled() = scenario { settingsRoot("dc_api", reviewEnabled = false) }
+    @Test fun settingsNearby() = scenario { settingsRoot("nearby") }
+    @Test fun settingsConnection() = scenario { settingsRoot("connection") }
+    @Test fun settingsTechnical() = scenario { settingsRoot("technical") }
+    @Test fun accountEmpty() = scenario { account("empty") }
+    @Test fun accountBusy() = scenario { account("busy") }
+    @Test fun accountExpired() = scenario { account("expired") }
+    @Test fun nearbyPermission() = scenario { nearbyState("permission") }
+    @Test fun nearbyReview() = scenario(size = Size(320f, 568f), fontScale = 1.5f) { nearbyState("review") }
+    @Test fun nearbyExpired() = scenario { nearbyState("expired") }
+    @Test fun nearbyReceipt() = scenario { nearbyState("receipt") }
+    @Test fun externalReceiving() = scenario() { externalReceiving() }
+    @Test fun externalUnavailableCallback() = scenario() { externalReceiving(unavailable = true) }
+    @Test fun providerSharingReview() = scenario { providerSharingReview() }
+    @Test
+    fun compactProviderSharingReview() = scenario(size = Size(320f, 568f), dark = true, fontScale = 1.5f) { providerSharingReview(compact = true) }
+    @Test fun providerOfferReview() = scenario { providerOfferReview() }
+    @Test fun paymentSheet() = scenario { paymentReview(sheet = true) }
+    @Test fun paymentLoading() = scenario { paymentState(blocked = false) }
+    @Test fun paymentBlocked() = scenario { paymentState(blocked = true) }
+    @Test fun paymentLocalizedCompact() = scenario(size = Size(320f, 568f), fontScale = 1.5f) { localizedPayment() }
+
+
+    @Test fun providerReceivingPreparing() = scenario() { providerReceivingState("preparing") }
+    @Test fun providerReceivingAuthorization() = scenario() { providerReceivingState("authorization") }
+    @Test fun providerReceivingFailure() = scenario() { providerReceivingState("failure") }
+    @Test fun providerReceivingPartialResult() = scenario() { providerReceivingState("partial_result") }
+    @Test fun providerPreparing() = scenario() { providerSharingStatus() }
+    @Test fun providerFailure() = scenario() { providerSharingStatus(failure = true) }
+
+    @Test fun keySummary() = scenario { keySetup("summary") }
+    @Test fun keyRecovery() = scenario { keySetup("recovery") }
+    @Test fun keyStorage() = scenario { keySetup("storage") }
+    @Test fun keyApproval() = scenario { keySetup("approval") }
+
     @Test fun pinSetup() = scenario { pin("setup") }
     @Test fun pinMismatch() = scenario { pin("mismatch") }
     @Test fun pinBiometrics() = scenario { pin("biometrics_enabled") }
@@ -57,13 +119,25 @@ class WalletVisualIosTest {
     @Test
     fun partialBatchResult() = scenario { partialBatchResult() }
 
+    @Test fun localSaveResult() = scenario { partialBatchResult(WalletDemoContinuationStatus.AwaitingLocalSave) }
+    @Test fun remoteUncertainResult() = scenario { partialBatchResult(WalletDemoContinuationStatus.RemoteOutcomeUncertain) }
+    @Test fun storageUncertainResult() = scenario { partialBatchResult(WalletDemoContinuationStatus.StorageOutcomeUncertain) }
+    @Test fun partialFailureResult() = scenario { partialBatchResult(failure = true) }
+
+
     @Test
     fun nearbyReady() = scenario { nearbyReady() }
 
     private fun scenario(size: Size = Size(393f, 852f), dark: Boolean = false, fontScale: Float = 1f,
                          block: WalletVisualScenarios.() -> Unit) = runSkikoComposeUiTest(size = size) {
         WalletVisualScenarios(this,
-            captureImage = { id -> onRoot().captureRoboImage(this, filePath = "compose-ios-phone-en-light/$id.png") },
+            captureImage = { id ->
+                val root = if (id.endsWith(".unsigned_confirmation"))
+                onNode(isRoot() and hasAnyDescendant(hasTestTag("payment-unsigned-confirm")))
+            else if (id.startsWith("external.") || id.startsWith("sharing.provider") || id.startsWith("receiving.provider") || id.startsWith("payment.sheet"))
+                    onNode(isRoot() and hasAnyDescendant(hasTestTag("wallet.review.sheet"))) else onRoot()
+                root.captureRoboImage(this, filePath = "compose-ios-phone-en-light/$id.png")
+            },
             // Headless Skia tests have no UIKit window from which to read the display theme.
             platformTheme = { content -> CompositionLocalProvider(
                 LocalSystemTheme provides if (dark) SystemTheme.Dark else SystemTheme.Light,

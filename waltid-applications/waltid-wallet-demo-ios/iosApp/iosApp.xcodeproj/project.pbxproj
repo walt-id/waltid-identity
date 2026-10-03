@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		13330004AAAA000100000003 /* PresentationErrorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330004AAAA000000000003 /* PresentationErrorView.swift */; };
+		13330004AAAA000100000002 /* WalletExternalFlowStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330004AAAA000000000002 /* WalletExternalFlowStatus.swift */; };
+		13330004AAAA000100000001 /* WalletExternalFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330004AAAA000000000001 /* WalletExternalFlow.swift */; };
+		13330031AAAA000100000001 /* SigningKeySetupContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330031AAAA000000000001 /* SigningKeySetupContent.swift */; };
+		13330030AAAA000100000001 /* WalletIdentityScreenModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330030AAAA000000000001 /* WalletIdentityScreenModel.swift */; };
 		A13330000000000000000001 /* SnapshotTesting in Frameworks */ = {isa = PBXBuildFile; productRef = A13330000000000000000002 /* SnapshotTesting */; };
 		A14440000000000000000003 /* TestHelpers.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A74900000000000000000010 /* TestHelpers.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -71,6 +76,16 @@
 		BB7491000000000000000001 /* NearbySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7490000000000000000001 /* NearbySettingsView.swift */; };
 		BB7491000000000000000002 /* ReaderTrustSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7490000000000000000002 /* ReaderTrustSettingsView.swift */; };
 		BB7491000000000000000003 /* TechnicalDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7490000000000000000003 /* TechnicalDetailsView.swift */; };
+		C25CC53977899FB4A1DFD52E /* ProximityPrerequisiteContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19080F553F8485E5BD797FE1 /* ProximityPrerequisiteContent.swift */; };
+		840A9F1B3D9706FE56A2F3F9 /* ProximityApprovalModeChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = C73BE1161BA532D3A322799E /* ProximityApprovalModeChoice.swift */; };
+		277493BB2FDE6B1E628622AA /* ProximityEngagementContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31D33F9BD6356B163E1118E9 /* ProximityEngagementContent.swift */; };
+		E32C62D962B0665227EEEE3E /* ProximityReviewContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8EDF0D7C39EB50782930334 /* ProximityReviewContent.swift */; };
+		523F6150528C5157B0C9AE37 /* ProximitySharingSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FBAB08965095A5D534750E /* ProximitySharingSummary.swift */; };
+		F2CD24C2B36AF60F7B2A6301 /* ProximityReaderDetails.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB6839D9409AAF08CC1AC680 /* ProximityReaderDetails.swift */; };
+		1CACFE637B0E59CF2642A5BF /* ProximityStatusContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A8122C18703A339DAD642D0 /* ProximityStatusContent.swift */; };
+		ACE2F185C850D1F871BA51F3 /* ProximityScreenPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43D2995C89B11C6E173D6BE7 /* ProximityScreenPolicy.swift */; };
+		800619A4865746A58B033223 /* DigitalCredentialsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 218A1C4A90404CA396529810; };
+		26A4B42DE64E46929A0EDA80 /* ReaderTrustImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCE0424B41224532B09D4962; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -148,6 +163,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		13330004AAAA000000000003 /* PresentationErrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationErrorView.swift; sourceTree = "<group>"; };
+		13330004AAAA000000000002 /* WalletExternalFlowStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletExternalFlowStatus.swift; sourceTree = "<group>"; };
+		13330004AAAA000000000001 /* WalletExternalFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletExternalFlow.swift; sourceTree = "<group>"; };
+		13330031AAAA000000000001 /* SigningKeySetupContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SigningKeySetupContent.swift; sourceTree = "<group>"; };
+		13330030AAAA000000000001 /* WalletIdentityScreenModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletIdentityScreenModel.swift; sourceTree = "<group>"; };
         A74900000000000000000004 /* WalletIdentityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletIdentityView.swift; sourceTree = "<group>"; };
 		71E100052FDAE00000000005 /* iosAppEnterpriseTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppEnterpriseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000001AAAA000000000001 /* WalletViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletViewModel.swift; sourceTree = "<group>"; };
@@ -200,6 +220,16 @@
 		BB7490000000000000000001 /* NearbySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NearbySettingsView.swift; sourceTree = "<group>"; };
 		BB7490000000000000000002 /* ReaderTrustSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderTrustSettingsView.swift; sourceTree = "<group>"; };
 		BB7490000000000000000003 /* TechnicalDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TechnicalDetailsView.swift; sourceTree = "<group>"; };
+		19080F553F8485E5BD797FE1 /* ProximityPrerequisiteContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityPrerequisiteContent.swift; sourceTree = "<group>"; };
+		C73BE1161BA532D3A322799E /* ProximityApprovalModeChoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityApprovalModeChoice.swift; sourceTree = "<group>"; };
+		31D33F9BD6356B163E1118E9 /* ProximityEngagementContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityEngagementContent.swift; sourceTree = "<group>"; };
+		D8EDF0D7C39EB50782930334 /* ProximityReviewContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityReviewContent.swift; sourceTree = "<group>"; };
+		C0FBAB08965095A5D534750E /* ProximitySharingSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximitySharingSummary.swift; sourceTree = "<group>"; };
+		BB6839D9409AAF08CC1AC680 /* ProximityReaderDetails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityReaderDetails.swift; sourceTree = "<group>"; };
+		7A8122C18703A339DAD642D0 /* ProximityStatusContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityStatusContent.swift; sourceTree = "<group>"; };
+		43D2995C89B11C6E173D6BE7 /* ProximityScreenPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityScreenPolicy.swift; sourceTree = "<group>"; };
+		218A1C4A90404CA396529810 /* DigitalCredentialsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitalCredentialsSettingsView.swift; sourceTree = "<group>"; };
+		FCE0424B41224532B09D4962 /* ReaderTrustImportReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderTrustImportReviewView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -280,7 +310,9 @@
 		A1000010AAAA000000000010 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				13330030AAAA000000000001 /* WalletIdentityScreenModel.swift */,
 				A1000001AAAA000000000001 /* WalletViewModel.swift */,
+				13330004AAAA000000000001 /* WalletExternalFlow.swift */,
 				A1000460AAAA000000000060 /* ProximityPresentationViewModel.swift */,
 				A1000462AAAA000000000062 /* DemoReaderTrustSettings.swift */,
 				A1000463AAAA000000000063 /* DemoClientIdTrust.swift */,
@@ -298,14 +330,27 @@
 			children = (
 				A1000002AAAA000000000002 /* HomeView.swift */,
 				13330001AAAA000000000001 /* WalletScanView.swift */,
+				13330004AAAA000000000003 /* PresentationErrorView.swift */,
+				13330004AAAA000000000002 /* WalletExternalFlowStatus.swift */,
 				A1000461AAAA000000000061 /* ProximityPresentationView.swift */,
+				43D2995C89B11C6E173D6BE7 /* ProximityScreenPolicy.swift */,
+				7A8122C18703A339DAD642D0 /* ProximityStatusContent.swift */,
+				BB6839D9409AAF08CC1AC680 /* ProximityReaderDetails.swift */,
+				C0FBAB08965095A5D534750E /* ProximitySharingSummary.swift */,
+				D8EDF0D7C39EB50782930334 /* ProximityReviewContent.swift */,
+				31D33F9BD6356B163E1118E9 /* ProximityEngagementContent.swift */,
+				C73BE1161BA532D3A322799E /* ProximityApprovalModeChoice.swift */,
+				19080F553F8485E5BD797FE1 /* ProximityPrerequisiteContent.swift */,
+				13330031AAAA000000000001 /* SigningKeySetupContent.swift */,
                 A74900000000000000000004 /* WalletIdentityView.swift */,
 				A1000422AAAA000000000022 /* CredentialsTabView.swift */,
 				A1000003AAAA000000000003 /* ReceiveView.swift */,
 				A1000004AAAA000000000004 /* PresentView.swift */,
 				A1000440AAAA000000000040 /* SettingsView.swift */,
 				BB7490000000000000000003 /* TechnicalDetailsView.swift */,
+				FCE0424B41224532B09D4962 /* ReaderTrustImportReviewView.swift */,
 				BB7490000000000000000002 /* ReaderTrustSettingsView.swift */,
+				218A1C4A90404CA396529810 /* DigitalCredentialsSettingsView.swift */,
 				BB7490000000000000000001 /* NearbySettingsView.swift */,
 				A1000442AAAA000000000042 /* PinView.swift */,
 			);
@@ -701,7 +746,9 @@
 			files = (
 				B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */,
 				B33B17EA2C2C394F001A32F7 /* WalletDemoApp.swift in Sources */,
+				13330030AAAA000100000001 /* WalletIdentityScreenModel.swift in Sources */,
 				A1000001AAAA000100000001 /* WalletViewModel.swift in Sources */,
+				13330004AAAA000100000001 /* WalletExternalFlow.swift in Sources */,
 				A1000460AAAA000100000060 /* ProximityPresentationViewModel.swift in Sources */,
 				A1000462AAAA000100000062 /* DemoReaderTrustSettings.swift in Sources */,
 				A1000463AAAA000100000063 /* DemoClientIdTrust.swift in Sources */,
@@ -709,11 +756,22 @@
 				A1000421AAAA000100000021 /* MockWalletClient.swift in Sources */,
 				A1000002AAAA000100000002 /* HomeView.swift in Sources */,
 				13330001AAAA000100000001 /* WalletScanView.swift in Sources */,
+				13330004AAAA000100000003 /* PresentationErrorView.swift in Sources */,
+				13330004AAAA000100000002 /* WalletExternalFlowStatus.swift in Sources */,
+				13330031AAAA000100000001 /* SigningKeySetupContent.swift in Sources */,
                 A74900000000000000000003 /* WalletIdentityView.swift in Sources */,
 				A1000422AAAA000100000022 /* CredentialsTabView.swift in Sources */,
 				A1000003AAAA000100000003 /* ReceiveView.swift in Sources */,
 				A1000004AAAA000100000004 /* PresentView.swift in Sources */,
 				A1000461AAAA000100000061 /* ProximityPresentationView.swift in Sources */,
+				ACE2F185C850D1F871BA51F3 /* ProximityScreenPolicy.swift in Sources */,
+				1CACFE637B0E59CF2642A5BF /* ProximityStatusContent.swift in Sources */,
+				F2CD24C2B36AF60F7B2A6301 /* ProximityReaderDetails.swift in Sources */,
+				523F6150528C5157B0C9AE37 /* ProximitySharingSummary.swift in Sources */,
+				E32C62D962B0665227EEEE3E /* ProximityReviewContent.swift in Sources */,
+				277493BB2FDE6B1E628622AA /* ProximityEngagementContent.swift in Sources */,
+				840A9F1B3D9706FE56A2F3F9 /* ProximityApprovalModeChoice.swift in Sources */,
+				C25CC53977899FB4A1DFD52E /* ProximityPrerequisiteContent.swift in Sources */,
 				A1000006AAAA000100000006 /* StatusBannerView.swift in Sources */,
 				A1000425AAAA000100000025 /* UrlEditor.swift in Sources */,
 				13330002AAAA000100000002 /* ScanCodeButton.swift in Sources */,
@@ -721,7 +779,9 @@
 				A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */,
 				A1000440AAAA000100000040 /* SettingsView.swift in Sources */,
 				BB7491000000000000000003 /* TechnicalDetailsView.swift in Sources */,
+				26A4B42DE64E46929A0EDA80 /* ReaderTrustImportReviewView.swift in Sources */,
 				BB7491000000000000000002 /* ReaderTrustSettingsView.swift in Sources */,
+				800619A4865746A58B033223 /* DigitalCredentialsSettingsView.swift in Sources */,
 				BB7491000000000000000001 /* NearbySettingsView.swift in Sources */,
 				A1000441AAAA000100000041 /* WalletTabChrome.swift in Sources */,
 				A1000442AAAA000100000042 /* PinView.swift in Sources */,

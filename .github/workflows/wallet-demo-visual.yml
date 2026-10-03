@@ -1,0 +1,113 @@
+name: Wallet demo visual comparison
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'waltid-applications/waltid-wallet-demo-*/**'
+      - 'waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/**'
+      - 'waltid-libraries/protocols/waltid-wallet-sdk-ios/**'
+      - 'gradle/libs.versions.toml'
+      - 'gradle.properties'
+      - '.github/workflows/wallet-demo-visual.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wallet-demo-visual-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: waltid-applications/waltid-wallet-demo-compose/webApp/visual/package-lock.json
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Build the production browser host
+        run: >-
+          ./gradlew :waltid-applications:waltid-wallet-demo-compose:webApp:wasmJsBrowserDistribution
+          -PenableAndroidBuild=false -PenableIosBuild=false -PenableWalletDemoComposeWeb=true
+          --max-workers=2 --console=plain
+      - name: Install the pinned browser test tools
+        working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
+        run: |
+          npm ci
+          npx playwright install chromium --only-shell
+      - name: Compare browser account states
+        working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
+        run: npm test
+      - name: Retain browser screenshots and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: wallet-browser-visual-${{ github.sha }}
+          path: waltid-applications/waltid-wallet-demo-compose/webApp/build/reports/browser-visual
+          if-no-files-found: warn
+          retention-days: 14
+
+  compare:
+    # The catalogue pins SDK 27A266a and runtime 26.5, independently of the SDK release lanes.
+    runs-on: xcode-27
+    timeout-minutes: 120
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      TZ: UTC
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Cache Kotlin Native dependencies
+        uses: actions/cache@v5
+        with:
+          path: ~/.konan
+          key: wallet-visual-konan-${{ runner.arch }}-${{ hashFiles('gradle/libs.versions.toml', '**/gradle-wrapper.properties') }}
+
+      - name: Install the pinned native test adapter
+        run: |
+          npm install --prefix "$RUNNER_TEMP/wallet-visual-tools" xcodebuildmcp@2.7.0
+          echo "$RUNNER_TEMP/wallet-visual-tools/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Prepare the pinned simulator runtime
+        timeout-minutes: 20
+        run: |
+          if ! xcrun simctl list runtimes --json | jq -e '.runtimes[] | select(.identifier == "com.apple.CoreSimulator.SimRuntime.iOS-26-5" and .isAvailable)' >/dev/null; then
+            xcodebuild -downloadPlatform iOS -buildVersion 26.5 -architectureVariant arm64
+          fi
+          wallet_simulator_id=$(xcrun simctl create "Wallet visual comparison" com.apple.CoreSimulator.SimDeviceType.iPhone-17 com.apple.CoreSimulator.SimRuntime.iOS-26-5)
+          echo "WALLET_VISUAL_SIMULATOR_ID=$wallet_simulator_id" >> "$GITHUB_ENV"
+
+      - name: Compare every catalogue cell
+        run: python3 waltid-applications/waltid-wallet-demo-test-fixtures/visual/verify.py --simulator "$WALLET_VISUAL_SIMULATOR_ID"
+
+      - name: Retain the gallery, diagnostics and differences
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: wallet-visual-${{ github.sha }}
+          path: |
+            build/reports/wallet-visual
+            waltid-applications/waltid-wallet-demo-compose/sharedUI/build/outputs/visual-diffs
+            waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Remove the job-owned simulator
+        if: always() && env.WALLET_VISUAL_SIMULATOR_ID != ''
+        run: xcrun simctl delete "$WALLET_VISUAL_SIMULATOR_ID"

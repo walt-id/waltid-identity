@@ -6,11 +6,14 @@ import id.walt.wallet2.handlers.WalletIssuanceBatchSession
 import id.walt.wallet2.handlers.WalletIssuanceTransactionCode
 import id.walt.wallet2.handlers.WalletDeferredCredential
 import id.walt.wallet2.handlers.WalletIssuanceContinuation
+import id.walt.wallet2.handlers.WalletIssuanceContinuationStatus
+import id.walt.wallet2.handlers.WalletIssuanceErrorCode
 import id.walt.wallet2.mobile.MobileWalletCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletHolderBinding
 import id.walt.wallet2.mobile.MobileWalletCredentialHolders
 
-internal fun List<WalletDemoCredentialSelection>.toMobileSelections() = map { selection ->
+/** Keeps in-app and platform-provider acceptance on the same SDK batch-selection contract. */
+fun List<WalletDemoCredentialSelection>.toMobileSelections(): List<MobileWalletCredentialSelection> = map { selection ->
     MobileWalletCredentialSelection(
         credentialConfigurationId = selection.credentialConfigurationId,
         holders = when (val holders = selection.holders) {
@@ -62,7 +65,7 @@ fun WalletIssuanceBatchSession.toDemoIssuanceSession(): WalletDemoIssuanceSessio
         ),
     )
 
-internal fun WalletIssuanceOutcome.toDemoIssuanceOutcome(): WalletDemoIssuanceOutcome =
+fun WalletIssuanceOutcome.toDemoIssuanceOutcome(): WalletDemoIssuanceOutcome =
     when (this) {
         is WalletIssuanceOutcome.Stored -> WalletDemoIssuanceOutcome.Stored(credentialIds)
         is WalletIssuanceOutcome.Deferred -> WalletDemoIssuanceOutcome.Deferred(
@@ -76,17 +79,32 @@ internal fun WalletIssuanceOutcome.toDemoIssuanceOutcome(): WalletDemoIssuanceOu
             deferredCredentials = deferredCredentials.map { it.toDemoDeferredCredential() },
             failedTargetCount = if (failure == null) 0 else 1,
             notAttemptedTargetCount = failure?.notAttempted?.size ?: 0,
-            offerConsumed = failure != null || storedCredentialIds.isNotEmpty() || deferredCredentials.isNotEmpty(),
+            offerConsumed = failure != null || storedCredentialIds.isNotEmpty() || deferredCredentials.isNotEmpty() ||
+                error.code in setOf(WalletIssuanceErrorCode.INVALID_SESSION, WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN,
+                    WalletIssuanceErrorCode.STORAGE_OUTCOME_UNCERTAIN),
+            kind = when (error.code) {
+                WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN -> WalletDemoIssuanceFailureKind.RemoteOutcomeUncertain
+                WalletIssuanceErrorCode.STORAGE_OUTCOME_UNCERTAIN -> WalletDemoIssuanceFailureKind.StorageOutcomeUncertain
+                else -> WalletDemoIssuanceFailureKind.General
+            },
         )
     }
 
 internal fun WalletDeferredCredential.toDemoDeferredCredential() = WalletIssuanceContinuation(this).toDemoDeferredCredential()
 
-internal fun WalletIssuanceContinuation.toDemoDeferredCredential() = WalletDemoDeferredCredential(
+fun WalletIssuanceContinuation.toDemoDeferredCredential() = WalletDemoDeferredCredential(
     id = id,
     credentialConfigurationId = credentialConfigurationId,
     credentialIdentifier = credentialIdentifier,
     intervalSeconds = intervalSeconds,
+    status = when (status) {
+        WalletIssuanceContinuationStatus.UNRESOLVED -> WalletDemoContinuationStatus.Unresolved
+        WalletIssuanceContinuationStatus.AWAITING_ISSUER -> WalletDemoContinuationStatus.AwaitingIssuer
+        WalletIssuanceContinuationStatus.AWAITING_LOCAL_SAVE -> WalletDemoContinuationStatus.AwaitingLocalSave
+        WalletIssuanceContinuationStatus.REMOTE_OUTCOME_UNCERTAIN -> WalletDemoContinuationStatus.RemoteOutcomeUncertain
+        WalletIssuanceContinuationStatus.STORAGE_OUTCOME_UNCERTAIN -> WalletDemoContinuationStatus.StorageOutcomeUncertain
+    },
+    displayMetadataJson = displayMetadataJson,
 )
 
 private fun WalletIssuanceTransactionCode.toDemoRequirement(): WalletDemoTransactionCodeRequirement =

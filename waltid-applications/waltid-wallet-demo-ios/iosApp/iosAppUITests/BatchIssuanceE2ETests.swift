@@ -20,21 +20,15 @@ final class BatchIssuanceE2ETests: XCTestCase {
 
         ui.openWalletLink(offer.offerUrl)
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 60), "Review credential offer")
-        let copies = app.steppers["issuance-copies-org.iso.18013.5.1.mDL"]
-        XCTAssertTrue(copies.waitForExistence(timeout: 10))
-        let increment = copies.buttons["issuance-copies-org.iso.18013.5.1.mDL-Increment"]
+        let increment = app.buttons["issuance-copies-org.iso.18013.5.1.mDL-Increment"]
+        XCTAssertTrue(increment.waitForExistence(timeout: 10))
         XCTAssertEqual(increment.value as? String, "1", "Advertised batch support must not request extra copies")
         increment.tap()
         XCTAssertEqual(increment.value as? String, "2")
         attachScreenshot(app, name: "Two copies selected before acceptance")
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
-        // Apple's first mdoc registration waits for this system consent, outside the app hierarchy.
-        let registrationAlert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts
-            .containing(NSPredicate(format: "label CONTAINS %@", "Identity Verification")).firstMatch
-        if registrationAlert.waitForExistence(timeout: 15) {
-            registrationAlert.buttons["Allow"].tap()
-        }
+        ui.allowIdentityDocumentRegistrationIfRequested()
 
         let cards = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
         let twoCards = NSPredicate { _, _ in Set(cards.allElementsBoundByIndex.map(\.identifier)).count == 2 }

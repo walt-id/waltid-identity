@@ -143,11 +143,15 @@ class WalletViewModel: ObservableObject {
     }
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
     @Published var selectedPresentationDisclosureOptions: Set<PresentationDisclosureSelection> = []
+    @Published var externalFlow: WalletExternalFlow?
+    @Published var incomingLinkNotice: String?
+    @Published private(set) var flowIsCommitting = false
     @Published var selectedTab: WalletTab = .credentials
     @Published var issuanceCopyCounts: [String: Int] = [:]
     @Published var offerPreview: IssuanceOfferPreview?
     @Published private(set) var authorizationRequestURL: URL?
     @Published var deferredCredentials: [DeferredCredential] = []
+    @Published var issuanceReceipt: IssuanceReceipt?
     @Published var lastReceivedCredentialIDs: [String] = []
     @Published var receiveCompleted = false
     @Published var presentationCompleted = false
@@ -394,6 +398,7 @@ class WalletViewModel: ObservableObject {
         selectedPresentationCredentialOptions = []
         selectedPresentationDisclosureOptions = []
         lastReceivedCredentialIDs = []
+        issuanceReceipt = nil
         receiveCompleted = false
         presentationCompleted = false
         clearPendingPresentationContinuation()
@@ -816,10 +821,19 @@ class WalletViewModel: ObservableObject {
     }
 
     func handleDeepLink(_ url: URL) {
+        let kind = (url.scheme?.lowercased()).flatMap(WalletDeepLinkScheme.init(rawValue:))
+        if kind == .credentialOffer || kind == .presentationRequest {
+            if externalFlow?.url == url { return }
+            guard canAcceptExternalRequest && !proximityPresentation.active else {
+                incomingLinkNotice = "Finish the current operation before opening another link."
+                return
+            }
+        }
         resetInputFocus()
         logE2E("Deep link received: \(url.scheme ?? "unknown")")
         switch (url.scheme?.lowercased()).flatMap(WalletDeepLinkScheme.init(rawValue:)) {
         case .credentialOffer:
+            externalFlow = .pending(url, .offer)
             receiveTask?.cancel()
             paymentConsentTask?.cancel()
             presentationTask?.cancel()
@@ -829,6 +843,7 @@ class WalletViewModel: ObservableObject {
             offerUrl = url.absoluteString
             offerPreview = nil
             lastReceivedCredentialIDs = []
+            issuanceReceipt = nil
             receiveCompleted = false
             receiveNavigationResetKey += 1
             presentationReview = nil
@@ -839,6 +854,7 @@ class WalletViewModel: ObservableObject {
             presentationNavigationResetKey += 1
             resetFlowStatusForIncomingURL()
         case .presentationRequest:
+            externalFlow = .pending(url, .presentation)
             receiveTask?.cancel()
             paymentConsentTask?.cancel()
             presentationTask?.cancel()
@@ -849,6 +865,7 @@ class WalletViewModel: ObservableObject {
             txCode = ""
             offerPreview = nil
             lastReceivedCredentialIDs = []
+            issuanceReceipt = nil
             receiveCompleted = false
             receiveNavigationResetKey += 1
             presentationReview = nil
@@ -867,6 +884,33 @@ class WalletViewModel: ObservableObject {
         }
     }
 
+    private var canAcceptExternalRequest: Bool {
+        !flowIsCommitting && pendingPresentationContinuationURL == nil && pendingPresentationFormPostHTML == nil
+    }
+
+    var canDismissExternalFlow: Bool {
+        canAcceptExternalRequest && !isAuthenticating && identityScreen?.busy != true
+    }
+
+    func prepareExternalFlow() {
+        guard case let .pending(url, kind) = externalFlow, auth == .unlocked, isReady, !isLoading else { return }
+        externalFlow = .active(url, kind)
+        switch kind {
+        case .offer: previewOffer()
+        case .presentation: previewPresentation()
+        }
+    }
+
+    @discardableResult func closeExternalFlow() -> Bool {
+        guard externalFlow != nil, canDismissExternalFlow else { return false }
+        externalFlow = nil
+        incomingLinkNotice = nil
+        startNewReceiveFlow()
+        startNewPresentationFlow()
+        selectedTab = .credentials
+        return true
+    }
+
     func startNewReceiveFlow() {
         receiveTask?.cancel()
         cancelIssuanceIfPresent()
@@ -876,6 +920,7 @@ class WalletViewModel: ObservableObject {
         offerPreview = nil
         authorizationRequestURL = nil
         lastReceivedCredentialIDs = []
+        issuanceReceipt = nil
         receiveCompleted = false
         receiveNavigationResetKey += 1
         isLoading = false
@@ -984,7 +1029,7 @@ class WalletViewModel: ObservableObject {
         let previousCredentials = credentials
         let request = ReceiveRequest(offerURL: offer.absoluteString, navigationResetKey: receiveNavigationResetKey)
 
-        setLoading(WalletStatusText.receivingCredential, tab: .receive)
+        setLoading(WalletStatusText.receivingCredential, tab: .receive, committing: true)
         receiveTask = Task {
             do {
                 let selections = try issuanceSelections(session.offer)
@@ -1039,6 +1084,14 @@ class WalletViewModel: ObservableObject {
     }
 
     private func continueAuthorization(callbackURI: URL) {
+        guard canAcceptExternalRequest else { return }
+        if issuanceSession == nil {
+            if !proximityPresentation.active && externalFlow == nil && !isLoading && offerPreview == nil && presentationReview == nil {
+                externalFlow = .unavailableCallback(callbackURI)
+                selectedTab = .receive
+            }
+            return
+        }
         guard let session = issuanceSession,
               let preview = offerPreview,
               preview.grant == .authorizationCode else { return }
@@ -1047,7 +1100,7 @@ class WalletViewModel: ObservableObject {
             navigationResetKey: receiveNavigationResetKey
         )
         let previousCredentials = credentials
-        setLoading(WalletStatusText.receivingCredential, tab: .receive)
+        setLoading(WalletStatusText.receivingCredential, tab: .receive, committing: true)
         receiveTask = Task {
             do {
                 try await completeIssuanceOutcome(
@@ -1069,12 +1122,16 @@ class WalletViewModel: ObservableObject {
     }
 
     private func completeIssuanceOutcome(
-        _ outcome: IssuanceOutcome,
+        _ rawOutcome: IssuanceOutcome,
         previousCredentials: [Credential],
         request: ReceiveRequest
     ) async throws {
         try Task.checkCancellation()
         guard isCurrent(request) else { return }
+        let outcome = try await refreshContinuations(rawOutcome)
+        try Task.checkCancellation()
+        guard isCurrent(request) else { return }
+        let issuer = offerPreview?.issuer
         let credentialIDs: [String]
         switch outcome {
         case let .stored(_, ids):
@@ -1084,9 +1141,11 @@ class WalletViewModel: ObservableObject {
             offerPreview = nil
             authorizationRequestURL = nil
             deferredCredentials = (deferredCredentials + deferred).reduce(into: [DeferredCredential]()) { result, credential in
-                if !result.contains(where: { $0.id == credential.id }) { result.append(credential) }
+                if let index = result.firstIndex(where: { $0.id == credential.id }) { result[index] = credential }
+                else { result.append(credential) }
             }
             lastReceivedCredentialIDs = storedIDs
+            issuanceReceipt = IssuanceReceipt(issuer: issuer, pendingIDs: Set(deferred.map(\.id)))
             receiveCompleted = false
             if !storedIDs.isEmpty {
                 let refreshed = try await walletClient.credentials()
@@ -1108,10 +1167,13 @@ class WalletViewModel: ObservableObject {
             return
         case let .failed(_, error, storedIDs, pending):
             deferredCredentials = (deferredCredentials + pending).reduce(into: []) { result, credential in
-                if !result.contains(where: { $0.id == credential.id }) { result.append(credential) }
+                if let index = result.firstIndex(where: { $0.id == credential.id }) { result[index] = credential }
+                else { result.append(credential) }
             }
             lastReceivedCredentialIDs = storedIDs
-            if error.targetFailure != nil || !storedIDs.isEmpty || !pending.isEmpty {
+            if error.targetFailure != nil || !storedIDs.isEmpty || !pending.isEmpty ||
+                [.invalidSession, .remoteOutcomeUncertain, .storageOutcomeUncertain].contains(error.code) {
+                issuanceReceipt = IssuanceReceipt(issuer: issuer, pendingIDs: Set(pending.map(\.id)), problem: error)
                 issuanceSession = nil
                 offerPreview = nil
                 authorizationRequestURL = nil
@@ -1143,6 +1205,7 @@ class WalletViewModel: ObservableObject {
             offerPreview = nil
             authorizationRequestURL = nil
             lastReceivedCredentialIDs = []
+            issuanceReceipt = nil
             receiveCompleted = false
             setError(
                 WalletStatusText.failure(
@@ -1160,12 +1223,13 @@ class WalletViewModel: ObservableObject {
         offerPreview = nil
         authorizationRequestURL = nil
         lastReceivedCredentialIDs = displayableReceivedCredentialIDs
+        issuanceReceipt = IssuanceReceipt(issuer: issuer)
         self.txCode = ""
         offerUrl = ""
         receiveCompleted = false
         receiveNavigationResetKey += 1
-        selectedTab = .credentials
-        setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: .credentials)
+        selectedTab = externalFlow == nil ? .credentials : .receive
+        setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: selectedTab)
     }
 
     func updateTxCode(_ value: String) {
@@ -1173,12 +1237,20 @@ class WalletViewModel: ObservableObject {
     }
 
     func resumeDeferredCredential(_ credential: DeferredCredential) {
-        guard !isLoading, deferredCredentials.contains(where: { $0.id == credential.id }) else { return }
+        guard !isLoading, let retained = deferredCredentials.first(where: { $0.id == credential.id }), retained.canResume else { return }
+        let priorReceipt = issuanceReceipt.flatMap { $0.pendingIDs.contains(credential.id) ? $0 : nil }
+        let priorIDs = priorReceipt == nil ? [] : lastReceivedCredentialIDs
+        func receipt(_ pending: [DeferredCredential], problem: IssuanceFailure? = nil) -> IssuanceReceipt {
+            IssuanceReceipt(issuer: priorReceipt?.issuer,
+                pendingIDs: (priorReceipt?.pendingIDs ?? []).subtracting([credential.id]).union(pending.map(\.id)),
+                problem: priorReceipt?.problem ?? problem)
+        }
+        func receivedIDs(_ ids: [String]) -> [String] { (priorIDs + ids).reduce(into: []) { if !$0.contains($1) { $0.append($1) } } }
         let request = ReceiveRequest(offerURL: offerUrl.trimmingCharacters(in: .whitespacesAndNewlines), navigationResetKey: receiveNavigationResetKey)
-        setLoading(WalletStatusText.receivingCredential, tab: .receive)
+        setLoading(WalletStatusText.receivingCredential, tab: .receive, committing: true)
         receiveTask = Task {
             do {
-                let outcome = try await walletClient.resumeDeferredIssuance(deferredCredentialID: credential.id)
+                let outcome = try await refreshContinuations(walletClient.resumeDeferredIssuance(deferredCredentialID: credential.id), resumingID: credential.id)
                 try Task.checkCancellation()
                 guard isCurrent(request) else { return }
                 switch outcome {
@@ -1191,13 +1263,14 @@ class WalletViewModel: ObservableObject {
                     try Task.checkCancellation()
                     guard isCurrent(request) else { return }
                     deferredCredentials.removeAll { $0.id == credential.id }
-                    lastReceivedCredentialIDs = credentialIDs
+                    lastReceivedCredentialIDs = receivedIDs(credentialIDs)
+                    issuanceReceipt = receipt([])
                     receiveCompleted = false
                     if deferredCredentials.isEmpty && !credentialIDs.isEmpty {
                         offerUrl = ""
                         receiveNavigationResetKey += 1
-                        selectedTab = .credentials
-                        setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: .credentials)
+                        selectedTab = externalFlow == nil ? .credentials : .receive
+                        setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: selectedTab)
                     } else {
                         setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: .receive)
                     }
@@ -1208,17 +1281,20 @@ class WalletViewModel: ObservableObject {
                         guard isCurrent(request) else { return }
                         credentials = refreshed
                     }
-                    lastReceivedCredentialIDs = storedIDs
+                    lastReceivedCredentialIDs = receivedIDs(storedIDs)
+                    issuanceReceipt = receipt(pending)
                     deferredCredentials.removeAll { $0.id == credential.id }
                     deferredCredentials.append(contentsOf: pending)
                     setSuccess(WalletStatusText.issuanceProgress(saved: storedIDs.count, pending: pending.count), tab: .receive)
                 case .cancelled:
+                    issuanceReceipt = receipt([])
                     deferredCredentials.removeAll { $0.id == credential.id }
                     setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
                 case let .failed(_, error, storedIDs, pending):
                     deferredCredentials.removeAll { $0.id == credential.id }
                     deferredCredentials.append(contentsOf: pending)
-                    lastReceivedCredentialIDs = storedIDs
+                    lastReceivedCredentialIDs = receivedIDs(storedIDs)
+                    issuanceReceipt = receipt(pending, problem: error)
                     if !storedIDs.isEmpty {
                         let refreshed = try await walletClient.credentials()
                         try Task.checkCancellation()
@@ -1233,6 +1309,39 @@ class WalletViewModel: ObservableObject {
                 if isCurrent(request) {
                     setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error), tab: .receive)
                 }
+            }
+        }
+    }
+
+    private func refreshContinuations(_ outcome: IssuanceOutcome, resumingID: String? = nil) async throws -> IssuanceOutcome {
+        guard outcome.hasPendingCredentials else { return outcome }
+        do { return outcome.withContinuations(try await walletClient.listDeferredIssuance(), resumingID: resumingID) }
+        catch is CancellationError { throw CancellationError() }
+        // A status-read failure must not discard an already completed issuance result.
+        catch { return outcome.withContinuations([], resumingID: resumingID) }
+    }
+
+    /// Refresh local state only; this never polls the issuer or takes over another writer.
+    func refreshIssuanceStatus() {
+        guard !isLoading else { return }
+        let request = ReceiveRequest(offerURL: offerUrl.trimmingCharacters(in: .whitespacesAndNewlines), navigationResetKey: receiveNavigationResetKey)
+        setLoading("Refreshing receiving status…", tab: .receive)
+        receiveTask = Task {
+            do {
+                let pending = try await walletClient.listDeferredIssuance()
+                let refreshed = try await walletClient.credentials()
+                try Task.checkCancellation()
+                guard isCurrent(request) else { return }
+                credentials = refreshed
+                deferredCredentials = pending
+                if let receipt = issuanceReceipt {
+                    issuanceReceipt = IssuanceReceipt(issuer: receipt.issuer,
+                        pendingIDs: receipt.pendingIDs.intersection(pending.map(\.id)), problem: receipt.problem)
+                }
+                setSuccess("Receiving status updated", tab: .receive)
+            } catch is CancellationError { return }
+            catch {
+                if isCurrent(request) { setError(WalletStatusText.failure("Could not refresh receiving status", error), tab: .receive) }
             }
         }
     }
@@ -1266,7 +1375,7 @@ class WalletViewModel: ObservableObject {
             return
         }
 
-        setLoading(WalletStatusText.presentingCredential, tab: .present)
+        setLoading(WalletStatusText.presentingCredential, tab: .present, committing: true)
         Task {
             do {
                 let result = try await walletClient.present(
@@ -1396,7 +1505,7 @@ class WalletViewModel: ObservableObject {
         let selectedDid = did.isEmpty ? nil : did
 
         let consentRevision = paymentReview.consent?.revision
-        setLoading(WalletStatusText.presentingCredential, tab: .present)
+        setLoading(WalletStatusText.presentingCredential, tab: .present, committing: true)
         presentationTask = Task {
             do {
                 let result = try await walletClient.submitPresentation(
@@ -1435,7 +1544,7 @@ class WalletViewModel: ObservableObject {
             isReportingError = false
         }
 
-        setLoading(WalletStatusText.decliningPresentation, tab: .present)
+        setLoading(WalletStatusText.decliningPresentation, tab: .present, committing: true)
         presentationTask = Task {
             do {
                 let result = try await walletClient.rejectPresentation(previewHandle: previewHandle)
@@ -1772,6 +1881,7 @@ class WalletViewModel: ObservableObject {
         selectedPresentationDisclosureOptions = []
         deferredCredentials = []
         lastReceivedCredentialIDs = []
+        issuanceReceipt = nil
         receiveCompleted = false
         presentationCompleted = false
         pendingPresentationContinuationURL = nil
@@ -1821,7 +1931,8 @@ class WalletViewModel: ObservableObject {
         )
     }
 
-    private func setLoading(_ message: String, tab: WalletTab? = nil) {
+    private func setLoading(_ message: String, tab: WalletTab? = nil, committing: Bool = false) {
+        flowIsCommitting = committing
         isLoading = true
         isError = false
         statusTab = tab
@@ -1832,6 +1943,7 @@ class WalletViewModel: ObservableObject {
     }
 
     private func setSuccess(_ message: String, tab: WalletTab? = nil) {
+        flowIsCommitting = false
         isLoading = false
         isError = false
         statusTab = tab
@@ -1861,6 +1973,7 @@ class WalletViewModel: ObservableObject {
     }
 
     private func setError(_ message: String, tab: WalletTab? = nil) {
+        flowIsCommitting = false
         isLoading = false
         isError = true
         statusTab = tab

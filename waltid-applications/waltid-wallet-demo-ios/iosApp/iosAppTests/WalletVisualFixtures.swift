@@ -2,6 +2,7 @@ import Foundation
 import WalletDemoSharingUI
 import XCTest
 @testable import WalletSDK
+@testable import iosApp
 
 /// Shared, non-personal input also consumed by Compose Android and Compose iOS.
 struct WalletVisualFixtures {
@@ -16,6 +17,29 @@ struct WalletVisualFixtures {
         let url = resourceDirectory.appendingPathComponent("wallet-visual-data.json")
         root = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
         XCTAssertEqual(root["schemaVersion"] as? Int, 1)
+    }
+
+    func readerTrustImport() throws -> ProximityReaderTrustImportPreview {
+        let value = try object(root, "readerTrust")
+        let authority = ProximityReaderTrustAnchorImportPreview(displayName: try text(value, "displayName"),
+            subject: try text(value, "subject"), issuer: try text(value, "issuer"), sha256Fingerprint: try text(value, "fingerprint"),
+            validFrom: try XCTUnwrap(ISO8601DateFormatter().date(from: text(value, "validFrom"))),
+            validUntil: try XCTUnwrap(ISO8601DateFormatter().date(from: text(value, "validUntil"))), profile: "X.509 CA certificate")
+        return ProximityReaderTrustImportPreview(kind: .readerCA, sourceName: try text(value, "sourceName"),
+            readerAuthorities: [authority], ricalProviders: [], policyEffect: "Only trusted readers can proceed to review.",
+            resultingSettings: .init(readerPolicy: .requireTrusted))
+    }
+
+    @MainActor
+    func keySetupOptions() throws -> [WalletIdentityScreenModel.SetupOption] {
+        try array(object(root, "keySetup"), "options").map { item in
+            func choice(_ name: String) throws -> WalletIdentityScreenModel.Selection {
+                let value = try object(item, name)
+                return .init(id: try text(value, "id"), title: try text(value, "title"), detail: try text(value, "detail"))
+            }
+            return .init(recovery: try choice("recovery"), storage: try choice("storage"), approval: try choice("approval"),
+                restoring: false, perform: {})
+        }
     }
 
     func credentialDetails() throws -> CredentialDetails {
@@ -58,12 +82,29 @@ struct WalletVisualFixtures {
         }
     }
 
+    func nearbyReviewData() throws -> [String: String] {
+        try XCTUnwrap(object(object(root, "nearby"), "review") as? [String: String])
+    }
+
+    func nearbyCredential() throws -> Credential {
+        let value = try nearbyReviewData()
+        func field(_ name: String) throws -> String { try XCTUnwrap(value[name]) }
+        let metadata: [String: Any] = [
+            "credentialDisplay": [["name": try field("title"), "background_color": try field("backgroundColor")]],
+            "credentialClaims": [["path": [try field("namespace"), try field("element")],
+                "display": [["name": try field("label"), "locale": "en"]]]]]
+        return Credential(id: try field("credentialId"), format: "mso_mdoc", issuer: try field("issuer"), subject: nil,
+            label: try field("title"), addedAt: nil,
+            credentialDataJSON: try json([field("namespace"): [field("element"): field("value")]]), metadataJSON: try json(metadata))
+    }
+
     func nearbyQrPayload() throws -> String { try text(object(root, "nearby"), "qrPayload") }
     func partialResultStatus() throws -> String { try text(object(root, "batchOutcome"), "status") }
     func deferredCredential() throws -> DeferredCredential {
         let value = try object(root, "batchOutcome")
         return DeferredCredential(id: try text(value, "pendingId"),
-            credentialConfigurationID: try text(value, "pendingConfigurationId"), intervalSeconds: 5)
+            credentialConfigurationID: try text(value, "pendingConfigurationId"), intervalSeconds: 5,
+            status: .awaitingIssuer, displayMetadataJSON: try json(object(value, "pendingMetadata")))
     }
 
     func offer() throws -> IssuanceOfferPreview {
@@ -95,16 +136,40 @@ struct WalletVisualFixtures {
         })
     }
 
-    func payment() throws -> PaymentConsent {
-        let value = try object(root, "payment")
+    func sharingReview(payment: Bool = false) throws -> SharingReviewModel {
+        let value = try object(root, "sharing")
+        let origin = try text(value, "origin")
+        let all = try array(value, "credentials")
+        let options: [PresentationCredentialOption] = try (payment ? all : Array(all.prefix(1))).map { item in
+            PresentationCredentialOption(queryID: try text(item, "queryId"), credentialID: try text(item, "credentialId"),
+                format: try text(item, "format"), issuer: try text(item, "issuer"), subject: nil, label: try text(item, "title"),
+                credentialDataJSON: "{}", disclosures: try array(item, "disclosures").map { claim in
+                    let value = try text(claim, "value")
+                    let encoded = try JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed])
+                    return PresentationDisclosure(path: try text(claim, "path"), name: try text(claim, "label"),
+                        valueJSON: try XCTUnwrap(String(data: encoded, encoding: .utf8)), displayValue: value,
+                        selectivelyDisclosable: false, required: false, selectable: false)
+                })
+        }
+        return SharingReviewModel(request: SharingRequest(
+            requester: SharingRequester(fallbackName: origin, verifiedOrigin: origin),
+            readerTrust: payment ? nil : .pendingVerification,
+            responseProtection: .encrypted(mechanism: payment ? .dcAPIJWT : .annexCHPKE),
+            transactionData: payment ? [ClaimGroup(id: "transaction:0", title: "Payment", items: [], transactionType: "urn:eudi:sca:payment:1")] : []),
+            credentialOptions: options,
+            credentialRequirements: options.map { .init(options: [[$0.queryID]]) })
+    }
+
+    func payment(localized: Bool = false) throws -> PaymentConsent {
+        let value = try object(root, localized ? "paymentLocalized" : "payment")
         let placements: [String: PaymentConsentFieldPlacement] = [
             "Prominent": .prominent, "Main": .main, "Details": .details, "Omitted": .omitted,
         ]
         return PaymentConsent(
             revision: try text(value, "revision"), locale: try text(value, "locale"),
-            title: try text(value, "title"), securityHint: nil,
-            affirmativeAction: try text(value, "affirmativeAction"), denialAction: try text(value, "denialAction"),
-            requiresUnsignedRequestWarning: true,
+            title: value["title"] as? String, securityHint: value["securityHint"] as? String,
+            affirmativeAction: try text(value, "affirmativeAction"), denialAction: value["denialAction"] as? String,
+            requiresUnsignedRequestWarning: value["requiresUnsignedRequestWarning"] as? Bool ?? true,
             fields: try array(value, "fields").map { field in
                 PaymentConsentField(label: try text(field, "name"), description: nil, value: try text(field, "value"),
                                     placement: try XCTUnwrap(placements[text(field, "placement")]))

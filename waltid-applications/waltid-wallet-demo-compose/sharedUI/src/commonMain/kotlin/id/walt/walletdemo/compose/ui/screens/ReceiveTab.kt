@@ -6,14 +6,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import id.walt.walletdemo.compose.logic.isBusy
+import id.walt.walletdemo.compose.logic.isError
+import id.walt.walletdemo.compose.logic.statusText
+import id.walt.walletdemo.compose.logic.receivedCredentials
+import id.walt.walletdemo.compose.ui.components.*
+import id.walt.walletdemo.compose.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletRequestDrafts
 import id.walt.walletdemo.compose.logic.acceptOfferEnabled
@@ -37,11 +40,15 @@ internal fun ReceiveTab(
     onAcceptOffer: () -> Unit,
     onDeclineOffer: () -> Unit,
     onResumeDeferred: (String) -> Unit,
+    onDone: () -> Unit,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    fillViewport: Boolean = true,
 ) {
     val preview = state.offerPreview
     if (preview != null) {
         ReviewScaffold(
+            fillViewport = fillViewport,
             modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent),
             actions = {
                 OfferReviewActions(
@@ -53,6 +60,9 @@ internal fun ReceiveTab(
                 )
             },
         ) {
+            if (state.externalFlow != null && state.isError) {
+                SettingsNotice(state.statusText, error = true, modifier = Modifier.testTag(WalletUiTestTags.Status))
+            }
             OfferReviewSection(
                 preview = preview,
                 acceptEnabled = state.acceptOfferEnabled,
@@ -65,8 +75,27 @@ internal fun ReceiveTab(
                 onDecline = onDeclineOffer,
                 showActions = false,
             )
-            DeferredCredentials(state, onResumeDeferred)
         }
+        return
+    }
+
+    if (state.issuanceReceipt != null || state.deferredCredentials.isNotEmpty()) {
+        val pending = state.deferredCredentials.filter { state.issuanceReceipt?.pendingIds?.contains(it.id) ?: true }
+        ReviewScaffold(fillViewport = fillViewport, modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent), actions = {
+            WalletActions(WalletAction(stringResource(Res.string.issuance_done), onDone,
+                enabled = !state.isBusy, testTag = "issuance-done", icon = WalletSymbol.Accept),
+                secondary = pending.takeIf { it.isNotEmpty() }?.let {
+                    WalletAction(stringResource(Res.string.issuance_refresh_status), onRefresh,
+                        enabled = !state.isBusy, testTag = "issuance-refresh", icon = WalletSymbol.Retry)
+                })
+        }) {
+            IssuanceResultContent(state.issuanceReceipt, state.receivedCredentials(), pending, state.isBusy, onResumeDeferred)
+        }
+        return
+    }
+
+    if (state.externalFlow != null) {
+        ExternalFlowStatus(state, onRetry = onPreviewOffer, modifier = modifier, fillViewport = fillViewport)
         return
     }
 
@@ -91,23 +120,5 @@ internal fun ReceiveTab(
             scanButtonTestTag = WalletUiTestTags.OfferScanButton,
             onClick = onPreviewOffer,
         )
-        DeferredCredentials(state, onResumeDeferred)
-    }
-}
-
-@Composable
-private fun DeferredCredentials(
-    state: WalletDemoUiState,
-    onResumeDeferred: (String) -> Unit,
-) {
-    if (state.deferredCredentials.isEmpty()) return
-    Text("Pending credentials", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-    state.deferredCredentials.forEach { pending ->
-        OutlinedButton(
-            onClick = { onResumeDeferred(pending.id) },
-            enabled = !state.isAuthenticating,
-        ) {
-            Text("Check ${pending.credentialConfigurationId ?: "credential"}")
-        }
     }
 }

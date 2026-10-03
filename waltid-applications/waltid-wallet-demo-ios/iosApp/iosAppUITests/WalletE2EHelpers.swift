@@ -14,10 +14,9 @@ final class WalletE2EUI {
     func completeKeySetupIfNeeded() {
         let button = app.buttons["wallet.keySetupContinue"]
         guard button.waitForExistence(timeout: 10) else { return }
-        for heading in ["1 of 4 · Recovery", "2 of 4 · Key storage", "3 of 4 · Signing approval", "4 of 4 · Review"] {
-            XCTAssertTrue(app.staticTexts[heading].waitForExistence(timeout: 10), "Missing setup step: \(heading)")
-            button.tap()
-        }
+        XCTAssertTrue(app.buttons["wallet.keySetupEdit.storage"].waitForExistence(timeout: 10))
+        XCTAssertEqual(button.label, "Create signing key")
+        button.tap()
     }
 
     func launch(attestation: [String: String] = [:], environment: [String: String] = [:], initializeSigningIdentity: Bool = true) {
@@ -104,14 +103,30 @@ final class WalletE2EUI {
         XCTAssertTrue(address.waitForExistence(timeout: 10), safari.debugDescription)
         address.tap()
         address.typeText(value + XCUIKeyboardKey.return.rawValue)
+        // Safari can put its first-run toolbar tip above the external-app confirmation.
+        // Dismiss that tip before waiting for the real Open action to become enabled.
+        let tip = safari.staticTexts.matching(NSPredicate(format: "label CONTAINS[cd] %@", "View Bookmarks")).firstMatch
+        if tip.waitForExistence(timeout: 2) {
+            let close = safari.buttons["Close"].firstMatch
+            if close.exists { close.tap() }
+        }
         let open = safari.buttons["Open"]
         if open.waitForExistence(timeout: 5) {
+            let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: open)
+            XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 10), .completed, safari.debugDescription)
             // Safari's external-app confirmation reports no XCTest hit point on
             // iOS 26. Tap the visible button's own frame, not a fixed coordinate.
             XCTAssertFalse(open.frame.isEmpty)
             open.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         }
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10), safari.debugDescription)
+    }
+
+    /// First-use simulator registration is an OS-owned step, separate from wallet receipt rendering.
+    func allowIdentityDocumentRegistrationIfRequested() {
+        let alert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts
+            .containing(NSPredicate(format: "label CONTAINS %@", "Identity Verification")).firstMatch
+        if alert.waitForExistence(timeout: 15) { alert.buttons["Allow"].tap() }
     }
 
     func waitForTextInputValue(identifier: String, fallbackLabel: String, value: String, timeout: TimeInterval) -> Bool {
@@ -198,12 +213,21 @@ final class WalletE2EUI {
 
     func returnToWallet() {
         dismissKeyboardIfPresent()
+        // Automatic issuance completion may already have returned home. Avoid
+        // tapping a disappearing back button from the previous navigation frame.
+        let home = app.buttons["wallet.scanButton"]
+        if home.exists && home.isHittable { return }
         // Close only known wallet destinations, starting with the innermost sheet.
         for identifier in ["wallet-detail-close", "wallet.presentationClaimsClose", "wallet.detailsBack", "wallet.flowBack"] {
             let button = app.buttons[identifier]
-            if button.exists && button.isHittable { button.tap() }
+            if home.exists && home.isHittable { break }
+            if button.exists && button.isHittable {
+                button.tap()
+                let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: button)
+                XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 5), .completed)
+            }
         }
-        XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 10), "Wallet home did not appear")
+        XCTAssertTrue(home.waitForExistence(timeout: 10), "Wallet home did not appear")
     }
 
     func openScanner() {
@@ -325,7 +349,7 @@ final class WalletE2EUI {
         return elements[0]
     }
 
-    private func unlockWallet() {
+    func unlockWallet() {
         let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
         guard pinInput.waitForExistence(timeout: 10) else {
             return

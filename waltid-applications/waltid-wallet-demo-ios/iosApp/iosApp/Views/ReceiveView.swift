@@ -12,8 +12,16 @@ struct ReceiveView: View {
     var body: some View {
         NavigationView {
             Group {
-                if let preview = viewModel.offerPreview {
+                if case .unavailableCallback = viewModel.externalFlow {
+                    Text("The original receiving session is no longer available. Check your wallet before starting again.")
+                        .padding(20).accessibilityIdentifier("wallet.external.unavailable")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                } else if let preview = viewModel.offerPreview {
                     reviewContent(preview: preview)
+                } else if viewModel.issuanceReceipt != nil || !viewModel.deferredCredentials.isEmpty {
+                    resultContent
+                } else if viewModel.externalFlow != nil {
+                    WalletExternalFlowStatus(viewModel: viewModel, onRetry: viewModel.previewOffer)
                 } else {
                     entryContent
                 }
@@ -21,7 +29,8 @@ struct ReceiveView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Receive credentials")
             .navigationBarTitleDisplayMode(.inline)
-            .walletFlowToolbar(onBack: onBack, backEnabled: !viewModel.isLoading, onOpenSettings: onOpenSettings)
+            .walletFlowToolbar(onBack: onBack, backEnabled: viewModel.externalFlow != nil ? viewModel.canDismissExternalFlow : !viewModel.isLoading,
+                onOpenSettings: viewModel.externalFlow == nil ? onOpenSettings : nil, external: viewModel.externalFlow != nil)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
         }
@@ -48,15 +57,9 @@ struct ReceiveView: View {
                     focusResetKey: viewModel.inputFocusResetKey
                 )
 
-                Button("Receive") {
-                    viewModel.previewOffer()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(branding.primary)
-                .disabled(!viewModel.receiveActionEnabled)
-                .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
+                WalletActions(primary: WalletAction("Receive", enabled: viewModel.receiveActionEnabled,
+                    identifier: WalletAccessibilityID.receiveButton, perform: viewModel.previewOffer))
 
-                deferredCredentials
             }
             .padding()
         }
@@ -84,7 +87,6 @@ struct ReceiveView: View {
                     WarningBannerView(message: warning)
                 }
 
-                deferredCredentials
             }
             .padding()
         }
@@ -102,18 +104,25 @@ struct ReceiveView: View {
         }
     }
 
-    @ViewBuilder
-    private var deferredCredentials: some View {
-        if !viewModel.deferredCredentials.isEmpty {
-            Text("Pending credentials")
-                .font(.subheadline.weight(.semibold))
-            ForEach(viewModel.deferredCredentials, id: \.id) { credential in
-                Button("Check \(credential.credentialConfigurationID ?? "credential")") {
-                    viewModel.resumeDeferredCredential(credential)
-                }
-                .buttonStyle(.bordered)
-                .disabled(viewModel.isLoading)
-            }
+    private var pendingCredentials: [DeferredCredential] {
+        viewModel.deferredCredentials.filter { viewModel.issuanceReceipt?.pendingIDs.contains($0.id) ?? true }
+    }
+
+    private var resultContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
+                IssuanceResultContent(receipt: viewModel.issuanceReceipt, saved: viewModel.receivedCredentials,
+                    pending: pendingCredentials,
+                    busy: viewModel.isLoading, onResume: viewModel.resumeDeferredCredential)
+            }.padding()
+        }
+        .safeAreaInset(edge: .bottom) {
+            WalletActions(primary: WalletAction("Done", enabled: !viewModel.isLoading, identifier: "issuance-done") {
+                if viewModel.externalFlow != nil { viewModel.closeExternalFlow() } else { viewModel.selectedTab = .credentials }
+            }, secondary: pendingCredentials.isEmpty ? nil : WalletAction("Refresh status",
+                enabled: !viewModel.isLoading, identifier: "issuance-refresh", perform: viewModel.refreshIssuanceStatus))
+                .padding().background(.bar)
         }
     }
 }

@@ -32,12 +32,30 @@ The shared Android/iOS offer review lets users select credential types and reque
 
 Compact review rows keep inclusion, copy counts and credential information separate. Information shows the issuer's advertised definitions before issuance; actual values appear after receipt. Review and stored details follow the same [credential-information contract](../waltid-wallet-demo-test-fixtures/credential-information.md).
 
-Saved credentials remain visible after a later failure or deferred response. Pending handles are restored when reopening the mobile wallet or reconnecting the browser to the same Wallet2 server wallet, and can be resumed individually. The browser uses the public deferred list/resume endpoints; durable server recovery requires OSS SQL persistence and store-backed holder keys. Copy counts apply to each authorized record of a selected type; the issuer determines which records are available.
+Saved credentials remain visible after a later failure or deferred response. Pending handles are restored when reopening the mobile wallet or reconnecting the browser to the same Wallet2 server wallet, and can be resumed individually. The browser uses the public deferred list/resume endpoints and opts into presentation status and metadata with `includeDetails=true`; the default list response retains its released wire shape. Durable server recovery requires OSS SQL persistence and store-backed holder keys. Copy counts apply to each authorized record of a selected type; the issuer determines which records are available.
 
 The receive status summarizes saved credentials and pending targets. When a target fails,
 it also shows the failed and not-attempted target counts. A target can yield multiple
 copies, so pending/failed counts are not credential-copy counts. Mixed deferred-resume
 outcomes refresh saved credentials and retain the remaining handles.
+
+### Android Digital Credentials providers
+
+The create and share activities use the same compact review content as the app. A retained request
+model owns the SDK session, selection and consent preparation across activity recreation. Browser
+returns are matched against the registered state and redirect before being claimed; an unrelated or
+duplicate callback cannot consume another request. Process restoration does not automatically replay
+an interrupted remote operation.
+
+Create shows a receipt before returning to the caller. Saved credentials, pending work and failures
+remain distinct; **Refresh** reads retained state, while a pending action resumes only when the SDK
+reports it is safe. **Done** acknowledges the provider result. An issuance acknowledgment is not proof
+that every offered credential was saved. If the host is lost after an operation starts, retained SDK
+continuations are preserved for recovery in the wallet.
+
+Provider tests combine deterministic request/lifecycle checks with a Google Play services emulator
+lane. The latter exercises real activity recreation during transaction-code review and receipt display.
+Use an isolated test wallet: the sharing E2E fixture provisions and replaces its own credentials.
 
 
 ## In-person presentation
@@ -140,7 +158,7 @@ Terminal recovery creates a new single-use session.
 
 ## Signing key setup
 
-PIN setup keeps both six-digit inputs and the optional biometric-unlock toggle on one screen. Enabling biometrics authenticates with the OS; Create PIN remains disabled during that check. Existing unlock PINs remain supported. Signing-key setup has three steps: choose whether to create or restore a key, choose its storage, and choose when signing requires system approval. New keys can be created with or without a backup. Each screen groups the SDK's supported options into choice rows; a single supported option is shown as read-only. Continue keeps the selection local until Create signing key or Restore signing key is pressed. The SDK revalidates the selected option before executing it.
+PIN setup keeps both six-digit inputs and the optional biometric-unlock toggle on one screen. Enabling biometrics authenticates with the OS; Create PIN remains disabled during that check. Existing unlock PINs remain supported. Signing-key setup starts with a summary of the default supported configuration. Create signing key needs one confirmation. Recovery, Key storage and Signing approval each open one focused options page; Done returns to the summary and does not create a key. A single supported option is shown as a fact. Customization retains a complete SDK-provided configuration, including changes required by the selected recovery/storage combination. The same summary rows show the active key in Settings, where immutable storage/signing policies are read-only and supported backup actions remain available. Only Create signing key or Restore signing key executes the selected option. The SDK revalidates the selected option before executing it.
 
 Key recovery restores the original key and DID, not credentials. A local save does not prove delivery to another device. Unavailable providers show their reported reason and can be checked again; returning to the app also refreshes the choices.
 
@@ -295,10 +313,12 @@ implementation, and is unrelated to Credential Manager Digital Credentials issua
 
 Android builds register with Credential Manager for:
 
-- **Presentation (`GET_CREDENTIAL`)** — OpenID4VP unsigned and ISO 18013-7 Annex C, via `DigitalCredentialProviderActivity` (full-screen consent for now).
+- **Presentation (`GET_CREDENTIAL`)** — OpenID4VP unsigned and ISO 18013-7 Annex C, via `DigitalCredentialProviderActivity` and the shared review in a modal sheet.
 - **Issuance (`CREATE_CREDENTIAL`)** — OpenID4VCI (`openid4vci-v1` and historical aliases), via `DigitalCredentialCreateActivity`.
 
-Issuance uses a translucent create Activity and a Material bottom sheet for offer review (including transaction-code entry). Pre-authorized offers complete in that sheet. Authorization-code offers use the same external-browser + `openid://` path as the Receive tab; `DigitalCredentialCreateAuthHandoff` returns the callback to the still-running create Activity (or completes wallet-side issuance if that Activity was destroyed). The Credential Manager create-option picker remains system-owned; the sheet is wallet fulfillment UI after the user selects this wallet.
+Issuance uses a translucent create Activity and a Material bottom sheet for offer review, credential inclusion, supported copy counts and transaction-code entry. Both pre-authorized and authorization-code grants forward the same explicit batch selection as in-app receiving. Authorization-code offers open the external browser and return through the dedicated `walt-wallet-create://authorize` callback, keeping browser `CLEAR_TOP` flags away from the provider request stack. `DigitalCredentialCreateAuthHandoff` correlates the callback and resumes the original create Activity (or queues wallet-side recovery after process loss). Issuers that require pre-registered redirect URIs must allow `walt-wallet-create://authorize` for provider authorization-code issuance; ordinary in-app receiving retains its existing redirect. The Credential Manager create-option picker remains system-owned; the sheet is wallet fulfillment UI after the user selects this wallet.
+
+`WalletReviewPresentation` selects a full-screen or modal-sheet container around the same content. Choices, transaction-code drafts and payment-consent revisions live above that container. Changing presentation does not re-prepare consent or authorize anything. Busy reviews block Back, swipe and outside-tap dismissal. Explicit Cancel/Decline and returning to Credential Manager's selector remain separate host callbacks. Ordinary app links still enter the app's full flow; the provider sheet is not evidence of cross-app transparency for those links.
 
 ### Manual Chrome origin-trial check
 
@@ -310,6 +330,18 @@ Chrome 143+ on Android can exercise create issuance with the Digital Credentials
 4. Select the walt.id wallet, accept the offer, and confirm the credential appears under Credentials.
 
 iOS Identity Document providers currently cover presentation only; create/issuance is Android-first.
+
+The optional `DigitalCredentialIssuanceE2ETest.authorizationCodeRetainsCopiesThroughBrowserReturn`
+case uses the coordinated Enterprise fixture's unattended test IdP. It checks a two-copy selection
+through Credential Manager, browser authorization, the provider receipt, and stored credential details.
+Start the fixture and forward ports as described above, finish Chrome's first-run setup on the test
+emulator, then run `connectedPreviewDebugAndroidTest` with
+`-Pandroid.testInstrumentationRunnerArguments.class=id.walt.walletdemo.compose.android.DigitalCredentialIssuanceE2ETest#authorizationCodeRetainsCopiesThroughBrowserReturn`
+and `-Pandroid.testInstrumentationRunnerArguments.enterprise_fixture_base_url=http://127.0.0.1:33335`.
+For unattended emulator runs, build with `-PwalletSigningProtectionMode=disabled`: the provider is
+launched independently and does not inherit the main Activity's test override. This case is skipped
+without the fixture argument. It does not establish protected-signing or Chrome DC API caller proof;
+Chrome acts as the authorization browser and the test Activity calls Credential Manager.
 
 ## Related modules
 

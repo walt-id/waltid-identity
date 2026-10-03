@@ -8,6 +8,73 @@ import XCTest
 
 @MainActor
 final class WalletVisualTests: XCTestCase {
+    private var previousTimeZone: String?
+    private var savedSharingPreferences: [(String, Any?)] = []
+    override func setUp() {
+        super.setUp()
+        previousTimeZone = ProcessInfo.processInfo.environment["TZ"]
+        setenv("TZ", "UTC", 1)
+        tzset()
+        NSTimeZone.resetSystemTimeZone()
+        let defaults = UserDefaults(suiteName: IdentityDocumentSharedConfiguration.appGroupIdentifier)!
+        savedSharingPreferences = [DemoSharingSettings.showDcApiPresentationPreviewKey,
+            DemoSharingSettings.proximityTransportProfileKey, DemoSharingSettings.proximityApprovalModeKey]
+            .map { ($0, defaults.object(forKey: $0)) }
+        savedSharingPreferences.forEach { defaults.removeObject(forKey: $0.0) }
+    }
+    override func tearDown() {
+        let defaults = UserDefaults(suiteName: IdentityDocumentSharedConfiguration.appGroupIdentifier)!
+        savedSharingPreferences.forEach { defaults.set($0.1, forKey: $0.0) }
+        if let previousTimeZone { setenv("TZ", previousTimeZone, 1) } else { unsetenv("TZ") }
+        tzset()
+        NSTimeZone.resetSystemTimeZone()
+        super.tearDown()
+    }
+
+    func testControls() throws { try capture(WalletControlsPreview(), id: "components.controls.default") }
+    func testControlsRtl() throws {
+        try capture(WalletControlsPreview().environment(\.layoutDirection, .rightToLeft), id: "components.controls.rtl")
+    }
+
+    func testExternalReceiving() async throws { try await externalReceiving(unavailable: false) }
+    func testExternalUnavailableCallback() async throws { try await externalReceiving(unavailable: true) }
+
+    private func externalReceiving(unavailable: Bool) async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        model.isReady = true
+        model.statusMessage = ""
+        model.externalFlow = unavailable ? .unavailableCallback(URL(string: "openid://callback")!)
+            : .active(URL(string: "openid-credential-offer://fixture")!, .offer)
+        model.selectedTab = .receive
+        if !unavailable {
+            let fixtures = try WalletVisualFixtures()
+            model.offerPreview = try fixtures.offer()
+            model.issuanceCopyCounts = try fixtures.copies()
+        }
+        // The real native sheet/window is covered by the URL-launch UI journey; this pins its content.
+        try capture(ReceiveView(viewModel: model, onOpenSettings: {}, onBack: {}),
+            id: unavailable ? "external.callback.unavailable" : "external.receiving.review", config: .iPhoneSe)
+    }
+
+    func testKeySummary() throws { try keySetup(.summary) }
+    func testKeyRecovery() throws { try keySetup(.recovery) }
+    func testKeyStorage() throws { try keySetup(.storage) }
+    func testKeyApproval() throws { try keySetup(.approval) }
+
+    private func keySetup(_ step: WalletIdentityScreenModel.Step) throws {
+        let options = try WalletVisualFixtures().keySetupOptions()
+        let selected = try XCTUnwrap(options.first)
+        try capture(NavigationView {
+            List { SigningKeySetupContent(options: options, selected: selected, step: step, onSelect: { _ in }, onEdit: { _ in }) }
+                .navigationTitle("Set up your wallet").navigationBarTitleDisplayMode(.inline)
+                .safeAreaInset(edge: .bottom) {
+                    WalletActionBar(primary: WalletAction(step == .summary ? "Create signing key" : "Done", perform: {}),
+                        secondary: step == .summary ? nil : WalletAction("Back", perform: {}))
+                }
+        }.navigationViewStyle(.stack), id: "onboarding.key.\(step)")
+    }
+
     func testPinSetup() async throws { try await pin("setup") }
     func testPinMismatch() async throws { try await pin("mismatch") }
     func testPinBiometrics() async throws { try await pin("biometrics_enabled") }
@@ -68,6 +135,47 @@ final class WalletVisualTests: XCTestCase {
         try capture(NavigationView { SettingsView(viewModel: model) }.navigationViewStyle(.stack), id: "settings.root.default")
     }
 
+    func testSettingsReader() async throws { try await readerSettings(required: false) }
+    func testSettingsReaderRequired() async throws { try await readerSettings(required: true) }
+    private func readerSettings(required: Bool) async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        model.readerTrustSettings.setReaderPolicy(required ? .requireTrusted : .allowAnonymousOrUntrusted)
+        await model.readerTrustSettings.awaitPendingOperations()
+        try capture(NavigationView { ReaderTrustSettingsView(controller: model.readerTrustSettings) }.navigationViewStyle(.stack),
+            id: required ? "settings.reader_required.default" : "settings.reader.default")
+    }
+    func testReaderTrustImport() throws {
+        try capture(ReaderTrustImportReviewView(preview: WalletVisualFixtures().readerTrustImport(), confirm: {}, cancel: {}),
+            id: "settings.reader.import_review")
+    }
+
+    func testSettingsDcApiEnabled() throws { try dcApiSettings(enabled: true) }
+    func testSettingsDcApiDisabled() throws { try dcApiSettings(enabled: false) }
+
+    private func dcApiSettings(enabled: Bool) throws {
+        try capture(NavigationView { DigitalCredentialsSettingsView(showWalletReview: .constant(enabled)) }
+            .navigationViewStyle(.stack), id: enabled ? "settings.dc_api.enabled" : "settings.dc_api.disabled")
+    }
+
+    func testSettingsNearby() async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        try capture(NavigationView { NearbySettingsView(viewModel: model) }.navigationViewStyle(.stack), id: "settings.nearby.default")
+    }
+
+    func testSettingsConnection() async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        try capture(NavigationView { ConnectionSettingsView(viewModel: model) }.navigationViewStyle(.stack), id: "settings.connection.default")
+    }
+
+    func testSettingsTechnical() async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        try capture(NavigationView { TechnicalDetailsView(viewModel: model) }.navigationViewStyle(.stack), id: "settings.technical.unavailable")
+    }
+
     func testCredentialDetails() throws {
         let details = try WalletVisualFixtures().credentialDetails()
         XCTAssertEqual(details.id, "visual-resident-card")
@@ -113,6 +221,71 @@ final class WalletVisualTests: XCTestCase {
                     config: .iPhoneSe, colorScheme: .dark, sizeCategory: .accessibilityMedium)
     }
 
+    func testProviderSharingReview() async throws { try await providerSharingReview() }
+    func testCompactProviderSharingReview() async throws { try await providerSharingReview(compact: true) }
+
+    private func providerSharingReview(compact: Bool = false) async throws {
+        let review = try WalletVisualFixtures().sharingReview()
+        let selection = SharingSelection(credentials: review.defaultCredentialSelection())
+        XCTAssertTrue(review.hasCompleteCredentialSelection(selection.credentials))
+        let screen = SharingReviewScreen(title: "Share documents", review: review, selection: selection,
+            selectionComplete: true, onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {})
+        let id = compact ? "sharing.provider.compact_dark_large_text" : "sharing.provider.review"
+        try await captureReview(screen, id: id,
+            config: compact ? .iPhoneSe : .iPhone13, colorScheme: compact ? .dark : .light,
+            sizeCategory: compact ? .accessibilityMedium : .large, expected: Set(review.credentialOptions.map { $0.selection.id }))
+        if compact {
+            try await captureReview(screen, id: "\(id).last", config: .iPhoneSe, colorScheme: .dark,
+                sizeCategory: .accessibilityMedium, expected: Set(review.credentialOptions.map { $0.selection.id }), scrollToBottom: true)
+        }
+    }
+
+    func testProviderPreparing() throws { try providerStatus(failure: nil) }
+    func testProviderFailure() throws { try providerStatus(failure: "The request could not be verified.") }
+
+    private func providerStatus(failure: String?) throws {
+        try capture(SharingReviewScreen(title: "Share documents", review: nil, selection: SharingSelection(),
+            selectionComplete: false, failure: failure,
+            onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {}),
+            id: failure == nil ? "sharing.provider.preparing" : "sharing.provider.failure")
+    }
+
+    func testMixedPaymentReview() async throws {
+        let fixtures = try WalletVisualFixtures()
+        let review = try fixtures.sharingReview(payment: true)
+        let selection = SharingSelection(credentials: review.defaultCredentialSelection())
+        XCTAssertEqual(selection.credentials.count, 2)
+        XCTAssertTrue(review.hasCompleteCredentialSelection(selection.credentials))
+        try await captureReview(SharingReviewScreen(title: "Payment", review: review, selection: selection,
+            selectionComplete: true, paymentReview: .ready(try fixtures.payment()),
+            onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {}),
+            id: "payment.mixed_credentials.main", expected: Set(review.credentialOptions.map { $0.selection.id }))
+    }
+
+    func testPaymentLoading() async throws { try await paymentStatus(.loading, id: "payment.loading") }
+    func testPaymentBlocked() async throws {
+        try await paymentStatus(.blocked("Required issuer payment labels are missing."), id: "payment.blocked")
+    }
+    private func paymentStatus(_ state: PaymentReviewState, id: String) async throws {
+        let review = try WalletVisualFixtures().sharingReview(payment: true)
+        try await captureReview(SharingReviewScreen(title: "Payment", review: review,
+            selection: SharingSelection(credentials: review.defaultCredentialSelection()),
+            selectionComplete: true, paymentReview: state,
+            onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {}),
+            id: id, expected: Set(review.credentialOptions.map { $0.selection.id }))
+        XCTAssertFalse(state.canConfirm)
+    }
+
+    func testPaymentLocalizedCompact() throws {
+        let state = PaymentReviewState.ready(try WalletVisualFixtures().payment(localized: true))
+        try capture(WalletReviewScaffold {
+            PaymentConsentView(state: state)
+        } actions: {
+            ReviewActions(selectionComplete: true, isLoading: false, onSubmit: {}, onReject: nil,
+                onCancel: {}, paymentReview: state)
+        }, id: "payment.localized.compact_large_text", config: .iPhoneSe, sizeCategory: .accessibilityMedium)
+    }
+
     func testPaymentConsent() throws {
         let consent = try WalletVisualFixtures().payment()
         XCTAssertEqual(consent.fields.count, 4)
@@ -137,26 +310,20 @@ final class WalletVisualTests: XCTestCase {
             .environment(\.locale, Locale(identifier: "en_US"))
             .environment(\.colorScheme, .light)
             .environment(\.sizeCategory, .large)
-        let host = UIHostingController(rootView: content)
-        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
-        let originalKeyWindow = scene.windows.first(where: \.isKeyWindow)
-        let window = UIWindow(windowScene: scene)
-        window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
-        window.rootViewController = host
-        window.makeKeyAndVisible()
-        defer { window.isHidden = true; window.rootViewController = nil; originalKeyWindow?.makeKey() }
-        // A placeholder has the same dimensions as a thumbnail. Wait for actual decoded views.
-        let deadline = Date().addingTimeInterval(5)
-        while Date() < deadline && !items.allSatisfy({ readyImages.contains($0.path.id) }) {
-            try await Task.sleep(nanoseconds: 10_000_000)
-        }
-        guard items.allSatisfy({ readyImages.contains($0.path.id) }) else {
-            return XCTFail("Image rows did not render their thumbnails: \(readyImages)")
-        }
-        try capture(host, id: "credential.media.loaded")
+        try await captureWhenReady(content, id: "credential.media.loaded", isReady: {
+            items.allSatisfy { readyImages.contains($0.path.id) }
+        }, failure: "Image rows did not render their thumbnails", readinessDescription: {
+            "Expected \(items.map { $0.path.id }.sorted()), rendered \(readyImages.sorted())"
+        })
     }
 
-    func testPartialBatchResult() async throws {
+    func testPartialBatchResult() async throws { try await batchResult() }
+    func testLocalSaveResult() async throws { try await batchResult(status: .awaitingLocalSave, id: "local_save_pending") }
+    func testRemoteUncertainResult() async throws { try await batchResult(status: .remoteOutcomeUncertain, id: "remote_uncertain") }
+    func testStorageUncertainResult() async throws { try await batchResult(status: .storageOutcomeUncertain, id: "storage_uncertain") }
+    func testPartialFailureResult() async throws { try await batchResult(id: "partial_failure", failure: true) }
+
+    private func batchResult(status: IssuanceContinuationStatus = .awaitingIssuer, id: String = "saved_and_deferred", failure: Bool = false) async throws {
         let fixtures = try WalletVisualFixtures()
         let model = makeModel()
         await model.readerTrustSettings.awaitPendingOperations()
@@ -165,10 +332,48 @@ final class WalletVisualTests: XCTestCase {
         model.statusMessage = try fixtures.partialResultStatus()
         model.credentials = [try fixtures.credential()]
         model.lastReceivedCredentialIDs = model.credentials.map(\.id)
-        model.deferredCredentials = [try fixtures.deferredCredential()]
+        let pending = try fixtures.deferredCredential()
+        model.deferredCredentials = failure ? [] : [DeferredCredential(id: pending.id,
+            credentialConfigurationID: pending.credentialConfigurationID, intervalSeconds: pending.intervalSeconds,
+            status: status, displayMetadataJSON: pending.displayMetadataJSON)]
+        let problem: IssuanceFailure? = failure ? .init(code: .issuerResponse, message: "The issuer could not finish this request.",
+            targetFailure: .init(target: .init(configurationID: "failed"), stage: .request,
+                notAttempted: [.init(configurationID: "unattempted-1"), .init(configurationID: "unattempted-2")])) : nil
+        model.issuanceReceipt = IssuanceReceipt(issuer: try fixtures.offer().issuer, pendingIDs: Set(model.deferredCredentials.map(\.id)), problem: problem)
+        if failure { model.statusMessage = problem?.message ?? ""; model.isError = true }
         XCTAssertEqual(model.credentials.count, 1)
-        XCTAssertEqual(model.deferredCredentials.count, 1)
-        try capture(ReceiveView(viewModel: model, onOpenSettings: {}), id: "batch.result.saved_and_deferred")
+        XCTAssertEqual(model.deferredCredentials.count, failure ? 0 : 1)
+        try capture(ReceiveView(viewModel: model, onOpenSettings: {}), id: "batch.result.\(id)")
+    }
+
+    func testNearbyPermission() async throws { try await nearbyState("permission") }
+    func testNearbyReview() async throws { try await nearbyState("review") }
+    func testNearbyExpired() async throws { try await nearbyState("expired") }
+    func testNearbyReceipt() async throws { try await nearbyState("receipt") }
+
+    private func nearbyState(_ kind: String) async throws {
+        let model = try await makeWalletVisualProximityState(kind)
+        defer { model.proximityPresentation.dismiss() }
+        let details = CredentialDisplayNormalizer.details(for: try WalletVisualFixtures().nearbyCredential())
+        let screen = NavigationView {
+            ProximityPresentationView(viewModel: model.proximityPresentation, approvalMode: .constant(.askEachTime),
+                credentialDetailsByID: [details.id: details])
+                .navigationTitle("Share nearby").navigationBarTitleDisplayMode(.inline)
+        }.navigationViewStyle(.stack)
+            // Pin the receipt's hour cycle independently of the machine's 12/24-hour preference.
+            .environment(\.locale, Locale(identifier: "en_US@hours=h23"))
+            .environment(\.timeZone, TimeZone(secondsFromGMT: 0)!)
+        if kind == "review" {
+            XCTAssertTrue(model.proximityPresentation.canApprove)
+            XCTAssertEqual(details.groups.flatMap(\.items).first?.label, "Given name")
+        } else if kind == "expired" || kind == "receipt" { XCTAssertTrue(model.proximityPresentation.isTerminal) }
+        try capture(screen, id: "nearby.\(kind)", config: kind == "review" ? .iPhoneSe : .iPhone13,
+            sizeCategory: kind == "review" ? .accessibilityMedium : .large)
+        if kind == "review" {
+            let content = screen.environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
+                .environment(\.locale, Locale(identifier: "en_US")).environment(\.sizeCategory, .accessibilityMedium)
+            try await captureWhenReady(content, id: "nearby.review.disclosures", config: .iPhoneSe, isReady: { true }, failure: "Review not ready", scrollToBottom: true, scrollFraction: 0.55)
+        }
     }
 
     func testNearbyReady() async throws {
@@ -203,16 +408,71 @@ final class WalletVisualTests: XCTestCase {
         )
     }
 
+    private func captureReview<Content: View>(_ view: Content, id: String, config: ViewImageConfig = .iPhone13,
+                                              colorScheme: ColorScheme = .light, sizeCategory: ContentSizeCategory = .large,
+                                              expected: Set<String>, scrollToBottom: Bool = false) async throws {
+        var ready: Set<String> = []
+        let content = view.environment(\.locale, Locale(identifier: "en_US"))
+            .environment(\.colorScheme, colorScheme).environment(\.sizeCategory, sizeCategory)
+            .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
+            .onPreferenceChange(SharingReviewReadinessKey.self) { ready = $0 }
+        try await captureWhenReady(content, id: id, config: config,
+            isReady: { expected.isSubset(of: ready) }, failure: "Requested credential rows did not finish loading",
+            readinessDescription: { "Expected \(expected.sorted()), rendered \(ready.sorted())" }, scrollToBottom: scrollToBottom)
+    }
+
+    private func captureWhenReady<Content: View>(_ content: Content, id: String, config: ViewImageConfig = .iPhone13,
+                                                 isReady: () -> Bool, failure: String, readinessDescription: () -> String = { "" },
+                                                 scrollToBottom: Bool = false, scrollFraction: CGFloat = 1) async throws {
+        let size = try XCTUnwrap(config.size)
+        let host = WalletVisualHostingController(rootView: content)
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let originalKeyWindow = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(origin: .zero, size: size)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; window.rootViewController = nil; originalKeyWindow?.makeKey() }
+        // Mount and lay out before waiting for SwiftUI tasks/preferences. Cold hosted simulators
+        // can take longer than five seconds to schedule that first update. Readiness, not elapsed
+        // time, still gates every capture; the deadline only bounds a genuine failure.
+        window.layoutIfNeeded()
+        host.view.layoutIfNeeded()
+        let deadline = ProcessInfo.processInfo.systemUptime + 30
+        while !isReady() && ProcessInfo.processInfo.systemUptime < deadline {
+            host.view.layoutIfNeeded()
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        guard isReady() else {
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            let attachment = XCTAttachment(image: image)
+            attachment.name = "readiness-\(id)"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            return XCTFail("\(failure). \(readinessDescription())")
+        }
+        // SnapshotTesting applies its device traits and geometry during capture. Scroll after that
+        // layout, rather than using the live simulator scene's larger viewport.
+        host.scrollToBottom = scrollToBottom
+        host.scrollFraction = scrollFraction
+        try capture(host, id: id, config: config)
+        if scrollToBottom {
+            XCTAssertTrue(host.didScroll, "The compact fixture must overflow and scroll to its requested offset")
+        }
+    }
+
     private func capture<Content: View>(_ view: Content, id: String, config: ViewImageConfig = .iPhone13,
                                       colorScheme: ColorScheme = .light, sizeCategory: ContentSizeCategory = .large,
                                       file: StaticString = #filePath, line: UInt = #line) throws {
         let content = view.environment(\.locale, Locale(identifier: "en_US"))
         .environment(\.colorScheme, colorScheme)
         .environment(\.sizeCategory, sizeCategory)
-        .environment(\.walletDemoBranding, .default)
+        .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
         .background(Color(.systemGroupedBackground))
 
-        try capture(UIHostingController(rootView: content), id: id, config: config, file: file, line: line)
+        try capture(WalletVisualHostingController(rootView: content), id: id, config: config, file: file, line: line)
     }
 
     private func capture(_ controller: UIViewController, id: String, config: ViewImageConfig = .iPhone13,
@@ -244,6 +504,43 @@ final class WalletVisualTests: XCTestCase {
         }
     }
 
+}
+
+/// Applies a test interaction after SnapshotTesting lays out the actual snapshot viewport.
+@MainActor
+private final class WalletVisualHostingController<Content: View>: UIHostingController<Content> {
+    var scrollToBottom = false
+    var scrollFraction: CGFloat = 1
+    private(set) var didScroll = false
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // Core Animation spinners run outside SwiftUI transactions. Freeze their layer clocks at
+        // one frame only in the snapshot host; production loading indicators keep animating.
+        freezeSpinners(view)
+        guard scrollToBottom, let scroll = findScrollView(view) else { return }
+        let bottom = scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom
+        guard bottom > -scroll.adjustedContentInset.top else { return }
+        let top = -scroll.adjustedContentInset.top
+        let target = top + (bottom - top) * scrollFraction
+        if scroll.contentOffset.y != target {
+            scroll.setContentOffset(CGPoint(x: 0, y: target), animated: false)
+        }
+        didScroll = true
+    }
+
+    private func freezeSpinners(_ view: UIView) {
+        if view is UIActivityIndicatorView {
+            view.layer.speed = 0
+            view.layer.timeOffset = 0
+        }
+        view.subviews.forEach(freezeSpinners)
+    }
+
+    private func findScrollView(_ view: UIView) -> UIScrollView? {
+        if let scroll = view as? UIScrollView { return scroll }
+        return view.subviews.lazy.compactMap { self.findScrollView($0) }.first
+    }
 }
 
 /// Every channel must stay within the measured SF Symbol edge noise (5/255); dimensions must match.

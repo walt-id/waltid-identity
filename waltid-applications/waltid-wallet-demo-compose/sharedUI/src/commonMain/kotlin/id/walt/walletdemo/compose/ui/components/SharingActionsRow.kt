@@ -20,6 +20,8 @@ internal fun SharingActionsRow(
     presentation: ReviewActionPresentation = ReviewActionPresentation.Sharing,
     paymentReview: WalletDemoPaymentReview = WalletDemoPaymentReview.NotRequired,
 ) {
+    val canSubmit = enabled && selectionComplete && paymentReview.canConfirm
+    val submit = rememberPaymentSubmission(paymentReview, canSubmit, onSubmit)
     val submitLabel = paymentReview.consent?.affirmativeAction ?: when (presentation) {
         ReviewActionPresentation.Sharing -> "Share"
         ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_approve)
@@ -36,7 +38,7 @@ internal fun SharingActionsRow(
         enabled = enabled || presentation == ReviewActionPresentation.Proximity, testTag = presentation.cancelTestTag,
         icon = WalletSymbol.Decline)
     WalletActions(
-        primary = WalletAction(submitLabel, onSubmit, enabled && selectionComplete && paymentReview.canConfirm, presentation.submitTestTag,
+        primary = WalletAction(submitLabel, submit, canSubmit, presentation.submitTestTag,
             icon = if (paymentReview.consent != null) WalletSymbol.Accept else WalletSymbol.Share),
         secondary = onReject?.let { WalletAction(rejectLabel, it, enabled, presentation.rejectTestTag, WalletSymbol.Decline) } ?: cancel,
         tertiary = cancel.takeIf { onReject != null },

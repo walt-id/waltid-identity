@@ -8,6 +8,12 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class WalletDemoAppAndroidTest {
+    @Test fun externalOfferFailureRemainsVisibleAndCanBeCorrected() = scenarios.externalOfferFailureRemainsVisibleAndCanBeCorrected()
+
+    @Test fun keySetupDefaultNeedsOneConfirmation() = scenarios.keySetupDefaultNeedsOneConfirmation()
+
+    @Test fun pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt() = scenarios.pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt()
+
     private val scenarios = WalletDemoAppTestScenarios()
 
     @Test fun pinSetupRequiresSixDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresSixDigitsAndMatchingConfirmation()
@@ -141,8 +147,8 @@ class WalletDemoAppAndroidTest {
         scenarios.deepLinksRouteToReceiveAndPresentTabs()
 
     @Test
-    fun deepLinksResetReceiveAndPresentDetailStacksEvenWhenUrlIsUnchanged() =
-        scenarios.deepLinksResetReceiveAndPresentDetailStacksEvenWhenUrlIsUnchanged()
+    fun duplicateExternalLinksPreserveReviewUntilExplicitlyClosed() =
+        scenarios.duplicateExternalLinksPreserveReviewUntilExplicitlyClosed()
 
     @Test
     fun credentialsPersistAcrossControllerRecreation() =

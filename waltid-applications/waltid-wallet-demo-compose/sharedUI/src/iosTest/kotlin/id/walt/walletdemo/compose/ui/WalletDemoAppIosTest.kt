@@ -9,6 +9,12 @@ import kotlin.test.Test
 
 @OptIn(InternalComposeUiApi::class)
 class WalletDemoAppIosTest {
+    @Test fun externalOfferFailureRemainsVisibleAndCanBeCorrected() = scenarios.externalOfferFailureRemainsVisibleAndCanBeCorrected()
+
+    @Test fun keySetupDefaultNeedsOneConfirmation() = scenarios.keySetupDefaultNeedsOneConfirmation()
+
+    @Test fun pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt() = scenarios.pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt()
+
     @Test fun pinSetupRequiresSixDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresSixDigitsAndMatchingConfirmation()
     @Test fun pinSetupAuthenticatesBiometricChoiceWithoutLeavingForm() = scenarios.pinSetupAuthenticatesBiometricChoiceWithoutLeavingForm()
 
@@ -149,8 +155,8 @@ class WalletDemoAppIosTest {
         scenarios.deepLinksRouteToReceiveAndPresentTabs()
 
     @Test
-    fun deepLinksResetReceiveAndPresentDetailStacksEvenWhenUrlIsUnchanged() =
-        scenarios.deepLinksResetReceiveAndPresentDetailStacksEvenWhenUrlIsUnchanged()
+    fun duplicateExternalLinksPreserveReviewUntilExplicitlyClosed() =
+        scenarios.duplicateExternalLinksPreserveReviewUntilExplicitlyClosed()
 
     @Test
     fun credentialsPersistAcrossControllerRecreation() =

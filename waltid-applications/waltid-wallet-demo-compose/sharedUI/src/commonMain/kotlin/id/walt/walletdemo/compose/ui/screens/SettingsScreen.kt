@@ -145,20 +145,18 @@ internal fun SettingsScreen(
                                     }
                                     is WalletDemoIdentityDetailsState.Available -> {
                                         val identity = details.details
-                                        WalletSection(stringResource(Res.string.settings_key_protection),
+                                        WalletSection(stringResource(Res.string.setup_summary),
                                             footer = stringResource(Res.string.settings_change_key_notice)) {
-                                            SettingsDetailRow(stringResource(Res.string.settings_storage_policy), identity.storage)
+                                            SigningKeySummary(identity.recovery, identity.storage, identity.authorization)
                                             SettingsDivider()
                                             SettingsDetailRow(stringResource(Res.string.settings_key_protection), identity.protection)
                                             SettingsDivider()
                                             SettingsDetailRow(stringResource(Res.string.settings_key_origin), identity.origin)
-                                            SettingsDivider()
-                                            SettingsDetailRow(stringResource(Res.string.settings_signing_approval), identity.authorization)
                                         }
-                                        WalletSection(stringResource(Res.string.settings_key_backup)) {
-                                            SettingsDetailRow(stringResource(Res.string.settings_backup_status), identity.recovery)
-                                            identity.choices.forEach { choice ->
-                                                SettingsDivider()
+                                        if (identity.choices.isNotEmpty() || currentState.identityProgress != null || currentState.identityError != null)
+                                            WalletSection(stringResource(Res.string.settings_key_backup)) {
+                                            identity.choices.forEachIndexed { index, choice ->
+                                                if (index > 0) SettingsDivider()
                                                 SettingsActionRow(choice.title, {
                                                     if (choice.destructive) deleteRecovery = choice.id else onIdentityAction(choice.id)
                                                 }, detail = choice.detail, enabled = !currentState.identityBusy,

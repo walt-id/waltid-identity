@@ -13,6 +13,17 @@ internal object WalletVisualFixtures {
     private val credential get() = data.getValue("credential").jsonObject
     private val offered get() = data.getValue("offer").jsonObject
 
+    val readerTrustImport: id.walt.wallet2.mobile.ProximityReaderTrustImportPreview get() {
+        val value = data.getValue("readerTrust").jsonObject
+        return id.walt.wallet2.mobile.ProximityReaderTrustImportPreview(
+            id.walt.wallet2.mobile.ProximityReaderTrustImportKind.ReaderCa, value.text("sourceName"),
+            listOf(id.walt.wallet2.mobile.ProximityReaderTrustAnchorPreview(value.text("displayName"),
+                value.text("subject"), value.text("issuer"), value.text("fingerprint"),
+                kotlin.time.Instant.parse(value.text("validFrom")), kotlin.time.Instant.parse(value.text("validUntil")))),
+            emptyList(), id.walt.wallet2.mobile.ProximityReaderTrustSettings(id.walt.wallet2.mobile.ProximityReaderPolicy.RequireTrusted),
+        )
+    }
+
     val credentialSummary: CredentialSummary get() = CredentialSummary(
         id = credential.text("id"), format = credential.text("format"),
         issuer = issuer.text("identifier"), label = credential.text("title"),
@@ -42,6 +53,17 @@ internal object WalletVisualFixtures {
         }.toString()), listOf("en"),
     )
 
+    val keySetup: WalletDemoIdentitySetup.Choose get() = WalletDemoIdentitySetup.Choose(
+        data.getValue("keySetup").jsonObject.getValue("options").jsonArray.map { value ->
+            val item = value.jsonObject
+            fun choice(name: String) = item.getValue(name).jsonObject.let {
+                WalletDemoKeyChoice(it.text("id"), it.text("title"), it.text("detail"))
+            }
+            WalletDemoKeySetupOption(item.text("id"), choice("recovery"), choice("storage"), choice("approval"))
+        })
+
+    val nearbyReviewData get() = data.getValue("nearby").jsonObject.getValue("review").jsonObject
+
     val nearbyQrPayload: String get() = data.getValue("nearby").jsonObject.text("qrPayload")
 
     val partialResult: WalletDemoUiState get() {
@@ -54,7 +76,9 @@ internal object WalletVisualFixtures {
             operation = WalletOperationState.Succeeded(outcome.text("status"), WalletDemoTab.Receive),
             lastReceivedCredentialIds = listOf(credentialSummary.id),
             deferredCredentials = listOf(WalletDemoDeferredCredential(outcome.text("pendingId"),
-                outcome.text("pendingConfigurationId"), 5)),
+                outcome.text("pendingConfigurationId"), 5, status = WalletDemoContinuationStatus.AwaitingIssuer,
+                displayMetadataJson = outcome.getValue("pendingMetadata").toString())),
+            issuanceReceipt = WalletDemoIssuanceReceipt(offer.issuer, setOf(outcome.text("pendingId"))),
         )
     }
 
@@ -81,12 +105,15 @@ internal object WalletVisualFixtures {
         it.jsonObject.text("configurationId") to it.jsonObject.getValue("copies").jsonPrimitive.int
     }
 
-    val payment: WalletDemoPaymentConsent get() {
-        val payment = data.getValue("payment").jsonObject
+    val payment: WalletDemoPaymentConsent get() = payment("payment")
+    val localizedPayment: WalletDemoPaymentConsent get() = payment("paymentLocalized")
+    private fun payment(key: String): WalletDemoPaymentConsent {
+        val payment = data.getValue(key).jsonObject
         return WalletDemoPaymentConsent(
-            revision = payment.text("revision"), locale = payment.text("locale"), title = payment.text("title"),
-            securityHint = null, affirmativeAction = payment.text("affirmativeAction"),
-            denialAction = payment.text("denialAction"), requiresUnsignedRequestWarning = true,
+            revision = payment.text("revision"), locale = payment.text("locale"), title = payment["title"]?.jsonPrimitive?.contentOrNull,
+            securityHint = payment["securityHint"]?.jsonPrimitive?.contentOrNull, affirmativeAction = payment.text("affirmativeAction"),
+            denialAction = payment["denialAction"]?.jsonPrimitive?.contentOrNull,
+            requiresUnsignedRequestWarning = payment["requiresUnsignedRequestWarning"]?.jsonPrimitive?.booleanOrNull ?: true,
             fields = payment.getValue("fields").jsonArray.map {
                 val field = it.jsonObject
                 WalletDemoPaymentField(field.text("name"), null, field.text("value"),
@@ -95,22 +122,35 @@ internal object WalletVisualFixtures {
         )
     }
 
+    val sharingCredentials: List<WalletDemoPresentationCredentialOption> get() =
+        data.getValue("sharing").jsonObject.getValue("credentials").jsonArray.map { item ->
+            val credential = item.jsonObject
+            WalletDemoPresentationCredentialOption(
+                queryId = credential.text("queryId"), credentialId = credential.text("credentialId"),
+                label = credential.text("title"), issuer = credential.text("issuer"), format = credential.text("format"),
+                credentialDataJson = "{}",
+                disclosures = credential.getValue("disclosures").jsonArray.map {
+                    val claim = it.jsonObject
+                    WalletDemoPresentationDisclosure(label = claim.text("label"), path = claim.text("path"),
+                        valueJson = JsonPrimitive(claim.text("value")).toString(), displayValue = claim.text("value"),
+                        selectivelyDisclosable = false)
+                },
+            )
+        }
+
+    val providerReview: WalletDemoSharingReview get() =
+        WalletDemoSharingReviewFixtures.annexCReview(WalletDemoReaderTrust.PendingVerification,
+            listOf(sharingCredentials.first()))
+
     val paymentReview: WalletDemoSharingReview get() {
-        val ordinary = WalletDemoSharingReviewFixtures.credentialOption()
-        val paymentCredential = WalletDemoSharingReviewFixtures.credentialOption(
-            queryId = "payment", credentialId = "visual-payment-credential", label = "Payment authorisation",
-            disclosures = listOf(WalletDemoPresentationDisclosure(
-                label = "Account reference", path = "account_reference", valueJson = "\"Example account\"",
-                displayValue = "Example account", selectivelyDisclosable = false,
-            )),
-        ).copy(format = "dc+sd-jwt")
-        val base = WalletDemoSharingReviewFixtures.digitalCredentialReview(listOf(ordinary, paymentCredential))
+        val options = sharingCredentials
+        val base = WalletDemoSharingReviewFixtures.digitalCredentialReview(options)
         return base.copy(
             request = base.request.copy(transactionData = listOf(ClaimGroup(
                 id = "transaction:0",
                 title = "Payment", items = emptyList(), transactionType = "urn:eudi:sca:payment:1",
             ))),
-            credentialRequirements = listOf(ordinary, paymentCredential).map {
+            credentialRequirements = options.map {
                 WalletDemoPresentationCredentialRequirement(options = listOf(listOf(it.queryId)))
             },
         )

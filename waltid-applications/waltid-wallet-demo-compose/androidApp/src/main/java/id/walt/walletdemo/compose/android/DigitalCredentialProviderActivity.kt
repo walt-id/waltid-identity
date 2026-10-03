@@ -1,248 +1,49 @@
 package id.walt.walletdemo.compose.android
 
-import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.credentials.provider.ProviderGetCredentialRequest
+import androidx.compose.runtime.LaunchedEffect
 import androidx.fragment.app.FragmentActivity
-import id.walt.wallet2.mobile.AndroidDigitalCredentialProvider
-import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
-import id.walt.wallet2.mobile.MobileWalletAnnexCRequest
-import id.walt.wallet2.mobile.MobileWalletAnnexCSubmission
-import id.walt.wallet2.mobile.MobileWalletDigitalCredentialPreview
-import id.walt.wallet2.mobile.MobileWalletDigitalCredentialProtocols
-import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
-import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
-import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
-import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
-import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
-import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
-import id.walt.walletdemo.compose.logic.defaultCredentialSelection
-import id.walt.walletdemo.compose.logic.toSharingReview
-import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewSheet
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
-import id.walt.walletdemo.compose.logic.WalletDemoPaymentConsent
-import id.walt.walletdemo.compose.logic.toDemoPaymentConsent
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewScreen
+import id.walt.walletdemo.compose.ui.WalletProviderStatusScreen
+import id.walt.walletdemo.compose.ui.WalletReviewPresentation
 
-/**
- * Credential Manager provider entry point.
- *
- * Separate from [MainActivity]: Credential Manager owns this task's lifecycle and expects exactly one
- * result from it, which the wallet's own navigation must not be able to influence.
- */
+/** Credential Manager owns the result; navigation and request work belong to a retained model. */
 class DigitalCredentialProviderActivity : FragmentActivity() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val resultIntent = Intent()
-    private var discardReview: (suspend () -> Unit)? = null
+    private lateinit var model: DigitalCredentialProviderModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        scope.launch {
-            runCatching {
-                // Vendored subset of https://www.gstatic.com/gpm-passkeys-privileged-apps/apps.json.
-                // Pinned in the APK on purpose: fetching it would put caller-origin trust on the network.
-                val allowlist = assets.open("privileged_apps.json").bufferedReader().use { it.readText() }
-                val input = AndroidDigitalCredentialProvider.extract(intent, allowlist)
-                // The same construction MainActivity uses: Credential Manager launches this activity
-                // without the wallet UI having run, and a wallet configured independently here would
-                // open a different database.
-                val config = demoWalletConfig()
-                val created = createAndroidDemoMobileWallet(
-                    context = applicationContext,
-                    config = config,
-                    interactionContextProvider = { this@DigitalCredentialProviderActivity },
-                )
-                val wallet = created.wallet
-                created.bootstrap(config.selectedSigningProtection(applicationContext))
-                val showPreview = createAndroidDemoSharingSettingsStore(applicationContext)
-                    .showDcApiPresentationPreview()
-                if (input.request.protocol == MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C) {
-                    val annexCRequest = wallet.annexCRequest(input.request)
-                    val preview = wallet.previewAnnexCPresentation(annexCRequest)
-                    presentOrSubmit(
-                        review = preview.toSharingReview(),
-                        title = "Share mobile document?",
-                        showPreview = showPreview,
-                    ) { selection ->
-                        submitAnnexC(wallet, preview, annexCRequest, selection, input.providerRequest)
-                    }
-                } else {
-                    val preview = wallet.previewDigitalCredentialPresentation(input.request)
-                    discardReview = { wallet.discardDigitalCredentialPreview(preview.requestId) }
-                    presentOrSubmit(
-                        review = preview.toSharingReview(),
-                        title = "Share digital credential?",
-                        showPreview = showPreview,
-                        preparePaymentConsent = { selection ->
-                            wallet.prepareDigitalCredentialPaymentConsent(preview.requestId,
-                                selection.toCredentialSelections(), selection.toDisclosureSelections())?.toDemoPaymentConsent()
-                        },
-                    ) { selection ->
-                        submitDigitalCredential(wallet, preview, selection, input.providerRequest)
-                    }
-                }
-            }.onFailure {
-                reportFailure(it)
-            }
-        }
-    }
-
-    /**
-     * Shows the shared review, or submits the default selection when the Settings toggle is off.
-     *
-     * Cancel and back resolve to different Credential Manager outcomes: Cancel ends the caller's whole
-     * operation, while backing out of this provider's review returns [RESULT_CANCELED] so Credential
-     * Manager can put its selector back up and another provider can still answer.
-     */
-    private fun presentOrSubmit(
-        review: WalletDemoSharingReview,
-        title: String,
-        showPreview: Boolean,
-        preparePaymentConsent: (suspend (WalletDemoSharingSelection) -> WalletDemoPaymentConsent?)? = null,
-        onSubmit: (WalletDemoSharingSelection) -> Unit,
-    ) {
-        if (showPreview) {
-            showReview(review, title, preparePaymentConsent, onSubmit)
-            return
-        }
-        onSubmit(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
-    }
-
-    /**
-     * Shows the shared review UI.
-     *
-     * Cancel and back resolve to different Credential Manager outcomes: Cancel ends the caller's whole
-     * operation, while backing out of this provider's review returns [RESULT_CANCELED] so Credential
-     * Manager can put its selector back up and another provider can still answer.
-     */
-    private fun showReview(
-        review: WalletDemoSharingReview,
-        title: String,
-        preparePaymentConsent: (suspend (WalletDemoSharingSelection) -> WalletDemoPaymentConsent?)? = null,
-        onSubmit: (WalletDemoSharingSelection) -> Unit,
-    ) {
+        model = ViewModelProvider(this, viewModelFactory {
+            initializer { DigitalCredentialProviderModel(applicationContext) }
+        })[DigitalCredentialProviderModel::class.java]
+        model.attach(this)
+        model.start(intent, restored = savedInstanceState != null)
         setContent {
-            var submitting by remember { mutableStateOf(false) }
-            WalletDemoSharingReviewSheet(
-                review = review,
-                title = title,
-                preparePaymentConsent = preparePaymentConsent,
-                enabled = !submitting,
-                onSubmit = { selection ->
-                    submitting = true
-                    onSubmit(selection)
-                },
-                onCancel = {
-                    AndroidDigitalCredentialProvider.setCancellation(resultIntent)
-                    finishProviderResult()
-                },
-                onBackAtRoot = ::finishWithoutProviderResult,
+            LaunchedEffect(model.result) {
+                model.takeResult()?.let { setResult(it.code, it.data); finish() }
+            }
+            val owner = model.reviewController
+            if (owner != null && model.failure == null) {
+                WalletDemoSharingReviewScreen(
+                    review = owner.review, controller = owner, title = model.title,
+                    presentation = WalletReviewPresentation.Sheet,
+                    enabled = !model.submitting,
+                    onSubmit = model::submit, onCancel = model::cancel,
+                    onBackAtRoot = model::back,
+                )
+            } else WalletProviderStatusScreen(
+                title = if (model.failure != null) "Unable to share" else if (model.submitting) "Sharing credentials…" else "Preparing request…",
+                message = model.failure, enabled = !model.submitting, onClose = model::cancel, onDismiss = model::back,
             )
         }
     }
 
-    private fun submitDigitalCredential(
-        wallet: MobileWallet,
-        preview: MobileWalletDigitalCredentialPreview,
-        selection: WalletDemoSharingSelection,
-        providerRequest: ProviderGetCredentialRequest,
-    ) {
-        scope.launch {
-            runCatching {
-                wallet.submitDigitalCredentialPresentation(
-                    requestId = preview.requestId,
-                    selectedCredentialOptions = selection.toCredentialSelections(),
-                    selectedDisclosureOptions = selection.toDisclosureSelections(),
-                    paymentConsentRevision = selection.paymentConsentRevision,
-                )
-            }.onSuccess { response ->
-                AndroidDigitalCredentialProvider.setResponse(resultIntent, response, providerRequest)
-                finishProviderResult()
-            }.onFailure {
-                reportFailure(it)
-            }
-        }
-    }
-
-    private fun submitAnnexC(
-        wallet: MobileWallet,
-        preview: MobileWalletAnnexCPreview,
-        request: MobileWalletAnnexCRequest,
-        selection: WalletDemoSharingSelection,
-        providerRequest: ProviderGetCredentialRequest,
-    ) {
-        scope.launch {
-            runCatching {
-                wallet.submitAnnexCPresentation(
-                    MobileWalletAnnexCSubmission(
-                        requestId = preview.requestId,
-                        verifiedOrigin = preview.verifiedOrigin,
-                        deviceRequestBase64Url = requireNotNull(request.deviceRequestBase64Url),
-                        encryptionInfoBase64Url = requireNotNull(request.encryptionInfoBase64Url),
-                        selectedCredentialOptions = selection.toCredentialSelections(),
-                    )
-                )
-            }.onSuccess { response ->
-                AndroidDigitalCredentialProvider.setResponse(resultIntent, response, providerRequest)
-                finishProviderResult()
-            }.onFailure {
-                reportFailure(it)
-            }
-        }
-    }
-
-    private fun reportFailure(error: Throwable) {
-        Log.e(TAG, "Digital credential presentation failed (${error::class.simpleName})", error)
-        AndroidDigitalCredentialProvider.setFailure(resultIntent)
-        finishProviderResult()
-    }
-
-    private fun finishProviderResult() {
-        setResult(RESULT_OK, resultIntent)
-        finish()
-    }
-
-    /**
-     * Leaves this provider without answering, which Credential Manager reads as "ask again".
-     *
-     * [RESULT_CANCELED] must carry no Credential Manager payload: writing a cancellation exception here
-     * would end the caller's `getCredential` call, as the Cancel button does.
-     */
-    private fun finishWithoutProviderResult() {
-        setResult(RESULT_CANCELED)
-        finish()
-    }
-
     override fun onDestroy() {
-        discardReview?.let { discard ->
-            scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                withContext(NonCancellable) { runCatching { discard() } }
-            }
-        }
-        scope.cancel()
+        if (::model.isInitialized) model.detach(this)
         super.onDestroy()
     }
-
-    private companion object {
-        private const val TAG = "WaltDigitalCredentials"
-    }
 }
-
-private fun WalletDemoSharingSelection.toCredentialSelections(): List<MobileWalletPresentationCredentialSelection> =
-    credentials.map { MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId) }
-
-private fun WalletDemoSharingSelection.toDisclosureSelections(): List<MobileWalletPresentationDisclosureSelection> =
-    disclosures.map { MobileWalletPresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }

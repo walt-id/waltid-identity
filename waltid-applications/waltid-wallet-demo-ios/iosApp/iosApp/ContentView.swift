@@ -6,15 +6,36 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            switch viewModel.auth {
-            case .setup, .login:
-                PinView(viewModel: viewModel)
-            case .storageUnavailable(let message):
-                pinStorageUnavailable(message)
-            case .unlocked:
-                HomeView(viewModel: viewModel)
-            }
+            if viewModel.externalFlow != nil { Color(.systemGroupedBackground).ignoresSafeArea() }
+            else { walletContent }
         }
+        .sheet(isPresented: Binding(get: { viewModel.externalFlow != nil },
+            set: { if !$0 { viewModel.closeExternalFlow() } })) {
+            VStack(spacing: 0) {
+                if viewModel.auth != .unlocked || !viewModel.isReady {
+                    HStack {
+                        Spacer()
+                        Button { viewModel.closeExternalFlow() } label: { Label("Close request", systemImage: "xmark") }
+                            .disabled(!viewModel.canDismissExternalFlow)
+                            .accessibilityIdentifier("wallet.external.close")
+                    }.padding()
+                }
+                walletContent
+            }
+            .modifier(ExternalSheetSize(isReady: viewModel.isReady && viewModel.auth == .unlocked))
+            .interactiveDismissDisabled(!viewModel.canDismissExternalFlow || !viewModel.isReady)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("wallet.external.flow")
+        }
+        .task { viewModel.prepareExternalFlow() }
+        .onChange(of: viewModel.externalFlow) { _ in viewModel.prepareExternalFlow() }
+        .onChange(of: viewModel.isReady) { _ in viewModel.prepareExternalFlow() }
+        .onChange(of: viewModel.isLoading) { _ in viewModel.prepareExternalFlow() }
+        .onChange(of: viewModel.auth) { _ in viewModel.prepareExternalFlow() }
+        .alert("Request already in progress", isPresented: Binding(
+            get: { viewModel.incomingLinkNotice != nil }, set: { if !$0 { viewModel.incomingLinkNotice = nil } })) {
+            Button("OK") { viewModel.incomingLinkNotice = nil }
+        } message: { Text(viewModel.incomingLinkNotice ?? "") }
         .alert(
             "Biometric signing unavailable",
             isPresented: Binding(
@@ -36,6 +57,19 @@ struct ContentView: View {
         }
     }
 
+    private var walletContent: some View {
+        Group {
+            switch viewModel.auth {
+            case .setup, .login:
+                PinView(viewModel: viewModel)
+            case .storageUnavailable(let message):
+                pinStorageUnavailable(message)
+            case .unlocked:
+                HomeView(viewModel: viewModel)
+            }
+        }
+    }
+
     private func pinStorageUnavailable(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("walt.id Wallet")
@@ -50,8 +84,44 @@ struct ContentView: View {
     }
 }
 
-#if DEBUG
-#Preview {
-    ContentView(viewModel: WalletViewModel.mockForUITests())
+// Preview the side-effect-free components in WalletDemoSharingUI. App-host
+// previews must not initialize PIN storage, reader stores or registration services.
+
+/// Use native resizing where available; older iOS retains its standard full-height sheet.
+private struct ExternalSheetSize: ViewModifier {
+    let isReady: Bool
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 16, *) {
+            ResizableExternalSheet(isReady: isReady, needsLargeText: typeSize.isAccessibilitySize, content: content)
+        } else { content }
+    }
 }
-#endif
+
+@available(iOS 16, *)
+private struct ResizableExternalSheet<Content: View>: View {
+    let isReady: Bool
+    let needsLargeText: Bool
+    let content: Content
+    @State private var detent: PresentationDetent = .medium
+    @State private var keyboardVisible = false
+    @State private var resizeAfterKeyboard = false
+
+    var body: some View {
+        content.presentationDetents([.medium, .large], selection: $detent)
+            .presentationDragIndicator(.visible)
+            .onAppear { resize() }
+            .onChange(of: isReady) { _ in
+                if keyboardVisible { resizeAfterKeyboard = true } else { resize() }
+            }
+            .onChange(of: needsLargeText) { _ in resize() }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardVisible = true }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
+                keyboardVisible = false
+                if resizeAfterKeyboard { resizeAfterKeyboard = false; resize() }
+            }
+    }
+
+    private func resize() { detent = isReady && !needsLargeText ? .medium : .large }
+}

@@ -4,13 +4,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
@@ -34,7 +36,6 @@ internal fun OfferReviewSection(
     onCopiesChange: ((String, Int) -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
-    var issuerExpanded by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -44,34 +45,7 @@ internal fun OfferReviewSection(
     ) {
         val issuerName = preview.issuer.display?.name?.trim()?.takeIf { it.isNotEmpty() }
         val issuerIdentifier = preview.issuer.credentialIssuer.trim()
-        val issuerDetails = listOf(
-            MetadataDetailItem(
-                label = "Credential Issuer",
-                value = issuerIdentifier.takeIf { issuerName != null && it != issuerName },
-                linkUri = issuerIdentifier,
-            ),
-        ).filter { !it.value.isNullOrBlank() }
-        ExpandableMetadataCard(
-            title = "Issuer",
-            expanded = issuerExpanded,
-            onToggle = { issuerExpanded = !issuerExpanded },
-            modifier = Modifier.testTag(WalletUiTestTags.OfferIssuerSection),
-            toggleTestTag = WalletUiTestTags.OfferIssuerDetailsToggle,
-            summary = {
-                MetadataIdentityRow(
-                    display = preview.issuer.display,
-                    fallbackName = issuerIdentifier,
-                )
-            },
-            details = {
-                if (issuerDetails.isNotEmpty()) {
-                    MetadataDetailList(
-                        issuerDetails,
-                        modifier = Modifier.testTag(WalletUiTestTags.OfferIssuerDetails),
-                    )
-                }
-            },
-        )
+        IssuanceIssuerSection(preview.issuer)
 
         if (preview.offeredCredentials.isNotEmpty()) {
             val selected = preview.offeredCredentials.map { copies[it.configurationId] ?: 1 }.filter { it > 0 }
@@ -111,6 +85,11 @@ internal fun OfferReviewSection(
         }
 
         preview.transactionCode?.let { requirement ->
+            // Feed IME edits back synchronously. The controller's Flow remains the
+            // request draft, but a delayed frame must not replace a newer iOS edit.
+            var editingCode by remember(requirement) { mutableStateOf(txCode) }
+            var codeFocused by remember { mutableStateOf(false) }
+            LaunchedEffect(txCode, codeFocused) { if (!codeFocused) editingCode = txCode }
             ReviewMetadataSection(
                 title = "Transaction code",
                 modifier = Modifier.testTag(WalletUiTestTags.OfferTransactionCodeSection),
@@ -121,13 +100,10 @@ internal fun OfferReviewSection(
                     style = MaterialTheme.typography.bodySmall,
                 )
                 OutlinedTextField(
-                    value = txCode,
+                    value = editingCode,
                     onValueChange = { value ->
-                        onTxCodeChange(value)
-                        val requiredLength = requirement.length
-                        if (requiredLength != null && requirement.normalizeInput(value).length == requiredLength) {
-                            focusManager.clearFocus()
-                        }
+                        editingCode = requirement.normalizeInput(value)
+                        onTxCodeChange(editingCode)
                     },
                     label = { Text("Code") },
                     supportingText = requirement.length?.let { length ->
@@ -136,12 +112,14 @@ internal fun OfferReviewSection(
                     singleLine = true,
                     enabled = reviewEnabled,
                     keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Done,
                         autoCorrectEnabled = false,
                         keyboardType = when (requirement.inputMode) {
                             WalletDemoTransactionCodeInputMode.Numeric -> KeyboardType.NumberPassword
                             WalletDemoTransactionCodeInputMode.Text -> KeyboardType.Password
                         },
                     ),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                     visualTransformation = PasswordVisualTransformation(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -149,6 +127,7 @@ internal fun OfferReviewSection(
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .onFocusChanged { codeFocused = it.isFocused }
                         .testTag(WalletUiTestTags.TxCodeInput),
                 )
             }
