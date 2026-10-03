@@ -51,6 +51,8 @@ internal object WalletVisualFixtures {
             WalletDemoKeySetupOption(item.text("id"), choice("recovery"), choice("storage"), choice("approval"))
         })
 
+    val nearbyReviewData get() = data.getValue("nearby").jsonObject.getValue("review").jsonObject
+
     val nearbyQrPayload: String get() = data.getValue("nearby").jsonObject.text("qrPayload")
 
     val partialResult: WalletDemoUiState get() {

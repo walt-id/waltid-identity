@@ -97,7 +97,7 @@ class PreparedProximitySharingAndroidTest {
         onNodeWithText("Presentation complete").assertIsDisplayed()
         onNodeWithText("What was shared").assertIsDisplayed()
         onNodeWithText("Done").assertIsDisplayed()
-        onNodeWithText("Data to share").performScrollTo().performClick()
+        // Receipts disclose the sent fields immediately; opening another group is unnecessary.
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
         onNodeWithText("Family name").performScrollTo().assertIsDisplayed()
         onAllNodesWithText("Birth date").assertCountEquals(0)
