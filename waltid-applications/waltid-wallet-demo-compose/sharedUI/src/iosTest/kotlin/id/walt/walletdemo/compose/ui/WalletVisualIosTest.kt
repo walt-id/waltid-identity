@@ -22,6 +22,8 @@ import kotlin.test.Test
 /** Compose iOS/Skia content on an iOS simulator; does not imitate a UIKit provider container. */
 @OptIn(ExperimentalTestApi::class, ExperimentalRoborazziApi::class, InternalComposeUiApi::class)
 class WalletVisualIosTest {
+    @Test fun externalReceiving() = scenario() { externalReceiving() }
+    @Test fun externalUnavailableCallback() = scenario() { externalReceiving(unavailable = true) }
     @Test fun providerSharingReview() = scenario { providerSharingReview() }
     @Test
     fun compactProviderSharingReview() = scenario(size = Size(320f, 568f), dark = true, fontScale = 1.5f) { providerSharingReview(compact = true) }
@@ -99,7 +101,7 @@ class WalletVisualIosTest {
             captureImage = { id ->
                 val root = if (id.endsWith(".unsigned_confirmation"))
                 onNode(isRoot() and hasAnyDescendant(hasTestTag("payment-unsigned-confirm")))
-            else if (id.startsWith("sharing.provider") || id.startsWith("receiving.provider") || id.startsWith("payment.sheet"))
+            else if (id.startsWith("external.") || id.startsWith("sharing.provider") || id.startsWith("receiving.provider") || id.startsWith("payment.sheet"))
                     onNode(isRoot() and hasAnyDescendant(hasTestTag("wallet.review.sheet"))) else onRoot()
                 root.captureRoboImage(this, filePath = "compose-ios-phone-en-light/$id.png")
             },

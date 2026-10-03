@@ -11,16 +11,19 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.fragment.app.FragmentActivity
 import id.walt.walletdemo.compose.logic.DemoWalletConfig
+import id.walt.walletdemo.compose.logic.WalletLinkKind
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityController
 import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.ui.MobileWalletDemoApp
+import id.walt.walletdemo.compose.ui.WalletExternalBackground
 
 const val WALLET_SIGNING_PROTECTION_MODE_EXTRA =
     "id.walt.walletdemo.compose.android.WALLET_SIGNING_PROTECTION_MODE"
 
 class MainActivity : FragmentActivity() {
+    private var launchedForExternalFlow = false
     private lateinit var activityModel: WalletDemoActivityModel
     private lateinit var controller: WalletDemoController
     private lateinit var proximityController: WalletDemoProximityController
@@ -33,6 +36,12 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        launchedForExternalFlow = savedInstanceState?.getBoolean("externalFlowLaunch") ?: when (
+            intent?.data?.toString()?.let(WalletLinkKind::classify)
+        ) {
+            WalletLinkKind.Offer, WalletLinkKind.Presentation -> true
+            else -> false
+        }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
@@ -60,8 +69,15 @@ class MainActivity : FragmentActivity() {
         if (createdSession) handleIntent(intent)
 
         setContent {
-            MobileWalletDemoApp(controller, proximityController, readerTrustSettingsController)
+            MobileWalletDemoApp(controller, proximityController, readerTrustSettingsController,
+                externalBackground = if (launchedForExternalFlow && !isTaskRoot) WalletExternalBackground.Caller else WalletExternalBackground.Wallet,
+                onExternalFlowClosed = { if (launchedForExternalFlow) finish() })
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("externalFlowLaunch", launchedForExternalFlow)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -80,7 +96,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         WalletDemoCredentialStoreNotifier.removeListener(onCredentialStoreChanged)
-        if (::proximityController.isInitialized) proximityController.dismiss()
+        if (isFinishing && ::proximityController.isInitialized) proximityController.dismiss()
         if (::activityModel.isInitialized) activityModel.detach(this)
         super.onDestroy()
     }

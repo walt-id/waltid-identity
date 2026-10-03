@@ -72,8 +72,6 @@ internal object WalletComposeE2EHelper {
     fun receiveThroughApp(device: UiDevice, offerUrl: String) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         sendDeepLink(context, offerUrl, signingProtectionMode = "required")
-        setTextByTag(device, "wallet.offerInput", offerUrl)
-        clickByTag(device, "wallet.receiveButton")
         requireNotNull(waitForResource(device, "wallet.offerAcceptButton", CREDENTIAL_OPERATION_TIMEOUT))
         println("SCA_OPERATOR: approve native issuance prompts")
         clickByTag(device, "wallet.offerAcceptButton")
@@ -147,6 +145,11 @@ internal object WalletComposeE2EHelper {
         val deadline = System.currentTimeMillis() + WALLET_READY_TIMEOUT
         var creationRequested = false
         while (System.currentTimeMillis() < deadline) {
+            // A preceding modal window may leave API 34+ UiAutomation with stale roots.
+            // Refresh accessibility only; never infer readiness from a timer or a status string.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                InstrumentationRegistry.getInstrumentation().uiAutomation.clearCache()
+            }
             val status = latestStatus(device)
             if (device.hasObject(By.res("wallet.scanButton"))) return
             if (status.startsWith("Bootstrap failed")) break

@@ -153,8 +153,8 @@ class WalletDemoAppIosTest {
         scenarios.deepLinksRouteToReceiveAndPresentTabs()
 
     @Test
-    fun deepLinksResetReceiveAndPresentDetailStacksEvenWhenUrlIsUnchanged() =
-        scenarios.deepLinksResetReceiveAndPresentDetailStacksEvenWhenUrlIsUnchanged()
+    fun duplicateExternalLinksPreserveReviewUntilExplicitlyClosed() =
+        scenarios.duplicateExternalLinksPreserveReviewUntilExplicitlyClosed()
 
     @Test
     fun credentialsPersistAcrossControllerRecreation() =

@@ -30,6 +30,7 @@ class WalletDemoController(
         InMemoryWalletDemoSigningProtectionStore(),
     private val sharingSettings: DemoSharingSettingsStore = InMemoryDemoSharingSettingsStore(),
     private val skipPin: Boolean = false,
+    private val canOpenExternalRequest: () -> Boolean = { true },
     private val issuanceRedirectUri: String = "openid://",
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -646,7 +647,16 @@ class WalletDemoController(
     }
 
     fun handleDeepLink(url: String) {
-        when (WalletDeepLinkScheme.parse(url)) {
+        val scheme = WalletDeepLinkScheme.parse(url)
+        if (scheme == WalletDeepLinkScheme.CredentialOffer || scheme == WalletDeepLinkScheme.PresentationRequest) {
+            val current = _state.value
+            if (current.externalFlow?.url == url) return
+            if (!current.canAcceptExternalRequest || !canOpenExternalRequest()) {
+                _state.update { it.copy(incomingLinkNotice = "Finish the current operation before opening another link.") }
+                return
+            }
+        }
+        when (scheme) {
             WalletDeepLinkScheme.CredentialOffer -> {
                 receiveJob?.cancel()
                 paymentConsentJob?.cancel()
@@ -654,6 +664,7 @@ class WalletDemoController(
                 val previous = getAndUpdateState {
                     it.copy(
                         selectedTab = WalletDemoTab.Receive,
+                        externalFlow = WalletExternalFlow.Pending(url, WalletExternalFlow.Kind.Offer),
                         requestDrafts = it.requestDrafts.copy(
                             offerUrl = url,
                             txCode = "",
@@ -683,6 +694,7 @@ class WalletDemoController(
                 val previous = getAndUpdateState {
                     it.copy(
                         selectedTab = WalletDemoTab.Present,
+                        externalFlow = WalletExternalFlow.Pending(url, WalletExternalFlow.Kind.Presentation),
                         requestDrafts = it.requestDrafts.copy(
                             presentationRequestUrl = url,
                             txCode = "",
@@ -709,6 +721,30 @@ class WalletDemoController(
             null -> Unit
         }
     }
+
+    /** Called by the host after unlock/setup. Recomposition or Activity recreation cannot replay it. */
+    fun prepareExternalFlow() {
+        val current = _state.value
+        val pending = current.externalFlow as? WalletExternalFlow.Pending ?: return
+        if (current.auth != WalletAuthState.Unlocked || current.session !is WalletSessionState.Ready || current.isBusy) return
+        if (!_state.compareAndSet(current, current.copy(externalFlow = WalletExternalFlow.Active(pending.url, pending.kind)))) return
+        when (pending.kind) {
+            WalletExternalFlow.Kind.Offer -> previewOffer()
+            WalletExternalFlow.Kind.Presentation -> previewPresentation()
+        }
+    }
+
+    fun closeExternalFlow(): Boolean {
+        val current = _state.value
+        if (current.externalFlow == null || !current.canDismissExternalFlow) return false
+        if (!_state.compareAndSet(current, current.copy(externalFlow = null, incomingLinkNotice = null))) return false
+        startNewReceiveFlow()
+        startNewPresentationFlow()
+        selectTab(WalletDemoTab.Credentials)
+        return true
+    }
+
+    fun dismissIncomingLinkNotice() { _state.update { it.copy(incomingLinkNotice = null) } }
 
     fun startNewReceiveFlow() {
         receiveJob?.cancel()
@@ -997,7 +1033,7 @@ class WalletDemoController(
                 issuanceReceipt = WalletDemoIssuanceReceipt(issuer),
                 receiveCompleted = false,
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
-                selectedTab = WalletDemoTab.Credentials,
+                selectedTab = if (it.externalFlow != null) WalletDemoTab.Receive else WalletDemoTab.Credentials,
             ).withPublishedStatus()
         }
     }
@@ -1046,7 +1082,7 @@ class WalletDemoController(
                                 } else {
                                     it.receiveNavigationResetKey
                                 },
-                                selectedTab = if (received) WalletDemoTab.Credentials else it.selectedTab,
+                                selectedTab = if (received && it.externalFlow == null) WalletDemoTab.Credentials else it.selectedTab,
                                 operation = WalletOperationState.Succeeded(
                                     WalletDisplayText.receivedCredentials(outcome.credentialIds.size),
                                     if (received) WalletDemoTab.Credentials else WalletDemoTab.Receive,
@@ -1151,11 +1187,19 @@ class WalletDemoController(
     fun authorizationRequestOpened() { _state.update { it.copy(authorizationRequestUrl = null) } }
 
     private fun continueAuthorization(callbackUri: String) {
+        if (!_state.value.canAcceptExternalRequest) return
         if (issuanceSession == null) {
             issuanceSession = wallet.pendingAuthorizationIssuance()
         }
         val session = issuanceSession
-        if (session == null) return
+        if (session == null) {
+            _state.update { current ->
+                if (canOpenExternalRequest() && current.externalFlow == null && !current.isBusy && current.offerPreview == null && current.presentationReview == null) {
+                    current.copy(externalFlow = WalletExternalFlow.UnavailableCallback(callbackUri), selectedTab = WalletDemoTab.Receive)
+                } else current
+            }
+            return
+        }
         val current = _state.value
         val ready = current.session as? WalletSessionState.Ready
         if (ready == null) {
@@ -1955,6 +1999,8 @@ class WalletDemoController(
         isChangingSigningProtection = false,
         signingProtectionError = null,
         operation = WalletOperationState.Idle,
+        externalFlow = null,
+        incomingLinkNotice = null,
         requestDrafts = WalletRequestDrafts(),
         offerPreview = null,
         authorizationRequestUrl = null,

@@ -616,6 +616,27 @@
         "T12"
       ],
       "note": "Explicit unsigned confirmation after reviewing the payment. Native alert interaction is covered by MockWalletUITests; this image is a Compose dialog."
+    },
+    {
+      "id": "external.receiving.review",
+      "requirements": [
+        "R08",
+        "R09",
+        "R18"
+      ],
+      "composeTest": "externalReceiving",
+      "swiftTest": "testExternalReceiving",
+      "note": "Compose actual modal window; native bounded receive content with external chrome. Real cold/warm windows, unlock, recreation and return paths have separate UI/instrumentation tests."
+    },
+    {
+      "id": "external.callback.unavailable",
+      "requirements": [
+        "R08",
+        "R09"
+      ],
+      "composeTest": "externalUnavailableCallback",
+      "swiftTest": "testExternalUnavailableCallback",
+      "note": "Unknown callback explains the unavailable original session and provides Close; no automatic replay or fabricated receipt."
     }
   ]
 }

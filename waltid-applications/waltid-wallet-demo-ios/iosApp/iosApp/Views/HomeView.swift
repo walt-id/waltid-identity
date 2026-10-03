@@ -81,6 +81,7 @@ struct HomeView: View {
     }
 
     private func returnHome() {
+        if viewModel.externalFlow != nil { viewModel.closeExternalFlow(); return }
         viewModel.startNewReceiveFlow()
         viewModel.startNewPresentationFlow()
         viewModel.proximityPresentation.dismiss()
