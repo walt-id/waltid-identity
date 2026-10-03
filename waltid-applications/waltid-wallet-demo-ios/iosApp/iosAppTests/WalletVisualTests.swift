@@ -312,7 +312,9 @@ final class WalletVisualTests: XCTestCase {
             .environment(\.sizeCategory, .large)
         try await captureWhenReady(content, id: "credential.media.loaded", isReady: {
             items.allSatisfy { readyImages.contains($0.path.id) }
-        }, failure: "Image rows did not render their thumbnails")
+        }, failure: "Image rows did not render their thumbnails", readinessDescription: {
+            "Expected \(items.map { $0.path.id }.sorted()), rendered \(readyImages.sorted())"
+        })
     }
 
     func testPartialBatchResult() async throws { try await batchResult() }
@@ -415,11 +417,13 @@ final class WalletVisualTests: XCTestCase {
             .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
             .onPreferenceChange(SharingReviewReadinessKey.self) { ready = $0 }
         try await captureWhenReady(content, id: id, config: config,
-            isReady: { expected.isSubset(of: ready) }, failure: "Requested credential rows did not finish loading", scrollToBottom: scrollToBottom)
+            isReady: { expected.isSubset(of: ready) }, failure: "Requested credential rows did not finish loading",
+            readinessDescription: { "Expected \(expected.sorted()), rendered \(ready.sorted())" }, scrollToBottom: scrollToBottom)
     }
 
     private func captureWhenReady<Content: View>(_ content: Content, id: String, config: ViewImageConfig = .iPhone13,
-                                                 isReady: () -> Bool, failure: String, scrollToBottom: Bool = false, scrollFraction: CGFloat = 1) async throws {
+                                                 isReady: () -> Bool, failure: String, readinessDescription: () -> String = { "" },
+                                                 scrollToBottom: Bool = false, scrollFraction: CGFloat = 1) async throws {
         let size = try XCTUnwrap(config.size)
         let host = WalletVisualHostingController(rootView: content)
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
@@ -429,9 +433,26 @@ final class WalletVisualTests: XCTestCase {
         window.rootViewController = host
         window.makeKeyAndVisible()
         defer { window.isHidden = true; window.rootViewController = nil; originalKeyWindow?.makeKey() }
-        let deadline = Date().addingTimeInterval(5)
-        while Date() < deadline && !isReady() { try await Task.sleep(nanoseconds: 10_000_000) }
-        guard isReady() else { return XCTFail(failure) }
+        // Mount and lay out before waiting for SwiftUI tasks/preferences. Cold hosted simulators
+        // can take longer than five seconds to schedule that first update. Readiness, not elapsed
+        // time, still gates every capture; the deadline only bounds a genuine failure.
+        window.layoutIfNeeded()
+        host.view.layoutIfNeeded()
+        let deadline = ProcessInfo.processInfo.systemUptime + 30
+        while !isReady() && ProcessInfo.processInfo.systemUptime < deadline {
+            host.view.layoutIfNeeded()
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        guard isReady() else {
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            let attachment = XCTAttachment(image: image)
+            attachment.name = "readiness-\(id)"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            return XCTFail("\(failure). \(readinessDescription())")
+        }
         // SnapshotTesting applies its device traits and geometry during capture. Scroll after that
         // layout, rather than using the live simulator scene's larger viewport.
         host.scrollToBottom = scrollToBottom
