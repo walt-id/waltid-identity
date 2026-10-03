@@ -19,6 +19,17 @@ struct WalletVisualFixtures {
         XCTAssertEqual(root["schemaVersion"] as? Int, 1)
     }
 
+    func readerTrustImport() throws -> ProximityReaderTrustImportPreview {
+        let value = try object(root, "readerTrust")
+        let authority = ProximityReaderTrustAnchorImportPreview(displayName: try text(value, "displayName"),
+            subject: try text(value, "subject"), issuer: try text(value, "issuer"), sha256Fingerprint: try text(value, "fingerprint"),
+            validFrom: try XCTUnwrap(ISO8601DateFormatter().date(from: text(value, "validFrom"))),
+            validUntil: try XCTUnwrap(ISO8601DateFormatter().date(from: text(value, "validUntil"))), profile: "X.509 CA certificate")
+        return ProximityReaderTrustImportPreview(kind: .readerCA, sourceName: try text(value, "sourceName"),
+            readerAuthorities: [authority], ricalProviders: [], policyEffect: "Only trusted readers can proceed to review.",
+            resultingSettings: .init(readerPolicy: .requireTrusted))
+    }
+
     @MainActor
     func keySetupOptions() throws -> [WalletIdentityScreenModel.SetupOption] {
         try array(object(root, "keySetup"), "options").map { item in

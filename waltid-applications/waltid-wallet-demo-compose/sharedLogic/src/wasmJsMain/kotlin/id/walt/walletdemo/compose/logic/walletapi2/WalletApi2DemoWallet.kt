@@ -34,8 +34,9 @@ fun createWalletApi2DemoWallet(
     redirectUri: String,
     kind: WalletApiKind = WalletApiKind.OpenSource,
     onWalletIdChanged: (String) -> Unit = {},
+    onSessionExpired: () -> Unit = {},
 ): DemoWallet = WalletApi2DemoWallet(
-    client = WalletApi2Client(baseUrl = baseUrl, token = token, kind = kind),
+    client = WalletApi2Client(baseUrl = baseUrl, token = token, kind = kind, onSessionExpired = onSessionExpired),
     kind = kind,
     walletId = walletId,
     redirectUri = redirectUri,

@@ -140,13 +140,8 @@ struct PresentView: View {
                     focusResetKey: viewModel.inputFocusResetKey
                 )
 
-                Button("Preview") {
-                    viewModel.previewPresentation()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(branding.primary)
-                .disabled(!viewModel.presentationPreviewActionEnabled)
-                .accessibilityIdentifier(WalletAccessibilityID.presentButton)
+                WalletActions(primary: WalletAction("Preview", enabled: viewModel.presentationPreviewActionEnabled,
+                    identifier: WalletAccessibilityID.presentButton, perform: viewModel.previewPresentation))
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("In-person presentation")
@@ -154,16 +149,10 @@ struct PresentView: View {
                     Text("Show a QR code or hold this iPhone near a compatible reader to present an mdoc.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Button("Present to nearby reader") {
-                        proximityPresentation.start()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(branding.primary)
-                    .disabled(
-                        !viewModel.isReady || viewModel.isLoading || viewModel.credentials.isEmpty
-                            || viewModel.presentationReview != nil || readerTrustSettings.loading
-                    )
-                    .accessibilityIdentifier(WalletAccessibilityID.proximityStartButton)
+                    WalletActions(primary: WalletAction("Present to nearby reader",
+                        enabled: viewModel.isReady && !viewModel.isLoading && !viewModel.credentials.isEmpty
+                            && viewModel.presentationReview == nil && !readerTrustSettings.loading,
+                        identifier: WalletAccessibilityID.proximityStartButton, perform: proximityPresentation.start))
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)

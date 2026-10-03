@@ -27,6 +27,27 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @OptIn(ExperimentalTestApi::class, ExperimentalMaterial3Api::class)
 class WalletVisualAndroidTest {
+    private lateinit var previousTimeZone: java.util.TimeZone
+    @org.junit.Before fun pinTimeZone() {
+        previousTimeZone = java.util.TimeZone.getDefault()
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"))
+    }
+    @org.junit.After fun restoreTimeZone() { java.util.TimeZone.setDefault(previousTimeZone) }
+
+    @Test fun controls() = scenario { controls() }
+    @Test fun controlsRtl() = scenario { controls(rtl = true) }
+
+    @Test fun settingsReader() = scenario { settingsRoot("reader") }
+    @Test fun settingsReaderRequired() = scenario { settingsRoot("reader_required") }
+    @Test fun readerTrustImport() = scenario { readerTrustImport() }
+    @Test fun settingsDcApiEnabled() = scenario { settingsRoot("dc_api") }
+    @Test fun settingsDcApiDisabled() = scenario { settingsRoot("dc_api", reviewEnabled = false) }
+    @Test fun settingsNearby() = scenario { settingsRoot("nearby") }
+    @Test fun settingsConnection() = scenario { settingsRoot("connection") }
+    @Test fun settingsTechnical() = scenario { settingsRoot("technical") }
+    @Test fun accountEmpty() = scenario { account("empty") }
+    @Test fun accountBusy() = scenario { account("busy") }
+    @Test fun accountExpired() = scenario { account("expired") }
     @Test fun nearbyPermission() = scenario { nearbyState("permission") }
     @Test
     @Config(qualifiers = "en-rUS-w320dp-h568dp-notnight-mdpi")
