@@ -272,5 +272,14 @@
     ],
     "securityHint": "Prüfen Sie Betrag und Empfänger.",
     "requiresUnsignedRequestWarning": false
+  },
+  "readerTrust": {
+    "sourceName": "example-reader-ca.pem",
+    "displayName": "Example Reader CA",
+    "subject": "CN=Example Reader CA, O=Example Authority",
+    "issuer": "CN=Example Reader CA, O=Example Authority",
+    "fingerprint": "12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78",
+    "validFrom": "2026-01-01T00:00:00Z",
+    "validUntil": "2031-01-01T00:00:00Z"
   }
 }

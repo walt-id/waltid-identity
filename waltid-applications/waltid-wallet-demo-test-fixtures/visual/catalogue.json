@@ -2,21 +2,21 @@
   "schemaVersion": 1,
   "renderers": {
     "android": {
-      "environment": "Robolectric 4.16 / API 35 / en-US / mdpi / 393x852 / light",
+      "environment": "Robolectric 4.16 / API 35 / en-US / mdpi / 393x852 / light / UTC",
       "baselineDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light",
       "resultDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/roborazzi/androidHostTest/results",
       "junit": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/testAndroidHostTest/TEST-id.walt.walletdemo.compose.ui.WalletVisualAndroidTest.xml",
       "suite": "id.walt.walletdemo.compose.ui.WalletVisualAndroidTest"
     },
     "compose-ios": {
-      "environment": "Compose 1.11.1 / iOS 26.5 / headless Skia / density 1 / 393x852 / light",
+      "environment": "Compose 1.11.1 / iOS 26.5 / headless Skia / density 1 / 393x852 / light / UTC",
       "baselineDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light",
       "resultDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/roborazzi/iosSimulatorArm64/results",
       "junit": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/iosSimulatorArm64Test/TEST-iosSimulatorArm64Test.id.walt.walletdemo.compose.ui.WalletVisualIosTest.xml",
       "suite": "iosSimulatorArm64Test.id.walt.walletdemo.compose.ui.WalletVisualIosTest"
     },
     "swiftui": {
-      "environment": "Xcode 27 / iOS 26.5 / hosted SwiftUI / iPhone 13 layout / scale 3 / en-US / light / Large",
+      "environment": "Xcode 27 / iOS 26.5 / hosted SwiftUI / iPhone 13 layout / scale 3 / en-US / light / Large / UTC",
       "baselineDirectory": "waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests",
       "suite": "WalletVisualTests",
       "suffix": ".native-ios26_5-phone-en-light"
@@ -705,6 +705,161 @@
         "R12"
       ],
       "note": "Production nearby review at 320x568 with Compose font scale 1.5 / SwiftUI accessibilityMedium; selected values, retention and pinned actions. Scrolled to the requested field."
+    },
+    {
+      "id": "settings.dc_api.enabled",
+      "requirements": [
+        "R01",
+        "R02",
+        "R03",
+        "R15"
+      ],
+      "composeTest": "settingsDcApiEnabled",
+      "swiftTest": "testSettingsDcApiEnabled"
+    },
+    {
+      "id": "settings.dc_api.disabled",
+      "requirements": [
+        "R01",
+        "R02",
+        "R03",
+        "R15"
+      ],
+      "composeTest": "settingsDcApiDisabled",
+      "swiftTest": "testSettingsDcApiDisabled"
+    },
+    {
+      "id": "settings.nearby.default",
+      "requirements": [
+        "R01",
+        "R02",
+        "R03",
+        "R15"
+      ],
+      "composeTest": "settingsNearby",
+      "swiftTest": "testSettingsNearby"
+    },
+    {
+      "id": "settings.connection.default",
+      "requirements": [
+        "R01",
+        "R02",
+        "R03",
+        "R15"
+      ],
+      "composeTest": "settingsConnection",
+      "swiftTest": "testSettingsConnection"
+    },
+    {
+      "id": "settings.technical.unavailable",
+      "requirements": [
+        "R01",
+        "R02",
+        "R03",
+        "R15"
+      ],
+      "composeTest": "settingsTechnical",
+      "swiftTest": "testSettingsTechnical"
+    },
+    {
+      "id": "account.empty",
+      "requirements": [
+        "R01",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "accountEmpty",
+      "renderers": [
+        "android",
+        "compose-ios"
+      ],
+      "note": "Shared Web account content rendered at phone size; real browser account behavior is verified separately. Native app uses PIN rather than account sign-in."
+    },
+    {
+      "id": "account.busy",
+      "requirements": [
+        "R01",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "accountBusy",
+      "renderers": [
+        "android",
+        "compose-ios"
+      ],
+      "note": "Shared Web account content rendered at phone size; real browser account behavior is verified separately. Native app uses PIN rather than account sign-in."
+    },
+    {
+      "id": "account.expired",
+      "requirements": [
+        "R01",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "accountExpired",
+      "renderers": [
+        "android",
+        "compose-ios"
+      ],
+      "note": "Shared Web account content rendered at phone size; real browser account behavior is verified separately. Native app uses PIN rather than account sign-in."
+    },
+    {
+      "id": "settings.reader.default",
+      "requirements": [
+        "R01",
+        "R02",
+        "R03",
+        "R15"
+      ],
+      "composeTest": "settingsReader",
+      "swiftTest": "testSettingsReader",
+      "note": "Synthetic trust display only; import validation and persistence have separate tests."
+    },
+    {
+      "id": "settings.reader_required.default",
+      "requirements": [
+        "R01",
+        "R02",
+        "R03",
+        "R15"
+      ],
+      "composeTest": "settingsReaderRequired",
+      "swiftTest": "testSettingsReaderRequired",
+      "note": "Synthetic trust display only; import validation and persistence have separate tests."
+    },
+    {
+      "id": "settings.reader.import_review",
+      "requirements": [
+        "R01",
+        "R02",
+        "R03",
+        "R15"
+      ],
+      "composeTest": "readerTrustImport",
+      "swiftTest": "testReaderTrustImport",
+      "note": "Synthetic trust display only; import validation and persistence have separate tests."
+    },
+    {
+      "id": "components.controls.default",
+      "requirements": [
+        "R11",
+        "R13",
+        "R16"
+      ],
+      "composeTest": "controls",
+      "swiftTest": "testControls",
+      "note": "Side-effect-free controls fixture shared with IDE previews. RTL checks reading-direction mirroring, not translated labels."
+    },
+    {
+      "id": "components.controls.rtl",
+      "requirements": [
+        "R11",
+        "R13",
+        "R16"
+      ],
+      "composeTest": "controlsRtl",
+      "swiftTest": "testControlsRtl",
+      "note": "Side-effect-free controls fixture shared with IDE previews. RTL checks reading-direction mirroring, not translated labels."
     }
   ]
 }

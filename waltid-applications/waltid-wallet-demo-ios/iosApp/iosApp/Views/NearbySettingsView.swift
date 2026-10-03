@@ -63,7 +63,7 @@ struct NearbySettingsView: View {
     }
 }
 
-private struct ConnectionSettingsView: View {
+struct ConnectionSettingsView: View {
     @ObservedObject var viewModel: WalletViewModel
 
     var body: some View {

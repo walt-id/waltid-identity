@@ -13,10 +13,10 @@ final class WalletE2EUI {
     func completeKeySetupIfNeeded() {
         let button = app.buttons["wallet.keySetupContinue"]
         guard button.waitForExistence(timeout: 10) else { return }
-        for heading in ["1 of 3 · Recovery", "2 of 3 · Key storage", "3 of 3 · Signing approval"] {
-            XCTAssertTrue(app.staticTexts[heading].waitForExistence(timeout: 10), "Missing setup step: \(heading)")
-            button.tap()
-        }
+        XCTAssertTrue(app.buttons["wallet.keySetupEdit.Recovery"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["wallet.keySetupEdit.Storage"].exists)
+        XCTAssertTrue(app.buttons["wallet.keySetupEdit.Approval"].exists)
+        button.tap()
     }
 
     func launch(environment: [String: String] = [:], initializeSigningIdentity: Bool = true) {
@@ -155,19 +155,39 @@ final class WalletE2EUI {
     }
 
     func openDeepLink(_ value: String) {
-        guard let url = URL(string: value) else {
+        guard URL(string: value) != nil else {
             XCTFail("Invalid deep link URL: \(value)")
             return
         }
 
-        app.open(url)
-        app.activate()
-
-        let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
-        if pinInput.waitForExistence(timeout: 2) {
-            unlockWallet()
-            _ = waitUntilWalletReady(timeout: 60)
+        // XCUIApplication.open launches a new process. Enter the link in Safari
+        // to exercise delivery to the running wallet and its navigation state.
+        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
+        safari.activate()
+        let address = safari.textFields.firstMatch
+        if !address.waitForExistence(timeout: 5), safari.buttons["Continue"].exists {
+            safari.buttons["Continue"].tap()
         }
+        XCTAssertTrue(address.waitForExistence(timeout: 10), safari.debugDescription)
+        address.tap()
+        address.typeText(value + XCUIKeyboardKey.return.rawValue)
+        // Safari can put its first-run toolbar tip above the external-app confirmation.
+        // Dismiss that tip before waiting for the real Open action to become enabled.
+        let tip = safari.staticTexts.matching(NSPredicate(format: "label CONTAINS[cd] %@", "View Bookmarks")).firstMatch
+        if tip.waitForExistence(timeout: 2) {
+            let close = safari.buttons["Close"].firstMatch
+            if close.exists { close.tap() }
+        }
+        let open = safari.buttons["Open"]
+        if open.waitForExistence(timeout: 5) {
+            let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: open)
+            XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 10), .completed, safari.debugDescription)
+            // Safari's external-app confirmation reports no XCTest hit point on
+            // iOS 26. Tap the visible button's own frame, not a fixed coordinate.
+            XCTAssertFalse(open.frame.isEmpty)
+            open.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10), safari.debugDescription)
     }
 
     func waitForTextInputValue(identifier: String, fallbackLabel: String, value: String, timeout: TimeInterval) -> Bool {
@@ -182,32 +202,25 @@ final class WalletE2EUI {
         return false
     }
 
-    /// Compose iOS can swallow the first Preview activation after a deep-linked URL field.
-    /// Retry once with a coordinate tap, and treat the review surface as success even if the
-    /// status banner has already dismissed.
-    func previewPresentation(timeout: TimeInterval) -> String? {
-        let prefixes = [
-            "Review presentation request",
-            "Preview failed",
-            "Present failed",
-            "Receive failed",
-            "Bootstrap failed",
-        ]
-        tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview")
-        if presentationReviewVisible() {
-            return latestStatus(prefixes: prefixes) ?? "Review presentation request"
-        }
-        if let status = waitForStatus(prefixes: prefixes, timeout: min(timeout, 8)) {
-            return status
-        }
-        tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview", useCoordinateTap: true)
-        if let status = waitForStatus(prefixes: prefixes, timeout: timeout) {
-            return status
-        }
-        if presentationReviewVisible() {
-            return "Review presentation request"
+    func waitForPresentationReview(timeout: TimeInterval) -> String? {
+        let prefixes = ["Review presentation request", "Preview failed", "Present failed", "Bootstrap failed"]
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let status = latestStatus(prefixes: prefixes) { return status }
+            if presentationReviewVisible() { return "Review presentation request" }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
         return nil
+    }
+
+    func openWalletLink(_ value: String) {
+        for identifier in ["issuance-done", "wallet-detail-close", "wallet.presentationClaimsClose", "wallet.detailsBack", "wallet.flowBack"] {
+            let button = app.buttons[identifier]
+            if button.exists && button.isHittable { button.tap() }
+        }
+        tapButton(identifier: "wallet.scanButton", fallbackLabel: "Scan or paste")
+        replaceText(in: textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request"), value: value)
+        tapButton(identifier: "wallet.scanContinue", fallbackLabel: "Continue")
     }
 
     func presentationReviewVisible() -> Bool {
@@ -228,7 +241,7 @@ final class WalletE2EUI {
         }
     }
 
-    func replaceText(in element: XCUIElement, value: String) {
+    func replaceText(in element: XCUIElement, value: String, dismiss: Bool = true) {
         XCTAssertTrue(element.waitForExistence(timeout: 20), "Input element not found")
         makeHittable(element)
         XCTAssertTrue(element.isHittable, "Input element is not hittable")
@@ -245,7 +258,7 @@ final class WalletE2EUI {
         }
 
         element.typeText(value)
-        dismissKeyboard(focusedElement: element)
+        if dismiss { dismissKeyboard(focusedElement: element) }
     }
 
     private func focusTextInput(_ element: XCUIElement, timeout: TimeInterval = 15) -> Bool {
@@ -327,12 +340,19 @@ final class WalletE2EUI {
     private func dismissKeyboard(focusedElement: XCUIElement? = nil) {
         guard app.keyboards.firstMatch.exists else { return }
 
+        // A completed transaction code clears focus in the app. Wait for its keyboard
+        // animation; tapping the old top-of-screen coordinate dismisses the entire sheet.
+        if let focusedElement, !hasKeyboardFocus(in: focusedElement) {
+            let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch)
+            if XCTWaiter.wait(for: [hidden], timeout: 3) == .completed { return }
+        }
+
         let doneButton = app.toolbars.buttons["Done"]
         if doneButton.exists && doneButton.isHittable {
             doneButton.tap()
         } else if let focusedElement, hasKeyboardFocus(in: focusedElement) {
             focusedElement.typeText(XCUIKeyboardKey.return.rawValue)
-        } else {
+        } else if !app.descendants(matching: .any)["wallet.review.sheet"].exists {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
         }
         RunLoop.current.run(until: Date().addingTimeInterval(0.3))
