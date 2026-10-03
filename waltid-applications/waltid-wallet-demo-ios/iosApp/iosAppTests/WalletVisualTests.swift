@@ -8,6 +8,27 @@ import XCTest
 
 @MainActor
 final class WalletVisualTests: XCTestCase {
+    func testExternalReceiving() async throws { try await externalReceiving(unavailable: false) }
+    func testExternalUnavailableCallback() async throws { try await externalReceiving(unavailable: true) }
+
+    private func externalReceiving(unavailable: Bool) async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        model.isReady = true
+        model.statusMessage = ""
+        model.externalFlow = unavailable ? .unavailableCallback(URL(string: "openid://callback")!)
+            : .active(URL(string: "openid-credential-offer://fixture")!, .offer)
+        model.selectedTab = .receive
+        if !unavailable {
+            let fixtures = try WalletVisualFixtures()
+            model.offerPreview = try fixtures.offer()
+            model.issuanceCopyCounts = try fixtures.copies()
+        }
+        // The real native sheet/window is covered by the URL-launch UI journey; this pins its content.
+        try capture(ReceiveView(viewModel: model, onOpenSettings: {}, onBack: {}),
+            id: unavailable ? "external.callback.unavailable" : "external.receiving.review", config: .iPhoneSe)
+    }
+
     func testKeySummary() throws { try keySetup(.summary) }
     func testKeyRecovery() throws { try keySetup(.recovery) }
     func testKeyStorage() throws { try keySetup(.storage) }
@@ -292,7 +313,7 @@ final class WalletVisualTests: XCTestCase {
         var ready: Set<String> = []
         let content = view.environment(\.locale, Locale(identifier: "en_US"))
             .environment(\.colorScheme, colorScheme).environment(\.sizeCategory, sizeCategory)
-            .environment(\.walletDemoBranding, .default)
+            .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
             .onPreferenceChange(SharingReviewReadinessKey.self) { ready = $0 }
         try await captureWhenReady(content, id: id, config: config,
             isReady: { expected.isSubset(of: ready) }, failure: "Requested credential rows did not finish loading", scrollToBottom: scrollToBottom)
@@ -327,7 +348,7 @@ final class WalletVisualTests: XCTestCase {
         let content = view.environment(\.locale, Locale(identifier: "en_US"))
         .environment(\.colorScheme, colorScheme)
         .environment(\.sizeCategory, sizeCategory)
-        .environment(\.walletDemoBranding, .default)
+        .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
         .background(Color(.systemGroupedBackground))
 
         try capture(WalletVisualHostingController(rootView: content), id: id, config: config, file: file, line: line)

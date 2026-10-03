@@ -54,6 +54,7 @@
         android:theme="@style/Theme.WalletDemoCompose">
         <activity
             android:name=".MainActivity"
+            android:theme="@style/Theme.WalletDemoCompose.Translucent"
             android:exported="true"
             android:launchMode="singleTop">
             <intent-filter>
