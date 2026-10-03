@@ -637,6 +637,74 @@
       "composeTest": "externalUnavailableCallback",
       "swiftTest": "testExternalUnavailableCallback",
       "note": "Unknown callback explains the unavailable original session and provides Close; no automatic replay or fabricated receipt."
+    },
+    {
+      "id": "nearby.permission",
+      "composeTest": "nearbyPermission",
+      "swiftTest": "testNearbyPermission",
+      "requirements": [
+        "R02",
+        "R05",
+        "R06",
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "note": "Production nearby content with a synthetic SDK state; no radio transport or OS permission prompt. Receipt input uses an explicit fixture timestamp."
+    },
+    {
+      "id": "nearby.review",
+      "composeTest": "nearbyReview",
+      "swiftTest": "testNearbyReview",
+      "requirements": [
+        "R02",
+        "R05",
+        "R06",
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "note": "Production nearby review at 320x568 with Compose font scale 1.5 / SwiftUI accessibilityMedium; selected values, retention and pinned actions. Initial viewport."
+    },
+    {
+      "id": "nearby.expired",
+      "composeTest": "nearbyExpired",
+      "swiftTest": "testNearbyExpired",
+      "requirements": [
+        "R02",
+        "R05",
+        "R06",
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "note": "Production nearby content with a synthetic SDK state; no radio transport or OS permission prompt. Receipt input uses an explicit fixture timestamp."
+    },
+    {
+      "id": "nearby.receipt",
+      "composeTest": "nearbyReceipt",
+      "swiftTest": "testNearbyReceipt",
+      "requirements": [
+        "R02",
+        "R05",
+        "R06",
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "note": "Production nearby content with a synthetic SDK state; no radio transport or OS permission prompt. Receipt input uses an explicit fixture timestamp."
+    },
+    {
+      "id": "nearby.review.disclosures",
+      "composeTest": "nearbyReview",
+      "swiftTest": "testNearbyReview",
+      "requirements": [
+        "R04",
+        "R05",
+        "R07",
+        "R12"
+      ],
+      "note": "Production nearby review at 320x568 with Compose font scale 1.5 / SwiftUI accessibilityMedium; selected values, retention and pinned actions. Scrolled to the requested field."
     }
   ]
 }

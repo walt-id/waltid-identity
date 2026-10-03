@@ -275,6 +275,33 @@ final class WalletVisualTests: XCTestCase {
         try capture(ReceiveView(viewModel: model, onOpenSettings: {}), id: "batch.result.\(id)")
     }
 
+    func testNearbyPermission() async throws { try await nearbyState("permission") }
+    func testNearbyReview() async throws { try await nearbyState("review") }
+    func testNearbyExpired() async throws { try await nearbyState("expired") }
+    func testNearbyReceipt() async throws { try await nearbyState("receipt") }
+
+    private func nearbyState(_ kind: String) async throws {
+        let model = try await makeWalletVisualProximityState(kind)
+        defer { model.proximityPresentation.dismiss() }
+        let details = CredentialDisplayNormalizer.details(for: try WalletVisualFixtures().nearbyCredential())
+        let screen = NavigationView {
+            ProximityPresentationView(viewModel: model.proximityPresentation, approvalMode: .constant(.askEachTime),
+                credentialDetailsByID: [details.id: details])
+                .navigationTitle("Share nearby").navigationBarTitleDisplayMode(.inline)
+        }.navigationViewStyle(.stack)
+        if kind == "review" {
+            XCTAssertTrue(model.proximityPresentation.canApprove)
+            XCTAssertEqual(details.groups.flatMap(\.items).first?.label, "Given name")
+        } else if kind == "expired" || kind == "receipt" { XCTAssertTrue(model.proximityPresentation.isTerminal) }
+        try capture(screen, id: "nearby.\(kind)", config: kind == "review" ? .iPhoneSe : .iPhone13,
+            sizeCategory: kind == "review" ? .accessibilityMedium : .large)
+        if kind == "review" {
+            let content = screen.environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
+                .environment(\.locale, Locale(identifier: "en_US")).environment(\.sizeCategory, .accessibilityMedium)
+            try await captureWhenReady(content, id: "nearby.review.disclosures", config: .iPhoneSe, isReady: { true }, failure: "Review not ready", scrollToBottom: true, scrollFraction: 0.55)
+        }
+    }
+
     func testNearbyReady() async throws {
         let model = try await makeWalletVisualProximityModel(qrPayload: WalletVisualFixtures().nearbyQrPayload())
         defer { model.proximityPresentation.dismiss() }
@@ -320,7 +347,7 @@ final class WalletVisualTests: XCTestCase {
     }
 
     private func captureWhenReady<Content: View>(_ content: Content, id: String, config: ViewImageConfig = .iPhone13,
-                                                 isReady: () -> Bool, failure: String, scrollToBottom: Bool = false) async throws {
+                                                 isReady: () -> Bool, failure: String, scrollToBottom: Bool = false, scrollFraction: CGFloat = 1) async throws {
         let size = try XCTUnwrap(config.size)
         let host = WalletVisualHostingController(rootView: content)
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
@@ -336,9 +363,10 @@ final class WalletVisualTests: XCTestCase {
         // SnapshotTesting applies its device traits and geometry during capture. Scroll after that
         // layout, rather than using the live simulator scene's larger viewport.
         host.scrollToBottom = scrollToBottom
+        host.scrollFraction = scrollFraction
         try capture(host, id: id, config: config)
         if scrollToBottom {
-            XCTAssertTrue(host.didScrollToBottom, "The compact fixture must overflow and reach its last row")
+            XCTAssertTrue(host.didScroll, "The compact fixture must overflow and scroll to its requested offset")
         }
     }
 
@@ -389,7 +417,8 @@ final class WalletVisualTests: XCTestCase {
 @MainActor
 private final class WalletVisualHostingController<Content: View>: UIHostingController<Content> {
     var scrollToBottom = false
-    private(set) var didScrollToBottom = false
+    var scrollFraction: CGFloat = 1
+    private(set) var didScroll = false
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
@@ -399,10 +428,12 @@ private final class WalletVisualHostingController<Content: View>: UIHostingContr
         guard scrollToBottom, let scroll = findScrollView(view) else { return }
         let bottom = scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom
         guard bottom > -scroll.adjustedContentInset.top else { return }
-        if scroll.contentOffset.y != bottom {
-            scroll.setContentOffset(CGPoint(x: 0, y: bottom), animated: false)
+        let top = -scroll.adjustedContentInset.top
+        let target = top + (bottom - top) * scrollFraction
+        if scroll.contentOffset.y != target {
+            scroll.setContentOffset(CGPoint(x: 0, y: target), animated: false)
         }
-        didScrollToBottom = true
+        didScroll = true
     }
 
     private func freezeSpinners(_ view: UIView) {

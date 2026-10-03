@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletDemoContinuationStatus
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceProblem
+import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
 import id.walt.wallet2.mobile.ProximityEngagement
@@ -313,6 +314,38 @@ internal class WalletVisualScenarios(
             else -> "saved_and_deferred"
         }
         capture("batch.result.$id")
+    }
+
+    fun nearbyState(kind: String) = with(test) {
+        val fixtures = WalletVisualProximityFixtures
+        val state = fixtures.state(kind)
+        content {
+            if (kind == "receipt") ReviewScaffold(actions = {
+                ProximityOutcomeActions(state, { it }, {}, {}, {}, {})
+            }) {
+                ProximityTerminalContent("Presentation complete", "The approved credential data was sent to the reader.") {
+                    ProximitySharingReceiptContent(fixtures.review, fixtures.submission,
+                        id.walt.wallet2.mobile.ProximityApprovalTiming.BeforeConnection, fixtures.completedAt, fixtures.details)
+                }
+            } else WalletDemoProximityScreen(state, fixtures.details,
+                WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
+                onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> }, onContinueAfterResponseChange = {},
+                onApprove = {}, onDecline = {}, onRetry = {}, onRemediate = { _, _ -> },
+                onCancel = {}, onDismiss = {}, onRestart = {})
+        }
+        when (kind) {
+            "permission" -> onNode(hasText("Allow Bluetooth access") and hasClickAction()).assertIsDisplayed()
+            "expired" -> { onNodeWithTag(WalletUiTestTags.ProximityRetry).assertIsDisplayed(); onNodeWithTag(WalletUiTestTags.ProximityDone).assertIsDisplayed() }
+            "receipt" -> { onNodeWithTag(WalletUiTestTags.ProximityDone).assertIsDisplayed(); onNodeWithText("City service desk").assertExists() }
+            "review" -> onNodeWithTag(WalletUiTestTags.ProximityReview).assertExists()
+        }
+        capture("nearby.$kind")
+        if (kind == "review") {
+            onNodeWithTag(WalletUiTestTags.proximityElement(0, "org.iso.18013.5.1", "given_name")).performScrollTo().assertIsDisplayed()
+            onNodeWithText("Reader intends to retain this data").performScrollTo().assertIsDisplayed()
+            onNodeWithText("Alex").assertIsDisplayed()
+            capture("nearby.review.disclosures")
+        }
     }
 
     fun nearbyReady() = with(test) {

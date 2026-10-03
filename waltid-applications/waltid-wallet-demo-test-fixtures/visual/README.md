@@ -52,3 +52,5 @@ Native comparison normalizes both PNGs to the same representation and bounds SF 
 Payment display responsibilities, placement, explicit unsigned confirmation and evidence boundaries are described in [the payment review contract](payment-consent.md). The localized compact variant uses 320×568 with large text; it checks wrapping, not translation of wallet-owned strings.
 
 Ordinary deep-link presentation, dismissal and platform background limits are described in [the external review contract](external-flows.md).
+
+Nearby review, prepared summaries and receipt evidence are described in [the nearby UI contract](nearby.md).
