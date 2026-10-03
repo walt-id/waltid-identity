@@ -52,7 +52,7 @@ fun WalletDemoSharingReviewScreen(
     val state by owner.state.collectAsState()
     val selection = state.selection
     val paymentReview = state.payment
-    val submit = { owner.selectionForSubmission()?.let(onSubmit); Unit }
+    val submit = { owner.selectionForSubmission(state)?.let(onSubmit); Unit }
     val selectionComplete = review.hasCompleteCredentialSelection(selection.credentials)
 
     WalletReviewHost(presentation, dismissEnabled = enabled, onDismiss = onBackAtRoot) { fillViewport ->

@@ -373,6 +373,31 @@ internal class WalletVisualScenarios(
         capture(if (failure) "sharing.provider.failure" else "sharing.provider.preparing")
     }
 
+    fun paymentState(blocked: Boolean) = with(test) {
+        content {
+            WalletDemoSharingReviewScreen(review = WalletVisualFixtures.paymentReview, title = "Payment",
+                onSubmit = {}, onCancel = {}, compact = false, preparePaymentConsent = {
+                    if (blocked) error("Required issuer payment labels are missing.")
+                    else kotlinx.coroutines.awaitCancellation()
+                })
+        }
+        onNodeWithTag(if (blocked) "payment-consent-blocked" else "payment-consent-loading").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsNotEnabled().assertIsDisplayed()
+        capture(if (blocked) "payment.blocked" else "payment.loading")
+    }
+
+    fun localizedPayment() = with(test) {
+        content {
+            WalletDemoSharingReviewScreen(review = WalletVisualFixtures.paymentReview, title = "Payment",
+                onSubmit = {}, onCancel = {}, compact = false,
+                preparePaymentConsent = { WalletVisualFixtures.localizedPayment })
+        }
+        onNodeWithText("11.56 EUR").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
+        onNodeWithTag("payment-unsigned-warning").assertDoesNotExist()
+        capture("payment.localized.compact_large_text")
+    }
+
     fun paymentReview(sheet: Boolean = false) = with(test) {
         val consent = WalletVisualFixtures.payment
         content {
@@ -394,5 +419,8 @@ internal class WalletVisualScenarios(
         onNodeWithText("Payment authorisation").performScrollTo().assertIsDisplayed()
         onNodeWithText("Pay €11.56").assertIsEnabled().assertIsDisplayed()
         capture("${if (sheet) "payment.sheet" else "payment.mixed_credentials"}.requested_data")
+        onNodeWithText("Pay €11.56").performClick()
+        onNodeWithTag("payment-unsigned-confirm").assertIsDisplayed()
+        capture("${if (sheet) "payment.sheet" else "payment.mixed_credentials"}.unsigned_confirmation")
     }
 }
