@@ -133,16 +133,16 @@ struct WalletVisualFixtures {
             credentialRequirements: options.map { .init(options: [[$0.queryID]]) })
     }
 
-    func payment() throws -> PaymentConsent {
-        let value = try object(root, "payment")
+    func payment(localized: Bool = false) throws -> PaymentConsent {
+        let value = try object(root, localized ? "paymentLocalized" : "payment")
         let placements: [String: PaymentConsentFieldPlacement] = [
             "Prominent": .prominent, "Main": .main, "Details": .details, "Omitted": .omitted,
         ]
         return PaymentConsent(
             revision: try text(value, "revision"), locale: try text(value, "locale"),
-            title: try text(value, "title"), securityHint: nil,
-            affirmativeAction: try text(value, "affirmativeAction"), denialAction: try text(value, "denialAction"),
-            requiresUnsignedRequestWarning: true,
+            title: value["title"] as? String, securityHint: value["securityHint"] as? String,
+            affirmativeAction: try text(value, "affirmativeAction"), denialAction: value["denialAction"] as? String,
+            requiresUnsignedRequestWarning: value["requiresUnsignedRequestWarning"] as? Bool ?? true,
             fields: try array(value, "fields").map { field in
                 PaymentConsentField(label: try text(field, "name"), description: nil, value: try text(field, "value"),
                                     placement: try XCTUnwrap(placements[text(field, "placement")]))

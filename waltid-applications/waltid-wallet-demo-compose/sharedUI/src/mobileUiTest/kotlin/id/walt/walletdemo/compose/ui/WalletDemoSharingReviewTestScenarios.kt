@@ -51,6 +51,30 @@ import kotlinx.coroutines.cancel
 @OptIn(ExperimentalTestApi::class)
 class WalletDemoSharingReviewTestScenarios {
 
+    fun unsignedConfirmationIsInvalidatedByNewConsentAndDisabledState() = runComposeUiTest {
+        val consent = WalletDemoPaymentConsent("first", "en", null, null, "Pay", null, true, emptyList())
+        val review = mutableStateOf<WalletDemoPaymentReview>(WalletDemoPaymentReview.Ready(consent))
+        val enabled = mutableStateOf(true)
+        var submissions = 0
+        setContent {
+            id.walt.walletdemo.compose.ui.components.SharingActionsRow(enabled.value, true,
+                onSubmit = { submissions++ }, onCancel = {}, onReject = null, paymentReview = review.value)
+        }
+        onNodeWithText("Pay").performClick()
+        onNodeWithTag("payment-unsigned-confirm").assertIsDisplayed()
+        runOnIdle { review.value = WalletDemoPaymentReview.Ready(consent.copy(revision = "second")) }
+        onNodeWithTag("payment-unsigned-confirm").assertDoesNotExist()
+        onNodeWithText("Pay").performClick()
+        runOnIdle { enabled.value = false }
+        onNodeWithTag("payment-unsigned-confirm").assertDoesNotExist()
+        onNodeWithText("Pay").assertIsNotEnabled()
+        assertEquals(0, submissions)
+        runOnIdle { enabled.value = true }
+        onNodeWithText("Pay").performClick()
+        onNodeWithTag("payment-unsigned-confirm").performClick()
+        assertEquals(1, submissions)
+    }
+
     fun changingHostPreservesDisclosureChoicesAndConsentRevision() = runComposeUiTest {
         val option = credentialOption(disclosures = listOf(requiredDisclosure(), optionalDisclosure()))
         val optional = disclosureSelection(option, OPTIONAL_DISCLOSURE_PATH)

@@ -92,12 +92,15 @@ internal object WalletVisualFixtures {
         it.jsonObject.text("configurationId") to it.jsonObject.getValue("copies").jsonPrimitive.int
     }
 
-    val payment: WalletDemoPaymentConsent get() {
-        val payment = data.getValue("payment").jsonObject
+    val payment: WalletDemoPaymentConsent get() = payment("payment")
+    val localizedPayment: WalletDemoPaymentConsent get() = payment("paymentLocalized")
+    private fun payment(key: String): WalletDemoPaymentConsent {
+        val payment = data.getValue(key).jsonObject
         return WalletDemoPaymentConsent(
-            revision = payment.text("revision"), locale = payment.text("locale"), title = payment.text("title"),
-            securityHint = null, affirmativeAction = payment.text("affirmativeAction"),
-            denialAction = payment.text("denialAction"), requiresUnsignedRequestWarning = true,
+            revision = payment.text("revision"), locale = payment.text("locale"), title = payment["title"]?.jsonPrimitive?.contentOrNull,
+            securityHint = payment["securityHint"]?.jsonPrimitive?.contentOrNull, affirmativeAction = payment.text("affirmativeAction"),
+            denialAction = payment["denialAction"]?.jsonPrimitive?.contentOrNull,
+            requiresUnsignedRequestWarning = payment["requiresUnsignedRequestWarning"]?.jsonPrimitive?.booleanOrNull ?: true,
             fields = payment.getValue("fields").jsonArray.map {
                 val field = it.jsonObject
                 WalletDemoPaymentField(field.text("name"), null, field.text("value"),

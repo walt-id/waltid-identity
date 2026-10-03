@@ -225,5 +225,36 @@
         ]
       }
     ]
+  },
+  "paymentLocalized": {
+    "revision": "localized-signed-payment",
+    "locale": "de",
+    "title": null,
+    "affirmativeAction": "Zahlung verbindlich bestätigen",
+    "denialAction": null,
+    "fields": [
+      {
+        "name": "Betrag",
+        "value": "11.56 EUR",
+        "placement": "Prominent"
+      },
+      {
+        "name": "Empfänger",
+        "value": "Example Bookshop",
+        "placement": "Main"
+      },
+      {
+        "name": "Transaktions-ID",
+        "value": "example-transaction-001",
+        "placement": "Details"
+      },
+      {
+        "name": "Interne Referenz",
+        "value": "bound-but-hidden",
+        "placement": "Omitted"
+      }
+    ],
+    "securityHint": "Prüfen Sie Betrag und Empfänger.",
+    "requiresUnsignedRequestWarning": false
   }
 }
