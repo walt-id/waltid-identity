@@ -2,6 +2,7 @@ package id.walt.itb
 
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.wallet2.handlers.CredentialEndpointException
+import id.waltid.openid4vci.wallet.token.TokenRequestException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
@@ -11,7 +12,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
 import java.time.Instant
 
-// Issuer response text is untrusted; reports retain only standardized error identifiers.
+// Issuer response text is untrusted; reports retain only known protocol error identifiers.
 private val credentialEndpointErrorCodes = setOf(
     CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
     CredentialErrorCodes.UNKNOWN_CREDENTIAL_CONFIGURATION,
@@ -20,6 +21,12 @@ private val credentialEndpointErrorCodes = setOf(
     CredentialErrorCodes.INVALID_NONCE,
     CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS,
     CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED,
+)
+
+private val tokenEndpointErrorCodes = setOf(
+    "invalid_request", "invalid_client", "invalid_grant", "unauthorized_client",
+    "unsupported_grant_type", "invalid_scope", "invalid_dpop_proof",
+    "use_dpop_nonce", "use_attestation_challenge", "unsafe_redirect",
 )
 
 /** An owned session is recorded before its first execution attempt, so failed starts can be cleaned up. */
@@ -124,6 +131,9 @@ class ItbCaseRunner(
                 is ItbPortalStepTimeout -> error.step.name.lowercase()
                 is CredentialEndpointException -> "credential_endpoint_http_${error.statusCode}" +
                     (error.credentialError?.error?.takeIf(credentialEndpointErrorCodes::contains)?.let { "_$it" } ?: "")
+                is TokenRequestException -> "token_endpoint_http_${error.statusCode}" +
+                    (error.oauthError?.takeIf(tokenEndpointErrorCodes::contains)?.let { "_$it" } ?: "") +
+                    (if (error.nonOAuthErrorBody) "_non_oauth_body" else "")
                 else -> null
             }
             outcome = when {
