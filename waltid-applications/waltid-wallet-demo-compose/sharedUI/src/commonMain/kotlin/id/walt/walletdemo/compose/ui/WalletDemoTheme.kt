@@ -1,6 +1,9 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -87,6 +90,8 @@ fun WalletDemoTheme(
                 surfaceContainerLow = Color(0xFF1B1D22),
                 surfaceContainer = Color(0xFF202228),
                 surfaceContainerHigh = Color(0xFF2B2D33),
+                surfaceContainerHighest = Color(0xFF34363D),
+                surfaceVariant = Color(0xFF25272D),
                 onSurface = Color(0xFFE2E2E9),
                 onSurfaceVariant = Color(0xFFC4C6D0),
                 outlineVariant = Color(0xFF44464F),
@@ -104,9 +109,16 @@ fun WalletDemoTheme(
                 surfaceContainerLow = Color.White,
                 surfaceContainer = Color(0xFFECEEF3),
                 surfaceContainerHigh = Color(0xFFE5E7ED),
+                surfaceContainerHighest = Color(0xFFDFE2E9),
+                surfaceVariant = Color(0xFFECEEF3),
                 onSurface = Color(0xFF191C20),
                 onSurfaceVariant = Color(0xFF44474F),
                 outlineVariant = Color(0xFFD9DCE3),
+            ),
+            shapes = Shapes(
+                extraSmall = RoundedCornerShape(8.dp), small = RoundedCornerShape(12.dp),
+                medium = RoundedCornerShape(16.dp), large = RoundedCornerShape(16.dp),
+                extraLarge = RoundedCornerShape(24.dp),
             ),
             content = content,
         )

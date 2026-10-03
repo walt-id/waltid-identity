@@ -5,6 +5,7 @@ import WalletSDK
 struct ReceiveView: View {
     @ObservedObject var viewModel: WalletViewModel
     let onOpenSettings: () -> Void
+    var onBack: (() -> Void)? = nil
     @Environment(\.openURL) private var openURL
     @Environment(\.walletDemoBranding) private var branding
 
@@ -17,8 +18,10 @@ struct ReceiveView: View {
                     entryContent
                 }
             }
-            .navigationTitle("Receive")
-            .walletSettingsToolbar(onOpenSettings: onOpenSettings)
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Receive credentials")
+            .navigationBarTitleDisplayMode(.inline)
+            .walletFlowToolbar(onBack: onBack, backEnabled: !viewModel.isLoading, onOpenSettings: onOpenSettings)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
         }

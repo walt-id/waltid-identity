@@ -38,7 +38,7 @@ public struct CredentialCardSummary {
         self.logoAltText = logoAltText
     }
 
-    public static func offered(from credential: IssuanceCredentialPreview) -> CredentialCardSummary {
+    public static func offered(from credential: IssuanceCredentialPreview, issuer: String = "") -> CredentialCardSummary {
         CredentialCardSummary(
             title: CredentialTitles.displayName(
                 format: credential.format,
@@ -46,6 +46,7 @@ public struct CredentialCardSummary {
                 displayName: credential.name,
                 fallback: credential.format
             ),
+            issuer: issuer,
             backgroundColor: credential.backgroundColor,
             backgroundImageURI: credential.backgroundImageURI?.absoluteString,
             textColor: credential.textColor,

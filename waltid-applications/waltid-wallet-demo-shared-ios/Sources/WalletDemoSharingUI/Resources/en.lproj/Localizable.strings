@@ -3,3 +3,39 @@
 "Decline" = "Decline";
 "Cancel" = "Cancel";
 "Cancel review" = "Cancel review";
+
+"Technical details" = "Technical details";
+
+"All credential information" = "All credential information";
+
+"Includes information outside this request." = "Includes information outside this request.";
+
+"Empty text" = "Empty text";
+
+"No value supplied" = "No value supplied";
+
+"No items" = "No items";
+
+"No fields" = "No fields";
+
+"Loading image" = "Loading image";
+
+"Image unavailable" = "Image unavailable";
+
+"Close" = "Close";
+
+/* Incoming offer definitions and copy selection */
+"Credential information" = "Credential information";
+"Receive %@" = "Receive %@";
+"Copies: %d" = "Copies: %d";
+"1 copy" = "1 copy";
+"Values have not been received yet." = "Values have not been received yet.";
+"Claim definitions" = "Claim definitions";
+"The issuer has not supplied claim definitions." = "The issuer has not supplied claim definitions.";
+"These definitions describe the offer. Review the actual values after receiving." = "These definitions describe the offer. Review the actual values after receiving.";
+"Always included" = "Always included";
+"May be included" = "May be included";
+"Issuer" = "Issuer";
+"Format" = "Format";
+"Configuration" = "Configuration";
+"Credential type" = "Credential type";

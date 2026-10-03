@@ -15,12 +15,14 @@ struct PresentView: View {
     @Environment(\.walletDemoBranding) private var branding
     @ObservedObject var viewModel: WalletViewModel
     let onOpenSettings: () -> Void
+    let onBack: (() -> Void)?
     @ObservedObject private var readerTrustSettings: DemoReaderTrustSettingsController
     @ObservedObject private var proximityPresentation: ProximityPresentationViewModel
     @StateObject private var proximityScreenPolicy = ProximityScreenPolicy()
 
-    init(viewModel: WalletViewModel, onOpenSettings: @escaping () -> Void) {
+    init(viewModel: WalletViewModel, onOpenSettings: @escaping () -> Void, onBack: (() -> Void)? = nil) {
         self.onOpenSettings = onOpenSettings
+        self.onBack = onBack
         _viewModel = ObservedObject(wrappedValue: viewModel)
         _readerTrustSettings = ObservedObject(wrappedValue: viewModel.readerTrustSettings)
         _proximityPresentation = ObservedObject(wrappedValue: viewModel.proximityPresentation)
@@ -37,9 +39,9 @@ struct PresentView: View {
                     entryContent
                 }
             }
-            .navigationTitle("Present")
-            .navigationBarTitleDisplayMode(proximityPresentation.active ? .inline : .large)
-            .walletSettingsToolbar(onOpenSettings: onOpenSettings)
+            .navigationTitle(proximityPresentation.active ? "Share nearby" : "Share credentials")
+            .navigationBarTitleDisplayMode(.inline)
+            .walletFlowToolbar(onBack: onBack, backEnabled: !viewModel.isLoading, onOpenSettings: onOpenSettings)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
         }

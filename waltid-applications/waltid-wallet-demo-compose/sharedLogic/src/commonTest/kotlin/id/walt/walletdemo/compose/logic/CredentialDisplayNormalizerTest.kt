@@ -13,6 +13,19 @@ import kotlin.test.assertTrue
 class CredentialDisplayNormalizerTest {
 
     @Test
+    fun claimIdentityPreservesNamespacesPunctuationAndArrayIndices() {
+        val literal = ClaimItemPath.topLevel("person.name")
+        val nested = ClaimItemPath.topLevel("person").child("name")
+        assertFalse(literal == nested)
+        assertEquals("[\"person.name\"]", literal.id)
+        assertFalse(ClaimItemPath.topLevel("list").child("0") == ClaimItemPath.topLevel("list").indexedChild(0))
+        assertEquals(listOf(ClaimPathExpression.Segment.Key("0"), ClaimPathExpression.Segment.Key("*")),
+            ClaimPathExpression.parse("['0']['*']").segments)
+        val group = ClaimGroup("personal", "Personal details", emptyList())
+        assertEquals(group.id, group.copy(title = "Persönliche Angaben").id)
+    }
+
+    @Test
     fun deferredByteArrayStillValidatesValuesAfterTheImageHeader() {
         val details = CredentialDisplayNormalizer.toDetails(CredentialSummary(
             id = "bad-image", format = "mso_mdoc", issuer = null, label = "Portrait",
@@ -114,9 +127,9 @@ class CredentialDisplayNormalizerTest {
         assertEquals(
             listOf(
                 "docType",
-                "eu.europa.ec.eudi.pid.1.birth_place.locality",
-                "eu.europa.ec.eudi.pid.1.birth_place.country",
-                "eu.europa.ec.eudi.pid.1.resident_state",
+                "[\"eu.europa.ec.eudi.pid.1\"].birth_place.locality",
+                "[\"eu.europa.ec.eudi.pid.1\"].birth_place.country",
+                "[\"eu.europa.ec.eudi.pid.1\"].resident_state",
             ),
             credentialData.items.map { it.path.id },
         )
@@ -551,7 +564,7 @@ class CredentialDisplayNormalizerTest {
                       }
                     }
                 """.trimIndent(),
-                expectedClaimPath = "eu.europa.ec.eudi.pid.1.resident_state",
+                expectedClaimPath = "[\"eu.europa.ec.eudi.pid.1\"].resident_state",
             ),
             FormatCase(
                 format = "mso_mdoc",
@@ -566,7 +579,7 @@ class CredentialDisplayNormalizerTest {
                       }
                     }
                 """.trimIndent(),
-                expectedClaimPath = "org.iso.18013.5.1.document_number",
+                expectedClaimPath = "[\"org.iso.18013.5.1\"].document_number",
             ),
         )
 
@@ -629,7 +642,7 @@ class CredentialDisplayNormalizerTest {
         assertEquals("E-123", (credentialData.items.first { it.path.id == "credentialSubject.employee_id" }.value as DisplayValue.Text).value)
 
         val technical = assertNotNull(details.groups.firstOrNull { it.title == "Credential metadata" })
-        assertTrue(technical.items.any { it.path.id == "@context" })
+        assertTrue(technical.items.any { it.path.id == "[\"@context\"]" })
         assertTrue(technical.items.any { it.path.id == "type" })
         assertTrue(technical.items.any { it.path.id == "issuer" })
         assertTrue(technical.items.any { it.path.id == "proof.type" })
@@ -681,7 +694,7 @@ class CredentialDisplayNormalizerTest {
         assertTrue(technical.items.any { it.path.id == "iss" })
         assertTrue(technical.items.any { it.path.id == "sub" })
         assertTrue(technical.items.any { it.path.id == "vc.type" })
-        assertTrue(technical.items.any { it.path.id == "vc.@context" })
+        assertTrue(technical.items.any { it.path.id == "vc[\"@context\"]" })
         assertEquals(
             DisplayValue.Text("StatusList2021Entry - https://issuer.example/status/1"),
             technical.items.first { it.path.id == "vc.credentialStatus" }.value,
@@ -816,7 +829,7 @@ class CredentialDisplayNormalizerTest {
 
         val portrait = details.groups
             .flatMap { it.items }
-            .first { it.path.id == "eu.europa.ec.eudi.pid.1.portrait.elementValue" }
+            .first { it.path.id == "[\"eu.europa.ec.eudi.pid.1\"].portrait.elementValue" }
         assertEquals("Portrait", portrait.label)
         assertIs<DisplayValue.Image>((portrait.value as DisplayValue.DeferredImage).resolve())
     }
@@ -843,7 +856,7 @@ class CredentialDisplayNormalizerTest {
 
         val signature = details.groups
             .flatMap { it.items }
-            .first { it.path.id == "org.iso.18013.5.1.signature_usual_mark.elementValue" }
+            .first { it.path.id == "[\"org.iso.18013.5.1\"].signature_usual_mark.elementValue" }
         assertEquals("Signature or usual mark", signature.label)
         assertIs<DisplayValue.Image>((signature.value as DisplayValue.DeferredImage).resolve())
     }
@@ -878,7 +891,7 @@ class CredentialDisplayNormalizerTest {
             "biometric_template_signature_sign",
             "biometric_template_iris",
         ).forEach { elementIdentifier ->
-            val claim = assertNotNull(claimsByPath["org.iso.18013.5.1.$elementIdentifier"])
+            val claim = assertNotNull(claimsByPath["[\"org.iso.18013.5.1\"].$elementIdentifier"])
             assertIs<DisplayValue.Image>((claim.value as DisplayValue.DeferredImage).resolve())
         }
     }

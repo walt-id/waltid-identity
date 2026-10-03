@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 class WalletDemoMetadataModelsTest {
 
     @Test
-    fun groupsMdocOfferClaimsByUserFacingSemantics() {
+    fun preservesIssuerClaimOrderWhileUsingReadableFallbackLabels() {
         val credential = WalletDemoOfferedCredentialMetadata(
             configurationId = "org.iso.23220.photoid.1",
             format = "mso_mdoc",
@@ -58,30 +58,16 @@ class WalletDemoMetadataModelsTest {
         )
 
         assertEquals(
-            listOf(
-                WalletDemoCredentialClaimDisplayGroup(
-                    title = "Credential claims",
-                    claims = listOf(WalletDemoCredentialClaimDisplay("Given name", "Always included")),
-                ),
-                WalletDemoCredentialClaimDisplayGroup(
-                    title = "Age attestations",
-                    claims = listOf(
-                        WalletDemoCredentialClaimDisplay("18 or older", "Always included"),
-                        WalletDemoCredentialClaimDisplay("65 or older", "May be included"),
-                    ),
-                ),
-                WalletDemoCredentialClaimDisplayGroup(
-                    title = "Travel document data",
-                    claims = listOf(
-                        WalletDemoCredentialClaimDisplay("Specification version", "Always included"),
-                        WalletDemoCredentialClaimDisplay("Document security object (SOD)", "Always included"),
-                        WalletDemoCredentialClaimDisplay("DG1: Machine-readable zone", "May be included"),
-                        WalletDemoCredentialClaimDisplay("DG2: Facial image", "May be included"),
-                        WalletDemoCredentialClaimDisplay("Document content information", "May be included"),
-                    ),
-                ),
-            ),
-            credential.claimDisplayGroups(),
+            listOf(WalletDemoCredentialClaimDisplayGroup(title = "Credential claims", claims = listOf(
+                WalletDemoCredentialClaimDisplay("Given name", "Always included"),
+                WalletDemoCredentialClaimDisplay("65 or older", "May be included"),
+                WalletDemoCredentialClaimDisplay("DG2: Facial image", "May be included"),
+                WalletDemoCredentialClaimDisplay("18 or older", "Always included"),
+                WalletDemoCredentialClaimDisplay("Document security object (SOD)", "Always included"),
+                WalletDemoCredentialClaimDisplay("DG1: Machine-readable zone", "May be included"),
+                WalletDemoCredentialClaimDisplay("Document content information", "May be included"),
+                WalletDemoCredentialClaimDisplay("Specification version", "Always included"),
+            ))), credential.claimDisplayGroups(),
         )
     }
 }

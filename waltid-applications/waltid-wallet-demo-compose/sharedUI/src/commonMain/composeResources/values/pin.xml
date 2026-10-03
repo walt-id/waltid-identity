@@ -1,0 +1,16 @@
+<resources>
+    <string name="pin_create">Create a PIN</string>
+    <string name="pin_create_help">Choose six digits and enter them again to confirm.</string>
+    <string name="pin_create_action">Create PIN</string>
+    <string name="pin_enter">Enter your PIN</string>
+    <string name="pin_enter_help">Enter your PIN to unlock this wallet.</string>
+    <string name="pin_label">PIN</string>
+    <string name="pin_confirmation_label">Confirm PIN</string>
+    <string name="pin_biometric_label">Use biometric unlock</string>
+    <string name="pin_biometric_help">Use biometrics to open the app instead of typing the PIN. Signing approval is set up next.</string>
+    <string name="pin_biometric_unavailable">Biometrics are not available on this device.</string>
+    <string name="pin_biometric_enabled">Biometrics enabled. Your PIN is always available as a fallback.</string>
+    <string name="pin_unlock">Unlock</string>
+    <string name="pin_unlock_biometrics">Unlock with biometrics</string>
+    <string name="pin_authenticating">Authenticating…</string>
+</resources>

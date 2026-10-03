@@ -11,6 +11,7 @@ fun CredentialDetails.toSystemInfoGroup(): ClaimGroup? {
 
     return items.takeIf { it.isNotEmpty() }?.let {
         ClaimGroup(
+            id = "system",
             title = "About this credential",
             items = it,
             initiallyExpanded = false,
@@ -21,7 +22,7 @@ fun CredentialDetails.toSystemInfoGroup(): ClaimGroup? {
 private fun String?.toSystemInfoItem(path: String, label: String): ClaimItem? {
     val value = this?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     return ClaimItem(
-        path = ClaimItemPath.topLevel(path),
+        path = ClaimItemPath.topLevel("system").child(path.substringAfter("system.")),
         label = label,
         value = DisplayValue.Text(value),
         rawValue = value,

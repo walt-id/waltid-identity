@@ -8,6 +8,52 @@ import XCTest
 
 @MainActor
 final class WalletVisualTests: XCTestCase {
+    func testPinSetup() async throws { try await pin("setup") }
+    func testPinMismatch() async throws { try await pin("mismatch") }
+    func testPinBiometrics() async throws { try await pin("biometrics_enabled") }
+
+    private func pin(_ state: String) async throws {
+        let model = makeModel(biometricsAvailable: state == "biometrics_enabled")
+        await model.readerTrustSettings.awaitPendingOperations()
+        if state != "setup" {
+            model.pin = "123456"
+            model.pinConfirmation = state == "mismatch" ? "654321" : "123456"
+        }
+        if state == "mismatch" { model.submitPin() }
+        if state == "biometrics_enabled" { model.useBiometrics = true }
+        XCTAssertEqual(model.auth, .setup)
+        if state == "mismatch" { XCTAssertEqual(model.pinError, "PIN confirmation does not match") }
+        try capture(PinView(viewModel: model), id: "onboarding.pin.\(state)")
+    }
+
+    func testHomeEmpty() async throws { try await home(empty: true) }
+    func testHomeCredential() async throws { try await home(empty: false) }
+
+    func testScanEmpty() throws {
+        try capture(WalletScanView(onBack: {}, onOpen: { _, _ in }), id: "wallet.scan.empty")
+    }
+
+    func testScanUnsupported() throws {
+        try capture(WalletScanView(input: "FIDO:/0123456789", onBack: {}, onOpen: { _, _ in }), id: "wallet.scan.unsupported")
+    }
+
+    func testScanWebLink() throws {
+        try capture(WalletScanView(input: "https://example.test/request", onBack: {}, onOpen: { _, _ in }), id: "wallet.scan.link")
+    }
+
+    private func home(empty: Bool) async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        model.isReady = true
+        model.statusMessage = ""
+        model.credentials = empty ? [] : [try WalletVisualFixtures().credential()]
+        let cards = await CredentialDisplayNormalizer.cards(for: model.credentials)
+        XCTAssertEqual(cards.count, model.credentials.count)
+        try capture(CredentialsTabView(viewModel: model, selectedDetailsID: .constant(nil), cards: cards,
+            onOpenSettings: {}, onScan: {}, onShareNearby: {}),
+            id: empty ? "wallet.home.empty" : "wallet.home.credential")
+    }
+
     func testSettingsRoot() async throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: IdentityDocumentSharedConfiguration.appGroupIdentifier))
         let keys = [DemoSharingSettings.showDcApiPresentationPreviewKey, DemoSharingSettings.proximityTransportProfileKey,
@@ -29,12 +75,42 @@ final class WalletVisualTests: XCTestCase {
         try capture(ScrollView { CredentialDetailsView(details: details).padding(20) }, id: "credential.details.identity")
     }
 
+    func testLocalizedCredentialDetails() throws {
+        let details = try WalletVisualFixtures().localizedCredentialDetails()
+        XCTAssertEqual(details.groups.flatMap(\.items).prefix(4).map(\.label), ["Familienname", "Vorname", "Name im Namensraum", "Straße"])
+        try capture(ScrollView { CredentialDetailsView(details: details).padding(20) }, id: "credential.details.localized_metadata")
+    }
+
     func testBatchOffer() async throws {
         try await batchOffer(noneSelected: false)
     }
 
+    func testOfferDefinitions() throws {
+        let offer = try WalletVisualFixtures().offer()
+        let credential = try XCTUnwrap(offer.credentials.first)
+        XCTAssertEqual(StoredCredentialMetadataParser.claims(from: credential.metadataJSON).map(\.name), ["Given name", "Family name"])
+        try capture(ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                OfferedCredentialDetails(credential: credential, issuerName: offer.issuer.name!, issuerIdentifier: offer.issuer.identifier)
+            }.padding(20)
+        }, id: "batch.offer.definitions")
+    }
+
     func testBatchOfferWithNothingSelected() async throws {
         try await batchOffer(noneSelected: true)
+    }
+
+    func testCompactBatchOffer() async throws {
+        let fixtures = try WalletVisualFixtures()
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        model.isReady = true
+        model.statusMessage = ""
+        model.offerPreview = try fixtures.offer()
+        model.issuanceCopyCounts = try fixtures.copies()
+        XCTAssertTrue(model.acceptOfferEnabled)
+        try capture(ReceiveView(viewModel: model, onOpenSettings: {}), id: "batch.offer.compact_dark_large_text",
+                    config: .iPhoneSe, colorScheme: .dark, sizeCategory: .accessibilityMedium)
     }
 
     func testPaymentConsent() throws {
@@ -50,16 +126,14 @@ final class WalletVisualTests: XCTestCase {
             guard case .image(_, let data, _, _) = item.value else { return XCTFail("Expected a resolved image") }
             XCTAssertNotNil(UIImage(data: data))
         }
-        var heights: [String: CGFloat] = [:]
+        var readyImages: Set<String> = []
         let content = ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 ForEach(items) { item in
-                    ClaimValueRow(item: item).background(GeometryReader { geometry in
-                        Color.clear.preference(key: ImageRowHeightKey.self, value: [item.path.id: geometry.size.height])
-                    })
+                    ClaimValueRow(item: item)
                 }
             }.padding(20)
-        }.onPreferenceChange(ImageRowHeightKey.self) { heights = $0 }
+        }.onPreferenceChange(CredentialImageReadinessKey.self) { readyImages = $0 }
             .environment(\.locale, Locale(identifier: "en_US"))
             .environment(\.colorScheme, .light)
             .environment(\.sizeCategory, .large)
@@ -71,14 +145,13 @@ final class WalletVisualTests: XCTestCase {
         window.rootViewController = host
         window.makeKeyAndVisible()
         defer { window.isHidden = true; window.rootViewController = nil; originalKeyWindow?.makeKey() }
-        // Each row has three short text lines; only its decoded 112pt thumbnail makes it this tall.
-        // The pixel assertion below then verifies the actual portrait/signature content.
+        // A placeholder has the same dimensions as a thumbnail. Wait for actual decoded views.
         let deadline = Date().addingTimeInterval(5)
-        while Date() < deadline && !items.allSatisfy({ (heights[$0.path.id] ?? 0) >= 150 }) {
+        while Date() < deadline && !items.allSatisfy({ readyImages.contains($0.path.id) }) {
             try await Task.sleep(nanoseconds: 10_000_000)
         }
-        guard items.allSatisfy({ (heights[$0.path.id] ?? 0) >= 150 }) else {
-            return XCTFail("Image rows did not render their thumbnails: \(heights)")
+        guard items.allSatisfy({ readyImages.contains($0.path.id) }) else {
+            return XCTFail("Image rows did not render their thumbnails: \(readyImages)")
         }
         try capture(host, id: "credential.media.loaded")
     }
@@ -118,37 +191,53 @@ final class WalletVisualTests: XCTestCase {
                     id: noneSelected ? "batch.offer.none_selected" : "batch.offer.two_targets_three_copies")
     }
 
-    private func makeModel() -> WalletViewModel {
+    private func makeModel(biometricsAvailable: Bool = false) -> WalletViewModel {
         WalletViewModel(
             walletID: "visual-settings",
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(),
             walletClient: MockWalletClient(),
             readerTrustSettingsPersistence: InMemoryDemoReaderTrustSettingsPersistence(),
             identityDocumentRegistrationUpdate: {},
-            pinStore: InMemoryDemoPinStore()
+            pinStore: InMemoryDemoPinStore(),
+            biometricAuthenticator: FakeDemoBiometricAuthenticator(isAvailable: biometricsAvailable)
         )
     }
 
-    private func capture<Content: View>(_ view: Content, id: String, file: StaticString = #filePath, line: UInt = #line) throws {
+    private func capture<Content: View>(_ view: Content, id: String, config: ViewImageConfig = .iPhone13,
+                                      colorScheme: ColorScheme = .light, sizeCategory: ContentSizeCategory = .large,
+                                      file: StaticString = #filePath, line: UInt = #line) throws {
         let content = view.environment(\.locale, Locale(identifier: "en_US"))
-        .environment(\.colorScheme, .light)
-        .environment(\.sizeCategory, .large)
+        .environment(\.colorScheme, colorScheme)
+        .environment(\.sizeCategory, sizeCategory)
         .environment(\.walletDemoBranding, .default)
+        .background(Color(.systemGroupedBackground))
 
-        try capture(UIHostingController(rootView: content), id: id, file: file, line: line)
+        try capture(UIHostingController(rootView: content), id: id, config: config, file: file, line: line)
     }
 
-    private func capture(_ controller: UIViewController, id: String, file: StaticString = #filePath, line: UInt = #line) throws {
+    private func capture(_ controller: UIViewController, id: String, config: ViewImageConfig = .iPhone13,
+                         file: StaticString = #filePath, line: UInt = #line) throws {
         let environment = ProcessInfo.processInfo.environment
         let record = environment["WALLET_VISUAL_RECORD"] == "1"
         let isCI = ["CI", "GITHUB_ACTIONS", "GITLAB_CI", "BUILD_BUILDID", "JENKINS_URL", "TEAMCITY_VERSION"]
             .contains { environment[$0] != nil }
         XCTAssertFalse(record && isCI, "CI must only verify reviewed baselines", file: file, line: line)
         guard !(record && isCI) else { return }
+        var strategy = Snapshotting<UIViewController, UIImage>.image(
+            on: config, drawHierarchyInKeyWindow: true, precision: 1)
+        let diffing = strategy.diffing
+        // Compare the same PNG representation on both sides. Core Image's perceptual path is
+        // inconsistent on the pinned simulator. Bound measured edge noise in each sRGB channel;
+        // unlike a percentage tolerance this never ignores a small missing label or icon.
+        strategy.diffing.diffV2 = { reference, actual in
+            let decoded = diffing.fromData(diffing.toData(actual))
+            if matchesWithinRasterNoise(reference, decoded) { return nil }
+            return diffing.diffV2(reference, decoded)
+        }
         withSnapshotTesting(record: record ? .all : .never) {
             assertSnapshot(
                 of: controller,
-                as: .image(on: .iPhone13, drawHierarchyInKeyWindow: true),
+                as: strategy,
                 named: "native-ios26_5-phone-en-light",
                 file: file, testName: id, line: line
             )
@@ -157,9 +246,28 @@ final class WalletVisualTests: XCTestCase {
 
 }
 
-private struct ImageRowHeightKey: PreferenceKey {
-    static let defaultValue: [String: CGFloat] = [:]
-    static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
-        value.merge(nextValue(), uniquingKeysWith: { _, next in next })
+/// Every channel must stay within the measured SF Symbol edge noise (5/255); dimensions must match.
+private func matchesWithinRasterNoise(_ reference: UIImage, _ actual: UIImage) -> Bool {
+    guard let lhs = reference.cgImage, let rhs = actual.cgImage,
+          lhs.width == rhs.width, lhs.height == rhs.height,
+          let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return false }
+    let byteCount = lhs.width * lhs.height * 4
+    func pixels(_ image: CGImage) -> [UInt8]? {
+        var bytes = [UInt8](repeating: 0, count: byteCount)
+        let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: image.width, height: image.height,
+                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            return true
+        }
+        return drawn ? bytes : nil
     }
+    guard let a = pixels(lhs), let b = pixels(rhs) else { return false }
+    var index = 0
+    while index < byteCount {
+        if abs(Int(a[index]) - Int(b[index])) > 5 { return false }
+        index += 1
+    }
+    return true
 }

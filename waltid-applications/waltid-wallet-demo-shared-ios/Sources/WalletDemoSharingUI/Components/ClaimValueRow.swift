@@ -30,43 +30,30 @@ private struct ClaimValueView: View {
         switch value {
         case .bool(let value):
             Text(value ? "Yes" : "No")
-                .font(.caption)
+                .font(.body)
         case .decodedText(let value), .text(let value), .number(let value):
-            Text(value)
-                .font(.caption)
+            Text(value.isEmpty ? String(localized: "Empty text", bundle: .module) : value)
+                .font(.body)
         case .deferredImage(let source):
             DeferredImageValue(source: source, path: path)
         case .image(_, let data, let mimeType, let byteCount):
             ImageValue(data: data, mimeType: mimeType, byteCount: byteCount, path: path)
         case .list(let values):
-            let preview = DisplayListPreview(values: values)
-            LazyVStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(preview.values.enumerated()), id: \.offset) { index, value in
-                    HStack(alignment: .top, spacing: 4) {
-                        Text("\(index + 1).")
-                            .font(.caption)
-                        ClaimValueView(value: value, path: path.indexedChild(index))
-                    }
-                }
-                if let overflowLabel = preview.overflowLabel {
-                    Text(overflowLabel)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            ClaimListView(values: values, path: path)
         case .null:
-            Text("Not provided")
-                .font(.caption)
+            Text("No value supplied", bundle: .module)
+                .font(.body)
                 .foregroundStyle(.secondary)
         case .object(let entries):
             LazyVStack(alignment: .leading, spacing: 6) {
+                if entries.isEmpty { Text("No fields", bundle: .module) }
                 ForEach(entries) { entry in
                     ClaimValueRow(item: entry)
                 }
             }
         case .raw(let value):
             Text(value)
-                .font(.caption.monospaced())
+                .font(.footnote.monospaced())
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
@@ -79,11 +66,50 @@ struct DisplayListPreview {
     let values: [DisplayValue]
     let overflowLabel: String?
 
-    init(values: [DisplayValue]) {
-        self.values = Array(values.prefix(Self.maxItems))
-        self.overflowLabel = values.count > Self.maxItems
-            ? "Showing first \(Self.maxItems) of \(values.count) items"
+    init(values: [DisplayValue], limit: Int = Self.maxItems) {
+        self.values = Array(values.prefix(limit))
+        self.overflowLabel = values.count > limit
+            ? "Showing first \(limit) of \(values.count) items"
             : nil
+    }
+}
+
+private struct ClaimListView: View {
+    let values: [DisplayValue]
+    let path: ClaimItemPath
+    @State private var limit = DisplayListPreview.maxItems
+
+    var body: some View {
+        let preview = DisplayListPreview(values: values, limit: limit)
+        LazyVStack(alignment: .leading, spacing: 4) {
+            if values.isEmpty { Text("No items", bundle: .module) }
+            ForEach(Array(preview.values.enumerated()), id: \.offset) { index, value in
+                HStack(alignment: .top, spacing: 4) {
+                    Text("\(index + 1).")
+                    ClaimValueView(value: value, path: path.indexedChild(index))
+                }
+            }
+            if let label = preview.overflowLabel {
+                Text(label).font(.caption).foregroundStyle(.secondary)
+                Button("Show \(min(DisplayListPreview.maxItems, values.count - limit)) more") {
+                    limit = min(limit + DisplayListPreview.maxItems, values.count)
+                }.frame(minHeight: 44)
+            }
+        }.onChange(of: path) { _ in limit = DisplayListPreview.maxItems }
+    }
+}
+
+private struct ClaimImagePlaceholder: View {
+    let loading: Bool
+
+    var body: some View {
+        VStack(spacing: 8) {
+            if loading { ProgressView() } else { Image(systemName: "photo.badge.exclamationmark") }
+            Text(loading ? String(localized: "Loading image", bundle: .module) : String(localized: "Image unavailable", bundle: .module)).font(.caption)
+        }
+        .foregroundStyle(.secondary)
+        .frame(width: 112, height: 112)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -97,7 +123,7 @@ private struct DeferredImageValue: View {
             if let resolved {
                 ClaimValueView(value: resolved, path: path)
             } else {
-                Color.clear.frame(width: 112, height: 112)
+                ClaimImagePlaceholder(loading: true)
             }
         }
         .task(id: ObjectIdentifier(source)) {
@@ -143,15 +169,21 @@ private struct ImageValue: View {
     let byteCount: Int
     let path: ClaimItemPath
     @State private var viewerOpen = false
-    @State private var image: UIImage?
+    private enum LoadState { case loading, loaded(UIImage), failed }
+    @State private var state = LoadState.loading
+
+    private var image: UIImage? {
+        if case .loaded(let image) = state { return image }
+        return nil
+    }
 
     var body: some View {
         content(image: image)
             .task(id: data) {
-                image = nil
+                state = .loading
                 let thumbnail = await CredentialImageDecoder.shared.thumbnail(data, maxPixelSize: 336)
                 guard !Task.isCancelled else { return }
-                image = thumbnail
+                state = thumbnail.map(LoadState.loaded) ?? .failed
             }
     }
 
@@ -176,18 +208,19 @@ private struct ImageValue: View {
                 .accessibilityLabel("Credential image")
                 .accessibilityHint("Opens the image full screen")
                 .accessibilityIdentifier(WalletAccessibilityID.claimImage(path.id))
+                .preference(key: CredentialImageReadinessKey.self, value: [path.id])
+            } else {
+                ClaimImagePlaceholder(loading: { if case .loading = state { return true }; return false }())
             }
-            Text(mimeType)
-                .font(.caption.weight(.medium))
-            Text("\(byteCount) bytes")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+
         }
         .fullScreenCover(isPresented: $viewerOpen) {
             if let image {
                 CredentialImageViewer(
                     data: data,
                     preview: image,
+                    mimeType: mimeType,
+                    byteCount: byteCount,
                     path: path,
                     onDismiss: { viewerOpen = false }
                 )
@@ -198,9 +231,19 @@ private struct ImageValue: View {
 
 }
 
+/// Propagates decoded thumbnail readiness through the actual mounted view hierarchy.
+struct CredentialImageReadinessKey: PreferenceKey {
+    static let defaultValue: Set<String> = []
+    static func reduce(value: inout Set<String>, nextValue: () -> Set<String>) {
+        value.formUnion(nextValue())
+    }
+}
+
 private struct CredentialImageViewer: View {
     let data: Data
     let preview: UIImage
+    let mimeType: String
+    let byteCount: Int
     let path: ClaimItemPath
     let onDismiss: () -> Void
     @State private var image: UIImage?
@@ -233,6 +276,7 @@ private struct CredentialImageViewer: View {
                     .accessibilityIdentifier(WalletAccessibilityID.claimImageViewerClose(path.id))
                 }
                 Spacer()
+                Text("\(mimeType) · \(byteCount) bytes").font(.footnote).foregroundStyle(.white)
             }
             .padding(16)
         }

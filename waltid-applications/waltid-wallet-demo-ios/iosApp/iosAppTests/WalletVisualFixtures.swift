@@ -22,6 +22,16 @@ struct WalletVisualFixtures {
         CredentialDisplayNormalizer.details(for: try credential())
     }
 
+    func localizedCredentialDetails() throws -> CredentialDetails {
+        let data = try Data(contentsOf: resourceDirectory.appendingPathComponent("credential-information.json"))
+        let contract = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let stored = try credential()
+        let value = Credential(id: stored.id, format: stored.format, issuer: stored.issuer, subject: nil,
+            label: stored.label, addedAt: stored.addedAt,
+            credentialDataJSON: try json(object(contract, "credentialData")), metadataJSON: try json(object(contract, "metadata")))
+        return CredentialDisplayNormalizer.details(for: value, preferredLocales: try XCTUnwrap(contract["preferredLocales"] as? [String]))
+    }
+
     func credential() throws -> Credential {
         let value = try object(root, "credential")
         let issuer = try object(root, "issuer")
@@ -64,9 +74,16 @@ struct WalletVisualFixtures {
             issuer: .init(identifier: try text(issuer, "identifier"), name: try text(issuer, "name"),
                           locale: "en", logoURI: nil, logoAltText: nil, metadataProvenance: .unsigned),
             credentials: try array(value, "credentials").map { item in
-                .init(configurationID: try text(item, "configurationId"), format: try text(item, "format"),
+                let claims = try array(item, "claims").map { claim -> [String: Any] in
+                    ["path": try XCTUnwrap(claim["path"] as? [String]),
+                     "mandatory": try XCTUnwrap(claim["mandatory"] as? Bool),
+                     "display": [["name": try text(claim, "label"), "locale": "en"]]]
+                }
+                let metadata = try JSONSerialization.data(withJSONObject: ["credentialClaims": claims])
+                return .init(configurationID: try text(item, "configurationId"), format: try text(item, "format"),
                       name: try text(item, "title"), descriptionText: nil, logoURI: nil,
-                      backgroundColor: try text(item, "backgroundColor"), textColor: "#FFFFFF")
+                      backgroundColor: try text(item, "backgroundColor"), textColor: "#FFFFFF",
+                      metadataJSON: String(data: metadata, encoding: .utf8))
             },
             transactionCode: nil, batchSize: try XCTUnwrap(value["batchSize"] as? Int)
         )

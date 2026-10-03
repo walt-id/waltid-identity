@@ -90,35 +90,35 @@ internal fun SettingsScreen(
                         currentState.sharingSettingsError?.let { SettingsNotice(it, error = true) }
                         when (destination) {
                             SettingsDestination.Main -> {
-                                SettingsSection(stringResource(Res.string.settings_wallet)) {
+                                WalletSection(stringResource(Res.string.settings_wallet)) {
                                     if (currentState.pinLockEnabled) {
-                                        SettingsNavigationRow(stringResource(Res.string.settings_signing_key),
+                                        WalletNavigationRow(stringResource(Res.string.settings_signing_key),
                                             { open(SettingsDestination.SigningKey) }, Modifier.testTag(WalletUiTestTags.SettingsSigningKey), summary = stringResource(Res.string.settings_key_subtitle),
                                             icon = { SettingsSymbol(Res.drawable.settings_key) })
                                         SettingsDivider()
                                     }
-                                    SettingsNavigationRow(stringResource(Res.string.settings_technical),
+                                    WalletNavigationRow(stringResource(Res.string.settings_technical),
                                         { open(SettingsDestination.Technical) }, Modifier.testTag(WalletUiTestTags.SettingsTechnicalDetails), summary = stringResource(Res.string.settings_technical_subtitle),
                                         icon = { SettingsSymbol(Res.drawable.settings_code) })
                                 }
                                 if (currentState.pinLockEnabled) {
-                                    SettingsSection(stringResource(Res.string.settings_sharing),
+                                    WalletSection(stringResource(Res.string.settings_sharing),
                                         modifier = Modifier.testTag(WalletUiTestTags.SettingsCredentialSharing)) {
                                         if (onProximityTransportProfileChange != null) {
-                                            SettingsNavigationRow(stringResource(Res.string.settings_nearby),
+                                            WalletNavigationRow(stringResource(Res.string.settings_nearby),
                                                 { open(SettingsDestination.Nearby) },
                                                 Modifier.testTag(WalletUiTestTags.SettingsProximityPresentation),
                                                 summary = stringResource(currentState.proximityTransportProfile.titleResource),
                                                 icon = { SettingsSymbol(Res.drawable.settings_nearby) })
                                             SettingsDivider()
                                         }
-                                        SettingsNavigationRow(stringResource(Res.string.settings_dc_api),
+                                        WalletNavigationRow(stringResource(Res.string.settings_dc_api),
                                             { open(SettingsDestination.DigitalCredentialsApi) }, Modifier.testTag(WalletUiTestTags.SettingsDigitalCredentialsApi),
                                             summary = stringResource(if (currentState.showDcApiPresentationPreview) Res.string.settings_review_on else Res.string.settings_review_off),
                                             icon = { SettingsSymbol(Res.drawable.settings_id_card) })
                                     }
                                 }
-                                SettingsSection {
+                                WalletSection {
                                     if (currentState.pinLockEnabled) {
                                         SettingsActionRow(stringResource(Res.string.settings_lock), onLock,
                                             Modifier.testTag(WalletUiTestTags.SettingsLock), icon = { Icon(Icons.Default.Lock, null) })
@@ -139,13 +139,13 @@ internal fun SettingsScreen(
                                 when (val details = currentState.identityDetails) {
                                     WalletDemoIdentityDetailsState.Loading -> CircularProgressIndicator()
                                     WalletDemoIdentityDetailsState.Unsupported -> SigningProtectionSettings(currentState, currentState.session as? WalletSessionState.Ready, onRequestSigningProtectionChange)
-                                    is WalletDemoIdentityDetailsState.Failed -> SettingsSection {
+                                    is WalletDemoIdentityDetailsState.Failed -> WalletSection {
                                         SettingsNotice(details.message, error = true)
                                         SettingsActionRow(stringResource(Res.string.settings_try_again), onRefreshIdentityDetails)
                                     }
                                     is WalletDemoIdentityDetailsState.Available -> {
                                         val identity = details.details
-                                        SettingsSection(stringResource(Res.string.settings_key_protection),
+                                        WalletSection(stringResource(Res.string.settings_key_protection),
                                             footer = stringResource(Res.string.settings_change_key_notice)) {
                                             SettingsDetailRow(stringResource(Res.string.settings_storage_policy), identity.storage)
                                             SettingsDivider()
@@ -155,7 +155,7 @@ internal fun SettingsScreen(
                                             SettingsDivider()
                                             SettingsDetailRow(stringResource(Res.string.settings_signing_approval), identity.authorization)
                                         }
-                                        SettingsSection(stringResource(Res.string.settings_key_backup)) {
+                                        WalletSection(stringResource(Res.string.settings_key_backup)) {
                                             SettingsDetailRow(stringResource(Res.string.settings_backup_status), identity.recovery)
                                             identity.choices.forEach { choice ->
                                                 SettingsDivider()
@@ -184,17 +184,17 @@ internal fun SettingsScreen(
                             }
                             SettingsDestination.Nearby -> {
                                 onProximityApprovalModeChange?.let { onChange ->
-                                    SettingsSection(stringResource(Res.string.settings_approval)) {
+                                    WalletSection(stringResource(Res.string.settings_approval)) {
                                         ProximityApprovalModeChoice(currentState.proximityApprovalMode, onChange)
                                     }
                                 }
-                                SettingsSection {
-                                    SettingsNavigationRow(stringResource(Res.string.settings_connection),
+                                WalletSection {
+                                    WalletNavigationRow(stringResource(Res.string.settings_connection),
                                         { open(SettingsDestination.Connection) }, Modifier.testTag(WalletUiTestTags.SettingsConnectionMethod), summary = stringResource(currentState.proximityTransportProfile.titleResource),
                                         icon = { SettingsSymbol(Res.drawable.settings_connection) })
                                     if (readerTrustSettingsContent != null) {
                                         SettingsDivider()
-                                        SettingsNavigationRow(stringResource(Res.string.settings_reader_authentication),
+                                        WalletNavigationRow(stringResource(Res.string.settings_reader_authentication),
                                             { open(SettingsDestination.ReaderAuthentication) },
                                             Modifier.testTag(WalletUiTestTags.SettingsReaderAuthentication),
                                             summary = currentReaderPolicy ?: stringResource(Res.string.settings_reader_subtitle),
@@ -205,7 +205,7 @@ internal fun SettingsScreen(
                             SettingsDestination.Connection -> Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
                                 val profiles = WalletDemoProximityTransportProfile.entries
                                 for (group in listOf(profiles.take(3), profiles.drop(3))) {
-                                    SettingsSection(title = if (group == profiles.take(3)) null else stringResource(Res.string.settings_provisional)) {
+                                    WalletSection(title = if (group == profiles.take(3)) null else stringResource(Res.string.settings_provisional)) {
                                         group.forEachIndexed { index, profile ->
                                             if (index > 0) SettingsDivider()
                                             SettingsChoiceRow(stringResource(profile.titleResource), stringResource(profile.descriptionResource),
@@ -218,7 +218,7 @@ internal fun SettingsScreen(
                             }
                             SettingsDestination.ReaderAuthentication -> readerTrustSettingsContent?.invoke()
                             SettingsDestination.DigitalCredentialsApi -> {
-                                SettingsSection(footer = stringResource(Res.string.settings_review_description)) {
+                                WalletSection(footer = stringResource(Res.string.settings_review_description)) {
                                 SettingsToggleRow(stringResource(Res.string.settings_show_review), currentState.showDcApiPresentationPreview,
                                     onShowDcApiPresentationPreviewChange, Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview))
                                 }

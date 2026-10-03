@@ -1,0 +1,50 @@
+[
+  {
+    "name": "offer",
+    "body": "{\"credential_issuer\":\"https://issuer.example\",\"credential_configuration_ids\":[\"resident\"]}",
+    "kind": "Offer",
+    "parameter": "credential_offer"
+  },
+  {
+    "name": "unsigned request",
+    "body": "{\"client_id\":\"redirect_uri:https://verifier.example\",\"response_type\":\"vp_token\",\"dcql_query\":{\"credentials\":[]},\"nonce\":\"fixture\"}",
+    "kind": "Presentation",
+    "parameter": "request_uri"
+  },
+  {
+    "name": "signed request bytes",
+    "body": "eyJhbGciOiJFUzI1NiJ9.eyJjbGllbnRfaWQiOiJyZWRpcmVjdF91cmk6aHR0cHM6Ly92ZXJpZmllci5leGFtcGxlIiwicmVzcG9uc2VfdHlwZSI6InZwX3Rva2VuIiwiZGNxbF9xdWVyeSI6eyJjcmVkZW50aWFscyI6W119LCJub25jZSI6ImZpeHR1cmUifQ.synthetic_signature",
+    "kind": "Presentation",
+    "parameter": "request"
+  },
+  {
+    "name": "mixed protocols",
+    "body": "{\"credential_issuer\": \"https://issuer.example\", \"credential_configuration_ids\": [\"resident\"], \"client_id\": \"redirect_uri:https://verifier.example\", \"response_type\": \"vp_token\", \"dcql_query\": {\"credentials\": []}, \"nonce\": \"fixture\"}",
+    "kind": "Unsupported"
+  },
+  {
+    "name": "HTML landing page",
+    "body": "<html><a href=\"https://example.test\">Continue</a></html>",
+    "kind": "Unsupported"
+  },
+  {
+    "name": "unrelated JSON",
+    "body": "{\"name\":\"Example\"}",
+    "kind": "Unsupported"
+  },
+  {
+    "name": "invalid JWT",
+    "body": "header.not_base64!.signature",
+    "kind": "Unsupported"
+  },
+  {
+    "name": "wrong issuer type",
+    "body": "{\"credential_issuer\":42,\"credential_configuration_ids\":[]}",
+    "kind": "Unsupported"
+  },
+  {
+    "name": "empty response",
+    "body": "",
+    "kind": "Unsupported"
+  }
+]
