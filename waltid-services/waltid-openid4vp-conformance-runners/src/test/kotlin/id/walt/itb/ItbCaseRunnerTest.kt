@@ -2,6 +2,7 @@ package id.walt.itb
 
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.wallet2.handlers.CredentialEndpointException
+import id.waltid.openid4vci.wallet.token.TokenRequestException
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -100,6 +101,40 @@ class ItbCaseRunnerTest {
                 assertEquals(ItbCaseResult.Outcome.WALLET_FAILED, result.outcome)
                 assertEquals("CredentialEndpointException", result.errorType)
                 assertEquals(expected, result.errorCode)
+                assertFalse(result.toString().contains("private"))
+            }
+        }
+    }
+
+    @Test
+    fun tokenEndpointFailureReportsOnlyBoundedProtocolCodes() = runBlocking<Unit> {
+        for ((failure, expected) in listOf(
+            TokenRequestException(400, "invalid_grant", "private issuer response") to
+                "token_endpoint_http_400_invalid_grant",
+            TokenRequestException(400, "use_dpop_nonce", "private issuer response") to
+                "token_endpoint_http_400_use_dpop_nonce",
+            TokenRequestException(401, "private_issuer_code", "private issuer response") to
+                "token_endpoint_http_401",
+            TokenRequestException(502, nonOAuthErrorBody = true) to
+                "token_endpoint_http_502_non_oauth_body",
+            TokenRequestException(0, cause = IllegalStateException("private transport details")) to
+                "token_endpoint_http_0",
+        )) {
+            HttpClient(MockEngine { request ->
+                respond(when (request.url.encodedPath.substringAfterLast('/')) {
+                    "status" -> status(false, "UNDEFINED")
+                    "stop" -> ""
+                    session -> report.replace("<result>SUCCESS</result>", "<result>UNDEFINED</result>")
+                    else -> error("Unexpected request")
+                })
+            }).use { client ->
+                val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), Bridge(), {
+                    throw failure
+                }).run(suite, case)
+                assertEquals(ItbCaseResult.Outcome.WALLET_FAILED, result.outcome)
+                assertEquals("TokenRequestException", result.errorType)
+                assertEquals(expected, result.errorCode)
+                assertFalse(result.walletSucceeded)
                 assertFalse(result.toString().contains("private"))
             }
         }
