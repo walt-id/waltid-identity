@@ -6,13 +6,19 @@ import android.net.Uri
 import androidx.credentials.ExperimentalDigitalCredentialApi
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import id.walt.mobile.test.backend.DemoTestBackend
+import id.walt.mobile.test.backend.EnterpriseMobileFixtureClient
+import id.walt.mobile.test.backend.EnterpriseMobilePlatform
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceTextEquals
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.credentialCardTags
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
@@ -22,8 +28,12 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.scrollDown
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.scrollUp
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.setTextByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
 import java.util.regex.Pattern
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -32,14 +42,17 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.fail
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * OS-mediated Digital Credentials create E2E for OpenID4VCI pre-authorized offers.
+ * OS-mediated Digital Credentials create E2E for OpenID4VCI offers.
  *
  * Requires Google Play services, so only the dedicated Google APIs lane should run it.
  *
@@ -56,6 +69,66 @@ import org.junit.runner.RunWith
 @OptIn(ExperimentalDigitalCredentialApi::class)
 class DigitalCredentialIssuanceE2ETest {
 
+    /** Requires the coordinated fixture's unattended test IdP; public-demo runs skip this case. */
+    @Test
+    fun authorizationCodeRetainsCopiesThroughBrowserReturn() = runBlocking {
+        val fixtureUrl = InstrumentationRegistry.getArguments()
+            .getString("enterprise_fixture_base_url")?.takeIf { it.isNotBlank() }
+        assumeTrue("Requires enterprise_fixture_base_url", fixtureUrl != null)
+        val backend = EnterpriseMobileFixtureClient(requireNotNull(fixtureUrl))
+        val scenario = backend.scenarios().first { it.id == "enterprise-mdl-authorized" }
+        val offer = backend.createOffer(scenario, EnterpriseMobilePlatform.ANDROID)
+        val uri = Uri.parse(offer.offerUrl)
+        val offerJson = uri.getQueryParameter("credential_offer") ?: withTimeout(30_000) {
+            HttpClient { expectSuccess = true }.use { client ->
+                client.get(requireNotNull(uri.getQueryParameter("credential_offer_uri"))).bodyAsText()
+            }
+        }
+        assertTrue(
+            "Fixture must exercise the authorization-code grant",
+            Json.parseToJsonElement(offerJson).jsonObject.getValue("grants").jsonObject.containsKey("authorization_code"),
+        )
+        val fixture = start()
+        launchOffer(fixture, offerJson)
+        fixture.device.selectWalletCreateCandidate()
+        fixture.device.confirmSelectorIfAsked()
+        assertNotNull(
+            "Authorization offer review missing",
+            waitForResource(fixture.device, "wallet.offerReview", UI_ELEMENT_TIMEOUT),
+        )
+        val configurationId = "org.iso.18013.5.1.mDL"
+        assertResourceVisibleAfterScrolling(fixture.device, "issuance-copies-$configurationId", "Copies missing", UI_ELEMENT_TIMEOUT)
+        clickByTag(fixture.device, "issuance-more-$configurationId")
+        assertResourceTextEquals(
+            fixture.device, "issuance-copies-$configurationId", "Copies: 2",
+            UI_ELEMENT_TIMEOUT, "Explicit batch choice was not applied",
+        )
+        val provider = resumedCreateProvider()
+        clickByTag(fixture.device, "wallet.offerAcceptButton")
+        assertNotNull(
+            "Browser authorization did not return to the provider receipt",
+            waitForResource(fixture.device, "wallet.provider.done", 90_000),
+        )
+        assertSame("Browser return must resume the original request host", provider, resumedCreateProvider())
+        clickByTag(fixture.device, "wallet.provider.done")
+        fixture.awaitCreateProviderCompletion()
+        relaunchAndUnlock(fixture.context, fixture.device)
+        assertNotNull("No credential stored after browser return",
+            fixture.device.waitForNewCredentialCard(fixture.preexistingCardTags))
+        val received = fixture.device.credentialCardTags() - fixture.preexistingCardTags
+        assertEquals("Browser return must preserve the explicit two-copy choice", 2, received.size)
+        fixture.assertStoredCredentialIs(DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" })
+    }
+
+    private fun resumedCreateProvider(): DigitalCredentialCreateActivity {
+        var provider: DigitalCredentialCreateActivity? = null
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            provider = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                .filterIsInstance<DigitalCredentialCreateActivity>().singleOrNull()
+        }
+        return requireNotNull(provider) { "Create provider is not resumed" }
+    }
+
     /**
      * Mirrors the Portal2 DC API request shape, including standards-valid numeric COSE algorithm IDs
      * in the issuer's mdoc metadata.
@@ -69,7 +142,7 @@ class DigitalCredentialIssuanceE2ETest {
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
         val portalOffer = createPortalShapedOffer(scenario)
 
-        launchPortalOffer(fixture, portalOffer)
+        launchOffer(fixture, portalOffer.enrichedOfferJson)
 
         fixture.device.selectWalletCreateCandidate()
         fixture.device.confirmSelectorIfAsked()
@@ -194,10 +267,10 @@ class DigitalCredentialIssuanceE2ETest {
         waitForIdle()
     }
 
-    private fun launchPortalOffer(fixture: Fixture, portalOffer: PortalOffer) {
+    private fun launchOffer(fixture: Fixture, offerJson: String) {
         DigitalCredentialTestIssuer.reset(
             requestJson = """
-                {"requests":[{"protocol":"openid4vci-v1","data":${portalOffer.enrichedOfferJson}}]}
+                {"requests":[{"protocol":"openid4vci-v1","data":$offerJson}]}
             """.trimIndent(),
         )
         fixture.device.wait(Until.gone(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).depth(0)), UI_ELEMENT_TIMEOUT)
