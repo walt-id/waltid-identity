@@ -32,7 +32,8 @@ missing tests, unlisted baselines, record-only results, and source/baseline chan
 
 The matching GitHub workflow retains the gallery, JUnit results and difference images as job
 artifacts. Apple comparisons require **Xcode 27.0 (27A266a), iOS 26.5 and XcodeBuildMCP 2.7.0**;
-all fixture clocks use UTC. Its [official `xcode-27` runner](https://github.com/actions/runner-images/issues/14404)
+all fixture clocks use UTC, and the native nearby receipt pins its locale's 24-hour cycle independently
+of the simulator's user preference. Its [official `xcode-27` runner](https://github.com/actions/runner-images/issues/14404)
 is currently a public preview. The [image inventory](https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md)
 provides the pinned Xcode, Java and Android SDK, but the job downloads iOS 26.5 and creates its
 own simulator. An unavailable runtime or changed Xcode fails explicitly; the workflow never

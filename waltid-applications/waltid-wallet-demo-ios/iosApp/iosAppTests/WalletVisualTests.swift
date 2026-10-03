@@ -358,6 +358,9 @@ final class WalletVisualTests: XCTestCase {
                 credentialDetailsByID: [details.id: details])
                 .navigationTitle("Share nearby").navigationBarTitleDisplayMode(.inline)
         }.navigationViewStyle(.stack)
+            // Pin the receipt's hour cycle independently of the machine's 12/24-hour preference.
+            .environment(\.locale, Locale(identifier: "en_US@hours=h23"))
+            .environment(\.timeZone, TimeZone(secondsFromGMT: 0)!)
         if kind == "review" {
             XCTAssertTrue(model.proximityPresentation.canApprove)
             XCTAssertEqual(details.groups.flatMap(\.items).first?.label, "Given name")

@@ -31,7 +31,7 @@ struct ProximityTerminalContent: View {
             Text(message).foregroundStyle(.secondary)
             if let receipt {
                 ReviewMetadataSection(title: "What was shared") {
-                    Text(receipt.completedAt.formatted(date: .abbreviated, time: .shortened)).font(.footnote)
+                    Text(receipt.completedAt, format: Date.FormatStyle(date: .abbreviated, time: .shortened)).font(.footnote)
                     if receipt.approvalTiming == .beforeConnection {
                         Text("Shared using your one-use prepared approval.")
                     }
