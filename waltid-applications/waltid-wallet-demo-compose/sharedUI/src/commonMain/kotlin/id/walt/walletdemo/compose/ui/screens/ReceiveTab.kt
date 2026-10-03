@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.isBusy
+import id.walt.walletdemo.compose.logic.isError
+import id.walt.walletdemo.compose.logic.statusText
 import id.walt.walletdemo.compose.logic.receivedCredentials
 import id.walt.walletdemo.compose.ui.components.*
 import id.walt.walletdemo.compose.ui.resources.*
@@ -58,6 +60,9 @@ internal fun ReceiveTab(
                 )
             },
         ) {
+            if (state.externalFlow != null && state.isError) {
+                SettingsNotice(state.statusText, error = true, modifier = Modifier.testTag(WalletUiTestTags.Status))
+            }
             OfferReviewSection(
                 preview = preview,
                 acceptEnabled = state.acceptOfferEnabled,

@@ -3,12 +3,9 @@ package id.walt.walletdemo.compose.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,25 +54,10 @@ internal fun UrlActionSection(
             maxLines = 2,
         )
         contentBeforeActions()
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            OutlinedButton(
-                enabled = inputEnabled,
-                onClick = { scannerVisible = true },
-                modifier = Modifier.testTag(scanButtonTestTag),
-            ) {
-                Text("Scan QR")
-            }
-            Button(
-                enabled = enabled,
-                onClick = onClick,
-                modifier = Modifier.testTag(buttonTestTag),
-            ) {
-                Text(buttonText)
-            }
-        }
+        WalletActions(
+            primary = WalletAction(buttonText, onClick, enabled, buttonTestTag, WalletSymbol.Next),
+            secondary = WalletAction("Scan QR", { scannerVisible = true }, inputEnabled, scanButtonTestTag, WalletSymbol.Scan),
+        )
     }
 
     if (scannerVisible) {

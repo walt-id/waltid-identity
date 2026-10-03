@@ -39,12 +39,12 @@ public struct OfferedCredentialRow: View {
                     HStack {
                         Text(String(format: String(localized: "Copies: %d", bundle: .module), copies.wrappedValue))
                             .font(.subheadline).frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityIdentifier("issuance-copies-\(credential.configurationID)")
                         WalletCountControl(value: copies, range: 1...limit, enabled: enabled,
                             decreaseLabel: String(format: String(localized: "Fewer copies of %@", bundle: .module), CredentialCardSummary.offered(from: credential).title),
                             increaseLabel: String(format: String(localized: "More copies of %@", bundle: .module), CredentialCardSummary.offered(from: credential).title),
                             identifier: "issuance-copies-\(credential.configurationID)")
                     }
-                    .accessibilityIdentifier("issuance-copies-\(credential.configurationID)")
                     .padding(.horizontal, 16)
                 } else {
                     Text(String(localized: "1 copy", bundle: .module))

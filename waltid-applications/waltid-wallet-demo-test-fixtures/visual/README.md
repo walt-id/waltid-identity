@@ -1,5 +1,7 @@
 # Wallet visual evidence
 
+Start with the [demo UI conventions](../design-system.md) when changing or adding a screen.
+
 The catalogue connects the existing Compose Android, Compose iOS and native SwiftUI test lanes. Fixtures render production content with synthetic inputs from `resources/files/wallet-visual-data.json`; they never create wallet keys, fetch issuer metadata or start real proximity sessions. Existing semantic and lifecycle tests remain separate.
 
 `catalogue.json` lists each captured state, its test, renderer and readable visual requirements. It is the current deterministic catalogue, not a claim that every wallet screen, system prompt or physical flow is covered. Payment fixtures include ordinary and payment credentials, authoritative consent and pinned actions; the native consent component also has a focused capture. Compose provider fixtures capture the actual modal window, while native provider fixtures render its shared content at a bounded device size. These are wallet-owned surfaces, not system picker evidence. Home content uses the real normalized card input; asynchronous app loading and navigation remain in the behavior/UI suites. Native media rows wait for decoded thumbnail layout and compare actual pixels. Compose media waits for successful image-loader completion. Nothing uses a fixed capture delay. PIN setup captures show the single form with empty, mismatched and biometric-enabled synthetic in-memory state; separate UI tests drive creation, authentication failure, keyboard dismissal and completion.
@@ -33,6 +35,15 @@ For custom orchestration, call `report.py begin` first and pass the generated `n
 
 `source-inputs.json` retains the complete path, kind and SHA-256 inventory used by that fingerprint, without file contents. It is bound to the run marker and retained with the comparison artifact, so intentional CI configuration edits and non-ignored additions can be audited against the checked-out commits. Missing or changed inventories invalidate the report; a dirty checkout is still labelled as such.
 
+The matching GitHub workflow retains the gallery, JUnit results and difference images as job
+artifacts. Apple comparisons require **Xcode 27.0 (27A266a), iOS 26.5 and XcodeBuildMCP 2.7.0**;
+all fixture clocks use UTC. Its [official `xcode-27` runner](https://github.com/actions/runner-images/issues/14404)
+is currently a public preview. The [image inventory](https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md)
+provides the pinned Xcode, Java and Android SDK, but the job downloads iOS 26.5 and creates its
+own simulator. An unavailable runtime or changed Xcode fails explicitly; the workflow never
+falls back to another OS or records replacement references. This pipeline requires hosted
+verification before it can establish CI portability; local success alone is insufficient.
+
 Native failed comparisons export their actual/difference images from the test xcresult bundle; they are included beside expected images in the report. The native renderer permits a maximum difference of 5/255 in every sRGB channel, measured from identical SF Symbol edge rendering. Image dimensions must match and no percentage of pixels is ignored. PNG normalization keeps the encoded reference and actual in the same color representation; the pinned Core Image perceptual comparator produced inconsistent color results.
 
 Settled-state captures advance the Compose virtual clock before capture. Android's native RenderThread ripple is excluded in the snapshot adapter using test-only `LocalRippleConfiguration`; it is not governed by that clock. Production interaction feedback and behavior tests remain unchanged. This follows the [Material ripple subtree override](https://developer.android.com/develop/ui/compose/touch-input/user-interactions/migrate-indication-ripple). The native snapshot host also freezes UIKit activity-indicator layer clocks at one frame. These images do not assert animation timing.
@@ -41,7 +52,7 @@ The wallet module defaults ordinary Gradle tests to verification from both Ident
 
 ## Deliberate baseline updates
 
-Use the same destinations and fixture configuration. Replace `verifyRoborazzi…` with `recordRoborazzi…` for Compose. For native tests, add `"WALLET_VISUAL_RECORD":"1"` to `testRunnerEnv`. Point-Free deliberately reports record-mode assertions as failures; this is not a successful verification run.
+Use the same destinations and fixture configuration. Use the corresponding `recordRoborazziAndroidHostTest` or `recordRoborazziIosSimulatorArm64` task for Compose, with the appropriate test class filter and device. The comparison runner intentionally has no recording option. For native tests, add `"WALLET_VISUAL_RECORD":"1"` to `testRunnerEnv`. Point-Free deliberately reports record-mode assertions as failures; this is not a successful verification run.
 
 Inspect each expected/actual/diff image and its semantic assertions before committing an intentional change. Then compare again with recording disabled. Both integrations reject recording when a CI environment is detected. Do not relax pixel thresholds to conceal missing text, images or action clipping. Keep toolchain-only refreshes separate from design changes.
 
@@ -80,3 +91,16 @@ Payment display responsibilities, placement, explicit unsigned confirmation and 
 Ordinary deep-link presentation, dismissal and platform background limits are described in [the external review contract](external-flows.md).
 
 Nearby review, prepared summaries and receipt evidence are described in [the nearby UI contract](nearby.md).
+
+## Component previews
+
+`WalletControlsPreview` in Compose and SwiftUI is an interactive, side-effect-free fixture
+for actions and compact copy controls. The same content is rendered by the catalogue in
+LTR and RTL. Compose also includes an expired-account preview. These use no wallet,
+metadata fetch, key generation, storage or permission prompts. App-host previews that
+initialized real services have been removed.
+
+Use these IDE previews for local component iteration, then the catalogue for complete
+review states and platform comparisons. Canvas/IDE availability depends on local IDE
+support; compilation and screenshot tests validate the content, not the IDE preview engine.
+Do not build another navigation-driven gallery or duplicate the protocol model for previews.
