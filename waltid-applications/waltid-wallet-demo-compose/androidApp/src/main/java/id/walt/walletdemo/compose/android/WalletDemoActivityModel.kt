@@ -29,15 +29,6 @@ internal class WalletDemoActivityModel(
     private val wallet = createAndroidDemoWallet(context.applicationContext, config) { activityReference.get() }
     private val sharingSettings = createAndroidDemoSharingSettingsStore(context.applicationContext)
 
-    val controller = WalletDemoController(
-        wallet = wallet,
-        pinStore = createAndroidDemoPinStore(context.applicationContext, config.walletId),
-        biometricAuthenticator = createAndroidDemoBiometricAuthenticator { activityReference.get() },
-        signingProtectionMode = config.signingProtectionMode,
-        signingProtectionStore = config.signingProtectionStore(context.applicationContext),
-        sharingSettings = sharingSettings,
-        scope = viewModelScope,
-    )
     val readerTrustSettingsController = DemoReaderTrustSettingsController(
         createAndroidDemoReaderTrustSettingsStore(context.applicationContext),
         scope = viewModelScope,
@@ -47,6 +38,17 @@ internal class WalletDemoActivityModel(
         profileProvider = sharingSettings::proximityTransportProfile,
         approvalModeProvider = sharingSettings::proximityApprovalMode,
         readerTrustSettingsProvider = readerTrustSettingsController::sessionSnapshot,
+        scope = viewModelScope,
+    )
+
+    val controller = WalletDemoController(
+        wallet = wallet,
+        pinStore = createAndroidDemoPinStore(context.applicationContext, config.walletId),
+        biometricAuthenticator = createAndroidDemoBiometricAuthenticator { activityReference.get() },
+        signingProtectionMode = config.signingProtectionMode,
+        signingProtectionStore = config.signingProtectionStore(context.applicationContext),
+        sharingSettings = sharingSettings,
+        canOpenExternalRequest = { !proximityController.state.value.active },
         scope = viewModelScope,
     )
 

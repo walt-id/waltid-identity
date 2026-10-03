@@ -1,0 +1,43 @@
+package id.walt.walletdemo.compose.ui.screens
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
+import id.walt.walletdemo.compose.logic.*
+import id.walt.walletdemo.compose.ui.rememberAuthorizationRequestOpener
+
+/** Wallet-owned external surface. Platform windows decide what can appear behind this sheet. */
+@Composable
+internal fun WalletExternalFlowScreen(
+    controller: WalletDemoController,
+    state: WalletDemoUiState,
+    onClose: () -> Unit,
+) {
+    val openAuthorization = rememberAuthorizationRequestOpener()
+    LaunchedEffect(state.authorizationRequestUrl) {
+        state.authorizationRequestUrl?.let { openAuthorization(it); controller.authorizationRequestOpened() }
+    }
+    Column(Modifier.fillMaxWidth().testTag("wallet.external.flow")) {
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(if (state.externalFlow?.tab == WalletDemoTab.Receive) "Receive credentials" else "Share credentials",
+                Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+            IconButton(onClick = onClose, enabled = state.canDismissExternalFlow,
+                modifier = Modifier.testTag("wallet.external.close")) { Icon(Icons.Default.Close, "Close request") }
+        }
+        if (state.isBusy && (state.offerPreview != null || state.presentationReview != null)) {
+            LinearProgressIndicator(Modifier.fillMaxWidth())
+            Text(state.statusText, Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+        }
+        if (state.externalFlow is WalletExternalFlow.UnavailableCallback) {
+            Text("The original receiving session is no longer available. Check your wallet before starting again.",
+                Modifier.padding(20.dp).testTag("wallet.external.unavailable"))
+        } else WalletFlowContent(controller, state, onDone = onClose,
+            fillViewport = false, modifier = Modifier.weight(1f, fill = false))
+    }
+}

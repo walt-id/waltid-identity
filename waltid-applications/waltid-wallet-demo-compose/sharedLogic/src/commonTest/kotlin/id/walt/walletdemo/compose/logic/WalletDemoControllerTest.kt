@@ -2574,6 +2574,109 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun externalEntryCannotReplaceAnotherMobileFlow() = runTest {
+        var available = false
+        val controller = WalletDemoController(FakeDemoWallet(), InMemoryDemoPinStore(),
+            canOpenExternalRequest = { available }, scope = backgroundScope, dispatcher = StandardTestDispatcher(testScheduler))
+        controller.handleDeepLink("openid4vp://external")
+        assertEquals(null, controller.state.value.externalFlow)
+        assertTrue(controller.state.value.incomingLinkNotice != null)
+        available = true
+        controller.dismissIncomingLinkNotice()
+        controller.handleDeepLink("openid4vp://external")
+        assertTrue(controller.state.value.externalFlow is WalletExternalFlow.Pending)
+    }
+
+    @Test
+    fun callbackWithoutOriginalSessionExplainsRecoveryWithoutReplayingAnOffer() = runTest {
+        val wallet = FakeDemoWallet()
+        val controller = controllerWith(wallet, this)
+        controller.handleDeepLink("openid://callback?code=orphan&state=lost")
+        assertTrue(controller.state.value.externalFlow is WalletExternalFlow.UnavailableCallback)
+        controller.updatePin("123456")
+        controller.updatePinConfirmation("123456")
+        controller.submitPin()
+        runCurrent()
+        controller.prepareExternalFlow()
+        runCurrent()
+        assertEquals(0, wallet.startIssuanceCalls)
+        assertEquals(0, wallet.receiveCalls)
+        assertTrue(controller.closeExternalFlow())
+    }
+
+    @Test
+    fun externalOfferWaitsForUnlockPreparesOnceAndKeepsReceiptUntilClosed() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val controller = controllerWith(wallet, this)
+        val url = "openid-credential-offer://external"
+        controller.handleDeepLink(url)
+        controller.prepareExternalFlow()
+        runCurrent()
+        assertEquals(0, wallet.startIssuanceCalls)
+        assertTrue(controller.state.value.externalFlow is WalletExternalFlow.Pending)
+        controller.updatePin("123456")
+        controller.updatePinConfirmation("123456")
+        controller.submitPin()
+        runCurrent()
+        repeat(2) { controller.prepareExternalFlow(); runCurrent() }
+        controller.handleDeepLink(url)
+        controller.prepareExternalFlow()
+        runCurrent()
+        assertEquals(1, wallet.startIssuanceCalls)
+        assertEquals(0, wallet.receiveCalls)
+        controller.acceptOffer()
+        runCurrent()
+        assertEquals(1, wallet.receiveCalls)
+        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
+        assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
+        assertTrue(controller.state.value.issuanceReceipt != null)
+        assertTrue(controller.closeExternalFlow())
+        assertFalse(controller.closeExternalFlow())
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
+    }
+
+    @Test
+    fun incomingLinkAndDismissCannotInterruptReceiving() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential), receiveGate = gate)
+        val controller = unlockedControllerWith(wallet, this)
+        val url = "openid-credential-offer://external"
+        controller.handleDeepLink(url)
+        controller.prepareExternalFlow()
+        runCurrent()
+        controller.acceptOffer()
+        runCurrent()
+        assertEquals(WalletOperationState.Receiving, controller.state.value.operation)
+        assertFalse(controller.closeExternalFlow())
+        controller.handleDeepLink("openid4vp://replacement")
+        assertEquals(url, controller.state.value.externalFlow?.url)
+        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
+        assertTrue(controller.state.value.incomingLinkNotice != null)
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(1, wallet.receiveCalls)
+        assertTrue(controller.state.value.issuanceReceipt != null)
+        assertTrue(controller.closeExternalFlow())
+    }
+
+    @Test
+    fun closingExternalPreviewDiscardsLateResolutionWithoutReceiving() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val wallet = FakeDemoWallet(startIssuanceGate = gate, ignoreStartIssuanceCancellation = true)
+        val controller = unlockedControllerWith(wallet, this)
+        controller.handleDeepLink("openid-credential-offer://external")
+        controller.prepareExternalFlow()
+        runCurrent()
+        assertTrue(controller.closeExternalFlow())
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(null, controller.state.value.offerPreview)
+        assertEquals(null, controller.state.value.externalFlow)
+        assertEquals(0, wallet.receiveCalls)
+        assertEquals(listOf("issuance-session"), wallet.cancelledIssuanceSessionIds)
+    }
+
+    @Test
     fun handleDeepLinkRoutesCredentialOffersAndPresentationRequests() = runTest {
         val controller = controllerWith(FakeDemoWallet(), this)
         val offerUrl = "openid-credential-offer://example"
@@ -2667,8 +2770,9 @@ class WalletDemoControllerTest {
 
         controller.handleDeepLink(presentationUrl)
 
-        assertEquals(receiveResetKeyBeforePresentationLink + 2, controller.state.value.receiveNavigationResetKey)
-        assertEquals(presentationResetKeyBeforePresentationLink + 2, controller.state.value.presentationNavigationResetKey)
+        // Duplicate delivery preserves the same external request and its review.
+        assertEquals(receiveResetKeyBeforePresentationLink + 1, controller.state.value.receiveNavigationResetKey)
+        assertEquals(presentationResetKeyBeforePresentationLink + 1, controller.state.value.presentationNavigationResetKey)
     }
 
     @Test

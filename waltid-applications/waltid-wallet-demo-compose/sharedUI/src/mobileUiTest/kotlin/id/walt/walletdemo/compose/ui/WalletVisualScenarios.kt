@@ -52,6 +52,25 @@ internal class WalletVisualScenarios(
         }
     }
 
+    fun externalReceiving(unavailable: Boolean = false) = with(test) {
+        val controller = id.walt.walletdemo.compose.logic.WalletDemoController(WalletUiTestWallet(), id.walt.walletdemo.compose.logic.InMemoryDemoPinStore())
+        val flow = if (unavailable) id.walt.walletdemo.compose.logic.WalletExternalFlow.UnavailableCallback("openid://callback")
+            else id.walt.walletdemo.compose.logic.WalletExternalFlow.Active("openid-credential-offer://fixture", id.walt.walletdemo.compose.logic.WalletExternalFlow.Kind.Offer)
+        val state = WalletDemoUiState(auth = id.walt.walletdemo.compose.logic.WalletAuthState.Unlocked,
+            session = WalletVisualFixtures.partialResult.session, selectedTab = WalletDemoTab.Receive, externalFlow = flow,
+            offerPreview = if (unavailable) null else WalletVisualFixtures.offer, issuanceCopyCounts = WalletVisualFixtures.copies)
+        content {
+            WalletReviewHost(WalletReviewPresentation.Sheet, true, {}) {
+                id.walt.walletdemo.compose.ui.screens.WalletExternalFlowScreen(controller, state, {})
+            }
+        }
+        onNodeWithTag("wallet.external.close").assertIsDisplayed().assertIsEnabled()
+        onAllNodesWithTag(WalletUiTestTags.OfferInput).assertCountEquals(0)
+        if (unavailable) onNodeWithTag("wallet.external.unavailable").assertIsDisplayed()
+        else onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsDisplayed().assertIsEnabled()
+        capture(if (unavailable) "external.callback.unavailable" else "external.receiving.review")
+    }
+
     fun pin(state: String) = with(test) {
         val biometrics = object : id.walt.walletdemo.compose.logic.DemoBiometricAuthenticator {
             override fun isAvailable() = state == "biometrics_enabled"

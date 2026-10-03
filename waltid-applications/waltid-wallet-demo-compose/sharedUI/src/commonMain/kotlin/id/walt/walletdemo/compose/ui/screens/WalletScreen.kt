@@ -188,46 +188,11 @@ internal fun WalletScreen(
                 modifier = Modifier.weight(1f),
                 )
             }
-            WalletDemoTab.Receive -> {
-                ReceiveTab(
-                    state = state,
-                    requestDrafts = state.requestDrafts,
-                    onOfferUrlChange = controller::updateOfferUrl,
-                    onTxCodeChange = controller::updateTxCode,
-                    onCopiesChange = controller::updateIssuanceCopies,
-                    onPreviewOffer = controller::previewOffer,
-                    onAcceptOffer = controller::acceptOffer,
-                    onDeclineOffer = controller::declineOffer,
-                    onResumeDeferred = controller::resumeDeferredCredential,
-                    onDone = { controller.selectTab(WalletDemoTab.Credentials) },
-                    onRefresh = controller::refreshIssuanceStatus,
-                    modifier = modifier,
-                )
-            }
-            WalletDemoTab.Present -> {
-                PresentTab(
-                    state = state,
-                    requestDrafts = state.requestDrafts,
-                    onPresentationRequestUrlChange = controller::updatePresentationRequestUrl,
-                    onPreview = controller::previewPresentation,
-                    onToggleCredential = controller::togglePresentationCredential,
-                    onToggleDisclosure = controller::togglePresentationDisclosure,
-                    onSubmit = {
-                        val current = controller.state.value
-                        if (current.presentationReview == state.presentationReview &&
-                            current.paymentReview == state.paymentReview &&
-                            current.selectedPresentationCredentialOptions == state.selectedPresentationCredentialOptions &&
-                            current.selectedPresentationDisclosureOptions == state.selectedPresentationDisclosureOptions) {
-                            controller.submitPresentation()
-                        }
-                    },
-                    onReject = controller::rejectPresentation,
-                    onCancel = controller::cancelPresentationReview,
-                    onStartProximityPresentation = onStartProximityPresentation,
-                    presentationContent = presentationContent,
-                    modifier = modifier,
-                )
-            }
+            WalletDemoTab.Receive, WalletDemoTab.Present -> WalletFlowContent(
+                controller, state, onDone = { controller.selectTab(WalletDemoTab.Credentials) },
+                modifier = modifier, onStartProximityPresentation = onStartProximityPresentation,
+                presentationContent = presentationContent,
+            )
         }
     }
 }

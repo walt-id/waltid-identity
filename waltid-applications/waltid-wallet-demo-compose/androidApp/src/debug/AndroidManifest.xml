@@ -3,6 +3,9 @@
 
     <application>
         <activity
+            android:name=".WalletExternalFlowTestCallerActivity"
+            android:exported="false" />
+        <activity
             android:name=".DigitalCredentialTestVerifierActivity"
             android:exported="false" />
         <activity

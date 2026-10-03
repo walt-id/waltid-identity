@@ -18,6 +18,8 @@ data class WalletDemoUiState(
     val signingProtectionError: String? = null,
     val operation: WalletOperationState = WalletOperationState.Idle,
     val selectedTab: WalletDemoTab = WalletDemoTab.Credentials,
+    val externalFlow: WalletExternalFlow? = null,
+    val incomingLinkNotice: String? = null,
     val requestDrafts: WalletRequestDrafts = WalletRequestDrafts(),
     val offerPreview: WalletDemoOfferPreview? = null,
     val issuanceCopyCounts: Map<String, Int> = emptyMap(),

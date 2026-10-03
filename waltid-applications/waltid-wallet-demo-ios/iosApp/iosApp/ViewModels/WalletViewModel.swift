@@ -143,6 +143,9 @@ class WalletViewModel: ObservableObject {
     }
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
     @Published var selectedPresentationDisclosureOptions: Set<PresentationDisclosureSelection> = []
+    @Published var externalFlow: WalletExternalFlow?
+    @Published var incomingLinkNotice: String?
+    @Published private(set) var flowIsCommitting = false
     @Published var selectedTab: WalletTab = .credentials
     @Published var issuanceCopyCounts: [String: Int] = [:]
     @Published var offerPreview: IssuanceOfferPreview?
@@ -818,10 +821,19 @@ class WalletViewModel: ObservableObject {
     }
 
     func handleDeepLink(_ url: URL) {
+        let kind = (url.scheme?.lowercased()).flatMap(WalletDeepLinkScheme.init(rawValue:))
+        if kind == .credentialOffer || kind == .presentationRequest {
+            if externalFlow?.url == url { return }
+            guard canAcceptExternalRequest && !proximityPresentation.active else {
+                incomingLinkNotice = "Finish the current operation before opening another link."
+                return
+            }
+        }
         resetInputFocus()
         logE2E("Deep link received: \(url.scheme ?? "unknown")")
         switch (url.scheme?.lowercased()).flatMap(WalletDeepLinkScheme.init(rawValue:)) {
         case .credentialOffer:
+            externalFlow = .pending(url, .offer)
             receiveTask?.cancel()
             paymentConsentTask?.cancel()
             presentationTask?.cancel()
@@ -842,6 +854,7 @@ class WalletViewModel: ObservableObject {
             presentationNavigationResetKey += 1
             resetFlowStatusForIncomingURL()
         case .presentationRequest:
+            externalFlow = .pending(url, .presentation)
             receiveTask?.cancel()
             paymentConsentTask?.cancel()
             presentationTask?.cancel()
@@ -869,6 +882,33 @@ class WalletViewModel: ObservableObject {
                 continueAuthorization(callbackURI: url)
             }
         }
+    }
+
+    private var canAcceptExternalRequest: Bool {
+        !flowIsCommitting && pendingPresentationContinuationURL == nil && pendingPresentationFormPostHTML == nil
+    }
+
+    var canDismissExternalFlow: Bool {
+        canAcceptExternalRequest && !isAuthenticating && identityScreen?.busy != true
+    }
+
+    func prepareExternalFlow() {
+        guard case let .pending(url, kind) = externalFlow, auth == .unlocked, isReady, !isLoading else { return }
+        externalFlow = .active(url, kind)
+        switch kind {
+        case .offer: previewOffer()
+        case .presentation: previewPresentation()
+        }
+    }
+
+    @discardableResult func closeExternalFlow() -> Bool {
+        guard externalFlow != nil, canDismissExternalFlow else { return false }
+        externalFlow = nil
+        incomingLinkNotice = nil
+        startNewReceiveFlow()
+        startNewPresentationFlow()
+        selectedTab = .credentials
+        return true
     }
 
     func startNewReceiveFlow() {
@@ -989,7 +1029,7 @@ class WalletViewModel: ObservableObject {
         let previousCredentials = credentials
         let request = ReceiveRequest(offerURL: offer.absoluteString, navigationResetKey: receiveNavigationResetKey)
 
-        setLoading(WalletStatusText.receivingCredential, tab: .receive)
+        setLoading(WalletStatusText.receivingCredential, tab: .receive, committing: true)
         receiveTask = Task {
             do {
                 let selections = try issuanceSelections(session.offer)
@@ -1044,6 +1084,14 @@ class WalletViewModel: ObservableObject {
     }
 
     private func continueAuthorization(callbackURI: URL) {
+        guard canAcceptExternalRequest else { return }
+        if issuanceSession == nil {
+            if !proximityPresentation.active && externalFlow == nil && !isLoading && offerPreview == nil && presentationReview == nil {
+                externalFlow = .unavailableCallback(callbackURI)
+                selectedTab = .receive
+            }
+            return
+        }
         guard let session = issuanceSession,
               let preview = offerPreview,
               preview.grant == .authorizationCode else { return }
@@ -1052,7 +1100,7 @@ class WalletViewModel: ObservableObject {
             navigationResetKey: receiveNavigationResetKey
         )
         let previousCredentials = credentials
-        setLoading(WalletStatusText.receivingCredential, tab: .receive)
+        setLoading(WalletStatusText.receivingCredential, tab: .receive, committing: true)
         receiveTask = Task {
             do {
                 try await completeIssuanceOutcome(
@@ -1180,8 +1228,8 @@ class WalletViewModel: ObservableObject {
         offerUrl = ""
         receiveCompleted = false
         receiveNavigationResetKey += 1
-        selectedTab = .credentials
-        setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: .credentials)
+        selectedTab = externalFlow == nil ? .credentials : .receive
+        setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: selectedTab)
     }
 
     func updateTxCode(_ value: String) {
@@ -1199,7 +1247,7 @@ class WalletViewModel: ObservableObject {
         }
         func receivedIDs(_ ids: [String]) -> [String] { (priorIDs + ids).reduce(into: []) { if !$0.contains($1) { $0.append($1) } } }
         let request = ReceiveRequest(offerURL: offerUrl.trimmingCharacters(in: .whitespacesAndNewlines), navigationResetKey: receiveNavigationResetKey)
-        setLoading(WalletStatusText.receivingCredential, tab: .receive)
+        setLoading(WalletStatusText.receivingCredential, tab: .receive, committing: true)
         receiveTask = Task {
             do {
                 let outcome = try await refreshContinuations(walletClient.resumeDeferredIssuance(deferredCredentialID: credential.id), resumingID: credential.id)
@@ -1221,8 +1269,8 @@ class WalletViewModel: ObservableObject {
                     if deferredCredentials.isEmpty && !credentialIDs.isEmpty {
                         offerUrl = ""
                         receiveNavigationResetKey += 1
-                        selectedTab = .credentials
-                        setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: .credentials)
+                        selectedTab = externalFlow == nil ? .credentials : .receive
+                        setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: selectedTab)
                     } else {
                         setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: .receive)
                     }
@@ -1327,7 +1375,7 @@ class WalletViewModel: ObservableObject {
             return
         }
 
-        setLoading(WalletStatusText.presentingCredential, tab: .present)
+        setLoading(WalletStatusText.presentingCredential, tab: .present, committing: true)
         Task {
             do {
                 let result = try await walletClient.present(
@@ -1457,7 +1505,7 @@ class WalletViewModel: ObservableObject {
         let selectedDid = did.isEmpty ? nil : did
 
         let consentRevision = paymentReview.consent?.revision
-        setLoading(WalletStatusText.presentingCredential, tab: .present)
+        setLoading(WalletStatusText.presentingCredential, tab: .present, committing: true)
         presentationTask = Task {
             do {
                 let result = try await walletClient.submitPresentation(
@@ -1496,7 +1544,7 @@ class WalletViewModel: ObservableObject {
             isReportingError = false
         }
 
-        setLoading(WalletStatusText.decliningPresentation, tab: .present)
+        setLoading(WalletStatusText.decliningPresentation, tab: .present, committing: true)
         presentationTask = Task {
             do {
                 let result = try await walletClient.rejectPresentation(previewHandle: previewHandle)
@@ -1885,7 +1933,8 @@ class WalletViewModel: ObservableObject {
         )
     }
 
-    private func setLoading(_ message: String, tab: WalletTab? = nil) {
+    private func setLoading(_ message: String, tab: WalletTab? = nil, committing: Bool = false) {
+        flowIsCommitting = committing
         isLoading = true
         isError = false
         statusTab = tab
@@ -1896,6 +1945,7 @@ class WalletViewModel: ObservableObject {
     }
 
     private func setSuccess(_ message: String, tab: WalletTab? = nil) {
+        flowIsCommitting = false
         isLoading = false
         isError = false
         statusTab = tab
@@ -1925,6 +1975,7 @@ class WalletViewModel: ObservableObject {
     }
 
     private func setError(_ message: String, tab: WalletTab? = nil) {
+        flowIsCommitting = false
         isLoading = false
         isError = true
         statusTab = tab

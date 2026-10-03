@@ -50,3 +50,5 @@ Simulator pixels do not prove external activity/scene lifecycle, OS-owned DC API
 Native comparison normalizes both PNGs to the same representation and bounds SF Symbol edge noise to 5/255 per sRGB channel, with equal dimensions and no ignored percentage of pixels. This reuses the catalogue comparison contract; recording never implies acceptance.
 
 Payment display responsibilities, placement, explicit unsigned confirmation and evidence boundaries are described in [the payment review contract](payment-consent.md). The localized compact variant uses 320×568 with large text; it checks wrapping, not translation of wallet-owned strings.
+
+Ordinary deep-link presentation, dismissal and platform background limits are described in [the external review contract](external-flows.md).

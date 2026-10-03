@@ -103,14 +103,23 @@ final class WalletE2EUI {
         XCTAssertTrue(address.waitForExistence(timeout: 10), safari.debugDescription)
         address.tap()
         address.typeText(value + XCUIKeyboardKey.return.rawValue)
+        // Safari can put its first-run toolbar tip above the external-app confirmation.
+        // Dismiss that tip before waiting for the real Open action to become enabled.
+        let tip = safari.staticTexts.matching(NSPredicate(format: "label CONTAINS[cd] %@", "View Bookmarks")).firstMatch
+        if tip.waitForExistence(timeout: 2) {
+            let close = safari.buttons["Close"].firstMatch
+            if close.exists { close.tap() }
+        }
         let open = safari.buttons["Open"]
         if open.waitForExistence(timeout: 5) {
+            let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: open)
+            XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 10), .completed, safari.debugDescription)
             // Safari's external-app confirmation reports no XCTest hit point on
             // iOS 26. Tap the visible button's own frame, not a fixed coordinate.
             XCTAssertFalse(open.frame.isEmpty)
             open.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         }
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10), safari.debugDescription)
     }
 
     func waitForTextInputValue(identifier: String, fallbackLabel: String, value: String, timeout: TimeInterval) -> Bool {
@@ -324,7 +333,7 @@ final class WalletE2EUI {
         return elements[0]
     }
 
-    private func unlockWallet() {
+    func unlockWallet() {
         let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
         guard pinInput.waitForExistence(timeout: 10) else {
             return
