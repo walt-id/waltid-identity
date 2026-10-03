@@ -19,6 +19,10 @@ class WalletDemoSharingReviewAndroidTest {
         scenarios.inspectingAllCredentialInformationDoesNotChangeDisclosureConsent()
 
     @Test
+    fun unsignedConfirmationIsInvalidatedByNewConsentAndDisabledState() =
+        scenarios.unsignedConfirmationIsInvalidatedByNewConsentAndDisabledState()
+
+    @Test
     fun paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements() =
         scenarios.paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements()
 

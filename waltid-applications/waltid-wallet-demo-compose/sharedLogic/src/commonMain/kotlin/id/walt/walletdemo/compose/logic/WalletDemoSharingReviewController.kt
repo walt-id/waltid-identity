@@ -44,10 +44,10 @@ class WalletDemoSharingReviewController(
         updateSelection(state.value.selection.toggleDisclosure(selection))
     }
 
-    /** Returns only the currently resolved revision; a stale layout cannot authorize prior choices. */
-    fun selectionForSubmission(): WalletDemoSharingSelection? {
+    /** UI callers must supply the rendered state: a stale click must never approve newer choices. */
+    fun selectionForSubmission(reviewedState: State = state.value): WalletDemoSharingSelection? {
         val current = state.value
-        if (closed || !review.hasCompleteCredentialSelection(current.selection.credentials) || !current.payment.canConfirm) return null
+        if (closed || current != reviewedState || !review.hasCompleteCredentialSelection(current.selection.credentials) || !current.payment.canConfirm) return null
         return current.selection.copy(paymentConsentRevision = current.payment.consent?.revision)
     }
 
