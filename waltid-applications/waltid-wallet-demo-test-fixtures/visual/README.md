@@ -87,6 +87,11 @@ Simulator pixels do not prove external activity/scene lifecycle, OS-owned DC API
 
 Native comparison normalizes both PNGs to the same representation and bounds measured iOS 27 SF Symbol edge noise to 6/255 per sRGB channel, with equal dimensions and no ignored percentage of pixels. Boundary tests reject larger channel changes, a missing detail and different dimensions. Recording never implies acceptance.
 
+The [browser account pilot](../../waltid-wallet-demo-compose/webApp/visual/README.md) separately
+compares six web-specific account states in the production Wasm host, including compact/wide
+viewports and actual form requests against synthetic HTTP responses. Its native Playwright report
+stays separate from the three-renderer mobile manifest.
+
 Payment display responsibilities, placement, explicit unsigned confirmation and evidence boundaries are described in [the payment review contract](payment-consent.md). The localized compact variant uses 320×568 with large text; it checks wrapping, not translation of wallet-owned strings.
 
 Ordinary deep-link presentation, dismissal and platform background limits are described in [the external review contract](external-flows.md).
