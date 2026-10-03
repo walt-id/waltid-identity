@@ -10,6 +10,7 @@ import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -194,7 +195,9 @@ internal class WalletApi2Client(
         }
 
     suspend fun listDeferred(walletId: String): List<DeferredCredentialHandleDto> =
-        request { get(walletPath(walletId, "credentials/receive/deferred")) }.body()
+        request {
+            get(walletPath(walletId, "credentials/receive/deferred")) { parameter("includeDetails", true) }
+        }.body()
 
     suspend fun resumeDeferred(walletId: String, deferredCredentialId: String): DeferredIssuanceOutcomeDto =
         request {
