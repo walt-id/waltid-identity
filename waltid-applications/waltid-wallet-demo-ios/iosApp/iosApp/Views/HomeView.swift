@@ -21,8 +21,7 @@ struct HomeView: View {
                         }
                         else {
                             Text(viewModel.statusMessage)
-                            Button("Retry opening wallet", action: viewModel.retryOpeningWallet)
-                                .buttonStyle(.borderedProminent)
+                            WalletActions(primary: WalletAction("Retry opening wallet", perform: viewModel.retryOpeningWallet))
                         }
                     }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -125,8 +124,7 @@ private struct WalletSetupView: View {
                     ProgressView("Opening wallet…")
                 } else {
                     Text(viewModel.statusMessage).foregroundStyle(.secondary)
-                    Button("Retry opening wallet") { viewModel.retryOpeningWallet() }
-                        .buttonStyle(.borderedProminent)
+                    WalletActions(primary: WalletAction("Retry opening wallet", perform: viewModel.retryOpeningWallet))
                 }
             }
             .padding(24)

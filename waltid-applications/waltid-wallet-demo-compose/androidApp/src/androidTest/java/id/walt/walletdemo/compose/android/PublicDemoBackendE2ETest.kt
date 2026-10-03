@@ -8,18 +8,18 @@ import androidx.test.uiautomator.activeWindow
 import androidx.test.uiautomator.waitForStable
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.VERIFIER_POLLING_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceTextEquals
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.latestStatus
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.setTextByTag
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,24 +41,7 @@ class PublicDemoBackendE2ETest {
 
         launchAndUnlock(context, device)
         sendDeepLink(context, offer.offerUrl)
-        assertResourceTextEquals(
-            device = device,
-            tag = "wallet.offerInput",
-            expected = offer.offerUrl,
-            timeoutMs = UI_ELEMENT_TIMEOUT,
-            message = "Offer URL did not appear in UI after deep link",
-        )
-
-        clickByTag(device, "wallet.receiveButton")
-        assertTrue(
-            "Offer preview did not appear. Latest status: ${latestStatus(device)}",
-            waitForStatus(
-                device = device,
-                timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
-                matcher = { it.startsWith("Review credential offer") },
-                failurePrefixes = listOf("Receive failed", "Bootstrap failed"),
-            ),
-        )
+        assertReview(device, "wallet.offerAcceptButton")
 
         setTextByTag(device, "wallet.txCodeInput", incorrectCodeFor(transactionCode))
         clickByTag(device, "wallet.offerAcceptButton")
@@ -75,15 +58,7 @@ class PublicDemoBackendE2ETest {
         // The reviewed offer remains active so the corrected code can be retried directly.
         setTextByTag(device, "wallet.txCodeInput", transactionCode)
         clickByTag(device, "wallet.offerAcceptButton")
-        assertTrue(
-            "Receive did not succeed after correcting the transaction code. Latest status: ${latestStatus(device)}",
-            waitForStatus(
-                device = device,
-                timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
-                matcher = { it.startsWith("Received") },
-                failurePrefixes = listOf("Receive failed", "Bootstrap failed"),
-            ),
-        )
+        assertReview(device, "issuance-done")
     }
 
     @Test
@@ -98,50 +73,15 @@ class PublicDemoBackendE2ETest {
         launchAndUnlock(context, device)
 
         sendDeepLink(context, offer.offerUrl)
-        assertResourceTextEquals(
-            device = device,
-            tag = "wallet.offerInput",
-            expected = offer.offerUrl,
-            timeoutMs = UI_ELEMENT_TIMEOUT,
-            message = "Offer URL did not appear in UI after deep link",
-        )
-
-        clickByTag(device, "wallet.receiveButton")
-        val offerPreviewReady = waitForStatus(
-            device = device,
-            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
-            matcher = { it.startsWith("Review credential offer") },
-            failurePrefixes = listOf("Receive failed", "Bootstrap failed", "Present failed")
-        )
-        assertTrue("Offer preview did not appear. Latest status: ${latestStatus(device)}", offerPreviewReady)
+        assertReview(device, "wallet.offerAcceptButton")
         clickByTag(device, "wallet.offerAcceptButton")
-        val receiveSuccess = waitForStatus(
-            device = device,
-            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
-            matcher = { it.startsWith("Received") },
-            failurePrefixes = listOf("Receive failed", "Bootstrap failed", "Present failed")
-        )
-        assertTrue("Receive did not complete successfully. Latest status: ${latestStatus(device)}", receiveSuccess)
+        assertReview(device, "issuance-done")
         assertTrue("No credentials were shown in UI", device.findObject(By.text("No credentials")) == null)
 
+        clickByTag(device, "issuance-done")
         val session = DemoTestBackend.createVerifierSession(scenario)
         sendDeepLink(context, session.authorizationRequestUri)
-        assertResourceTextEquals(
-            device = device,
-            tag = "wallet.presentationInput",
-            expected = session.authorizationRequestUri,
-            timeoutMs = UI_ELEMENT_TIMEOUT,
-            message = "Presentation request URL did not appear in UI after deep link",
-        )
-
-        clickByTag(device, "wallet.presentButton")
-        val previewReady = waitForStatus(
-            device = device,
-            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
-            matcher = { it == "Review presentation request" },
-            failurePrefixes = listOf("Preview failed", "Present failed", "Receive failed", "Bootstrap failed")
-        )
-        assertTrue("Presentation preview did not load. Latest status: ${latestStatus(device)}", previewReady)
+        assertReview(device, "wallet.presentationSubmitButton")
 
         clickByTag(device, "wallet.presentationSubmitButton")
         val presentSuccess = waitForStatus(
@@ -179,49 +119,14 @@ class PublicDemoBackendE2ETest {
         launchAndUnlock(context, device)
 
         sendDeepLink(context, offer.offerUrl)
-        assertResourceTextEquals(
-            device = device,
-            tag = "wallet.offerInput",
-            expected = offer.offerUrl,
-            timeoutMs = UI_ELEMENT_TIMEOUT,
-            message = "Offer URL did not appear in UI after deep link",
-        )
-
-        clickByTag(device, "wallet.receiveButton")
-        val offerPreviewReady2 = waitForStatus(
-            device = device,
-            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
-            matcher = { it.startsWith("Review credential offer") },
-            failurePrefixes = listOf("Receive failed", "Bootstrap failed", "Present failed")
-        )
-        assertTrue("Offer preview did not appear. Latest status: ${latestStatus(device)}", offerPreviewReady2)
+        assertReview(device, "wallet.offerAcceptButton")
         clickByTag(device, "wallet.offerAcceptButton")
-        val receiveSuccess = waitForStatus(
-            device = device,
-            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
-            matcher = { it.startsWith("Received") },
-            failurePrefixes = listOf("Receive failed", "Bootstrap failed", "Present failed")
-        )
-        assertTrue("Receive did not complete successfully. Latest status: ${latestStatus(device)}", receiveSuccess)
+        assertReview(device, "issuance-done")
 
+        clickByTag(device, "issuance-done")
         val session = DemoTestBackend.createTransactionDataVerifierSession(scenario)
         sendDeepLink(context, session.authorizationRequestUri)
-        assertResourceTextEquals(
-            device = device,
-            tag = "wallet.presentationInput",
-            expected = session.authorizationRequestUri,
-            timeoutMs = UI_ELEMENT_TIMEOUT,
-            message = "Presentation request URL did not appear in UI after deep link",
-        )
-
-        clickByTag(device, "wallet.presentButton")
-        val previewReady = waitForStatus(
-            device = device,
-            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
-            matcher = { it == "Review presentation request" },
-            failurePrefixes = listOf("Preview failed", "Present failed", "Receive failed", "Bootstrap failed")
-        )
-        assertTrue("Transaction-data preview did not load. Latest status: ${latestStatus(device)}", previewReady)
+        assertReview(device, "wallet.presentationSubmitButton")
 
         val stableWindow = device.activeWindow().waitForStable(stableTimeoutMs = UI_ELEMENT_TIMEOUT)
         assertTrue("Transaction-data review did not stabilize before capture", !stableWindow.isTimeout)
@@ -259,6 +164,11 @@ class PublicDemoBackendE2ETest {
             expectedValues = listOf("ACME Corp"),
             message = "Payment merchant name missing",
         )
+    }
+
+    private fun assertReview(device: UiDevice, tag: String) {
+        assertNotNull("Wallet surface $tag did not appear. Latest status: ${latestStatus(device)}",
+            waitForResource(device, tag, CREDENTIAL_OPERATION_TIMEOUT))
     }
 
     private fun incorrectCodeFor(code: String): String {

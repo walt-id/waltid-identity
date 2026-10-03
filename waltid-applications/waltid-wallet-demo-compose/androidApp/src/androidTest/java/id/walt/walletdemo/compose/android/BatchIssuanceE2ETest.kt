@@ -13,8 +13,9 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.latestStatus
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.relaunchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,10 +41,8 @@ class BatchIssuanceE2ETest {
         val previousIds = device.credentialCardTags()
 
         sendDeepLink(context, offer.offerUrl)
-        clickByTag(device, "wallet.receiveButton")
-        assertTrue("Offer review missing: ${latestStatus(device)}", waitForStatus(
-            device, 60_000, { it == "Review credential offer" }, listOf("Receive failed"),
-        ))
+        assertNotNull("Offer review missing: ${latestStatus(device)}",
+            waitForResource(device, "wallet.offerAcceptButton", 60_000))
         val configurationId = "org.iso.18013.5.1.mDL"
         assertResourceVisibleAfterScrolling(device, "issuance-copies-$configurationId", "Copy selection missing", 10_000)
         assertResourceTextEquals(device, "issuance-copies-$configurationId", "Copies: 1", 10_000,
@@ -53,9 +52,9 @@ class BatchIssuanceE2ETest {
             "Explicit copy selection was not applied")
         screenshot(device, "batch-review")
         clickByTag(device, "wallet.offerAcceptButton")
-        assertTrue("Batch receive did not finish: ${latestStatus(device)}", waitForStatus(
-            device, 90_000, { it.startsWith("Received 2") }, listOf("Receive failed"),
-        ))
+        assertNotNull("Batch receipt missing: ${latestStatus(device)}",
+            waitForResource(device, "issuance-done", 90_000))
+        clickByTag(device, "issuance-done")
         val receivedIds = device.credentialCardTags() - previousIds
         assertEquals("Expected two distinct stored credential cards", 2, receivedIds.size)
         screenshot(device, "batch-stored")

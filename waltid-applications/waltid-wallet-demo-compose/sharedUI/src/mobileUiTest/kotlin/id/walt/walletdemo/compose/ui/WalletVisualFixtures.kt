@@ -13,6 +13,17 @@ internal object WalletVisualFixtures {
     private val credential get() = data.getValue("credential").jsonObject
     private val offered get() = data.getValue("offer").jsonObject
 
+    val readerTrustImport: id.walt.wallet2.mobile.ProximityReaderTrustImportPreview get() {
+        val value = data.getValue("readerTrust").jsonObject
+        return id.walt.wallet2.mobile.ProximityReaderTrustImportPreview(
+            id.walt.wallet2.mobile.ProximityReaderTrustImportKind.ReaderCa, value.text("sourceName"),
+            listOf(id.walt.wallet2.mobile.ProximityReaderTrustAnchorPreview(value.text("displayName"),
+                value.text("subject"), value.text("issuer"), value.text("fingerprint"),
+                kotlin.time.Instant.parse(value.text("validFrom")), kotlin.time.Instant.parse(value.text("validUntil")))),
+            emptyList(), id.walt.wallet2.mobile.ProximityReaderTrustSettings(id.walt.wallet2.mobile.ProximityReaderPolicy.RequireTrusted),
+        )
+    }
+
     val credentialSummary: CredentialSummary get() = CredentialSummary(
         id = credential.text("id"), format = credential.text("format"),
         issuer = issuer.text("identifier"), label = credential.text("title"),

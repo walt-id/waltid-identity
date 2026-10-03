@@ -1,4 +1,8 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package id.walt.walletdemo.compose.ui
+
+import kotlinx.cinterop.toKString
 
 import id.walt.walletdemo.compose.logic.WalletDemoContinuationStatus
 
@@ -22,6 +26,31 @@ import kotlin.test.Test
 /** Compose iOS/Skia content on an iOS simulator; does not imitate a UIKit provider container. */
 @OptIn(ExperimentalTestApi::class, ExperimentalRoborazziApi::class, InternalComposeUiApi::class)
 class WalletVisualIosTest {
+    private var previousTimeZone: String? = null
+    @kotlin.test.BeforeTest fun pinTimeZone() {
+        previousTimeZone = platform.posix.getenv("TZ")?.toKString()
+        platform.posix.setenv("TZ", "UTC", 1)
+        platform.posix.tzset()
+    }
+    @kotlin.test.AfterTest fun restoreTimeZone() {
+        previousTimeZone?.let { platform.posix.setenv("TZ", it, 1) } ?: platform.posix.unsetenv("TZ")
+        platform.posix.tzset()
+    }
+
+    @Test fun controls() = scenario { controls() }
+    @Test fun controlsRtl() = scenario { controls(rtl = true) }
+
+    @Test fun settingsReader() = scenario { settingsRoot("reader") }
+    @Test fun settingsReaderRequired() = scenario { settingsRoot("reader_required") }
+    @Test fun readerTrustImport() = scenario { readerTrustImport() }
+    @Test fun settingsDcApiEnabled() = scenario { settingsRoot("dc_api") }
+    @Test fun settingsDcApiDisabled() = scenario { settingsRoot("dc_api", reviewEnabled = false) }
+    @Test fun settingsNearby() = scenario { settingsRoot("nearby") }
+    @Test fun settingsConnection() = scenario { settingsRoot("connection") }
+    @Test fun settingsTechnical() = scenario { settingsRoot("technical") }
+    @Test fun accountEmpty() = scenario { account("empty") }
+    @Test fun accountBusy() = scenario { account("busy") }
+    @Test fun accountExpired() = scenario { account("expired") }
     @Test fun nearbyPermission() = scenario { nearbyState("permission") }
     @Test fun nearbyReview() = scenario(size = Size(320f, 568f), fontScale = 1.5f) { nearbyState("review") }
     @Test fun nearbyExpired() = scenario { nearbyState("expired") }

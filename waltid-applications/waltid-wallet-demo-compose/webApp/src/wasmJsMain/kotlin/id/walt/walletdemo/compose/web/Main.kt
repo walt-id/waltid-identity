@@ -13,6 +13,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -81,32 +83,27 @@ private fun WebWalletRoot(branding: WalletDemoBranding) {
         authorizationReady = true
     }
 
+    fun authenticate(email: String, password: String, register: Boolean) {
+        if (isBusy) return
+        isBusy = true
+        error = null
+        scope.launch {
+            try {
+                session = establishWalletApi2Session(email, password, register)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { error = failure.message ?: "Sign in failed. Try again." }
+            finally { isBusy = false }
+        }
+    }
+
     val current = session
     if (current == null) {
         AccountAuthScreen(
             isBusy = isBusy,
             error = error,
             allowRegister = kind.canRegister,
-            onLogin = { email, password ->
-                scope.launch {
-                    isBusy = true
-                    error = null
-                    runCatching { establishWalletApi2Session(email, password, register = false) }
-                        .onSuccess { session = it }
-                        .onFailure { error = it.message ?: "Login failed" }
-                    isBusy = false
-                }
-            },
-            onRegister = { email, password ->
-                scope.launch {
-                    isBusy = true
-                    error = null
-                    runCatching { establishWalletApi2Session(email, password, register = true) }
-                        .onSuccess { session = it }
-                        .onFailure { error = it.message ?: "Registration failed" }
-                    isBusy = false
-                }
-            },
+            onLogin = { email, password -> authenticate(email, password, register = false) },
+            onRegister = { email, password -> authenticate(email, password, register = true) },
         )
         return
     }
@@ -118,9 +115,16 @@ private fun WebWalletRoot(branding: WalletDemoBranding) {
         authorizationNotice = authorizationNotice,
         onSessionChange = { session = it },
         onSignOut = {
-            scope.launch {
-                WalletApi2BrowserSessionStore.signOut(current)
+            WalletApi2BrowserSessionStore.clearIfCurrent(current)
+            session = null
+            error = null
+            scope.launch { WalletApi2BrowserSessionStore.signOut(current) }
+        },
+        onSessionExpired = {
+            if (session === current) {
+                WalletApi2BrowserSessionStore.clearIfCurrent(current)
                 session = null
+                error = "Your session has expired. Sign in again to continue."
             }
         },
     )
@@ -133,8 +137,11 @@ private fun WebWalletSession(
     authorizationNotice: String?,
     onSessionChange: (WalletApi2Session?) -> Unit,
     onSignOut: () -> Unit,
+    onSessionExpired: () -> Unit,
 ) {
     val redirectUri = remember { webIssuanceRedirectUri() }
+    val sessionScope = rememberCoroutineScope()
+    val expireSession by rememberUpdatedState(onSessionExpired)
     var targets by remember(session.walletId, session.walletTargets) { mutableStateOf(session.walletTargets) }
     val controller = remember(session.token, session.walletId, session.kind, session.baseUrl) {
         WalletDemoController(
@@ -144,10 +151,12 @@ private fun WebWalletSession(
                 walletId = session.walletId,
                 redirectUri = redirectUri,
                 kind = session.kind,
-                onWalletIdChanged = WalletApi2BrowserSessionStore::updateWalletId,
+                onWalletIdChanged = { WalletApi2BrowserSessionStore.updateWalletIdIfCurrent(session, it) },
+                onSessionExpired = { expireSession() },
             ),
             pinStore = InMemoryDemoPinStore(),
             skipPin = true,
+            scope = sessionScope,
             issuanceRedirectUri = redirectUri,
             signingProtectionMode = WalletDemoSigningProtectionMode.Disabled,
         )

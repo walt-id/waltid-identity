@@ -53,6 +53,20 @@ internal class WalletVisualScenarios(
         }
     }
 
+    fun controls(rtl: Boolean = false) = with(test) {
+        content {
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides
+                if (rtl) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr) {
+                id.walt.walletdemo.compose.ui.components.WalletControlsPreview()
+            }
+        }
+        onNodeWithTag("preview.copies.less").assertIsDisplayed().assertIsNotEnabled()
+        onNodeWithTag("preview.copies.more").assertIsDisplayed().assertIsEnabled()
+        capture(if (rtl) "components.controls.rtl" else "components.controls.default")
+        onNodeWithTag("preview.copies.more").performClick()
+        onNodeWithText("Copies: 2").assertIsDisplayed()
+    }
+
     fun externalReceiving(unavailable: Boolean = false) = with(test) {
         val controller = id.walt.walletdemo.compose.logic.WalletDemoController(WalletUiTestWallet(), id.walt.walletdemo.compose.logic.InMemoryDemoPinStore())
         val flow = if (unavailable) id.walt.walletdemo.compose.logic.WalletExternalFlow.UnavailableCallback("openid://callback")
@@ -120,19 +134,67 @@ internal class WalletVisualScenarios(
         capture("onboarding.key.$page")
     }
 
-    fun settingsRoot() = with(test) {
+    fun account(state: String) = with(test) {
+        content {
+            id.walt.walletdemo.compose.ui.screens.AccountAuthScreen(
+                isBusy = state == "busy", error = if (state == "expired") "Your session has expired. Sign in again to continue." else null,
+                onLogin = { _, _ -> }, onRegister = { _, _ -> })
+        }
+        onNodeWithTag(WalletUiTestTags.AccountEmailInput).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.AccountPasswordInput).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.AccountLoginButton).assertIsNotEnabled()
+        onNodeWithTag(WalletUiTestTags.AccountRegisterButton).assertIsNotEnabled()
+        if (state == "expired") onNodeWithTag(WalletUiTestTags.AccountAuthError).assertIsDisplayed()
+        capture("account.$state")
+    }
+
+    fun readerTrustImport() = with(test) {
+        content { ReaderTrustImportReview(WalletVisualFixtures.readerTrustImport, {}, {}, WalletReviewPresentation.FullScreen) }
+        onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportConfirm).assertIsDisplayed().assertIsEnabled()
+        onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportCancel).assertIsDisplayed()
+        onNodeWithText("Example Reader CA", substring = false).assertIsDisplayed()
+        capture("settings.reader.import_review")
+    }
+
+    fun settingsRoot(destination: String = "root", reviewEnabled: Boolean = true) = with(test) {
+        val trust = id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController(
+            id.walt.walletdemo.compose.logic.InMemoryDemoReaderTrustSettingsStore(
+                id.walt.wallet2.mobile.ProximityReaderTrustSettings(if (destination == "reader_required")
+                    id.walt.wallet2.mobile.ProximityReaderPolicy.RequireTrusted else id.walt.wallet2.mobile.ProximityReaderPolicy.AllowAnonymousOrUntrusted)),
+            scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
+            dispatcher = kotlinx.coroutines.Dispatchers.Unconfined,
+            workerDispatcher = kotlinx.coroutines.Dispatchers.Unconfined)
         content {
             SettingsScreen(
-                state = WalletDemoUiState(),
+                state = WalletDemoUiState(showDcApiPresentationPreview = reviewEnabled),
                 onShowDcApiPresentationPreviewChange = {}, onProximityTransportProfileChange = {},
                 onBack = {}, onIdentityAction = {}, onRefreshIdentityDetails = {}, onLock = {}, onResetWallet = {},
                 onRequestSigningProtectionChange = {}, onConfirmSigningProtectionChange = {},
-                onCancelSigningProtectionChange = {},
+                onCancelSigningProtectionChange = {}, onProximityApprovalModeChange = {},
+                readerTrustSettingsContent = { DemoReaderTrustSettings(trust) },
             )
         }
         onNodeWithTag(WalletUiTestTags.SettingsSigningKey).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsDigitalCredentialsApi).assertIsDisplayed()
-        capture("settings.root.default")
+        when (destination) {
+            "dc_api" -> {
+                onNodeWithTag(WalletUiTestTags.SettingsDigitalCredentialsApi).performClick()
+                val toggle = onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview)
+                if (reviewEnabled) toggle.assertIsOn() else toggle.assertIsOff()
+            }
+            "nearby", "connection", "reader", "reader_required" -> {
+                onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation).performClick()
+                if (destination == "connection") onNodeWithTag(WalletUiTestTags.SettingsConnectionMethod).performClick()
+                if (destination.startsWith("reader")) onNodeWithTag(WalletUiTestTags.SettingsReaderAuthentication).performClick()
+            }
+            "technical" -> onNodeWithTag(WalletUiTestTags.SettingsTechnicalDetails).performClick()
+        }
+        val stateId = when (destination) {
+            "dc_api" -> if (reviewEnabled) "enabled" else "disabled"
+            "technical" -> "unavailable"
+            else -> "default"
+        }
+        capture("settings.$destination.$stateId")
     }
 
     fun walletHome(empty: Boolean = false) = with(test) {

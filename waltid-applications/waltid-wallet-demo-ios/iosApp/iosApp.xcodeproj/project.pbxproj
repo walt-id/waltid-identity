@@ -84,6 +84,8 @@
 		F2CD24C2B36AF60F7B2A6301 /* ProximityReaderDetails.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB6839D9409AAF08CC1AC680 /* ProximityReaderDetails.swift */; };
 		1CACFE637B0E59CF2642A5BF /* ProximityStatusContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A8122C18703A339DAD642D0 /* ProximityStatusContent.swift */; };
 		ACE2F185C850D1F871BA51F3 /* ProximityScreenPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43D2995C89B11C6E173D6BE7 /* ProximityScreenPolicy.swift */; };
+		800619A4865746A58B033223 /* DigitalCredentialsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 218A1C4A90404CA396529810; };
+		26A4B42DE64E46929A0EDA80 /* ReaderTrustImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCE0424B41224532B09D4962; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -226,6 +228,8 @@
 		BB6839D9409AAF08CC1AC680 /* ProximityReaderDetails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityReaderDetails.swift; sourceTree = "<group>"; };
 		7A8122C18703A339DAD642D0 /* ProximityStatusContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityStatusContent.swift; sourceTree = "<group>"; };
 		43D2995C89B11C6E173D6BE7 /* ProximityScreenPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityScreenPolicy.swift; sourceTree = "<group>"; };
+		218A1C4A90404CA396529810 /* DigitalCredentialsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitalCredentialsSettingsView.swift; sourceTree = "<group>"; };
+		FCE0424B41224532B09D4962 /* ReaderTrustImportReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderTrustImportReviewView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -344,7 +348,9 @@
 				A1000004AAAA000000000004 /* PresentView.swift */,
 				A1000440AAAA000000000040 /* SettingsView.swift */,
 				BB7490000000000000000003 /* TechnicalDetailsView.swift */,
+				FCE0424B41224532B09D4962 /* ReaderTrustImportReviewView.swift */,
 				BB7490000000000000000002 /* ReaderTrustSettingsView.swift */,
+				218A1C4A90404CA396529810 /* DigitalCredentialsSettingsView.swift */,
 				BB7490000000000000000001 /* NearbySettingsView.swift */,
 				A1000442AAAA000000000042 /* PinView.swift */,
 			);
@@ -773,7 +779,9 @@
 				A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */,
 				A1000440AAAA000100000040 /* SettingsView.swift in Sources */,
 				BB7491000000000000000003 /* TechnicalDetailsView.swift in Sources */,
+				26A4B42DE64E46929A0EDA80 /* ReaderTrustImportReviewView.swift in Sources */,
 				BB7491000000000000000002 /* ReaderTrustSettingsView.swift in Sources */,
+				800619A4865746A58B033223 /* DigitalCredentialsSettingsView.swift in Sources */,
 				BB7491000000000000000001 /* NearbySettingsView.swift in Sources */,
 				A1000441AAAA000100000041 /* WalletTabChrome.swift in Sources */,
 				A1000442AAAA000100000042 /* PinView.swift in Sources */,

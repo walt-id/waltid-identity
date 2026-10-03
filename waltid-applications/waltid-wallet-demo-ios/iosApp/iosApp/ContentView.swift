@@ -84,11 +84,8 @@ struct ContentView: View {
     }
 }
 
-#if DEBUG
-#Preview {
-    ContentView(viewModel: WalletViewModel.mockForUITests())
-}
-#endif
+// Preview the side-effect-free components in WalletDemoSharingUI. App-host
+// previews must not initialize PIN storage, reader stores or registration services.
 
 /// Use native resizing where available; older iOS retains its standard full-height sheet.
 private struct ExternalSheetSize: ViewModifier {

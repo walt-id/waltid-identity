@@ -41,17 +41,5 @@ struct ContentView: UIViewControllerRepresentable {
     }
 }
 
-#Preview {
-    ContentView(
-        walletId: "default",
-        attestationBaseUrl: "",
-        attestationAttesterPath: "",
-        attestationBearerToken: "",
-        attestationHostHeader: "",
-        transactionDataProfilesUrl: "",
-        appGroupIdentifier: "",
-        keychainAccessGroup: "",
-        onDigitalCredentialRegistryChanged: {},
-        signingProtectionMode: "disabled"
-    )
-}
+// Preview reusable content in WalletDemoSharingUI or the shared Compose component
+// previews. Constructing this host initializes a real wallet and is not a preview fixture.

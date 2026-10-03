@@ -54,18 +54,13 @@ struct PinView: View {
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            WalletActionBar(primary: primary, secondary: secondary)
+            // Keep numeric-keyboard navigation in the same inset as confirmation.
+            // A floating system keyboard toolbar can overlap a separate bottom action bar.
+            WalletActions(primary: primary, secondary: keyboardAction ?? secondary,
+                tertiary: keyboardAction == nil ? nil : secondary)
+                .padding(.horizontal, 20).padding(.vertical, 12).background(.regularMaterial)
         }
         .walletScrollDismissesKeyboard()
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                if isSetup && focusedInput == .pin {
-                    Button("Next") { focusedInput = .confirmation }
-                }
-                Button("Done") { focusedInput = nil }
-            }
-        }
         .onAppear { viewModel.refreshBiometricAvailability() }
     }
 
@@ -77,6 +72,7 @@ struct PinView: View {
             Text(label).font(.caption).foregroundStyle(.secondary).accessibilityHidden(true)
             SecureField(label, text: pinBinding(for: input))
                 .focused($focusedInput, equals: input)
+                .onSubmit { focusedInput = nil }
                 .accessibilityIdentifier(identifier)
         }
     }
@@ -104,6 +100,15 @@ struct PinView: View {
             identifier: WalletAccessibilityID.pinSubmitButton) {
             focusedInput = nil
             viewModel.submitPin()
+        }
+    }
+
+    private var keyboardAction: WalletAction? {
+        guard let focusedInput else { return nil }
+        let next = isSetup && focusedInput == .pin
+        return WalletAction(next ? "Next" : "Done", enabled: !viewModel.isAuthenticating,
+            identifier: "wallet.pinKeyboardAction") {
+            self.focusedInput = next ? .confirmation : nil
         }
     }
 

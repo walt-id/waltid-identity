@@ -49,7 +49,8 @@ object WalletApi2BrowserSessionStore {
         writeCookie(WalletIdCookie, session.walletId)
     }
 
-    fun updateWalletId(walletId: String) {
+    fun updateWalletIdIfCurrent(session: WalletApi2Session, walletId: String) {
+        if (localStorage.getItem(TokenKey) != session.token) return
         localStorage.setItem(WalletIdKey, walletId)
         writeCookie(WalletIdCookie, walletId)
     }
@@ -111,9 +112,14 @@ object WalletApi2BrowserSessionStore {
         writeCookie(WalletIdCookie, "", maxAge = 0)
     }
 
+    fun clearIfCurrent(session: WalletApi2Session) {
+        if (localStorage.getItem(TokenKey) == session.token) clearAuth()
+    }
+
     suspend fun signOut(session: WalletApi2Session) {
+        // A late sign-out from an older session must not erase a newly signed-in account.
+        clearIfCurrent(session)
         runCatching { WalletApi2AuthClient(session.baseUrl, session.kind).logout(session.token) }
-        clearAuth()
     }
 }
 
