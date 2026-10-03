@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "renderers": {
+    "android": {
+      "environment": "Robolectric 4.16 / API 35 / en-US / mdpi / 393x852 / light",
+      "baselineDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light",
+      "resultDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/roborazzi/androidHostTest/results",
+      "junit": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/testAndroidHostTest/TEST-id.walt.walletdemo.compose.ui.WalletVisualAndroidTest.xml",
+      "suite": "id.walt.walletdemo.compose.ui.WalletVisualAndroidTest"
+    },
+    "compose-ios": {
+      "environment": "Compose 1.11.1 / iOS 26.5 / headless Skia / density 1 / 393x852 / light",
+      "baselineDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light",
+      "resultDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/roborazzi/iosSimulatorArm64/results",
+      "junit": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/iosSimulatorArm64Test/TEST-iosSimulatorArm64Test.id.walt.walletdemo.compose.ui.WalletVisualIosTest.xml",
+      "suite": "iosSimulatorArm64Test.id.walt.walletdemo.compose.ui.WalletVisualIosTest"
+    },
+    "swiftui": {
+      "environment": "Xcode 27 / iOS 26.5 / hosted SwiftUI / iPhone 13 layout / scale 3 / en-US / light / Large",
+      "baselineDirectory": "waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests",
+      "suite": "WalletVisualTests",
+      "suffix": ".native-ios26_5-phone-en-light"
+    }
+  },
+  "states": [
+    { "id": "settings.root.default", "requirements": ["R03", "R11", "R15"], "composeTest": "settingsRoot", "swiftTest": "testSettingsRoot" },
+    { "id": "credential.details.identity", "requirements": ["R04", "R05", "R15"], "composeTest": "credentialDetails", "swiftTest": "testCredentialDetails" },
+    { "id": "credential.details.nested", "requirements": ["R04", "R12"], "composeTest": "credentialDetails" },
+    { "id": "credential.media.portrait", "requirements": ["R04", "R06"], "composeTest": "credentialImages" },
+    { "id": "credential.media.signature", "requirements": ["R04", "R06"], "composeTest": "credentialImages" },
+    { "id": "credential.media.loaded", "requirements": ["R04", "R06"], "swiftTest": "testCredentialImages", "note": "Loaded native image rows; lazy decoding remains a separate behavior test." },
+    { "id": "batch.offer.two_targets_three_copies", "requirements": ["R06", "R07", "R18"], "composeTest": "batchOffer", "swiftTest": "testBatchOffer" },
+    { "id": "batch.offer.two_targets_three_copies.second_target", "requirements": ["R11", "R12", "R18"], "composeTest": "batchOffer" },
+    { "id": "batch.offer.none_selected", "requirements": ["R11", "R18"], "composeTest": "batchOfferWithNothingSelected", "swiftTest": "testBatchOfferWithNothingSelected" },
+    { "id": "batch.offer.none_selected.second_target", "requirements": ["R11", "R18"], "composeTest": "batchOfferWithNothingSelected" },
+    { "id": "batch.result.saved_and_deferred", "requirements": ["R02", "R07", "R18"], "composeTest": "partialBatchResult", "swiftTest": "testPartialBatchResult" },
+    { "id": "payment.mixed_credentials.main", "requirements": ["R14", "T01", "T04", "T05", "T10"], "composeTest": "paymentReview" },
+    { "id": "payment.mixed_credentials.details", "requirements": ["R14", "T06", "T07"], "composeTest": "paymentReview" },
+    { "id": "payment.mixed_credentials.requested_data", "requirements": ["R04", "R14", "T03"], "composeTest": "paymentReview" },
+    { "id": "payment.consent.main", "requirements": ["R14", "T01", "T04", "T05"], "swiftTest": "testPaymentConsent", "note": "Native consent component; mixed-credential host coverage is still required." },
+    { "id": "nearby.ready.qr", "requirements": ["R02", "R10", "R12"], "composeTest": "nearbyReady", "swiftTest": "testNearbyReady" }
+  ]
+}
