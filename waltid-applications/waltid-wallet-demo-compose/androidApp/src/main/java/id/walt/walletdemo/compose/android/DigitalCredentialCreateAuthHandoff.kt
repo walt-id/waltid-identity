@@ -9,7 +9,7 @@ import org.json.JSONObject
  * Durable handoff for authorization-code issuance started from [DigitalCredentialCreateActivity].
  *
  * Credential Manager create stays on the translucent Activity while the system browser handles
- * issuer/AS login. When the AS redirects to `openid://…`, [MainActivity] delivers the callback
+ * issuer/AS login. The dedicated [DigitalCredentialCreateCallbackActivity] delivers the callback
  * here so the still-running create Activity can finish the OpenID4VCI token exchange and return
  * the CREATE_CREDENTIAL provider result.
  *
@@ -17,6 +17,8 @@ import org.json.JSONObject
  * complete wallet-side issuance (the CREATE_CREDENTIAL provider result may already be lost).
  */
 internal object DigitalCredentialCreateAuthHandoff {
+    const val REDIRECT_URI = "walt-wallet-create://authorize"
+    enum class Delivery { Unmatched, Live, Orphan, Duplicate }
     private const val PREFS = "digital_credential_create_auth"
     private const val PREFIX = "pending:"
     private val live = mutableMapOf<String, (String) -> Unit>()
@@ -46,13 +48,13 @@ internal object DigitalCredentialCreateAuthHandoff {
 
     /** SDK validation still applies. This correlation only decides which flow owns the URI. */
     @Synchronized
-    fun deliver(context: Context, uri: Uri): Boolean {
-        if (!uri.isHierarchical || uri.fragment != null) return false
-        val state = uri.getQueryParameters("state").singleOrNull()?.takeIf { it.isNotBlank() } ?: return false
+    fun deliver(context: Context, uri: Uri): Delivery {
+        if (!uri.isHierarchical || uri.fragment != null) return Delivery.Unmatched
+        val state = uri.getQueryParameters("state").singleOrNull()?.takeIf { it.isNotBlank() } ?: return Delivery.Unmatched
         val codes = uri.getQueryParameters("code")
         val errors = uri.getQueryParameters("error")
         if (!((codes.size == 1 && codes.single().isNotBlank() && errors.isEmpty()) ||
-                (errors.size == 1 && errors.single().isNotBlank() && codes.isEmpty()))) return false
+                (errors.size == 1 && errors.single().isNotBlank() && codes.isEmpty()))) return Delivery.Unmatched
         val matches = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).all
             .filter { (key, value) ->
                 if (!key.startsWith(PREFIX) || value !is String) return@filter false
@@ -62,12 +64,16 @@ internal object DigitalCredentialCreateAuthHandoff {
                     uri.encodedAuthority.orEmpty() == redirect.encodedAuthority.orEmpty() &&
                     uri.encodedPath.orEmpty() == redirect.encodedPath.orEmpty()
             }
-        val sessionId = matches.keys.singleOrNull()?.removePrefix(PREFIX) ?: return false
-        if (!claimed.add(sessionId)) return true
+        val sessionId = matches.keys.singleOrNull()?.removePrefix(PREFIX) ?: return Delivery.Unmatched
+        if (!claimed.add(sessionId)) return Delivery.Duplicate
         val continuation = live.remove(sessionId)
-        if (continuation != null) continuation(uri.toString())
-        else OrphanAuthorizationCallback.queue(sessionId, uri.toString())
-        return true
+        return if (continuation != null) {
+            continuation(uri.toString())
+            Delivery.Live
+        } else {
+            OrphanAuthorizationCallback.queue(sessionId, uri.toString())
+            Delivery.Orphan
+        }
     }
 
     fun openExternalBrowser(context: Context, authorizationUrl: String) {
@@ -80,7 +86,7 @@ internal object DigitalCredentialCreateAuthHandoff {
 
 /**
  * Holds an authorization callback that arrived after [DigitalCredentialCreateActivity] was
- * destroyed. [MainActivity] drains this into [MobileWallet.continueAuthorizationIssuance] so the
+ * destroyed. [MainActivity] drains this into the SDK's continueAuthorizationIssuance so the
  * credential is still stored even when the CREATE_CREDENTIAL result can no longer be returned.
  */
 internal object OrphanAuthorizationCallback {

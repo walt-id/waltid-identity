@@ -10,6 +10,7 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.fragment.app.FragmentActivity
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.handlers.WalletIssuancePkceState
 import id.walt.walletdemo.compose.logic.*
@@ -23,6 +24,8 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Robolectric
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import kotlin.test.*
@@ -86,18 +89,30 @@ class DigitalCredentialCreateModelTest {
     @Test fun browserReturnUsesTheSameBatchAndIgnoresUnrelatedOrDuplicateCallbacks() = runTest(dispatcher) {
         val client = Client(WalletDemoIssuanceGrant.AuthorizationCode)
         val model = model(client)
+        val host = Robolectric.buildActivity(FragmentActivity::class.java).setup()
+        model.attach(host.get())
         model.start(Intent(), false); runCurrent()
         model.accept(null, mapOf("pid" to 0, "mdl" to 2)); runCurrent()
         assertIs<WalletDemoOfferCreateUiState.WaitingForAuthorization>(model.state)
         assertEquals(listOf(WalletDemoCredentialSelection("mdl", WalletDemoCredentialHolders.NewKeys(2))), client.selections)
-        assertFalse(DigitalCredentialCreateAuthHandoff.deliver(context, Uri.parse("openid://?code=abc&state=wrong")))
-        repeat(2) { assertTrue(DigitalCredentialCreateAuthHandoff.deliver(context, Uri.parse("openid://?code=abc&state=expected"))) }
+        assertEquals(Intent.ACTION_VIEW, assertNotNull(shadowOf(host.get()).nextStartedActivity).action)
+        assertEquals(DigitalCredentialCreateAuthHandoff.Delivery.Unmatched,
+            DigitalCredentialCreateAuthHandoff.deliver(context, Uri.parse("openid://?code=abc&state=wrong")))
+        assertNull(shadowOf(host.get()).nextStartedActivity)
+        listOf(DigitalCredentialCreateAuthHandoff.Delivery.Live, DigitalCredentialCreateAuthHandoff.Delivery.Duplicate).forEach { expected ->
+            assertEquals(expected, DigitalCredentialCreateAuthHandoff.deliver(context, Uri.parse("openid://?code=abc&state=expected")))
+        }
         runCurrent()
         assertEquals(1, client.callbacks)
         assertEquals(0, client.accepts)
         assertIs<WalletDemoOfferCreateUiState.Receipt>(model.state)
+        val resume = assertNotNull(shadowOf(host.get()).nextStartedActivity)
+        assertEquals(DigitalCredentialCreateActivity::class.java.name, resume.component?.className)
+        assertEquals(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP, resume.flags)
+        assertNull(shadowOf(host.get()).nextStartedActivity)
         model.done(); assertNotNull(model.takeResult())
         store.clear(); runCurrent()
+        host.pause().stop().destroy()
     }
 
     @Test fun refreshDoesNotRepeatIssuanceAndUncertainWorkCannotBeResumed() = runTest(dispatcher) {

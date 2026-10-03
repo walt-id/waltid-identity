@@ -103,7 +103,7 @@ class MainActivity : FragmentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         val uri = intent?.data ?: return
-        if (DigitalCredentialCreateAuthHandoff.deliver(this, uri)) {
+        if (DigitalCredentialCreateAuthHandoff.deliver(this, uri) != DigitalCredentialCreateAuthHandoff.Delivery.Unmatched) {
             activityModel.drainOrphanCreateAuthorization()
             return
         }
