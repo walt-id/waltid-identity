@@ -148,7 +148,8 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertLessThanOrEqual(unlock.frame.maxY, app.keyboards.firstMatch.frame.minY,
             "The keyboard must not cover Unlock")
         unlock.tap()
-        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10), "Wallet ready")
+        XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(input.exists)
     }
 
     func testWalletHomeScannerRoutesOfferAndBackCancelsReview() {
