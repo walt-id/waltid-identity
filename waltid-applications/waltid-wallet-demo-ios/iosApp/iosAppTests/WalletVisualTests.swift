@@ -172,6 +172,30 @@ final class WalletVisualTests: XCTestCase {
             id: "payment.mixed_credentials.main", expected: Set(review.credentialOptions.map { $0.selection.id }))
     }
 
+    func testPaymentLoading() async throws { try await paymentStatus(.loading, id: "payment.loading") }
+    func testPaymentBlocked() async throws {
+        try await paymentStatus(.blocked("Required issuer payment labels are missing."), id: "payment.blocked")
+    }
+    private func paymentStatus(_ state: PaymentReviewState, id: String) async throws {
+        let review = try WalletVisualFixtures().sharingReview(payment: true)
+        try await captureReview(SharingReviewScreen(title: "Payment", review: review,
+            selection: SharingSelection(credentials: review.defaultCredentialSelection()),
+            selectionComplete: true, paymentReview: state,
+            onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {}),
+            id: id, expected: Set(review.credentialOptions.map { $0.selection.id }))
+        XCTAssertFalse(state.canConfirm)
+    }
+
+    func testPaymentLocalizedCompact() throws {
+        let state = PaymentReviewState.ready(try WalletVisualFixtures().payment(localized: true))
+        try capture(WalletReviewScaffold {
+            PaymentConsentView(state: state)
+        } actions: {
+            ReviewActions(selectionComplete: true, isLoading: false, onSubmit: {}, onReject: nil,
+                onCancel: {}, paymentReview: state)
+        }, id: "payment.localized.compact_large_text", config: .iPhoneSe, sizeCategory: .accessibilityMedium)
+    }
+
     func testPaymentConsent() throws {
         let consent = try WalletVisualFixtures().payment()
         XCTAssertEqual(consent.fields.count, 4)

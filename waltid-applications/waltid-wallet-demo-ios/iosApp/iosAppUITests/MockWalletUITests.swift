@@ -5,6 +5,54 @@ import XCTest
 final class MockWalletUITests: XCTestCase {
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
+    func testUnsignedPaymentShowsLocalizedFieldsAndRequiresSeparateConfirmation() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_PAYMENT": "unsigned"])
+        receiveMockCredential(app: app, ui: ui)
+        ui.openWalletLink("openid4vp://mock")
+        ui.assertExists(identifier: "payment-unsigned-warning")
+        XCTAssertTrue(app.staticTexts["Zahlung prüfen"].exists)
+        XCTAssertTrue(app.staticTexts["11.56 EUR"].exists)
+        XCTAssertTrue(app.staticTexts["Super Store"].exists)
+        XCTAssertFalse(app.staticTexts["txn-1"].exists)
+        XCTAssertFalse(app.staticTexts["bound-but-hidden"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["payment-security-hint"].exists)
+        ui.tapElement(identifier: "payment-details-toggle")
+        XCTAssertTrue(app.staticTexts["txn-1"].waitForExistence(timeout: 5))
+        let details = XCTAttachment(screenshot: app.screenshot())
+        details.name = "payment-localized-details"
+        details.lifetime = .keepAlways
+        add(details)
+        ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Zahlen")
+        let alert = app.alerts["Unsigned payment request"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        let warning = XCTAttachment(screenshot: app.screenshot())
+        warning.name = "payment-unsigned-confirmation"
+        warning.lifetime = .keepAlways
+        add(warning)
+        alert.buttons["payment-unsigned-back"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["wallet.presentationSubmitButton"].exists)
+        ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Zahlen")
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        alert.buttons["payment-unsigned-confirm"].firstMatch.tap()
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Presentation sent", "Present failed"], timeout: 10), "Presentation sent")
+    }
+
+    func testMissingPaymentMetadataBlocksSharing() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_PAYMENT": "blocked"])
+        receiveMockCredential(app: app, ui: ui)
+        ui.openWalletLink("openid4vp://mock")
+        ui.assertExists(identifier: "payment-consent-blocked")
+        XCTAssertFalse(app.buttons["wallet.presentationSubmitButton"].isEnabled)
+        XCTAssertFalse(app.staticTexts["bound-but-hidden"].exists)
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+    }
+
     func testPinCreationRequiresSixDigitsAndMatchingConfirmationOnOneScreen() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)

@@ -64,3 +64,17 @@
 "Key storage" = "Key storage";
 
 "Signing approval" = "Signing approval";
+
+"Loading payment instructions…" = "Loading payment instructions…";
+
+"Review payment" = "Review payment";
+
+"This payment request is unsigned. Confirm only if you recognize the requester and approve the payment below." = "This payment request is unsigned. Confirm only if you recognize the requester and approve the payment below.";
+
+"Payment details" = "Payment details";
+
+"Unsigned payment request" = "Unsigned payment request";
+
+"Back to review" = "Back to review";
+
+"This request has no signature to verify its sender. Do you want to proceed with the payment you reviewed?" = "This request has no signature to verify its sender. Do you want to proceed with the payment you reviewed?";

@@ -10,7 +10,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import androidx.test.uiautomator.By
-import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
@@ -499,7 +498,22 @@ internal object WalletComposeE2EHelper {
             try { node.visibleBounds.let { node to it } } catch (_: StaleObjectException) { null }
         }.filter { (_, bounds) -> bounds.width() > 0 && bounds.height() > 0 }
             .maxByOrNull { (_, bounds) -> bounds.width().toLong() * bounds.height() }?.first ?: return false
-        return viewport.scroll(if (towardBottom) Direction.DOWN else Direction.UP, 0.8f)
+        val bounds = viewport.visibleBounds
+        fun visibleContent() = findObjects(By.pkg(walletPackage).text(Pattern.compile(".*"))).mapNotNull { node ->
+            try {
+                node.visibleBounds.takeIf { android.graphics.Rect.intersects(it, bounds) }
+                    ?.let { "${node.text}:$it" }
+            } catch (_: StaleObjectException) { null }
+        }
+        val before = visibleContent()
+        val upper = bounds.top + bounds.height() * 15 / 100
+        val lower = bounds.bottom - bounds.height() * 15 / 100
+        swipe(bounds.centerX(), if (towardBottom) lower else upper,
+            bounds.centerX(), if (towardBottom) upper else lower, 40)
+        waitForIdle()
+        // UiObject2.scroll reports false on this Compose/API 37 host even before the end.
+        // Compare the actual visible content after a bounded gesture instead of trusting that event.
+        return before != visibleContent()
     }
 
     fun latestStatus(device: UiDevice): String = try {

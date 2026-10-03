@@ -184,7 +184,15 @@ struct PresentView: View {
     }
 
     private func onlineReviewContent(review: SharingReviewModel) -> some View {
-        presentationContent(showsActions: true) {
+        let reviewedSelection = viewModel.presentationSharingSelection
+        let reviewedPayment = viewModel.paymentReview
+        let submit = {
+            guard review == viewModel.presentationSharingReview,
+                  reviewedSelection == viewModel.presentationSharingSelection,
+                  reviewedPayment == viewModel.paymentReview else { return }
+            viewModel.submitPresentation()
+        }
+        return presentationContent(showsActions: true) {
             if let warning = viewModel.transactionDataProfilesWarning {
                 WarningBannerView(message: warning)
             }
@@ -197,7 +205,7 @@ struct PresentView: View {
                 isReadOnly: false,
                 onToggleCredential: viewModel.togglePresentationCredential,
                 onToggleDisclosure: viewModel.togglePresentationDisclosure,
-                onSubmit: viewModel.submitPresentation,
+                onSubmit: submit,
                 onReject: viewModel.rejectPresentation,
                 onCancel: viewModel.cancelPresentationReview,
                 compact: false,
@@ -208,7 +216,7 @@ struct PresentView: View {
             ReviewActions(
                 selectionComplete: viewModel.presentationCredentialSelectionComplete,
                 isLoading: !viewModel.presentationReviewEnabled,
-                onSubmit: viewModel.submitPresentation,
+                onSubmit: submit,
                 onReject: viewModel.rejectPresentation,
                 onCancel: viewModel.cancelPresentationReview,
                 paymentReview: viewModel.paymentReview
