@@ -1,5 +1,6 @@
 import sys
 import subprocess
+import runpy
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -8,6 +9,10 @@ import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import ios_simulator_test as host
+
+imported_framework = runpy.run_path(
+    str(Path(__file__).resolve().parents[1] / "build-recovery-simulator-host.py")
+)["imported_framework"]
 
 
 class SimulatorHostTest(unittest.TestCase):
@@ -202,6 +207,35 @@ class SimctlTest(unittest.TestCase):
         with patch.object(host.subprocess, "run", side_effect=error):
             with self.assertRaisesRegex(RuntimeError, r"launch timed out after 180 seconds[\s\S]+launch diagnostic"):
                 host.simctl("launch", timeout=180)
+
+
+class ImportedFrameworkTest(unittest.TestCase):
+    def test_uses_compiled_search_paths_with_spaces_and_ignores_other_caches(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            selected = root / "current cache" / "SQLCipher.framework"
+            selected.mkdir(parents=True)
+            (root / "stale cache" / "SQLCipher.framework").mkdir(parents=True)
+            definition = root / "arm64.def"
+            definition.write_text(f'compilerOpts = -fmodules "-F{selected.parent}" "-F{root / "missing"}"\n')
+            self.assertEqual(selected.resolve(), imported_framework(definition, "SQLCipher"))
+
+    def test_missing_framework_fails(self):
+        with TemporaryDirectory() as directory:
+            definition = Path(directory) / "arm64.def"
+            definition.write_text(f'compilerOpts = "-F{directory}"\n')
+            with self.assertRaisesRegex(RuntimeError, "No imported SQLCipher framework"):
+                imported_framework(definition, "SQLCipher")
+
+    def test_preserves_compiler_search_order(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("first", "second"):
+                (root / name / "SQLCipher.framework").mkdir(parents=True)
+            definition = root / "arm64.def"
+            definition.write_text(f'compilerOpts = "-F{root / "first"}" "-F{root / "second"}"\n')
+            self.assertEqual((root / "first" / "SQLCipher.framework").resolve(),
+                             imported_framework(definition, "SQLCipher"))
 
 
 if __name__ == "__main__":

@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalEncodingApi::class)
-
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.foundation.layout.Column
@@ -119,7 +117,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -356,7 +353,10 @@ class WalletDemoAppTestScenarios(
         unlockWithPin()
         awaitTaggedNode(WalletUiTestTags.CredentialsLoading)
         gate.completeExceptionally(IllegalStateException("Credential storage unavailable"))
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Failed }
+        waitUntil(timeoutMillis = 5_000) {
+            controller.state.value.session is WalletSessionState.Failed &&
+                onAllNodesWithTag(WalletUiTestTags.CredentialsLoading).fetchSemanticsNodes().isEmpty()
+        }
         onNodeWithTag(WalletUiTestTags.CredentialsLoading).assertDoesNotExist()
         onNodeWithTag(WalletUiTestTags.CredentialsEmpty).assertDoesNotExist()
     }

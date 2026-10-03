@@ -33,7 +33,7 @@ kotlin {
         }
 
         if (enableMobileWallet) {
-            val mobileMain by creating {
+            val mobileMain = create("mobileMain") {
                 dependsOn(commonMain.get())
                 dependencies {
                     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
@@ -90,7 +90,7 @@ kotlin {
         if (enableWalletDemoComposeWeb) {
             getByName("wasmJsMain").dependencies {
                 implementation(identityLibs.ktor.client.js)
-                implementation("org.jetbrains.kotlinx:kotlinx-browser:0.3")
+                implementation(identityLibs.kotlinx.browser)
             }
         }
 

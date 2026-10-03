@@ -9,7 +9,7 @@ plugins {
 // KGP can infer ABI for registered, host-unsupported targets, but not for omitted targets.
 // Check the enabled targets against a projection of the single, complete committed baseline.
 if (!enableIosBuild) {
-    val prepareNonIosAbiReference by tasks.registering(PrepareNonIosAbiReference::class) {
+    val prepareNonIosAbiReference = tasks.register<PrepareNonIosAbiReference>("prepareNonIosAbiReference") {
         referenceDirectory.set(layout.projectDirectory.dir("api"))
         outputDirectory.set(layout.buildDirectory.dir("abi-reference/non-ios"))
     }

@@ -38,7 +38,7 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.test)
         }
         if (enableAndroidBuild) {
-            val androidHostTest by getting {
+            val androidHostTest = getByName("androidHostTest") {
                 dependencies {
                     implementation(kotlin("test"))
                     implementation(identityLibs.kotlinx.coroutines.test)
@@ -60,7 +60,7 @@ if (enableIosBuild) {
     val testObject = layout.buildDirectory.file("core-bluetooth-test-doubles/CoreBluetoothTestDoubles.o")
     val developerDirectory = providers.exec { commandLine("xcode-select", "-p") }
         .standardOutput.asText.map { it.trim() }
-    val compileCoreBluetoothTestDoubles by tasks.registering(Exec::class) {
+    val compileCoreBluetoothTestDoubles = tasks.register<Exec>("compileCoreBluetoothTestDoubles") {
         inputs.files(testObjc.file("CoreBluetoothTestDoubles.h"), testObjc.file("CoreBluetoothTestDoubles.m"))
         outputs.file(testObject)
         val output = testObject.get().asFile

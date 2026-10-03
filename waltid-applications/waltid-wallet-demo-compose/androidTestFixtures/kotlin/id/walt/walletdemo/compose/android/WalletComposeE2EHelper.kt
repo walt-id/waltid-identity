@@ -436,7 +436,14 @@ internal object WalletComposeE2EHelper {
 
     private fun UiDevice.scrollContent(towardBottom: Boolean) {
         // Review actions are fixed below the scroll viewport, especially on compact devices.
-        val bounds = findObjects(By.pkg(walletPackage).scrollable(true)).map { it.visibleBounds }
+        val bounds = findObjects(By.pkg(walletPackage).scrollable(true)).mapNotNull { node ->
+            try {
+                node.visibleBounds
+            } catch (_: StaleObjectException) {
+                // Rotation/recreation can invalidate a node from this accessibility snapshot.
+                null
+            }
+        }
             .filter { it.width() > 0 && it.height() > 0 }
             .maxByOrNull { it.width().toLong() * it.height() }
         val x = bounds?.centerX() ?: displayWidth / 2

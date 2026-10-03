@@ -2,7 +2,6 @@ package id.walt.walletdemo.compose.logic
 
 import java.io.File
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -13,7 +12,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-@OptIn(ExperimentalEncodingApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class CredentialDisplayImageFallbackAndroidTest {
