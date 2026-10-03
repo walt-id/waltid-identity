@@ -24,7 +24,8 @@ class DigitalCredentialCreateAuthHandoffTest {
     private fun register(id: String = "one", state: String = "expected") {
         DigitalCredentialCreateAuthHandoff.register(context, id, state, "openid://") { delivered += it }
     }
-    private fun deliver(uri: String) = DigitalCredentialCreateAuthHandoff.deliver(context, Uri.parse(uri))
+    private fun deliver(uri: String) = DigitalCredentialCreateAuthHandoff.deliver(context, Uri.parse(uri)) !=
+        DigitalCredentialCreateAuthHandoff.Delivery.Unmatched
 
     @Test fun unrelatedOrMalformedCallbacksDoNotConsumeTheRegisteredRequest() {
         register()

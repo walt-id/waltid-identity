@@ -80,6 +80,13 @@ internal class DigitalCredentialCreateModel(
         val id = session?.id ?: return
         if (waiting.completing || result != null || released) return
         state = waiting.copy(completing = true)
+        // The callback trampoline can be in a different task from the Credential Manager caller.
+        // Reorder the existing provider in its own task; do not clear it or replay its request.
+        interactionActivity()?.let { activity ->
+            activity.startActivity(Intent(activity, DigitalCredentialCreateActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            })
+        }
         preserveContinuations = true
         perform {
             try { completeOutcome(client.continueAuthorization(id, callback)) }
