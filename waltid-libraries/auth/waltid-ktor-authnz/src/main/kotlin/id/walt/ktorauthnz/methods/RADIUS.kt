@@ -1,6 +1,6 @@
 package id.walt.ktorauthnz.methods
 
-import id.walt.commons.web.RadiusAuthException
+import id.walt.ktorauthnz.exceptions.RadiusAuthException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.RADIUSIdentifier

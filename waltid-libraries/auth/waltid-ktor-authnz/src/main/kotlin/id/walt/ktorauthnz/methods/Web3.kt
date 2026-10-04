@@ -1,7 +1,7 @@
 package id.walt.ktorauthnz.methods
 
-import id.walt.commons.web.InvalidChallengeException
-import id.walt.commons.web.Web3AuthException
+import id.walt.ktorauthnz.exceptions.InvalidChallengeException
+import id.walt.ktorauthnz.exceptions.Web3AuthException
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws

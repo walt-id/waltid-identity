@@ -126,7 +126,7 @@ class E2ETest(
                 run = E2ETestWebService(Application::e2eTestModule).run(block)
             )
         )*/
-        service.main(arrayOf("-l", loglevelOption))
+        service.run(arrayOf("-l", loglevelOption))
 
         term.println("\n" + TextColors.magenta("Test results:"))
         testResults.forEachIndexed { index, result ->

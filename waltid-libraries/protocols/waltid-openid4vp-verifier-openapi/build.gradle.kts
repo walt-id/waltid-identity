@@ -7,11 +7,14 @@ group = "id.walt.protocols"
 
 dependencies {
     // walt.id
-    api(project(":waltid-services:waltid-service-commons"))
     implementation(project(":waltid-libraries:protocols:waltid-openid4vp-verifier"))
     implementation(project(":waltid-libraries:credentials:waltid-dcql"))
     implementation(project(":waltid-libraries:credentials:waltid-verification-policies2"))
     implementation(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
+
+    // OpenAPI route documentation
+    api(identityLibs.smiley.ktor.openapi)
+    api(identityLibs.ktor.http)
 
     // JSON
     implementation(identityLibs.kotlinx.serialization.json)

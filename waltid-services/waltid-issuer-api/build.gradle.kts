@@ -66,6 +66,7 @@ dependencies {
     implementation(identityLibs.slf4j.klogging)
 
     // Test
+    testImplementation(project(":waltid-services:waltid-service-events"))
     testImplementation(kotlin("test"))
     testImplementation(identityLibs.kotlinx.coroutines.test)
 
