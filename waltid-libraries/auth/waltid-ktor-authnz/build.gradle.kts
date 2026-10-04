@@ -98,6 +98,7 @@ dependencies {
 
     // Ktor
     testImplementation(identityLibs.ktor.server.cio)
+    testImplementation(identityLibs.unboundid.ldapsdk)
     testImplementation(identityLibs.ktor.server.test.host)
 
     // Kotlin
