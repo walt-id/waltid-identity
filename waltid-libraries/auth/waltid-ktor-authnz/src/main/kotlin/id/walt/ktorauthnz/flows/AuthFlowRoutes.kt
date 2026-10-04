@@ -1,5 +1,7 @@
 package id.walt.ktorauthnz.flows
 
+import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
+import id.walt.ktorauthnz.tenants.authnzTenant
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.AuthSessionStateException
@@ -19,8 +21,8 @@ fun AuthFlow.allMethods(): Set<String> = setOf(method) + continueWith.orEmpty().
 
 /** Options of [authFlows]. */
 class AuthFlowRoutesConfig {
-    /** Tenant of a call, in multi-tenant services; sessions are bound to it. Default: none. */
-    var tenant: ApplicationCall.() -> String? = { null }
+    /** Tenant of a call, in multi-tenant services; sessions are bound to it. Default: the [authnzTenant] scope, if any. */
+    var tenant: ApplicationCall.() -> String? = { authnzTenant }
 
     /** Whether the login token is also returned in the response body, besides the cookie. */
     var revealTokenToClient: Boolean = true
@@ -30,6 +32,19 @@ class AuthFlowRoutesConfig {
 
     /** Function amendments per method, e.g. the registration function Web3 needs. */
     var functionAmendments: Map<AuthenticationMethod, Map<AuthMethodFunctionAmendments, suspend (Any) -> Unit>> = emptyMap()
+
+    /**
+     * Logs in identities the account store does not know yet, for [methods] that support it (LDAP users, VC
+     * holders, Web3 addresses, `email-code` sign-ups): [register] adds an account for the identifier - e.g.
+     * `accounts.addAccountIdentifierToAccount(newId, it)` - and the login continues with it. Without it they are refused.
+     */
+    fun registerUnknownAccounts(vararg methods: AuthenticationMethod, register: suspend (AccountIdentifier) -> Unit) {
+        functionAmendments = functionAmendments + methods.associateWith { method ->
+            functionAmendments[method].orEmpty() + (AuthMethodFunctionAmendments.Registration to { identifier: Any ->
+                register(identifier as AccountIdentifier)
+            })
+        }
+    }
 }
 
 /**
