@@ -6,7 +6,7 @@ import id.walt.ktorauthnz.accounts.InMemoryAccountStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.LDAPIdentifier
 import id.walt.ktorauthnz.attempts.AttemptLimits
 import id.walt.ktorauthnz.ephemeral.InMemoryExpiringStore
-import id.walt.ktorauthnz.examples.multitenant.ExampleDirectory
+import id.walt.ktorauthnz.examples.services.ExampleDirectory
 import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.flows.authFlows
 import id.walt.ktorauthnz.methods.config.LDAPConfiguration
