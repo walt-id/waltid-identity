@@ -29,6 +29,9 @@ class KtorAuthnzConfig {
     /** The WebAuthn relying party, needed for passkeys. */
     var passkeys: PasskeySettings? = null
 
+    /** How one-time email codes are sent, needed for the `email-code` method. */
+    var emailCodes: id.walt.ktorauthnz.methods.config.EmailCodeSettings? = null
+
     /** Issue refresh tokens with each login token; see [RefreshTokenSettings]. */
     var refreshTokens: RefreshTokenSettings? = null
 
@@ -79,6 +82,7 @@ val KtorAuthnz = createApplicationPlugin("KtorAuthnz", ::KtorAuthnzConfig) {
     config.passwordHashing?.let { KtorAuthnzManager.passwordHashingConfig = it }
     config.refreshTokens?.let { KtorAuthnzManager.refreshTokens = it }
     config.passkeys?.let { KtorAuthnzManager.passkeys = it }
+    config.emailCodes?.let { KtorAuthnzManager.emailCodes = it }
 
     config.cookie.name?.let { SessionTokenCookieHandler.cookieName = it }
     config.cookie.domain?.let { SessionTokenCookieHandler.domain = it }
