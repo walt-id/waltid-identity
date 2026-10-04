@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.methods.sessiondata.IdentifiedSessionData
 import id.walt.ktorauthnz.exceptions.AuthSessionNotFoundException
 import id.walt.ktorauthnz.auth.getEffectiveRequestAuthToken
 import kotlin.uuid.Uuid
@@ -69,6 +70,9 @@ object OIDC : AuthenticationMethod("oidc") {
     internal const val OIDC_STATE_NAMESPACE = "oidc-state"
     internal const val OIDC_TOKEN_VALIDATION_NAMESPACE = "oidc-token-validation-v2"
 
+
+    /** The IdP calls back (and logs out) without the session in the path. */
+    override val hasSessionlessRoutes = true
 
     private val configurationCache = mutableMapOf<Url, OpenIdConfiguration>()
 
@@ -147,6 +151,8 @@ object OIDC : AuthenticationMethod("oidc") {
                 append("redirect_uri", config.callbackUri)
                 append("state", state)
                 append("nonce", nonce)
+                // After an `identify` step, the IdP can skip asking who is logging in.
+                createdSession.getSessionData<IdentifiedSessionData>(Identify)?.let { append("login_hint", it.value) }
                 if (codeChallenge != null) {
                     append("code_challenge", codeChallenge)
                     append("code_challenge_method", "S256")
