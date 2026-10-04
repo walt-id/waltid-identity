@@ -60,6 +60,7 @@ class JwtTokenHandler private constructor(
         val payload = buildJsonObject {
             put("sub", session.accountId)
             put("session", session.id)
+            session.tenant?.let { put("tenant", it) }
             (session.tokenExpiration ?: session.expiration)?.let { put("exp", it.epochSeconds) }
         }.toString().toByteArray()
 
@@ -129,6 +130,8 @@ class JwtTokenHandler private constructor(
     override suspend fun getTokenSessionId(token: String): String {
         return token.getTokenClaim("session")
     }
+
+    override suspend fun getTokenTenant(token: String): String? = runCatching { token.getTokenClaim("tenant") }.getOrNull()
 
     override suspend fun getTokenAccountId(token: String): String {
         return token.getTokenClaim("sub")
