@@ -5,6 +5,13 @@ public enum WalletError: Error, Equatable, Sendable {
     /// The SDK input could not be parsed or validated.
     case invalidInput(String)
 
+    /// An invalid OpenID4VP request whose protocol error could not be reported safely.
+    /// - Parameters:
+    ///   - code: The original OpenID4VP error code.
+    ///   - message: The original request-validation message.
+    ///   - responseSafetyFailure: The reason the error response was not sent.
+    case presentationValidation(code: PresentationErrorCode, message: String, responseSafetyFailure: String)
+
     /// Network communication with an issuer, verifier, or wallet backend failed.
     case network(String)
 
@@ -22,6 +29,9 @@ public enum WalletError: Error, Equatable, Sendable {
 
     /// A protected wallet-key request failed for a stable, actionable reason.
     case keyUseAuthorization(WalletKeyUseAuthorizationFailure)
+
+    /// Payment review or authorization failed for a stable reason.
+    case paymentConsent(PaymentConsentFailure, message: String)
 
     /// The requested credential was not found in the wallet.
     case credentialNotFound(String)
@@ -46,6 +56,10 @@ extension WalletError: LocalizedError {
              .credentialNotFound(let message),
              .internalFailure(let message):
             return message
+        case .presentationValidation(let code, let message, let responseSafetyFailure):
+            return "\(code.errorCode): \(message). Error response was not sent: \(responseSafetyFailure)"
+        case .paymentConsent(_, let message):
+            return message
         case .keyUseAuthorization(let failure):
             return "Wallet key authorization failed: \(failure)"
         case .cancelled:
@@ -67,4 +81,28 @@ extension WalletError: LocalizedError {
     public var helpAnchor: String? {
         nil
     }
+}
+
+/// Stable reasons for refusing payment consent, resolved by the shared wallet core.
+public enum PaymentConsentFailure: Equatable, Sendable {
+    /// The credential issuer or signature could not be authenticated.
+    case untrustedCredential
+    /// Required metadata could not be retrieved within the resource limits.
+    case metadataUnavailable
+    /// The issuer instructions are malformed or incomplete.
+    case invalidMetadata
+    /// Fetched metadata does not match a supplied integrity reference.
+    case integrityMismatch
+    /// The schema or inheritance mechanism is not supported.
+    case unsupportedSchema
+    /// The payment shape, currency or number of authorizations is unsupported.
+    case unsupportedPayment
+    /// The transaction contains invalid payment values.
+    case invalidPayment
+    /// No complete preferred-language catalogue is available.
+    case missingTranslation
+    /// This attempt has no prepared and acknowledged review.
+    case consentRequired
+    /// The selection or another bound input changed after review.
+    case staleConsent
 }

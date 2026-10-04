@@ -69,6 +69,19 @@ LocalAuthentication context for the configured interval; native Keychain metadat
 verify that interval. Android reuse may cover other eligible keys. Timed reuse is recent platform or
 provider authentication, not consent for issuance, presentation, or another wallet action.
 
+## HTTP response caching
+
+The default iOS transport disables Foundation `URLCache` for SDK HTTP sessions,
+including immediate credential responses and deferred issuance polling. This
+prevents Foundation from retaining credential bodies outside wallet persistence,
+even when an external issuer omits `Cache-Control: no-store`. CMP iOS and the Swift
+WalletSDK use this transport by default.
+
+Caller-supplied HTTP clients must apply the same policy. A custom Ktor Darwin client
+should use `engine { configureSession { URLCache = null } }`; a custom `URLSession`
+should set `configuration.urlCache = nil` before creating the session. A request
+policy that ignores cached responses does not prevent storing new response bodies.
+
 ## Receiving credentials
 
 When an issuer advertises `key_attestations_required`, attach an application-supplied
@@ -125,6 +138,13 @@ Preview a presentation request before submission. The request information includ
 typed verifier metadata and the response-encryption state selected by the protocol
 implementation:
 
+An invalid request with an unsafe response channel throws
+`UnsafePresentationErrorResponseException`. Its `error` preserves the OpenID4VP
+code and request-validation message; `responseSafetyFailure` explains why remote
+reporting was blocked. The exception message includes both for demo diagnostics.
+Requests with a safe response channel return `Invalid` for review and explicit
+rejection. No protocol error is sent by preview.
+
 ```kotlin
 val preview = wallet.previewPresentation(requestUrl)
 preview.request.verifierMetadata?.display?.name?.let(::showVerifierName)
@@ -141,6 +161,37 @@ when (val encryption = preview.request.responseEncryption) {
 
 Response-encryption metadata describes protection of the authorization response. It
 does not establish verifier trust and does not expose verifier key material.
+
+### TS-12 payment consent
+
+Configure `MobileWalletConfig.paymentCredentialIssuers` with independently trusted
+issuer URLs and public JWKs, and set `preferredLocales`. An empty trust list blocks
+authoritative payment review. After preview and selection, prepare the review:
+
+```kotlin
+val consent = wallet.preparePaymentConsent(
+    previewHandle = handle,
+    selectedCredentialOptions = selectedCredentials,
+    selectedDisclosureOptions = selectedDisclosures,
+)
+// Render consent.payment and its unsigned-request warning; await explicit confirmation.
+wallet.submitPresentation(
+    previewHandle = handle,
+    selectedCredentialOptions = selectedCredentials,
+    selectedDisclosureOptions = selectedDisclosures,
+    paymentConsentRevision = consent?.revision,
+)
+```
+
+A null result means no SD-JWT TS-12 payment requires review. A
+`PaymentConsentException` blocks submission; do not fall back to generic labels.
+For app-reviewed Android DC API payments, use `prepareDigitalCredentialPaymentConsent`
+and pass its revision to `submitDigitalCredentialPresentation`. Hosts relying on platform
+confirmation instead omit the revision; this does not qualify the platform's display as
+TS-12 conformant. Native SCA authorization is enforced on both paths. Discard abandoned previews.
+After changing selections, prepare/display a new review. Reusing an acknowledgment
+after failure or cancellation is rejected. The immediate `present` API cannot
+satisfy payment consent. See [supported scope and rollout](../../../docs/ts12-sca-payment-demo.md).
 
 ### Android credential registry
 

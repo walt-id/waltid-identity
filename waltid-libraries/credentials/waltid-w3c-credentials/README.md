@@ -80,8 +80,9 @@ The `CredentialBuilder` class provides a fluent API for constructing W3C credent
 The library provides multiple ways to issue credentials:
 
 - **Static Configuration** (`baseIssue`): Directly specify data overwrites and updates
-- **Dynamic Configuration** (`mergingJwtIssue`, `mergingSdJwtIssue`): Use data functions and mappings for flexible credential creation
-- **Data Functions**: Built-in functions for accessing context data (issuerDid, subjectDid, display, etc.)
+- **Dynamic Configuration** (`mergingJwtIssue`, `mergingSdJwtIssue`): data functions and mappings for flexible credential creation. These live in
+  `waltid-digital-credentials` (`id.walt.credentials.issuance.MergingIssuer`), together with the merge engine and data
+  functions they use, since those serve every credential format.
 
 ### Signature Formats
 
@@ -129,7 +130,7 @@ The library relies on the following walt.id libraries:
 ### Basic Workflow
 
 1. **Build Credential**: Use `CredentialBuilder` to construct a W3C credential with desired properties
-2. **Issue Credential**: Use `Issuer.baseIssue()`, `Issuer.mergingJwtIssue()`, or `Issuer.mergingSdJwtIssue()` to sign and issue the credential
+2. **Issue Credential**: Use `Issuer.baseIssue()`, or `MergingIssuer.mergingJwtIssue()` / `MergingIssuer.mergingSdJwtIssue()` from `waltid-digital-credentials`, to sign and issue the credential
 3. **Build Presentation** (optional): Use `PresentationBuilder` to create a Verifiable Presentation containing credentials
 4. **Validate** (optional): Use `Verifier` from `waltid-verification-policies` to validate credentials and presentations against policies
 
@@ -218,7 +219,8 @@ val jwt = w3cCredential.baseIssue(
 
 #### Dynamic Configuration
 
-Issue a jwt-formatted verifiable credential:
+With `waltid-digital-credentials` (`import id.walt.credentials.issuance.MergingIssuer.mergingJwtIssue`), issue a
+jwt-formatted verifiable credential:
 
 ```kotlin
 val jwt = w3cCredential.mergingJwtIssue(

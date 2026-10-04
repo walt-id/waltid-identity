@@ -1,4 +1,5 @@
-FROM node:22-alpine AS buildstage
+# Debian/glibc, not Alpine: Node + npm + better-sqlite3 deadlock under QEMU on musl.
+FROM node:22-slim AS buildstage
 WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm config set fetch-retries 5 \
@@ -8,12 +9,11 @@ RUN npm config set fetch-retries 5 \
 COPY ./ /build
 
 RUN npm run build
-# RUN
-FROM node:22-alpine
 
-# Create non-root user
-RUN addgroup -g 10001 -S appgroup && \
-    adduser -u 10001 -S appuser -G appgroup
+FROM node:22-slim
+
+RUN groupadd --gid 10001 appgroup && \
+    useradd --uid 10001 --gid appgroup --no-create-home --home-dir /app --shell /usr/sbin/nologin appuser
 
 COPY --from=buildstage --chown=appuser:appgroup /build/.output/ /app
 WORKDIR /app

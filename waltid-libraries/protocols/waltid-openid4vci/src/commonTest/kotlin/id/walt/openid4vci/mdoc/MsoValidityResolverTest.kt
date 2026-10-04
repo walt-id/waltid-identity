@@ -1,6 +1,6 @@
 package id.walt.openid4vci.mdoc
 
-import id.walt.w3c.issuance.InstantClock
+import id.walt.credentials.issuance.InstantClock
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test

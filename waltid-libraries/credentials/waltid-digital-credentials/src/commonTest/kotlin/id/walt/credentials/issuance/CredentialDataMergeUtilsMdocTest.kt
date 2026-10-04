@@ -1,6 +1,8 @@
-import id.walt.w3c.issuance.dataFunctions
-import id.walt.w3c.utils.CredentialDataMergeUtils.mdocNamespaceMapping
-import id.walt.w3c.utils.CredentialDataMergeUtils.mergeMdocPayloadWithMapping
+package id.walt.credentials.issuance
+
+import id.walt.credentials.issuance.dataFunctions
+import id.walt.credentials.issuance.CredentialDataMergeUtils.mdocNamespaceMapping
+import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeMdocPayloadWithMapping
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject

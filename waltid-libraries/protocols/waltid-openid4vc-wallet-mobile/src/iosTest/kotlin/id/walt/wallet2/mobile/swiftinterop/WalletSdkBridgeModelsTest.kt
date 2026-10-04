@@ -17,6 +17,48 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class WalletSdkBridgeModelsTest {
+    @Test
+    fun unsafePresentationErrorsRetainBothFailuresThroughTheBridge() {
+        val requestError = id.waltid.openid4vp.wallet.PresentationRequestError(
+            id.waltid.openid4vp.wallet.WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST,
+            "Authorization Request nonce is required",
+        )
+        val failure = id.waltid.openid4vp.wallet.UnsafePresentationErrorResponseException(
+            requestError, IllegalArgumentException("Unbound response destination"),
+        )
+        val error = WalletBridgeError.fromThrowable(failure)
+        assertEquals(WalletBridgeErrorCategory.presentationValidation, error.category)
+        val details = requireNotNull(error.presentationValidationFailure)
+        assertEquals(id.walt.wallet2.mobile.MobileWalletPresentationErrorCode.invalidRequest, details.errorCode)
+        assertEquals(requestError.message, details.message)
+        assertEquals("Unbound response destination", details.responseSafetyFailure)
+        assertEquals(failure.message, error.message)
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeError(WalletBridgeErrorCategory.presentationValidation, "Missing details")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeError(WalletBridgeErrorCategory.invalidInput, "Wrong category", presentationValidationFailure = details)
+        }
+    }
+
+    @Test
+    fun paymentFailuresPreserveTheirTypedReasonAndWalletOwnedMessage() {
+        for (reason in id.walt.wallet2.consent.PaymentConsentFailure.entries) {
+            val failure = id.walt.wallet2.consent.PaymentConsentException(reason)
+            val error = WalletBridgeError.fromThrowable(failure)
+            assertEquals(WalletBridgeErrorCategory.paymentConsent, error.category)
+            assertEquals(reason, error.paymentConsentFailure)
+            assertEquals(failure.message, error.message)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeError(WalletBridgeErrorCategory.paymentConsent, "Missing reason")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            WalletBridgeError(WalletBridgeErrorCategory.internalFailure, "Wrong category",
+                paymentConsentFailure = id.walt.wallet2.consent.PaymentConsentFailure.STALE_CONSENT)
+        }
+    }
+
 
     @Test
     fun mapsThrowableCategoriesWithoutLeakingRawKotlinExceptionTypesAsTheApi() {

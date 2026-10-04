@@ -283,3 +283,7 @@ iOS Identity Document providers currently cover presentation only; create/issuan
 - [waltid-openid4vc-wallet-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md)
 - [waltid-openid4vc-wallet-persistence-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md)
 - [waltid-mobile-test-utils](../../waltid-libraries/protocols/waltid-mobile-test-utils/README.md)
+
+## SD-JWT SCA payment demo
+
+See the [payment demo guide](../../docs/ts12-sca-payment-demo.md) for issuer/verifier setup, per-use biometric provisioning and the physical-device acceptance lane.

@@ -58,11 +58,13 @@ public struct ClaimGroup: Equatable, Identifiable {
     public let title: String
     public let items: [ClaimItem]
     public let initiallyExpanded: Bool
+    public let transactionType: String?
 
-    public init(title: String, items: [ClaimItem], initiallyExpanded: Bool = true) {
+    public init(title: String, items: [ClaimItem], initiallyExpanded: Bool = true, transactionType: String? = nil) {
         self.title = title
         self.items = items
         self.initiallyExpanded = initiallyExpanded
+        self.transactionType = transactionType
     }
 
     public var id: String { title }

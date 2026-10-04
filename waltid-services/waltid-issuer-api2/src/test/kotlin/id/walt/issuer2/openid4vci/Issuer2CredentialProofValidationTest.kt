@@ -2,7 +2,9 @@ package id.walt.issuer2.openid4vci
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JweUtils
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
@@ -20,12 +22,14 @@ import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -42,6 +46,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.io.encoding.Base64
@@ -51,6 +56,45 @@ class Issuer2CredentialProofValidationTest {
     @AfterEach
     fun clearConfig() {
         clearIssuer2TestEnvironment()
+    }
+
+    @Test
+    fun `encrypted credential response prohibits caching through the HTTP route`() = testApplication {
+        val issuerKey = JWKKey.generate(KeyType.secp256r1)
+        val walletKey = JWKKey.generate(KeyType.secp256r1)
+        val serializedIssuerKey = KeySerialization.serializeKey(issuerKey)
+        installIssuer2WithConfigFiles(configureServiceConfig = {
+            it.copy(credentialEncryptionKey = serializedIssuerKey)
+        })
+        val flow = prepareFlow(apiClient())
+        val proofs = proof(walletKey, flow.nonce())
+        val encryptionJwk = JsonObject(walletKey.getPublicKey().exportJWKObject() + mapOf(
+            "alg" to JsonPrimitive(CredentialEncryptionProfile.ALG_ECDH_ES),
+            "use" to JsonPrimitive(CredentialEncryptionProfile.KEY_USE_ENC),
+        ))
+        val payload = JsonObject(credentialRequest(
+            flow.resolvedOffer.offer.credentialConfigurationIds.single(), proofs,
+        ) + ("credential_response_encryption" to buildJsonObject {
+            put("jwk", encryptionJwk)
+            put("enc", CredentialEncryptionProfile.ENC_A128GCM)
+        }))
+        val requestJwe = JweUtils.toJWE(
+            payload = payload,
+            jwk = issuerKey.getPublicKey().exportJWK(),
+            alg = CredentialEncryptionProfile.ALG_ECDH_ES,
+            enc = CredentialEncryptionProfile.ENC_A128GCM,
+            headerParams = mapOf("kid" to JsonPrimitive(issuerKey.getKeyId())),
+        )
+        val response = flow.client.post(flow.resolvedOffer.issuerMetadata.credentialEndpoint) {
+            bearerAuth(flow.accessToken)
+            contentType(ContentType.parse(CredentialEncryptionProfile.MEDIA_TYPE_JWT))
+            setBody(requestJwe)
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals("no-store", response.headers["Cache-Control"])
+        assertEquals(CredentialEncryptionProfile.MEDIA_TYPE_JWT, response.contentType()?.withoutParameters()?.toString())
+        val decrypted = JweUtils.parseJWE(response.bodyAsText(), walletKey.exportJWK()).payload
+        assertTrue((decrypted["credentials"] as JsonArray).isNotEmpty())
     }
 
     @Test
@@ -111,6 +155,7 @@ class Issuer2CredentialProofValidationTest {
         ).jwt.orEmpty().single()
         val response = flow.request(Proofs(jwt = listOf(validProof)))
         assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals("no-store", response.headers["Cache-Control"])
         assertEquals(1, acceptanceCalls.get())
     }
 
@@ -195,6 +240,7 @@ class Issuer2CredentialProofValidationTest {
         expectedError: String = CredentialErrorCodes.INVALID_PROOF,
     ) {
         assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertEquals("no-store", response.headers["Cache-Control"])
         assertEquals(expectedError, response.body<JsonObject>()["error"]?.jsonPrimitive?.content)
     }
 

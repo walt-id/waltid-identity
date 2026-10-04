@@ -25,6 +25,10 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
@@ -75,6 +79,7 @@ import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
+import id.waltid.openid4vp.wallet.UnsafePresentationErrorResponseException
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.RequestObjectAuthentication
@@ -157,6 +162,7 @@ class MobileWalletTest {
             onEvent,
             preferredLocales,
             transactionDataProfiles,
+            paymentCredentialIssuers,
             credentialIssuerMetadataTrustResolver,
         ) = config
 
@@ -165,11 +171,50 @@ class MobileWalletTest {
         assertEquals(MobileWalletPersistence(), persistence)
         assertEquals(emptyList(), preferredLocales)
         assertEquals(emptyList(), transactionDataProfiles)
+        assertEquals(emptyList(), paymentCredentialIssuers)
         assertEquals(null, credentialIssuerMetadataTrustResolver)
         assertSame(config.onEvent, onEvent)
         assertIs<MobileWalletDatabaseKey.Managed>(config.persistence.databaseKey)
         assertEquals(null, config.persistence.credentialStore)
         assertEquals(null, config.persistence.didStore)
+    }
+
+    @Test
+    fun authenticatedInvalidRequestRetainsBothFailuresWhenResponseChannelIsUnusable() = runTest {
+        val verifierKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId("validation-verifier"), spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            ),
+        )
+        val publicKey = Jwk.parse(requireNotNull(verifierKey.capabilities.publicKeyExporter)
+            .exportPublicKey().toPublicJwk(verifierKey.spec))
+        val wallet = walletWithTrust(ClientIdTrustConfiguration(preRegisteredClients = mapOf(
+            "verifier2" to ClientMetadata(jwks = ClientMetadata.Jwks(listOf(publicKey))),
+        )))
+        val jwt = CompactJws.sign(
+            buildJsonObject {
+                put("client_id", "verifier2")
+                put("aud", AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE)
+                put("response_type", "vp_token")
+                put("response_mode", "fragment")
+            }.toString().encodeToByteArray(),
+            key = verifierKey, algorithm = JwsAlgorithm.ES256,
+            protectedHeader = buildJsonObject { put("typ", "oauth-authz-req+jwt") },
+        )
+        val url = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
+            parameters.append("request", jwt)
+        }.buildString()
+        val failure = assertFailsWith<UnsafePresentationErrorResponseException> {
+            wallet.previewPresentation(url)
+        }
+        assertEquals("invalid_request", failure.error.code.code)
+        assertEquals("Authorization Request nonce is required", failure.error.message)
+        assertEquals(
+            "Authorization Request redirect_uri is required; an error response cannot be sent safely",
+            failure.responseSafetyFailure.message,
+        )
     }
 
     @Test
@@ -1702,6 +1747,55 @@ class MobileWalletTest {
         }
 
         collector.cancel()
+    }
+
+    @Test
+    fun immediatePresentationPreservesProtocolErrorHandling() = runTest {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val id = key.getKeyId()
+        val wallet = MobileWallet(
+            walletId = "immediate-errors",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = id, keyType = "Ed25519"), key = key),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:test", document = JsonObject(emptyMap()))),
+            credentialStore = RecordingCredentialStore(),
+            clientIdTrustConfiguration = ClientIdTrustConfiguration(preRegisteredClients = mapOf(
+                "verifier2" to ClientMetadata(jwks = ClientMetadata.Jwks(listOf(
+                    JsonObject(key.getPublicKey().exportJWKObject() + ("kid" to JsonPrimitive(id))),
+                ))),
+            )),
+        )
+        for (invalidTransactionData in listOf(false, true)) {
+            val signed = key.signJws(buildJsonObject {
+                put("client_id", "verifier2")
+                put("aud", AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE)
+                put("nonce", "nonce")
+                put("response_type", "vp_token")
+                put("response_mode", "fragment")
+                put("redirect_uri", "https://verifier.example/callback")
+                put("dcql_query", buildJsonObject {
+                    put("credentials", buildJsonArray {
+                        if (invalidTransactionData) add(buildJsonObject {
+                            put("id", "pid")
+                            put("format", "dc+sd-jwt")
+                            put("meta", buildJsonObject { put("vct_values", buildJsonArray { add(JsonPrimitive("urn:test:pid")) }) })
+                        })
+                    })
+                })
+                if (invalidTransactionData) put("transaction_data", buildJsonArray { add(JsonPrimitive("!")) })
+            }.toString().encodeToByteArray(), mapOf(
+                "typ" to JsonPrimitive("oauth-authz-req+jwt"), "kid" to JsonPrimitive(id),
+            ))
+            val url = URLBuilder("openid4vp://authorize").apply {
+                parameters.append("client_id", "verifier2")
+                parameters.append("request", signed)
+            }.buildString()
+            if (invalidTransactionData) {
+                assertFailsWith<IllegalArgumentException> { wallet.present(url) }
+            } else {
+                val result = assertIs<MobileWalletPresentationResult.Prepared.OpenUrl>(wallet.present(url))
+                assertTrue(result.url.contains("error=invalid_request"))
+            }
+        }
     }
 
     private fun presentationRequestInfo(
