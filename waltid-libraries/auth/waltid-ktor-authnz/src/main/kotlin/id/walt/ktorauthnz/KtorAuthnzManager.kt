@@ -33,6 +33,9 @@ object KtorAuthnzManager {
     /** The WebAuthn relying party, for passkeys; passkeys are off when null. */
     var passkeys: PasskeySettings? = null
 
+    /** Sending of one-time email codes, for the `email-code` method; off when null. */
+    var emailCodes: id.walt.ktorauthnz.methods.config.EmailCodeSettings? = null
+
     /** Receivers of authentication events (audit, alerts, metrics). */
     val eventListeners: MutableList<AuthnzEventListener> = java.util.concurrent.CopyOnWriteArrayList()
 
