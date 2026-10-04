@@ -1,4 +1,4 @@
-package id.walt.ktorauthnz.examples.multitenant
+package id.walt.ktorauthnz.examples.services
 
 import com.unboundid.ldap.listener.InMemoryDirectoryServer
 import com.unboundid.ldap.listener.InMemoryDirectoryServerConfig
@@ -116,16 +116,19 @@ class ExampleVerifier : AutoCloseable {
     override fun close() = server.stop()
 }
 
-/** org3's directory: `uid=<name>,ou=people,dc=org3`, with [users] and their passwords. */
-class ExampleDirectory(users: Map<String, String>) : AutoCloseable {
-    private val server = InMemoryDirectoryServer(InMemoryDirectoryServerConfig("dc=org3").apply {
+/**
+ * A directory under `dc=<[domain]>`: people at `<[nameAttribute]>=<name>,ou=people,dc=<domain>`, with [users] and their
+ * passwords.
+ */
+class ExampleDirectory(users: Map<String, String>, domain: String = "org3", nameAttribute: String = "uid") : AutoCloseable {
+    private val server = InMemoryDirectoryServer(InMemoryDirectoryServerConfig("dc=$domain").apply {
         setListenerConfigs(InMemoryListenerConfig.createLDAPConfig("ldap", 0))
     }).apply {
         startListening()
-        add("dn: dc=org3", "objectClass: domain", "dc: org3")
-        add("dn: ou=people,dc=org3", "objectClass: organizationalUnit", "ou: people")
+        add("dn: dc=$domain", "objectClass: domain", "dc: $domain")
+        add("dn: ou=people,dc=$domain", "objectClass: organizationalUnit", "ou: people")
         users.forEach { (name, password) ->
-            add("dn: uid=$name,ou=people,dc=org3", "objectClass: inetOrgPerson", "uid: $name", "cn: $name", "sn: $name", "userPassword: $password")
+            add("dn: $nameAttribute=$name,ou=people,dc=$domain", "objectClass: inetOrgPerson", "$nameAttribute: $name", "cn: $name", "sn: $name", "userPassword: $password")
         }
     }
     val url = "ldap://127.0.0.1:${server.listenPort}"
