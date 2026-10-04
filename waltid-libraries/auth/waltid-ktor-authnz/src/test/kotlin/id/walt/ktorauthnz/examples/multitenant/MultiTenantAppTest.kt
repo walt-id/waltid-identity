@@ -4,6 +4,9 @@ import com.atlassian.onetime.core.TOTPGenerator
 import com.atlassian.onetime.model.TOTPSecret
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.InMemoryAccountStore
+import id.walt.ktorauthnz.examples.services.ExampleDirectory
+import id.walt.ktorauthnz.examples.services.ExampleIdentityProvider
+import id.walt.ktorauthnz.examples.services.ExampleVerifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.LDAPIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.UsernameIdentifier
