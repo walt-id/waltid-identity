@@ -1,5 +1,7 @@
 package id.walt.ktorauthnz.enrollment
 
+import io.ktor.server.application.ApplicationCall
+import id.walt.ktorauthnz.tenants.authnzTenant
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.attempts.AttemptLimiter.attemptOnIdentifier
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
@@ -95,7 +97,9 @@ fun Route.passwordReset(
 ) = authenticationMethodRoutes {
     require(method.managesPasswords) { "${method.id} passwords are not kept by ktor-authnz" }
     val store = { KtorAuthnzManager.expiringStore }
-    fun tokenKey(token: String) = "password-reset:${SHA256().digest(token.toByteArray()).toHexString()}"
+    // Per tenant: a reset token confirms only in the tenant it was requested in, as the login name is only unique there.
+    fun ApplicationCall.tokenKey(token: String) =
+        listOfNotNull("password-reset", authnzTenant, SHA256().digest(token.toByteArray()).toHexString()).joinToString(":")
 
     post("password/reset/request", {
         tags("Authentication")
@@ -104,13 +108,15 @@ fun Route.passwordReset(
         response { HttpStatusCode.Accepted to { } }
     }) {
         val name = requireNotNull(call.receive<JsonObject>().string(method.usernameName)) { "Missing ${method.usernameName}" }
-        val requests = store().increment("password-reset-requests:${method.id}:${name.lowercase()}", 1.hours)
+        val requests = store().increment(
+            listOfNotNull("password-reset-requests", call.authnzTenant, method.id, name.lowercase()).joinToString(":"), 1.hours
+        )
         if (requests > maxRequestsPerHour) throw TooManyAttemptsException("Too many password reset requests; try again later")
 
         val identifier = method.identifierFor(name)
         if (identifier.resolveIfExists() != null) {
             val token = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(ByteArray(32).also { SecureRandom().nextBytes(it) })
-            store().put(tokenKey(token), name, tokenLifetime)
+            store().put(call.tokenKey(token), name, tokenLifetime)
             AuthnzEvents.emit(AuthnzEvent.PasswordResetRequested(method.id, name))
             sendResetToken(name, token)
         }
@@ -125,7 +131,7 @@ fun Route.passwordReset(
     }) {
         val request = call.receive<PasswordResetConfirmation>()
         val new = requireAcceptable(request.newPassword, minimumLength)
-        val key = tokenKey(request.token)
+        val key = call.tokenKey(request.token)
         val name = store().get(key)?.takeIf { store().putIfAbsent("$key:used", "used", tokenLifetime) }
             ?: throw AuthSessionStateException("Invalid or expired password reset token")
         store().remove(key)
