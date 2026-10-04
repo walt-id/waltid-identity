@@ -7,6 +7,7 @@ import id.walt.ktorauthnz.events.AuthnzEvent
 import id.walt.ktorauthnz.events.AuthnzEvents
 import id.walt.ktorauthnz.attempts.AuthAttemptTracking
 import id.walt.ktorauthnz.exceptions.AccountDataNotFoundException
+import id.walt.ktorauthnz.exceptions.AuthenticationFailureException
 import id.walt.ktorauthnz.exceptions.AuthSessionNotFoundException
 import id.walt.ktorauthnz.exceptions.AuthSessionStateException
 import id.walt.ktorauthnz.exceptions.TooManyAttemptsException
@@ -56,6 +57,11 @@ abstract class AuthenticationMethod(open val id: String) {
 
 
     private suspend fun ApplicationCall.handleSessionAuthSuccess(session: AuthSession, authContext: AuthContext, accountId: String?) {
+        // A step continues the login of the account the session is for: it cannot switch to another account, e.g. to
+        // one whose own flow asks for more than the flow this session follows.
+        if (accountId != null && session.accountId != null && accountId != session.accountId) {
+            throw AuthenticationFailureException("This step authenticated a different account than this login is for")
+        }
         accountId?.let { session.accountId = it }
         session.progressFlow(this@AuthenticationMethod)
         AttemptLimiter.recordSuccess(this)
@@ -176,6 +182,13 @@ abstract class AuthenticationMethod(open val id: String) {
         attemptOnSession(session.id)
         return session
     }
+
+    /**
+     * Whether some routes of this method are called without the session in the path - e.g. the OIDC callback, which
+     * finds its session by `state`. They are then also served where a flow continues with this method, not only where
+     * one starts with it.
+     */
+    open val hasSessionlessRoutes: Boolean = false
 
     // Relations
     open val relatedAuthMethodStoredData: KClass<out AuthMethodStoredData>? = null
