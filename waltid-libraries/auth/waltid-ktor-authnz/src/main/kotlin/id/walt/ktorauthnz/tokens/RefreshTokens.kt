@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.tokens
 
+import id.walt.ktorauthnz.tenants.authnzTenant
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.events.AuthnzEvent
 import id.walt.ktorauthnz.events.AuthnzEvents
@@ -47,9 +48,10 @@ object RefreshTokens {
 
     /**
      * Exchanges [refreshToken] for a new login token and refresh token (the old ones end). A refresh token presented a
-     * second time ends its session: one of the two callers holds a stolen token.
+     * second time ends its session: one of the two callers holds a stolen token. With [tenant] set, a refresh token of
+     * another tenant's session is refused before it is used up.
      */
-    suspend fun refresh(refreshToken: String): AuthSession {
+    suspend fun refresh(refreshToken: String, tenant: String? = null): AuthSession {
         val settings = KtorAuthnzManager.refreshTokens ?: throw InvalidTokenException("Refresh tokens are not enabled")
         val key = key(refreshToken)
         suspend fun reused(sessionId: String): Nothing {
@@ -59,6 +61,9 @@ object RefreshTokens {
         }
         store.get("$key:used")?.let { reused(it) }
         val sessionId = store.get(key) ?: throw InvalidTokenException("Invalid or expired refresh token")
+        if (tenant != null && SessionManager.findSessionById(sessionId)?.tenant != tenant) {
+            throw InvalidTokenException("Invalid or expired refresh token")
+        }
         if (!store.putIfAbsent("$key:used", sessionId, settings.refreshTokenLifetime)) reused(sessionId)
         store.remove(key)
 
@@ -85,7 +90,7 @@ fun Route.tokenRefresh(revealTokenToClient: Boolean = true) {
         request { body<TokenRefreshRequest>() }
         response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
     }) {
-        val session = RefreshTokens.refresh(call.receive<TokenRefreshRequest>().refreshToken)
+        val session = RefreshTokens.refresh(call.receive<TokenRefreshRequest>().refreshToken, call.authnzTenant)
         SessionTokenCookieHandler.run { call.setCookie(session.token!!) }
         call.respond(session.toInformation(revealTokenToClient = revealTokenToClient).copy(refreshToken = session.refreshToken))
     }
