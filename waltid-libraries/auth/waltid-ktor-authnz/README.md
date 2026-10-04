@@ -32,7 +32,7 @@ passkeys, passwords) and protections (attempt limits, single-use challenges, rev
   hashes, TOTP secrets, passkeys). `InMemoryAccountStore` is a complete one to start with.
 - **Authentication method** (`AuthenticationMethod`): one way to prove identity; each serves routes named by its id.
   Built in: `userpass`, `email`, `email-code`, `totp`, `recovery-code`, `passkey`, `ldap`, `radius`, `jwt`, `oidc`, `vc`,
-  `web3`.
+  `web3`, and `identify`, which finds the account first and offers the ways it can log in.
 - **Auth flow** (`AuthFlow`): a tree of methods, e.g. a password, then TOTP or a recovery code:
 
   ```json
@@ -173,8 +173,12 @@ See [new-auth-method.md](docs/new-auth-method.md).
 
 [`examples/multitenant`](src/test/kotlin/id/walt/ktorauthnz/examples/multitenant/MultiTenantApp.kt): an application
 whose tenants each configure their own login (password + TOTP + email code, OIDC, LDAP + TOTP, verifiable credential),
-run by `MultiTenantAppTest` against a mock IdP, a mock verifier and an in-memory LDAP server. It is compiled with the
-tests, so it follows the API.
+run by `MultiTenantAppTest` against a mock IdP, a mock verifier and an in-memory LDAP server.
+
+[`examples/identifierfirst`](src/test/kotlin/id/walt/ktorauthnz/examples/identifierfirst/IdentifierFirstApp.kt): the
+user enters an address and is offered what the account set up (password + TOTP or email code, passkey or wallet, IdP
+or LDAP + TOTP, an IdP for a whole domain), run by `IdentifierFirstAppTest`. Both examples are compiled with the
+tests, so they follow the API.
 
 The tests double as examples: `AuthFlowRoutesTest` (flows, tenants, provider hook), `TotpEnrollmentTest`,
 `PasswordRoutesTest`, `PasskeyTest`, `RefreshTokensTest`, `OidcLoginTest` (mock IdP), `VerifiableCredentialLoginTest`
@@ -184,6 +188,7 @@ The tests double as examples: `AuthFlowRoutesTest` (flows, tenants, provider hoo
 
 - [1.Quickstart.md](docs/1.Quickstart.md): flows and requests, step by step
 - [multi-tenant.md](docs/multi-tenant.md): a login configured per tenant
+- [identifier-first.md](docs/identifier-first.md): the account decides how it logs in
 - [new-auth-method.md](docs/new-auth-method.md): adding an authentication method
 - [oidc.md](docs/oidc.md): OpenID Connect
 - [radius.md](docs/radius.md): RADIUS
