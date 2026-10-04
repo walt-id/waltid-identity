@@ -14,6 +14,9 @@ interface TokenHandler {
     suspend fun getTokenAccountId(token: String): String
     suspend fun dropToken(token: String)
 
+    /** The tenant the token's session was opened for, or null. */
+    suspend fun getTokenTenant(token: String): String? = resolveTokenToSession(token).tenant
+
 
     suspend fun resolveTokenToSession(token: String): AuthSession {
         val session = KtorAuthnzManager.sessionStore.findSessionById(getTokenSessionId(token))
