@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.methods.sessiondata.IdentifiedSessionData
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
@@ -79,15 +80,16 @@ object EmailCode : AuthenticationMethod("email-code") {
             }) {
                 val settings = settings
                 val session = call.getAuthSession(authContext)
+                val identifiedEmail = session.getSessionData<IdentifiedSessionData>(Identify)?.takeIf { it.identifierType == "email" }?.value
                 val email: String?
                 val accountId: String?
                 if (session.accountId != null) {
-                    email = null
+                    email = identifiedEmail
                     accountId = session.accountId
                     call.limitSends("session:${session.id}")
                 } else {
-                    val body = runCatching { call.receive<JsonObject>() }.getOrNull()
-                    email = (body?.get("email") as? JsonPrimitive)?.contentOrNull?.trim()
+                    email = identifiedEmail ?: runCatching { call.receive<JsonObject>() }.getOrNull()
+                        ?.let { (it["email"] as? JsonPrimitive)?.contentOrNull?.trim() }
                     require(!email.isNullOrBlank() && "@" in email) { "Missing or invalid email" }
                     call.attemptOnIdentifier(id, email)
                     call.limitSends("address:${email.lowercase()}")
