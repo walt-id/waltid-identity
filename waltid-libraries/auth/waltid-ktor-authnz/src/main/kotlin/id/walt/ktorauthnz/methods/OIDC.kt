@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.exceptions.AuthSessionNotFoundException
 import id.walt.ktorauthnz.auth.getEffectiveRequestAuthToken
 import kotlin.uuid.Uuid
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -188,6 +189,8 @@ object OIDC : AuthenticationMethod("oidc") {
                 val sessionId = SessionManager.getSessionIdByExternalId(OIDC_STATE_NAMESPACE, returnedState)
                     ?: throw IllegalArgumentException("Unknown OIDC state in callback: $returnedState")
                 val session = SessionManager.getSessionById(sessionId)
+                // A callback arriving at another tenant does not continue the session there.
+                if (session.tenant != null && session.tenant != authContext(call).tenant) throw AuthSessionNotFoundException(sessionId)
                 val config = session.lookupFlowMethodConfiguration<OidcAuthConfiguration>(OIDC)
                 val oidcConfig = config.getOpenIdConfiguration()
 
