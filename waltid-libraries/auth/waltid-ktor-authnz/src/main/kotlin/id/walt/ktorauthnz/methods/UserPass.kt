@@ -60,7 +60,7 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
         }) {
             val session = call.getAuthSession(authContext)
 
-            val credential = call.getUsernamePasswordFromRequest()
+            val credential = call.getUsernamePasswordFromRequest(session)
 
             val identifier = auth(session, credential, call)
 
