@@ -15,6 +15,7 @@ object AuthMethodManager {
 
     init {
         registerAuthenticationMethods(
+            EmailCode,
             EmailPass,
             JWT,
             // Kerberos,
