@@ -1,16 +1,21 @@
 package id.walt.ktorauthnz.auth
 
+import id.walt.ktorauthnz.tenants.authnzTenant
 import id.walt.ktorauthnz.KtorAuthnzManager
 import io.klogging.logger
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.response.*
 
-/** The authenticated caller: its login token, account and session (the session is unknown for foreign JWTs). */
+/**
+ * The authenticated caller: its login token, account and session (the session is unknown for foreign JWTs), and the
+ * tenant it logged in to, if any.
+ */
 data class KtorAuthnzPrincipal(
     val token: String,
     val accountId: String,
     val sessionId: String?,
+    val tenant: String? = null,
 )
 
 /**
@@ -49,11 +54,19 @@ class DefaultKtorAuthnzAuthentication internal constructor(
         val handler = KtorAuthnzManager.tokenHandler
         val principal = runCatching {
             if (!handler.validateToken(token)) return@runCatching null
-            KtorAuthnzPrincipal(
+            val principal = KtorAuthnzPrincipal(
                 token = token,
                 accountId = handler.getTokenAccountId(token),
                 sessionId = runCatching { handler.getTokenSessionId(token) }.getOrNull(),
+                tenant = runCatching { handler.getTokenTenant(token) }.getOrNull(),
             )
+            // Under a tenant scope, a login to another tenant (or to none) does not count.
+            val tenant = call.authnzTenant
+            if (tenant != null && principal.tenant != tenant) {
+                log.debug { "Token is for tenant ${principal.tenant}, not $tenant" }
+                return@runCatching null
+            }
+            principal
         }.getOrElse {
             log.debug { "Token rejected: ${it.message}" }
             null
