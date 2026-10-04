@@ -87,6 +87,7 @@ oci-sdk = "3.90.0"
 web3j = "5.0.3"
 aaa4j-radius = "0.4.0"
 apache-ldap-api = "2.1.8"
+unboundid-ldapsdk = "7.0.5"
 mina-core = "2.2.8"
 commons-lang3 = "3.20.0"
 onetime = "2.2.0"
@@ -388,6 +389,7 @@ web3j-core = { module = "org.web3j:core", version.ref = "web3j" }
 web3j-utils = { module = "org.web3j:utils", version.ref = "web3j" }
 aaa4j-radius = { module = "org.aaa4j.radius:aaa4j-radius-client", version.ref = "aaa4j-radius" }
 apache-ldap-api = { module = "org.apache.directory.api:apache-ldap-api", version.ref = "apache-ldap-api" }
+unboundid-ldapsdk = { module = "com.unboundid:unboundid-ldapsdk", version.ref = "unboundid-ldapsdk" }
 mina-core = { module = "org.apache.mina:mina-core", version.ref = "mina-core" }
 commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
 onetime = { module = "com.atlassian:onetime", version.ref = "onetime" }
