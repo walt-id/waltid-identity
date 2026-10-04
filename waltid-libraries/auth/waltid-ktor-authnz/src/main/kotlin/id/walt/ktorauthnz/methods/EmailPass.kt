@@ -90,7 +90,7 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
             }) {
                 val session = call.getAuthSession(authContext)
 
-                val credential = call.getUsernamePasswordFromRequest()
+                val credential = call.getUsernamePasswordFromRequest(session)
 
                 val identifier = auth(session, credential, call)
 
@@ -107,7 +107,7 @@ object EmailPass : UserPassBasedAuthMethod("email", usernameName = "email") {
         }) {
             val session = getSession(authContext)
 
-            val credential = call.getUsernamePasswordFromRequest()
+            val credential = call.getUsernamePasswordFromRequest(session)
 
             val identifier = register(session, credential, context)
 
