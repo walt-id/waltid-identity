@@ -68,7 +68,7 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
         }) {
             val session = call.getAuthSession(authContext)
 
-            val credential = call.getUsernamePasswordFromRequest()
+            val credential = call.getUsernamePasswordFromRequest(session)
 
             val identifier = auth(session, credential, call)
             val authContext = authContext(call)
