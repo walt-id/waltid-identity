@@ -17,7 +17,7 @@ import id.walt.ktorauthnz.attempts.AttemptLimits
 import id.walt.ktorauthnz.auth.ktorAuthnz
 import id.walt.ktorauthnz.enrollment.passwordReset
 import id.walt.ktorauthnz.ephemeral.InMemoryExpiringStore
-import id.walt.ktorauthnz.examples.multitenant.ExampleIdentityProvider
+import id.walt.ktorauthnz.examples.services.ExampleIdentityProvider
 import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.flows.authFlows
 import id.walt.ktorauthnz.methods.OIDC
