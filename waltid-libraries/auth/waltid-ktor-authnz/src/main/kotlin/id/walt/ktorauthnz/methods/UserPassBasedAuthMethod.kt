@@ -1,5 +1,7 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.exceptions.AuthSessionStateException
+import id.walt.ktorauthnz.methods.sessiondata.IdentifiedSessionData
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 import id.walt.ktorauthnz.attempts.AttemptLimiter.attemptOnIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
@@ -38,9 +40,27 @@ abstract class UserPassBasedAuthMethod(
      * 3. Form post
      */
     suspend fun ApplicationCall.getUsernamePasswordFromRequest(): UserPasswordCredential =
-        readUsernamePassword().also { attemptOnIdentifier(id, it.name) }
+        readUsernamePassword(identified = null).also { attemptOnIdentifier(id, it.name) }
 
-    private suspend fun ApplicationCall.readUsernamePassword(): UserPasswordCredential {
+    /**
+     * Like [getUsernamePasswordFromRequest], for a step of [session]: after an `identify` step the login name is the
+     * identified one, so only the password is needed (a different name is refused).
+     */
+    suspend fun ApplicationCall.getUsernamePasswordFromRequest(session: AuthSession): UserPasswordCredential {
+        val identified = session.getSessionData<IdentifiedSessionData>(Identify)?.value
+        return readUsernamePassword(identified).also { attemptOnIdentifier(id, it.name) }
+    }
+
+    private suspend fun ApplicationCall.readUsernamePassword(identified: String?): UserPasswordCredential {
+        val credential = readCredentials(identified != null)
+        if (identified == null) return UserPasswordCredential(requireNotNull(credential.first) { "Missing $usernameName. $EXPLANATION_MESSAGE" }, credential.second)
+        if (credential.first != null && !credential.first.equals(identified, ignoreCase = true)) {
+            throw AuthSessionStateException("This login is for the identified $usernameName")
+        }
+        return UserPasswordCredential(identified, credential.second)
+    }
+
+    private suspend fun ApplicationCall.readCredentials(nameOptional: Boolean): Pair<String?, String> {
         val contentType = request.contentType()
         when {
             // As JSON document
@@ -50,30 +70,31 @@ abstract class UserPassBasedAuthMethod(
                 val username = body[usernameName] as? JsonPrimitive ?: body[DEFAULT_USER_NAME] as? JsonPrimitive
                 val password = body[passwordName] as? JsonPrimitive ?: body[DEFAULT_PASSWORD_NAME] as? JsonPrimitive
 
-                require(username?.isString == true) { "Invalid or missing $usernameName in JSON request. $EXPLANATION_MESSAGE" }
+                require(username?.isString == true || (nameOptional && username == null)) { "Invalid or missing $usernameName in JSON request. $EXPLANATION_MESSAGE" }
                 require(password?.isString == true) { "Invalid or missing $passwordName in JSON request. $EXPLANATION_MESSAGE" }
 
-                return UserPasswordCredential(username.content, password.content)
+                return username?.content to password.content
             }
             // As form post
             contentType.match(ContentType.Application.FormUrlEncoded) -> {
                 val form = receiveParameters()
 
-                val username = requireNotNull(form[usernameName] ?: form[DEFAULT_USER_NAME]) {
-                    "Invalid or missing $usernameName in form post request. $EXPLANATION_MESSAGE"
+                val username = (form[usernameName] ?: form[DEFAULT_USER_NAME]).also {
+                    require(it != null || nameOptional) { "Invalid or missing $usernameName in form post request. $EXPLANATION_MESSAGE" }
                 }
 
                 val password = requireNotNull(form[passwordName] ?: form[DEFAULT_PASSWORD_NAME]) {
                     "Invalid or missing $passwordName in form post request. $EXPLANATION_MESSAGE"
                 }
 
-                return UserPasswordCredential(username, password)
+                return username to password
             }
             // Basic auth (fallback)
             contentType.match(ContentType.Any) -> {
-                return requireNotNull(request.basicAuthenticationCredentials()) {
+                val basic = requireNotNull(request.basicAuthenticationCredentials()) {
                     "No basic auth credential header found. $EXPLANATION_MESSAGE"
                 }
+                return basic.name to basic.password
             }
 
             else -> throw IllegalArgumentException("Invalid content type: $contentType. $EXPLANATION_MESSAGE")
