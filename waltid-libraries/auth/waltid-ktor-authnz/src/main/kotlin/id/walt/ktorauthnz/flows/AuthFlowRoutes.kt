@@ -1,5 +1,8 @@
 package id.walt.ktorauthnz.flows
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
+import id.walt.ktorauthnz.methods.config.IdentifyConfiguration
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.tenants.authnzTenant
 import id.walt.ktorauthnz.AuthContext
@@ -16,8 +19,17 @@ import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
-/** Every method of a flow tree, each once. */
-fun AuthFlow.allMethods(): Set<String> = setOf(method) + continueWith.orEmpty().flatMap { it.allMethods() }
+/**
+ * Every method of a flow tree, each once. For an `identify` step, those its configuration names; methods that only
+ * accounts' own flows use are not known here - list them in `authFlows(methods = ...)`.
+ */
+fun AuthFlow.allMethods(): Set<String> {
+    val identified = if (method == AuthFlow.IDENTIFY && config != null) {
+        val identify = Json.decodeFromJsonElement<IdentifyConfiguration>(config)
+        identify.methods.keys + (identify.domains.values.flatten() + identify.default.orEmpty() + identify.unknown.orEmpty()).flatMap { it.allMethods() }
+    } else emptySet()
+    return setOf(method) + identified + continueWith.orEmpty().flatMap { it.allMethods() }
+}
 
 /** Options of [authFlows]. */
 class AuthFlowRoutesConfig {
@@ -94,6 +106,13 @@ fun Route.authFlows(
                 initialFlow = flowStartingWith(method),
                 revealTokenToClient = config.revealTokenToClient,
             )
+        }, config.functionAmendments[method])
+    }
+
+    // Routes the IdP or a device calls without the session id, for methods that only continue flows.
+    methods.distinct().filter { it.hasSessionlessRoutes && it !in firstMethods }.forEach { method ->
+        registerAuthenticationMethod(method, {
+            AuthContext(tenant = config.tenant(this), revealTokenToClient = config.revealTokenToClient)
         }, config.functionAmendments[method])
     }
 
