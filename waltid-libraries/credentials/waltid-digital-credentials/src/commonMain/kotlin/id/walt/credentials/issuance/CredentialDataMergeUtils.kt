@@ -1,4 +1,4 @@
-package id.walt.w3c.utils
+package id.walt.credentials.issuance
 
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.w3c.vc.vcs.W3CVC
@@ -10,6 +10,14 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
+/**
+ * Merges a credential's data with a mapping: values of the mapping are written into the data, and template values
+ * such as `<timestamp>` or `<uuid>` are replaced by the result of the named data function.
+ *
+ * One engine serves every credential format. Formats differ only in a [MergePolicy] - W3C and SD-JWT payloads
+ * append arrays and keep templates inside arrays literal, mdoc namespaces replace arrays and evaluate templates
+ * everywhere - and in how `jwt:` keys are treated.
+ */
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 object CredentialDataMergeUtils {
@@ -57,61 +65,82 @@ object CredentialDataMergeUtils {
         return result
     }
 
-    @JvmBlocking
-    @JvmAsync
-    @JsPromise
+    /**
+     * How a mapping is merged into data. The two presets are the behaviours the formats have always had, kept
+     * exactly so that no issued credential changes.
+     */
     @JsExport.Ignore
-    suspend fun MutableMap<String, JsonElement>.patch(
-        k: String,
-        v: JsonElement,
-        dataFunctions: Map<String, suspend (FunctionCall) -> JsonElement>,
-        context: Map<String, JsonElement>,
-        functionHistory: MutableMap<String, JsonElement>
-    ): MutableMap<String, JsonElement> {
-        when (v) {
-            is JsonPrimitive -> {
-                when {
-                    v.isTemplate() -> this[k] = getTemplateData(v.content, dataFunctions, context, functionHistory)
-                    else -> this[k] = v
-                }
-            }
+    data class MergePolicy(
+        /** A mapped array is appended to an existing one (true), or replaces it (false). */
+        val appendArrays: Boolean,
+        /** Templates inside a mapped array are evaluated (true), or copied literally (false). */
+        val evaluateTemplatesInArrays: Boolean,
+        /** A mapped object over a value that is not an object replaces it (true), or is an error (false). */
+        val objectReplacesNonObject: Boolean,
+        /** An empty mapped object still sets the key (true), or leaves the data unchanged (false). */
+        val emptyObjectSetsKey: Boolean,
+    ) {
+        companion object {
+            /** W3C and SD-JWT payloads. */
+            val APPEND = MergePolicy(appendArrays = true, evaluateTemplatesInArrays = false, objectReplacesNonObject = false, emptyObjectSetsKey = false)
 
-            is JsonObject -> {
-                v.jsonObject.forEach { (k2, v2) ->
-                    if (!this.containsKey(k)) {
-                        this[k] = JsonObject(emptyMap())
+            /** mdoc namespace payloads. */
+            val REPLACE = MergePolicy(appendArrays = false, evaluateTemplatesInArrays = true, objectReplacesNonObject = true, emptyObjectSetsKey = true)
+        }
+    }
+
+    /** One merge: the policy, the template inputs, and the call history `<last:...>` reads, shared across it. */
+    private class Merge(
+        val policy: MergePolicy,
+        val context: Map<String, JsonElement>,
+        val functions: Map<String, suspend (FunctionCall) -> JsonElement>,
+    ) {
+        val history = HashMap<String, JsonElement>()
+
+        suspend fun template(value: JsonPrimitive): JsonElement =
+            if (value.isString && value.isTemplate()) getTemplateData(value.content, functions, context, history) else value
+
+        /** Writes the [mapping] of [key] into [data]. */
+        suspend fun into(data: MutableMap<String, JsonElement>, key: String, mapping: JsonElement) {
+            when (mapping) {
+                is JsonPrimitive -> data[key] = template(mapping)
+
+                is JsonObject -> {
+                    if (mapping.isEmpty() && !policy.emptyObjectSetsKey) return
+                    val existing = data[key]
+                    val target = when {
+                        existing == null -> mutableMapOf()
+                        existing is JsonObject -> existing.toMutableMap()
+                        policy.objectReplacesNonObject -> mutableMapOf()
+                        else -> {
+                            val cause = runCatching { existing.jsonObject }.exceptionOrNull()
+                            throw IllegalArgumentException(
+                                "Invalid mapping for credential, when processing \"$key\": ${cause?.message}",
+                                cause
+                            )
+                        }
                     }
-
-                    val kJson = runCatching { this[k]?.jsonObject }.getOrElse { ex ->
-                        throw IllegalArgumentException(
-                            "Invalid mapping for credential, when processing \"$k\": ${ex.message}",
-                            ex
-                        )
-                    }
-                        ?: throw IllegalArgumentException("This key does not exist to map to: $k")
-
-                    this[k] =
-                        JsonObject(
-                            kJson.toMutableMap().patch(k2, v2, dataFunctions, context, functionHistory)
-                        )
-                }
-            }
-
-            is JsonArray -> {
-                if (!this.containsKey(k)) {
-                    this[k] = JsonArray(emptyList())
+                    mapping.forEach { (childKey, childMapping) -> into(target, childKey, childMapping) }
+                    data[key] = JsonObject(target)
                 }
 
-                when {
-                    this[k] is JsonArray -> this[k] =
-                        JsonArray(this[k]!!.jsonArray.toMutableList().apply { addAll(v.toList()) })
-
-                    else -> this[k] = v
+                is JsonArray -> {
+                    val items = if (policy.evaluateTemplatesInArrays) evaluated(mapping) else mapping
+                    val existing = data[key]
+                    data[key] = if (policy.appendArrays && existing is JsonArray) JsonArray(existing + items) else items
                 }
             }
         }
 
-        return this
+        private suspend fun evaluated(mapping: JsonArray): JsonArray = JsonArray(mapping.map { item ->
+            when (item) {
+                is JsonPrimitive -> template(item)
+                is JsonObject -> JsonObject(mutableMapOf<String, JsonElement>().also { target ->
+                    item.forEach { (k, v) -> into(target, k, v) }
+                })
+                is JsonArray -> evaluated(item)
+            }
+        })
     }
 
 
@@ -140,16 +169,14 @@ object CredentialDataMergeUtils {
         context: Map<String, JsonElement>,
         data: Map<String, suspend (FunctionCall) -> JsonElement>
     ): MergeResult {
+        val merge = Merge(MergePolicy.APPEND, context, data)
         val vcm = this.toMutableMap()
-
         val results = HashMap<String, JsonElement>()
-        val functionHistory = HashMap<String, JsonElement>()
-
         mapping.forEach { (k, v) ->
             if (!k.startsWith("jwt:")) {
-                vcm.patch(k, v, data, context, functionHistory)
+                merge.into(vcm, k, v)
             } else {
-                results[k] = getTemplateData(v.jsonPrimitive.content, data, context, functionHistory)
+                results[k] = getTemplateData(v.jsonPrimitive.content, data, context, merge.history)
             }
         }
         return MergeResult(W3CVC(vcm), results)
@@ -164,15 +191,13 @@ object CredentialDataMergeUtils {
         context: Map<String, JsonElement>,
         data: Map<String, suspend (FunctionCall) -> JsonElement>
     ): JsonObject {
+        val merge = Merge(MergePolicy.APPEND, context, data)
         val vcm = this.toMutableMap()
-
-        val functionHistory = HashMap<String, JsonElement>()
-
         mapping.forEach { (k, v) ->
             if (!k.startsWith("jwt:")) {
-                vcm.patch(k, v, data, context, functionHistory)
+                merge.into(vcm, k, v)
             } else {
-                vcm[k.removePrefix("jwt:")] = getTemplateData(v.jsonPrimitive.content, data, context, functionHistory)
+                vcm[k.removePrefix("jwt:")] = getTemplateData(v.jsonPrimitive.content, data, context, merge.history)
             }
         }
         return vcm.toJsonObject()
@@ -212,9 +237,8 @@ object CredentialDataMergeUtils {
     }
 
     /**
-     * Replace-merge for mDoc namespace payloads. Mapping arrays replace existing arrays
-     * and templates inside array items are evaluated. SD-JWT merge appends arrays and
-     * leaves nested templates unevaluated.
+     * Merge for mDoc namespace payloads, with [MergePolicy.REPLACE]: mapped arrays replace existing ones and
+     * templates inside them are evaluated. W3C and SD-JWT merges use [MergePolicy.APPEND].
      */
     @JvmBlocking
     @JvmAsync
@@ -224,55 +248,10 @@ object CredentialDataMergeUtils {
         mapping: JsonObject,
         context: Map<String, JsonElement>,
         data: Map<String, suspend (FunctionCall) -> JsonElement>,
-    ): JsonObject = mergeMdocJsonObject(this, mapping, context, data, HashMap())
-
-    private suspend fun mergeMdocJsonObject(
-        credentialData: JsonObject,
-        mapping: JsonObject,
-        context: Map<String, JsonElement>,
-        data: Map<String, suspend (FunctionCall) -> JsonElement>,
-        functionHistory: MutableMap<String, JsonElement>,
-    ): JsonObject = buildJsonObject {
-        credentialData.forEach { (key, value) -> put(key, value) }
-        mapping.forEach { (key, value) ->
-            put(key, mergeMdocJsonElement(credentialData[key], value, context, data, functionHistory))
-        }
-    }
-
-    private suspend fun mergeMdocJsonArray(
-        mapping: JsonArray,
-        context: Map<String, JsonElement>,
-        data: Map<String, suspend (FunctionCall) -> JsonElement>,
-        functionHistory: MutableMap<String, JsonElement>,
-    ): JsonArray = buildJsonArray {
-        mapping.forEach { value ->
-            add(mergeMdocJsonElement(null, value, context, data, functionHistory))
-        }
-    }
-
-    private suspend fun mergeMdocJsonElement(
-        original: JsonElement?,
-        mapping: JsonElement,
-        context: Map<String, JsonElement>,
-        data: Map<String, suspend (FunctionCall) -> JsonElement>,
-        functionHistory: MutableMap<String, JsonElement>,
-    ): JsonElement = when (mapping) {
-        is JsonPrimitive -> when {
-            mapping.isString && mapping.isTemplate() -> getTemplateData(
-                functionCall = mapping.content,
-                dataFunctions = data,
-                context = context,
-                functionHistory = functionHistory,
-            )
-            else -> mapping
-        }
-        is JsonObject -> mergeMdocJsonObject(
-            credentialData = original as? JsonObject ?: JsonObject(emptyMap()),
-            mapping = mapping,
-            context = context,
-            data = data,
-            functionHistory = functionHistory,
-        )
-        is JsonArray -> mergeMdocJsonArray(mapping, context, data, functionHistory)
+    ): JsonObject {
+        val merge = Merge(MergePolicy.REPLACE, context, data)
+        val result = this.toMutableMap()
+        mapping.forEach { (k, v) -> merge.into(result, k, v) }
+        return JsonObject(result)
     }
 }

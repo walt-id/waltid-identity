@@ -14,7 +14,7 @@ import id.walt.issuer.issuance.openapi.issuerapi.SdJwtDocs.getSdJwtBatchDocs
 import id.walt.issuer.issuance.openapi.issuerapi.SdJwtDocs.getSdJwtDocs
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.requests.CredentialOfferRequest
-import id.walt.w3c.issuance.Issuer.mergingJwtIssue
+import id.walt.credentials.issuance.MergingIssuer.mergingJwtIssue
 import id.walt.w3c.vc.vcs.W3CVC
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.post

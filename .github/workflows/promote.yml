@@ -166,6 +166,24 @@ jobs:
           sync-status: true
           inputs: '{"api-index-digest": "${{ needs.enterprise-image-digests.outputs.api-index-digest }}", "ui-index-digest": "${{ needs.enterprise-image-digests.outputs.ui-index-digest }}", "version": "${{ needs.version.outputs.release_version }}"}'
 
+  enterprise-release-evidence:
+    name: Enterprise release evidence
+    runs-on: ubuntu-latest
+    # Attaches to the enterprise GitHub release, so it has to exist first.
+    needs: [ version, source, enterprise-image-digests, enterprise-release ]
+    if: ${{ !failure() && !cancelled() }}
+    steps:
+      - name: Dispatch release-evidence.yml and wait
+        uses: benc-uk/workflow-dispatch@v1.3.2
+        with:
+          workflow: release-evidence.yml
+          repo: walt-id/waltid-identity-enterprise
+          ref: ${{ needs.source.outputs.tag }}
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          wait-for-completion: true
+          sync-status: true
+          inputs: '{"version": "${{ needs.version.outputs.release_version }}", "api-index-digest": "${{ needs.enterprise-image-digests.outputs.api-index-digest }}", "ui-index-digest": "${{ needs.enterprise-image-digests.outputs.ui-index-digest }}", "attach-to-release": "true"}'
+
   deploy-license:
     name: Deploy license
     runs-on: ubuntu-latest

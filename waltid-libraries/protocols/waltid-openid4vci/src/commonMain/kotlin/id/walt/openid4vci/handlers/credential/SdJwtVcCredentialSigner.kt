@@ -1,5 +1,7 @@
 package id.walt.openid4vci.handlers.credential
 
+import id.walt.credentials.issuance.issuanceDataFunctions
+import id.walt.credentials.issuance.issuanceTemplateContext
 import id.walt.certificate.x509.X509Certificate
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.crypto.keys.Key
@@ -22,8 +24,7 @@ import id.walt.sdjwt.SDJwtVC.Companion.defaultPayloadProperties
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
 import id.walt.w3c.issuance.Issuer.getKidHeader
-import id.walt.w3c.issuance.dataFunctions
-import id.walt.w3c.utils.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
+import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
 import kotlinx.serialization.json.*
 import id.walt.crypto2.keys.Key as Crypto2Key
 
@@ -112,23 +113,8 @@ object SdJwtVcCredentialSigner {
         val sdPayload = SDPayload.createSDPayload(
             fullPayload = credentialData.mergeSDJwtVCPayloadWithMapping(
                 mapping = dataMapping ?: JsonObject(emptyMap()),
-                context = mapOf(
-                    "subjectDid" to holderDid,
-                    "issuerDid" to issuerId,
-                    "issuerId" to issuerId,
-                    "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-                ).filterValues {
-                    when (it) {
-                        is JsonElement -> it !is JsonNull && (it !is JsonObject || it.jsonObject.isNotEmpty()) && (it !is JsonArray || it.jsonArray.isNotEmpty())
-                        else -> it.toString().isNotEmpty()
-                    }
-                }.mapValues { (_, value) ->
-                    when (value) {
-                        is JsonElement -> value
-                        else -> JsonPrimitive(value.toString())
-                    }
-                },
-                data = dataFunctions
+                context = issuanceTemplateContext(issuerId = issuerId, subjectDid = holderDid, display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray),
+                data = issuanceDataFunctions()
             ),
             disclosureMap = selectiveDisclosure ?: SDMap(mapOf())
         )

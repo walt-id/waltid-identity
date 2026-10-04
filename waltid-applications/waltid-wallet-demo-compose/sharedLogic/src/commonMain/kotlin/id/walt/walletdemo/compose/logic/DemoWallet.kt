@@ -27,11 +27,19 @@ interface DemoWallet {
     suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome
     suspend fun present(requestUrl: String, did: String? = null): WalletDemoOperationResult
     suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult
+    /** Only requested for a preview identified as an SD-JWT TS-12 payment by the mobile adapter. */
+    suspend fun preparePaymentConsent(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        did: String?,
+    ): WalletDemoPaymentConsent? = error("Payment consent is unavailable on this wallet")
     suspend fun submitPresentation(
         previewHandle: WalletDemoPresentationPreviewHandle,
         selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String? = null,
+        paymentConsentRevision: String? = null,
     ): WalletDemoOperationResult
     suspend fun rejectPresentation(previewHandle: WalletDemoPresentationPreviewHandle): WalletDemoOperationResult
     suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle)

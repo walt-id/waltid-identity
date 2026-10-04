@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.logic.ClaimItem
 import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
@@ -71,6 +72,7 @@ internal fun SharingReviewSection(
     readOnly: Boolean = false,
     compact: Boolean = false,
     showActions: Boolean = true,
+    paymentReview: WalletDemoPaymentReview = WalletDemoPaymentReview.NotRequired,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -79,7 +81,9 @@ internal fun SharingReviewSection(
             .testTag(WalletUiTestTags.PresentationReview),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        SharingRequestSections(review.request)
+        SharingRequestSections(if (paymentReview is WalletDemoPaymentReview.NotRequired) review.request else
+            review.request.copy(transactionData = review.request.transactionData.filterNot { it.transactionType == "urn:eudi:sca:payment:1" }))
+        PaymentConsentSection(paymentReview)
 
         if (compact) {
             var claimsOptionId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -139,6 +143,7 @@ internal fun SharingReviewSection(
             SharingActionsRow(
                 enabled = enabled,
                 selectionComplete = selectionComplete,
+                paymentReview = paymentReview,
                 onSubmit = onSubmit,
                 onCancel = onCancel,
                 onReject = onReject,
@@ -355,26 +360,27 @@ internal fun SharingActionsRow(
     onCancel: () -> Unit,
     onReject: (() -> Unit)?,
     presentation: ReviewActionPresentation = ReviewActionPresentation.Sharing,
+    paymentReview: WalletDemoPaymentReview = WalletDemoPaymentReview.NotRequired,
 ) {
-    val submitLabel = when (presentation) {
+    val submitLabel = paymentReview.consent?.affirmativeAction ?: when (presentation) {
         ReviewActionPresentation.Sharing -> "Share"
         ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_approve)
     }
-    val rejectLabel = when (presentation) {
+    val rejectLabel = paymentReview.consent?.denialAction ?: when (presentation) {
         ReviewActionPresentation.Sharing -> "Reject"
         ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_decline)
     }
-    val cancelLabel = when (presentation) {
+    val cancelLabel = (if (onReject == null) paymentReview.consent?.denialAction else null) ?: when (presentation) {
         ReviewActionPresentation.Sharing -> if (onReject == null) "Cancel" else "Cancel review"
         ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_cancel)
     }
-    Row(
+    androidx.compose.foundation.layout.FlowRow(
         modifier = Modifier.testTag(WalletUiTestTags.PresentationActions),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Button(
             onClick = onSubmit,
-            enabled = enabled && selectionComplete,
+            enabled = enabled && selectionComplete && paymentReview.canConfirm,
             modifier = Modifier.testTag(presentation.submitTestTag),
         ) {
             Text(submitLabel)

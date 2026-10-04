@@ -77,7 +77,7 @@ further cleanup is required; a missing PID cannot justify stopping an unrelated 
 Default Gradle sources contain no physical classes. Opt-in
 `-PenableProximityPhysicalTests=true` adds the Android test-only sources and changes
 the test application ID; normal CI/emulator scripts also exclude the runtime-retained
-`id.walt.proximity.test.PhysicalDeviceTest` annotation. Physical framework compilation
+`id.walt.mobile.test.PhysicalDeviceTest` annotation. Physical framework compilation
 uses `-PenableWalletSdkPhysicalFixtures=true` and writes to a separate output directory.
 Both Gradle flags reject CI environment variables. The iOS project under
 `waltid-wallet-sdk-ios/PhysicalTests` has its own scheme and test plan and is outside

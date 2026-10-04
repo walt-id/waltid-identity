@@ -23,6 +23,15 @@ import kotlin.test.assertTrue
  * field fails a test instead of shipping a screen that misdescribes the request.
  */
 class MobileDigitalCredentialSharingReviewTest {
+    @Test
+    fun scaPaymentRetainsNestedTransactionDetails() {
+        val payment = transactionDataItem("Payment", """{"payload":{"payee":{"name":"Super Store","id":"merchant-001"},"amount":11.56,"currency":"EUR"}}""")
+            .copy(type = "urn:eudi:sca:payment:1")
+        val review = digitalCredentialPreview(transactionData = listOf(payment)).toSharingReview()
+        assertEquals("Super Store", review.request.transactionData.single().textValue("Payee name"))
+        assertEquals("11.56", review.request.transactionData.single().textValue("Amount"))
+    }
+
     /**
      * The presentation signs over transaction_data, so a review that omits it asks the user to
      * authorize a payment they were never shown.
