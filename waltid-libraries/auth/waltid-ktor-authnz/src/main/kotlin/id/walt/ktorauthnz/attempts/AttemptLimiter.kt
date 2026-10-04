@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.attempts
 
+import id.walt.ktorauthnz.tenants.authnzTenant
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.events.AuthnzEvent
 import id.walt.ktorauthnz.events.AuthnzEvents
@@ -52,7 +53,8 @@ object AttemptLimiter {
      * compared case-insensitively, so that `Alice` and `alice` share one count.
      */
     suspend fun ApplicationCall.attemptOnIdentifier(method: String, identifier: String) {
-        val key = "$method:${identifier.lowercase()}"
+        // Per tenant: the same login name in two tenants is two accounts.
+        val key = listOfNotNull(authnzTenant, method, identifier.lowercase()).joinToString(":")
         attributes.put(identifierKey, key)
         attributes.put(methodKey, method)
         attributes.put(enteredIdentifierKey, identifier)
