@@ -90,7 +90,7 @@ object LDAP : UserPassBasedAuthMethod("ldap") {
             response { HttpStatusCode.OK to { body<AuthSessionInformation>() } }
         }) {
             val session = call.getAuthSession(authContext)
-            val credential = call.getUsernamePasswordFromRequest()
+            val credential = call.getUsernamePasswordFromRequest(session)
             val identifier = auth(session, credential, call)
 
             val accountId = identifier.resolveIfExists() ?: run {
