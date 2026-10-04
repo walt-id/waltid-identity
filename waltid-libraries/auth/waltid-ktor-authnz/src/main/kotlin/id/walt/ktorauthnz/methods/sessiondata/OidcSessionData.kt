@@ -78,3 +78,13 @@ data class OidcTokenValidationPolicyData(
 data class VerifiableCredentialSessionData(
     val verifierSessionId: String,
 ) : SessionData
+
+/** A pending email code: its digest, when it expires, and the account and address it was sent for. */
+@Serializable
+@SerialName("email-code")
+data class EmailCodeSessionData(
+    val codeDigest: String,
+    val expiresAt: kotlin.time.Instant,
+    val accountId: String?,
+    val email: String?,
+) : SessionData
