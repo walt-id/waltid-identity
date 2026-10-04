@@ -36,6 +36,8 @@ data class AuthFlow(
         private val log = logger("AuthFlow")
 
         fun fromConfig(config: String): AuthFlow = Json.decodeFromString<AuthFlow>(config)
+
+        internal const val IDENTIFY = "identify"
     }
 
     @Suppress("DEPRECATION") // check for legacy Deprecated "ok"
@@ -51,8 +53,9 @@ data class AuthFlow(
             runBlocking { log.warn { msg } }
         }
 
-        check(isEndConditionSuccess() || continueWith != null) { "No end condition in auth flow with method $method" }
-        check(isEndConditionSuccess() xor (continueWith != null)) { "Multiple end conditions in auth flow with method $method: OK and ${continueWith!!.methods()}" }
+        // `identify` decides what follows from the account it finds.
+        check(isEndConditionSuccess() || continueWith != null || method == IDENTIFY) { "No end condition in auth flow with method $method" }
+        check(!(isEndConditionSuccess() && continueWith != null)) { "Multiple end conditions in auth flow with method $method: OK and ${continueWith!!.methods()}" }
 
         if (continueWith != null) {
             check(continueWith.isNotEmpty()) { "Next flow list (`continueWith`) is empty at method $method" }
