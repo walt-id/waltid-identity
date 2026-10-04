@@ -17,6 +17,7 @@ object AuthMethodManager {
         registerAuthenticationMethods(
             EmailCode,
             EmailPass,
+            Identify,
             JWT,
             // Kerberos,
             LDAP,
