@@ -5,7 +5,7 @@ import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.UsernameIdentifier
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.attempts.AttemptLimiter.attemptOnIdentifier
 import id.walt.ktorauthnz.exceptions.AccountNotFoundException
 import id.walt.ktorauthnz.flows.AuthFlow
