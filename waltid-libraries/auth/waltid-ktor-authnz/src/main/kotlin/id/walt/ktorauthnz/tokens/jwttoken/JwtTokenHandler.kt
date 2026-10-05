@@ -1,5 +1,10 @@
 package id.walt.ktorauthnz.tokens.jwttoken
 
+import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.JsonArray
+import id.walt.ktorauthnz.tokens.TokenLogin
 import id.walt.ktorauthnz.exceptions.ExpiredTokenException
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -61,6 +66,9 @@ class JwtTokenHandler private constructor(
             put("sub", session.accountId)
             put("session", session.id)
             session.tenant?.let { put("tenant", it) }
+            // RFC 9068 / OIDC: when the user authenticated, and how
+            session.authenticatedAt?.let { put("auth_time", it.epochSeconds) }
+            if (session.completedMethods.isNotEmpty()) putJsonArray("amr") { session.completedMethods.forEach { add(it) } }
             (session.tokenExpiration ?: session.expiration)?.let { put("exp", it.epochSeconds) }
         }.toString().toByteArray()
 
@@ -116,19 +124,28 @@ class JwtTokenHandler private constructor(
         return verificationKey.verifyJws(token).isSuccess
     }
 
+    private fun String.payload(): JsonObject = runCatching {
+        if (crypto2Keys != null) {
+            Json.parseToJsonElement(CompactJws.decodeUnverified(this).payload.decodeToString()) as? JsonObject
+        } else {
+            decodeJws().payload
+        }
+    }.getOrNull() ?: throw InvalidTokenException("Token is not a JWT")
+
     private fun String.getTokenClaim(claim: String): String {
-        val payload = runCatching {
-            if (crypto2Keys != null) {
-                Json.parseToJsonElement(CompactJws.decodeUnverified(this).payload.decodeToString()) as? JsonObject
-            } else {
-                decodeJws().payload
-            }
-        }.getOrNull() ?: throw InvalidTokenException("Token is not a JWT")
+        val payload = payload()
         return payload[claim]?.jsonPrimitive?.contentOrNull ?: throw InvalidTokenException("Token has no \"$claim\" claim")
     }
 
     override suspend fun getTokenSessionId(token: String): String {
         return token.getTokenClaim("session")
+    }
+
+    override suspend fun getTokenLogin(token: String): TokenLogin? {
+        val payload = runCatching { token.payload() }.getOrNull() ?: return null
+        val authTime = payload["auth_time"]?.jsonPrimitive?.longOrNull?.let { kotlin.time.Instant.fromEpochSeconds(it) }
+        val methods = (payload["amr"] as? JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
+        return TokenLogin(authTime, methods)
     }
 
     override suspend fun getTokenTenant(token: String): String? = runCatching { token.getTokenClaim("tenant") }.getOrNull()
