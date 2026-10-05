@@ -1,31 +1,20 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.exceptions.AccountNotFoundException
+import kotlin.time.Duration.Companion.minutes
 import id.walt.ktorauthnz.KtorAuthnzManager
-import kotlin.time.Duration.Companion.seconds
 import id.walt.ktorauthnz.exceptions.InvalidChallengeException
 import id.walt.ktorauthnz.exceptions.Web3AuthException
-import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.jose.CompactJws
-import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.EdwardsCurve
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.Web3Identifier
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.exceptions.authFailure
-import id.walt.ktorauthnz.tokens.jwttoken.JwtTokenHandler
 import io.github.smiley4.ktoropenapi.post
 import io.klogging.logger
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import org.web3j.crypto.ECDSASignature
@@ -34,34 +23,22 @@ import org.web3j.crypto.Sign
 import org.web3j.utils.Numeric
 import java.math.BigInteger
 import java.security.SecureRandom
-import kotlin.time.Clock
 
 object Web3 : AuthenticationMethod("web3") {
     private val log = logger<Web3>()
 
-    private val nonceKey = runBlocking {
-        CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
-            GenerateSoftwareKeyRequest(
-                id = KeyId("web3-nonce"),
-                spec = KeySpec.Edwards(EdwardsCurve.ED25519),
-                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-            )
-        )
-    }
-    private val jwtHandler = JwtTokenHandler.crypto2(nonceKey, algorithm = JwsAlgorithm.ED25519)
-    private const val NONCE_VALIDITY_SECONDS = 300L // 5 minutes
+    private val challengeLifetime = 5.minutes
 
+    private fun challengeKey(challenge: String) = "web3-challenge:$challenge"
 
+    /**
+     * A new challenge for the wallet to sign: random, kept in the expiring store for [challengeLifetime] - so it works
+     * across instances sharing that store - and accepted once.
+     */
     suspend fun makeNonce(): String {
-        val nonce = ByteArray(32).apply { SecureRandom().nextBytes(this) }
-        val nonceHex = Numeric.toHexString(nonce)
-
-        val payload = buildJsonObject {
-            put("nonce", JsonPrimitive(nonceHex))
-            put("exp", JsonPrimitive(Clock.System.now().epochSeconds + NONCE_VALIDITY_SECONDS))
-        }.toString().toByteArray()
-
-        return CompactJws.sign(payload, nonceKey, JwsAlgorithm.ED25519)
+        val challenge = "Sign in: " + Numeric.toHexString(ByteArray(32).apply { SecureRandom().nextBytes(this) })
+        KtorAuthnzManager.expiringStore.put(challengeKey(challenge), "issued", challengeLifetime)
+        return challenge
     }
 
     override val supportsRegistration = true
@@ -114,24 +91,11 @@ object Web3 : AuthenticationMethod("web3") {
         val challenge = siweReq.challenge
         log.trace { "Challenge was: $challenge. Verifying challenge authenticity..." }
 
-        authCheck(jwtHandler.validateToken(challenge), InvalidChallengeException())
-        // A challenge logs in once: a replayed (challenge, signature) pair is refused.
-        authCheck(
-            KtorAuthnzManager.expiringStore.putIfAbsent("web3-used-challenge:$challenge", "used", (NONCE_VALIDITY_SECONDS + 60).seconds),
-            InvalidChallengeException()
-        )
-        log.trace { "Challenge is authentic. Verifying challenge timestamp..." }
-
-        val decodedJwt = challenge.decodeJws()
-        val jwtPayload = decodedJwt.payload.jsonObject
-
-        //val nonce = jwtPayload["nonce"]?.jsonPrimitive?.content ?: authFailure("No nonce in token")
-        val exp = jwtPayload["exp"]?.jsonPrimitive?.long ?: authFailure("No exp in token")
-
-        val now = Clock.System.now().epochSeconds
-        if (now > exp) {
-            authFailure("Token expired")
-        }
+        // Issued here, not expired, and not used before: taking it removes it.
+        val store = KtorAuthnzManager.expiringStore
+        authCheck(store.get(challengeKey(challenge)) != null, InvalidChallengeException())
+        authCheck(store.putIfAbsent("${challengeKey(challenge)}:used", "used", challengeLifetime), InvalidChallengeException())
+        store.remove(challengeKey(challenge))
 
         log.trace { "Challenge did not yet expire. Verifying challenge signature..." }
 
@@ -160,7 +124,7 @@ object Web3 : AuthenticationMethod("web3") {
 
                 if (identifierResolved == null) {
                     val registrationFunction = functionAmendments?.get(AuthMethodFunctionAmendments.Registration)
-                        ?: error("Missing registration function amendment for web3 method")
+                        ?: throw AccountNotFoundException(identifier.accountIdentifierName)
                     registrationFunction.invoke(identifier)
                 }
 
