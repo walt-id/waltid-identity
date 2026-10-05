@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,7 +33,7 @@ internal fun WalletActions(
             TextButton(onClick = action.onClick, enabled = action.enabled, modifier = action.modifier()) { ActionLabel(action) }
         }
         secondary?.let { action ->
-            OutlinedButton(onClick = action.onClick, enabled = action.enabled,
+            TextButton(onClick = action.onClick, enabled = action.enabled,
                 modifier = action.modifier(), shape = RoundedCornerShape(24.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) { ActionLabel(action) }
         }

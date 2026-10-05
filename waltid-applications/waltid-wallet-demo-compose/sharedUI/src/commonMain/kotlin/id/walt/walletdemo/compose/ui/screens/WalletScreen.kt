@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.ui.screens
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.ui.components.WalletSection
@@ -173,6 +174,7 @@ internal fun WalletScreen(
         val modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding)
+            .consumeWindowInsets(contentPadding)
 
         when (state.selectedTab) {
             WalletDemoTab.Credentials -> Column(modifier) {
