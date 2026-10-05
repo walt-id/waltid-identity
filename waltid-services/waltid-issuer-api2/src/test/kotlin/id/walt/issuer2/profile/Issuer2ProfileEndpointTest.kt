@@ -617,6 +617,7 @@ class Issuer2ProfileEndpointTest {
         val MDOC_PROFILE_IDS = setOf(
             ISO_MDL_PROFILE_ID,
             ISO_PHOTO_ID_PROFILE_ID,
+            "isoPhotoIdEudi",
             "eudiPidMdoc",
             SCA_PAYMENT_CARD_MDOC_PROFILE_ID,
             "emvcoDpcMdoc",

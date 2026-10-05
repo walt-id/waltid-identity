@@ -507,6 +507,13 @@ class Issuer2MetadataEndpointTest {
     private fun assertConfiguredCredentialScenariosAreAdvertised(
         credentialIssuerMetadata: CredentialIssuerMetadata,
     ) {
+        assertEquals(
+            Issuer2CredentialScenarios.eudiConfigurationIds,
+            credentialIssuerMetadata.credentialConfigurationsSupported.filterValues {
+                it.proofTypesSupported?.get("jwt")?.keyAttestationsRequired != null
+            }.keys,
+            "Required JWT attestation must be confined to the EUDI configurations",
+        )
         Issuer2CredentialScenarios.configured.forEach { scenario ->
             val configuration = assertNotNull(
                 credentialIssuerMetadata.credentialConfigurationsSupported[scenario.credentialConfigurationId],
