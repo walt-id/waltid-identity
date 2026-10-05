@@ -25,8 +25,9 @@ fun interface MetadataJwtSigner {
                     throw IllegalArgumentException("signedMetadata key-reference could not be resolved")
                 }
                 requireNotNull(material) { "signedMetadata key-reference signing key is unavailable" }
-                if (material.certificateChainPem != null) {
-                    CertificateMetadataSigner.fromKey(material.key, material.certificateChainPem)
+                val certificateChain = signing.certificateChainPem ?: material.certificateChainPem
+                if (certificateChain != null) {
+                    CertificateMetadataSigner.fromKey(material.key, certificateChain)
                 } else {
                     JwkMetadataSigner.fromKey(material.key)
                 }

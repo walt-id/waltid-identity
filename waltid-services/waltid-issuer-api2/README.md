@@ -74,7 +74,7 @@ and signing implementation are shared with enterprise issuer2 in
 |--------|------------------|----------------------|
 | `static-jwk` | Inline private JWK JSON object | Public `jwk` |
 | `x509-chain` | Inline PKCS#8 private-key PEM and matching leaf-first PEM certificate list | `x5c` |
-| `key-reference` | Signing-capable crypto2 key returned by a deployment resolver | Public `jwk`, or `x5c` when the resolver supplies certificates |
+| `key-reference` | Signing-capable crypto2 key returned by a deployment resolver, with optional public `certificateChainPem` | Public `jwk`, or `x5c` when configuration or the resolver supplies certificates |
 
 Omitting `signedMetadata` preserves the existing token-key behavior. Only the three strategies
 above are accepted; there are no file-path fields or separate algorithm settings.
@@ -150,10 +150,33 @@ registry or an already-configured KMS provider; references are not interpreted a
 The stock standalone startup does not register a resolver automatically. Selecting
 `key-reference` without one fails initialization, as does an unresolved or unusable key.
 
+To use `x5c` with a referenced private key, add `certificateChainPem` to the same method:
+
+```hocon
+signedMetadata {
+  signingMethod {
+    type = "key-reference"
+    reference = "metadata-signing-key"
+    certificateChainPem = ["""
+-----BEGIN CERTIFICATE-----
+<matching leaf certificate Base64 contents>
+-----END CERTIFICATE-----
+"""]
+  }
+}
+```
+
+This configuration contains only the key reference and public certificates. The private
+key stays with the resolver's signing provider. Include intermediate certificates as
+subsequent list entries when needed. An explicitly configured chain takes precedence over
+certificates returned by the resolver; an invalid configured chain fails initialization
+without falling back. If the field is omitted or null, resolver-provided certificates are
+used when present, otherwise metadata retains the public-JWK header.
+
 Resolution happens once at initialization. No private-key export is required. Without a
 certificate chain the key must export public JWK material, and its thumbprint becomes the
 published `kid`. With a chain, the leaf provides the public verification key, so even public
-export from the signer is optional. The returned chain must match the resolved signer; an
+export from the signer is optional. The selected chain must match the resolved signer; an
 empty list is rejected.
 
 Algorithm selection uses the key's declared algorithm, otherwise crypto2's default for its

@@ -3,6 +3,7 @@ package id.walt.openid4vci.metadata.issuer.signing
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlin.jvm.JvmOverloads
 
 /** One signing strategy, initialized by the embedding service. Omit this config to reuse its token key. */
 @Serializable
@@ -38,9 +39,17 @@ sealed interface MetadataSigningMethod {
 
     @Serializable
     @SerialName("key-reference")
-    data class KeyReference(val reference: String) : MetadataSigningMethod {
+    data class KeyReference @JvmOverloads constructor(
+        val reference: String,
+        /** Optional public chain, leaf first. Overrides certificates supplied by the resolver. */
+        val certificateChainPem: List<String>? = null,
+    ) : MetadataSigningMethod {
         init {
             require(reference.isNotBlank()) { "Metadata signing key reference must not be blank" }
+            require(certificateChainPem == null ||
+                certificateChainPem.isNotEmpty() && certificateChainPem.all { it.isNotBlank() }) {
+                "signedMetadata.certificateChainPem must contain PEM certificates, leaf first"
+            }
         }
 
         override fun toString(): String = "MetadataSigningMethod.KeyReference([redacted])"

@@ -70,6 +70,8 @@ class Issuer2ServiceConfigTest {
             """{ type = "x509-chain", privateKeyPem = "synthetic", certificateChainPem = ["leaf", "intermediate"] }""" to
                 MetadataSigningMethod.X509Chain("synthetic", listOf("leaf", "intermediate")),
             """{ type = "key-reference", reference = "metadata-key" }""" to MetadataSigningMethod.KeyReference("metadata-key"),
+            """{ type = "key-reference", reference = "metadata-key", certificateChainPem = ["leaf", "intermediate"] }""" to
+                MetadataSigningMethod.KeyReference("metadata-key", listOf("leaf", "intermediate")),
         )
         for ((method, expected) in cases) {
             clearIssuer2TestEnvironment()
@@ -129,7 +131,10 @@ class Issuer2ServiceConfigTest {
             """{ type = "x509-chain", privateKeyPem = "secret-inline-key", certificateChainPem = "chain" }""",
             """{ type = "key-reference" }""",
             """{ type = "key-reference", reference = " " }""",
-            """{ type = "key-reference", reference = "key", certificateChainPem = ["chain"] }""",
+            """{ type = "key-reference", reference = "key", certificateChainPem = [] }""",
+            """{ type = "key-reference", reference = "key", certificateChainPem = [" "] }""",
+            """{ type = "key-reference", reference = "key", certificateChainPem = "chain" }""",
+            """{ type = "key-reference", reference = "key", privateKeyPem = "secret-inline-key" }""",
             """"secret-inline-key"""",
         )
         for (method in methods) {
