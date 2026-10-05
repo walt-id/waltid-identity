@@ -1,8 +1,9 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.errors.StatusException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.VerifiableCredentialIdentifier
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.AccountNotFoundException
 import id.walt.ktorauthnz.exceptions.AuthSessionStateException
 import id.walt.ktorauthnz.exceptions.AuthenticationFailureException
@@ -50,18 +51,18 @@ object VerifiableCredential : AuthenticationMethod("vc") {
             contentType(ContentType.Application.Json)
             setBody(config.setup)
         }
-        check(response.status.isSuccess()) { "Verifier refused the verification session: ${response.status} ${response.bodyAsText()}" }
+        if (!response.status.isSuccess()) throw StatusException(502, "The verifier refused the verification session: ${response.status}")
         val created = response.body<JsonObject>()
-        val sessionId = created["sessionId"]?.jsonPrimitive?.contentOrNull ?: error("Verifier answered no sessionId")
+        val sessionId = created["sessionId"]?.jsonPrimitive?.contentOrNull ?: throw StatusException(502, "The verifier answered no sessionId")
         val url = (created["bootstrapAuthorizationRequestUrl"] ?: created["fullAuthorizationRequestUrl"])?.jsonPrimitive?.contentOrNull
-            ?: error("Verifier answered no authorization request URL")
+            ?: throw StatusException(502, "The verifier answered no authorization request URL")
         return sessionId to Url(url)
     }
 
     /** The verifier2 session, as its `info` endpoint shows it. */
     suspend fun verification(config: VerifiableCredentialAuthConfiguration, verifierSessionId: String): JsonObject {
         val response = http.get(config.endpoint("$verifierSessionId/info"))
-        check(response.status.isSuccess()) { "Verifier has no session $verifierSessionId: ${response.status}" }
+        if (!response.status.isSuccess()) throw StatusException(502, "The verifier has no session $verifierSessionId: ${response.status}")
         return response.body()
     }
 
