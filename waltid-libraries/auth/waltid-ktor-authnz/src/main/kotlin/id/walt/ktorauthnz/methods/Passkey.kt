@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.tenants.currentAuthnzTenant
 import com.webauthn4j.WebAuthnManager
 import com.webauthn4j.converter.AttestedCredentialDataConverter
 import com.webauthn4j.converter.util.ObjectConverter
@@ -53,32 +54,41 @@ object Passkey : AuthenticationMethod("passkey") {
     private val webAuthn = WebAuthnManager.createNonStrictWebAuthnManager(objectConverter)
     private val challengeLifetime = 5.minutes
 
-    internal val settings: PasskeySettings
-        get() = KtorAuthnzManager.passkeys ?: error("Passkeys need their relying party: set `passkeys` when installing KtorAuthnz")
+    /** The relying party of the current call: the tenant's, if set per tenant, otherwise the one of the application. */
+    internal suspend fun settings(): PasskeySettings =
+        KtorAuthnzManager.passkeysPerTenant?.invoke(currentAuthnzTenant())
+            ?: KtorAuthnzManager.passkeys
+            ?: error("Passkeys need their relying party: set `passkeys` when installing KtorAuthnz")
 
     /** Signature algorithms offered for new passkeys: ES256, EdDSA, RS256. */
     private val algorithms = listOf(COSEAlgorithmIdentifier.ES256, COSEAlgorithmIdentifier.EdDSA, COSEAlgorithmIdentifier.RS256)
 
     /** A new single-use challenge for [purpose]; base64url. */
+    /** Challenges are issued for a purpose within a tenant, and only answer that purpose in that tenant. */
+    private suspend fun scoped(purpose: String) = listOfNotNull(currentAuthnzTenant(), purpose).joinToString(":")
+
     internal suspend fun newChallenge(purpose: String): String {
         val challenge = base64Url.encode(ByteArray(32).also { random.nextBytes(it) })
-        KtorAuthnzManager.expiringStore.put("passkey-challenge:$challenge", purpose, challengeLifetime)
+        KtorAuthnzManager.expiringStore.put("passkey-challenge:$challenge", scoped(purpose), challengeLifetime)
         return challenge
     }
 
     /** Takes the challenge a response signed: it must have been issued for [purpose], and works once. */
     private suspend fun takeChallenge(challenge: ByteArray, purpose: String) {
+        val scopedPurpose = scoped(purpose)
         val key = "passkey-challenge:${base64Url.encode(challenge)}"
         val store = KtorAuthnzManager.expiringStore
         val issuedFor = store.get(key)
-        if (issuedFor != purpose || !store.putIfAbsent("$key:used", "used", challengeLifetime)) throw InvalidChallengeException()
+        if (issuedFor != scopedPurpose || !store.putIfAbsent("$key:used", "used", challengeLifetime)) throw InvalidChallengeException()
         store.remove(key)
     }
 
-    private fun serverProperty(challenge: ByteArray) =
+    private fun serverProperty(challenge: ByteArray, settings: PasskeySettings) =
         ServerProperty(settings.origins.map(::Origin).toSet(), settings.rpId, DefaultChallenge(challenge))
 
-    internal fun registrationOptions(challenge: String, accountId: String, userName: String, excludeCredentials: List<String>) = buildJsonObject {
+    internal suspend fun registrationOptions(challenge: String, accountId: String, userName: String, excludeCredentials: List<String>): JsonObject {
+        val settings = settings()
+        return buildJsonObject {
         putJsonObject("rp") { put("id", settings.rpId); put("name", settings.rpName) }
         putJsonObject("user") {
             put("id", base64Url.encode(accountId.toByteArray()))
@@ -95,6 +105,7 @@ object Passkey : AuthenticationMethod("passkey") {
             put("userVerification", if (settings.requireUserVerification) "required" else "preferred")
         }
         put("attestation", "none")
+        }
     }
 
     /** Verifies a registration response for [accountId]; returns the new passkey's identifier and stored data. */
@@ -103,12 +114,13 @@ object Passkey : AuthenticationMethod("passkey") {
             .getOrElse { throw IllegalArgumentException("Invalid passkey registration response: ${it.message}", it) }
         val challenge = parsed.collectedClientData?.challenge?.value ?: throw InvalidChallengeException()
         takeChallenge(challenge, "register:$accountId")
+        val settings = settings()
 
         val verified = try {
             webAuthn.verify(
                 parsed,
                 RegistrationParameters(
-                    serverProperty(challenge),
+                    serverProperty(challenge, settings),
                     algorithms.map { PublicKeyCredentialParameters(PublicKeyCredentialType.PUBLIC_KEY, it) },
                     settings.requireUserVerification,
                     true,
@@ -135,6 +147,7 @@ object Passkey : AuthenticationMethod("passkey") {
             .getOrElse { throw IllegalArgumentException("Invalid passkey response: ${it.message}", it) }
         val challenge = parsed.collectedClientData?.challenge?.value ?: throw InvalidChallengeException()
         takeChallenge(challenge, "login")
+        val settings = settings()
 
         val identifier = PasskeyIdentifier(base64Url.encode(parsed.credentialId))
         val accountId = identifier.resolveIfExists() ?: throw AuthenticationFailureException("Unknown passkey")
@@ -149,7 +162,7 @@ object Passkey : AuthenticationMethod("passkey") {
         val verified = try {
             webAuthn.verify(
                 parsed,
-                AuthenticationParameters(serverProperty(challenge), record, listOf(parsed.credentialId), settings.requireUserVerification, true)
+                AuthenticationParameters(serverProperty(challenge, settings), record, listOf(parsed.credentialId), settings.requireUserVerification, true)
             )
         } catch (e: VerificationException) {
             throw AuthenticationFailureException("Passkey verification failed: ${e.message}")
@@ -171,6 +184,7 @@ object Passkey : AuthenticationMethod("passkey") {
                 description = "PublicKeyCredentialRequestOptions (WebAuthn JSON) for navigator.credentials.get()"
                 response { HttpStatusCode.OK to { body<JsonObject>() } }
             }) {
+                val settings = settings()
                 call.respond(buildJsonObject {
                     put("challenge", newChallenge("login"))
                     put("rpId", settings.rpId)
