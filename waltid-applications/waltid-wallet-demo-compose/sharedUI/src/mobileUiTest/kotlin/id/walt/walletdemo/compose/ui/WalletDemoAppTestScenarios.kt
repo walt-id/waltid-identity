@@ -210,6 +210,43 @@ class WalletDemoAppTestScenarios(
         assertFalse(pinStore.isBiometricUnlockEnabled())
     }
 
+    fun scannerPastePreservesEditsAndNeverStartsAFlow() = runComposeUiTest {
+        val url = "openid-credential-offer://mock"
+        val gate = CompletableDeferred<ClipEntry?>()
+        var reads = 0
+        var opened = false
+        val clipboard = object : Clipboard {
+            override suspend fun getClipEntry(): ClipEntry? = when (++reads) {
+                1 -> gate.await()
+                2 -> plainTextClipEntry(url)
+                3 -> null
+                else -> error("Clipboard permission denied")
+            }
+            override suspend fun setClipEntry(clipEntry: ClipEntry?) = Unit
+        }
+        setWalletContent {
+            CompositionLocalProvider(LocalClipboard provides clipboard) {
+                id.walt.walletdemo.compose.ui.screens.WalletScanScreen(onBack = {},
+                    onOpen = { _, _ -> opened = true }, initialInput = "Original")
+            }
+        }
+        onNodeWithText("Paste link").performClick().assertIsNotEnabled()
+        onNodeWithTag(WalletUiTestTags.ScanInput).performTextReplacement("Edited while waiting")
+        gate.complete(plainTextClipEntry(url))
+        waitUntil { !onNodeWithText("Paste link").fetchSemanticsNode().config.contains(SemanticsProperties.Disabled) }
+        onNodeWithTag(WalletUiTestTags.ScanInput).assertTextContains("Edited while waiting")
+        onNodeWithText("Paste link").performClick()
+        onNodeWithTag(WalletUiTestTags.ScanInput).assertTextContains(url)
+        onNodeWithTag(WalletUiTestTags.ScanContinue).assertIsEnabled()
+        onNodeWithText("Paste link").performClick()
+        onNodeWithText("There is no text in the clipboard.").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.ScanInput).assertTextContains(url)
+        onNodeWithText("Paste link").performClick()
+        onNodeWithText("Could not paste this link. Paste it into the field and try again.").assertIsDisplayed()
+        assertFalse(opened)
+        assertEquals(4, reads)
+    }
+
     fun scannerResolvesWebLinksAndKeepsFailureRecoverable() = runComposeUiTest {
         var calls = 0
         var opened: id.walt.walletdemo.compose.logic.ResolvedWalletLink? = null

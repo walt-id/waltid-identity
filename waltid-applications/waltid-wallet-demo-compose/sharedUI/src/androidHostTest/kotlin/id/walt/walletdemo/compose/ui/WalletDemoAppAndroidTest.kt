@@ -21,6 +21,8 @@ class WalletDemoAppAndroidTest {
     @Test fun pinSetupRequiresFourDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresFourDigitsAndMatchingConfirmation()
     @Test fun pinConfirmationPromptsBiometricsAndDeclineCompletesSetup() = scenarios.pinConfirmationPromptsBiometricsAndDeclineCompletesSetup()
 
+    @Test fun scannerPastePreservesEditsAndNeverStartsAFlow() = scenarios.scannerPastePreservesEditsAndNeverStartsAFlow()
+
     @Test fun scannerResolvesWebLinksAndKeepsFailureRecoverable() = scenarios.scannerResolvesWebLinksAndKeepsFailureRecoverable()
 
     @Test fun scannerBackCancelsLinkResolution() = scenarios.scannerBackCancelsLinkResolution()
