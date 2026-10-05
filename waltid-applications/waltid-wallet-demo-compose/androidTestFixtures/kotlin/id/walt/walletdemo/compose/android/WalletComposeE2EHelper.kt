@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.android
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.StaleObjectException
@@ -14,6 +15,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import java.io.ByteArrayOutputStream
+import java.util.regex.Pattern
 
 internal object WalletComposeE2EHelper {
     private val walletPackage: String get() = InstrumentationRegistry.getArguments().getString("targetAppId")
@@ -393,18 +395,18 @@ internal object WalletComposeE2EHelper {
             try {
                 findVisibleResource(device, tag)?.let { return it }
                 device.findObject(By.res(tag))?.let { return it }
+                if (towardBottom) device.scrollDown() else device.scrollUp()
+                stepsInDirection++
+                if (stepsInDirection == 6) {
+                    towardBottom = !towardBottom
+                    stepsInDirection = 0
+                }
             } catch (_: StaleObjectException) {
-                // Compose replaces the accessibility tree during rotation and recreation.
-            }
-            if (towardBottom) device.scrollDown() else device.scrollUp()
-            stepsInDirection++
-            if (stepsInDirection == 6) {
-                towardBottom = !towardBottom
-                stepsInDirection = 0
+                // Re-query the target and all scroll-container bounds after Compose replaces a node.
             }
             Thread.sleep(200)
         }
-        return findResourceAfterScrolling(device, tag)
+        return null
     }
 
     fun assertResourceVisibleAfterScrolling(
@@ -430,13 +432,32 @@ internal object WalletComposeE2EHelper {
     private fun claimTag(path: String): String =
         "wallet.claim.${path.map { if (it.isLetterOrDigit()) it else '_' }.joinToString("")}"
 
+    /** Every card tag currently in the tree, sweeping the list so off-screen cards are included. */
+    fun UiDevice.credentialCardTags(): Set<String> {
+        val cardTag = Pattern.compile("wallet\\.credentialCard\\..*")
+        val tags = mutableSetOf<String>()
+        fun collect() {
+            findObjects(By.res(cardTag))
+                .mapNotNullTo(tags) { runCatching { it.resourceName }.getOrNull() }
+        }
+        collect()
+        repeat(6) {
+            scrollDown()
+            collect()
+        }
+        repeat(6) { scrollUp() }
+        return tags
+    }
+
     internal fun UiDevice.scrollDown() = scrollContent(towardBottom = true)
 
     internal fun UiDevice.scrollUp() = scrollContent(towardBottom = false)
 
     private fun UiDevice.scrollContent(towardBottom: Boolean) {
         // Review actions are fixed below the scroll viewport, especially on compact devices.
-        val bounds = findObjects(By.pkg(walletPackage).scrollable(true)).map { it.visibleBounds }
+        val bounds = findObjects(By.pkg(walletPackage).scrollable(true)).mapNotNull {
+            try { it.visibleBounds } catch (_: StaleObjectException) { null }
+        }
             .filter { it.width() > 0 && it.height() > 0 }
             .maxByOrNull { it.width().toLong() * it.height() }
         val x = bounds?.centerX() ?: displayWidth / 2
@@ -453,7 +474,10 @@ internal object WalletComposeE2EHelper {
             }
             ?: "UNKNOWN"
     } catch (_: StaleObjectException) {
-        // A screen transition invalidated the node; the next poll reads the new tree.
+        // Discard stale accessibility data so the next poll reads the current screen.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            InstrumentationRegistry.getInstrumentation().uiAutomation.clearCache()
+        }
         "UNKNOWN"
     }
 

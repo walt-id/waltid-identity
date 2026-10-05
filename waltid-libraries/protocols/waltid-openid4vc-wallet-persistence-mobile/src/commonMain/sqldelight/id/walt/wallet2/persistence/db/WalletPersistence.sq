@@ -89,6 +89,21 @@ VALUES (?, ?, ?, ?, ?);
 deleteIssuanceSessionRecordById:
 DELETE FROM issuance_session_records WHERE record_id = ?;
 
+compareAndSetIssuanceSessionRecord:
+UPDATE issuance_session_records
+SET session_id = :replacement_session_id, kind = :replacement_kind,
+    payload = :replacement_payload, updated_at = :replacement_updated_at
+WHERE record_id = :record_id AND session_id = :expected_session_id AND kind = :expected_kind
+    AND payload = :expected_payload AND updated_at = :expected_updated_at;
+
+issuanceSessionRecordChanges:
+SELECT changes();
+
+compareAndRemoveIssuanceSessionRecord:
+DELETE FROM issuance_session_records
+WHERE record_id = :record_id AND session_id = :expected_session_id AND kind = :expected_kind
+    AND payload = :expected_payload AND updated_at = :expected_updated_at;
+
 -- Identity operations are journaled before native or backup side effects.
 CREATE TABLE wallet_identity_records (
     wallet_id TEXT NOT NULL PRIMARY KEY,

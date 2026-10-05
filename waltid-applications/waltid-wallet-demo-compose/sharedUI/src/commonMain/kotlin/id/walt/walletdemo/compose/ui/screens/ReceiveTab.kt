@@ -32,6 +32,7 @@ internal fun ReceiveTab(
     requestDrafts: WalletRequestDrafts,
     onOfferUrlChange: (String) -> Unit,
     onTxCodeChange: (String) -> Unit,
+    onCopiesChange: (String, Int) -> Unit,
     onPreviewOffer: () -> Unit,
     onAcceptOffer: () -> Unit,
     onDeclineOffer: () -> Unit,
@@ -58,6 +59,8 @@ internal fun ReceiveTab(
                 reviewEnabled = state.offerReviewEnabled,
                 txCode = requestDrafts.txCode,
                 onTxCodeChange = onTxCodeChange,
+                copies = state.issuanceCopyCounts,
+                onCopiesChange = onCopiesChange,
                 onAccept = onAcceptOffer,
                 onDecline = onDeclineOffer,
                 showActions = false,
@@ -104,7 +107,7 @@ private fun DeferredCredentials(
             onClick = { onResumeDeferred(pending.id) },
             enabled = !state.isAuthenticating,
         ) {
-            Text("Check ${pending.credentialConfigurationId}")
+            Text("Check ${pending.credentialConfigurationId ?: "credential"}")
         }
     }
 }

@@ -13,11 +13,16 @@ interface DemoWallet {
         signingProtection: WalletDemoSigningProtection,
     ): WalletDemoSigningProtectionAvailability
     suspend fun listCredentials(): List<WalletDemoCredential>
+    suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential>
     suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?): WalletDemoIssuanceSession
-    suspend fun beginAuthorizationIssuance(sessionId: String): WalletDemoIssuanceAuthorization
+    suspend fun beginAuthorizationIssuance(
+        sessionId: String,
+        credentials: List<WalletDemoCredentialSelection>,
+    ): WalletDemoIssuanceAuthorization
     suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
         transactionCode: String?,
+        credentials: List<WalletDemoCredentialSelection>,
     ): WalletDemoIssuanceOutcome
     suspend fun continueAuthorizationIssuance(
         sessionId: String,

@@ -188,8 +188,8 @@ class Wallet2MoreUseCasesTest {
             install(ContentNegotiation) { json(json) }
             routing {
                 get("/.well-known/openid-credential-issuer") { call.respond(issuerMetadata) }
-                get("/.well-known/oauth-authorization-server") { call.respond(AuthorizationServerMetadata(issuer = issuerBase, authorizationEndpoint = "$issuerBase/authorize", tokenEndpoint = "$issuerBase/token", responseTypesSupported = setOf("code"), grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"))) }
-                get("/.well-known/openid-configuration") { call.respond(AuthorizationServerMetadata(issuer = issuerBase, authorizationEndpoint = "$issuerBase/authorize", tokenEndpoint = "$issuerBase/token", responseTypesSupported = setOf("code"), grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"))) }
+                get("/.well-known/oauth-authorization-server") { call.respond(AuthorizationServerMetadata(issuer = issuerBase, authorizationEndpoint = "$issuerBase/authorize", tokenEndpoint = "$issuerBase/token", authorizationDetailsTypesSupported = setOf("openid_credential"), responseTypesSupported = setOf("code"), grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"))) }
+                get("/.well-known/openid-configuration") { call.respond(AuthorizationServerMetadata(issuer = issuerBase, authorizationEndpoint = "$issuerBase/authorize", tokenEndpoint = "$issuerBase/token", authorizationDetailsTypesSupported = setOf("openid_credential"), responseTypesSupported = setOf("code"), grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"))) }
                 get("/credential-offer-json") { call.respond(offer) }
                 post("/nonce") {
                     val nonce = proofSupport.issueNonce()
@@ -220,7 +220,7 @@ class Wallet2MoreUseCasesTest {
                         // Store the original CredentialRequest so we can use it when polling
                         val txId = "tx-${Uuid.random()}"
                         deferredCredentials[txId] = Pair(cr.request, credentialData)
-                        call.respond(buildJsonObject { put("transaction_id", txId) })
+                        call.respond(HttpStatusCode.Accepted, buildJsonObject { put("transaction_id", txId); put("interval", 1) })
                         return@post
                     }
 
@@ -463,9 +463,9 @@ class Wallet2MoreUseCasesTest {
                     }.also { assertEquals(HttpStatusCode.Created, it.status) }
                 }
 
-                // Step 1: receive credential via wallet → issuer defers → deferredTransactionIds populated
+                // Step 1: receive credential via wallet → issuer defers → pending target retained
                 val offer = CredentialOffer.withPreAuthorizedCodeGrant(issuerBase, listOf(credConfigId), preAuthCode)
-                val receiveResult = testAndReturn("Deferred: receive returns deferredTransactionIds (no immediate credential)") {
+                val receiveResult = testAndReturn("Deferred: receive returns a pending target (no immediate credential)") {
                     http.post("/wallet/$walletId/credentials/receive") {
                         contentType(ContentType.Application.Json)
                         setBody(ReceiveCredentialRequest(offerJson = Json.encodeToJsonElement(offer).jsonObject))
@@ -473,9 +473,9 @@ class Wallet2MoreUseCasesTest {
                         .body<ReceiveCredentialResult>()
                 }
                 assertEquals(0, receiveResult.credentialIds.size, "Deferred: no immediate credential, expected 0 got ${receiveResult.credentialIds.size}")
-                assertTrue(receiveResult.deferredTransactionIds.isNotEmpty(), "Deferred: must have a transactionId")
+                assertEquals(setOf(credConfigId), receiveResult.deferredTransactionIds.keys, "Deferred: must retain the offered configuration")
 
-                val txId = receiveResult.deferredTransactionIds.values.first()
+                val txId = receiveResult.deferredTransactionIds.getValue(credConfigId)
 
                 // Step 2: get an access token for the deferred poll — exchange a second pre-auth code
                 // We call the isolated request-token endpoint with a fresh code seeded into the issuer.

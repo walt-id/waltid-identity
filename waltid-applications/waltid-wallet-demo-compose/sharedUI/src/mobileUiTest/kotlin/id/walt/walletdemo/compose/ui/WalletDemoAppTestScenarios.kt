@@ -2,6 +2,9 @@
 
 package id.walt.walletdemo.compose.ui
 
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialSelection
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialHolders
+import id.walt.walletdemo.compose.logic.WalletDemoDeferredCredential
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -503,6 +506,34 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.OfferInput).assertTextContains("")
         onNodeWithTag(WalletUiTestTags.ReceiveButton).assertIsNotEnabled()
         assertEquals(null, wallet.receivedOfferUrl)
+    }
+
+    fun batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit() = runComposeUiTest {
+        val gate = CompletableDeferred<Unit>()
+        val wallet = FakeDemoWallet(batchSize = 3, receiveGate = gate)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+        setWalletContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+        onNodeWithTag(WalletUiTestTags.ReceiveTab).performClick()
+        onNodeWithTag(WalletUiTestTags.OfferInput).performTextInput("openid-credential-offer://batch")
+        onNodeWithTag(WalletUiTestTags.ReceiveButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+        onNodeWithTag("issuance-copies-ExampleCredential").performScrollTo().assertTextEquals("Copies: 1")
+        onNodeWithTag("issuance-fewer-ExampleCredential").assertIsNotEnabled()
+        repeat(2) { onNodeWithTag("issuance-more-ExampleCredential").performClick() }
+        onNodeWithTag("issuance-copies-ExampleCredential").assertTextEquals("Copies: 3")
+        onNodeWithTag("issuance-more-ExampleCredential").assertIsNotEnabled()
+        onNodeWithTag("issuance-select-ExampleCredential").performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsNotEnabled()
+        onNodeWithTag("issuance-select-ExampleCredential").performClick()
+        onNodeWithTag("issuance-more-ExampleCredential").performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { wallet.receivedSelections != null }
+        assertEquals(WalletDemoCredentialHolders.NewKeys(2), wallet.receivedSelections?.single()?.holders)
+        onNodeWithTag("issuance-more-ExampleCredential").assertIsNotEnabled()
+        gate.complete(Unit)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.operation !is WalletOperationState.Receiving }
     }
 
     fun authorizationCodeOfferExplainsIssuerSignIn() = runComposeUiTest {
@@ -1955,6 +1986,7 @@ private class FakeDemoWallet(
     private val receiveGate: CompletableDeferred<Unit>? = null,
     private val previewGate: CompletableDeferred<Unit>? = null,
     private val transactionCodeRequired: Boolean = false,
+    private val batchSize: Int? = null,
     private val issuanceGrant: WalletDemoIssuanceGrant = WalletDemoIssuanceGrant.PreAuthorizedCode,
     private val offeredCredential: WalletDemoOfferedCredentialMetadata = WalletDemoOfferedCredentialMetadata(
         configurationId = "ExampleCredential",
@@ -2031,22 +2063,27 @@ private class FakeDemoWallet(
                 )
             },
             requiresIssuerAuthentication = issuanceGrant == WalletDemoIssuanceGrant.AuthorizationCode,
+            batchSize = batchSize,
             ),
         )
     }
 
-    override suspend fun beginAuthorizationIssuance(sessionId: String): WalletDemoIssuanceAuthorization =
+    override suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<WalletDemoCredentialSelection>): WalletDemoIssuanceAuthorization =
         WalletDemoIssuanceAuthorization("https://issuer.example/authorize")
 
     override suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
         transactionCode: String?,
+        credentials: List<WalletDemoCredentialSelection>,
     ): WalletDemoIssuanceOutcome {
         receivedOfferUrl = issuanceSources[sessionId]
+        receivedSelections = credentials
         receiveGate?.await()
-        credentialsAfterReceive?.let { credentials = it }
+        credentialsAfterReceive?.let { this.credentials = it }
         return WalletDemoIssuanceOutcome.Stored(receivedCredentialIds)
     }
+
+    var receivedSelections: List<WalletDemoCredentialSelection>? = null
 
     override suspend fun continueAuthorizationIssuance(
         sessionId: String,
@@ -2057,6 +2094,8 @@ private class FakeDemoWallet(
         issuanceSources.remove(sessionId)
         return WalletDemoIssuanceOutcome.Cancelled
     }
+
+    override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> = emptyList()
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome =
         WalletDemoIssuanceOutcome.Failed("Deferred issuance is not configured")

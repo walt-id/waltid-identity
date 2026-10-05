@@ -34,11 +34,14 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
     override suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?) =
         wallet().startIssuance(offerUrl, redirectUri, did)
 
-    override suspend fun beginAuthorizationIssuance(sessionId: String) =
-        wallet().beginAuthorizationIssuance(sessionId)
+    override suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<WalletDemoCredentialSelection>) =
+        wallet().beginAuthorizationIssuance(sessionId, credentials)
 
-    override suspend fun continuePreAuthorizedIssuance(sessionId: String, transactionCode: String?) =
-        wallet().continuePreAuthorizedIssuance(sessionId, transactionCode)
+
+    override suspend fun listDeferredIssuance() = wallet().listDeferredIssuance()
+
+    override suspend fun continuePreAuthorizedIssuance(sessionId: String, transactionCode: String?, credentials: List<WalletDemoCredentialSelection>) =
+        wallet().continuePreAuthorizedIssuance(sessionId, transactionCode, credentials)
 
     override suspend fun continueAuthorizationIssuance(sessionId: String, callbackUri: String) =
         wallet().continueAuthorizationIssuance(sessionId, callbackUri)

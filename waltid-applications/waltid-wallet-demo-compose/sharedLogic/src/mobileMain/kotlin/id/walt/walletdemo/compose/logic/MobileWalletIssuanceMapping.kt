@@ -2,11 +2,26 @@ package id.walt.walletdemo.compose.logic
 
 import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
-import id.walt.wallet2.handlers.WalletIssuanceSession
+import id.walt.wallet2.handlers.WalletIssuanceBatchSession
 import id.walt.wallet2.handlers.WalletIssuanceTransactionCode
+import id.walt.wallet2.handlers.WalletDeferredCredential
+import id.walt.wallet2.handlers.WalletIssuanceContinuation
+import id.walt.wallet2.mobile.MobileWalletCredentialSelection
+import id.walt.wallet2.mobile.MobileWalletHolderBinding
+import id.walt.wallet2.mobile.MobileWalletCredentialHolders
+
+internal fun List<WalletDemoCredentialSelection>.toMobileSelections() = map { selection ->
+    MobileWalletCredentialSelection(
+        credentialConfigurationId = selection.credentialConfigurationId,
+        holders = when (val holders = selection.holders) {
+            is WalletDemoCredentialHolders.Existing -> MobileWalletCredentialHolders.Existing(holders.bindings.map { MobileWalletHolderBinding(it.keyId, it.did) })
+            is WalletDemoCredentialHolders.NewKeys -> MobileWalletCredentialHolders.NewKeys(holders.count)
+        },
+    )
+}
 
 /** Maps a core issuance session into the demo offer-review model. */
-fun WalletIssuanceSession.toDemoIssuanceSession(): WalletDemoIssuanceSession =
+fun WalletIssuanceBatchSession.toDemoIssuanceSession(): WalletDemoIssuanceSession =
     WalletDemoIssuanceSession(
         id = id,
         grant = when (offer.grant) {
@@ -43,6 +58,7 @@ fun WalletIssuanceSession.toDemoIssuanceSession(): WalletDemoIssuanceSession =
             },
             transactionCode = offer.transactionCode?.toDemoRequirement(),
             requiresIssuerAuthentication = offer.grant == WalletIssuanceGrant.AUTHORIZATION_CODE,
+            batchSize = batchSize,
         ),
     )
 
@@ -51,17 +67,27 @@ internal fun WalletIssuanceOutcome.toDemoIssuanceOutcome(): WalletDemoIssuanceOu
         is WalletIssuanceOutcome.Stored -> WalletDemoIssuanceOutcome.Stored(credentialIds)
         is WalletIssuanceOutcome.Deferred -> WalletDemoIssuanceOutcome.Deferred(
             storedCredentialIds = storedCredentialIds,
-            credentials = credentials.map { deferred ->
-                WalletDemoDeferredCredential(
-                    id = deferred.id,
-                    credentialConfigurationId = deferred.credentialConfigurationId,
-                    intervalSeconds = deferred.intervalSeconds,
-                )
-            },
+            credentials = credentials.map { it.toDemoDeferredCredential() },
         )
         is WalletIssuanceOutcome.Cancelled -> WalletDemoIssuanceOutcome.Cancelled
-        is WalletIssuanceOutcome.Failed -> WalletDemoIssuanceOutcome.Failed(error.message)
+        is WalletIssuanceOutcome.Failed -> WalletDemoIssuanceOutcome.Failed(
+            message = error.message,
+            storedCredentialIds = storedCredentialIds,
+            deferredCredentials = deferredCredentials.map { it.toDemoDeferredCredential() },
+            failedTargetCount = if (failure == null) 0 else 1,
+            notAttemptedTargetCount = failure?.notAttempted?.size ?: 0,
+            offerConsumed = failure != null || storedCredentialIds.isNotEmpty() || deferredCredentials.isNotEmpty(),
+        )
     }
+
+internal fun WalletDeferredCredential.toDemoDeferredCredential() = WalletIssuanceContinuation(this).toDemoDeferredCredential()
+
+internal fun WalletIssuanceContinuation.toDemoDeferredCredential() = WalletDemoDeferredCredential(
+    id = id,
+    credentialConfigurationId = credentialConfigurationId,
+    credentialIdentifier = credentialIdentifier,
+    intervalSeconds = intervalSeconds,
+)
 
 private fun WalletIssuanceTransactionCode.toDemoRequirement(): WalletDemoTransactionCodeRequirement =
     WalletDemoTransactionCodeRequirement(

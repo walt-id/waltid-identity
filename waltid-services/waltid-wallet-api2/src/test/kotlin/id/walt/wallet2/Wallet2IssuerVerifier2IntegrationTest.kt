@@ -2,7 +2,9 @@ package id.walt.wallet2
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
+import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialFormat
@@ -11,6 +13,13 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.JwtVcJsonMeta
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.did.dids.DidService
+import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
+import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
+import id.walt.issuer2.application.Issuer2Module
+import id.walt.issuer2.config.CredentialProfileConfig
+import id.walt.issuer2.config.Issuer2MetadataConfig
+import id.walt.issuer2.config.Issuer2ProfilesConfig
+import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.core.OAuth2ProviderConfig
@@ -18,10 +27,13 @@ import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
+import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
+import id.walt.openid4vci.metadata.issuer.CredentialDefinition
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
+import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRecord
@@ -54,58 +66,62 @@ import id.walt.verifier2.data.Verification2Session.DefinedVerificationPolicies
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import id.walt.verifier2.verifierApi
+import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.StoredCredentialMetadata
 import id.walt.wallet2.data.WalletKeyInfo
+import id.walt.wallet2.handlers.BuildVpTokenRequest
+import id.walt.wallet2.handlers.BuildVpTokenResult
+import id.walt.wallet2.handlers.CredentialHolderBinding
+import id.walt.wallet2.handlers.GenerateBatchAuthorizationUrlRequest
+import id.walt.wallet2.handlers.GenerateBatchAuthorizationUrlResult
 import id.walt.wallet2.handlers.PresentCredentialRequest
+import id.walt.wallet2.handlers.ReceiveAuthorizedCredentialsRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
 import id.walt.wallet2.handlers.ReceiveCredentialResult
+import id.walt.wallet2.handlers.ReceiveCredentialsResult
+import id.walt.wallet2.handlers.ResolveOfferRequest
+import id.walt.wallet2.handlers.SendAuthorizationResponseRequest
+import id.walt.wallet2.handlers.WalletCredentialSelection
 import id.walt.wallet2.server.handlers.CreateWalletRequest
-import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
+import id.walt.wallet2.server.models.ResolveBatchOfferResponse
+import io.ktor.client.HttpClient
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import io.ktor.server.plugins.callid.CallId
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.*
+import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.*
 import id.walt.openid4vci.CredentialFormat as VciCredentialFormat
 
 /**
- * End-to-end integration tests: OpenID4VCI 1.0 in-process issuer → Wallet2 → Verifier2 (OpenID4VP 1.0).
- *
- * The issuer is a minimal Ktor server backed by [buildOAuth2Provider] from the
- * waltid-openid4vci library (OpenID4VCI 1.0 compliant). It runs on [issuerPort]
- * while wallet2 + verifier2 share [walletPort].
- *
- * Covered:
- *   1. EU PID as dc+sd-jwt  (vct = eu.europa.ec.eudi.pid.1) — with selective disclosure
- *   2. OpenBadge as jwt_vc_json — without selective disclosure
- *
- * Out of scope: mso_mdoc — the waltid-openid4vci library has no mdoc credential handler.
+ * In-process OpenID4VCI issuance through Wallet2 and presentation through Verifier2.
+ * The single-copy cases use a minimal issuer; the batch cases use real OSS Issuer2 routes
+ * for both grants, dataset expansion, explicit holder keys and configuration selection.
  */
 @OptIn(ExperimentalSerializationApi::class)
 class Wallet2IssuerVerifier2IntegrationTest {
 
-    // Each test gets its own pair of ports to avoid Address-already-in-use when
-    // the previous test's embedded server hasn't fully stopped yet.
-    companion object {
-    }
-
-    // Issuer signing key (ES256) — generated once at class load time
+    // Issuer signing key shared by the fixture profiles.
     private val issuerKey: JWKKey = runBlocking { JWKKey.generate(KeyType.secp256r1) }
     private val accessTokenKey: JWKKey = runBlocking { JWKKey.generate(KeyType.secp256r1) }
 
@@ -226,6 +242,189 @@ class Wallet2IssuerVerifier2IntegrationTest {
     // Core E2E runner
     // -----------------------------------------------------------------------
 
+    @Test
+    fun `pre-authorized batch retains both datasets and holder keys`() = runBatchE2EFlow(AuthenticationMethod.PRE_AUTHORIZED)
+
+    @Test
+    fun `authorized batch selects one configuration from a mixed-format offer`() = runBatchE2EFlow(AuthenticationMethod.AUTHORIZED)
+
+    private fun runBatchE2EFlow(authMethod: AuthenticationMethod) {
+        val port = freePort()
+        val baseUrl = "http://127.0.0.1:$port"
+        val redirectUri = "openid://batch-callback"
+        val profileId = "batch-profile"
+        val configurationId = "batch_identity"
+        val vct = "https://credentials.example/batch-identity"
+        val names = listOf("Alice", "Bob")
+        val configuration = CredentialConfiguration(
+            format = VciCredentialFormat.SD_JWT_VC, vct = vct, scope = configurationId,
+            cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
+            proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256"))),
+        )
+        val profile = CredentialProfileConfig(
+            name = profileId, credentialConfigurationId = configurationId,
+            issuerKey = Json.parseToJsonElement(KeySerialization.serializeKey(issuerKey)).jsonObject,
+            issuerDid = runBlocking { DidKeyRegistrar().registerByKey(issuerKey, DidKeyCreateOptions()).did },
+            credentialData = buildJsonObject { put("given_name", "Alice"); put("family_name", "Batch") },
+        )
+        val issuer = Issuer2Module(
+            Issuer2ServiceConfig(baseUrl, batchCredentialIssuance = BatchCredentialIssuance(5)),
+            Issuer2MetadataConfig(credentialConfigurations = mapOf(
+                configurationId to Json.encodeToJsonElement(configuration),
+                "unused_badge" to Json.encodeToJsonElement(configuration.copy(
+                    format = VciCredentialFormat.JWT_VC_JSON, vct = null, scope = "unused_badge",
+                    credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "OpenBadgeCredential")),
+                )),
+            )),
+            Issuer2ProfilesConfig(profiles = mapOf(profileId to profile, "unused-badge-profile" to profile.copy(
+                name = "unused-badge-profile", credentialConfigurationId = "unused_badge",
+                credentialData = buildJsonObject {
+                    put("@context", buildJsonArray { add("https://www.w3.org/2018/credentials/v1") })
+                    put("type", buildJsonArray { add("VerifiableCredential"); add("OpenBadgeCredential") })
+                    put("credentialSubject", buildJsonObject { put("given_name", "Must not be issued") })
+                },
+            ))),
+        )
+        HttpClient().use { oauthClient ->
+            E2ETest("127.0.0.1", port, failEarly = true).testBlock(
+                features = listOf(OSSWallet2FeatureCatalog, OSSVerifier2FeatureCatalog),
+                preload = {
+                    ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(publicBaseUrl = Url(baseUrl)))
+                    ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(
+                        clientMetadata = ClientMetadata(clientName = "Batch Verifier"),
+                        urlPrefix = "$baseUrl/verification-session", urlHost = "openid4vp://authorize",
+                    ))
+                },
+                init = { DidService.minimalInit() },
+                module = {
+                    combinedWalletVerifierModule()
+                    install(CallId) { generate { Uuid.random().toString() } }
+                    authentication {
+                        oauth("auth-oauth") {
+                            client = oauthClient
+                            urlProvider = { "$baseUrl/openid4vci/external/oauth/callback" }
+                            providerLookup = { OAuthServerSettings.OAuth2ServerSettings(
+                                name = "batch-test-idp", authorizeUrl = "$baseUrl/test-idp/authorize",
+                                accessTokenUrl = "$baseUrl/test-idp/token", requestMethod = HttpMethod.Post,
+                                clientId = "local-issuer", clientSecret = "local-test-only", defaultScopes = listOf("openid"),
+                            ) }
+                        }
+                    }
+                    routing {
+                        issuer.managementController.register(this)
+                        issuer.openId4VciController.register(this)
+                        get("/test-idp/authorize") {
+                            call.respondRedirect(URLBuilder(requireNotNull(call.parameters["redirect_uri"])).apply {
+                                parameters.append("code", "batch-test-code")
+                                parameters.append("state", requireNotNull(call.parameters["state"]))
+                            }.buildString())
+                        }
+                        post("/test-idp/token") {
+                            fun encoded(value: String) = Base64.UrlSafe.encode(value.encodeToByteArray()).trimEnd('=')
+                            call.respond(buildJsonObject {
+                                put("access_token", "batch-test-token"); put("token_type", "Bearer")
+                                put("id_token", "${encoded("""{"alg":"none"}""")}.${encoded("""{"sub":"batch-holder"}""")}.")
+                            })
+                        }
+                    }
+                },
+            ) {
+                testAndReturn("Batch issuance and presentation: $authMethod") {
+                    testHttpClient(doFollowRedirects = false).use { http ->
+                        val walletId = http.post("/wallet") { setBody(CreateWalletRequest()) }
+                            .also { assertEquals(HttpStatusCode.Created, it.status, it.bodyAsText()) }.body<WalletCreatedResponse>().walletId
+                        val path = "/wallet/$walletId"
+                        try {
+                            val keys = List(2) {
+                                http.post("$path/keys/generate") {
+                                    setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(KeyType.secp256r1))
+                                }.also { assertEquals(HttpStatusCode.Created, it.status, it.bodyAsText()) }.body<WalletKeyInfo>().keyId
+                            }
+                            val receipt = http.post("/issuer2/credential-offers") { setBody(buildJsonObject {
+                                put("authMethod", authMethod.name)
+                                put("valueMode", if (authMethod == AuthenticationMethod.AUTHORIZED) "BY_VALUE" else "BY_REFERENCE")
+                                if (authMethod == AuthenticationMethod.AUTHORIZED) put("issuerStateMode", "INCLUDE")
+                                put("credentials", buildJsonArray {
+                                    names.forEach { name -> add(buildJsonObject {
+                                        put("profileId", profileId)
+                                        put("runtimeOverrides", buildJsonObject {
+                                            put("credentialData", buildJsonObject { put("given_name", name); put("family_name", "Batch") })
+                                        })
+                                    }) }
+                                    if (authMethod == AuthenticationMethod.AUTHORIZED) add(buildJsonObject { put("profileId", "unused-badge-profile") })
+                                })
+                            }) }.also { assertEquals(HttpStatusCode.Created, it.status, it.bodyAsText()) }.body<JsonObject>()
+                            val offerUrl = Url(receipt.getValue("credentialOffer").jsonPrimitive.content)
+                            val preview = http.post("$path/credentials/receive/resolve-offer/batch") {
+                                setBody(ResolveOfferRequest(offerUrl))
+                            }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<ResolveBatchOfferResponse>()
+                            assertEquals(listOf(configurationId) + if (authMethod == AuthenticationMethod.AUTHORIZED) listOf("unused_badge") else emptyList(),
+                                preview.offer.credentialConfigurationIds)
+                            assertEquals(5, preview.batchSize)
+                            val selections = listOf(WalletCredentialSelection(configurationId,
+                                holderBindings = keys.map { CredentialHolderBinding(keyId = it) }))
+                            val received = if (authMethod == AuthenticationMethod.PRE_AUTHORIZED) {
+                                http.post("$path/credentials/receive") { setBody(ReceiveCredentialRequest(offerUrl, credentials = selections)) }
+                            } else {
+                                val authorization = http.post("$path/credentials/receive/authorization-url/batch") {
+                                    setBody(GenerateBatchAuthorizationUrlRequest(offerUrl = offerUrl, credentialConfigurationIds = listOf(configurationId),
+                                        clientId = "wallet-client", redirectUri = Url(redirectUri)))
+                                }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<GenerateBatchAuthorizationUrlResult>()
+                                assertNotNull(authorization.authorizationUrl.parameters["authorization_details"])
+                                var callback = authorization.authorizationUrl
+                                repeat(5) {
+                                    if (!callback.toString().startsWith(redirectUri + "?")) {
+                                        val response = http.get(callback)
+                                        assertTrue(response.status in listOf(HttpStatusCode.Found, HttpStatusCode.SeeOther), response.bodyAsText())
+                                        callback = Url(assertNotNull(response.headers[HttpHeaders.Location]))
+                                    }
+                                }
+                                assertEquals(redirectUri, callback.toString().substringBefore('?'))
+                                assertEquals(authorization.state, callback.parameters["state"])
+                                http.post("$path/credentials/receive/authorized/batch") {
+                                    setBody(ReceiveAuthorizedCredentialsRequest(
+                                        credentials = selections, code = assertNotNull(callback.parameters["code"]),
+                                        codeVerifier = assertNotNull(authorization.codeVerifier), credentialIssuer = preview.offer.credentialIssuer,
+                                        credentialEndpoint = preview.offer.credentialEndpoint, nonceEndpoint = preview.offer.nonceEndpoint,
+                                        clientId = "wallet-client", redirectUri = Url(redirectUri),
+                                    ))
+                                }
+                            }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<ReceiveCredentialsResult>()
+                            assertEquals(4, received.credentialIds.size)
+                            val stored = received.credentialIds.map { id -> http.get("$path/credentials/$id")
+                                .also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<StoredCredential>() }
+                            assertEquals(2, stored.map { assertNotNull(it.holderKeyBinding).publicKeyThumbprint }.distinct().size)
+                            assertEquals(names.associateWith { 2 }, stored.map { it.credential.credentialData.getValue("given_name").jsonPrimitive.content }
+                                .groupingBy { it }.eachCount())
+                            val issuerSession = http.get("/issuer2/sessions/${receipt.getValue("offerId").jsonPrimitive.content}")
+                                .also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<JsonObject>()
+                            assertEquals(2, issuerSession.getValue("issuanceResults").jsonObject.size, "Unselected configurations must not be issued")
+                            for (credential in stored) {
+                                val session = http.post("/verification-session/create") {
+                                    setBody(CrossDeviceFlowSetup(core = GeneralFlowConfig(dcqlQuery = DcqlQuery(credentials = listOf(
+                                        CredentialQuery(id = "identity", format = CredentialFormat.DC_SD_JWT,
+                                            meta = SdJwtVcMeta(vctValues = listOf(vct)), claims = listOf(ClaimsQuery(pathStrings = listOf("given_name")))),
+                                    )))) as VerificationSessionSetup)
+                                }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<VerificationSessionCreationResponse>()
+                                val requestUrl = assertNotNull(session.bootstrapAuthorizationRequestUrl)
+                                val vp = http.post("$path/credentials/present/build-vp-token") {
+                                    setBody(BuildVpTokenRequest(requestUrl, selectedCredentialIds = mapOf("identity" to listOf(credential.id))))
+                                }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<BuildVpTokenResult>()
+                                http.post("$path/credentials/present/send-response") {
+                                    setBody(SendAuthorizationResponseRequest(requestUrl, vp.vpToken, vp.idToken))
+                                }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+                                val status = http.get("/verification-session/${session.sessionId}/info").body<Verification2Session>()
+                                assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, status.status, status.statusReason)
+                            }
+                        } finally {
+                            assertTrue(http.delete(path).status.isSuccess())
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private fun runE2EFlow(
         tag: String,
         credentialConfigId: String,
@@ -301,7 +500,8 @@ class Wallet2IssuerVerifier2IntegrationTest {
 
         val issuerMetadata = CredentialIssuerMetadata.fromBaseUrl(
             baseUrl = issuerBase,
-            credentialConfigurationsSupported = mapOf(credentialConfigId to configuration)
+            credentialConfigurationsSupported = mapOf(credentialConfigId to configuration),
+            batchCredentialIssuance = BatchCredentialIssuance(5),
             // authorizationServers deliberately NOT set — IssuerMetadataResolver has a bug
             // when authorizationServers is set and resolution fails (Unit cast to AS metadata).
             // Instead we let the fallback path run which calls resolveAuthorizationServerMetadata
@@ -516,7 +716,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
                             "Receive failed: ${it.body<String>()}"
                         )
                     }.body<ReceiveCredentialResult>()
-                        .also { assertTrue(it.credentialIds.isNotEmpty(), "No credential stored") }
+                        .also { assertEquals(1, it.credentialIds.size, "Single receive must retain the default one copy") }
                 }
 
                 // 3. Credential is visible in wallet

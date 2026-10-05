@@ -718,7 +718,8 @@ class Wallet2AdditionalUseCasesTest {
                             authorizationEndpoint = "$issuerBase/authorize",
                             tokenEndpoint = "$issuerBase/token",
                             responseTypesSupported = setOf("code"),
-                            grantTypesSupported = setOf("authorization_code")
+                            grantTypesSupported = setOf("authorization_code"),
+                            authorizationDetailsTypesSupported = setOf("openid_credential")
                         )
                     )
                 }
@@ -729,7 +730,8 @@ class Wallet2AdditionalUseCasesTest {
                             authorizationEndpoint = "$issuerBase/authorize",
                             tokenEndpoint = "$issuerBase/token",
                             responseTypesSupported = setOf("code"),
-                            grantTypesSupported = setOf("authorization_code")
+                            grantTypesSupported = setOf("authorization_code"),
+                            authorizationDetailsTypesSupported = setOf("openid_credential")
                         )
                     )
                 }

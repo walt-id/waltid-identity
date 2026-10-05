@@ -44,7 +44,8 @@ val WalletDemoUiState.offerReviewEnabled: Boolean
     get() = !isBusy && offerPreview != null
 
 val WalletDemoUiState.acceptOfferEnabled: Boolean
-    get() = offerReviewEnabled && (offerPreview?.transactionCode?.accepts(requestDrafts.txCode) ?: true)
+    get() = offerReviewEnabled && (offerPreview?.transactionCode?.accepts(requestDrafts.txCode) ?: true) &&
+        offerPreview?.offeredCredentials?.any { (issuanceCopyCounts[it.configurationId] ?: 1) > 0 } == true
 
 val WalletDemoUiState.presentationUrlEntryEnabled: Boolean
     get() = !isBusy && presentationReview == null
