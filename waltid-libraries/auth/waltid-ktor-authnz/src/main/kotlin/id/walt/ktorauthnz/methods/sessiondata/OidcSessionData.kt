@@ -88,3 +88,11 @@ data class EmailCodeSessionData(
     val accountId: String?,
     val email: String?,
 ) : SessionData
+
+/** A TOTP secret being set up during login, until a code from the authenticator app confirms it. */
+@Serializable
+@SerialName("totp-setup")
+data class TotpSetupSessionData(
+    val secret: String,
+    val expiresAt: kotlin.time.Instant,
+) : SessionData
