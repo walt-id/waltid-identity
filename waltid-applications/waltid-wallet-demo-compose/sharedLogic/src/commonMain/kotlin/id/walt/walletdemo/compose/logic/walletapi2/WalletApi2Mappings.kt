@@ -5,6 +5,8 @@ import id.walt.walletdemo.compose.logic.CredentialDisplayNormalizer
 import id.walt.walletdemo.compose.logic.CredentialDisplayVocabulary
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialClaimMetadata
+import id.walt.walletdemo.compose.logic.WalletDemoDeferredCredential
+import id.walt.walletdemo.compose.logic.WalletDemoIssuanceOutcome
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
 import id.walt.walletdemo.compose.logic.WalletDemoIssuerMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
@@ -41,7 +43,7 @@ internal val walletApi2Json = Json {
     explicitNulls = false
 }
 
-internal fun ResolveOfferDetailedResponseDto.toDemoPreview(): WalletDemoOfferPreview =
+internal fun ResolveOfferDetailedResponseDto.toDemoPreview(batchSize: Int? = null): WalletDemoOfferPreview =
     WalletDemoOfferPreview(
         issuer = WalletDemoIssuerMetadata(
             credentialIssuer = issuer.credentialIssuer,
@@ -65,6 +67,7 @@ internal fun ResolveOfferDetailedResponseDto.toDemoPreview(): WalletDemoOfferPre
         },
         transactionCode = transactionCode?.toDemoRequirement(),
         requiresIssuerAuthentication = toDemoGrant() == WalletDemoIssuanceGrant.AuthorizationCode,
+        batchSize = batchSize,
     )
 
 internal fun List<WalletDemoPresentationDisclosureSelection>.toDisclosureSelectionDtos(): List<DisclosureSelectionDto> =
@@ -75,14 +78,6 @@ internal fun List<WalletDemoPresentationDisclosureSelection>.toDisclosureSelecti
             path = selection.path,
         )
     }
-
-internal suspend fun replaceWalletAfterSuccessfulDelete(
-    deleteCurrent: suspend () -> Unit,
-    createReplacement: suspend () -> String,
-): String {
-    deleteCurrent()
-    return createReplacement()
-}
 
 internal fun ResolveOfferDetailedResponseDto.toDemoGrant(): WalletDemoIssuanceGrant {
     val grant = grantType.orEmpty()
@@ -283,4 +278,38 @@ private fun jsonElementAsString(value: JsonElement?): String? = when (value) {
     null -> null
     is JsonPrimitive -> value.content
     else -> value.toString()
+}
+
+internal fun DeferredCredentialHandleDto.toDemoDeferred() = WalletDemoDeferredCredential(
+    id = id, credentialConfigurationId = credentialConfigurationId,
+    intervalSeconds = intervalSeconds, credentialIdentifier = credentialIdentifier,
+)
+
+internal fun ReceiveCredentialResultDto.toOutcome(): WalletDemoIssuanceOutcome {
+    val pending = deferredCredentials.map {
+        WalletDemoDeferredCredential(it.deferredCredentialId, it.credentialConfigurationId,
+            it.intervalSeconds, it.credentialIdentifier)
+    } + storageOutcome?.deferredCredentials.orEmpty().map { it.toDemoDeferred() }
+    return when {
+        failure != null -> WalletDemoIssuanceOutcome.Failed(
+            message = "Credential issuance stopped during ${failure.stage.lowercase()}",
+            storedCredentialIds = credentialIds, deferredCredentials = pending, offerConsumed = true,
+            failedTargetCount = 1, notAttemptedTargetCount = failure.notAttempted.size,
+        )
+        pending.isNotEmpty() -> WalletDemoIssuanceOutcome.Deferred(credentialIds, pending)
+        else -> WalletDemoIssuanceOutcome.Stored(credentialIds)
+    }
+}
+
+internal fun DeferredIssuanceOutcomeDto.toOutcome(): WalletDemoIssuanceOutcome = when (this) {
+    is DeferredIssuanceOutcomeDto.Stored -> WalletDemoIssuanceOutcome.Stored(credentialIds)
+    is DeferredIssuanceOutcomeDto.Deferred -> WalletDemoIssuanceOutcome.Deferred(
+        storedCredentialIds, credentials.map { it.toDemoDeferred() })
+    is DeferredIssuanceOutcomeDto.Failed -> WalletDemoIssuanceOutcome.Failed(
+        message = error.message, storedCredentialIds = storedCredentialIds,
+        failedTargetCount = if (failure == null) 0 else 1,
+        notAttemptedTargetCount = failure?.notAttempted?.size ?: 0,
+        deferredCredentials = deferredCredentials.map { it.toDemoDeferred() }, offerConsumed = true,
+    )
+    DeferredIssuanceOutcomeDto.Cancelled -> WalletDemoIssuanceOutcome.Cancelled
 }

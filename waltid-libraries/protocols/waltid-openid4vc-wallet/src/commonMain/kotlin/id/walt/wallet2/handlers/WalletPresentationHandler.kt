@@ -8,6 +8,9 @@ import id.waltid.openid4vp.wallet.presentation.ScaPresentationAuthorizer
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Mutex
 import kotlin.time.TimeSource
+import id.waltid.openid4vp.wallet.CredentialPresentationKey
+import id.waltid.openid4vp.wallet.CredentialPresentationKeyResolver
+
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.keys.KeyUsage
@@ -1252,8 +1255,28 @@ object WalletPresentationHandler {
         scaAuthorizer: WalletScaPresentationAuthorizer? = null,
     ): Result<WalletPresentResult> = memoizedSelection(selectCredentialsForQuery).let { selectOnce ->
         keyMaterial.crypto2Key?.let { crypto2Key ->
-        WalletPresentFunctionality2.walletPresentHandling(
-            holderKey = crypto2Key,
+            WalletPresentFunctionality2.walletPresentHandling(
+                holderKey = crypto2Key,
+                holderDid = holderDid,
+                presentationRequestUrl = presentationRequestUrl,
+                selectCredentialsForQuery = selectOnce,
+                holderPoliciesToRun = null,
+                runPolicies = runPolicies,
+                transactionDataTypeRegistry = transactionDataTypeRegistry,
+                resolvedAuthorizationRequest = resolvedAuthorizationRequest,
+                clientIdTrustConfiguration = clientIdTrustConfiguration,
+                beforeCredentialsUsed = beforeCredentialsUsed,
+                expectedRequestObjectAudience = expectedRequestObjectAudience,
+                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+                scaAuthorizer = scaAuthorizer?.let { authorizer ->
+                    ScaPresentationAuthorizer { authorizer.authorize(crypto2Key, it) }
+                },
+                credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(isolatedCredentialsById, scaAuthorizer),
+            )
+        } ?: WalletPresentFunctionality2.walletPresentHandling(
+            holderKey = requireNotNull(keyMaterial.legacyKey) {
+                "Key '${keyMaterial.keyId}' has no usable signing representation"
+            },
             holderDid = holderDid,
             presentationRequestUrl = presentationRequestUrl,
             selectCredentialsForQuery = selectOnce,
@@ -1261,45 +1284,34 @@ object WalletPresentationHandler {
             runPolicies = runPolicies,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             resolvedAuthorizationRequest = resolvedAuthorizationRequest,
+            holderCrypto2Key = null,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             beforeCredentialsUsed = beforeCredentialsUsed,
-            mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(isolatedCredentialsById),
             expectedRequestObjectAudience = expectedRequestObjectAudience,
             unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
-            scaAuthorizer = scaAuthorizer?.let { authorizer ->
-                ScaPresentationAuthorizer { authorizer.authorize(crypto2Key, it) }
-            },
+            credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(isolatedCredentialsById),
+            scaAuthorizer = null,
         )
-    } ?: WalletPresentFunctionality2.walletPresentHandling(
-        holderKey = requireNotNull(keyMaterial.legacyKey) {
-            "Key '${keyMaterial.keyId}' has no usable signing representation"
-        },
-        holderDid = holderDid,
-        presentationRequestUrl = presentationRequestUrl,
-        selectCredentialsForQuery = selectOnce,
-        holderPoliciesToRun = null,
-        runPolicies = runPolicies,
-        transactionDataTypeRegistry = transactionDataTypeRegistry,
-        resolvedAuthorizationRequest = resolvedAuthorizationRequest,
-        holderCrypto2Key = null,
-        clientIdTrustConfiguration = clientIdTrustConfiguration,
-        beforeCredentialsUsed = beforeCredentialsUsed,
-        mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(isolatedCredentialsById),
-        expectedRequestObjectAudience = expectedRequestObjectAudience,
-        unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
-    )
     }
 
-    private fun Wallet.mdocHolderKeyResolver(
+    private fun Wallet.credentialHolderKeyResolver(
         isolatedCredentialsById: Map<String, StoredCredential> = emptyMap(),
-    ): suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key = { credentialId, _ ->
-        val isolated = isolatedCredentialsById[credentialId]
-        val resolved = if (isolated != null) {
-            resolveHolderKey(isolated, setOf(KeyUsage.SIGN))
-        } else {
-            resolveHolderKey(credentialId, setOf(KeyUsage.SIGN))
+        scaAuthorizer: WalletScaPresentationAuthorizer? = null,
+    ): CredentialPresentationKeyResolver = CredentialPresentationKeyResolver { credentialId, credential ->
+        val stored = isolatedCredentialsById[credentialId] ?: findCredential(credentialId)
+        if (stored?.holderKeyBinding == null && WalletPresentationFormatRegistry.resolve(credential.format) !=
+            WalletPresentationFormatRegistry.SupportedFormat.MSO_MDOC) null else {
+            val key = (stored?.let { resolveHolderKey(it, setOf(KeyUsage.SIGN)) }
+                ?: resolveHolderKey(credentialId, setOf(KeyUsage.SIGN))).keyMaterial.requireCrypto2SigningKey()
+            CredentialPresentationKey(key, credential.subject,
+                scaAuthorizer?.let { authorizer ->
+                    ScaPresentationAuthorizer { authorizer.authorize(key, it) }
+                })
         }
-        resolved.keyMaterial.requireCrypto2Key()
+    }
+
+    private fun Wallet.mdocHolderKeyResolver(): suspend (String, DigitalCredential) -> Crypto2Key = { credentialId, _ ->
+        resolveHolderKey(credentialId, setOf(KeyUsage.SIGN)).keyMaterial.requireCrypto2SigningKey()
     }
 
     suspend fun submitDcApiPresentation(
@@ -1362,10 +1374,10 @@ object WalletPresentationHandler {
                 request = resolvedRequest,
                 selectCredentialsForQuery = selectCredentialsForQuery,
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
-                mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(),
                 scaAuthorizer = scaAuthorizer?.let { authorizer ->
                     ScaPresentationAuthorizer { authorizer.authorize(holderKey, it) }
                 },
+                credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(scaAuthorizer = scaAuthorizer),
             ).getOrElse { error ->
                 onEvent(WalletSessionEvent.presentation_failed)
                 throw error
@@ -1583,8 +1595,9 @@ object WalletPresentationHandler {
                 matchedCredentials = selected,
                 holderKey = crypto2Key,
                 holderDid = did,
-                mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(),
                 clientMetadata = resolvedAuthorizationRequest.effectiveClientMetadata,
+                credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(),
+                scaAuthorizer = null,
             )
         } else {
             WalletPresentFunctionality2.buildVpToken(
@@ -1596,8 +1609,9 @@ object WalletPresentationHandler {
                 holderDid = did,
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                 holderCrypto2Key = null,
-                mdocHolderKeyResolver = wallet.mdocHolderKeyResolver(),
                 clientMetadata = resolvedAuthorizationRequest.effectiveClientMetadata,
+                credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(),
+                scaAuthorizer = null,
             )
         }
         val idToken = if (crypto2Key != null) {

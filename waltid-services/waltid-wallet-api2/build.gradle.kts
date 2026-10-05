@@ -72,6 +72,7 @@ dependencies {
     testImplementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     testImplementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
     testImplementation(project(":waltid-services:waltid-verifier-api2"))
+    testImplementation(project(":waltid-services:waltid-issuer-api2"))
     testImplementation(identityLibs.ktor.server.sse)
 }
 

@@ -12,6 +12,11 @@ import id.walt.crypto2.serialization.BinaryData
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.KeyAttestationProvider
 import id.walt.wallet2.handlers.WalletPresentationHandler
+import id.walt.wallet2.handlers.WalletIssuanceSessionService
+import id.walt.wallet2.handlers.WalletIssuanceSessionState
+import io.ktor.client.HttpClient
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.merge
@@ -83,6 +88,24 @@ data class Wallet(
 ) {
     private var resolvedStaticCrypto2Key: Crypto2Key? = null
     private var keyAttestationProvider: KeyAttestationProvider? = null
+    private var issuanceSessionState: WalletIssuanceSessionState? = null
+    private var issuanceSessionService: WalletIssuanceSessionService? = null
+    private val issuanceSessionMutex = Mutex()
+
+    /** Attaches shared private state before issuance starts; engines keep their current wallet. */
+    fun attachIssuanceSessionState(state: WalletIssuanceSessionState): Wallet = apply {
+        require(state.walletId == id) { "Issuance state belongs to a different wallet" }
+        check(issuanceSessionService == null || issuanceSessionState === state) {
+            "Cannot replace issuance state after issuance starts"
+        }
+        issuanceSessionState = state
+    }
+
+    /** Shared retained engine for full REST issuance and opaque deferred handles. */
+    suspend fun issuanceSessions(httpClient: HttpClient? = null): WalletIssuanceSessionService = issuanceSessionMutex.withLock {
+        issuanceSessionService ?: WalletIssuanceSessionService(this, runtimeState = issuanceSessionState, httpClient = httpClient)
+            .also { issuanceSessionService = it }
+    }
 
     /** Attach a runtime wallet-provider service without persisting it in the wallet model. */
     fun attachKeyAttestationProvider(provider: KeyAttestationProvider): Wallet = apply {

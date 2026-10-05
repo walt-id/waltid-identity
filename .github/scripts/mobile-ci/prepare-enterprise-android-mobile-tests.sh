@@ -11,6 +11,8 @@ cd "$workspace_dir"
 "$identity_dir/gradlew" -p "$identity_dir" \
   -PenableAndroidBuild=true \
   :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleAndroidDeviceTest \
+  :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleProductionDebug \
+  :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleProductionDebugAndroidTest \
   --no-configuration-cache
 
 ./gradlew --stop
