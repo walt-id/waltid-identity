@@ -113,7 +113,15 @@ As a later step, `POST {sessionId}/email-code/send` sends a code for the account
 
 ## Current limits
 
-- `KtorAuthnz` is configured once per JVM: tenants share the token handler, session store, cookie and passkey relying
-  party (`PasskeySettings`), so passkeys work for one domain.
+- `KtorAuthnz` is configured once per JVM: tenants share the token handler, session store and cookie settings.
+- Passkeys are bound to a domain. Tenants on their own domains each need their own relying party:
+
+  ```kotlin
+  install(KtorAuthnz) {
+      passkeysPerTenant { tenant -> PasskeySettings(rpId = "$tenant.example.com", rpName = tenant!!, origins = setOf("https://$tenant.example.com")) }
+  }
+  ```
+
+  Passkey challenges answer only in the tenant they were issued for.
 - A user who has not enrolled TOTP cannot pass a flow that requires it; enrolment happens after login
   (`totpEnrollment`).
