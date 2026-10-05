@@ -77,6 +77,21 @@ class ValkeyStoresTest {
     }
 
     @Test
+    fun `an account's sessions are listed, without expired ones`() = withValkey {
+        val store = ValkeySessionStore(null, "127.0.0.1", port, null, null)
+        val account = key()
+        val flow = AuthFlow(method = "userpass", success = true)
+        val live = SessionManager.newSession(flow, persist = false).copy(status = AuthSessionStatus.SUCCESS, flows = null, accountId = account)
+        val ending = live.copy(id = key(), expiration = Clock.System.now() + 300.milliseconds)
+        val other = live.copy(id = key(), accountId = key())
+        store.storeSession(live); store.storeSession(ending); store.storeSession(other)
+
+        assertEquals(setOf(live.id, ending.id), store.listSessionsForAccount(account).map { it.id }.toSet())
+        Thread.sleep(450)
+        assertEquals(listOf(live.id), store.listSessionsForAccount(account).map { it.id })
+    }
+
+    @Test
     fun `unfinished sessions get the short lifetime`() = withValkey {
         val store = ValkeySessionStore(null, "127.0.0.1", port, null, null, pendingSessionLifetime = 300.milliseconds)
         val flow = AuthFlow(method = "userpass", success = true)
