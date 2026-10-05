@@ -4,7 +4,7 @@ import id.walt.ktorauthnz.KtorAuthnz
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.ExampleAccountStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.VerifiableCredentialIdentifier
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.attempts.AttemptLimits
 import id.walt.ktorauthnz.ephemeral.InMemoryExpiringStore
 import id.walt.ktorauthnz.flows.AuthFlow
@@ -41,6 +41,8 @@ class VerifiableCredentialLoginTest {
 
     /** The mock verifier2: one session, whose status and presented subject the test sets. */
     private var status = "IN_USE"
+    /** When set, the verifier refuses to open sessions with this status. */
+    private var refuseWith: HttpStatusCode? = null
     private var presentedSubject = "did:key:holder-${Uuid.random()}"
     private var createdWith: JsonObject? = null
 
@@ -50,6 +52,7 @@ class VerifiableCredentialLoginTest {
         routing {
             post("/verification-session/create") {
                 createdWith = call.receive<JsonObject>()
+                refuseWith?.let { call.respond(it, "refused"); return@post }
                 call.respond(buildJsonObject {
                     put("sessionId", "verifier-session-1")
                     put("bootstrapAuthorizationRequestUrl", "openid4vp://authorize?request_uri=https%3A%2F%2Fverifier%2Frequest")
@@ -146,6 +149,12 @@ class VerifiableCredentialLoginTest {
         val started = start()
         status = "SUCCESSFUL"
         assertEquals(AuthSessionStatus.SUCCESS, json.decodeFromString<AuthSessionInformation>(status(started.id).bodyAsText()).status)
+    }
+
+    @Test
+    fun `a failing verifier answers 502, not 500`() = vcTest(register = false) {
+        refuseWith = HttpStatusCode.InternalServerError
+        assertEquals(HttpStatusCode.BadGateway, client.post("/auth/vc/start").status)
     }
 
     @Test
