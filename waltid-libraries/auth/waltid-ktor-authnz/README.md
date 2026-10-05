@@ -31,7 +31,7 @@ passkeys, passwords) and protections (attempt limits, single-use challenges, rev
   OIDC issuer + subject, passkey credential id, ...) to accounts, and keeps each method's stored data (password
   hashes, TOTP secrets, passkeys). `InMemoryAccountStore` is a complete one to start with.
 - **Authentication method** (`AuthenticationMethod`): one way to prove identity; each serves routes named by its id.
-  Built in: `userpass`, `email`, `email-code`, `totp`, `recovery-code`, `passkey`, `ldap`, `radius`, `jwt`, `oidc`, `vc`,
+  Built in: `userpass`, `email`, `email-code`, `totp`, `totp-setup`, `recovery-code`, `passkey`, `ldap`, `radius`, `jwt`, `oidc`, `vc`,
   `web3`, and `identify`, which finds the account first and offers the ways it can log in.
 - **Auth flow** (`AuthFlow`): a tree of methods, e.g. a password, then TOTP or a recovery code:
 
@@ -122,6 +122,9 @@ The token is read from the `ktor-authnz-auth` header, a Bearer `Authorization` h
 
 Place inside `authenticate { }`:
 
+- `totp-setup` in a flow, next to `totp`, sets TOTP up during login for accounts that have none yet (an account
+  that has TOTP is refused there): `{"method": "email", "continue": [{"method": "totp", "success": true},
+  {"method": "totp-setup", "success": true, "config": {"issuer": "Example"}}]}`
 - `totpEnrollment(issuer = "Example")`: `totp/enroll`, `totp/enroll/confirm` (answers recovery codes), `DELETE totp`,
   `recovery-codes`
 - `passkeyEnrollment { accountId -> emailOf(accountId) }`: `passkey/register/options`, `passkey/register`,
