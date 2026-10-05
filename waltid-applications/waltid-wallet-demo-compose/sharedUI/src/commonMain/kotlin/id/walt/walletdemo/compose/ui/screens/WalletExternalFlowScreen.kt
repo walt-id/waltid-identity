@@ -30,10 +30,6 @@ internal fun WalletExternalFlowScreen(
             IconButton(onClick = onClose, enabled = state.canDismissExternalFlow,
                 modifier = Modifier.testTag("wallet.external.close")) { Icon(Icons.Default.Close, "Close request") }
         }
-        if (state.isBusy && (state.offerPreview != null || state.presentationReview != null)) {
-            LinearProgressIndicator(Modifier.fillMaxWidth())
-            Text(state.statusText, Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-        }
         if (state.externalFlow is WalletExternalFlow.UnavailableCallback) {
             Text("The original receiving session is no longer available. Check your wallet before starting again.",
                 Modifier.padding(20.dp).testTag("wallet.external.unavailable"))

@@ -6,9 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,14 +24,11 @@ import id.walt.walletdemo.compose.logic.presentationPreviewActionEnabled
 import id.walt.walletdemo.compose.logic.presentationReviewEnabled
 import id.walt.walletdemo.compose.logic.presentationUrlEntryEnabled
 import id.walt.walletdemo.compose.logic.toSharingReview
-import id.walt.walletdemo.compose.logic.isError
-import id.walt.walletdemo.compose.logic.statusText
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.PresentationErrorSection
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
-import id.walt.walletdemo.compose.ui.components.SettingsNotice
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -53,6 +48,8 @@ internal fun PresentTab(
     presentationContent: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
     fillViewport: Boolean = true,
+    feedback: (@Composable () -> Unit)? = null,
+    contextualStatus: (@Composable () -> Unit)? = null,
 ) {
     val credentials = (state.session as? WalletSessionState.Ready)?.credentials.orEmpty()
     val preview = state.presentationPreview
@@ -73,6 +70,7 @@ internal fun PresentTab(
         ReviewScaffold(
             fillViewport = fillViewport,
             modifier = modifier.testTag(WalletUiTestTags.PresentTabContent),
+            feedback = feedback,
             actions = {
                 SharingActionsRow(
                     paymentReview = state.paymentReview,
@@ -84,9 +82,7 @@ internal fun PresentTab(
                 )
             },
         ) {
-            if (state.externalFlow != null && state.isError) {
-                SettingsNotice(state.statusText, error = true, modifier = Modifier.testTag(WalletUiTestTags.Status))
-            }
+            contextualStatus?.invoke()
             SharingReviewSection(
                 paymentReview = state.paymentReview,
                 review = preview.toSharingReview(),
@@ -115,14 +111,9 @@ internal fun PresentTab(
         return
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag(WalletUiTestTags.PresentTabContent)
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
+    ReviewScaffold(modifier = modifier.testTag(WalletUiTestTags.PresentTabContent),
+        fillViewport = fillViewport, feedback = feedback) {
+        contextualStatus?.invoke()
         UrlActionSection(
             title = stringResource(Res.string.proximity_online_request),
             value = requestDrafts.presentationRequestUrl,

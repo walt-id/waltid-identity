@@ -198,6 +198,6 @@ class WalletDemoAppAndroidTest {
         scenarios.deleteFromCredentialsWhileAReviewIsActive()
 
     @Test
-    fun successStatusCanBeDismissedFromTheHeader() =
-        scenarios.successStatusCanBeDismissedFromTheHeader()
+    fun successStatusCanBeDismissedFromTheFooter() =
+        scenarios.successStatusCanBeDismissedFromTheFooter()
 }

@@ -208,6 +208,6 @@ class WalletDemoAppIosTest {
         scenarios.deleteFromCredentialsWhileAReviewIsActive()
 
     @Test
-    fun successStatusCanBeDismissedFromTheHeader() =
-        scenarios.successStatusCanBeDismissedFromTheHeader()
+    fun successStatusCanBeDismissedFromTheFooter() =
+        scenarios.successStatusCanBeDismissedFromTheFooter()
 }
