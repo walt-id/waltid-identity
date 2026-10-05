@@ -1,5 +1,7 @@
 package id.walt.issuer2.config
 
+import id.walt.openid4vci.metadata.issuer.signing.SignedMetadataConfig
+
 import com.sksamuel.hoplite.ArrayNode
 import com.sksamuel.hoplite.BooleanNode
 import com.sksamuel.hoplite.ConfigFailure
@@ -40,6 +42,9 @@ fun registerIssuer2ConfigDecoders() {
     // otherwise choose the legacy constructor and silently discard newer fields.
     ConfigManager.registerCustomDecoder(Issuer2ServiceConfigDecoder())
     ConfigManager.registerCustomDecoder(
+        Issuer2KotlinxConfigDecoder(SignedMetadataConfig::class, SignedMetadataConfig.serializer(), ignoreUnknownKeys = false),
+    )
+    ConfigManager.registerCustomDecoder(
         Issuer2KotlinxConfigDecoder(KeyAttestationConfig::class, KeyAttestationConfig.serializer()),
     )
     ConfigManager.registerCustomDecoder(
@@ -74,15 +79,26 @@ fun registerIssuer2ConfigDecoders() {
 private class Issuer2KotlinxConfigDecoder<T : Any>(
     private val supportedClass: KClass<T>,
     private val serializer: KSerializer<T>,
+    ignoreUnknownKeys: Boolean = true,
 ) : Decoder<T> {
+    private val json = Json {
+        this.ignoreUnknownKeys = ignoreUnknownKeys
+        explicitNulls = false
+    }
+
     override fun supports(type: KType): Boolean =
         type.classifier == supportedClass
 
     override fun decode(node: Node, type: KType, context: DecoderContext): ConfigResult<T> =
         try {
-            Validated.Valid(json.decodeFromJsonElement(serializer, node.toJsonElement()))
+            val element = node.toJsonElement()
+            Validated.Valid(json.decodeFromJsonElement(serializer, element))
         } catch (_: Exception) {
-            Validated.Invalid(ConfigFailure.DecodeError(node, type))
+            Validated.Invalid(
+                if (supportedClass == SignedMetadataConfig::class) {
+                    ConfigFailure.Generic("Invalid signedMetadata configuration: use signingMethod with static-jwk (inline jwk), x509-chain (inline privateKeyPem and certificateChainPem list), or key-reference (reference)")
+                } else ConfigFailure.DecodeError(node, type),
+            )
         }
 
     private fun Node.toJsonElement(): JsonElement = when (this) {
@@ -95,13 +111,6 @@ private class Issuer2KotlinxConfigDecoder<T : Any>(
         is NullNode -> JsonNull
         Undefined -> JsonNull
     }
-
-    private companion object {
-        val json = Json {
-            ignoreUnknownKeys = true
-            explicitNulls = false
-        }
-    }
 }
 
 /** Keeps Hoplite field decoding and aliases while excluding the ABI compatibility constructor. */
@@ -109,6 +118,9 @@ private class Issuer2ServiceConfigDecoder : Decoder<Issuer2ServiceConfig> {
     override fun supports(type: KType): Boolean = type.classifier == Issuer2ServiceConfig::class
 
     override fun decode(node: Node, type: KType, context: DecoderContext): ConfigResult<Issuer2ServiceConfig> {
+        if (node.atKey("metadataSigning") !is Undefined || node.atKey("metadata-signing") !is Undefined) {
+            return Validated.Invalid(ConfigFailure.Generic("metadataSigning is unsupported; configure signedMetadata.signingMethod"))
+        }
         val constructor = requireNotNull(Issuer2ServiceConfig::class.primaryConstructor)
         val args = mutableMapOf<KParameter, Any?>()
         for (param in constructor.parameters) {

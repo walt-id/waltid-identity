@@ -1,5 +1,7 @@
 package id.walt.issuer2.config
 
+import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningMethod
+
 import id.walt.commons.config.ConfigManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -24,6 +26,10 @@ import kotlin.test.assertFails
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertNotNull
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 class Issuer2ServiceConfigTest {
 
@@ -50,9 +56,116 @@ class Issuer2ServiceConfigTest {
         )
 
         assertNull(config.clientAuthenticationConfig)
+        assertNull(config.signedMetadata)
         assertNull(config.clientAttestationConfig())
         assertEquals(false, config.supportsPreAuthAnonymous())
         assertEquals("http://localhost:7002/openid4vci", config.openId4VciBaseUrl())
+    }
+
+    @Test
+    fun `service config decodes the three inline or reference signing strategies`() {
+        val jwk = JsonObject(mapOf("kty" to JsonPrimitive("EC"), "d" to JsonPrimitive("synthetic")))
+        val cases = listOf(
+            """{ type = "static-jwk", jwk = $jwk }""" to MetadataSigningMethod.StaticJwk(jwk),
+            """{ type = "x509-chain", privateKeyPem = "synthetic", certificateChainPem = ["leaf", "intermediate"] }""" to
+                MetadataSigningMethod.X509Chain("synthetic", listOf("leaf", "intermediate")),
+            """{ type = "key-reference", reference = "metadata-key" }""" to MetadataSigningMethod.KeyReference("metadata-key"),
+        )
+        for ((method, expected) in cases) {
+            clearIssuer2TestEnvironment()
+            val config = loadServiceConfig("baseUrl = \"http://localhost\"\nsignedMetadata { signingMethod = $method }")
+            assertEquals(expected, config.signedMetadata?.signingMethod)
+        }
+    }
+
+    @Test
+    fun `inline signed metadata decodes multiline PEM and redacts private material`() {
+        val jwk = JsonObject(mapOf("kty" to JsonPrimitive("EC"), "d" to JsonPrimitive("secret-inline-key")))
+        val config = loadServiceConfig("""
+            baseUrl = "http://localhost"
+            signedMetadata { signingMethod { type = "static-jwk", jwk = $jwk } }
+        """.trimIndent())
+        assertEquals(MetadataSigningMethod.StaticJwk(jwk), config.signedMetadata?.signingMethod)
+        assertFalse(config.toString().contains("secret-inline-key"))
+
+        clearIssuer2TestEnvironment()
+        val pem = "-----BEGIN PRIVATE KEY-----\nsecret-inline-pem\n-----END PRIVATE KEY-----"
+        val leaf = "-----BEGIN CERTIFICATE-----\nsynthetic-leaf\n-----END CERTIFICATE-----"
+        val intermediate = "-----BEGIN CERTIFICATE-----\nsynthetic-intermediate\n-----END CERTIFICATE-----"
+        val certificateConfig = loadServiceConfig("""
+            baseUrl = "http://localhost"
+            signedMetadata {
+                signingMethod {
+                    type = "x509-chain"
+                    privateKeyPem = ${hoconTripleQuoted(pem)}
+                    certificateChainPem = [${hoconTripleQuoted(leaf)}, ${hoconTripleQuoted(intermediate)}]
+                }
+            }
+        """.trimIndent())
+        assertEquals(MetadataSigningMethod.X509Chain(pem, listOf(leaf, intermediate)), certificateConfig.signedMetadata?.signingMethod)
+        assertFalse(certificateConfig.toString().contains("secret-inline-pem"))
+    }
+
+    @Test
+    fun `unsupported file fields and invalid strategies fail without exposing values`() {
+        val methods = listOf(
+            "{}",
+            """{ type = "unknown" }""",
+            """{ type = "token-key" }""",
+            """{ type = "jwk", jwk = { d = "secret-inline-key" } }""",
+            """{ type = "static-jwk" }""",
+            """{ type = "static-jwk", jwkFile = "/key.jwk" }""",
+            """{ type = "static-jwk", jwkFile = "/key.jwk", jwk = { d = "secret-inline-key" } }""",
+            """{ type = "static-jwk", jwk = "secret-inline-key" }""",
+            """{ type = "static-jwk", jwk = {} }""",
+            """{ type = "static-jwk", jwk = { d = "secret-inline-key" }, algorithm = "ES256" }""",
+            """{ type = "x509-chain", privateKeyPemFile = "/key.pem", certificateChainPemFile = "/chain.pem" }""",
+            """{ type = "x509-chain", privateKeyPem = "secret-inline-key", privateKeyPemFile = "/key.pem", certificateChainPem = ["chain"] }""",
+            """{ type = "x509-chain", privateKeyPem = "secret-inline-key", certificateChainPem = ["chain"], certificateChainPemFile = "/chain.pem" }""",
+            """{ type = "x509-chain", privateKeyPem = "secret-inline-key" }""",
+            """{ type = "x509-chain", privateKeyPem = "", certificateChainPem = ["chain"] }""",
+            """{ type = "x509-chain", privateKeyPem = "secret-inline-key", certificateChainPem = [] }""",
+            """{ type = "x509-chain", privateKeyPem = "secret-inline-key", certificateChainPem = [" "] }""",
+            """{ type = "x509-chain", privateKeyPem = "secret-inline-key", certificateChainPem = "chain" }""",
+            """{ type = "key-reference" }""",
+            """{ type = "key-reference", reference = " " }""",
+            """{ type = "key-reference", reference = "key", certificateChainPem = ["chain"] }""",
+            """"secret-inline-key"""",
+        )
+        for (method in methods) {
+            clearIssuer2TestEnvironment()
+            val error = assertFails { loadServiceConfig("baseUrl = \"http://localhost\"\nsignedMetadata { signingMethod = $method }") }
+            assertFalse(error.stackTraceToString().contains("secret-inline-key"))
+            assertTrue(error.stackTraceToString().contains("signedMetadata"))
+        }
+    }
+
+    @Test
+    fun `unrelated configuration validation errors do not expose metadata signing secrets`() {
+        val error = assertFails {
+            loadServiceConfig("""
+                baseUrl = "http://localhost"
+                credentialEncryptionKey = ${hoconTripleQuoted(ED25519_KEY)}
+                signedMetadata { signingMethod {
+                    type = "static-jwk"
+                    jwk = { kty = "EC", d = "secret-inline-key" }
+                } }
+            """.trimIndent())
+        }
+        assertFalse(error.stackTraceToString().contains("secret-inline-key"))
+    }
+
+    @Test
+    fun `earlier draft configuration forms are rejected instead of falling back`() {
+        for (block in listOf(
+            "signedMetadata = {}",
+            """signedMetadata { type = "jwk", jwk = { d = "secret-inline-key" } }""",
+            """metadataSigning { privateKeyPemFile = "secret-inline-key", certificateChainPemFile = "/chain.pem" }""",
+        )) {
+            clearIssuer2TestEnvironment()
+            val error = assertFails { loadServiceConfig("baseUrl = \"http://localhost\"\n$block") }
+            assertFalse(error.stackTraceToString().contains("secret-inline-key"))
+        }
     }
 
     @Test
@@ -232,7 +345,7 @@ class Issuer2ServiceConfigTest {
 
         System.setProperty("config.file.issuer-service", configFile.toString())
         ConfigManager.registerConfig("issuer-service", Issuer2ServiceConfig::class)
-        ConfigManager.loadConfigs()
+        ConfigManager.loadConfig(ConfigManager.ConfigData("issuer-service", Issuer2ServiceConfig::class), emptyArray()).getOrThrow()
 
         return ConfigManager.getConfig()
     }
