@@ -406,7 +406,7 @@ class WalletDemoController(
         presentationJob?.cancel()
         val previous = getAndUpdateState {
             it.copy(
-                auth = WalletAuthState.Login(biometricPromptConsumed = true),
+                auth = WalletAuthState.Login(),
                 session = if (it.session is WalletSessionState.Bootstrapping) WalletSessionState.NotBootstrapped else it.session,
                 isAuthenticating = false,
                 operation = WalletOperationState.Idle,

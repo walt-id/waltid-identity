@@ -32,4 +32,3 @@ sealed interface WalletDemoOfferCreateUiState {
 
     data class Failure(val message: String) : WalletDemoOfferCreateUiState
 }
-
