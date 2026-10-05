@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.ui.components.WalletSection
 import id.walt.walletdemo.compose.ui.components.WalletNavigationRow
@@ -27,6 +28,12 @@ import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.WalletLinkKind
 import id.walt.walletdemo.compose.logic.isBusy
+import id.walt.walletdemo.compose.logic.isStatusVisible
+import id.walt.walletdemo.compose.logic.statusBanner
+import id.walt.walletdemo.compose.logic.WalletStatusKind
+import id.walt.walletdemo.compose.ui.components.StatusCard
+import id.walt.walletdemo.compose.ui.components.WalletStatusPlacement
+import id.walt.walletdemo.compose.ui.components.WalletFooter
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.rememberAuthorizationRequestOpener
 
@@ -149,8 +156,6 @@ internal fun WalletScreen(
                     WalletHeader(
                         state = state,
                         onSettings = { onOpenSettings(); showingSettings = true },
-                        onDismissStatus = controller::dismissStatus,
-                        onToggleStatusExpanded = controller::toggleStatusExpanded,
                         onScan = ({ showingScanner = true }).takeIf { state.selectedTab == WalletDemoTab.Credentials },
                         onShareNearby = onStartProximityPresentation?.let { start ->
                             {
@@ -170,6 +175,14 @@ internal fun WalletScreen(
                 }
             }
         },
+        bottomBar = {
+            if (state.selectedTab == WalletDemoTab.Credentials && detailsChrome == null && state.isStatusVisible &&
+                state.statusBanner()?.kind != WalletStatusKind.Error) {
+                WalletFooter(modifier = Modifier.navigationBarsPadding(), feedback = {
+                    StatusCard(state, controller::dismissStatus, controller::toggleStatusExpanded, WalletStatusPlacement.Footer)
+                })
+            }
+        },
     ) { contentPadding ->
         val modifier = Modifier
             .fillMaxSize()
@@ -178,6 +191,9 @@ internal fun WalletScreen(
 
         when (state.selectedTab) {
             WalletDemoTab.Credentials -> Column(modifier) {
+                if (detailsChrome == null && state.statusBanner()?.kind == WalletStatusKind.Error) {
+                    StatusCard(state, controller::dismissStatus, controller::toggleStatusExpanded, WalletStatusPlacement.Contextual)
+                }
                 if (state.deferredCredentials.isNotEmpty() && detailsChrome == null) WalletSection(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
                     WalletNavigationRow(stringResource(Res.string.issuance_pending_count, state.deferredCredentials.size),
                         onClick = { controller.startNewReceiveFlow(); controller.selectTab(WalletDemoTab.Receive) },

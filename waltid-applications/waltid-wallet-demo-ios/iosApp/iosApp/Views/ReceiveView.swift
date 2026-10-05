@@ -45,7 +45,7 @@ struct ReceiveView: View {
     private var entryContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
+                WalletTabStatusBanner(viewModel: viewModel, tab: .receive, placement: .contextual)
 
                 ScannableUrlEditor(
                     title: "",
@@ -63,34 +63,32 @@ struct ReceiveView: View {
             }
             .padding()
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) { WalletTabFeedback(viewModel: viewModel, tab: .receive) }
     }
 
     private func reviewContent(preview: IssuanceOfferPreview) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
+        WalletReviewScaffold {
+            WalletTabStatusBanner(viewModel: viewModel, tab: .receive, placement: .contextual)
 
-                OfferReviewView(
-                    preview: preview,
-                    isAcceptEnabled: viewModel.acceptOfferEnabled,
-                    isReviewEnabled: viewModel.offerReviewEnabled,
-                    copies: viewModel.issuanceCopyCounts,
-                    onCopiesChange: viewModel.updateIssuanceCopies,
-                    txCode: viewModel.txCode,
-                    onTxCodeChange: viewModel.updateTxCode,
-                    onAccept: viewModel.acceptOffer,
-                    onDecline: viewModel.declineOffer,
-                    showActions: false
-                )
+            OfferReviewView(
+                preview: preview,
+                isAcceptEnabled: viewModel.acceptOfferEnabled,
+                isReviewEnabled: viewModel.offerReviewEnabled,
+                copies: viewModel.issuanceCopyCounts,
+                onCopiesChange: viewModel.updateIssuanceCopies,
+                txCode: viewModel.txCode,
+                onTxCodeChange: viewModel.updateTxCode,
+                onAccept: viewModel.acceptOffer,
+                onDecline: viewModel.declineOffer,
+                showActions: false
+            )
 
-                if let warning = viewModel.transactionDataProfilesWarning {
-                    WarningBannerView(message: warning)
-                }
-
+            if let warning = viewModel.transactionDataProfilesWarning {
+                WarningBannerView(message: warning)
             }
-            .padding()
-        }
-        .safeAreaInset(edge: .bottom) {
+
+        } actions: {
+            WalletTabStatusBanner(viewModel: viewModel, tab: .receive, placement: .footer)
             OfferReviewActions(
                 requiresIssuerAuthentication: preview.grant == .authorizationCode,
                 isAcceptEnabled: viewModel.acceptOfferEnabled,
@@ -98,9 +96,6 @@ struct ReceiveView: View {
                 onAccept: viewModel.acceptOffer,
                 onDecline: viewModel.declineOffer
             )
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.bar)
         }
     }
 
@@ -109,20 +104,17 @@ struct ReceiveView: View {
     }
 
     private var resultContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
-                IssuanceResultContent(receipt: viewModel.issuanceReceipt, saved: viewModel.receivedCredentials,
-                    pending: pendingCredentials,
-                    busy: viewModel.isLoading, onResume: viewModel.resumeDeferredCredential)
-            }.padding()
-        }
-        .safeAreaInset(edge: .bottom) {
+        WalletReviewScaffold {
+            WalletTabStatusBanner(viewModel: viewModel, tab: .receive, placement: .contextual)
+            IssuanceResultContent(receipt: viewModel.issuanceReceipt, saved: viewModel.receivedCredentials,
+                pending: pendingCredentials,
+                busy: viewModel.isLoading, onResume: viewModel.resumeDeferredCredential)
+        } actions: {
+            WalletTabStatusBanner(viewModel: viewModel, tab: .receive, placement: .footer)
             WalletActions(primary: WalletAction("Done", enabled: !viewModel.isLoading, identifier: "issuance-done") {
                 if viewModel.externalFlow != nil { viewModel.closeExternalFlow() } else { viewModel.selectedTab = .credentials }
             }, secondary: pendingCredentials.isEmpty ? nil : WalletAction("Refresh status",
                 enabled: !viewModel.isLoading, identifier: "issuance-refresh", perform: viewModel.refreshIssuanceStatus))
-                .padding().background(.bar)
         }
     }
 }
