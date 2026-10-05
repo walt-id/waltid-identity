@@ -358,3 +358,15 @@ Test: `GET http://waltid.enterprise.localhost:3000/v1/account/info`:
 An identity (issuer + `sub`) that has no account yet is provisioned by the account store's
 `addAccountIdentifierToAccount`, with a new random account id - never the IdP's `sub`, which another IdP could also
 issue. Link an existing account to an identity instead with its `OIDCIdentifier(issuer, subject)`.
+
+## Provider metadata and keys
+
+Discovery documents and signing keys (JWKS) are cached per URL, shared by all logins (`OIDC.configurationCache`,
+`OIDC.jwksCache`):
+
+- they are fetched again after an hour (`lifetime`); concurrent logins share one fetch
+- a token naming a key id the cached JWKS lacks - the provider rotated its keys - fetches the JWKS again, at most once
+  a minute (`minRefreshInterval`), so tokens with made-up key ids cannot make every login call the provider
+- while the provider cannot be reached, the last copy is used for up to a day (`staleIfError`)
+
+The values can be changed, e.g. `OIDC.jwksCache.lifetime = 10.minutes`.
