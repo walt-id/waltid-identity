@@ -3,7 +3,7 @@ package id.walt.ktorauthnz.methods
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.LDAPIdentifier
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.AccountNotFoundException
 import id.walt.ktorauthnz.exceptions.authFailure
 import id.walt.ktorauthnz.methods.config.LDAPConfiguration
