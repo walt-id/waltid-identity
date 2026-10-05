@@ -42,6 +42,7 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.plainTextClipEntry
 import id.walt.walletdemo.compose.ui.components.CredentialCardStack
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -111,7 +112,11 @@ internal fun CredentialsTab(
             if (showingDetails) {
                 CredentialDetailsChrome(
                     onClose = ::requestClose,
-                    onCopy = { scope.launch { clipboard.setClipEntry(plainTextClipEntry(rawCredential)) } },
+                    onCopy = {
+                        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                            clipboard.setClipEntry(plainTextClipEntry(rawCredential))
+                        }
+                    },
                     onDelete = if (onDeleteCredential != null) {
                         { confirmDelete = true }
                     } else {

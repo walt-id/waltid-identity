@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.ui.plainTextClipEntry
 import id.walt.walletdemo.compose.ui.resources.*
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -227,7 +228,8 @@ internal fun SettingsCopyRow(
                     }
                     SettingsIconButton(copyLabel, enabled = !value.isNullOrBlank(), onClick = {
                         value?.let { text ->
-                            scope.launch {
+                            // Web clipboard permissions require starting within the click gesture.
+                            scope.launch(start = CoroutineStart.UNDISPATCHED) {
                                 clipboard.setClipEntry(plainTextClipEntry(text))
                                 copied = true
                             }
