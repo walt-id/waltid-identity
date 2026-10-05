@@ -30,8 +30,8 @@ import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigning
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInput
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputProvider
 import id.walt.openid4vci.mdoc.MsoValidityResolver
-import id.walt.w3c.issuance.InstantClock
-import id.walt.w3c.issuance.IssuanceClock
+import id.walt.credentials.issuance.InstantClock
+import id.walt.credentials.issuance.IssuanceClock
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult

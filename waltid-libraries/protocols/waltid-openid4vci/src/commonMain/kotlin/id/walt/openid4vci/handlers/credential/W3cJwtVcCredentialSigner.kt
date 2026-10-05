@@ -13,8 +13,8 @@ import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDMap
 import id.walt.w3c.CredentialBuilder
 import id.walt.w3c.CredentialBuilderType
-import id.walt.w3c.issuance.Issuer.mergingJwtIssue
-import id.walt.w3c.issuance.Issuer.mergingSdJwtIssue
+import id.walt.credentials.issuance.MergingIssuer.mergingJwtIssue
+import id.walt.credentials.issuance.MergingIssuer.mergingSdJwtIssue
 import id.walt.w3c.vc.vcs.W3CV11DataModel
 import id.walt.w3c.vc.vcs.W3CV2DataModel
 import id.walt.w3c.vc.vcs.W3CVC
@@ -160,22 +160,6 @@ object W3cJwtVcCredentialSigner {
                     builder.buildW3C()
                 } ?: vc
             }
-            val context = mapOf(
-                "subjectDid" to holderDid,
-                "issuerDid" to issuerId,
-                "issuerId" to issuerId,
-                "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-            ).filterValues {
-                when (it) {
-                    is JsonElement -> it !is JsonNull && (it !is JsonObject || it.isNotEmpty()) && (it !is JsonArray || it.isNotEmpty())
-                    else -> it != null && it.toString().isNotEmpty()
-                }
-            }.mapValues { (_, value) ->
-                when (value) {
-                    is JsonElement -> value
-                    else -> JsonPrimitive(value.toString())
-                }
-            }
             when (selectiveDisclosure.isNullOrEmpty()) {
                 true -> when (issuerSigningKey) {
                     is IssuerSigningKey.Legacy -> w3cVc.mergingJwtIssue(
@@ -186,7 +170,6 @@ object W3cJwtVcCredentialSigner {
                         additionalJwtHeader = additionalJwtHeaders,
                         display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                         additionalJwtOptions = emptyMap(),
-                        context = context,
                     )
 
                     is IssuerSigningKey.Crypto2 -> w3cVc.mergingJwtIssue(
@@ -198,7 +181,6 @@ object W3cJwtVcCredentialSigner {
                         additionalJwtHeader = additionalJwtHeaders,
                         display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                         additionalJwtOptions = emptyMap(),
-                        context = context,
                     )
                 }
 
@@ -218,7 +200,6 @@ object W3cJwtVcCredentialSigner {
                             additionalJwtOptions = emptyMap(),
                             display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                             disclosureMap = selectiveDisclosure,
-                            context = context,
                             type = type,
                         )
 
@@ -232,7 +213,6 @@ object W3cJwtVcCredentialSigner {
                             additionalJwtOptions = emptyMap(),
                             display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                             disclosureMap = selectiveDisclosure,
-                            context = context,
                             type = type,
                         )
                     }

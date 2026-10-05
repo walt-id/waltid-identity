@@ -3,8 +3,8 @@
 package id.walt.wallet2
 
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.config.list.TransactionDataProfile
-import id.walt.commons.config.list.TransactionDataProfilesConfig
+import id.walt.verifier.openid.transactiondata.TransactionDataProfile
+import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureConfig
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.testing.E2ETest

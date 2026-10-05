@@ -11,10 +11,22 @@ import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 
-/** Expected OpenID4VP request failure that can be returned through the resolved response channel. */
+/** Expected OpenID4VP request failure, independent of whether it can be reported remotely. */
 data class PresentationRequestError(
     val code: WalletPresentFunctionality2.OID4VPErrorCode,
     val message: String,
+)
+
+/**
+ * A protocol error that must remain local because its response channel is unsafe.
+ * [error] preserves the request failure; [responseSafetyFailure] explains why it was not sent.
+ */
+class UnsafePresentationErrorResponseException(
+    val error: PresentationRequestError,
+    val responseSafetyFailure: Exception,
+) : IllegalArgumentException(
+    "${error.code.code}: ${error.message}. Error response was not sent: ${responseSafetyFailure.message}",
+    responseSafetyFailure,
 )
 
 /** Result of validating a resolved OpenID4VP request for this wallet implementation. */
@@ -40,7 +52,8 @@ enum class PresentationValidationTransport {
  * Validates wallet capabilities and request semantics after request resolution.
  *
  * Invalid results are safe to return through a signed request's response channel or an unsigned request's
- * client-bound redirect URI. Failures that prevent a safe response remain local exceptions.
+ * client-bound redirect URI. An unsafe error response throws [UnsafePresentationErrorResponseException]
+ * carrying both the protocol error and the response-safety failure.
  */
 object PresentationRequestValidator {
     /**
@@ -60,17 +73,15 @@ object PresentationRequestValidator {
         transport: PresentationValidationTransport = PresentationValidationTransport.Http,
     ): PresentationRequestValidationResult {
         val request = resolvedRequest.authorizationRequest
-        if (transport == PresentationValidationTransport.Http) {
-            requireUsableResponse(request)
-        }
         fun invalid(
             code: WalletPresentFunctionality2.OID4VPErrorCode,
             message: String,
         ): PresentationRequestValidationResult.Invalid {
+            val error = PresentationRequestError(code, message)
             if (transport == PresentationValidationTransport.Http) {
-                requireErrorResponseCanBeSent(resolvedRequest)
+                requireErrorResponseCanBeSent(resolvedRequest, error)
             }
-            return PresentationRequestValidationResult.Invalid(PresentationRequestError(code, message))
+            return PresentationRequestValidationResult.Invalid(error)
         }
 
         if (request.nonce.isNullOrBlank()) {
@@ -140,6 +151,9 @@ object PresentationRequestValidator {
             )
         }
 
+        if (transport == PresentationValidationTransport.Http) {
+            requireUsableResponse(request)
+        }
         return PresentationRequestValidationResult.Valid(transactionData)
     }
 
@@ -195,6 +209,20 @@ object PresentationRequestValidator {
         requireUsableResponse(request)
         require(resolvedRequest.client.responseDestinationAuthenticated) {
             "An Authorization Request must bind its response destination before an error response can be sent safely"
+        }
+    }
+
+    /** Applies the same safety gate while retaining an already established protocol error. */
+    fun requireErrorResponseCanBeSent(
+        resolvedRequest: ResolvedAuthorizationRequest,
+        error: PresentationRequestError,
+    ) {
+        try {
+            requireErrorResponseCanBeSent(resolvedRequest)
+        } catch (failure: IllegalArgumentException) {
+            throw UnsafePresentationErrorResponseException(error, failure)
+        } catch (failure: UnsupportedOperationException) {
+            throw UnsafePresentationErrorResponseException(error, failure)
         }
     }
 

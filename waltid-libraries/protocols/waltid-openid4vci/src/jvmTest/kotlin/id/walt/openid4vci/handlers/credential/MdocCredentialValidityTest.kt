@@ -28,7 +28,7 @@ import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.mdoc.MsoData
 import id.walt.openid4vci.mdoc.MsoValidityResolver
-import id.walt.w3c.issuance.InstantClock
+import id.walt.credentials.issuance.InstantClock
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborArray
