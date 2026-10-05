@@ -4,7 +4,8 @@ import WalletDemoSharingUI
 struct PinView: View {
     @ObservedObject var viewModel: WalletViewModel
     @Environment(\.walletDemoBranding) private var branding
-    @FocusState private var inputFocused: Bool
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var inputFocused = false
 
     var body: some View {
         ScrollView {
@@ -46,14 +47,37 @@ struct PinView: View {
                 .padding(.horizontal, 20).padding(.vertical, 12).background(.regularMaterial)
         }
         .walletScrollDismissesKeyboard()
-        .onAppear { viewModel.refreshBiometricAvailability() }
-        .onChange(of: viewModel.pinSetupStep) { _ in inputFocused = true }
-        .onChange(of: viewModel.isAuthenticating) { busy in if busy { inputFocused = false } }
+        .onAppear {
+            viewModel.refreshBiometricAvailability()
+            viewModel.promptBiometricUnlockIfNeeded()
+        }
+        .task(id: inputFocusRequest) {
+            let request = inputFocusRequest
+            guard request.isActive, request.target != .none else { inputFocused = false; return }
+            guard !Task.isCancelled, inputFocusRequest == request else { return }
+            inputFocused = true
+        }
     }
 
     private var isSetup: Bool { viewModel.auth == .setup }
     private var confirming: Bool { isSetup && viewModel.pinSetupStep == .confirm }
     private var value: String { confirming ? viewModel.pinConfirmation : viewModel.pin }
+    private enum InputFocusTarget: Hashable { case none, choose, confirm, unlock }
+    private struct InputFocusRequest: Equatable {
+        let target: InputFocusTarget
+        let isActive: Bool
+    }
+    private var inputFocusRequest: InputFocusRequest {
+        InputFocusRequest(target: inputFocusTarget, isActive: scenePhase == .active)
+    }
+    private var inputFocusTarget: InputFocusTarget {
+        guard !viewModel.isAuthenticating, !viewModel.shouldPromptBiometricUnlock else { return .none }
+        switch viewModel.auth {
+        case .setup: return confirming ? .confirm : .choose
+        case .login: return .unlock
+        case .storageUnavailable, .unlocked: return .none
+        }
+    }
 
     private var pinBinding: Binding<String> {
         Binding(get: { value }, set: { input in
@@ -96,6 +120,7 @@ struct PinView: View {
         }
     }
 }
+
 
 private extension View {
     @ViewBuilder
