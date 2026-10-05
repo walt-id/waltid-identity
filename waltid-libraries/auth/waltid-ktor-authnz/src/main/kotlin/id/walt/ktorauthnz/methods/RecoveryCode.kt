@@ -2,7 +2,7 @@ package id.walt.ktorauthnz.methods
 
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.AuthSessionStateException
 import id.walt.ktorauthnz.exceptions.OTPAuthException
 import id.walt.ktorauthnz.exceptions.authCheck
