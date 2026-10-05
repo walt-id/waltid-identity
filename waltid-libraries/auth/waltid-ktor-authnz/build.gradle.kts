@@ -26,7 +26,6 @@ dependencies {
         exclude("org.apache.commons:commons-lang3") // Manually updated due to security CVE
     }
     implementation(identityLibs.mina.core)
-    implementation(identityLibs.commons.lang3)
 
     // TOTP/HOTP
     implementation(identityLibs.onetime)
@@ -38,9 +37,6 @@ dependencies {
     implementation(identityLibs.nimbus.jose.jwt)
 
     // Cryptography
-    /*implementation(platform("dev.whyoleg.cryptography:cryptography-bom:0.4.0"))
-    implementation("dev.whyoleg.cryptography:cryptography-core")
-    implementation("dev.whyoleg.cryptography:cryptography-provider-jdk")*/
     implementation("com.password4j:password4j:1.8.4")
     implementation(identityLibs.kotlincrypto.hash.sha2)
     implementation(identityLibs.kotlincrypto.random)
@@ -48,23 +44,13 @@ dependencies {
     // Ktor server
     implementation(identityLibs.ktor.server.core)
     implementation(identityLibs.ktor.server.auth)
-    implementation(identityLibs.ktor.server.authjwt)
-    //implementation("io.ktor:ktor-server-auth-ldap")
-    implementation(identityLibs.ktor.server.sessions)
-    implementation(identityLibs.ktor.server.auto.head.response)
-    implementation(identityLibs.ktor.server.double.receive)
-    implementation(identityLibs.ktor.server.host.common)
     implementation(identityLibs.ktor.server.status.pages)
-    implementation(identityLibs.ktor.server.cors)
-    implementation(identityLibs.ktor.server.default.headers)
-    implementation(identityLibs.ktor.server.forwarded.header)
-    implementation(identityLibs.ktor.server.call.logging)
     implementation(identityLibs.ktor.server.content.negotiation)
-    implementation(identityLibs.ktor.server.cio)
     implementation(identityLibs.ktor.server.html.builder)
 
     // Ktor client
     implementation(identityLibs.ktor.client.core)
+    // The engine of the OIDC and VC clients (`HttpClient {}` picks it from the classpath)
     implementation(identityLibs.ktor.client.apache5)
     implementation(identityLibs.ktor.client.content.negotiation)
 
@@ -73,20 +59,14 @@ dependencies {
 
     // Ktor server external
     implementation(identityLibs.smiley.ktor.openapi)
-    implementation(identityLibs.smiley.ktor.swaggerui)
-    implementation(identityLibs.smiley.ktor.redoc)
 
     // JSON
     implementation(identityLibs.kotlinx.serialization.json)
-    implementation(identityLibs.kotlinx.datetime)
-    implementation(identityLibs.jsonpathkt)
 
     // Logging
     implementation(identityLibs.klogging)
-    implementation(identityLibs.slf4j.klogging)
 
     // Redis
-    //implementation("eu.vendeli:rethis:0.3.3")
     implementation(identityLibs.kedis)
 
     // Passkeys (WebAuthn)
@@ -98,6 +78,11 @@ dependencies {
 
     // Ktor
     testImplementation(identityLibs.ktor.server.cio)
+    // The example web app of the tests
+    testImplementation(identityLibs.smiley.ktor.swaggerui)
+    testImplementation(identityLibs.smiley.ktor.redoc)
+    testImplementation(identityLibs.ktor.server.auto.head.response)
+    testImplementation(identityLibs.ktor.server.double.receive)
     testImplementation(identityLibs.unboundid.ldapsdk)
     testImplementation(identityLibs.ktor.server.test.host)
 
