@@ -100,6 +100,7 @@ val KtorAuthnz = createApplicationPlugin("KtorAuthnz", ::KtorAuthnzConfig) {
     config.expiringStore?.let { KtorAuthnzManager.expiringStore = it }
     config.attemptLimits?.let { KtorAuthnzManager.attemptLimits = it }
     config.passwordHashing?.let { KtorAuthnzManager.passwordHashingConfig = it }
+    pepperWarning(KtorAuthnzManager.passwordHashingConfig)?.let { application.log.warn(it) }
     config.refreshTokens?.let { KtorAuthnzManager.refreshTokens = it }
     config.passkeys?.let { KtorAuthnzManager.passkeys = it }
     config.passkeysPerTenant?.let { KtorAuthnzManager.passkeysPerTenant = it }
@@ -111,3 +112,10 @@ val KtorAuthnz = createApplicationPlugin("KtorAuthnz", ::KtorAuthnzConfig) {
     config.cookie.secure?.let { SessionTokenCookieHandler.secure = it }
     config.listeners.forEach { AuthnzEvents.listen(it) }
 }
+
+/** The startup warning for a deployment that hashes passwords with the public default pepper, or null. */
+internal fun pepperWarning(config: PasswordHashingConfiguration): String? =
+    if (config.pepper != PasswordHashingConfiguration.DEFAULT_PEPPER) null
+    else "ktor-authnz hashes passwords with the default, public pepper. Set your own secret one: " +
+            "install(KtorAuthnz) { passwordHashing = PasswordHashingConfiguration(pepper = ...) }. " +
+            "Passwords hashed before keep verifying only with the pepper they were hashed with."
