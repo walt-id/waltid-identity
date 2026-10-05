@@ -214,6 +214,17 @@ class X500NameExtensionsTest {
     }
 
     @Test
+    fun `buildX500Name accepts 64 character common names and rejects 65 characters`() {
+        val commonName = "C".repeat(64)
+
+        assertEquals(
+            expected = commonName,
+            actual = buildX500Name(commonName = commonName).getCommonName(),
+        )
+        assertFailsWith<IllegalArgumentException> { buildX500Name(commonName = commonName + "C") }
+    }
+
+    @Test
     fun `buildX500Name supports non-ASCII characters`() {
         val name = buildX500Name(
             country = "DE",
