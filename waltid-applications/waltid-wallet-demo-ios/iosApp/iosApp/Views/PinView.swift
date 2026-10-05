@@ -21,13 +21,12 @@ struct PinView: View {
                 }
                 VStack(spacing: 8) {
                     WalletPinInput(value: pinBinding, label: confirming ? "Confirm PIN" : "PIN",
-                        digitCount: isSetup ? WalletViewModel.setupPinLength : max(WalletViewModel.setupPinLength, viewModel.pin.count),
+                        digitCount: WalletViewModel.pinLength,
                         isEnabled: !viewModel.isAuthenticating, isError: viewModel.pinError != nil,
                         identifier: confirming ? WalletAccessibilityID.pinConfirmationInput : WalletAccessibilityID.pinInput,
                         focus: $inputFocused, onSubmit: { inputFocused = false })
-                    if !isSetup { Text("Existing PINs with 4–8 digits are accepted.").font(.footnote).foregroundStyle(.secondary) }
                 }
-                Text(isSetup ? (confirming ? "Enter the same six digits again." : "Use six digits to protect your wallet.")
+                Text(isSetup ? (confirming ? "Enter the same four digits again." : "Use four digits to protect your wallet.")
                      : "Enter your PIN to unlock this wallet.").foregroundStyle(.secondary)
                 if confirming && viewModel.isBiometricUnlockAvailable {
                     Text("Next, your device will offer biometric unlock. Decline to keep using your PIN.")
@@ -81,9 +80,7 @@ struct PinView: View {
 
     private var pinBinding: Binding<String> {
         Binding(get: { value }, set: { input in
-            let digits = isSetup
-                ? String(decoding: input.utf8.filter { (48...57).contains($0) }.prefix(WalletViewModel.setupPinLength), as: UTF8.self)
-                : String(input.filter(\.isNumber).prefix(8))
+            let digits = String(decoding: input.utf8.filter { (48...57).contains($0) }.prefix(WalletViewModel.pinLength), as: UTF8.self)
             guard digits != value else { return }
             if confirming { viewModel.updatePinConfirmation(digits) } else { viewModel.updatePin(digits) }
         })
@@ -91,7 +88,7 @@ struct PinView: View {
 
     private var primary: WalletAction {
         WalletAction(isSetup ? (confirming ? "Confirm PIN" : "Continue") : "Unlock",
-            enabled: !viewModel.isAuthenticating && (isSetup ? value.count == WalletViewModel.setupPinLength : (4...8).contains(value.count)),
+            enabled: !viewModel.isAuthenticating && value.count == WalletViewModel.pinLength,
             identifier: WalletAccessibilityID.pinSubmitButton) {
             inputFocused = false
             viewModel.submitPin()

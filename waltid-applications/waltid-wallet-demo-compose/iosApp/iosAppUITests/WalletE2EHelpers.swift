@@ -4,7 +4,7 @@ import XCTest
 @MainActor
 final class WalletE2EUI {
     let app: XCUIApplication
-    private let pin = "123456"
+    private let pin = "1234"
 
     init(app: XCUIApplication) {
         self.app = app

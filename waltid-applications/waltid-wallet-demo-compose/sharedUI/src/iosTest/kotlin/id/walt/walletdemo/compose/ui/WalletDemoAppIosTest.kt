@@ -17,7 +17,7 @@ class WalletDemoAppIosTest {
 
     @Test fun biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline() = scenarios.biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline()
 
-    @Test fun pinSetupRequiresSixDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresSixDigitsAndMatchingConfirmation()
+    @Test fun pinSetupRequiresFourDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresFourDigitsAndMatchingConfirmation()
     @Test fun pinConfirmationPromptsBiometricsAndDeclineCompletesSetup() = scenarios.pinConfirmationPromptsBiometricsAndDeclineCompletesSetup()
 
     @Test fun scannerResolvesWebLinksAndKeepsFailureRecoverable() = scenarios.scannerResolvesWebLinksAndKeepsFailureRecoverable()
