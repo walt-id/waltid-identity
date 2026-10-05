@@ -76,7 +76,7 @@ private struct SharingClaimsSheet: View {
         WalletDetailSheet(String(localized: "Credential information", bundle: .module), onDismiss: onDismiss,
             closeIdentifier: WalletAccessibilityID.presentationClaimsClose) {
             VStack(alignment: .leading, spacing: 16) {
-                CredentialSummaryRow(summary: details.cardSummary)
+                CredentialSummaryRow(summary: details.cardSummary, showsIssuer: false)
                 SharingClaimsIssuerRow(details: details)
                 if option.disclosures.isEmpty {
                     Text("No additional claims to review").font(.caption).foregroundStyle(.secondary)
