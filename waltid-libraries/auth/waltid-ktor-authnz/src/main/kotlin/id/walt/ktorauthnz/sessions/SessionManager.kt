@@ -17,7 +17,7 @@ object SessionManager {
      * Opens a session for [authFlow]. With [persist] false it is only stored once something is written to it (a step
      * succeeds, or a multi-step method records its state) - so failed first attempts leave nothing behind.
      */
-    suspend fun newSession(authFlow: AuthFlow, persist: Boolean = true, tenant: String? = null): AuthSession {
+    suspend fun newSession(authFlow: AuthFlow, persist: Boolean = true, tenant: String? = null, linkToAccount: String? = null): AuthSession {
         val now = Clock.System.now()
         val newSession = AuthSession(
             id = randomUUIDString(),
@@ -26,6 +26,7 @@ object SessionManager {
             expiration = authFlow.parsedDuration?.let { now + it },
             createdAt = now,
             tenant = tenant,
+            linkToAccount = linkToAccount,
         )
 
         if (persist) KtorAuthnzManager.sessionStore.storeSession(newSession)
