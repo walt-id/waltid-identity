@@ -26,6 +26,7 @@ object AuthMethodManager {
             RADIUS,
             RecoveryCode,
             TOTP,
+            TotpSetup,
             UserPass,
             VerifiableCredential,
             Web3
