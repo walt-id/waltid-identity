@@ -51,6 +51,10 @@ class AuthSessionNotFoundException(sessionId: String) :
 class AuthSessionStateException(override val message: String) :
     AuthException(message, HttpStatusCode.BadRequest)
 
+/** An identifier a new account was to get belongs to an account already. */
+class AccountExistsException(identifierType: String) :
+    AuthException("An account with this $identifierType exists already", HttpStatusCode.Conflict)
+
 /** The identity was authenticated, but no account belongs to it. */
 class AccountNotFoundException(identifierType: String) :
     AuthException("No account exists for this $identifierType identity", HttpStatusCode.NotFound)
