@@ -24,7 +24,7 @@ def step_script(workflow, name):
 class ConformanceEligibilityTest(unittest.TestCase):
     def decide(self, labels=(), *, event="pull_request", draft=False,
                fork=False, file="waltid-services/waltid-issuer-api2/src/main/Example.kt",
-               ref="refs/heads/main"):
+               ref="refs/heads/main", script=None):
         wrapper = CONFORMANCE.read_text()
         expression = re.search(r"pr-require-label: (.+)", wrapper).group(1)
         self.assertEqual(expression, "${{ contains(fromJson(inputs.pr-labels), 'ci:conformance-deferred') }}")
@@ -50,7 +50,7 @@ class ConformanceEligibilityTest(unittest.TestCase):
                    "PLATFORM_NAME": platform_name, "PLATFORM_LABEL": platform_label,
                    "ADDITIONAL_LABELS": json.dumps(additional_labels), "PATH_PATTERNS": patterns}
             result = subprocess.run(
-                ["bash", "-c", step_script(PLATFORM, "Decide whether platform jobs should run")],
+                ["bash", "-c", script if script is not None else step_script(PLATFORM, "Decide whether platform jobs should run")],
                 env=env, capture_output=True, text=True, timeout=10,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -87,6 +87,26 @@ class ConformanceEligibilityTest(unittest.TestCase):
         self.assertEqual(deferred["should-run"], "false")
         self.assertEqual(resumed["should-run"], "true")
         self.assertTrue(called)
+
+    def test_opt_ins_reach_conformance_despite_docs_only_gradle_skip(self):
+        gradle_script = (GITHUB / "scripts/ci/decide-gradle-eligibility.sh").read_text()
+        gradle, _ = self.decide(file="README.md", script=gradle_script)
+        self.assertEqual(gradle["should-run"], "false")
+        for label in OPT_INS:
+            with self.subTest(label=label):
+                conformance, _ = self.decide([DEFERRED, label], file="README.md")
+                self.assertEqual(conformance["should-run"], "true")
+
+        # Check the caller's wiring as well as its scripts: the docs-only decision must
+        # not discard an explicit, eligible PR opt-in. Keep automatic docs skips intact.
+        caller = BUILD.read_text().split("  gradle-build:\n", 1)[1].split("\n  distribute-android-preview:", 1)[0]
+        condition = re.search(r"    if: (.+)", caller).group(1)
+        self.assertEqual(condition,
+                         "${{ needs.gradle-eligibility.outputs.should-run == 'true' || "
+                         "(needs.conformance-eligibility.outputs.should-run == 'true' && "
+                         "github.event_name == 'pull_request' && "
+                         "(contains(github.event.pull_request.labels.*.name, 'ci:conformance') || "
+                         "contains(github.event.pull_request.labels.*.name, 'ci:issuer-conformance'))) }}")
 
     def test_draft_and_fork_restrictions_remain(self):
         for labels, draft, fork in [([], True, False), ([DEFERRED], True, False),

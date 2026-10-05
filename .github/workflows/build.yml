@@ -146,7 +146,7 @@ jobs:
     uses: ./.github/workflows/gradle.yml
     secrets: inherit
     needs: [android-eligibility, conformance-eligibility, cacheless-eligibility, gradle-eligibility]
-    if: ${{ needs.gradle-eligibility.outputs.should-run == 'true' }}
+    if: ${{ needs.gradle-eligibility.outputs.should-run == 'true' || (needs.conformance-eligibility.outputs.should-run == 'true' && github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'ci:conformance') || contains(github.event.pull_request.labels.*.name, 'ci:issuer-conformance'))) }}
     with:
       enable-android-build: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
       cacheless: ${{ needs.cacheless-eligibility.outputs.should-run == 'true' }}

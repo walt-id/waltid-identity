@@ -25,9 +25,11 @@ force those specific lanes.
 ## Deferring live conformance
 
 Maintainers can use `ci:conformance-deferred` to postpone repeated live runs
-while a coordinated PR stack is being developed. Ordinary build and platform
+while a coordinated PR stack is being developed. Automatic build and platform
 selection remain unchanged. Either `ci:conformance` or `ci:issuer-conformance`
-overrides deferral, including on draft PRs. Removing the deferral label triggers
+overrides deferral, including on draft and docs/asset-only PRs. On docs/asset-only
+PRs, this also starts the Linux Gradle workflow that hosts conformance.
+Removing the deferral label triggers
 eligibility again; ready PRs resume automatic path selection. Draft and fork
 restrictions still apply. Main pushes and manual/workflow-call runs are unchanged.
 
@@ -53,7 +55,7 @@ maintainers enforce the completion policy during review.
 
 | Lane | Automatic when | Covers | Not a substitute for |
 |---|---|---|---|
-| `gradle-build` | Code changes (skipped for docs/asset-only PRs and pushes) | Unified Gradle `build allTests`, including Android host compilation when `android-eligibility` is true, and coordinated Enterprise graph compilation | Live OpenID conformance, device/UI tests, iOS XCFramework consumers |
+| `gradle-build` | Code changes or an eligible explicit PR conformance opt-in (ordinary docs/asset-only PRs and pushes remain skipped) | Unified Gradle `build allTests`, including Android host compilation when `android-eligibility` is true, and coordinated Enterprise graph compilation | Live OpenID conformance, device/UI tests, iOS XCFramework consumers |
 | `conformance` | Issuer/verifier/wallet OpenID4VP and OpenID4VCI paths unless deferred, or `ci:conformance` / `ci:issuer-conformance` | Cloudflare tunnel + live conformance runners | The default Gradle job (live suites are skipped there) |
 | `android-device-tests` | Android-relevant paths, or `ci:android` / `ci:mobile` | Selected instrumented device phases | Host-side Android compilation in `gradle-build` |
 | `ios-simulator` | Kotlin `common*` / `ios*` sources, library Gradle files, wallet-mobile, shared build-logic/CI | Kotlin iOS compile + `iosSimulatorArm64Test` | Swift package, XCFramework, native/Compose demos, DocC |
