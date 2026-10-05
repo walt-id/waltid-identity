@@ -3,6 +3,8 @@ package id.walt.ktorauthnz.examples.multitenant
 import id.walt.errors.HttpStatusError
 import id.walt.ktorauthnz.KtorAuthnz
 import id.walt.ktorauthnz.accounts.EditableAccountStore
+import id.walt.ktorauthnz.accounts.RegisteredAccount
+import id.walt.ktorauthnz.enrollment.signUp
 import id.walt.ktorauthnz.auth.authnzPrincipal
 import id.walt.ktorauthnz.auth.ktorAuthnz
 import id.walt.ktorauthnz.flows.AuthFlow
@@ -22,8 +24,6 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 /*
  * Example: a multi-tenant application where every tenant configures its own login.
@@ -32,6 +32,7 @@ import kotlin.uuid.Uuid
  *   org2: OIDC with the tenant's identity provider
  *   org3: LDAP (username + password against the tenant's directory), then TOTP
  *   org4: presenting a verifiable credential from a wallet
+ *   org5: username + password, accounts its users sign up for themselves
  *
  * Tenants are the first path segment (`/org1/auth/userpass`, `/org1/me`); a host or header works the same way.
  * Everything below `authnzTenant` is scoped to the tenant: sessions, accounts (the store sees `currentAuthnzTenant()`),
@@ -63,6 +64,7 @@ class TenantDirectory(private val flows: Map<String, AuthFlow>) {
                     """{"method": "ldap", "config": {"ldapServerUrl": "$ldapUrl", "userDNFormat": "uid=%s,ou=people,dc=org3"},
                         "continue": [{"method": "totp", "success": true}]}"""
                 ),
+                "org5" to AuthFlow.fromConfig("""{"method": "userpass", "success": true}"""),
                 "org4" to AuthFlow.fromConfig(
                     """{"method": "vc", "success": true, "config": {
                          "verifierUrl": "$verifierUrl",
@@ -75,15 +77,17 @@ class TenantDirectory(private val flows: Map<String, AuthFlow>) {
 }
 
 /** The application: [accounts] is your account store, [sendEmailCode] your mail service. */
-@OptIn(ExperimentalUuidApi::class)
 fun Application.multiTenantApp(
     accounts: EditableAccountStore,
     tenants: TenantDirectory,
     sendEmailCode: suspend (EmailCodeDelivery) -> Unit,
+    /** Your own records of a new account, e.g. a profile. */
+    onRegistered: suspend (RegisteredAccount) -> Unit = {},
 ) {
     install(KtorAuthnz) {
         accountStore = accounts
         emailCodes = EmailCodeSettings(send = sendEmailCode)
+        onAccountRegistered { account -> onRegistered(account) }
     }
     install(Authentication) { ktorAuthnz("login") }
     install(ContentNegotiation) { json() }
@@ -109,8 +113,10 @@ fun Application.multiTenantApp(
                     flowsFor = { tenants.flowsOf(authnzTenant!!) },
                 ) {
                     // Wallet holders log in with their first presentation, as a new account of the tenant.
-                    registerUnknownAccounts(VerifiableCredential) { accounts.addAccountIdentifierToAccount(Uuid.random().toString(), it) }
+                    registerUnknownAccounts(VerifiableCredential)
                 }
+                // Users sign up themselves with a username and password, as accounts of the tenant.
+                signUp(UserPass, verifyEmail = false)
             }
 
             authenticate("login") {
