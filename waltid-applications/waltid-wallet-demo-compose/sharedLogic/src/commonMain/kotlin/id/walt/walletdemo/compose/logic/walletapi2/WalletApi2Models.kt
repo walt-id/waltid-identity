@@ -117,6 +117,7 @@ internal data class ReceiveCredentialRequestDto(
     val clientId: String = WalletApi2DefaultClientId,
     val redirectUri: String? = null,
     val credentials: List<IssuanceCredentialSelectionDto>,
+    val keyId: String? = null,
 )
 
 @Serializable
@@ -226,6 +227,7 @@ internal data class ReceiveAuthorizedCredentialRequestDto(
     val clientId: String = WalletApi2DefaultClientId,
     val redirectUri: String,
     val did: String? = null,
+    val keyId: String? = null,
 )
 
 @Serializable
@@ -415,6 +417,7 @@ internal data class RejectPresentationRequestDto(
 internal data class PresentCredentialRequestDto(
     val requestUrl: String,
     val did: String? = null,
+    val keyId: String? = null,
 )
 
 @Serializable

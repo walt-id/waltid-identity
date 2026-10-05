@@ -4,6 +4,8 @@
     <string name="settings_sharing">Sharing</string>
     <string name="settings_signing_key">Signing key</string>
     <string name="settings_key_subtitle">Protection and key backup</string>
+    <string name="settings_server">Wallet service</string>
+    <string name="settings_server_subtitle">Choose which wallet this account uses</string>
     <string name="settings_technical">Technical details</string>
     <string name="settings_technical_subtitle">DID, key ID, and public key</string>
     <string name="settings_nearby">Nearby sharing</string>

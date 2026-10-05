@@ -32,9 +32,11 @@ fun createWalletApi2DemoWallet(
     token: String,
     walletId: String,
     redirectUri: String,
+    kind: WalletApiKind = WalletApiKind.OpenSource,
     onWalletIdChanged: (String) -> Unit = {},
 ): DemoWallet = WalletApi2DemoWallet(
-    client = WalletApi2Client(baseUrl = baseUrl, token = token),
+    client = WalletApi2Client(baseUrl = baseUrl, token = token, kind = kind),
+    kind = kind,
     walletId = walletId,
     redirectUri = redirectUri,
     onWalletIdChanged = onWalletIdChanged,
@@ -42,6 +44,7 @@ fun createWalletApi2DemoWallet(
 
 internal class WalletApi2DemoWallet(
     private val client: WalletApi2Client,
+    private val kind: WalletApiKind,
     private var walletId: String,
     private val redirectUri: String,
     private val onWalletIdChanged: (String) -> Unit,
@@ -138,6 +141,7 @@ internal class WalletApi2DemoWallet(
             did = session.did,
             redirectUri = session.redirectUri,
             credentials = selections,
+            keyId = keyId,
         )
         finishIssuance(sessionId)
         result.toOutcome()
@@ -176,6 +180,7 @@ internal class WalletApi2DemoWallet(
                 nonceEndpoint = session.nonceEndpoint,
                 redirectUri = session.redirectUri,
                 did = session.did,
+                keyId = keyId,
             ),
         )
         finishIssuance(sessionId)
@@ -276,7 +281,7 @@ internal class WalletApi2DemoWallet(
     }
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult = useWallet {
-        client.present(walletId, requestUrl, did ?: this.did).toDemoOperationResult(
+        client.present(walletId, requestUrl, did ?: this.did, keyId).toDemoOperationResult(
             successMessage = WalletDisplayText.PresentationSent,
             failureMessage = WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation,
         )
@@ -360,6 +365,7 @@ internal class WalletApi2DemoWallet(
 
     // Keep acknowledged steps for explicit retry; a lost server acknowledgement remains uncertain.
     override suspend fun deleteWallet() {
+        require(kind.canManageWallet) { "This API does not reset wallets" }
         currentCoroutineContext().ensureActive()
         check(!resetInProgress && activeOperations == 0) { "Cannot reset the wallet while an operation is in progress" }
         resetInProgress = true
@@ -397,6 +403,7 @@ internal class WalletApi2DemoWallet(
     }
 
     private suspend fun ensureIdentity(): WalletIdentity {
+        if (!kind.canGenerateIdentity) return useExistingIdentity()
         val info = runCatching { client.walletInfo(walletId) }.getOrNull()
         val existingKeyId = info?.defaultKeyId ?: client.listKeys(walletId).firstOrNull()?.keyId
         val resolvedKeyId = existingKeyId ?: client.generateKey(walletId).keyId
@@ -408,6 +415,20 @@ internal class WalletApi2DemoWallet(
         runCatching { client.setDefaultDid(walletId, resolvedDid.did) }
         return WalletIdentity(
             keyId = resolvedKeyId,
+            did = resolvedDid.did,
+            publicJwk = publicJwkFromDidDocument(resolvedDid.document),
+        )
+    }
+
+    private suspend fun useExistingIdentity(): WalletIdentity {
+        val resolvedKey = client.listKeys(walletId).firstOrNull()
+            ?: error("This wallet has no keys in its linked key store")
+        val resolvedDid = client.listDids(walletId).firstOrNull()
+            ?: error("This wallet has no DIDs in its linked DID store")
+        keyId = resolvedKey.keyId
+        did = resolvedDid.did
+        return WalletIdentity(
+            keyId = resolvedKey.keyId,
             did = resolvedDid.did,
             publicJwk = publicJwkFromDidDocument(resolvedDid.document),
         )
