@@ -126,6 +126,11 @@ class KeyAttestationVerifier(
         if (attestedKeys.isEmpty()) {
             throw invalidCredentialProof("Key attestation attested_keys must not be empty")
         }
+        options.maxAttestedKeys?.let { maximum ->
+            if (attestedKeys.size > maximum) {
+                throw invalidCredentialProof("Key attestation exceeds the configured attested-key limit")
+            }
+        }
         val verified = VerifiedKeyAttestation(jwt, header, payload, signer, attestedKeys.map {
             restoreAttestedKey(it as? JsonObject ?: throw invalidCredentialProof("Attested keys must be JWK objects"))
         })

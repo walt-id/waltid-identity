@@ -11,7 +11,11 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class KeyAttestationConfig(
     val verificationMethod: KeyAttestationVerificationMethod,
-)
+    /** Maximum entries in each attested_keys array; defaults to 20. Explicit null disables the limit. */
+    val maxAttestedKeys: Int? = 20,
+) {
+    init { require(maxAttestedKeys == null || maxAttestedKeys > 0) { "maxAttestedKeys must be positive" } }
+}
 
 @Serializable
 sealed class KeyAttestationVerificationMethod {
@@ -45,4 +49,5 @@ suspend fun KeyAttestationConfig.toVerificationOptions(
     keyReferenceResolver: KeyAttestationKeyReferenceResolver? = null,
 ): KeyAttestationVerificationOptions = KeyAttestationVerificationOptions(
     createKeyAttestationTrustResolver(verificationMethod, keyReferenceResolver),
+    maxAttestedKeys = maxAttestedKeys,
 )

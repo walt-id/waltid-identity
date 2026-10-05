@@ -45,7 +45,11 @@ fun interface KeyAttestationPolicy {
 data class KeyAttestationVerificationOptions(
     val trustResolver: KeyAttestationTrustResolver,
     val policy: KeyAttestationPolicy? = null,
-)
+    /** Maximum entries per attestation, checked before key import; defaults to 20. Explicit null disables the limit. */
+    val maxAttestedKeys: Int? = 20,
+) {
+    init { require(maxAttestedKeys == null || maxAttestedKeys > 0) { "maxAttestedKeys must be positive" } }
+}
 
 /** An issuer/deployment failure, not invalid evidence from the wallet. */
 class KeyAttestationServiceException(message: String, cause: Throwable? = null) : CredentialProofServiceException(message, cause)
