@@ -55,6 +55,10 @@ class AuthSessionStateException(override val message: String) :
 class AccountExistsException(identifierType: String) :
     AuthException("An account with this $identifierType exists already", HttpStatusCode.Conflict)
 
+/** The action needs a login more recent than the caller's; log in again and retry. */
+class ReauthenticationRequiredException(override val message: String) :
+    AuthException(message, HttpStatusCode.Unauthorized)
+
 /** The identity was authenticated, but no account belongs to it. */
 class AccountNotFoundException(identifierType: String) :
     AuthException("No account exists for this $identifierType identity", HttpStatusCode.NotFound)
