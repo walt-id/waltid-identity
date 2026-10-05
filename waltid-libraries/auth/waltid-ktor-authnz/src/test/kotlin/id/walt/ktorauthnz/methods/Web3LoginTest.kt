@@ -5,7 +5,7 @@ import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.ExampleAccountStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.Web3Identifier
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.ephemeral.InMemoryExpiringStore
 import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.sessions.InMemorySessionStore
@@ -80,6 +80,12 @@ class Web3LoginTest {
 
         assertEquals(HttpStatusCode.OK, signed(challenge, signature).status)
         assertEquals(HttpStatusCode.Unauthorized, signed(challenge, signature).status, "replayed")
+    }
+
+    @Test
+    fun `a challenge the server did not issue is refused, however well signed`() = web3Test {
+        val madeUp = "Sign in: 0x" + "ab".repeat(32)
+        assertEquals(HttpStatusCode.Unauthorized, signed(madeUp, sign(madeUp)).status)
     }
 
     @Test
