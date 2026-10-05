@@ -26,7 +26,7 @@ public struct MetadataDisclosure<Content: View>: View {
         } label: {
             Text(title)
                 .font(.body.weight(.semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(Color.primary)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
                 .accessibilityAddTraits(.isHeader)

@@ -13,7 +13,7 @@ public struct CredentialInformationContent: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            CredentialSummaryRow(summary: details.cardSummary)
+            CredentialSummaryRow(summary: details.cardSummary, showsIssuer: false)
             CredentialDetailsBody(details: details, onTechnicalDetails: { technicalOpen = true })
         }
         .walletDetailDestination(isPresented: $technicalOpen) {
