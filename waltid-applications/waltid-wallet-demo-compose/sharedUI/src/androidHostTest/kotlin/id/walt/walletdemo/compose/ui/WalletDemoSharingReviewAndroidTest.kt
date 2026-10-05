@@ -11,6 +11,10 @@ class WalletDemoSharingReviewAndroidTest {
     private val scenarios = WalletDemoSharingReviewTestScenarios()
 
     @Test
+    fun closingTechnicalInformationReturnsToReviewWithoutSubmitting() =
+        scenarios.closingTechnicalInformationReturnsToReviewWithoutSubmitting()
+
+    @Test
     fun changingHostPreservesDisclosureChoicesAndConsentRevision() =
         scenarios.changingHostPreservesDisclosureChoicesAndConsentRevision()
 

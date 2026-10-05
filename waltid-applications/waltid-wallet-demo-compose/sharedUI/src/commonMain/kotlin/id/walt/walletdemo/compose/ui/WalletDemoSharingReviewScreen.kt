@@ -1,14 +1,11 @@
 package id.walt.walletdemo.compose.ui
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.text.font.FontWeight
 import id.walt.walletdemo.compose.logic.WalletDemoPaymentConsent
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
@@ -18,6 +15,7 @@ import id.walt.walletdemo.compose.logic.hasCompleteCredentialSelection
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
+import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
 
 /**
  * One sharing review for full-screen and platform-invoked sheet hosts.
@@ -58,6 +56,7 @@ fun WalletDemoSharingReviewScreen(
     WalletReviewHost(presentation, dismissEnabled = enabled, onDismiss = onBackAtRoot) { fillViewport ->
         ReviewScaffold(
             fillViewport = fillViewport,
+            header = { WalletScreenHeader(title) },
             actions = {
                 SharingActionsRow(
                     paymentReview = paymentReview,
@@ -69,7 +68,6 @@ fun WalletDemoSharingReviewScreen(
                 )
             },
         ) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             SharingReviewSection(
                 paymentReview = paymentReview,
                 review = review,

@@ -71,8 +71,8 @@ private struct SavedCredentialRow: View {
             }.padding(16).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityIdentifier("issuance-saved-\(credential.id)")
         .sheet(isPresented: $detailsOpen) {
-            WalletDetailSheet(CredentialCardSummary.stored(from: credential).title, onDismiss: { detailsOpen = false }) {
-                CredentialDetailsView(details: CredentialDisplayNormalizer.details(for: credential))
+            WalletDetailSheet(String(localized: "Credential information", bundle: .module), onDismiss: { detailsOpen = false }) {
+                CredentialInformationContent(details: CredentialDisplayNormalizer.details(for: credential), onDismiss: { detailsOpen = false })
             }
         }
     }

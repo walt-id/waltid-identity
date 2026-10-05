@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 internal fun UrlActionSection(
-    title: String,
+    title: String? = null,
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
@@ -37,7 +37,7 @@ internal fun UrlActionSection(
     var scannerVisible by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        title?.let { Text(it, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,

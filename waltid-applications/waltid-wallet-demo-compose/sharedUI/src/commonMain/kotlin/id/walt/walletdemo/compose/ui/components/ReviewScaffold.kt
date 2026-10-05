@@ -27,10 +27,12 @@ import androidx.compose.ui.unit.dp
 internal fun ReviewScaffold(
     modifier: Modifier = Modifier,
     fillViewport: Boolean = true,
+    header: (@Composable () -> Unit)? = null,
     actions: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val body: @Composable ColumnScope.() -> Unit = {
+        header?.invoke()
         Column(
             modifier = Modifier
                 .then(

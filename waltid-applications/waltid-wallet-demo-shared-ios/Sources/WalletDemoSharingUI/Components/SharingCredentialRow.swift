@@ -73,34 +73,37 @@ private struct SharingClaimsSheet: View {
     @State private var allInformationOpen = false
 
     var body: some View {
-        WalletDetailSheet(details.cardSummary.title, onDismiss: onDismiss,
+        WalletDetailSheet(String(localized: "Credential information", bundle: .module), onDismiss: onDismiss,
             closeIdentifier: WalletAccessibilityID.presentationClaimsClose) {
-            SharingClaimsIssuerRow(details: details)
-            if option.disclosures.isEmpty {
-                Text("No additional claims to review").font(.caption).foregroundStyle(.secondary)
-            } else {
-                DisclosureList(option: option, credentialSelected: credentialSelected,
-                    selectedDisclosureOptions: selectedDisclosureOptions,
-                    requestedDisclosureItems: requestedDisclosureItems, isLoading: isLoading,
-                    isReadOnly: isReadOnly, onToggleDisclosure: onToggleDisclosure)
-            }
-            if details.groups.contains(where: { $0.id != "requested" }) {
-                WalletSection {
-                    WalletNavigationRow(String(localized: "All credential information", bundle: .module),
-                        subtitle: String(localized: "Includes information outside this request.", bundle: .module)) {
-                        allInformationOpen = true
-                    }.accessibilityIdentifier("review-all-credential-information")
+            VStack(alignment: .leading, spacing: 16) {
+                CredentialSummaryRow(summary: details.cardSummary)
+                SharingClaimsIssuerRow(details: details)
+                if option.disclosures.isEmpty {
+                    Text("No additional claims to review").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    DisclosureList(option: option, credentialSelected: credentialSelected,
+                        selectedDisclosureOptions: selectedDisclosureOptions,
+                        requestedDisclosureItems: requestedDisclosureItems, isLoading: isLoading,
+                        isReadOnly: isReadOnly, onToggleDisclosure: onToggleDisclosure)
                 }
+                if details.groups.contains(where: { $0.id != "requested" }) {
+                    WalletSection {
+                        WalletNavigationRow(String(localized: "All credential information", bundle: .module),
+                            subtitle: String(localized: "Includes information outside this request.", bundle: .module)) {
+                            allInformationOpen = true
+                        }.accessibilityIdentifier("review-all-credential-information")
+                    }
+                }
+            }
+            .walletDetailDestination(isPresented: $allInformationOpen) {
+                WalletDetailPage(String(localized: "All credential information", bundle: .module), onDismiss: onDismiss) {
+                    Text("Includes information outside this request.", bundle: .module).font(.body)
+                    CredentialInformationContent(details: details, onDismiss: onDismiss)
+                }
+                .accessibilityIdentifier("review-all-information-details")
             }
         }
         .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsDialog)
-        .sheet(isPresented: $allInformationOpen) {
-            WalletDetailSheet(String(localized: "All credential information", bundle: .module), onDismiss: { allInformationOpen = false }) {
-                Text("Includes information outside this request.", bundle: .module).font(.body)
-                CredentialSummaryRow(summary: details.cardSummary)
-                CredentialDetailsView(details: details)
-            }
-        }
     }
 }
 
