@@ -55,7 +55,7 @@ internal fun OfferedCredentialRow(
         )
     }
     if (showDetails) {
-        WalletDetailSheet(title, onDismiss = { showDetails = false },
+        WalletDetailSheet(stringResource(Res.string.issuance_information), onDismiss = { showDetails = false },
             modifier = Modifier.testTag("issuance-credential-details")) {
             OfferedCredentialDetails(credential, issuer, issuerIdentifier)
         }
