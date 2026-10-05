@@ -23,12 +23,6 @@ private val credentialEndpointErrorCodes = setOf(
     CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED,
 )
 
-private val tokenEndpointErrorCodes = setOf(
-    "invalid_request", "invalid_client", "invalid_grant", "unauthorized_client",
-    "unsupported_grant_type", "invalid_scope", "invalid_dpop_proof",
-    "use_dpop_nonce", "use_attestation_challenge", "unsafe_redirect",
-)
-
 /** An owned session is recorded before its first execution attempt, so failed starts can be cleaned up. */
 data class ItbSession(val testSuite: String, val testCase: String, val session: String) {
     init {
@@ -131,9 +125,7 @@ class ItbCaseRunner(
                 is ItbPortalStepTimeout -> error.step.name.lowercase()
                 is CredentialEndpointException -> "credential_endpoint_http_${error.statusCode}" +
                     (error.credentialError?.error?.takeIf(credentialEndpointErrorCodes::contains)?.let { "_$it" } ?: "")
-                is TokenRequestException -> "token_endpoint_http_${error.statusCode}" +
-                    (error.oauthError?.takeIf(tokenEndpointErrorCodes::contains)?.let { "_$it" } ?: "") +
-                    (if (error.nonOAuthErrorBody) "_non_oauth_body" else "")
+                is TokenRequestException -> ItbTokenFailure.reportCode(error)
                 else -> null
             }
             outcome = when {

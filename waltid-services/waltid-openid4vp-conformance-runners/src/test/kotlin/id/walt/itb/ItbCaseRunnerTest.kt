@@ -7,7 +7,11 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.*
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import java.net.InetAddress
+import java.net.ServerSocket
 import kotlin.test.*
 
 class ItbCaseRunnerTest {
@@ -108,35 +112,67 @@ class ItbCaseRunnerTest {
 
     @Test
     fun tokenEndpointFailureReportsOnlyBoundedProtocolCodes() = runBlocking<Unit> {
-        for ((failure, expected) in listOf(
-            TokenRequestException(400, "invalid_grant", "private issuer response") to
-                "token_endpoint_http_400_invalid_grant",
-            TokenRequestException(400, "use_dpop_nonce", "private issuer response") to
-                "token_endpoint_http_400_use_dpop_nonce",
-            TokenRequestException(401, "private_issuer_code", "private issuer response") to
-                "token_endpoint_http_401",
-            TokenRequestException(502, nonOAuthErrorBody = true) to
-                "token_endpoint_http_502_non_oauth_body",
-            TokenRequestException(0, cause = IllegalStateException("private transport details")) to
-                "token_endpoint_http_0",
-        )) {
-            HttpClient(MockEngine { request ->
-                respond(when (request.url.encodedPath.substringAfterLast('/')) {
-                    "status" -> status(false, "UNDEFINED")
-                    "stop" -> ""
-                    session -> report.replace("<result>SUCCESS</result>", "<result>UNDEFINED</result>")
-                    else -> error("Unexpected request")
-                })
-            }).use { client ->
-                val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), Bridge(), {
-                    throw failure
-                }).run(suite, case)
-                assertEquals(ItbCaseResult.Outcome.WALLET_FAILED, result.outcome)
-                assertEquals("TokenRequestException", result.errorType)
-                assertEquals(expected, result.errorCode)
-                assertFalse(result.walletSucceeded)
-                assertFalse(result.toString().contains("private"))
+        for ((failure, expected) in tokenFailures()) {
+            assertTokenFailureReported(expected) { throw failure }
+        }
+    }
+
+    @Test
+    fun nativeTokenEndpointFailureReportsTheSameBoundedProtocolCodes() = runBlocking<Unit> {
+        for ((failure, expected) in tokenFailures()) {
+            coroutineScope {
+                withTimeout(5_000) {
+                    ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { listener ->
+                        val device = launch(Dispatchers.IO) {
+                            listener.accept().use { socket ->
+                                ItbDeviceWire.authenticate(ItbDeviceWire.read(socket), "a".repeat(64))
+                                ItbDeviceWire.write(socket, buildJsonObject {
+                                    put("ready", true); put("provider", "android-native-biometric")
+                                })
+                                ItbDeviceWire.serve(socket) { throw failure }
+                            }
+                        }
+                        ItbAndroidWalletDriver.connect(
+                            listener.localPort, "a".repeat(64), Url("https://dev-i4mlab.aegean.gr"), "fixture", Dispatchers.IO,
+                        ).use { native -> assertTokenFailureReported(expected, native::execute) }
+                        device.join()
+                    }
+                }
             }
+        }
+    }
+
+    private fun tokenFailures() = listOf(
+        TokenRequestException(400, "invalid_grant", "private issuer response") to
+            "token_endpoint_http_400_invalid_grant",
+        TokenRequestException(400, "invalid_dpop_proof", "private issuer response") to
+            "token_endpoint_http_400_invalid_dpop_proof",
+        TokenRequestException(400, "use_dpop_nonce", "private issuer response") to
+            "token_endpoint_http_400_use_dpop_nonce",
+        TokenRequestException(401, "private_issuer_code", "private issuer response") to
+            "token_endpoint_http_401",
+        TokenRequestException(502, nonOAuthErrorBody = true) to
+            "token_endpoint_http_502_non_oauth_body",
+        TokenRequestException(0, cause = IllegalStateException("private transport details")) to
+            "token_endpoint_http_0",
+    )
+
+    private suspend fun assertTokenFailureReported(expected: String, execute: suspend (ItbWalletInteraction) -> Unit) {
+        HttpClient(MockEngine { request ->
+            respond(when (request.url.encodedPath.substringAfterLast('/')) {
+                "status" -> status(false, "UNDEFINED")
+                "stop" -> ""
+                session -> report.replace("<result>SUCCESS</result>", "<result>UNDEFINED</result>")
+                else -> error("Unexpected request")
+            })
+        }).use { client ->
+            val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), Bridge(), execute)
+                .run(suite, case)
+            assertEquals(ItbCaseResult.Outcome.WALLET_FAILED, result.outcome)
+            assertEquals("TokenRequestException", result.errorType)
+            assertEquals(expected, result.errorCode)
+            assertFalse(result.walletSucceeded)
+            assertFalse(result.toString().contains("private"))
         }
     }
 
