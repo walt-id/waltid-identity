@@ -13,7 +13,7 @@ import id.walt.policies2.vc.policies.JsonSchemaPolicy
 import id.walt.policies2.vc.policies.NotBeforePolicy
 import id.walt.policies2.vc.policies.RevocationPolicy
 import id.walt.policies2.vc.policies.WebhookPolicy
-import id.walt.w3c.issuance.Issuer.mergingJwtIssue
+import id.walt.credentials.issuance.MergingIssuer.mergingJwtIssue
 import id.walt.w3c.vc.vcs.W3CVC
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json

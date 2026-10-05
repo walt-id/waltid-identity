@@ -49,6 +49,13 @@ do {
 }
 ```
 
+When an invalid OpenID4VP request has an unsafe response channel, the SDK throws
+`WalletError.presentationValidation(code:message:responseSafetyFailure:)`. The
+protocol code and validation message describe the request failure;
+`responseSafetyFailure` explains why no error response was sent to the verifier.
+`localizedDescription` includes both reasons for demo and application diagnostics.
+The response-destination safety checks still apply before any remote reporting.
+
 > Important: The current error surface is intentionally small. More structured
 > typed failures can be added without exposing Kotlin bridge internals to iOS
 > app code.

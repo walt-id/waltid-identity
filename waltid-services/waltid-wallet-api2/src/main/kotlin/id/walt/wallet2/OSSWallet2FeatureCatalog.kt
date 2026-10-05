@@ -1,7 +1,7 @@
 package id.walt.wallet2
 
 import id.walt.commons.config.list.DevModeConfig
-import id.walt.commons.config.list.TransactionDataProfilesConfig
+import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog

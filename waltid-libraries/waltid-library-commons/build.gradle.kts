@@ -12,6 +12,8 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            // Needed by the suspend-transform compiler plugin of the multiplatform convention
+            implementation(identityLibs.kotlinx.coroutines.core)
         }
         commonTest.dependencies {
             implementation(kotlin("test-common"))

@@ -12,6 +12,9 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.waltid.openid4vp.wallet.request.AuthenticatedClientFacts
+import id.waltid.openid4vp.wallet.request.RequestObjectAuthentication
+import id.walt.openid4vp.clientidprefix.prefixes.PreRegistered
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonArray
@@ -23,6 +26,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalSerializationApi::class)
 class PresentationRequestValidatorTest {
@@ -534,6 +539,83 @@ class PresentationRequestValidatorTest {
                 ),
             ).error.code,
         )
+    }
+
+    @Test
+    fun protocolErrorsArePreservedAcrossResponseTrustStates() {
+        val cases = listOf(
+            request(nonce = null) to WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST,
+            request(dcqlQuery = null) to WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST,
+            request(dcqlQuery = null, scope = "unknown") to WalletPresentFunctionality2.OID4VPErrorCode.INVALID_SCOPE,
+            request(responseType = OpenID4VPResponseType.CODE) to WalletPresentFunctionality2.OID4VPErrorCode.UNSUPPORTED_RESPONSE_TYPE,
+            request(dcqlQuery = DcqlQuery(credentials = emptyList())) to WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST,
+            request(dcqlQuery = DcqlQuery(credentials = listOf(credentialQuery(CredentialFormat.AC_VP)))) to
+                WalletPresentFunctionality2.OID4VPErrorCode.VP_FORMATS_NOT_SUPPORTED,
+            request(transactionData = listOf(transactionData("unknown"))) to
+                WalletPresentFunctionality2.OID4VPErrorCode.INVALID_TRANSACTION_DATA,
+        )
+        for ((request, code) in cases) {
+            val authenticated = ResolvedAuthorizationRequest.AuthenticatedRequestObject(
+                authorizationRequest = request,
+                requestObject = "verified.request.object",
+                authentication = RequestObjectAuthentication(PreRegistered("verifier"), "ES256", null),
+            )
+            val expected = assertIs<PresentationRequestValidationResult.Invalid>(
+                validate(request, resolvedRequest = authenticated),
+            ).error
+            assertEquals(code, expected.code)
+            val unbound = ResolvedAuthorizationRequest.Plain(request)
+            val failure = assertFailsWith<UnsafePresentationErrorResponseException> {
+                validate(request, resolvedRequest = unbound)
+            }
+            assertEquals(expected, failure.error)
+            assertEquals(
+                "An Authorization Request must bind its response destination before an error response can be sent safely",
+                failure.responseSafetyFailure.message,
+            )
+            assertSame(failure.responseSafetyFailure, failure.cause)
+            assertTrue(requireNotNull(failure.message).contains(expected.message))
+            assertTrue(requireNotNull(failure.message).contains(requireNotNull(failure.responseSafetyFailure.message)))
+            assertFailsWith<IllegalArgumentException> {
+                PresentationRequestValidator.requireErrorResponseCanBeSent(unbound)
+            }
+            val bound = request.copy(clientId = "redirect_uri:${request.responseUri}")
+            assertEquals(expected, assertIs<PresentationRequestValidationResult.Invalid>(
+                validate(bound, resolvedRequest = ResolvedAuthorizationRequest.Plain(
+                    bound, AuthenticatedClientFacts.redirectUriBound(bound),
+                )),
+            ).error)
+        }
+    }
+
+    @Test
+    fun unusableResponseChannelsDoNotMaskMissingNonce() {
+        val cases = listOf(
+            request(clientId = null),
+            request(responseMode = OpenID4VPResponseMode.FRAGMENT, responseUri = null),
+            request(responseMode = OpenID4VPResponseMode.DC_API, responseUri = null),
+            request().copy(responseMode = null, responseType = null),
+        )
+        for (request in cases) {
+            val failure = assertFailsWith<UnsafePresentationErrorResponseException> {
+                validate(request.copy(nonce = null))
+            }
+            assertEquals(WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST, failure.error.code)
+            assertEquals("Authorization Request nonce is required", failure.error.message)
+            assertTrue(requireNotNull(failure.responseSafetyFailure.message).isNotBlank())
+        }
+    }
+
+    @Test
+    fun credentialAvailabilityErrorIsRetainedWhenReportingIsUnsafe() {
+        val error = requireNotNull(PresentationRequestValidator.validateCredentialAvailability(
+            query = requireNotNull(request().dcqlQuery), availableCredentialQueryIds = emptySet(),
+        ))
+        val failure = assertFailsWith<UnsafePresentationErrorResponseException> {
+            PresentationRequestValidator.requireErrorResponseCanBeSent(ResolvedAuthorizationRequest.Plain(request()), error)
+        }
+        assertSame(error, failure.error)
+        assertEquals(WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED, failure.error.code)
     }
 
     private fun validate(

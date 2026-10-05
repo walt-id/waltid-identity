@@ -24,6 +24,7 @@ kotlin {
             /*
              * walt.id:
              */
+            api(project(":waltid-libraries:waltid-library-commons"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
         }

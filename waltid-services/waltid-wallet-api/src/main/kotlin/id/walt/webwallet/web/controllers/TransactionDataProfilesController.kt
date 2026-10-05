@@ -1,8 +1,8 @@
 package id.walt.webwallet.web.controllers
 
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.config.list.TransactionDataProfile
-import id.walt.commons.config.list.TransactionDataProfilesConfig
+import id.walt.verifier.openid.transactiondata.TransactionDataProfile
+import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
 import io.github.smiley4.ktoropenapi.get
 import io.ktor.http.*

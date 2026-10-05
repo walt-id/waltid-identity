@@ -105,6 +105,10 @@ object FeatureManager {
     suspend fun <T> runIfEnabled(feature: OptionalFeature, block: suspend () -> T?): T? =
         feature.takeIf { isFeatureEnabled(it) }?.let { block.invoke() }
 
+    @Deprecated(
+        "A second spelling of whenFeature; use that.",
+        ReplaceWith("block.whenFeature(this)", "id.walt.commons.featureflag.FeatureManager.whenFeature")
+    )
     infix fun OptionalFeature.feature(block: () -> Unit) {
         runIfEnabledBlocking(this, block)
     }

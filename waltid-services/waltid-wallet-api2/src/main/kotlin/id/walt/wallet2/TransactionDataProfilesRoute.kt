@@ -1,8 +1,8 @@
 package id.walt.wallet2
 
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.config.list.TransactionDataProfile
-import id.walt.commons.config.list.TransactionDataProfilesConfig
+import id.walt.verifier.openid.transactiondata.TransactionDataProfile
+import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureManager
 import io.github.smiley4.ktoropenapi.get
 import io.ktor.http.*
