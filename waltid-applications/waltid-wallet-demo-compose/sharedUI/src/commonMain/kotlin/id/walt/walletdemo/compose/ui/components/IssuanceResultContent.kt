@@ -61,9 +61,9 @@ private fun SavedCredentialRow(credential: WalletDemoCredential) {
         CredentialSummaryRow(summary.toCardArt(), summary.issuer, Modifier.weight(1f))
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
     }
-    if (detailsOpen) WalletDetailSheet(summary.title, { detailsOpen = false }) {
+    if (detailsOpen) {
         val details = remember(credential) { credential.toCredentialDetails() }
-        CredentialDetailsContent(details)
+        CredentialInformationSheet(details, onDismiss = { detailsOpen = false })
     }
 }
 

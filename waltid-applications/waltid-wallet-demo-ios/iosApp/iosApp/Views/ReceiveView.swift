@@ -48,7 +48,7 @@ struct ReceiveView: View {
                 WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
 
                 ScannableUrlEditor(
-                    title: "Receive",
+                    title: "",
                     label: "Credential offer URL",
                     text: $viewModel.offerUrl,
                     inputIdentifier: WalletAccessibilityID.offerInput,

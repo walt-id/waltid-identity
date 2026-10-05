@@ -15,19 +15,15 @@ public struct WalletDetailSheet<Content: View>: View {
     }
 
     public var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) { content }.padding(20)
+        if #available(iOS 16, *) {
+            NavigationStack {
+                WalletDetailPage(title, onDismiss: onDismiss, closeIdentifier: closeIdentifier) { content }
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "Close", bundle: .module), action: onDismiss)
-                        .accessibilityIdentifier(closeIdentifier)
-                }
+        } else {
+            NavigationView {
+                WalletDetailPage(title, onDismiss: onDismiss, closeIdentifier: closeIdentifier) { content }
             }
-        }.navigationViewStyle(.stack)
+            .navigationViewStyle(.stack)
+        }
     }
 }
