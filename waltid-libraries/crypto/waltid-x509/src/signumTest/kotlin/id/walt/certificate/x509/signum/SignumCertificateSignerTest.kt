@@ -55,6 +55,24 @@ class SignumCertificateSignerTest {
         }
     }
 
+    @Test
+    fun csrSigningRejectsNonDerAlgorithmBeforeSigning() = runTest {
+        val rawAlgorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.IEEE_P1363)
+        val key = object : Key by rawEcSigningKey {
+            override val capabilities = KeyCapabilities(
+                signatureAlgorithms = setOf(rawAlgorithm),
+                signer = Signer { _, _ -> error("Rejected CSR algorithm reached the signer") },
+                publicKeyExporter = rawEcSigningKey.capabilities.publicKeyExporter,
+            )
+        }
+
+        assertFailsWith<IllegalArgumentException> {
+            SignumCertificateSigner().signCsr(
+                key, rawAlgorithm, Pkcs10CertificateSigningRequestBuilder("CN=DER signature test")
+            )
+        }
+    }
+
     private val derAlgorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
 
     private val rawEcSigningKey = object : Key {

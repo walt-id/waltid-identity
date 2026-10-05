@@ -178,6 +178,8 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
         signatureAlgorithm: SignatureAlgorithm,
         csrBuilder: Pkcs10CertificateSigningRequestBuilder
     ): Pkcs10CertificateSigningRequest {
+        val sigAlgorithm = X509SigningAlgorithmInfo.ofKey(holderKey, signatureAlgorithm)
+        val algorithm = sigAlgorithm.toSignatureAlgorithm()
         val publicKey = (convertKeyToPublicKeyInfo(holderKey) as SignumPublicKeyInfo).keyInfo
         val tbsCsr = buildTbsCsr(csrBuilder, publicKey)
 
@@ -191,8 +193,6 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
             ?: error("Signer not found for key")
 
         // 3. Decode the requested DER ECDSA format or preserve opaque RSA bytes.
-        val sigAlgorithm = X509SigningAlgorithmInfo.ofKey(holderKey, signatureAlgorithm)
-        val algorithm = sigAlgorithm.toSignatureAlgorithm()
         val signature = SignumSignatureAlgorithmUtil.evaluateDerSignature(sigAlgorithm, rawSignatureBytes)
 
         // 4. Directly construct the finished PKCS#10 Certificate Request
@@ -219,8 +219,7 @@ class SignumCertificateSigner : X509CertificateSigner, Pkcs10CertificateSigningR
         // 2. Compute the cryptographic signature using your JS/External provider
         val rawSignatureBytes: ByteArray = holderKey.signRaw(tbsDerBytes) as ByteArray
 
-        // 3. Instantiate the appropriate CryptoSignature variant manually.
-        // For EC keys (e.g., P-256), use EC.fromRawBytes. For RSA, use CryptoSignature.RSA.
+        // 3. Decode ECDSA as DER with raw fallback, or preserve opaque RSA bytes.
         val sigAlgorithm = X509SigningAlgorithmInfo.ofKey(holderKey)
         val algorithm = sigAlgorithm.toSignatureAlgorithm()
         val signature = SignumSignatureAlgorithmUtil.evaluateSignature(sigAlgorithm, rawSignatureBytes)
