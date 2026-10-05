@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.flows
 
+import id.walt.ktorauthnz.accounts.registerAccount
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import id.walt.ktorauthnz.methods.config.IdentifyConfiguration
@@ -47,10 +48,14 @@ class AuthFlowRoutesConfig {
 
     /**
      * Logs in identities the account store does not know yet, for [methods] that support it (LDAP users, VC
-     * holders, Web3 addresses, `email-code` sign-ups): [register] adds an account for the identifier - e.g.
-     * `accounts.addAccountIdentifierToAccount(newId, it)` - and the login continues with it. Without it they are refused.
+     * holders, Web3 addresses, `email-code` sign-ups): [register] adds an account for the identifier - by default with
+     * [registerAccount], so the `onAccountRegistered` hook runs - and the login continues with it. Without this, they
+     * are refused.
      */
-    fun registerUnknownAccounts(vararg methods: AuthenticationMethod, register: suspend (AccountIdentifier) -> Unit) {
+    fun registerUnknownAccounts(
+        vararg methods: AuthenticationMethod,
+        register: suspend (AccountIdentifier) -> Unit = { identifier -> registerAccount { identifier(identifier) } },
+    ) {
         functionAmendments = functionAmendments + methods.associateWith { method ->
             functionAmendments[method].orEmpty() + (AuthMethodFunctionAmendments.Registration to { identifier: Any ->
                 register(identifier as AccountIdentifier)
