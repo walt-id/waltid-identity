@@ -123,5 +123,4 @@ As a later step, `POST {sessionId}/email-code/send` sends a code for the account
   ```
 
   Passkey challenges answer only in the tenant they were issued for.
-- A user who has not enrolled TOTP cannot pass a flow that requires it; enrolment happens after login
-  (`totpEnrollment`).
+- A user who has not set up TOTP passes a flow that requires it only if the flow offers `totp-setup` next to `totp`.
