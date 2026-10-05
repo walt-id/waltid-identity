@@ -71,6 +71,10 @@ install(Authentication) {
 }
 ```
 
+Set your own `passwordHashing = PasswordHashingConfiguration(pepper = ...)`, a secret kept out of the database: the
+default pepper is public, and ktor-authnz warns at startup while it is used. Hashes only verify with the pepper they
+were made with, so keep the one you start with.
+
 The configuration is process-wide (kept in `KtorAuthnzManager`): one JVM runs one ktor-authnz configuration. Use
 Valkey stores when a service runs on more than one instance.
 
