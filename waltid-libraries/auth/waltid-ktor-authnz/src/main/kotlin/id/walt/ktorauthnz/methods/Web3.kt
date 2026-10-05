@@ -120,16 +120,8 @@ object Web3 : AuthenticationMethod("web3") {
                 val address = verifySiweLogin(req)
 
                 val identifier = Web3Identifier(address)
-                val identifierResolved = identifier.resolveIfExists()
-
-                if (identifierResolved == null) {
-                    val registrationFunction = functionAmendments?.get(AuthMethodFunctionAmendments.Registration)
-                        ?: throw AccountNotFoundException(identifier.accountIdentifierName)
-                    registrationFunction.invoke(identifier)
-                }
-
-                val authContext = authContext(call)
-                call.handleAuthSuccess(session, authContext, identifierResolved ?: identifier.resolveToAccountId())
+                val accountId = accountFor(session, identifier, functionAmendments?.get(AuthMethodFunctionAmendments.Registration))
+                call.handleAuthSuccess(session, authContext(call), accountId)
             }
         }
     }
