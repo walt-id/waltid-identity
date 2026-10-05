@@ -39,7 +39,7 @@ data class AuthMethodRegistrationWrapper(
             data = setInitialAuthJsonObjectType(data!!, type)
         }
         if (config != null) {
-            data = setInitialAuthJsonObjectType(config!!, type)
+            config = setInitialAuthJsonObjectType(config!!, type)
         }
         return Json.decodeFromJsonElement<AuthMethodRegistration>(Json.encodeToJsonElement(this))
     }
