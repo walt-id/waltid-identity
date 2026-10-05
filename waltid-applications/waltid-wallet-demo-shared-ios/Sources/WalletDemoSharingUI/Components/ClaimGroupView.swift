@@ -19,12 +19,14 @@ public struct ClaimGroupView: View {
                             initiallyExpanded: group.initiallyExpanded,
                             accessibilityIdentifier: WalletAccessibilityID.claimGroupDisclosure(group.title)
                         ) {
-                            claimItems
+                            claimItems.padding(.bottom, 12)
                         }
                     } else {
                         claimItems
                     }
-                }.padding(16)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, collapsible ? 4 : 16)
             }
         }
     }
