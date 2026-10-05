@@ -131,6 +131,10 @@ code. Every new account runs the `onAccountRegistered` hook, e.g. to create a pr
 
 ### Enrolment and account routes
 
+- `accountRoutes()`: `logout`, `sessions` (list, end one, end all); `identityLinking(flows)`: link an OIDC, LDAP,
+  wallet or Web3 identity to the account, list and remove identities; `requireRecentLogin(maxAge)` for sensitive
+  actions. See [account-routes.md](docs/account-routes.md).
+
 Place inside `authenticate { }`:
 
 - `totp-setup` in a flow, next to `totp`, sets TOTP up during login for accounts that have none yet (an account
@@ -204,6 +208,7 @@ The tests double as examples: `AuthFlowRoutesTest` (flows, tenants, provider hoo
 - [multi-tenant.md](docs/multi-tenant.md): a login configured per tenant
 - [identifier-first.md](docs/identifier-first.md): the account decides how it logs in
 - [registration.md](docs/registration.md): sign-up, registration on first login, and from code
+- [account-routes.md](docs/account-routes.md): logout, sessions, fresh logins, linking identities
 - [new-auth-method.md](docs/new-auth-method.md): adding an authentication method
 - [oidc.md](docs/oidc.md): OpenID Connect
 - [radius.md](docs/radius.md): RADIUS
