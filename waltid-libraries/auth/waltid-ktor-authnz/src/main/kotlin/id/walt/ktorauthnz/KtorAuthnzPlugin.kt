@@ -31,6 +31,16 @@ class KtorAuthnzConfig {
 
     internal var passkeysPerTenant: (suspend (tenant: String?) -> PasskeySettings?)? = null
 
+    internal var onAccountRegistered: (suspend (id.walt.ktorauthnz.accounts.RegisteredAccount) -> Unit)? = null
+
+    /**
+     * Runs for every new account - signed up, a new OIDC identity, or registered by `registerUnknownAccounts` - e.g. to
+     * create a profile from its details. Failing it fails the registration (the login identifiers are stored already).
+     */
+    fun onAccountRegistered(hook: suspend (id.walt.ktorauthnz.accounts.RegisteredAccount) -> Unit) {
+        onAccountRegistered = hook
+    }
+
     /**
      * The WebAuthn relying party per tenant, for tenants on their own domains: passkeys are bound to a domain, so
      * `org1.example.com` and `org2.example.com` need their own. Null for a tenant uses [passkeys].
@@ -93,6 +103,7 @@ val KtorAuthnz = createApplicationPlugin("KtorAuthnz", ::KtorAuthnzConfig) {
     config.refreshTokens?.let { KtorAuthnzManager.refreshTokens = it }
     config.passkeys?.let { KtorAuthnzManager.passkeys = it }
     config.passkeysPerTenant?.let { KtorAuthnzManager.passkeysPerTenant = it }
+    config.onAccountRegistered?.let { KtorAuthnzManager.onAccountRegistered = it }
     config.emailCodes?.let { KtorAuthnzManager.emailCodes = it }
 
     config.cookie.name?.let { SessionTokenCookieHandler.cookieName = it }
