@@ -113,12 +113,7 @@ object VerifiableCredential : AuthenticationMethod("vc") {
                     "SUCCESSFUL" -> {
                         val identifier = identifierOf(verification, config)
                             ?: throw AuthenticationFailureException("The presented credential has no ${config.identifierClaim.joinToString("/")} claim")
-                        val accountId = identifier.resolveIfExists() ?: run {
-                            val register = functionAmendments?.get(AuthMethodFunctionAmendments.Registration)
-                                ?: throw AccountNotFoundException(identifier.accountIdentifierName)
-                            register(identifier)
-                            identifier.resolveToAccountId()
-                        }
+                        val accountId = accountFor(session, identifier, functionAmendments?.get(AuthMethodFunctionAmendments.Registration))
                         call.handleAuthSuccess(session, authContext(call), accountId)
                     }
 
