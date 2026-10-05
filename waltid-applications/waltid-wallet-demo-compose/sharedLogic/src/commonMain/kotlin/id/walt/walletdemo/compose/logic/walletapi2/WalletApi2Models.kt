@@ -2,6 +2,7 @@
 
 package id.walt.walletdemo.compose.logic.walletapi2
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
@@ -114,6 +115,7 @@ internal data class ReceiveCredentialRequestDto(
     val offerUrl: String,
     val txCode: String? = null,
     val did: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val clientId: String = WalletApi2DefaultClientId,
     val redirectUri: String? = null,
     val credentials: List<IssuanceCredentialSelectionDto>,
@@ -200,6 +202,7 @@ internal data class CredentialIssuanceFailureDto(
 @Serializable
 internal data class GenerateAuthorizationUrlRequestDto(
     val offerUrl: String,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val clientId: String = WalletApi2DefaultClientId,
     val redirectUri: String,
     val usePkce: Boolean = true,
@@ -224,6 +227,7 @@ internal data class ReceiveAuthorizedCredentialRequestDto(
     val credentialEndpoint: String,
     val credentials: List<IssuanceCredentialSelectionDto>,
     val nonceEndpoint: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val clientId: String = WalletApi2DefaultClientId,
     val redirectUri: String,
     val did: String? = null,

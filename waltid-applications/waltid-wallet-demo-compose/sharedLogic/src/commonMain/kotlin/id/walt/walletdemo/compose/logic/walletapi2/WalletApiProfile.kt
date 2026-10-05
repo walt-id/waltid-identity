@@ -1,6 +1,8 @@
 package id.walt.walletdemo.compose.logic.walletapi2
 
 import io.ktor.http.encodeURLPathPart
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -49,17 +51,21 @@ internal fun walletApiOperationPath(kind: WalletApiKind, walletId: String, opera
 }
 
 internal fun adaptWalletRequestBody(kind: WalletApiKind, body: JsonObject): JsonObject {
-    if (kind != WalletApiKind.Enterprise || !body.containsKey("keyId")) return body
-    val keyId = body["keyId"] ?: return body
-    if (keyId is JsonNull) return body
-    return JsonObject(
+    if (kind != WalletApiKind.Enterprise) return body
+    return adaptEnterpriseValue(body) as JsonObject
+}
+
+private fun adaptEnterpriseValue(value: JsonElement): JsonElement = when (value) {
+    is JsonObject -> JsonObject(
         buildMap {
-            body.forEach { (key, value) ->
-                if (key != "keyId") put(key, value)
+            value.forEach { (key, child) ->
+                val adapted = adaptEnterpriseValue(child)
+                if (key == "keyId" && child !is JsonNull) put("keyReference", adapted) else put(key, adapted)
             }
-            put("keyReference", keyId)
         },
     )
+    is JsonArray -> JsonArray(value.map(::adaptEnterpriseValue))
+    else -> value
 }
 
 internal fun wallet2TargetsFromResourceTree(tree: JsonObject): List<String> {

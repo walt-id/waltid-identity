@@ -1,7 +1,10 @@
 package id.walt.walletdemo.compose.logic.walletapi2
 
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,6 +45,27 @@ class WalletApiProfileTest {
         assertEquals(JsonPrimitive("waltid.tenant1.kms.key1"), adapted["keyReference"])
         assertFalse(adapted.containsKey("keyId"))
         assertEquals(body, adaptWalletRequestBody(WalletApiKind.OpenSource, body))
+    }
+
+    @Test
+    fun enterpriseRequestsRenameNestedHolderKeyIds() {
+        val body = buildJsonObject {
+            put("credentials", buildJsonArray {
+                add(buildJsonObject {
+                    put("holderBindings", buildJsonArray {
+                        add(buildJsonObject {
+                            put("keyId", "waltid.tenant1.kms.key1")
+                            put("did", "did:jwk:example")
+                        })
+                    })
+                })
+            })
+        }
+        val binding = adaptWalletRequestBody(WalletApiKind.Enterprise, body)
+            .getValue("credentials").jsonArray.single().jsonObject
+            .getValue("holderBindings").jsonArray.single().jsonObject
+        assertEquals(JsonPrimitive("waltid.tenant1.kms.key1"), binding["keyReference"])
+        assertFalse(binding.containsKey("keyId"))
     }
 
     @Test

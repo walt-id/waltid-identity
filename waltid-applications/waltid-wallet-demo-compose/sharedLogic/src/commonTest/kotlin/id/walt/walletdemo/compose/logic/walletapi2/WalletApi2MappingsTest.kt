@@ -4,6 +4,7 @@ import id.walt.walletdemo.compose.logic.WalletDeepLinkScheme
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
 import kotlin.test.Test
 import kotlin.test.assertIs
@@ -71,8 +72,20 @@ class WalletApi2MappingsTest {
         )
         val json = walletApi2Json.parseToJsonElement(walletApi2Json.encodeToString(request)).jsonObject
         assertFalse("credentialConfigurationId" in json)
+        assertEquals(WalletApi2DefaultClientId, json.getValue("clientId").jsonPrimitive.content)
         assertEquals(2, json.getValue("credentials").jsonArray.single().jsonObject.getValue("holderBindings").jsonArray.size)
         assertEquals(request, walletApi2Json.decodeFromString<ReceiveAuthorizedCredentialRequestDto>(json.toString()))
+    }
+
+    @Test
+    fun authorizationUrlRequestAlwaysSendsTheSameClientId() {
+        val request = GenerateAuthorizationUrlRequestDto(
+            offerUrl = "openid-credential-offer://issuer.example/?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer",
+            redirectUri = "http://localhost:8080/",
+            credentialConfigurationIds = listOf("OpenBadgeCredential_jwt_vc_json"),
+        )
+        val json = walletApi2Json.parseToJsonElement(walletApi2Json.encodeToString(request)).jsonObject
+        assertEquals(WalletApi2DefaultClientId, json.getValue("clientId").jsonPrimitive.content)
     }
 
     @Test

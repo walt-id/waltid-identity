@@ -402,9 +402,14 @@ class WalletApi2IssuanceOwnershipTest {
         }) {
             install(ContentNegotiation) { json(walletApi2Json) }
         }
-        private val client = WalletApi2Client("https://wallet-api.example", "token", http)
+        private val client = WalletApi2Client("https://wallet-api.example", "token", http = http)
         val wallet = newWallet()
-        fun newWallet() = WalletApi2DemoWallet(client, "wallet", "https://wallet.example/callback") { id ->
+        fun newWallet() = WalletApi2DemoWallet(
+            client,
+            WalletApiKind.OpenSource,
+            "wallet",
+            "https://wallet.example/callback",
+        ) { id ->
             publishedWalletIds += id
             check(!failPublication) { "Browser storage unavailable" }
         }
