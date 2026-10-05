@@ -5,7 +5,7 @@ import com.atlassian.onetime.model.TOTPSecret
 import com.atlassian.onetime.service.DefaultTOTPService
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.events.AuthnzEvent
 import id.walt.ktorauthnz.events.AuthnzEvents
 import id.walt.ktorauthnz.exceptions.AuthSessionStateException
