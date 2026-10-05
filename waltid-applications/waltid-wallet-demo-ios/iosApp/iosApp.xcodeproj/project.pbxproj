@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1000470AAAA000100000070 /* WalletPinInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000470AAAA000000000070 /* WalletPinInput.swift */; };
 		13330004AAAA000100000003 /* PresentationErrorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330004AAAA000000000003 /* PresentationErrorView.swift */; };
 		13330004AAAA000100000002 /* WalletExternalFlowStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330004AAAA000000000002 /* WalletExternalFlowStatus.swift */; };
 		13330004AAAA000100000001 /* WalletExternalFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330004AAAA000000000001 /* WalletExternalFlow.swift */; };
@@ -163,6 +164,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A1000470AAAA000000000070 /* WalletPinInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletPinInput.swift; sourceTree = "<group>"; };
 		13330004AAAA000000000003 /* PresentationErrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationErrorView.swift; sourceTree = "<group>"; };
 		13330004AAAA000000000002 /* WalletExternalFlowStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletExternalFlowStatus.swift; sourceTree = "<group>"; };
 		13330004AAAA000000000001 /* WalletExternalFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletExternalFlow.swift; sourceTree = "<group>"; };
@@ -361,6 +363,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000006AAAA000000000006 /* StatusBannerView.swift */,
+				A1000470AAAA000000000070 /* WalletPinInput.swift */,
 				A1000441AAAA000000000041 /* WalletTabChrome.swift */,
 				A1000425AAAA000000000025 /* UrlEditor.swift */,
 				13330002AAAA000000000002 /* ScanCodeButton.swift */,
@@ -783,6 +786,7 @@
 				BB7491000000000000000002 /* ReaderTrustSettingsView.swift in Sources */,
 				800619A4865746A58B033223 /* DigitalCredentialsSettingsView.swift in Sources */,
 				BB7491000000000000000001 /* NearbySettingsView.swift in Sources */,
+				A1000470AAAA000100000070 /* WalletPinInput.swift in Sources */,
 				A1000441AAAA000100000041 /* WalletTabChrome.swift in Sources */,
 				A1000442AAAA000100000042 /* PinView.swift in Sources */,
 				A1000443AAAA000100000043 /* DemoPinStore.swift in Sources */,

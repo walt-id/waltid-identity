@@ -87,34 +87,41 @@ internal class WalletVisualScenarios(
     }
 
     fun pin(state: String) = with(test) {
+        val gate = kotlinx.coroutines.CompletableDeferred<id.walt.walletdemo.compose.logic.DemoBiometricResult>()
         val biometrics = object : id.walt.walletdemo.compose.logic.DemoBiometricAuthenticator {
-            override fun isAvailable() = state == "biometrics_enabled"
-            override suspend fun authenticate(reason: String) = id.walt.walletdemo.compose.logic.DemoBiometricResult.Succeeded
+            override fun isAvailable() = state in setOf("confirmation", "biometric_prompt", "compact_dark_large_text")
+            override suspend fun authenticate(reason: String) = gate.await()
         }
-        val controller = id.walt.walletdemo.compose.logic.WalletDemoController(
-            WalletUiTestWallet(), id.walt.walletdemo.compose.logic.InMemoryDemoPinStore(), biometrics)
-        if (state != "setup") {
-            controller.updatePin("1234")
-            controller.updatePinConfirmation(if (state == "mismatch") "4321" else "1234")
+        val memory = id.walt.walletdemo.compose.logic.InMemoryDemoPinStore()
+        val store = if (state == "legacy_unlock") object : id.walt.walletdemo.compose.logic.DemoPinStore by memory {
+            override fun hasPin() = true
+        } else memory
+        val controller = id.walt.walletdemo.compose.logic.WalletDemoController(WalletUiTestWallet(), store, biometrics)
+        if (state == "legacy_unlock") controller.updatePin("1234")
+        else if (state != "setup") {
+            controller.updatePin("123456")
+            controller.submitPin()
+            if (state == "mismatch") controller.updatePinConfirmation("654321")
+            if (state == "compact_dark_large_text") controller.updatePinConfirmation("123")
+            if (state == "biometric_prompt") controller.updatePinConfirmation("123456")
         }
-        if (state == "mismatch") controller.submitPin()
-        if (state == "biometrics_enabled") {
-            controller.updateUseBiometrics(true)
-            waitUntil { !controller.state.value.isAuthenticating }
-        }
-        val auth = controller.state.value.auth as id.walt.walletdemo.compose.logic.WalletAuthState.Setup
-        content { id.walt.walletdemo.compose.ui.screens.PinScreen(controller, auth, false, biometrics.isAvailable()) }
-        onNodeWithTag(WalletUiTestTags.PinInput).assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.PinConfirmationInput).assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.PinBiometricToggle).assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsDisplayed()
+        val auth = controller.state.value.auth as id.walt.walletdemo.compose.logic.WalletAuthState.PinEntry
+        content { id.walt.walletdemo.compose.ui.screens.PinScreen(controller, auth, state == "biometric_prompt", biometrics.isAvailable()) }
+        onAllNodesWithTag("wallet.pinBiometricToggle").assertCountEquals(0)
+        val confirming = state !in setOf("setup", "legacy_unlock")
+        onNodeWithTag(if (confirming) WalletUiTestTags.PinConfirmationInput else WalletUiTestTags.PinInput).assertIsDisplayed()
+        onAllNodesWithTag(if (confirming) WalletUiTestTags.PinInput else WalletUiTestTags.PinConfirmationInput).assertCountEquals(0)
         when (state) {
-            "setup" -> onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsNotEnabled()
+            "legacy_unlock" -> onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsEnabled()
+            "biometric_prompt" -> {
+                onNodeWithTag(WalletUiTestTags.PinBackButton).assertIsNotEnabled()
+                onNodeWithText("Authenticating…").assertIsDisplayed()
+            }
             "mismatch" -> onNodeWithText("PIN confirmation does not match").assertIsDisplayed()
-            "biometrics_enabled" -> onNodeWithTag(WalletUiTestTags.PinBiometricToggle).assertIsOn()
-            else -> error("Unknown PIN fixture: $state")
         }
+        if (state != "legacy_unlock") onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsDisplayed().assertIsNotEnabled()
         capture("onboarding.pin.$state")
+        gate.complete(id.walt.walletdemo.compose.logic.DemoBiometricResult.Failed)
     }
 
     fun keySetup(page: String) = with(test) {

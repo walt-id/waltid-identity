@@ -15,8 +15,8 @@ class WalletDemoAppIosTest {
 
     @Test fun pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt() = scenarios.pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt()
 
-    @Test fun pinSetupRequiresFourDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresFourDigitsAndMatchingConfirmation()
-    @Test fun pinSetupAuthenticatesBiometricChoiceWithoutLeavingForm() = scenarios.pinSetupAuthenticatesBiometricChoiceWithoutLeavingForm()
+    @Test fun pinSetupRequiresSixDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresSixDigitsAndMatchingConfirmation()
+    @Test fun pinConfirmationPromptsBiometricsAndDeclineCompletesSetup() = scenarios.pinConfirmationPromptsBiometricsAndDeclineCompletesSetup()
 
     @Test fun scannerResolvesWebLinksAndKeepsFailureRecoverable() = scenarios.scannerResolvesWebLinksAndKeepsFailureRecoverable()
 

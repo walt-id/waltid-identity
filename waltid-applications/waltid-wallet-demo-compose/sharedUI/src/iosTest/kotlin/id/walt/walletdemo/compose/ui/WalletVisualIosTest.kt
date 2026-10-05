@@ -81,7 +81,10 @@ class WalletVisualIosTest {
 
     @Test fun pinSetup() = scenario { pin("setup") }
     @Test fun pinMismatch() = scenario { pin("mismatch") }
-    @Test fun pinBiometrics() = scenario { pin("biometrics_enabled") }
+    @Test fun pinConfirmation() = scenario { pin("confirmation") }
+    @Test fun pinBiometricPrompt() = scenario { pin("biometric_prompt") }
+    @Test fun pinLegacyUnlock() = scenario { pin("legacy_unlock") }
+    @Test fun pinCompact() = scenario(size = Size(320f, 568f), fontScale = 1.5f, dark = true) { pin("compact_dark_large_text") }
 
     @Test fun homeEmpty() = scenario { walletHome(empty = true) }
     @Test fun homeCredential() = scenario { walletHome() }

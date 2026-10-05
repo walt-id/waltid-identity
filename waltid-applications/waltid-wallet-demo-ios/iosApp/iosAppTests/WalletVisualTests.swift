@@ -77,20 +77,38 @@ final class WalletVisualTests: XCTestCase {
 
     func testPinSetup() async throws { try await pin("setup") }
     func testPinMismatch() async throws { try await pin("mismatch") }
-    func testPinBiometrics() async throws { try await pin("biometrics_enabled") }
+    func testPinConfirmation() async throws { try await pin("confirmation") }
+    func testPinBiometricPrompt() async throws { try await pin("biometric_prompt") }
+    func testPinLegacyUnlock() async throws { try await pin("legacy_unlock") }
+    func testPinCompact() async throws { try await pin("compact_dark_large_text") }
 
     private func pin(_ state: String) async throws {
-        let model = makeModel(biometricsAvailable: state == "biometrics_enabled")
+        let gate = DemoBiometricTestGate()
+        let biometric = FakeDemoBiometricAuthenticator(isAvailable: state != "setup", gate: gate)
+        let model = makeModel(biometricAuthenticator: biometric)
         await model.readerTrustSettings.awaitPendingOperations()
-        if state != "setup" {
-            model.pin = "1234"
-            model.pinConfirmation = state == "mismatch" ? "4321" : "1234"
+        if state == "legacy_unlock" { model.auth = .login; model.pin = "1234" }
+        else if state != "setup" {
+            model.updatePin("123456")
+            model.submitPin()
+            if state == "mismatch" { model.updatePinConfirmation("654321") }
+            if state == "compact_dark_large_text" { model.updatePinConfirmation("123") }
+            if state == "biometric_prompt" {
+                model.updatePinConfirmation("123456")
+                let deadline = DispatchTime.now().uptimeNanoseconds + 20_000_000_000
+                while biometric.authenticateCalls == 0 && DispatchTime.now().uptimeNanoseconds < deadline {
+                    try await Task.sleep(nanoseconds: 10_000_000)
+                }
+                XCTAssertEqual(biometric.authenticateCalls, 1)
+                XCTAssertTrue(model.isAuthenticating)
+            }
         }
-        if state == "mismatch" { model.submitPin() }
-        if state == "biometrics_enabled" { model.useBiometrics = true }
-        XCTAssertEqual(model.auth, .setup)
         if state == "mismatch" { XCTAssertEqual(model.pinError, "PIN confirmation does not match") }
-        try capture(PinView(viewModel: model), id: "onboarding.pin.\(state)")
+        let compact = state == "compact_dark_large_text"
+        try capture(PinView(viewModel: model), id: "onboarding.pin.\(state)",
+            config: compact ? .iPhoneSe : .iPhone13,
+            colorScheme: compact ? .dark : .light, sizeCategory: compact ? .accessibilityMedium : .large)
+        await gate.complete(.failed)
     }
 
     func testHomeEmpty() async throws { try await home(empty: true) }
@@ -396,7 +414,7 @@ final class WalletVisualTests: XCTestCase {
                     id: noneSelected ? "batch.offer.none_selected" : "batch.offer.two_targets_three_copies")
     }
 
-    private func makeModel(biometricsAvailable: Bool = false) -> WalletViewModel {
+    private func makeModel(biometricAuthenticator: (any DemoBiometricAuthenticator)? = nil) -> WalletViewModel {
         WalletViewModel(
             walletID: "visual-settings",
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(),
@@ -404,7 +422,7 @@ final class WalletVisualTests: XCTestCase {
             readerTrustSettingsPersistence: InMemoryDemoReaderTrustSettingsPersistence(),
             identityDocumentRegistrationUpdate: {},
             pinStore: InMemoryDemoPinStore(),
-            biometricAuthenticator: FakeDemoBiometricAuthenticator(isAvailable: biometricsAvailable)
+            biometricAuthenticator: biometricAuthenticator ?? FakeDemoBiometricAuthenticator(isAvailable: false)
         )
     }
 

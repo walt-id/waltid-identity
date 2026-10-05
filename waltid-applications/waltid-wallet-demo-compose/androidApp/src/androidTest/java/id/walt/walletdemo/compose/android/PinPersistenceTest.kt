@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.android
 
 import android.app.Instrumentation
+import android.view.WindowInsets
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
@@ -27,6 +28,38 @@ class PinPersistenceTest {
 
     @After
     fun clearPinAfterTest() = clearPersistedPin()
+
+    @Test
+    fun pinStepsKeepConfirmationSeparateAndActionsAboveTheKeyboard() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val device = UiDevice.getInstance(instrumentation)
+        WalletComposeE2EHelper.launch(context)
+        val input = requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 30_000))
+        assertTrue(device.hasObject(By.text("Step 1 of 2")))
+        assertTrue(!device.hasObject(By.res("wallet.pinConfirmationInput")))
+        assertTrue(!device.hasObject(By.res("wallet.pinBiometricToggle")))
+        input.click()
+        input.setText("1234")
+        assertPinSubmitAboveKeyboard(instrumentation, device)
+        assertTrue(!requireNotNull(device.findObject(By.res("wallet.pinSubmitButton"))).isEnabled)
+        input.setText("123456")
+        WalletComposeE2EHelper.dismissKeyboard(device)
+        WalletComposeE2EHelper.clickByTag(device, "wallet.pinSubmitButton")
+        val confirmation = requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinConfirmationInput", 10_000))
+        assertTrue(!device.hasObject(By.res("wallet.pinInput")))
+        confirmation.setText("123")
+        assertPinSubmitAboveKeyboard(instrumentation, device)
+        device.pressBack() // Hide the IME first.
+        device.pressBack() // The system Back action returns to Choose, rather than exiting.
+        assertTrue(device.wait(Until.hasObject(By.text("Step 1 of 2")), 10_000))
+        WalletComposeE2EHelper.clickByTag(device, "wallet.pinSubmitButton")
+        val retry = requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinConfirmationInput", 10_000))
+        retry.setText("654321")
+        assertTrue(device.wait(Until.hasObject(By.text("PIN confirmation does not match")), 10_000))
+        retry.setText("123456")
+        WalletComposeE2EHelper.awaitWalletReady(device)
+    }
 
     @Test
     fun relaunchShowsLoginAndAcceptsOriginalPin() {
@@ -73,6 +106,30 @@ class PinPersistenceTest {
             device.setOrientationNatural()
             device.unfreezeRotation()
         }
+    }
+
+    private fun assertPinSubmitAboveKeyboard(instrumentation: Instrumentation, device: UiDevice) {
+        val deadline = System.currentTimeMillis() + 10_000
+        var observed: String? = null
+        while (System.currentTimeMillis() < deadline) {
+            var keyboardTop: Int? = null
+            instrumentation.runOnMainSync {
+                val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                    .filterIsInstance<MainActivity>().singleOrNull()
+                val view = activity?.window?.decorView
+                val insets = view?.rootWindowInsets
+                if (view != null && insets?.isVisible(WindowInsets.Type.ime()) == true) {
+                    val location = IntArray(2)
+                    view.getLocationOnScreen(location)
+                    keyboardTop = location[1] + view.height - insets.getInsets(WindowInsets.Type.ime()).bottom
+                }
+            }
+            val bounds = device.findObject(By.res("wallet.pinSubmitButton"))?.visibleBounds
+            observed = "action=$bounds keyboardTop=$keyboardTop"
+            if (keyboardTop != null && bounds != null && bounds.bottom <= keyboardTop) return
+            Thread.sleep(100)
+        }
+        fail("The PIN action must remain above the visible IME: $observed")
     }
 
     private fun waitForLandscape(device: UiDevice) {

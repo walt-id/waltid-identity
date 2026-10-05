@@ -295,6 +295,12 @@ final class WalletE2EUI {
     }
 
     private func submitFocusedInput(_ element: XCUIElement) {
+        guard element.exists && element.isEnabled else { return }
+        let numericDone = app.buttons["wallet.pinKeyboardAction"]
+        if numericDone.exists && numericDone.isEnabled && numericDone.isHittable {
+            numericDone.tap()
+            return
+        }
         let doneButton = app.toolbars.buttons["Done"]
         if doneButton.exists && doneButton.isHittable {
             doneButton.tap()
@@ -359,11 +365,14 @@ final class WalletE2EUI {
 
         let submit = app.buttons["wallet.pinSubmitButton"]
         XCTAssertTrue(submit.waitForExistence(timeout: 10), "PIN submit button not found")
-        let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
-        if confirmation.waitForExistence(timeout: 2) {
+        if app.staticTexts["Step 1 of 2"].exists {
+            submit.tap()
+            let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
+            XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
             replaceText(in: confirmation, value: pin)
+        } else {
+            submit.tap()
         }
-        submit.tap()
     }
 }
 

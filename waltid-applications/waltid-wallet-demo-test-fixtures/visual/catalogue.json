@@ -222,7 +222,7 @@
         "R12",
         "R13"
       ],
-      "note": "One app-unlock form contains PIN, confirmation and optional biometrics. Synthetic in-memory state; real OS prompt and persistence use separate flow/model tests."
+      "note": "WAL-1440: separate six-digit choose/confirm screens, decorative masked circles and OS-controlled biometric opt-in. Wallet-owned synthetic state; real biometric dialogs and persistence are verified separately."
     },
     {
       "id": "onboarding.pin.mismatch",
@@ -234,19 +234,55 @@
         "R12",
         "R13"
       ],
-      "note": "One app-unlock form contains PIN, confirmation and optional biometrics. Synthetic in-memory state; real OS prompt and persistence use separate flow/model tests."
+      "note": "WAL-1440: separate six-digit choose/confirm screens, decorative masked circles and OS-controlled biometric opt-in. Wallet-owned synthetic state; real biometric dialogs and persistence are verified separately."
     },
     {
-      "id": "onboarding.pin.biometrics_enabled",
-      "composeTest": "pinBiometrics",
-      "swiftTest": "testPinBiometrics",
+      "id": "onboarding.pin.confirmation",
+      "composeTest": "pinConfirmation",
+      "swiftTest": "testPinConfirmation",
       "requirements": [
         "R01",
         "R11",
         "R12",
         "R13"
       ],
-      "note": "One app-unlock form contains PIN, confirmation and optional biometrics. Synthetic in-memory state; real OS prompt and persistence use separate flow/model tests."
+      "note": "WAL-1440: separate six-digit choose/confirm screens, decorative masked circles and OS-controlled biometric opt-in. Wallet-owned synthetic state; real biometric dialogs and persistence are verified separately."
+    },
+    {
+      "id": "onboarding.pin.biometric_prompt",
+      "composeTest": "pinBiometricPrompt",
+      "swiftTest": "testPinBiometricPrompt",
+      "requirements": [
+        "R01",
+        "R11",
+        "R12",
+        "R13"
+      ],
+      "note": "Confirmed PIN waits for the OS biometric result with Back and confirmation disabled. The screenshot shows only the in-app progress, not an imitation system dialog."
+    },
+    {
+      "id": "onboarding.pin.compact_dark_large_text",
+      "composeTest": "pinCompact",
+      "swiftTest": "testPinCompact",
+      "requirements": [
+        "R01",
+        "R11",
+        "R12",
+        "R13"
+      ],
+      "note": "Confirmation at 320x568, dark mode, Compose font scale 1.5 / SwiftUI accessibilityMedium. Six positions and compact trailing actions remain visible."
+    },
+    {
+      "id": "onboarding.pin.legacy_unlock",
+      "composeTest": "pinLegacyUnlock",
+      "swiftTest": "testPinLegacyUnlock",
+      "requirements": [
+        "R01",
+        "R11",
+        "R12",
+        "R13"
+      ],
+      "note": "Existing four-digit PIN input stays masked and enables Unlock; legacy 4-8 digit verifier records are unchanged."
     },
     {
       "id": "credential.details.localized_metadata",

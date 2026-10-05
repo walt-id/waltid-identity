@@ -47,8 +47,7 @@ final class WalletE2EUI {
 
         let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
         XCTAssertTrue(pinInput.waitForExistence(timeout: 10), "PIN input not found after relaunch")
-        let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
-        XCTAssertFalse(confirmation.waitForExistence(timeout: 2), "PIN setup was shown after relaunch")
+        XCTAssertFalse(app.staticTexts["Step 1 of 2"].exists, "PIN setup was shown after relaunch")
         unlockWallet()
 
         let readyStatus = waitUntilWalletReady(timeout: walletReadyTimeout)
@@ -348,8 +347,8 @@ final class WalletE2EUI {
             return
         }
 
-        // Setup now includes a biometric toggle; wait for the full form before the first tap.
-        _ = button(identifier: "wallet.pinSubmitButton", fallbackLabel: "Create PIN")
+        // Wait for the step action before entering the first PIN.
+        _ = button(identifier: "wallet.pinSubmitButton", fallbackLabel: "Continue")
             .waitForExistence(timeout: 5)
 
         let settleDeadline = Date().addingTimeInterval(2)
@@ -360,12 +359,15 @@ final class WalletE2EUI {
 
         replaceText(in: pinInput, value: pin)
 
-        let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
-        if confirmation.waitForExistence(timeout: 2) {
-            replaceText(in: confirmation, value: pin)
+        if app.staticTexts["Step 1 of 2"].exists {
+            tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Continue")
+            let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
+            XCTAssertTrue(confirmation.waitForExistence(timeout: 10))
+            XCTAssertFalse(pinInput.exists, "Choose and Confirm must be separate screens")
+            replaceText(in: confirmation, value: pin, dismiss: false)
+        } else {
+            tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Unlock")
         }
-
-        tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Create PIN")
     }
 
     private func firstExisting(_ elements: [XCUIElement]) -> XCUIElement {
