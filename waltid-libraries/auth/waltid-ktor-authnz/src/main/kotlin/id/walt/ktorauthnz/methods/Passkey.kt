@@ -18,7 +18,7 @@ import com.webauthn4j.verifier.exception.VerificationException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.PasskeyIdentifier
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.AuthenticationFailureException
 import id.walt.ktorauthnz.exceptions.InvalidChallengeException
 import id.walt.ktorauthnz.methods.config.PasskeySettings
