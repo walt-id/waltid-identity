@@ -93,12 +93,7 @@ object LDAP : UserPassBasedAuthMethod("ldap") {
             val credential = call.getUsernamePasswordFromRequest(session)
             val identifier = auth(session, credential, call)
 
-            val accountId = identifier.resolveIfExists() ?: run {
-                val register = functionAmendments?.get(AuthMethodFunctionAmendments.Registration)
-                    ?: throw AccountNotFoundException(identifier.accountIdentifierName)
-                register(identifier)
-                identifier.resolveToAccountId()
-            }
+            val accountId = accountFor(session, identifier, functionAmendments?.get(AuthMethodFunctionAmendments.Registration))
             call.handleAuthSuccess(session, authContext(call), accountId)
         }
     }
