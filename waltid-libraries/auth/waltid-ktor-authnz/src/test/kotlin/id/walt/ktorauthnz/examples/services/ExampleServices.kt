@@ -37,14 +37,30 @@ class ExampleIdentityProvider(private val clientId: String) : AutoCloseable {
     val issuer = "http://127.0.0.1:$port"
     val discoveryUrl = "$issuer/.well-known/openid-configuration"
 
-    private val key = runBlocking {
+    /** Requests for the provider's keys, to see how often they are fetched. */
+    val jwksRequests = java.util.concurrent.atomic.AtomicInteger()
+
+    private var kid = "idp-key"
+    private var key = newKey()
+    private var publicJwk = publicJwkOf(key)
+    /** The key id ID tokens name; null names the current key. */
+    var signedKid: String? = null
+
+    private fun newKey() = runBlocking {
         CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
-            GenerateSoftwareKeyRequest(KeyId("idp-key"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+            GenerateSoftwareKeyRequest(KeyId(kid), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
         )
     }
-    private val publicJwk = runBlocking {
+    private fun publicJwkOf(key: id.walt.crypto2.keys.Key) = runBlocking {
         Json.parseToJsonElement(key.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(key.spec).data.toByteArray().decodeToString())
-            .jsonObject.let { JsonObject(it + ("kid" to JsonPrimitive("idp-key"))) }
+            .jsonObject.let { JsonObject(it + ("kid" to JsonPrimitive(kid))) }
+    }
+
+    /** Signs with a new key under [newKid] from now on, and publishes only that one. */
+    fun rotateKey(newKid: String) {
+        kid = newKid
+        key = newKey()
+        publicJwk = publicJwkOf(key)
     }
 
     private val server = embeddedServer(CIO, port = port) {
@@ -69,12 +85,15 @@ class ExampleIdentityProvider(private val clientId: String) : AutoCloseable {
                     }.toString().encodeToByteArray(),
                     key = key,
                     algorithm = JwsAlgorithm.ES256,
-                    protectedHeader = buildJsonObject { put("kid", "idp-key") },
+                    protectedHeader = buildJsonObject { put("kid", signedKid ?: kid) },
                 )
                 call.respond(buildJsonObject { put("id_token", idToken); put("access_token", "at"); put("token_type", "Bearer") })
             }
             get("/userinfo") { call.respond(buildJsonObject { put("sub", subject) }) }
-            get("/jwks") { call.respond(buildJsonObject { putJsonArray("keys") { add(publicJwk) } }) }
+            get("/jwks") {
+                jwksRequests.incrementAndGet()
+                call.respond(buildJsonObject { putJsonArray("keys") { add(publicJwk) } })
+            }
         }
     }.start(wait = false)
 
