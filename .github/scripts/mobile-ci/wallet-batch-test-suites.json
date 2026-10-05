@@ -9,6 +9,18 @@
           "name": "explicitCopiesSurviveActivityRelaunch"
         }
       ]
+    },
+    "swift-batch-bridge": {
+      "requiredTests": [
+        {
+          "class": "IssuanceBridgeContractTests",
+          "name": "testGeneratedSelectionPreservesCountAndRejectsInvalidNativeCounts"
+        },
+        {
+          "class": "IssuanceBridgeContractTests",
+          "name": "testEveryFailureStageRetainsStoredIdsDeferredHandlesAndUnattemptedTargets"
+        }
+      ]
     }
   }
 }

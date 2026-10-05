@@ -867,7 +867,8 @@ object Wallet2RouteHandler {
             }
 
             post("/sign-proof", {
-                summary = "Isolated: sign a collection of proof-of-possession JWTs"
+                summary = "Isolated: sign proof-of-possession JWTs"
+                description = "Returns proofJwt for one proof, or proofs.jwt for multiple holder bindings."
                 request { pathParameter<String>("walletId"); body<SignProofsRequest>() }
                 response { HttpStatusCode.OK to { body<SignProofsResult>() } }
             }) {
@@ -883,7 +884,7 @@ object Wallet2RouteHandler {
                         "resume that handle through the deferred-resume route instead of repeating the issuer fetch. " +
                         "Pass credentialIssuerBaseUrl when storing so issuer display metadata and labels " +
                         "are persisted like the full receive path. " +
-                        "Supply holderBindings identifying the exact stored wallet keys used to create proofs.jwt; " +
+                        "Supply holderBindings identifying the exact stored wallet keys used to create the submitted proofs; " +
                         "copies require distinct public keys, and inline holder keys cannot be used for storage. " +
                         "For a single instance keyId may supply the default holder key. " +
                         "Requests using only released fields return rawCredentials on success. " +

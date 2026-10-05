@@ -123,7 +123,7 @@ private data class WalletKeyCandidate(
 )
 
 /**
- * Resolves the exact Crypto2 key bound to [credential]. Bindings are created during issuance or
+ * Resolves the exact wallet key bound to [credential]. Bindings are created during issuance or
  * import; unbound mdocs are never repaired implicitly during presentation. [requiredUsages]
  * selects the operation being authorized; signature and device-MAC presentations deliberately
  * resolve the same durable binding with different usage requirements.

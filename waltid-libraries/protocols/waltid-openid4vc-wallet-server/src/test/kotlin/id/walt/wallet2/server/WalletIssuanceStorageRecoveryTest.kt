@@ -30,7 +30,7 @@ class WalletIssuanceStorageRecoveryTest {
     fun publicFetchReturnsPartialStorageAndResumesWithoutRefetching() = exerciseStorageRecovery(RequestKind.FETCH)
 
     @Test
-    fun legacyPublicPollReturnsStorageRecoveryWithoutInventingAConfiguration() = exerciseStorageRecovery(RequestKind.POLL)
+    fun publicPollReturnsStorageRecoveryWithoutInventingAConfiguration() = exerciseStorageRecovery(RequestKind.POLL)
 
     @Test
     fun publicPreAuthorizedFlowRetainsTheBatchWhenNoWriteSucceeds() = exerciseStorageRecovery(RequestKind.PRE_AUTHORIZED)

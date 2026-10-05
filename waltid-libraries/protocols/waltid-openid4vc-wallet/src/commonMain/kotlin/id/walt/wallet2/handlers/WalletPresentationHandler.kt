@@ -1310,16 +1310,8 @@ object WalletPresentationHandler {
         }
     }
 
-    private fun Wallet.mdocHolderKeyResolver(
-        isolatedCredentialsById: Map<String, StoredCredential> = emptyMap(),
-    ): suspend (credentialId: String, credential: DigitalCredential) -> Crypto2Key = { credentialId, _ ->
-        val isolated = isolatedCredentialsById[credentialId]
-        val resolved = if (isolated != null) {
-            resolveHolderKey(isolated, setOf(KeyUsage.SIGN))
-        } else {
-            resolveHolderKey(credentialId, setOf(KeyUsage.SIGN))
-        }
-        resolved.keyMaterial.requireCrypto2SigningKey()
+    private fun Wallet.mdocHolderKeyResolver(): suspend (String, DigitalCredential) -> Crypto2Key = { credentialId, _ ->
+        resolveHolderKey(credentialId, setOf(KeyUsage.SIGN)).keyMaterial.requireCrypto2SigningKey()
     }
 
     suspend fun submitDcApiPresentation(

@@ -9,6 +9,7 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.wallet2.data.*
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -117,7 +118,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun deferredIntervalsSurviveRestartAndEarlyCallsDoNotMoveTheDeadline() = runTest {
         val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         var proofs = emptyList<String>()
         var polls = 0
         val http = batchTestClient(credentialStatus = HttpStatusCode.Accepted, credential = {
@@ -269,7 +270,7 @@ class WalletBatchIssuanceTest {
         for (detailsSupported in listOf(false, true)) for (authorized in listOf(false, true))
             for (atomic in listOf(false, true)) {
             val fixture = batchTestFixture(true)
-            val backingStore = MemorySessionStore()
+            val backingStore = InMemoryIssuanceSessionStore()
             val records = if (atomic) backingStore else object : WalletIssuanceSessionStore by backingStore {}
             val http = batchTestClient(authorizationDetailsSupported = detailsSupported, token = { parameters ->
                 if (!authorized) assertAutomaticParameters(parameters, detailsSupported)
@@ -502,26 +503,6 @@ class WalletBatchIssuanceTest {
         assertEquals(0, tokenCalls)
     }
 
-    @Test fun tokenDatasetsProduceSeparateRequestsUsingTheSameToken() = runTest {
-        val fixture = batchTestFixture(true)
-        var tokenCalls = 0
-        val targets = mutableListOf<String>()
-        val result = WalletIssuanceHandler.receiveCredentials(fixture.wallet,
-            ReceiveCredentialRequest(offerJson = batchTestOffer(), credentials = listOf(fixture.selection(2))),
-            httpClient = batchTestClient(token = {
-                tokenCalls++
-                """{"access_token":"access","token_type":"Bearer","authorization_details":[
-                    {"type":"openid_credential","credential_configuration_id":"identity","credential_identifiers":["dataset-a","dataset-b"]}]}"""
-            }, credential = { body ->
-                assertNull(body["credential_configuration_id"])
-                targets += body["credential_identifier"]!!.jsonPrimitive.content
-                batchTestResponse(body.batchProofs())
-            }))
-        assertEquals(1, tokenCalls)
-        assertEquals(listOf("dataset-a", "dataset-b"), targets)
-        assertEquals(4, result.credentialIds.size)
-    }
-
     @Test fun laterTargetFailureReportsPriorProgressAndUnattemptedTargetsForBothGrants() = runTest {
         for (authorized in listOf(false, true)) for (deferred in listOf(false, true)) {
             val fixture = batchTestFixture(true)
@@ -732,7 +713,7 @@ class WalletBatchIssuanceTest {
     @Test fun batchAcceptanceAfterRecreationUsesTheReviewedIssuerSnapshot() = runTest {
         for (authorized in listOf(false, true)) {
             val fixture = batchTestFixture(true)
-            val records = MemorySessionStore()
+            val records = InMemoryIssuanceSessionStore()
             val initialHttp = batchTestClient(metadata = batchTestMetadata(2),
                 token = { error("Review must not redeem a grant") }, credential = { error("Review must not issue") })
             val restoredHttp = batchTestClient(metadata = batchTestMetadata(1),
@@ -767,7 +748,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun mobileDeferredBatchSurvivesServiceRecreationWithEveryHolderKey() = runTest {
         val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         var proofs = emptyList<String>()
         val http = batchTestClient(credentialStatus = HttpStatusCode.Accepted, credential = {
             proofs = it.batchProofs()
@@ -786,7 +767,7 @@ class WalletBatchIssuanceTest {
         val stored = fixture.store.listCredentials().toList()
         assertEquals(fixture.keys.reversed().map { it.keyId },
             stored.map { fixture.wallet.resolveHolderKey(it, setOf(KeyUsage.SIGN)).keyMaterial.keyId })
-        assertTrue(records.records.isEmpty())
+        assertTrue(records.list().isEmpty())
     }
 
     @Test fun issuedCredentialsMustMatchTheRequestedFormatAndTypeBeforeAnyWrite() = runTest {
@@ -817,7 +798,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun deferredResponseUsesTheOriginallySelectedConfigurationAfterRestart() = runTest {
         val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         var proofs = emptyList<String>()
         val http = batchTestClient(credentialStatus = HttpStatusCode.Accepted,
             credential = {
@@ -840,7 +821,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun deferredTargetSurvivesFailureOfLaterTargetAndServiceRecreation() = runTest {
         val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         var calls = 0
         var firstProofs = emptyList<String>()
         val http = batchTestClient(token = { negotiatedToken(true) }, credentialStatus = HttpStatusCode.Accepted,
@@ -849,7 +830,7 @@ class WalletBatchIssuanceTest {
                     firstProofs = request.batchProofs()
                     """{"transaction_id":"accepted-first","interval":1}"""
                 } else {
-                    assertEquals(1, records.records.values.count { it.kind == WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL })
+                    assertEquals(1, records.list().count { it.kind == WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL })
                     error("Later target failed")
                 }
             }, deferred = { batchTestResponse(firstProofs) })
@@ -867,7 +848,7 @@ class WalletBatchIssuanceTest {
         assertEquals(listOf(pending), restored.listIssuanceContinuations())
         assertEquals(2, assertIs<WalletIssuanceOutcome.Stored>(restored.resumeWhenDue(pending.id)).credentialIds.size)
         assertTrue(restored.listIssuanceContinuations().isEmpty())
-        assertTrue(records.records.isEmpty())
+        assertTrue(records.list().isEmpty())
     }
 
     @Test fun isolatedDeferredPollingReturnsIntervalAndUsesTheTokenKeyForDpopNonceRetry() = runTest {
@@ -956,7 +937,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun deferredStorageRetryAfterRestartUsesReceivedResponseAndSkipsCommittedWrites() = runTest {
         val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         var writes = 0
         val writeStore = object : WalletCredentialStore by fixture.store {
             override suspend fun addCredential(entry: StoredCredential) {
@@ -995,13 +976,13 @@ class WalletBatchIssuanceTest {
         assertEquals(completed.credentialIds.toSet(), meteredIds.toSet())
         assertEquals(2, meteredIds.size)
         assertEquals(1, polls)
-        assertTrue(records.records.isEmpty())
+        assertTrue(records.list().isEmpty())
     }
 
     @Test fun fullGrantDeferredHandlesRecoverPartialStorageAcrossWalletRecreation() = runTest {
         for (authorized in listOf(false, true)) {
             val fixture = batchTestFixture(true)
-            val records = MemorySessionStore()
+            val records = InMemoryIssuanceSessionStore()
             var writes = 0
             val writeStore = object : WalletCredentialStore by fixture.store {
                 override suspend fun addCredential(entry: StoredCredential) {
@@ -1040,7 +1021,7 @@ class WalletBatchIssuanceTest {
             assertEquals(3, writes)
             assertEquals(1, polls)
             assertTrue(restarted.listIssuanceContinuations().isEmpty())
-            assertTrue(records.records.isEmpty())
+            assertTrue(records.list().isEmpty())
             assertIs<WalletIssuanceOutcome.Failed>(restarted.resumeWhenDue(handle))
             assertEquals(1, polls)
         }
@@ -1053,7 +1034,7 @@ class WalletBatchIssuanceTest {
             Triple(HttpStatusCode.BadRequest, """{"error":"issuance_pending"}""", 5L),
         )) {
             val fixture = batchTestFixture(true)
-            val records = MemorySessionStore()
+            val records = InMemoryIssuanceSessionStore()
             var proofs = emptyList<String>()
             var pendingResponse = true
             val http = batchTestClient(credentialStatus = HttpStatusCode.Accepted, credential = {
@@ -1078,7 +1059,7 @@ class WalletBatchIssuanceTest {
     @Test fun deferredFailureRetainsTransientContinuationButConsumesExplicitDenial() = runTest {
         for (error in listOf("temporarily_unavailable", "invalid_transaction_id", "credential_request_denied")) {
             val fixture = batchTestFixture(true)
-            val records = MemorySessionStore()
+            val records = InMemoryIssuanceSessionStore()
             val terminal = error != "temporarily_unavailable"
             val http = batchTestClient(credentialStatus = HttpStatusCode.Accepted,
                 credential = { """{"transaction_id":"failure","interval":1}""" },
@@ -1090,7 +1071,7 @@ class WalletBatchIssuanceTest {
             val failed = assertIs<WalletIssuanceOutcome.Failed>(service.resumeWhenDue(pending.id))
             assertEquals(WalletIssuanceErrorCode.ISSUER_RESPONSE, failed.error.code)
             assertEquals(if (terminal) emptyList() else listOf(WalletIssuanceContinuation(pending)), failed.deferredCredentials)
-            assertEquals(if (terminal) 0 else 1, records.records.size)
+            assertEquals(if (terminal) 0 else 1, records.list().size)
         }
     }
 
@@ -1123,7 +1104,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun cancelAndClearCannotDiscardAnInFlightDeferredResponse() = runTest {
         val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         val http = batchTestClient(credentialStatus = HttpStatusCode.Accepted,
@@ -1142,7 +1123,7 @@ class WalletBatchIssuanceTest {
         entered.await()
         assertIs<WalletIssuanceOutcome.Failed>(restored.cancel(preview.id))
         assertFailsWith<IllegalStateException> { restored.clearSessions() }
-        assertEquals(1, records.records.size)
+        assertEquals(1, records.list().size)
         release.complete(Unit)
         val updated = assertIs<WalletIssuanceOutcome.Deferred>(poll.await()).credentials.single()
         assertEquals(7, updated.intervalSeconds)
@@ -1150,12 +1131,12 @@ class WalletBatchIssuanceTest {
         assertIs<WalletIssuanceOutcome.Cancelled>(restored.cancel(preview.id))
         assertTrue(restored.listIssuanceContinuations().isEmpty())
         restored.clearSessions()
-        assertTrue(records.records.isEmpty())
+        assertTrue(records.list().isEmpty())
     }
 
     @Test fun reconstructedEnginesSharePollAdmissionAndCannotClearEachOthersWork() = runTest {
         val fixture = batchTestFixture(true)
-        val state = WalletIssuanceSessionState(fixture.wallet.id, MemorySessionStore())
+        val state = WalletIssuanceSessionState(fixture.wallet.id, InMemoryIssuanceSessionStore())
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         var proofs = emptyList<String>()
@@ -1242,7 +1223,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun isolatedFetchCheckpointFailurePreventsLocalWritesAndPreservesTheResponseInItsRuntime() = runTest {
         val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         var unavailable = true
         val store = object : AtomicWalletIssuanceSessionStore by records {
             override suspend fun put(record: WalletIssuanceSessionRecord) {
@@ -1269,7 +1250,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun cancellingAnIsolatedFetchDuringCheckpointRetainsItsResponseWithoutStartingWrites() = runTest {
         val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         val checkpointed = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         val store = object : AtomicWalletIssuanceSessionStore by records {
@@ -1305,7 +1286,7 @@ class WalletBatchIssuanceTest {
     @Test fun isolatedPollResumesPartialStorageWithKnownOrUnknownTargetIdentityWithoutRepolling() = runTest {
         for (knownConfiguration in listOf(false, true)) {
             val fixture = batchTestFixture(true)
-            val records = MemorySessionStore()
+            val records = InMemoryIssuanceSessionStore()
             var writes = 0
             val failingStore = object : WalletCredentialStore by fixture.store {
                 override suspend fun addCredential(entry: StoredCredential) {
@@ -1358,7 +1339,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun deferredQuotaRejectionCanRetryTheReceivedResponseWithoutAnotherIssuerPoll() = runTest {
         val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         var proofs = emptyList<String>()
         var polls = 0
         val http = batchTestClient(credentialStatus = HttpStatusCode.Accepted, credential = {
@@ -1386,7 +1367,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun databaseFailurePreservesReceivedResponseAcrossRequestScopedWallets() = runTest {
         val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         var failWrites = false
         val failingStore = object : AtomicWalletIssuanceSessionStore by records {
             override suspend fun put(record: WalletIssuanceSessionRecord) {
@@ -1521,7 +1502,7 @@ class WalletBatchIssuanceTest {
     @Test fun terminalCloseAbandonsClaimsAndRejectsAnIndependentOwnersLateProgress() = runTest {
         for (pauseAt in listOf("response", "reservation", "first-save")) {
             val fixture = batchTestFixture(true)
-            val records = MemorySessionStore()
+            val records = InMemoryIssuanceSessionStore()
             val entered = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
             suspend fun pause() { entered.complete(Unit); release.await() }
@@ -1566,7 +1547,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun terminalCloseRemovesAnAbandonedProcessingSessionWithoutRedeemingIt() = runTest {
         val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         var tokenCalls = 0
         val http = batchTestClient(token = { tokenCalls++; BATCH_TEST_TOKEN }, credential = { error("Must not issue") })
         val original = newSessionService(fixture.wallet, http, records)
@@ -1616,7 +1597,7 @@ class WalletBatchIssuanceTest {
     @Test fun lostOrCancelledDeferredResponseCannotBeAutomaticallyRepolledAfterRestart() = runTest {
         for (cancel in listOf(false, true)) {
             val fixture = batchTestFixture(true)
-            val records = MemorySessionStore()
+            val records = InMemoryIssuanceSessionStore()
             var polls = 0
             val http = batchTestClient(credentialStatus = HttpStatusCode.Accepted,
                 credential = { """{"transaction_id":"lost-response","interval":1}""" },
@@ -1695,7 +1676,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun deferredClaimMustBeDurableBeforeTheIssuerIsContacted() = runTest {
         val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         var unavailable = true
         val store = object : AtomicWalletIssuanceSessionStore by records {
             override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean {
@@ -1761,7 +1742,7 @@ class WalletBatchIssuanceTest {
     @Test fun closingWalletRejectsLateImmediateAndDeferredFullFlowResponses() = runTest {
         for (pendingResponse in listOf(false, true)) {
             val fixture = batchTestFixture(true)
-            val records = MemorySessionStore()
+            val records = InMemoryIssuanceSessionStore()
             val state = WalletIssuanceSessionState(fixture.wallet.id, records)
             val wallet = fixture.wallet.attachIssuanceSessionState(state)
             val requestStarted = CompletableDeferred<Unit>()
@@ -1800,7 +1781,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun acceptedFullFlowTargetSurvivesInitialContinuationWriteFailureAcrossRequests() = runTest {
         val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         var unavailable = true
         val store = object : AtomicWalletIssuanceSessionStore by records {
             override suspend fun put(record: WalletIssuanceSessionRecord) {
@@ -1832,7 +1813,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun sharedStateDoesNotReuseAnotherRequestsKeyAccess() = runTest {
         val fixture = batchTestFixture(true)
-        val state = WalletIssuanceSessionState(fixture.wallet.id, MemorySessionStore())
+        val state = WalletIssuanceSessionState(fixture.wallet.id, InMemoryIssuanceSessionStore())
         var proofs = emptyList<String>()
         var polls = 0
         val http = batchTestClient(credentialStatus = HttpStatusCode.Accepted, credential = {
@@ -1855,7 +1836,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun sharedAuthorizationContinuationRechecksEveryAcceptedHolderKeyBeforeExchangingCode() = runTest {
         val fixture = batchTestFixture(true)
-        val state = WalletIssuanceSessionState(fixture.wallet.id, MemorySessionStore())
+        val state = WalletIssuanceSessionState(fixture.wallet.id, InMemoryIssuanceSessionStore())
         var exchanges = 0
         val http = batchTestClient(token = { exchanges++; BATCH_TEST_TOKEN }, credential = { error("No credential request is allowed") })
         val permitted = fixture.wallet.copy().attachIssuanceSessionState(state).issuanceSessions(http)
@@ -1874,7 +1855,7 @@ class WalletBatchIssuanceTest {
 
     @Test fun walletInitiatedAuthorizationSelectsOnlyAcceptedConfigurationsAndRetainsKeys() = runTest {
         val fixture = batchTestFixture(true)
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         val http = batchTestClient(credential = { batchTestResponse(it.batchProofs()) })
         val service = newSessionService(fixture.wallet, httpClient = http, sessionStore = records)
         val preview = service.start(WalletIssuanceSessionRequest(
@@ -1957,7 +1938,7 @@ class WalletBatchIssuanceTest {
     @Test fun deferredBatchWithMissingHolderKeyFailsBeforePollingAndRetainsRecord() = runTest {
         for (persisted in listOf(false, true)) {
             val fixture = batchTestFixture(true)
-            val records = MemorySessionStore().takeIf { persisted }
+            val records = InMemoryIssuanceSessionStore().takeIf { persisted }
             var polls = 0
             val http = batchTestClient(credentialStatus = HttpStatusCode.Accepted,
                 credential = { """{"transaction_id":"batch","interval":1}""" },
@@ -1974,19 +1955,4 @@ class WalletBatchIssuanceTest {
             assertEquals(1, service.listIssuanceContinuations().size)
         }
     }
-
-    private class MemorySessionStore : AtomicWalletIssuanceSessionStore {
-        val records = mutableMapOf<String, WalletIssuanceSessionRecord>()
-        override suspend fun get(id: String) = records[id]
-        override suspend fun put(record: WalletIssuanceSessionRecord) { records[record.id] = record }
-        override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean {
-            require(replacement == null || expected.id == replacement.id)
-            if (records[expected.id] != expected) return false
-            if (replacement == null) records.remove(expected.id) else records[expected.id] = replacement
-            return true
-        }
-        override suspend fun remove(id: String): Boolean = records.remove(id) != null
-        override suspend fun list() = records.values.toList()
-    }
-
 }

@@ -114,7 +114,8 @@ KMS resource path) in each holder binding instead of OSS `keyId`.
 - Authorization parameters are selected automatically from metadata in both flows:
   prefer `authorization_details` when the authorization server advertises
   `openid_credential`; otherwise use the selected configurations' advertised scopes.
-  Missing support for both produces an error before sending the authorization/token request.
+  Authorization-code issuance requires one of these selectors; an offered pre-authorized
+  code already authorizes its credentials and works without either selector.
   Multiple datasets under one configuration require dataset identifiers.
   Isolated request-token also negotiates automatically when given `credentialIssuer`
   and `credentialConfigurationIds`; explicit `authorizationDetails` or `scope` remain
@@ -123,8 +124,8 @@ KMS resource path) in each holder binding instead of OSS `keyId`.
   either an offer or `credentialIssuer` for wallet-initiated authorization.
 - Authorized receive accepts plural `credentials` selections. Existing single-copy
   REST callers can still supply `credentialConfigurationId`; supplying both is rejected.
-- Isolated sign-proof returns `proofs.jwt` (a collection). Pass `proofs` to
-  fetch-credential. Pass `credentialIdentifier` when the token returned it;
+- Isolated sign-proof returns `proofJwt` for one proof and `proofs.jwt` for multiple
+  proofs. Pass the returned field to fetch-credential. Pass `credentialIdentifier` when the token returned it;
   `credentialConfigurationId` is still needed locally for metadata, but only
   one selector is sent to the issuer. Multi-proof fetch also requires
   `credentialIssuerBaseUrl` to validate the issuer's batch limit.
@@ -140,8 +141,9 @@ KMS resource path) in each holder binding instead of OSS `keyId`.
   Preserve both saved IDs and pending handles in mixed or failed outcomes.
 - With OSS SQL persistence enabled, store-backed holder bindings and deferred
   responses awaiting local storage survive service recreation. In-memory deployments
-  and inline private keys have process-local continuation semantics. Keep holder keys
-  available until completion; a missing or changed key stops resumption before polling.
+  have process-local continuation semantics. Storage-producing requests require stored
+  holder keys. Keep them available until completion; a missing or changed key stops
+  resumption before polling.
 - Retained handles persist the next allowed poll time from the issuer's `interval`.
   An early resume returns a `deferred` outcome with the remaining seconds rounded up,
   without contacting the issuer or reserving usage. Restart does not reset the deadline;

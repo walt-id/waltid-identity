@@ -76,7 +76,7 @@ class WalletIssuanceHttpContractTest {
     }
 
     @Test
-    fun detailedOfferReleasedCopyKeepsBatchLimitAndComponentOrder() {
+    fun releasedOfferCopyKeepsComponentOrderAndWireShape() {
         val issuer = "https://issuer.example"
         val response = ResolveOfferDetailedResponse(issuer, listOf("identity"), txCodeRequired = false,
             credentialEndpoint = Url("$issuer/credential"), issuer = OfferIssuerMetadata(issuer),

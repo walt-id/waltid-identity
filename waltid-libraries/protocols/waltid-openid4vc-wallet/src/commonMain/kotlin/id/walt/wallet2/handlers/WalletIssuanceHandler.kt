@@ -275,10 +275,7 @@ data class ReceiveCredentialResult(
     /** All credentials that were successfully issued and stored. */
     val credentialIds: List<String>,
     /**
-     * Transaction IDs for credentials deferred by the issuer.
-     * Each entry maps a credential configuration ID to the transaction ID
-     * that should be used with [WalletIssuanceHandler.pollDeferredFlow] to
-     * retrieve the credential once it becomes available.
+     * Configuration IDs mapped to issuer transaction IDs for [WalletIssuanceHandler.pollDeferredFlow].
      */
     val deferredTransactionIds: Map<String, String> = emptyMap()
 ) {
@@ -293,9 +290,8 @@ data class ReceiveCredentialsResult(
     val credentialIds: List<String>,
     /**
      * Deferred targets with the holder bindings required to resume each request.
-     * Each entry maps a credential configuration ID to the transaction ID
-     * that should be used with [WalletIssuanceHandler.pollDeferredFlow] to
-     * retrieve the credential once it becomes available.
+     * Each entry retains its configuration, optional dataset identifier and transaction ID.
+     * Resume the opaque wallet continuation when available.
      */
     val deferredCredentials: List<DeferredCredentialTransaction> = emptyList(),
     /** A stopped target; earlier stored/deferred results remain valid. Do not redeem the grant again. */
@@ -1083,9 +1079,6 @@ object WalletIssuanceHandler {
     private val httpClient: HttpClient by lazy {
         WebDataFetcher(WebDataFetcherId.WALLET2_ISSUANCE_HANDLER).httpClient
     }
-
-    @Deprecated("Use the shared httpClient property", replaceWith = ReplaceWith("httpClient"))
-    private fun defaultHttpClient(): HttpClient = httpClient
 
     /**
      * Resolves a credential offer from any [CredentialOfferSource], handling both inline JSON
@@ -1934,7 +1927,7 @@ object WalletIssuanceHandler {
     suspend fun fetchCredential(
         wallet: Wallet,
         request: FetchCredentialRequest,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
     ): FetchCredentialResult = FetchCredentialResult(
@@ -1945,7 +1938,7 @@ object WalletIssuanceHandler {
     suspend fun fetchCredentials(
         wallet: Wallet,
         request: FetchCredentialRequest,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
         /** Called with the exact response batch size before any credential of that batch is persisted. */
         beforeCredentialsStored: suspend (Int) -> Unit = {},
         onCredentialStored: suspend (StoredCredential) -> Unit = {},
@@ -2482,11 +2475,8 @@ object WalletIssuanceHandler {
          * Key to client authenticate and sender constrain this exchange with, when the caller already
          * resolved one.
          *
-         * Must be the same key the subsequent credential request proves possession of: a DPoP access
-         * token is bound to the `jkt` of the key that requested it (RFC 9449 Section 6), so resolving
-         * the wallet default here while the flow proceeds with a `keyReference`-selected key binds the
-         * token to one key and proves possession of another - which the credential endpoint correctly
-         * rejects as `invalid_token`.
+         * Reuse this key for subsequent DPoP proofs: the access token is bound to its `jkt`
+         * (RFC 9449 Section 6). Credential holder keys are selected independently.
          */
         keyMaterial: WalletKeyStoreEntry? = null,
         /** See [ReceiveAuthorizedCredentialRequest.useDpop]. Client authentication is unaffected. */

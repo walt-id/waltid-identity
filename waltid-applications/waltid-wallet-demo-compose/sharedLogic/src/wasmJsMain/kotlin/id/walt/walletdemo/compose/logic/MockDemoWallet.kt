@@ -134,7 +134,7 @@ private class MockDemoWallet : DemoWallet {
     override suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome =
         WalletDemoIssuanceOutcome.Cancelled
 
-    private suspend fun createIssuanceHolderKeys(count: Int) =
+    private fun createIssuanceHolderKeys(count: Int) =
         List(count) { WalletDemoHolderBinding("batch-holder-$it", "did:key:batch-holder-$it") }
 
     override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> = emptyList()
