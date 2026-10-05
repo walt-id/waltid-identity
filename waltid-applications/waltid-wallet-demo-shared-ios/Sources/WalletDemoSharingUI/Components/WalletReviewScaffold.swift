@@ -25,11 +25,7 @@ public struct WalletReviewScaffold<Content: View, Actions: View>: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if showsActions {
-                VStack(spacing: 0) {
-                    Divider()
-                    actions.padding(.horizontal, 20).padding(.vertical, 12)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                }.background(.regularMaterial)
+                WalletFooter { actions }
             }
         }
         .background(Color(.systemGroupedBackground))

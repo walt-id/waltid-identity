@@ -27,6 +27,7 @@ zxing-cpp = "3.1.1"
 compose-navigation3 = "1.1.2"
 dokka = "2.2.0"
 coil = "3.6.3"
+haze = "2.0.1"
 firebase-bom = "34.19.0"
 google-services = "4.5.0"
 
@@ -341,6 +342,8 @@ compose-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigati
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
 coil-svg = { module = "io.coil-kt.coil3:coil-svg", version.ref = "coil" }
+haze-core = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
+haze-blur = { module = "dev.chrisbanes.haze:haze-blur", version.ref = "haze" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-ext-junit" }
 androidx-test-rules = { module = "androidx.test:rules", version.ref = "androidx-test-rules" }

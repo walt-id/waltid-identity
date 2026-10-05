@@ -1,20 +1,21 @@
 package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.constrainHeight
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 
 /**
  * Review chrome for receive and share: details scroll, actions stay pinned.
@@ -28,51 +29,38 @@ internal fun ReviewScaffold(
     modifier: Modifier = Modifier,
     fillViewport: Boolean = true,
     header: (@Composable () -> Unit)? = null,
+    feedback: (@Composable () -> Unit)? = null,
     actions: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val body: @Composable ColumnScope.() -> Unit = {
-        header?.invoke()
-        Column(
-            modifier = Modifier
-                .then(
-                    if (fillViewport) {
-                        Modifier.weight(1f, fill = true)
-                    } else {
-                        Modifier.weight(1f, fill = false)
-                    },
-                )
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(top = 20.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            content = content,
-        )
-        if (actions != null) {
-            HorizontalDivider()
-            Surface(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                ) {
-                    actions()
-                }
-            }
-        }
-    }
-
-    if (fillViewport) {
-        Column(modifier = modifier.fillMaxSize(), content = body)
-    } else {
-        BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+    val scrollState = rememberScrollState()
+    val hazeState = rememberHazeState()
+    // Measure the controls before the body so the first frame has correct end clearance.
+    // The scroll viewport ends above the controls. An overlay with end padding alone leaves
+    // bring-into-view, accessibility scrolling and hit testing unaware of the obstruction.
+    SubcomposeLayout(modifier.fillMaxWidth().imePadding()) { constraints ->
+        require(constraints.hasBoundedHeight) { "Wallet review needs a bounded screen or sheet host" }
+        val loose = constraints.copy(minHeight = 0)
+        val heading = subcompose("header") { header?.invoke() }.singleOrNull()?.measure(loose)
+        val bodyHeight = (constraints.maxHeight - (heading?.height ?: 0)).coerceAtLeast(0)
+        val controls = if (actions != null || feedback != null) subcompose("footer") {
+            WalletFooter(hazeState = hazeState, feedback = feedback, actions = actions)
+        }.single().measure(loose.copy(maxHeight = bodyHeight)) else null
+        val viewportHeight = (bodyHeight - (controls?.height ?: 0)).coerceAtLeast(0)
+        val body = subcompose("content") {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = maxHeight),
-                content = body,
+                Modifier.fillMaxWidth().testTag("wallet.review.content")
+                    .then(if (controls != null) Modifier.hazeSource(hazeState) else Modifier)
+                    .verticalScroll(scrollState).padding(horizontal = 20.dp)
+                    .padding(top = 20.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp), content = content,
             )
+        }.single().measure(loose.copy(minHeight = if (fillViewport) viewportHeight else 0, maxHeight = viewportHeight))
+        val height = constraints.constrainHeight((heading?.height ?: 0) + body.height + (controls?.height ?: 0))
+        layout(constraints.maxWidth, height) {
+            heading?.placeRelative(0, 0)
+            body.placeRelative(0, heading?.height ?: 0)
+            controls?.placeRelative(0, height - controls.height)
         }
     }
 }
