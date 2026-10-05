@@ -16,6 +16,10 @@ data class KtorAuthnzPrincipal(
     val accountId: String,
     val sessionId: String?,
     val tenant: String? = null,
+    /** When the login completed, if known - e.g. to ask for a fresh login before a sensitive change ([requireRecentLogin]). */
+    val authenticatedAt: kotlin.time.Instant? = null,
+    /** The methods the login used, in order (e.g. `email`, `totp`). */
+    val methods: List<String> = emptyList(),
 )
 
 /**
@@ -59,7 +63,10 @@ class DefaultKtorAuthnzAuthentication internal constructor(
                 accountId = handler.getTokenAccountId(token),
                 sessionId = runCatching { handler.getTokenSessionId(token) }.getOrNull(),
                 tenant = runCatching { handler.getTokenTenant(token) }.getOrNull(),
-            )
+            ).let { p ->
+                runCatching { handler.getTokenLogin(token) }.getOrNull()
+                    ?.let { p.copy(authenticatedAt = it.authenticatedAt, methods = it.methods) } ?: p
+            }
             // Under a tenant scope, a login to another tenant (or to none) does not count.
             val tenant = call.authnzTenant
             if (tenant != null && principal.tenant != tenant) {
