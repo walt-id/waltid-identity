@@ -98,7 +98,6 @@ private struct WalletActionStyle: ButtonStyle {
         configuration.label
             .foregroundStyle(prominence == .primary ? branding.onPrimary : branding.primary)
             .background(prominence == .primary ? branding.primary : Color.clear, in: Capsule())
-            .overlay(Capsule().strokeBorder(prominence == .secondary ? branding.primary.opacity(0.4) : Color.clear, lineWidth: 1))
             .opacity(!isEnabled ? 0.4 : configuration.isPressed ? 0.72 : 1)
     }
 }
