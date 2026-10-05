@@ -3,9 +3,13 @@ import SwiftUI
 /// A compact identity summary. Its host supplies separate selection and navigation actions.
 public struct CredentialSummaryRow: View {
     public let summary: CredentialCardSummary
+    private let showsIssuer: Bool
     @Environment(\.sizeCategory) private var sizeCategory
 
-    public init(summary: CredentialCardSummary) { self.summary = summary }
+    public init(summary: CredentialCardSummary, showsIssuer: Bool = true) {
+        self.summary = summary
+        self.showsIssuer = showsIssuer
+    }
 
     public var body: some View {
         HStack(spacing: 12) {
@@ -20,7 +24,7 @@ public struct CredentialSummaryRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(summary.title).font(.body.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
-            if !summary.issuer.isEmpty {
+            if showsIssuer && !summary.issuer.isEmpty {
                 Text(summary.issuer).font(.footnote).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
