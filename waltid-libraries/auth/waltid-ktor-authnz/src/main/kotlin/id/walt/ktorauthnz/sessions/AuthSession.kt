@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.sessions
 
+import kotlin.time.Clock
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.events.AuthnzEvent
 import id.walt.ktorauthnz.events.AuthnzEvents
@@ -68,6 +69,15 @@ data class AuthSession(
 
     /** Expiry of the current login token, when it ends before the session (refresh tokens). */
     var tokenExpiration: Instant? = null,
+
+    /** The methods of the steps completed so far, in order (e.g. `email`, `totp`). */
+    var completedMethods: List<String> = emptyList(),
+
+    /** When the login completed. */
+    var authenticatedAt: Instant? = null,
+
+    /** Set when this session links a further identity to this account instead of logging in (see `identityLinking`). */
+    val linkToAccount: String? = null,
 ) {
     /** The refresh token just issued - handed to the client once, never stored (only its digest is). */
     @kotlinx.serialization.Transient
@@ -107,6 +117,7 @@ data class AuthSession(
     suspend fun progressFlow(method: AuthenticationMethod) {
         val currentFlow = currentFlowFor(method)
         setStepInformation(method, null)
+        completedMethods = completedMethods + method.id
 
         if (currentFlow.continueWith != null) {
             flows = currentFlow.continueWith
@@ -114,6 +125,7 @@ data class AuthSession(
         } else if (currentFlow.isEndConditionSuccess()) {
             flows = null
             status = AuthSessionStatus.SUCCESS
+            authenticatedAt = Clock.System.now()
             KtorAuthnzManager.refreshTokens?.let { RefreshTokens.startRefreshableSession(this, it) }
 
             // Stored before its token exists: token stores may only map tokens to stored sessions.
