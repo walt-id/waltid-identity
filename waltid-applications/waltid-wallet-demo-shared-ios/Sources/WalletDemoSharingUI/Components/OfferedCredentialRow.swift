@@ -55,7 +55,7 @@ public struct OfferedCredentialRow: View {
                 .accessibilityIdentifier("issuance-details-\(credential.configurationID)")
         }
         .sheet(isPresented: $showDetails) {
-            WalletDetailSheet(CredentialCardSummary.offered(from: credential).title, onDismiss: { showDetails = false }) {
+            WalletDetailSheet(String(localized: "Credential information", bundle: .module), onDismiss: { showDetails = false }) {
                 OfferedCredentialDetails(credential: credential, issuerName: issuerName, issuerIdentifier: issuerIdentifier)
             }.accessibilityIdentifier("issuance-credential-details")
         }

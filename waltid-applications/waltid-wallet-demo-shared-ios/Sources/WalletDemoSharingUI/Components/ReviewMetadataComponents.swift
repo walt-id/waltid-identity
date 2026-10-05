@@ -79,45 +79,6 @@ public struct ReviewMetadataSection<Content: View>: View {
     }
 }
 
-public struct MetadataDisclosure<Content: View>: View {
-    public let title: String
-    public let accessibilityIdentifier: String?
-    public let content: Content
-    @State private var isExpanded: Bool
-
-    public init(
-        title: String,
-        initiallyExpanded: Bool,
-        accessibilityIdentifier: String? = nil,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.title = title
-        self.accessibilityIdentifier = accessibilityIdentifier
-        self.content = content()
-        _isExpanded = State(initialValue: initiallyExpanded)
-    }
-
-    public var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            if isExpanded {
-                content.padding(.top, 4)
-            }
-        } label: {
-            disclosureLabel
-        }
-    }
-
-    @ViewBuilder
-    private var disclosureLabel: some View {
-        let label = Text(title).font(.subheadline.weight(.medium))
-        if let accessibilityIdentifier {
-            label.accessibilityIdentifier(accessibilityIdentifier)
-        } else {
-            label
-        }
-    }
-}
-
 public struct MetadataIdentityView: View {
     public let display: MetadataDisplay?
     public let fallbackName: String
