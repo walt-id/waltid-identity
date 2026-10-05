@@ -8,7 +8,7 @@ import com.atlassian.onetime.model.TOTPSecret
 import com.atlassian.onetime.service.DefaultTOTPService
 import id.walt.ktorauthnz.exceptions.OTPAuthException
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.storeddata.TOTPStoredData
 import id.walt.ktorauthnz.sessions.AuthSession
@@ -73,19 +73,3 @@ object TOTP : AuthenticationMethod("totp") {
     }
 
 }
-
-/*fun main() {
-    val service = DefaultTOTPService()
-
-    val secret = TOTPSecret.fromBase32EncodedString("ZIQL3WHUAGCS5FQQDKP74HZCFT56TJHR")
-    val totpGenerator: TOTPGenerator = TOTPGenerator()
-    val totp = totpGenerator.generateCurrent(secret) //TOTP(value=123456)
-    println("totp: $totp")
-
-    val totpUri = service.generateTOTPUrl(
-        secret, ////NIQXUILREVGHIUKNORKHSJDHKMWS6UTY
-        EmailAddress("jsmith@acme.com"),
-        Issuer("Acme Co")
-    )
-    println("URI: $totpUri")
-}*/
