@@ -999,6 +999,9 @@ public struct IssuanceOfferPreview: Equatable, Sendable {
     /// Credential configurations included in the offer.
     public let credentials: [IssuanceCredentialPreview]
 
+    /// Maximum copies per credential request advertised by the issuer; absence means one copy.
+    public let batchSize: Int?
+
     /// Transaction-code requirement for pre-authorized issuance, if any.
     public let transactionCode: IssuanceTransactionCode?
 
@@ -1009,16 +1012,19 @@ public struct IssuanceOfferPreview: Equatable, Sendable {
     ///   - issuer: Issuer information suitable for review UI.
     ///   - credentials: Credential configurations included in the offer.
     ///   - transactionCode: Optional transaction-code requirement.
+    ///   - batchSize: Optional advertised copy limit; never an automatic requested count.
     public init(
         grant: IssuanceGrant,
         issuer: IssuanceIssuerPreview,
         credentials: [IssuanceCredentialPreview],
-        transactionCode: IssuanceTransactionCode?
+        transactionCode: IssuanceTransactionCode?,
+        batchSize: Int? = nil
     ) {
         self.grant = grant
         self.issuer = issuer
         self.credentials = credentials
         self.transactionCode = transactionCode
+        self.batchSize = batchSize
     }
 }
 
@@ -1109,13 +1115,16 @@ public struct IssuanceSession: Equatable, Sendable {
 
 }
 
-/// Credential issuance operation that must be resumed after issuer processing.
+/// Issuance continuation awaiting issuer processing or local credential storage.
 public struct DeferredCredential: Equatable, Sendable {
     /// Opaque identifier used to resume this deferred operation.
     public let id: String
 
-    /// Credential configuration associated with the operation.
-    public let credentialConfigurationID: String
+    /// Credential configuration, or nil when an isolated request did not supply one.
+    public let credentialConfigurationID: String?
+
+    /// Issuer-granted dataset identifier, when available.
+    public let credentialIdentifier: String?
 
     /// Issuer-recommended minimum polling interval in seconds.
     public let intervalSeconds: Int64?
@@ -1124,12 +1133,14 @@ public struct DeferredCredential: Equatable, Sendable {
     ///
     /// - Parameters:
     ///   - id: Opaque deferred operation identifier.
-    ///   - credentialConfigurationID: Credential configuration being issued.
+    ///   - credentialConfigurationID: Credential configuration, if supplied by the original request.
     ///   - intervalSeconds: Issuer-recommended polling interval.
-    public init(id: String, credentialConfigurationID: String, intervalSeconds: Int64?) {
+    ///   - credentialIdentifier: Optional issuer-granted dataset identifier.
+    public init(id: String, credentialConfigurationID: String?, intervalSeconds: Int64?, credentialIdentifier: String? = nil) {
         self.id = id
         self.credentialConfigurationID = credentialConfigurationID
         self.intervalSeconds = intervalSeconds
+        self.credentialIdentifier = credentialIdentifier
     }
 }
 
@@ -1156,6 +1167,12 @@ public enum IssuanceErrorCode: Equatable, Sendable {
     /// A transport failure prevented issuer communication.
     case network
 
+    /// A remote request is running or its response was lost; automatic retry is unsafe.
+    case remoteOutcomeUncertain
+
+    /// A local save is running or stopped without releasing ownership; automatic takeover is unsafe.
+    case storageOutcomeUncertain
+
     /// Key selection, signing, or proof generation failed.
     case crypto
 
@@ -1174,14 +1191,19 @@ public struct IssuanceFailure: Equatable, Sendable {
     /// Public error description that excludes protocol secrets.
     public let message: String
 
+    /// Failed target and unattempted targets, when failure occurred during credential processing.
+    public let targetFailure: IssuanceTargetFailure?
+
     /// Creates a sanitized issuance failure.
     ///
     /// - Parameters:
     ///   - code: Stable error category.
     ///   - message: Public error description.
-    public init(code: IssuanceErrorCode, message: String) {
+    ///   - targetFailure: Optional target-level failure details.
+    public init(code: IssuanceErrorCode, message: String, targetFailure: IssuanceTargetFailure? = nil) {
         self.code = code
         self.message = message
+        self.targetFailure = targetFailure
     }
 }
 
@@ -1197,7 +1219,7 @@ public enum IssuanceOutcome: Equatable, Sendable {
     case cancelled(sessionID: String)
 
     /// The transition failed with a sanitized error and any credentials stored before the failure.
-    case failed(sessionID: String, error: IssuanceFailure, storedCredentialIDs: [String])
+    case failed(sessionID: String, error: IssuanceFailure, storedCredentialIDs: [String], deferredCredentials: [DeferredCredential])
 }
 
 /// Result of responding to an OpenID4VP presentation request.

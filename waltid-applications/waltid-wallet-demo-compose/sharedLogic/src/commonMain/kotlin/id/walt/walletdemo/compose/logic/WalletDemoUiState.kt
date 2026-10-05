@@ -20,6 +20,7 @@ data class WalletDemoUiState(
     val selectedTab: WalletDemoTab = WalletDemoTab.Credentials,
     val requestDrafts: WalletRequestDrafts = WalletRequestDrafts(),
     val offerPreview: WalletDemoOfferPreview? = null,
+    val issuanceCopyCounts: Map<String, Int> = emptyMap(),
     val authorizationRequestUrl: String? = null,
     val deferredCredentials: List<WalletDemoDeferredCredential> = emptyList(),
     val lastReceivedCredentialIds: List<String> = emptyList(),

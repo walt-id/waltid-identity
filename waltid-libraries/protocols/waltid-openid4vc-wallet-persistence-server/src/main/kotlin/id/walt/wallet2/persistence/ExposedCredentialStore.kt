@@ -29,11 +29,18 @@ import kotlin.time.toKotlinInstant
  * No re-parsing on load — the kotlinx.serialization JSON preserves the exact [DigitalCredential]
  * subtype including format-specific fields, disclosures, and parsed data.
  */
-class ExposedCredentialStore(
+class ExposedCredentialStore private constructor(
     val storeId: String,
     private val db: Database,
-    private val json: Json = Json { ignoreUnknownKeys = true },
+    private val json: Json,
+    private val walletScope: ExposedWalletScope?,
 ) : WalletCredentialStore {
+    constructor(storeId: String, db: Database, json: Json = Json { ignoreUnknownKeys = true }) :
+        this(storeId, db, json, null)
+
+    internal fun forWallet(scope: ExposedWalletScope): ExposedCredentialStore =
+        ExposedCredentialStore(storeId, db, json, scope)
+
 
     override suspend fun getCredential(id: String): StoredCredential? =
         suspendTransaction(db) {
@@ -52,6 +59,13 @@ class ExposedCredentialStore(
 
     override suspend fun addCredential(entry: StoredCredential) {
         suspendTransaction(db) {
+            walletScope?.let { scope ->
+                scope.requireCurrentForWrite()
+                check(Wallet2Tables.WalletCredentialStores.selectAll().where {
+                    (Wallet2Tables.WalletCredentialStores.walletId eq scope.walletId) and
+                        (Wallet2Tables.WalletCredentialStores.storeId eq storeId)
+                }.any()) { "Credential store is no longer attached to the wallet" }
+            }
             Wallet2Tables.Credentials.upsert {
                 it[Wallet2Tables.Credentials.storeId] = this@ExposedCredentialStore.storeId
                 it[Wallet2Tables.Credentials.id] = entry.id

@@ -241,16 +241,21 @@ internal class MobileDemoWallet(
         )
     ).toDemoIssuanceSession()
 
-    override suspend fun beginAuthorizationIssuance(sessionId: String): WalletDemoIssuanceAuthorization =
-        mobileWallet.beginAuthorizationIssuance(sessionId).let {
+    override suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<WalletDemoCredentialSelection>): WalletDemoIssuanceAuthorization =
+        mobileWallet.beginAuthorizationIssuance(sessionId, credentials.toMobileSelections()).let {
             WalletDemoIssuanceAuthorization(url = it.url)
         }
+
+    override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> =
+        mobileWallet.listDeferredIssuance().map { it.toDemoDeferredCredential() }
+
 
     override suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
         transactionCode: String?,
+        credentials: List<WalletDemoCredentialSelection>,
     ): WalletDemoIssuanceOutcome =
-        mobileWallet.continuePreAuthorizedIssuance(sessionId, transactionCode).toDemoIssuanceOutcome()
+        mobileWallet.continuePreAuthorizedIssuance(sessionId, transactionCode, credentials.toMobileSelections()).toDemoIssuanceOutcome()
 
     override suspend fun continueAuthorizationIssuance(
         sessionId: String,

@@ -17,7 +17,11 @@ val enableMobileWallet = enableAndroidBuild || enableIosBuild
 kotlin {
     if (enableWalletDemoComposeWeb) {
         wasmJs {
-            browser()
+            browser {
+                testTask {
+                    useKarma { useChromeHeadless() }
+                }
+            }
         }
     }
 
@@ -91,6 +95,9 @@ kotlin {
             getByName("wasmJsMain").dependencies {
                 implementation(identityLibs.ktor.client.js)
                 implementation("org.jetbrains.kotlinx:kotlinx-browser:0.3")
+            }
+            getByName("wasmJsTest").dependencies {
+                implementation(identityLibs.ktor.client.mock)
             }
         }
 

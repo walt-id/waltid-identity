@@ -26,6 +26,18 @@ For setup, IDE guidance, and mobile integration test commands, see the [Mobile W
 
 The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM linkage package for native iOS linkage.
 
+## Credential issuance
+
+The shared Android/iOS offer review lets users select credential types and request copies up to the issuer's advertised limit. Each type defaults to one copy. Additional holder keys are created only after acceptance; the same selections are forwarded to pre-authorized and browser authorization flows and reused for a supported transaction-code retry.
+
+Saved credentials remain visible after a later failure or deferred response. Pending handles are restored when reopening the mobile wallet or reconnecting the browser to the same Wallet2 server wallet, and can be resumed individually. The browser uses the public deferred list/resume endpoints; durable server recovery requires OSS SQL persistence and store-backed holder keys. Copy counts apply to each authorized record of a selected type; the issuer determines which records are available.
+
+The receive status summarizes saved credentials and pending targets. When a target fails,
+it also shows the failed and not-attempted target counts. A target can yield multiple
+copies, so pending/failed counts are not credential-copy counts. Mixed deferred-resume
+outcomes refresh saved credentials and retain the remaining handles.
+
+
 ## In-person presentation
 
 The Android and iOS apps expose a dedicated **Present in person** journey for holder-side ISO mdoc
@@ -249,6 +261,25 @@ Backend E2E fixtures are intentionally shared:
 - Android tests use `waltid-mobile-test-utils` for public EUDI, public demo, and Enterprise fixture backend operations.
 - iOS UI tests use the shared Swift `TestHelpers` backend fixtures from `../mobile-e2e-fixtures/ios/TestHelpers`.
 - Public demo UI tests run through the normal Android instrumentation and XCTest runners.
+
+`BatchIssuanceE2ETest` checks default one-copy review, explicit two-copy issuance and stored
+cards after Activity relaunch. From the coordinated build, run
+`./gradlew :waltid-enterprise-integration-tests:enterpriseAndroidMobileIntegrationTest`.
+This starts the Enterprise fixture, forwards its ports, runs the SDK and Compose batch tests,
+and requires the named Compose case to pass in its JUnit report. CI runs it in the
+`enterprise-mobile` phase; the generic `compose-demo` phase excludes this fixture-backed case.
+For a standalone run, supply the instrumentation argument
+`enterprise_fixture_base_url=http://127.0.0.1:33335` and forward ports 33334 and 33335 with
+`adb -s <serial> reverse tcp:<port> tcp:<port>`. Missing fixture configuration fails the test.
+Remove the forwarding after the run.
+Screenshots are saved under the app's external-files `batch-evidence` directory. Use the
+preview variant for a separate test wallet data directory when preserving an existing demo
+installation. Activity relaunch does not prove recovery after process termination.
+
+Compose iOS runs `iosAppUITests/BatchIssuanceE2ETests` with the test runner environment
+`ENTERPRISE_MOBILE_FIXTURE_BASE_URL=http://localhost:33335`. It checks the same explicit
+copy choice and credential IDs after terminating and reopening the app. The UI test uses
+an isolated wallet ID and exports review/result screenshots as XCTest attachments.
 
 ## Default wallet app (Android 15+)
 

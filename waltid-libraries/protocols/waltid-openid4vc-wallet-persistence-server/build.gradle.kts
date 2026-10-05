@@ -40,6 +40,11 @@ dependencies {
     testImplementation(project(":waltid-libraries:crypto:waltid-jose"))
 }
 
+// Re-execute the lifecycle contract when switching between SQLite and the disposable PostgreSQL fixture.
+tasks.withType<Test>().configureEach {
+    inputs.property("wallet2TestPostgresUrl", providers.environmentVariable("WALLET2_TEST_POSTGRES_URL").orElse(""))
+}
+
 mavenPublishing {
     pom {
         name.set("walt.id Wallet SDK - Persistence (Exposed/SQL)")

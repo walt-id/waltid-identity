@@ -1,8 +1,11 @@
 package id.walt.wallet2.handlers
 
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
+import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -21,6 +24,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -28,8 +32,12 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
 
     @Test
     fun `deferred polling observes pending issued and consumed issuer transaction`() = runTest {
+        val holderKey = batchTestLegacyKey()
+        val keys = InMemoryKeyStore()
+        val request = deferredRequest().copy(holderBindings = listOf(CredentialHolderBinding(keyId = keys.addKey(holderKey))))
+        val credential = batchTestCredential(holderKey)
         val store = FailingCredentialStore(failAtAttempt = Int.MAX_VALUE)
-        val wallet = Wallet(id = "wallet", credentialStores = listOf(store))
+        val wallet = Wallet(id = "wallet", keyStores = listOf(keys), credentialStores = listOf(store))
         var requests = 0
         var transactionConsumed = false
         val client = HttpClient(MockEngine) {
@@ -43,7 +51,7 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
                         transactionConsumed -> """{"error":"invalid_transaction_id"}""" to HttpStatusCode.BadRequest
                         else -> {
                             transactionConsumed = true
-                            """{"credentials":[{"credential":$CREDENTIAL}]}""" to HttpStatusCode.OK
+                            """{"credentials":[{"credential":${Json.encodeToString(credential)}}]}""" to HttpStatusCode.OK
                         }
                     }
                     // Deliberately omit Cache-Control, as an external issuer may do.
@@ -53,15 +61,15 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
             install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
         }
         try {
-            assertTrue(WalletIssuanceHandler.pollDeferredFlow(wallet, deferredRequest(), httpClient = client).toList().isEmpty())
+            assertTrue(WalletIssuanceHandler.pollDeferredFlow(wallet, request, httpClient = client).toList().isEmpty())
             assertEquals(1, requests)
-            assertEquals(1, WalletIssuanceHandler.pollDeferredFlow(wallet, deferredRequest(), httpClient = client).toList().size)
+            assertEquals(1, WalletIssuanceHandler.pollDeferredFlow(wallet, request, httpClient = client).toList().size)
             assertEquals(2, requests)
             assertTrue(transactionConsumed)
-            val error = assertFailsWith<IllegalStateException> {
-                WalletIssuanceHandler.pollDeferredFlow(wallet, deferredRequest(), httpClient = client).toList()
+            val error = assertFailsWith<CredentialEndpointException> {
+                WalletIssuanceHandler.pollDeferredFlow(wallet, request, httpClient = client).toList()
             }
-            assertTrue(error.message.orEmpty().contains("invalid_transaction_id"))
+            assertEquals("invalid_transaction_id", error.credentialError?.error)
             assertEquals(3, requests)
             assertEquals(1, store.stored.size)
         } finally {
@@ -71,38 +79,50 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
 
     @Test
     fun `callback reports first credential when second persistence fails`() = runTest {
+        val keys = InMemoryKeyStore()
+        val holders = List(2) { JWKKey.generate(KeyType.Ed25519) }
+        val bindings = holders.map { CredentialHolderBinding(keyId = keys.addKey(it)) }
+        val credentials = holders.map { batchTestCredential(it) }
         val store = FailingCredentialStore(failAtAttempt = 2)
         val callbacks = mutableListOf<String>()
 
-        assertFailsWith<IllegalStateException> {
+        val failure = assertFailsWith<CredentialStorageException> {
             WalletIssuanceHandler.pollDeferredFlow(
-                wallet = Wallet(id = "wallet", credentialStores = listOf(store)),
-                request = deferredRequest(),
-                httpClient = credentialResponseClient(credentialCount = 2),
+                wallet = Wallet(id = "wallet", keyStores = listOf(keys), credentialStores = listOf(store)),
+                request = deferredRequest().copy(holderBindings = bindings),
+                httpClient = credentialResponseClient(credentials),
                 onCredentialStored = { callbacks += it.id },
             ).toList()
         }
 
         assertEquals(1, store.stored.size)
         assertEquals(store.stored.map { it.id }, callbacks)
+        assertEquals(callbacks, failure.outcome.storedCredentialIds)
+        assertNull(failure.outcome.deferredCredentials.single().credentialConfigurationId)
     }
 
     @Test
     fun `callback reports nothing when persistence fails before first credential`() = runTest {
+        val keys = InMemoryKeyStore()
+        val holders = List(2) { JWKKey.generate(KeyType.Ed25519) }
+        val bindings = holders.map { CredentialHolderBinding(keyId = keys.addKey(it)) }
+        val credentials = holders.map { batchTestCredential(it) }
         val store = FailingCredentialStore(failAtAttempt = 1)
         var callbacks = 0
 
-        assertFailsWith<IllegalStateException> {
+        val failure = assertFailsWith<CredentialStorageException> {
             WalletIssuanceHandler.pollDeferredFlow(
-                wallet = Wallet(id = "wallet", credentialStores = listOf(store)),
-                request = deferredRequest(),
-                httpClient = credentialResponseClient(credentialCount = 2),
+                wallet = Wallet(id = "wallet", keyStores = listOf(keys), credentialStores = listOf(store)),
+                request = deferredRequest().copy(holderBindings = bindings),
+                httpClient = credentialResponseClient(credentials),
                 onCredentialStored = { callbacks++ },
             ).toList()
         }
 
         assertEquals(0, store.stored.size)
         assertEquals(0, callbacks)
+        assertEquals(emptyList(), failure.outcome.storedCredentialIds)
+        assertNull(failure.outcome.deferredCredentials.single().credentialConfigurationId)
     }
 
     private fun deferredRequest() = PollDeferredRequest(
@@ -111,11 +131,11 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
         transactionId = "transaction",
     )
 
-    private fun credentialResponseClient(credentialCount: Int) = HttpClient(MockEngine) {
+    private fun credentialResponseClient(credentials: List<String>) = HttpClient(MockEngine) {
         engine {
             addHandler {
                 respond(
-                    content = """{"credentials":[${List(credentialCount) { "{\"credential\":$CREDENTIAL}" }.joinToString()}]}""",
+                    content = """{"credentials":[${credentials.map { "{\"credential\":${Json.encodeToString(it)}}" }.joinToString()}]}""",
                     status = HttpStatusCode.OK,
                     headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
                 )
@@ -142,12 +162,4 @@ class WalletIssuanceHandlerPersistenceCallbackTest {
         override suspend fun removeCredential(id: String): Boolean = stored.removeAll { it.id == id }
     }
 
-    private companion object {
-        const val CREDENTIAL = """{
-            "@context":["https://www.w3.org/2018/credentials/v1"],
-            "type":["VerifiableCredential"],
-            "issuer":"did:example:issuer",
-            "credentialSubject":{"id":"did:example:holder"}
-        }"""
-    }
 }

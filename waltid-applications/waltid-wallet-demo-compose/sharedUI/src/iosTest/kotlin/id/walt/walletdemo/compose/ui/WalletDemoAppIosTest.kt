@@ -9,6 +9,10 @@ import kotlin.test.Test
 
 @OptIn(InternalComposeUiApi::class)
 class WalletDemoAppIosTest {
+    @Test
+    fun batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit() =
+        scenarios.batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit()
+
     private val scenarios = WalletDemoAppTestScenarios { content ->
         // Headless Skiko tests have no UIKit window; reading its fallback display theme can block.
         CompositionLocalProvider(LocalSystemTheme provides SystemTheme.Light, content = content)
