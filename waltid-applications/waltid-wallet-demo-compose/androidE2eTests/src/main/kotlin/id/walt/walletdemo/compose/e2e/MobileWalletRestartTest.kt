@@ -4,8 +4,9 @@ import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.Condition
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.Until
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
@@ -90,8 +91,16 @@ class MobileWalletRestartTest {
     private fun credentialIds(): Set<String> {
         clickByTag(device, "wallet.tab.credentials")
         val cards = By.res(Pattern.compile("wallet\\.credentialCard\\..*"))
-        assertTrue("Saved credential must remain visible", device.wait(Until.hasObject(cards), UI_ELEMENT_TIMEOUT))
-        return device.findObjects(cards).map { it.resourceName }.toSet().also {
+        val ids = device.wait(Condition<UiDevice, Set<String>?> { currentDevice ->
+            try {
+                currentDevice.findObjects(cards).map { it.resourceName }.toSet().takeIf { it.isNotEmpty() }
+            } catch (_: StaleObjectException) {
+                // Reacquire every card if Compose replaces a node while reading the snapshot.
+                null
+            }
+        }, UI_ELEMENT_TIMEOUT)
+        assertTrue("Saved credential must remain visible", ids != null)
+        return requireNotNull(ids).also {
             assertEquals("The fresh wallet must contain the one issued credential", 1, it.size)
         }
     }
