@@ -11,7 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -20,17 +20,20 @@ import id.walt.walletdemo.compose.logic.ResolvedWalletLink
 import id.walt.walletdemo.compose.logic.WalletLinkException
 import id.walt.walletdemo.compose.logic.resolveWalletLink
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.readPlainText
 import id.walt.walletdemo.compose.ui.components.QrScannerDialog
 import id.walt.walletdemo.compose.ui.components.WalletAction
 import id.walt.walletdemo.compose.ui.components.WalletActionBar
 import id.walt.walletdemo.compose.ui.components.WalletSection
 import id.walt.walletdemo.compose.ui.components.WalletIcon
 import id.walt.walletdemo.compose.ui.components.WalletSymbol
+import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
 
 /** One entry point for camera and manual links; decoding never grants consent. */
 @Composable
@@ -47,7 +50,8 @@ internal fun WalletScanScreen(
     var resolutionError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val kind = WalletLinkKind.classify(input)
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    var pasting by remember { mutableStateOf(false) }
     fun open(value: String) {
         if (dispatched || resolving) return
         resolving = true
@@ -67,13 +71,11 @@ internal fun WalletScanScreen(
     SystemBackHandler(onBack = onBack, enabled = true)
     Scaffold(
         topBar = {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            WalletScreenHeader("Scan or paste", leading = {
                 IconButton(onClick = onBack, modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to wallet")
                 }
-                Text("Scan or paste", style = MaterialTheme.typography.titleLarge)
-            }
+            })
         },
         bottomBar = {
             WalletActionBar(primary = WalletAction(
@@ -104,7 +106,24 @@ internal fun WalletScanScreen(
                         Spacer(Modifier.width(8.dp))
                         Text("Use camera")
                     }
-                    OutlinedButton(onClick = { input = clipboard.getText()?.text.orEmpty(); resolutionError = null }, enabled = !resolving) {
+                    OutlinedButton(onClick = {
+                        val originalInput = input
+                        pasting = true
+                        // Browser clipboard access must begin in the button's user gesture.
+                        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                            try {
+                                val text = clipboard.getClipEntry()?.readPlainText()
+                                currentCoroutineContext().ensureActive()
+                                if (input == originalInput) {
+                                    if (text != null) { input = text; resolutionError = null }
+                                    else resolutionError = "There is no text in the clipboard."
+                                }
+                            } catch (error: CancellationException) { throw error }
+                            catch (_: Exception) {
+                                if (input == originalInput) resolutionError = "Could not paste this link. Paste it into the field and try again."
+                            } finally { pasting = false }
+                        }
+                    }, enabled = !resolving && !pasting) {
                         WalletIcon(WalletSymbol.Paste, null, Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
                         Text("Paste link")
