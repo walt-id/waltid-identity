@@ -1,5 +1,7 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.exceptions.AccountNotFoundException
+import id.walt.ktorauthnz.exceptions.AccountExistsException
 import id.walt.ktorauthnz.attempts.AttemptLimiter
 import id.walt.ktorauthnz.attempts.AttemptLimiter.attemptOnSession
 import id.walt.ktorauthnz.attempts.AttemptLimiter.attemptWithMethod
@@ -67,7 +69,12 @@ abstract class AuthenticationMethod(open val id: String) {
         AttemptLimiter.recordSuccess(this)
         AuthnzEvents.emit(AuthnzEvent.LoginStepSucceeded(session.id, id, session.accountId, session.status.isSuccess()))
 
-        if (session.status.isSuccess()) {
+        if (session.status.isSuccess() && session.linkToAccount != null) {
+            // Linking ends here: the identity is the account's now, and no further login is issued.
+            session.token?.let { KtorAuthnzManager.tokenHandler.dropToken(it) }
+            SessionManager.invalidateSession(session)
+            session.token = null
+        } else if (session.status.isSuccess()) {
             session.currentlyActiveMethod = null // No longer any method active, authentication is done for this session
             check(session.token != null) { "Session token does not exist after successful authentication?" }
 
@@ -142,6 +149,30 @@ abstract class AuthenticationMethod(open val id: String) {
     open fun Route.registerRegistrationRoutes(authContext: ApplicationCall.() -> AuthContext): Unit =
         throw NotImplementedError("Authentication method ${this::class.simpleName} does not offer registration routes. Authentication routes handle registration: $authenticationHandlesRegistration")
 
+
+    /**
+     * The account an authenticated [identifier] logs in: the one it belongs to; else, for a session linking an identity
+     * to an account, that account (the identifier is added to it); else one [register] creates. Without [register], an
+     * identifier without account is refused (404). An identifier of another account cannot be linked (409).
+     */
+    protected suspend fun accountFor(
+        session: AuthSession,
+        identifier: AccountIdentifier,
+        register: (suspend (AccountIdentifier) -> Unit)?,
+    ): String {
+        val existing = identifier.resolveIfExists()
+        session.linkToAccount?.let { target ->
+            if (existing == target) return target
+            if (existing != null) throw AccountExistsException(identifier.accountIdentifierName)
+            KtorAuthnzManager.accountStore.addAccountIdentifierToAccount(target, identifier)
+            AuthnzEvents.emit(AuthnzEvent.MethodEnrolled(target, id))
+            return target
+        }
+        if (existing != null) return existing
+        val registration = register ?: throw AccountNotFoundException(identifier.accountIdentifierName)
+        registration(identifier)
+        return identifier.resolveToAccountId()
+    }
 
     // Data functions
     suspend inline fun <reified V : AuthMethodStoredData> lookupAccountIdentifierStoredData(identifier: AccountIdentifier): V {
