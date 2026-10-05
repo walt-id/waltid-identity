@@ -14,6 +14,10 @@ interface TokenHandler {
     suspend fun getTokenAccountId(token: String): String
     suspend fun dropToken(token: String)
 
+    /** When and with which methods the token's login completed, or null if unknown. */
+    suspend fun getTokenLogin(token: String): TokenLogin? =
+        runCatching { resolveTokenToSession(token) }.getOrNull()?.let { TokenLogin(it.authenticatedAt, it.completedMethods) }
+
     /** The tenant the token's session was opened for, or null. */
     suspend fun getTokenTenant(token: String): String? = resolveTokenToSession(token).tenant
 
@@ -25,3 +29,6 @@ interface TokenHandler {
     }
 
 }
+
+/** When a login completed ([authenticatedAt]), and the methods of its steps ([methods], e.g. `email`, `totp`). */
+data class TokenLogin(val authenticatedAt: kotlin.time.Instant?, val methods: List<String>)
