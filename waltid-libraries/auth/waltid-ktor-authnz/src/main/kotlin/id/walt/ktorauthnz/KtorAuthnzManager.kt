@@ -33,6 +33,9 @@ object KtorAuthnzManager {
     /** The WebAuthn relying party, for passkeys; passkeys are off when null. */
     var passkeys: PasskeySettings? = null
 
+    /** The relying party per tenant (e.g. each on its own domain); null for a tenant falls back to [passkeys]. */
+    var passkeysPerTenant: (suspend (tenant: String?) -> PasskeySettings?)? = null
+
     /** Sending of one-time email codes, for the `email-code` method; off when null. */
     var emailCodes: id.walt.ktorauthnz.methods.config.EmailCodeSettings? = null
 
