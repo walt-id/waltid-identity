@@ -47,6 +47,11 @@ class InMemoryAccountStore : EditableAccountStore {
 
     override suspend fun lookupAccountUuid(identifier: AccountIdentifier) = accountIds[scoped(identifier)]
 
+    override suspend fun lookupAccountIdentifiers(accountId: String): List<AccountIdentifier> {
+        val tenant = currentAuthnzTenant()
+        return accountIds.filter { (key, id) -> key.tenant == tenant && id == accountId }.map { it.key.key }
+    }
+
     override suspend fun addAccountIdentifierToAccount(accountId: String, newAccountIdentifier: AccountIdentifier) {
         accountIds[scoped(newAccountIdentifier)] = accountId
     }
