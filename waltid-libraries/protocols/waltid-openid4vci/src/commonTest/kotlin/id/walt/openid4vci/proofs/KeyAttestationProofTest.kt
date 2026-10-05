@@ -58,6 +58,47 @@ class KeyAttestationProofTest {
     )
 
     @Test
+    fun `nested attested key limit is per attestation and checked before key import`() = runTest {
+        val attester = key()
+        val holders = List(4) { key() }
+        val atDefaultLimit = proof(holders[0], attestation(attester, List(20) { holders[0] }))
+        assertEquals(1, verifier.verify(request(atDefaultLimit), configuration, context(attester)).bindings.size)
+        val aboveDefaultLimit = proof(holders[0], attestation(attester, List(21) { holders[0] }))
+        assertEquals(CredentialErrorCodes.INVALID_PROOF, assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(request(aboveDefaultLimit), configuration, context(attester))
+        }.errorCode)
+        assertEquals(1, verifier.verify(request(aboveDefaultLimit), configuration,
+            context(attester, maxAttestedKeys = null)).bindings.size)
+        val limited = context(attester, maxAttestedKeys = 2).copy(batchCredentialIssuance = BatchCredentialIssuance(2))
+        for (count in 1..2) {
+            val jwt = proof(holders[0], attestation(attester, holders.take(count)))
+            assertEquals(count, verifier.verify(request(jwt), configuration, limited).bindings.size)
+        }
+        val first = proof(holders[0], attestation(attester, holders.take(2)))
+        val second = proof(holders[2], attestation(attester, holders.drop(2)))
+        assertEquals(4, verifier.verify(request(first, second), configuration, limited).bindings.size)
+        assertEquals(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
+            assertFailsWith<CredentialProofValidationException> {
+                verifier.verify(request(first, second, first), configuration, limited)
+            }.errorCode)
+
+        val oversized = proof(holders[0], attestation(attester, holders.take(3)))
+        assertEquals(3, verifier.verify(request(oversized), configuration, context(attester)).bindings.size)
+        val duplicates = proof(holders[0], attestation(attester, List(3) { holders[0] }))
+        // Malformed keys would fail import if the count were not checked first.
+        val malformed = proof(holders[0], attestation(attester, emptyList(), claims = mapOf(
+            "attested_keys" to JsonArray(List(3) { buildJsonObject {} }),
+        )))
+        for (jwt in listOf(oversized, duplicates, malformed)) {
+            val error = assertFailsWith<CredentialProofValidationException> {
+                verifier.verify(request(jwt), configuration, limited)
+            }
+            assertEquals(CredentialErrorCodes.INVALID_PROOF, error.errorCode)
+            assertEquals("Key attestation exceeds the configured attested-key limit", error.message)
+        }
+    }
+
+    @Test
     fun `one proof selects all distinct attested keys in attestation order`() = runTest {
         val attester = key()
         val holders = List(3) { key() }
@@ -181,7 +222,7 @@ class KeyAttestationProofTest {
     }
 
     @Test
-    fun `one nested attestation larger than 64 KiB issues credentials for 33 keys`() = runTest {
+    fun `one nested attestation larger than 64 KiB issues credentials for 33 keys when the key limit is disabled`() = runTest {
         val attester = key()
         val holders = List(33) { key() }
         val attestation = attestation(attester, holders, mapOf("padding" to JsonPrimitive("x".repeat(65_536))))
@@ -204,7 +245,7 @@ class KeyAttestationProofTest {
         // batch_size counts proofs, not attested keys or issued credentials.
         val response = assertIs<CredentialResponseResult.Success>(provider.createCredentialResponse(
             request = request, configuration = configuration, issuerKey = Crypto2CredentialSigningKey.select(key(), configuration), issuerId = issuer,
-            issuanceInputData = inputs, proofValidationContext = context(attester).copy(batchCredentialIssuance = BatchCredentialIssuance(2)),
+            issuanceInputData = inputs, proofValidationContext = context(attester, maxAttestedKeys = null).copy(batchCredentialIssuance = BatchCredentialIssuance(2)),
         ))
         assertEquals(holders.size, allocated)
         val keys = response.response.credentials!!.map {
@@ -321,7 +362,7 @@ class KeyAttestationProofTest {
         val config = KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(key().exportPublicJwkObject()))
         val json = Json { encodeDefaults = true }
         val encoded = json.encodeToJsonElement(config)
-        assertEquals(setOf("verificationMethod"), encoded.jsonObject.keys)
+        assertEquals(setOf("verificationMethod", "maxAttestedKeys"), encoded.jsonObject.keys)
         assertEquals(config, json.decodeFromJsonElement<KeyAttestationConfig>(encoded))
         assertFailsWith<IllegalArgumentException> { validateKeyAttestationConfiguration(listOf(configuration), null) }
         validateKeyAttestationConfiguration(listOf(configuration), config)
@@ -451,10 +492,12 @@ class KeyAttestationProofTest {
         CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(GenerateSoftwareKeyRequest(
             KeyId("test-key"), spec, setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
         ))
-    private suspend fun context(attester: Key) = CredentialProofValidationContext(
+    private suspend fun context(attester: Key, maxAttestedKeys: Int? = 20) = CredentialProofValidationContext(
         credentialIssuer = issuer,
         batchCredentialIssuance = BatchCredentialIssuance(10),
-        keyAttestation = KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(attester.exportPublicJwkObject())).toVerificationOptions(),
+        keyAttestation = KeyAttestationConfig(
+            KeyAttestationVerificationMethod.StaticJwk(attester.exportPublicJwkObject()), maxAttestedKeys,
+        ).toVerificationOptions(),
     )
     private suspend fun attestation(attester: Key, keys: List<Key>, claims: Map<String, JsonElement> = emptyMap(), headers: Map<String, JsonElement> = emptyMap()): String = CompactJws.sign(
         buildJsonObject {

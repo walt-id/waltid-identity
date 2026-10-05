@@ -43,10 +43,12 @@ class StandaloneAttestationProofTest {
         Crypto2JwtVerificationKeyResolver { Crypto2JwtVerificationKey(key, setOf(JwsAlgorithm.ES256)) },
         now = { time },
     )
-    private suspend fun context(attester: Key, service: CredentialNonceService) = CredentialProofValidationContext(
+    private suspend fun context(attester: Key, service: CredentialNonceService, maxAttestedKeys: Int? = 20) = CredentialProofValidationContext(
         issuer, clientId = "oauth-client",
         nonceValidation = CredentialNonceValidationContext(service, binding),
-        keyAttestation = KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(attester.exportPublicJwkObject())).toVerificationOptions(),
+        keyAttestation = KeyAttestationConfig(
+            KeyAttestationVerificationMethod.StaticJwk(attester.exportPublicJwkObject()), maxAttestedKeys,
+        ).toVerificationOptions(),
     )
     private fun request(vararg tokens: String) = DefaultCredentialRequest(
         client = DefaultClient("client", emptyList(), emptySet(), emptySet(), setOf("credential")),
@@ -65,6 +67,40 @@ class StandaloneAttestationProofTest {
             put("attested_keys", JsonArray(holders.map { it.exportPublicJwkObject() }))
         }
         return CompactJws.sign(JsonObject((payload + claims) - omit).toString().encodeToByteArray(), attester, JwsAlgorithm.ES256, header)
+    }
+
+    @Test
+    fun `standalone attested key limit is checked before key import`() = runTest {
+        val attester = key("attester")
+        val holders = List(3) { key("holder-$it") }
+        val service = nonceService(key("issuer"))
+        val nonce = service.issue(binding).nonce
+        val atDefaultLimit = token(attester, List(20) { holders[0] }, nonce)
+        assertEquals(1, verifier.verify(request(atDefaultLimit), configuration, context(attester, service)).bindings.size)
+        val aboveDefaultLimit = token(attester, List(21) { holders[0] }, nonce)
+        assertEquals(CredentialErrorCodes.INVALID_PROOF, assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(request(aboveDefaultLimit), configuration, context(attester, service))
+        }.errorCode)
+        assertEquals(1, verifier.verify(request(aboveDefaultLimit), configuration,
+            context(attester, service, maxAttestedKeys = null)).bindings.size)
+        val limited = context(attester, service, maxAttestedKeys = 2)
+        for (count in 1..2) {
+            val jwt = token(attester, holders.take(count), nonce)
+            assertEquals(count, verifier.verify(request(jwt), configuration, limited).bindings.size)
+        }
+        val oversized = token(attester, holders, nonce)
+        assertEquals(3, verifier.verify(request(oversized), configuration, context(attester, service)).bindings.size)
+        val duplicates = token(attester, List(3) { holders[0] }, nonce)
+        val malformed = token(attester, emptyList(), nonce, claims = mapOf(
+            "attested_keys" to JsonArray(List(3) { buildJsonObject {} }),
+        ))
+        for (jwt in listOf(oversized, duplicates, malformed)) {
+            val error = assertFailsWith<CredentialProofValidationException> {
+                verifier.verify(request(jwt), configuration, limited)
+            }
+            assertEquals(CredentialErrorCodes.INVALID_PROOF, error.errorCode)
+            assertEquals("Key attestation exceeds the configured attested-key limit", error.message)
+        }
     }
 
     @Test
@@ -198,12 +234,12 @@ class StandaloneAttestationProofTest {
     }
 
     @Test
-    fun `one standalone attestation larger than 64 KiB issues 33 credentials after binding validation`() = runTest {
+    fun `one standalone attestation larger than 64 KiB issues 33 credentials when the key limit is disabled`() = runTest {
         val attester = key()
         val holders = List(33) { key() }
         val issuerKey = key()
         val service = nonceService(issuerKey)
-        val context = context(attester, service)
+        val context = context(attester, service, maxAttestedKeys = null)
         val attestation = token(attester, holders, service.issue(binding).nonce,
             claims = mapOf("padding" to JsonPrimitive("x".repeat(65_536))))
         assertTrue(attestation.length > 65_536)

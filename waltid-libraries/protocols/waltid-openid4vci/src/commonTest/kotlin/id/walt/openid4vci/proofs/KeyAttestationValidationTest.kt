@@ -38,6 +38,30 @@ class KeyAttestationValidationTest {
     )
 
     @Test
+    fun `attested key limit defaults to twenty and supports positive overrides or explicit null`() = runTest {
+        val method = KeyAttestationVerificationMethod.StaticJwk(key("attester").exportPublicJwkObject())
+        val config = KeyAttestationConfig(method)
+        val options = config.toVerificationOptions()
+        assertEquals(20, options.maxAttestedKeys)
+        assertEquals(20, KeyAttestationVerificationOptions(options.trustResolver).maxAttestedKeys)
+        val encoded = Json.encodeToJsonElement(config).jsonObject
+        assertFalse("maxAttestedKeys" in encoded)
+        assertEquals(20, Json.decodeFromJsonElement<KeyAttestationConfig>(encoded).maxAttestedKeys)
+        val unlimited = Json.decodeFromString<KeyAttestationConfig>(Json.encodeToString(config.copy(maxAttestedKeys = null)))
+        assertNull(unlimited.toVerificationOptions().maxAttestedKeys)
+        assertNull(options.copy(maxAttestedKeys = null).maxAttestedKeys)
+        val configured = Json.decodeFromString<KeyAttestationConfig>(Json.encodeToString(config.copy(maxAttestedKeys = 2)))
+        assertEquals(2, configured.toVerificationOptions().maxAttestedKeys)
+        assertEquals(2, options.copy(maxAttestedKeys = 2).maxAttestedKeys)
+        for (invalid in listOf(0, -1)) {
+            assertFailsWith<IllegalArgumentException> { config.copy(maxAttestedKeys = invalid) }
+            assertFailsWith<IllegalArgumentException> { options.copy(maxAttestedKeys = invalid) }
+            val json = JsonObject(Json.encodeToJsonElement(config).jsonObject + ("maxAttestedKeys" to JsonPrimitive(invalid)))
+            assertFailsWith<IllegalArgumentException> { Json.decodeFromJsonElement<KeyAttestationConfig>(json) }
+        }
+    }
+
+    @Test
     fun `not before honors skew and rejects malformed claims`() = runTest {
         val attester = key("attester")
         for (nbf in listOf(null, JsonPrimitive(now.epochSeconds), JsonPrimitive(now.epochSeconds + 60), JsonPrimitive(now.epochSeconds + 59.5))) {
