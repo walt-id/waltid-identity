@@ -4,7 +4,7 @@ import id.walt.ktorauthnz.methods.sessiondata.IdentifiedSessionData
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.attempts.AttemptLimiter.attemptOnIdentifier
 import id.walt.ktorauthnz.exceptions.AuthSessionStateException
 import id.walt.ktorauthnz.exceptions.AuthenticationFailureException
