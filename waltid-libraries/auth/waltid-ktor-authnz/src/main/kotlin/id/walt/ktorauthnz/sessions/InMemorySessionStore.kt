@@ -90,6 +90,10 @@ class InMemorySessionStore(
         }
     }
 
+    override suspend fun listSessionsForAccount(accountId: String): List<AuthSession> = synchronized(lock) {
+        accountSessions[accountId].orEmpty().mapNotNull { live(it)?.copy() }
+    }
+
     override suspend fun invalidateAllSessionsForAccount(accountId: String) {
         synchronized(lock) {
             accountSessions.remove(accountId)?.forEach { sessions.remove(it) }
