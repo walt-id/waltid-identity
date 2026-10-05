@@ -63,6 +63,135 @@ The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Upd
 
 `ciTokenStoredKey` optionally carries an encoded crypto2 `StoredKey` sidecar for `ciTokenKey` and takes precedence at startup. The service validates that both values identify the same signing and verification key. If the sidecar is absent, a legacy JWK is migrated only in memory; the configuration file is never rewritten. A malformed or mismatched sidecar fails startup without falling back to `ciTokenKey`.
 
+### Signed issuer metadata
+
+`signedMetadata.signingMethod` follows the same strategy pattern as the attestation
+`verificationMethod` settings, with signing-specific key requirements. The strategy models
+and signing implementation are shared with enterprise issuer2 in
+`id.walt.openid4vci.metadata.issuer.signing`:
+
+| `type` | Signing material | Protected JWT header |
+|--------|------------------|----------------------|
+| `static-jwk` | Inline private JWK JSON object | Public `jwk` |
+| `x509-chain` | Inline PKCS#8 private-key PEM and matching leaf-first PEM certificate list | `x5c` |
+| `key-reference` | Signing-capable crypto2 key returned by a deployment resolver | Public `jwk`, or `x5c` when the resolver supplies certificates |
+
+Omitting `signedMetadata` preserves the existing token-key behavior. Only the three strategies
+above are accepted; there are no file-path fields or separate algorithm settings.
+
+For a static key, supply one raw **private JWK JSON object**, including its public members
+(placeholder values below):
+
+```hocon
+signedMetadata {
+  signingMethod {
+    type = "static-jwk"
+    jwk {
+      kty = "EC"
+      crv = "P-256"
+      x = "<base64url public x>"
+      y = "<base64url public y>"
+      d = "<base64url private scalar>"
+      kid = "metadata-signing-key"
+    }
+  }
+}
+```
+
+The `jwk` value is one JSON object, not a JSON string, a JWKS, or a serialized walt.id key wrapper.
+The JWK's `kid` is retained if present; otherwise the RFC 7638 SHA-256 thumbprint is used.
+Only public key material is emitted in the JWT header.
+
+For certificate signing, supply PEM contents directly:
+
+```hocon
+signedMetadata {
+  signingMethod {
+    type = "x509-chain"
+    privateKeyPem = """
+-----BEGIN PRIVATE KEY-----
+<PKCS#8 Base64 contents>
+-----END PRIVATE KEY-----
+"""
+    certificateChainPem = ["""
+-----BEGIN CERTIFICATE-----
+<leaf certificate Base64 contents>
+-----END CERTIFICATE-----
+"""]
+  }
+}
+```
+
+Add any needed intermediate certificates as subsequent list entries, one PEM certificate per
+entry, after the leaf; normally omit the trust anchor.
+A leaf-only chain is allowed when the wallet can establish trust from it. These are the
+signer's certificates, not the trusted-root list used by verification methods.
+
+Private PEM must be unencrypted PKCS#8 (`BEGIN PRIVATE KEY`), with standard Base64 wrapping. Encrypted PEM,
+SEC1 `EC PRIVATE KEY`, and PKCS#12 are not accepted. In JSON config, use `\n` for PEM newlines.
+
+To reference a managed or deployment-owned signing key:
+
+```hocon
+signedMetadata {
+  signingMethod {
+    type = "key-reference"
+    reference = "metadata-signing-key"
+  }
+}
+```
+
+The embedding application supplies `MetadataSigningKeyReferenceResolver` through
+`Issuer2Module(..., metadataSigningKeyResolver = resolver)` or
+`Issuer2Module.load(metadataSigningKeyResolver = resolver)`. The resolver returns a
+`ResolvedMetadataSigningKey(key, certificateChainPem = optionalPemList)`, or null when
+unavailable. The `key` must be a signing-capable crypto2 `Key`. The resolver can use a key
+registry or an already-configured KMS provider; references are not interpreted as URLs or filesystem paths.
+The stock standalone startup does not register a resolver automatically. Selecting
+`key-reference` without one fails initialization, as does an unresolved or unusable key.
+
+Resolution happens once at initialization. No private-key export is required. Without a
+certificate chain the key must export public JWK material, and its thumbprint becomes the
+published `kid`. With a chain, the leaf provides the public verification key, so even public
+export from the signer is optional. The returned chain must match the resolved signer; an
+empty list is rejected.
+
+Algorithm selection uses the key's declared algorithm, otherwise crypto2's default for its
+key type. For example, P-256 selects ES256, P-384 selects ES384, and Ed25519 selects the fully
+specified Ed25519 algorithm. RSA defaults depend on key size; a private JWK may declare
+`alg = "PS256"` when appropriate. Symmetric keys, unsigned algorithms, incompatible declared
+algorithms, and keys lacking signing capability fail startup. A certificate's CA signature
+algorithm does not select the JWT algorithm. The available key types and algorithms are
+those supported by the crypto2 provider.
+
+Startup validates signing capability with a signing/verification check. Certificate modes
+also validate dates, digital-signature usage, chain ordering/signatures and CA constraints.
+The `x5c` header is a leaf-first array of standard Base64 DER certificates, without `jwk`;
+its `kid` is the unpadded Base64url SHA-256 digest of the leaf public key's SPKI DER.
+Certificate validity is rechecked before each metadata signature. Invalid dedicated settings
+never fall back to the token key.
+
+Inline private values make the configuration itself secret. Keep secrets out of source
+control and container images; mount the configuration containing these values read-only
+with restrictive permissions
+(for example, `0600` files within a `0700` directory readable by the service user).
+Config string representations redact signing material and validation errors omit private
+values. **Restart issuer2** after replacing configuration, referenced keys, or certificates.
+
+Dedicated metadata signers do not change token signing, credential signing, encryption,
+proof requirements, or the token JWKS. The complete metadata payload is preserved, with
+`iss` and `sub` equal to `credential_issuer` (including `/openid4vci`) and a runtime `iat`.
+`Accept: application/json` returns ordinary metadata; `Accept: application/jwt` returns the
+compact JWT directly with `Content-Type: application/jwt` and `Vary: Accept`. The existing
+`application/openidvci-issuer-metadata+jwt` media type remains supported.
+
+Wallet trust is independent of these local signing checks. No EUDI CA or trust list is
+installed here. A wallet requiring trusted `x5c` certificates will not accept JWK-only mode.
+After deployment is separately activated, verify the served signature and fingerprint, then
+test the exact wallet version and trust policy.
+
+### Batch issuance
+
 The shipped `issuer-service.conf` enables batch credential issuance and advertises a
 maximum of 10 proofs per Credential Request:
 
@@ -328,3 +457,62 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
+
+### General and EUDI credential configurations
+
+JWT key attestation is selected per credential configuration, independently of metadata
+signing and OAuth client authentication. The shipped catalog offers these pairs:
+
+| General configuration / profile | EUDI configuration / profile |
+| --- | --- |
+| `identity_credential` / `identityCredentialSdJwt` | `identity_credential_eudi` / `identityCredentialSdJwtEudi` |
+| `org.iso.23220.photoid.1` / `isoPhotoId` | `org.iso.23220.photoid.1_eudi` / `isoPhotoIdEudi` |
+
+The general variants omit `proof_types_supported.jwt.key_attestations_required`. The EUDI
+variants advertise ES256 JWT proofs with `key_attestations_required: {}` and require a valid
+`key_attestation` in the proof JWT header. `{}` requires attestation without adding storage or
+user-authentication assurance constraints. The EUDI configurations and profiles are full,
+independent definitions with the same initial credential data and signing settings as the
+general profiles, but distinct IDs and scopes. Edits to one definition do not update the other.
+The SD-JWT EUDI
+variant gets its own self-hosted VCT ending in `/identity_credential_eudi`; the photo-ID
+variant retains the original mdoc doctype and namespaces.
+
+The following existing EUDI-related catalog entries also require nested attestation when
+using JWT proofs, directly in their full metadata definitions:
+
+| Configuration | Profile |
+| --- | --- |
+| `urn:eudi:pid:1` | `eudiPidSdJwt` |
+| `eu.europa.ec.eudi.pid.1` | `eudiPidMdoc` |
+| `eu.europa.ec.av.1` | `euAgeVerificationMdoc` |
+| `urn:eu.europa.ec.eudi:cor:1` | `certificateOfResidenceSdJwt` |
+| `urn:eudi:ehic:1` | `ehicSdJwt` |
+| `sca_payment_card_sd_jwt` | `scaPaymentCardSdJwt` |
+| `sca_payment_card_mso_mdoc` | `scaPaymentCardMdoc` |
+| `emvco_dpc_mso_mdoc` | `emvcoDpcMdoc` |
+
+Together with the identity/photo-ID EUDI variants, ten configurations require JWT key
+attestation. The payment entries are demonstration credentials included in this catalog
+policy; the flag does not establish EUDI compliance. Commented-out configurations remain disabled.
+Other general catalog configurations do not require nested JWT key attestation. Standalone
+`proofs.attestation`, where advertised, still requires a valid attestation by definition.
+
+Use the EUDI profile ID in the usual create-offer request, for example:
+
+```json
+{
+  "profileId": "identityCredentialSdJwtEudi",
+  "authMethod": "PRE_AUTHORIZED"
+}
+```
+
+Swagger includes EUDI identity and photo-ID offer examples. Profiles determine the offered
+configuration; selecting an EUDI profile does not change another credential's proof policy.
+`keyAttestationConfig` configures trusted attestation signers for the issuer; it does not
+make attestation mandatory on all configurations. Any supplied attestation is verified,
+even when optional. Configure the trust appropriate for the wallet deployment separately.
+These examples do not assert full EUDI compliance for every credential schema.
+
+Restart OSS issuer2 after editing the metadata/profile configuration files. Existing offers
+should be replaced with offers selecting the intended profile after a policy change.
