@@ -11,12 +11,22 @@ import id.walt.issuer2.config.AuthenticationServiceConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
+import id.walt.openid4vci.metadata.issuer.signing.SignedMetadataConfig
+import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningMethod
+import id.walt.openid4vci.metadata.issuer.signing.ResolvedMetadataSigningKey
+import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningKeyReferenceResolver
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.config.registerIssuer2ConfigDecoders
 import id.walt.issuer2.application.Issuer2Module
 import id.walt.issuer2.configurePlugins
 import id.walt.issuer2.controller.Issuer2RouteSurface
 import id.walt.issuer2.issuer2Module
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
+import id.walt.issuer2.testsupport.MetadataCertificateFixture
+import id.walt.issuer2.testsupport.Issuer2WalletFlowDriver
+import id.walt.issuer2.testsupport.createCredentialOffer
+import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.CryptographicBindingMethod
@@ -60,6 +70,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.reflect.KClass
@@ -69,8 +80,13 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.assertFails
+import kotlinx.serialization.json.JsonPrimitive
+import java.util.Base64
 
 class Issuer2MetadataEndpointTest {
+    @TempDir
+    lateinit var temporaryDirectory: Path
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -260,6 +276,138 @@ class Issuer2MetadataEndpointTest {
             }
             assertTrue(signingKey.verifyJws(compactJws).isSuccess)
         }
+    }
+
+    @Test
+    fun certificateMetadataPreservesPayloadNegotiationAndTokenSigning() = testApplication {
+        val fixture = MetadataCertificateFixture()
+        installIssuer2WithConfigFiles(signedMetadata = fixture.config())
+        val client = apiClient()
+        val path = "/.well-known/openid-credential-issuer/openid4vci"
+        val unsignedResponse = client.get(path) { header(HttpHeaders.Accept, "application/json") }
+        assertEquals(ContentType.Application.Json, unsignedResponse.contentType()?.withoutParameters())
+        assertTrue(HttpHeaders.Accept in unsignedResponse.headers.getSplitValues(HttpHeaders.Vary).orEmpty())
+        val unsigned = unsignedResponse.body<JsonObject>()
+        val tokenKey = KeyManager.resolveSerializedKey(ConfigManager.getConfig<Issuer2ServiceConfig>().ciTokenKey).getPublicKey()
+        val acceptCases = listOf(
+            "application/jwt" to "application/jwt",
+            CredentialIssuerMetadataJwt.TYPED_MEDIA_TYPE to CredentialIssuerMetadataJwt.TYPED_MEDIA_TYPE,
+            "application/json;q=0.5, application/jwt;q=1" to "application/jwt",
+        )
+        for ((accept, expectedContentType) in acceptCases) {
+            val response = client.get(path) { header(HttpHeaders.Accept, accept) }
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(ContentType.parse(expectedContentType), response.contentType()?.withoutParameters())
+            assertTrue(HttpHeaders.Accept in response.headers.getSplitValues(HttpHeaders.Vary).orEmpty())
+            val jwt = response.bodyAsText()
+            assertEquals(3, jwt.split('.').size)
+            assertFalse(jwt.startsWith('"'))
+            assertTrue(MetadataCertificateFixture.verifies(jwt, fixture.leaf))
+            assertTrue(tokenKey.verifyJws(jwt).isFailure)
+            val decoded = jwt.decodeJws()
+            assertEquals("ES256", decoded.header["alg"]?.jsonPrimitive?.content)
+            assertEquals(CredentialIssuerMetadataJwt.TYPE, decoded.header["typ"]?.jsonPrimitive?.content)
+            assertNull(decoded.header["jwk"])
+            assertTrue(decoded.header["kid"]?.jsonPrimitive?.content != tokenKey.getKeyId())
+            assertEquals(fixture.chain.map { Base64.getEncoder().encodeToString(it.encoded) },
+                decoded.header["x5c"]!!.jsonArray.map { it.jsonPrimitive.content })
+            assertEquals(ISSUER_BASE_URL, decoded.payload["iss"]?.jsonPrimitive?.content)
+            assertEquals(ISSUER_BASE_URL, decoded.payload["sub"]?.jsonPrimitive?.content)
+            val issuedAt = assertNotNull(decoded.payload["iat"]?.jsonPrimitive?.content?.toLongOrNull())
+            assertTrue(kotlin.math.abs(java.time.Instant.now().epochSecond - issuedAt) < 60)
+            assertEquals(unsigned, JsonObject(decoded.payload.filterKeys { it !in setOf("iss", "sub", "iat") }))
+            assertFalse(decoded.header.toString().contains("PRIVATE KEY"))
+            assertFalse(decoded.payload.toString().contains("PRIVATE KEY"))
+        }
+        val preferredJson = client.get(path) { header(HttpHeaders.Accept, "application/json;q=1, application/jwt;q=0.5") }
+        assertEquals(unsigned, preferredJson.body<JsonObject>())
+
+        val wallet = Issuer2WalletFlowDriver(client)
+        val offer = client.createCredentialOffer(Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE)
+        val resolved = wallet.resolve(offer)
+        assertEquals(ISSUER_BASE_URL, resolved.offer.credentialIssuer)
+        val token = wallet.exchangePreAuthorizedCode(resolved, txCode = null).access_token
+        assertTrue(tokenKey.verifyJws(token).isSuccess)
+        assertFalse(MetadataCertificateFixture.verifies(token, fixture.leaf))
+        assertEquals(tokenKey.getKeyId(), token.decodeJws().header["kid"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun dedicatedJwkMetadataPreservesPayloadAndTokenKey() = testApplication {
+        val key = JWKKey.generate(KeyType.secp256r1)
+        val jwk = JsonObject(key.exportJWKObject() + ("kid" to JsonPrimitive("dedicated-metadata")))
+        val config = MetadataSigningMethod.StaticJwk(jwk)
+        installIssuer2WithConfigFiles(signedMetadata = config)
+        val client = apiClient()
+        val path = "/.well-known/openid-credential-issuer/openid4vci"
+        val unsigned = client.get(path).body<JsonObject>()
+        val tokenKey = KeyManager.resolveSerializedKey(ConfigManager.getConfig<Issuer2ServiceConfig>().ciTokenKey).getPublicKey()
+        for (mediaType in listOf(CredentialIssuerMetadataJwt.MEDIA_TYPE, CredentialIssuerMetadataJwt.TYPED_MEDIA_TYPE)) {
+            val response = client.get(path) { header(HttpHeaders.Accept, mediaType) }
+            assertEquals(ContentType.parse(mediaType), response.contentType()?.withoutParameters())
+            assertTrue(HttpHeaders.Accept in response.headers.getSplitValues(HttpHeaders.Vary).orEmpty())
+            val jwt = response.bodyAsText()
+            assertTrue(key.getPublicKey().verifyJws(jwt).isSuccess)
+            assertTrue(tokenKey.verifyJws(jwt).isFailure)
+            val decoded = jwt.decodeJws()
+            assertNull(decoded.header["x5c"])
+            assertFalse("d" in decoded.header["jwk"]!!.jsonObject)
+            assertEquals("dedicated-metadata", decoded.header["kid"]?.jsonPrimitive?.content)
+            assertEquals(unsigned, JsonObject(decoded.payload.filterKeys { it !in setOf("iss", "sub", "iat") }))
+        }
+        val wallet = Issuer2WalletFlowDriver(client)
+        val offer = client.createCredentialOffer(Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE)
+        val token = wallet.exchangePreAuthorizedCode(wallet.resolve(offer), txCode = null).access_token
+        assertTrue(tokenKey.verifyJws(token).isSuccess)
+        assertTrue(key.getPublicKey().verifyJws(token).isFailure)
+        val jwks = client.get("$OPENID4VCI_PREFIX/jwks").body<JsonObject>()["keys"]!!.jsonArray
+        assertFalse(jwks.any { it.jsonObject["kid"]?.jsonPrimitive?.content == "dedicated-metadata" })
+    }
+
+    @Test
+    fun referencedSigningKeyIsWiredThroughIssuerModule() = testApplication {
+        val fixture = MetadataCertificateFixture()
+        val key = fixture.crypto2SigningKey()
+        var resolutions = 0
+        installIssuer2WithConfigFiles(
+            signedMetadata = MetadataSigningMethod.KeyReference("metadata-key"),
+            metadataSigningKeyResolver = MetadataSigningKeyReferenceResolver {
+                assertEquals("metadata-key", it)
+                resolutions++
+                ResolvedMetadataSigningKey(key, fixture.config().certificateChainPem)
+            },
+        )
+        val client = apiClient()
+        repeat(2) {
+            val response = client.get("/.well-known/openid-credential-issuer/openid4vci") { header(HttpHeaders.Accept, "application/jwt") }
+            assertEquals(HttpStatusCode.OK, response.status)
+            val jwt = response.bodyAsText()
+            assertTrue(MetadataCertificateFixture.verifies(jwt, fixture.leaf))
+            assertNotNull(jwt.decodeJws().header["x5c"])
+        }
+        assertEquals(1, resolutions)
+    }
+
+    @Test
+    fun referenceWithoutResolverFailsApplicationInitialization() = testApplication {
+        installIssuer2WithConfigFiles(signedMetadata = MetadataSigningMethod.KeyReference("unavailable"))
+        val error = assertFails { startApplication() }
+        assertTrue(generateSequence(error) { it.cause }.any { it.message.orEmpty().contains("metadata signing key resolver") })
+    }
+
+    @Test
+    fun invalidDedicatedJwkFailsStartupInsteadOfFallingBack() = testApplication {
+        installIssuer2WithConfigFiles(signedMetadata = MetadataSigningMethod.StaticJwk(JWKKey.generate(KeyType.secp256r1).getPublicKey().exportJWKObject()))
+        val error = assertFails { startApplication() }
+        assertTrue(generateSequence(error) { it.cause }.any { it.message.orEmpty().contains("Invalid signedMetadata configuration") })
+    }
+
+    @Test
+    fun invalidCertificateConfigurationFailsApplicationStartup() = testApplication {
+        val fixture = MetadataCertificateFixture()
+        installIssuer2WithConfigFiles(signedMetadata = fixture.config(privateKey = MetadataCertificateFixture.generateKey()))
+        val error = assertFails { startApplication() }
+        assertTrue(generateSequence(error) { it.cause }.any { it.message.orEmpty().contains("Invalid signedMetadata configuration") })
     }
 
     @Test
@@ -532,8 +680,12 @@ class Issuer2MetadataEndpointTest {
         )
     }
 
-    private fun ApplicationTestBuilder.installIssuer2WithConfigFiles(surfaces: Set<Issuer2RouteSurface>? = null) {
-        loadIssuer2ConfigFiles()
+    private fun ApplicationTestBuilder.installIssuer2WithConfigFiles(
+        surfaces: Set<Issuer2RouteSurface>? = null,
+        signedMetadata: MetadataSigningMethod? = null,
+        metadataSigningKeyResolver: MetadataSigningKeyReferenceResolver? = null,
+    ) {
+        loadIssuer2ConfigFiles(signedMetadata)
         application {
             install(ServerContentNegotiation) {
                 json(json)
@@ -541,12 +693,12 @@ class Issuer2MetadataEndpointTest {
             configureStatusPages()
             runBlocking { issuer2AuthenticationPluginAmendment() }
             AuthenticationServiceModule.run { enable() }
-            if (surfaces == null) {
+            if (surfaces == null && metadataSigningKeyResolver == null) {
                 issuer2Module(withPlugins = true)
             } else {
                 configurePlugins()
-                val module = Issuer2Module.load()
-                routing { module.openId4VciController.register(this, surfaces) }
+                val module = Issuer2Module.load(metadataSigningKeyResolver = metadataSigningKeyResolver)
+                routing { module.openId4VciController.register(this, surfaces ?: Issuer2RouteSurface.all) }
             }
         }
     }
@@ -558,7 +710,7 @@ class Issuer2MetadataEndpointTest {
         }
     }
 
-    private fun loadIssuer2ConfigFiles() {
+    private fun loadIssuer2ConfigFiles(signedMetadata: MetadataSigningMethod? = null) {
         ConfigManager.preclear()
         FeatureManager.preclear()
         registerIssuer2ConfigDecoders()
@@ -566,7 +718,16 @@ class Issuer2MetadataEndpointTest {
 
         val configDir = issuer2ConfigDir()
         configFiles.forEach { (id, type) ->
-            System.setProperty("config.file.$id", configDir.resolve("$id.conf").toString())
+            val path = if (id == "issuer-service") {
+                Files.createTempFile(temporaryDirectory, "issuer-service-", ".conf").also {
+                    val signingBlock = signedMetadata?.let { method ->
+                        "signedMetadata = " + Json.encodeToString(SignedMetadataConfig.serializer(), SignedMetadataConfig(method))
+                    }.orEmpty()
+                    val baseline = requireNotNull(javaClass.getResource("/metadata/issuer-service.conf")).readText()
+                    Files.writeString(it, baseline + "\nbaseUrl = \"http://localhost\"\n" + signingBlock)
+                }
+            } else configDir.resolve("$id.conf")
+            System.setProperty("config.file.$id", path.toString())
             ConfigManager.registerConfig(id, type)
         }
         ConfigManager.loadConfigs()
