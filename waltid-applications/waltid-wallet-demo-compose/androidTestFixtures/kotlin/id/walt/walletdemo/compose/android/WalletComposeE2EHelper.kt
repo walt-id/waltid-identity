@@ -393,18 +393,18 @@ internal object WalletComposeE2EHelper {
             try {
                 findVisibleResource(device, tag)?.let { return it }
                 device.findObject(By.res(tag))?.let { return it }
+                if (towardBottom) device.scrollDown() else device.scrollUp()
+                stepsInDirection++
+                if (stepsInDirection == 6) {
+                    towardBottom = !towardBottom
+                    stepsInDirection = 0
+                }
             } catch (_: StaleObjectException) {
-                // Compose replaces the accessibility tree during rotation and recreation.
-            }
-            if (towardBottom) device.scrollDown() else device.scrollUp()
-            stepsInDirection++
-            if (stepsInDirection == 6) {
-                towardBottom = !towardBottom
-                stepsInDirection = 0
+                // Re-query the target and all scroll-container bounds after Compose replaces a node.
             }
             Thread.sleep(200)
         }
-        return findResourceAfterScrolling(device, tag)
+        return null
     }
 
     fun assertResourceVisibleAfterScrolling(
