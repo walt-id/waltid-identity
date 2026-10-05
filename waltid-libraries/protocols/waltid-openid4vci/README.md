@@ -30,7 +30,7 @@ The library includes:
 - **Authorization Endpoint** - Handles authorization requests and generates authorization codes
 - **Token Endpoint** - Issues access tokens for credential requests
 - **JWT Access Tokens** - JWT-based access token generation and signing
-- **Credential Key Attestations** - [JWT and standalone proof verification with multi-key credential binding](docs/key-attestation.md)
+- **Credential Key Attestations** - [JWT and standalone proof verification with multi-key credential binding](#key-attestation-limits)
 - **Request Validation** - Validates authorization and token requests according to OAuth2/OpenID4VCI specs
 - **Repository Interfaces** - Pluggable storage for authorization codes and pre-authorized codes
 - **Session Management** - Session tracking for issuance flows
@@ -113,6 +113,18 @@ The provider is configured via `OAuth2ProviderConfig`:
 - **Endpoint Handlers** - Handle grant type-specific logic
 - **Repositories** - Store authorization codes and pre-authorized codes
 - **Token Issuer** - Issue and sign access tokens
+
+### Key Attestation Limits
+
+`KeyAttestationConfig.maxAttestedKeys` defaults to **20 entries per attestation**, including
+duplicates, for both nested `proofs.jwt` key attestations and `proofs.attestation`.
+Larger arrays are rejected with `invalid_proof` before attested-key import or DID resolution.
+Set a positive value to override the limit, or explicitly set `null` to disable it.
+Direct `KeyAttestationVerificationOptions` callers use the same default.
+
+This is a library resource-protection default. `batch_size` still limits the number of
+proofs per request; it does not limit keys within an attestation. With both limits enabled,
+up to `batch_size × maxAttestedKeys` candidate bindings can be processed before deduplication.
 
 ### JWT Access Tokens
 
