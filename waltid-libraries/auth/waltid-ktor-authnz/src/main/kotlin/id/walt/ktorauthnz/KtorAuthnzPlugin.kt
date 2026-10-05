@@ -29,6 +29,16 @@ class KtorAuthnzConfig {
     /** The WebAuthn relying party, needed for passkeys. */
     var passkeys: PasskeySettings? = null
 
+    internal var passkeysPerTenant: (suspend (tenant: String?) -> PasskeySettings?)? = null
+
+    /**
+     * The WebAuthn relying party per tenant, for tenants on their own domains: passkeys are bound to a domain, so
+     * `org1.example.com` and `org2.example.com` need their own. Null for a tenant uses [passkeys].
+     */
+    fun passkeysPerTenant(resolve: suspend (tenant: String?) -> PasskeySettings?) {
+        passkeysPerTenant = resolve
+    }
+
     /** How one-time email codes are sent, needed for the `email-code` method. */
     var emailCodes: id.walt.ktorauthnz.methods.config.EmailCodeSettings? = null
 
@@ -82,6 +92,7 @@ val KtorAuthnz = createApplicationPlugin("KtorAuthnz", ::KtorAuthnzConfig) {
     config.passwordHashing?.let { KtorAuthnzManager.passwordHashingConfig = it }
     config.refreshTokens?.let { KtorAuthnzManager.refreshTokens = it }
     config.passkeys?.let { KtorAuthnzManager.passkeys = it }
+    config.passkeysPerTenant?.let { KtorAuthnzManager.passkeysPerTenant = it }
     config.emailCodes?.let { KtorAuthnzManager.emailCodes = it }
 
     config.cookie.name?.let { SessionTokenCookieHandler.cookieName = it }
