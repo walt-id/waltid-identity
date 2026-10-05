@@ -4,7 +4,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.*
-import io.ktor.utils.io.readRemaining
+import io.ktor.utils.io.readBuffer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.io.readByteArray
@@ -97,7 +97,7 @@ private suspend fun fetchWalletLinkDocument(url: String): WalletLinkDocument {
             if (response.status.value in 300..399) return@execute WalletLinkDocument(response.status.value,
                 location = response.headers[HttpHeaders.Location])
             if ((response.contentLength() ?: 0) > maxWalletLinkBytes) throw WalletLinkException(unsupportedLinkMessage)
-            val bytes = response.bodyAsChannel().readRemaining(maxWalletLinkBytes + 1L).readByteArray()
+            val bytes = response.bodyAsChannel().readBuffer(maxWalletLinkBytes + 1L).readByteArray()
             if (bytes.size > maxWalletLinkBytes) throw WalletLinkException(unsupportedLinkMessage)
             WalletLinkDocument(response.status.value, bytes.decodeToString(throwOnInvalidSequence = true))
         }
