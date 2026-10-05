@@ -66,6 +66,7 @@ dependencies {
     implementation(identityLibs.slf4j.klogging)
 
     // Test
+    testImplementation(project(":waltid-services:waltid-service-events"))
     testImplementation(kotlin("test"))
     testImplementation(identityLibs.kotlinx.coroutines.test)
 
@@ -81,6 +82,7 @@ dependencies {
     api(project(":waltid-libraries:waltid-did"))
 
     api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
+    api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
     api(project(":waltid-libraries:credentials:waltid-verification-policies"))
     api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
     api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))

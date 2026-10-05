@@ -228,6 +228,25 @@ Run public-backend tests serially on iOS. The tests depend on public network
 services, so a transient simulator networking failure should be retried before
 treating it as a product regression.
 
+For signed DID presentation after a process restart, both iOS demos' `testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2`
+terminate and relaunch the app before previewing a signed `did:key` request and sharing the saved credential.
+Android's `MobileWalletRestartTest` runs in the self-instrumenting `androidE2eTests` module,
+separately from the wallet process. One test receives a credential, force-stops and relaunches the app,
+then presents the saved credential through a signed `did:key` request.
+From the Identity repository root, select an emulator or device:
+
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew -PenableAndroidBuild=true \
+  :waltid-applications:waltid-wallet-demo-compose:androidE2eTests:connectedProductionDebugAndroidTest
+```
+
+The test clears wallet app data before setup and preserves it across the restart. It checks that the
+wallet process ended, the runner survived, credential IDs and signing DID/key ID stayed unchanged,
+and the exact verifier session succeeded. `androidTestFixtures/` shares the demo UI helpers between
+the in-process app tests and external tests. CI runs the test in the Android Compose demo lane and
+publishes its standard JUnit report alongside the app tests. The native and Compose iOS lanes run
+the corresponding receive-and-present tests.
+
 Identity document provider configuration is checked on the built products rather than on the source
 `.entitlements` and `Info.plist` files, because the interesting values contain `$(AppIdentifierPrefix)`
 or come from `INFOPLIST_KEY_` build settings and can silently resolve to nothing. Run the same script

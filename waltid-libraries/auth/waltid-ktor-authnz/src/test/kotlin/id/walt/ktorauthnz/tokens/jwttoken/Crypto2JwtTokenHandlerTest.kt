@@ -1,6 +1,6 @@
 package id.walt.ktorauthnz.tokens.jwttoken
 
-import id.walt.commons.web.ExpiredTokenException
+import id.walt.ktorauthnz.exceptions.ExpiredTokenException
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm

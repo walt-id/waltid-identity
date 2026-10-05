@@ -8,8 +8,8 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.commons.config.list.TransactionDataProfile
-import id.walt.commons.config.list.TransactionDataProfilesConfig
+import id.walt.verifier.openid.transactiondata.TransactionDataProfile
+import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup

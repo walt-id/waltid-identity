@@ -86,6 +86,7 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
+    sourceSets["androidTest"].kotlin.srcDir("../androidTestFixtures/kotlin")
 }
 
 dependencies {

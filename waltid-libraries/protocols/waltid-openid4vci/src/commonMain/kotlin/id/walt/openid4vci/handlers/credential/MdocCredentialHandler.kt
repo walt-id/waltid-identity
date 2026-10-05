@@ -1,5 +1,7 @@
 package id.walt.openid4vci.handlers.credential
 
+import kotlinx.serialization.json.jsonArray
+import id.walt.credentials.issuance.issuanceTemplateContext
 import id.walt.certificate.x509.X509Certificate
 import id.walt.cose.CoseCertificate
 import id.walt.crypto.keys.Key
@@ -19,11 +21,11 @@ import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.sdjwt.SDMap
-import id.walt.w3c.issuance.IssuanceClock
-import id.walt.w3c.issuance.InstantClock
-import id.walt.w3c.issuance.dataFunctionsFor
-import id.walt.w3c.utils.CredentialDataMergeUtils.mdocNamespaceMapping
-import id.walt.w3c.utils.CredentialDataMergeUtils.mergeMdocPayloadWithMapping
+import id.walt.credentials.issuance.IssuanceClock
+import id.walt.credentials.issuance.InstantClock
+import id.walt.credentials.issuance.dataFunctionsFor
+import id.walt.credentials.issuance.CredentialDataMergeUtils.mdocNamespaceMapping
+import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeMdocPayloadWithMapping
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -197,12 +199,11 @@ class MdocCredentialHandler(
         issuerId: String,
         display: List<CredentialDisplay>?,
         subjectDid: String?,
-    ): Map<String, JsonElement> = buildMap {
-        put("issuerId", JsonPrimitive(issuerId))
-        put("issuerDid", JsonPrimitive(issuerId))
-        subjectDid?.takeIf { it.isNotBlank() }?.let { put("subjectDid", JsonPrimitive(it)) }
-        display?.takeIf { it.isNotEmpty() }?.let { put("display", Json.encodeToJsonElement(it)) }
-    }
+    ): Map<String, JsonElement> = issuanceTemplateContext(
+        issuerId = issuerId,
+        subjectDid = subjectDid?.takeIf { it.isNotBlank() },
+        display = display?.let { Json.encodeToJsonElement(it).jsonArray },
+    )
 
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun computeCredentialResult(

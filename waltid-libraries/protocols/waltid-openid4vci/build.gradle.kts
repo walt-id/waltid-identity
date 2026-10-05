@@ -23,6 +23,7 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-credential-key-resolver"))
             implementation(project(":waltid-libraries:waltid-did"))
             implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
+            implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
             // HTTP

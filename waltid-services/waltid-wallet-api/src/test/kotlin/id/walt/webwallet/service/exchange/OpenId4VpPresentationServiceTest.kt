@@ -54,8 +54,8 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 import id.walt.commons.config.ConfigManager
-import id.walt.commons.config.list.TransactionDataProfile
-import id.walt.commons.config.list.TransactionDataProfilesConfig
+import id.walt.verifier.openid.transactiondata.TransactionDataProfile
+import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.dcql.models.CredentialFormat as DcqlCredentialFormat
 
 @OptIn(ExperimentalSerializationApi::class)

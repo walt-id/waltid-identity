@@ -1,6 +1,6 @@
 package id.walt.wallet2.server.handlers
 
-import id.walt.commons.web.WebException
+import id.walt.errors.StatusException
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.did.dids.DidService
@@ -38,13 +38,13 @@ import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
 
-internal fun TokenRequestException.toWebException(): WebException {
+internal fun TokenRequestException.toStatusException(): StatusException {
     val status = if (statusCode in 400..499) {
         HttpStatusCode.fromValue(statusCode)
     } else {
         HttpStatusCode.BadGateway
     }
-    return WebException(status.value, oauthError ?: "token_request_failed").also { it.initCause(this) }
+    return StatusException(status.value, oauthError ?: "token_request_failed", cause = this)
 }
 
 // ---------------------------------------------------------------------------
@@ -614,7 +614,7 @@ object Wallet2RouteHandler {
                             )
                             call.respond(result)
                         } catch (e: TokenRequestException) {
-                            throw e.toWebException()
+                            throw e.toStatusException()
                         }
                     }
 
@@ -648,7 +648,7 @@ object Wallet2RouteHandler {
                                 )
                             )
                         } catch (e: TokenRequestException) {
-                            throw e.toWebException()
+                            throw e.toStatusException()
                         }
                     }
 
@@ -743,7 +743,7 @@ object Wallet2RouteHandler {
                                 )
                             )
                         } catch (e: TokenRequestException) {
-                            throw e.toWebException()
+                            throw e.toStatusException()
                         }
                     }
 
@@ -791,7 +791,7 @@ object Wallet2RouteHandler {
                                 )
                             )
                         } catch (e: TokenRequestException) {
-                            throw e.toWebException()
+                            throw e.toStatusException()
                         }
                     }
                 }
