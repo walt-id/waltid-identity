@@ -16,6 +16,9 @@ sealed interface AuthnzEvent {
 
     data class LoggedOut(val sessionId: String, val accountId: String?) : AuthnzEvent
 
+    /** A new account was registered with these identifiers. */
+    data class AccountRegistered(val accountId: String, val identifiers: List<String>) : AuthnzEvent
+
     /** All sessions of an account were ended, e.g. after a password change. */
     data class SessionsRevoked(val accountId: String) : AuthnzEvent
 
