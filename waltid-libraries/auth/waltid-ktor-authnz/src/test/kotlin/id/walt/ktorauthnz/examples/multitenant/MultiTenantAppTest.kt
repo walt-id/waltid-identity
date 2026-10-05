@@ -20,6 +20,7 @@ import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import id.walt.ktorauthnz.sessions.AuthSessionNextStepRedirectData
 import id.walt.ktorauthnz.sessions.AuthSessionStatus
 import id.walt.ktorauthnz.sessions.InMemorySessionStore
+import id.walt.ktorauthnz.tenants.currentAuthnzTenant
 import id.walt.ktorauthnz.tenants.inAuthnzTenant
 import id.walt.ktorauthnz.tokens.ktorauthnztoken.KtorAuthNzTokenHandler
 import io.ktor.client.request.*
@@ -46,6 +47,9 @@ class MultiTenantAppTest {
 
     /** The "mail service": the last code sent per account. */
     private val sentCodes = ConcurrentHashMap<String, EmailCodeDelivery>()
+
+    /** New accounts and the tenant they were registered in. */
+    private val registered = mutableListOf<Pair<String, String?>>()
 
     private lateinit var alice: String
     private lateinit var carol: String
@@ -76,7 +80,11 @@ class MultiTenantAppTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     private fun app(block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {
-        application { multiTenantApp(accounts, tenants) { sentCodes[it.accountId ?: it.email!!] = it } }
+        application {
+            multiTenantApp(accounts, tenants, sendEmailCode = { sentCodes[it.accountId ?: it.email!!] = it }) {
+                registered += it.accountId to currentAuthnzTenant()
+            }
+        }
         block()
     }
 
@@ -166,6 +174,16 @@ class MultiTenantAppTest {
         assertNotEquals(alice, other)
         assertEquals(alice, inAuthnzTenant("org1") { accounts.lookupAccountUuid(UsernameIdentifier("alice")) })
         assertNull(inAuthnzTenant("org5") { accounts.lookupStoredDataForAccountIdentifier(UsernameIdentifier("alice"), UserPass) })
+    }
+
+    @Test
+    fun `a user signs up in a tenant and logs in there only`() = app {
+        val created = post("/org5/auth/signup", """{"username": "frank", "password": "frank-password", "name": "Frank"}""")
+        assertEquals(HttpStatusCode.Created, created.status, created.bodyAsText())
+        assertEquals(listOf("org5"), registered.map { it.second })
+        assertNull(inAuthnzTenant("org1") { accounts.lookupAccountUuid(UsernameIdentifier("frank")) })
+        val token = assertNotNull(post("/org5/auth/userpass", """{"username": "frank", "password": "frank-password"}""").session().token)
+        assertEquals(HttpStatusCode.OK, me("org5", token).status)
     }
 
     @Test
