@@ -259,7 +259,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
         val configuration = CredentialConfiguration(
             format = VciCredentialFormat.SD_JWT_VC, vct = vct, scope = configurationId,
             cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
-            proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256"))),
+            proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256"))),
         )
         val profile = CredentialProfileConfig(
             name = profileId, credentialConfigurationId = configurationId,
