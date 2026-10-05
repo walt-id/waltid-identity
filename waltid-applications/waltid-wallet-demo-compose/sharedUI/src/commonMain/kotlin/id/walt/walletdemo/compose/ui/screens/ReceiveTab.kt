@@ -108,7 +108,6 @@ internal fun ReceiveTab(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         UrlActionSection(
-            title = "Receive",
             value = requestDrafts.offerUrl,
             onValueChange = onOfferUrlChange,
             label = "Credential offer URL",

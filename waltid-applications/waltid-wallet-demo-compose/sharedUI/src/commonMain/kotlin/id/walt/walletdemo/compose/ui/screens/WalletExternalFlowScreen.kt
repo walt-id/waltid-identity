@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.ui.rememberAuthorizationRequestOpener
+import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
 
 /** Wallet-owned external surface. Platform windows decide what can appear behind this sheet. */
 @Composable
@@ -24,9 +25,8 @@ internal fun WalletExternalFlowScreen(
         state.authorizationRequestUrl?.let { openAuthorization(it); controller.authorizationRequestOpened() }
     }
     Column(Modifier.fillMaxWidth().testTag("wallet.external.flow")) {
-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(if (state.externalFlow?.tab == WalletDemoTab.Receive) "Receive credentials" else "Share credentials",
-                Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+        WalletScreenHeader(if (state.externalFlow?.tab == WalletDemoTab.Receive) "Receive credentials" else "Share credentials",
+            titleTag = "wallet.external.title") {
             IconButton(onClick = onClose, enabled = state.canDismissExternalFlow,
                 modifier = Modifier.testTag("wallet.external.close")) { Icon(Icons.Default.Close, "Close request") }
         }

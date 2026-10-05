@@ -10,6 +10,45 @@ final class MockWalletUITests: XCTestCase {
 
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
+    func testCredentialInformationUsesOneNavigationStackAndCloseReturnsToReview() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+        receiveMockCredential(app: app, ui: ui)
+        ui.openWalletLink("openid4vp://mock")
+        ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.")
+        XCTAssertTrue(app.buttons["wallet.presentationClaimsClose"].waitForExistence(timeout: 10))
+
+        func assertSingleHeaderAndCapture(_ name: String) {
+            XCTAssertEqual(app.navigationBars.allElementsBoundByIndex.filter(\.isHittable).count, 1, app.debugDescription)
+            XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == %@", "Close"))
+                .allElementsBoundByIndex.filter(\.isHittable).count, 1, app.debugDescription)
+            let capture = XCTAttachment(screenshot: app.screenshot())
+            capture.name = name; capture.lifetime = .keepAlways; add(capture)
+        }
+
+        assertSingleHeaderAndCapture("credential-information-requested")
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "Example Credential"))
+            .allElementsBoundByIndex.filter(\.isHittable).count, 1)
+        ui.tapElement(identifier: "review-all-credential-information")
+        XCTAssertTrue(app.navigationBars["All credential information"].waitForExistence(timeout: 5))
+        assertSingleHeaderAndCapture("credential-information-all")
+        ui.tapElement(identifier: "credential-technical-details")
+        XCTAssertTrue(app.navigationBars["Technical details"].waitForExistence(timeout: 5))
+        assertSingleHeaderAndCapture("credential-information-technical")
+
+        ui.tapNavigationBack()
+        XCTAssertTrue(app.navigationBars["All credential information"].waitForExistence(timeout: 5))
+        ui.tapNavigationBack()
+        XCTAssertTrue(app.buttons["wallet.presentationClaimsClose"].waitForExistence(timeout: 5))
+        ui.tapElement(identifier: "review-all-credential-information")
+        ui.tapElement(identifier: "credential-technical-details")
+        ui.tapButton(identifier: "wallet-detail-close", fallbackLabel: "Close")
+        XCTAssertFalse(app.otherElements["wallet.presentationClaimsDialog"].exists)
+        XCTAssertTrue(app.buttons["wallet.presentationSubmitButton"].isHittable)
+        XCTAssertFalse(app.staticTexts["Presentation sent"].exists)
+    }
+
     func testExternalCallbackWithoutSessionExplainsRecoveryAfterUnlock() throws {
         guard #available(iOS 16.4, *) else { throw XCTSkip("Opening a URL through XCTest requires iOS 16.4") }
         continueAfterFailure = false

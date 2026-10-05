@@ -77,13 +77,11 @@ internal fun SettingsScreen(
         NavDisplay(backStack = path, onBack = back) { destination ->
             NavEntry(destination) {
                 Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                    Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 20.dp, top = 8.dp, bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
+                    WalletScreenHeader(stringResource(destination.title), leading = {
                         IconButton(back, Modifier.testTag(WalletUiTestTags.SettingsBack)) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.settings_back))
                         }
-                        Text(stringResource(destination.title), style = MaterialTheme.typography.titleLarge)
-                    }
+                    })
                     Column(
                         Modifier.weight(1f).verticalScroll(rememberScrollState()).fillMaxWidth()
                             .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 640.dp)
