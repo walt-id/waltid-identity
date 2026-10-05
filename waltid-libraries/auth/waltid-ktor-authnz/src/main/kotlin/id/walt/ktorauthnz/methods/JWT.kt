@@ -6,7 +6,7 @@ import com.nimbusds.jose.crypto.MACVerifier
 import id.walt.ktorauthnz.exceptions.JWTVerificationException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.JWTIdentifier
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.config.JwtAuthConfiguration
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
