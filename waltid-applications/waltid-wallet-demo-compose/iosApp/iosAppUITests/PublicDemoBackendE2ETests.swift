@@ -138,7 +138,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Step 1 of 2"].exists)
         assertPinKeyboardAboveAction(app)
-        input.typeText("123456") // No tap: the screen owns focus.
+        input.typeText("1234") // No tap: the screen owns focus.
         app.buttons["wallet.pinSubmitButton"].tap()
         let confirmation = ui.textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
         XCTAssertTrue(confirmation.waitForExistence(timeout: 10))
@@ -150,7 +150,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         app.buttons["wallet.pinSubmitButton"].tap()
         XCTAssertTrue(confirmation.waitForExistence(timeout: 10))
         assertPinKeyboardAboveAction(app)
-        confirmation.typeText("123456")
+        confirmation.typeText("1234")
         ui.completeKeySetupIfNeeded()
         let readyStatus = ui.waitUntilWalletReady(timeout: walletReadyTimeout)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
@@ -160,7 +160,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["Step 1 of 2"].exists)
         assertPinKeyboardAboveAction(app)
-        input.typeText("123456")
+        input.typeText("1234")
         app.buttons["wallet.pinSubmitButton"].tap()
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
     }

@@ -79,7 +79,7 @@ final class WalletVisualTests: XCTestCase {
     func testPinMismatch() async throws { try await pin("mismatch") }
     func testPinConfirmation() async throws { try await pin("confirmation") }
     func testPinBiometricPrompt() async throws { try await pin("biometric_prompt") }
-    func testPinLegacyUnlock() async throws { try await pin("legacy_unlock") }
+    func testPinUnlock() async throws { try await pin("unlock") }
     func testPinCompact() async throws { try await pin("compact_dark_large_text") }
 
     private func pin(_ state: String) async throws {
@@ -87,14 +87,14 @@ final class WalletVisualTests: XCTestCase {
         let biometric = FakeDemoBiometricAuthenticator(isAvailable: state != "setup", gate: gate)
         let model = makeModel(biometricAuthenticator: biometric)
         await model.readerTrustSettings.awaitPendingOperations()
-        if state == "legacy_unlock" { model.auth = .login; model.pin = "1234" }
+        if state == "unlock" { model.auth = .login; model.pin = "1234" }
         else if state != "setup" {
-            model.updatePin("123456")
+            model.updatePin("1234")
             model.submitPin()
-            if state == "mismatch" { model.updatePinConfirmation("654321") }
+            if state == "mismatch" { model.updatePinConfirmation("4321") }
             if state == "compact_dark_large_text" { model.updatePinConfirmation("123") }
             if state == "biometric_prompt" {
-                model.updatePinConfirmation("123456")
+                model.updatePinConfirmation("1234")
                 let deadline = DispatchTime.now().uptimeNanoseconds + 20_000_000_000
                 while biometric.authenticateCalls == 0 && DispatchTime.now().uptimeNanoseconds < deadline {
                     try await Task.sleep(nanoseconds: 10_000_000)

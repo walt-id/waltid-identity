@@ -1,8 +1,8 @@
 <resources>
     <string name="pin_create">Choose a PIN</string>
-    <string name="pin_create_help">Use six digits to protect your wallet.</string>
+    <string name="pin_create_help">Use four digits to protect your wallet.</string>
     <string name="pin_confirm">Confirm your PIN</string>
-    <string name="pin_confirm_help">Enter the same six digits again.</string>
+    <string name="pin_confirm_help">Enter the same four digits again.</string>
     <string name="pin_step_choose">Step 1 of 2</string>
     <string name="pin_step_confirm">Step 2 of 2</string>
     <string name="pin_continue">Continue</string>
@@ -10,7 +10,6 @@
     <string name="pin_digit_progress">%1$d of %2$d digits entered</string>
     <string name="pin_enter">Enter your PIN</string>
     <string name="pin_enter_help">Enter your PIN to unlock this wallet.</string>
-    <string name="pin_existing_length">Existing PINs with 4–8 digits are accepted.</string>
     <string name="pin_label">PIN</string>
     <string name="pin_confirmation_label">Confirm PIN</string>
     <string name="pin_biometric_next">Next, your device will offer biometric unlock. Decline to keep using your PIN.</string>

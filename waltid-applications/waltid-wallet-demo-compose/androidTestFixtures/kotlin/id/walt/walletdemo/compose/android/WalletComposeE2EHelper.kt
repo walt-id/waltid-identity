@@ -26,7 +26,7 @@ internal object WalletComposeE2EHelper {
         ?: InstrumentationRegistry.getInstrumentation().targetContext.packageName
     private const val SIGNING_PROTECTION_MODE_EXTRA =
         "id.walt.walletdemo.compose.android.WALLET_SIGNING_PROTECTION_MODE"
-    const val PIN = "123456"
+    const val PIN = "1234"
     const val WALLET_READY_TIMEOUT = 60_000L
     const val UI_ELEMENT_TIMEOUT = 30_000L
     private const val CLICK_VISIBLE_TIMEOUT = 3_000L

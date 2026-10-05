@@ -35,9 +35,7 @@ internal fun WalletPinInput(
     onValueChange: (String) -> Unit,
     label: String,
     progressDescription: String,
-    maxLength: Int,
     digitCount: Int,
-    allowUnicodeDigits: Boolean,
     enabled: Boolean,
     isError: Boolean,
     onSubmit: () -> Unit,
@@ -48,7 +46,7 @@ internal fun WalletPinInput(
     BasicTextField(
         value = value,
         onValueChange = { input ->
-            val digits = input.filter { it in '0'..'9' || (allowUnicodeDigits && it.isDigit()) }.take(maxLength)
+            val digits = input.filter { it in '0'..'9' }.take(digitCount)
             if (digits != value) onValueChange(digits)
         },
         enabled = enabled,

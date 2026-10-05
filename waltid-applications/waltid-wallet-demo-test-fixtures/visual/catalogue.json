@@ -222,7 +222,7 @@
         "R12",
         "R13"
       ],
-      "note": "WAL-1440: separate six-digit choose/confirm screens, decorative masked circles and OS-controlled biometric opt-in. Wallet-owned synthetic state; real biometric dialogs and persistence are verified separately."
+      "note": "WAL-1440: separate four-digit choose/confirm screens, decorative masked circles and OS-controlled biometric opt-in. Wallet-owned synthetic state; real biometric dialogs and persistence are verified separately."
     },
     {
       "id": "onboarding.pin.mismatch",
@@ -234,7 +234,7 @@
         "R12",
         "R13"
       ],
-      "note": "WAL-1440: separate six-digit choose/confirm screens, decorative masked circles and OS-controlled biometric opt-in. Wallet-owned synthetic state; real biometric dialogs and persistence are verified separately."
+      "note": "WAL-1440: separate four-digit choose/confirm screens, decorative masked circles and OS-controlled biometric opt-in. Wallet-owned synthetic state; real biometric dialogs and persistence are verified separately."
     },
     {
       "id": "onboarding.pin.confirmation",
@@ -246,7 +246,7 @@
         "R12",
         "R13"
       ],
-      "note": "WAL-1440: separate six-digit choose/confirm screens, decorative masked circles and OS-controlled biometric opt-in. Wallet-owned synthetic state; real biometric dialogs and persistence are verified separately."
+      "note": "WAL-1440: separate four-digit choose/confirm screens, decorative masked circles and OS-controlled biometric opt-in. Wallet-owned synthetic state; real biometric dialogs and persistence are verified separately."
     },
     {
       "id": "onboarding.pin.biometric_prompt",
@@ -270,19 +270,19 @@
         "R12",
         "R13"
       ],
-      "note": "Confirmation at 320x568, dark mode, Compose font scale 1.5 / SwiftUI accessibilityMedium. Six positions and compact trailing actions remain visible."
+      "note": "Confirmation at 320x568, dark mode, Compose font scale 1.5 / SwiftUI accessibilityMedium. Four positions and compact trailing actions remain visible."
     },
     {
-      "id": "onboarding.pin.legacy_unlock",
-      "composeTest": "pinLegacyUnlock",
-      "swiftTest": "testPinLegacyUnlock",
+      "id": "onboarding.pin.unlock",
+      "composeTest": "pinUnlock",
+      "swiftTest": "testPinUnlock",
       "requirements": [
         "R01",
         "R11",
         "R12",
         "R13"
       ],
-      "note": "Existing four-digit PIN input stays masked and enables Unlock; legacy 4-8 digit verifier records are unchanged."
+      "note": "Four-digit PIN input stays masked and enables Unlock; the same fixed length applies to creation and confirmation."
     },
     {
       "id": "credential.details.localized_metadata",

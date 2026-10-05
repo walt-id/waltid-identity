@@ -93,33 +93,33 @@ internal class WalletVisualScenarios(
             override suspend fun authenticate(reason: String) = gate.await()
         }
         val memory = id.walt.walletdemo.compose.logic.InMemoryDemoPinStore()
-        val store = if (state == "legacy_unlock") object : id.walt.walletdemo.compose.logic.DemoPinStore by memory {
+        val store = if (state == "unlock") object : id.walt.walletdemo.compose.logic.DemoPinStore by memory {
             override fun hasPin() = true
         } else memory
         val controller = id.walt.walletdemo.compose.logic.WalletDemoController(WalletUiTestWallet(), store, biometrics)
-        if (state == "legacy_unlock") controller.updatePin("1234")
+        if (state == "unlock") controller.updatePin("1234")
         else if (state != "setup") {
-            controller.updatePin("123456")
+            controller.updatePin("1234")
             controller.submitPin()
-            if (state == "mismatch") controller.updatePinConfirmation("654321")
+            if (state == "mismatch") controller.updatePinConfirmation("4321")
             if (state == "compact_dark_large_text") controller.updatePinConfirmation("123")
-            if (state == "biometric_prompt") controller.updatePinConfirmation("123456")
+            if (state == "biometric_prompt") controller.updatePinConfirmation("1234")
         }
         val auth = controller.state.value.auth as id.walt.walletdemo.compose.logic.WalletAuthState.PinEntry
         content { id.walt.walletdemo.compose.ui.screens.PinScreen(controller, auth, state == "biometric_prompt", biometrics.isAvailable()) }
         onAllNodesWithTag("wallet.pinBiometricToggle").assertCountEquals(0)
-        val confirming = state !in setOf("setup", "legacy_unlock")
+        val confirming = state !in setOf("setup", "unlock")
         onNodeWithTag(if (confirming) WalletUiTestTags.PinConfirmationInput else WalletUiTestTags.PinInput).assertIsDisplayed()
         onAllNodesWithTag(if (confirming) WalletUiTestTags.PinInput else WalletUiTestTags.PinConfirmationInput).assertCountEquals(0)
         when (state) {
-            "legacy_unlock" -> onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsEnabled()
+            "unlock" -> onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsEnabled()
             "biometric_prompt" -> {
                 onNodeWithTag(WalletUiTestTags.PinBackButton).assertIsNotEnabled()
                 onNodeWithText("Authenticating…").assertIsDisplayed()
             }
             "mismatch" -> onNodeWithText("PIN confirmation does not match").assertIsDisplayed()
         }
-        if (state != "legacy_unlock") onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsDisplayed().assertIsNotEnabled()
+        if (state != "unlock") onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsDisplayed().assertIsNotEnabled()
         capture("onboarding.pin.$state")
         gate.complete(id.walt.walletdemo.compose.logic.DemoBiometricResult.Failed)
     }

@@ -85,7 +85,7 @@ class WalletVisualAndroidTest {
     @Test fun pinMismatch() = scenario { pin("mismatch") }
     @Test fun pinConfirmation() = scenario { pin("confirmation") }
     @Test fun pinBiometricPrompt() = scenario { pin("biometric_prompt") }
-    @Test fun pinLegacyUnlock() = scenario { pin("legacy_unlock") }
+    @Test fun pinUnlock() = scenario { pin("unlock") }
     @Test
     @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
     fun pinCompact() = scenario(fontScale = 1.5f) { pin("compact_dark_large_text") }

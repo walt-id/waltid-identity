@@ -111,7 +111,7 @@ class WalletDemoController(
             }
         }
         val setup = _state.value.auth as? WalletAuthState.Setup ?: return
-        if (setup.step == PinSetupStep.Confirm && value.length == SetupPinLength) submitPin()
+        if (setup.step == PinSetupStep.Confirm && value.length == PinLength) submitPin()
     }
 
     fun editSetupPin() {
@@ -1657,8 +1657,8 @@ class WalletDemoController(
 
     private fun submitSetupPin(auth: WalletAuthState.Setup) {
         val pin = auth.pin
-        if (pin.length != SetupPinLength || !pin.all { it in '0'..'9' }) {
-            setSetupPinError(WalletDisplayText.PinMustContain6Digits)
+        if (!isValidPin(pin)) {
+            setSetupPinError(WalletDisplayText.PinMustContain4Digits)
             return
         }
 
@@ -1714,7 +1714,7 @@ class WalletDemoController(
     private fun submitLoginPin(auth: WalletAuthState.Login) {
         val pin = auth.pin
         if (!isValidPin(pin)) {
-            setLoginPinError(WalletDisplayText.PinMustContain4To8Digits)
+            setLoginPinError(WalletDisplayText.PinMustContain4Digits)
             return
         }
 
@@ -2049,10 +2049,9 @@ class WalletDemoController(
         }
 
     companion object {
-        const val SetupPinLength = 6
-        private val pinPattern = Regex("\\d{4,8}")
+        const val PinLength = 4
         private val SuccessBannerAutoHide = 4.seconds
 
-        private fun isValidPin(pin: String): Boolean = pin.matches(pinPattern)
+        private fun isValidPin(pin: String): Boolean = pin.length == PinLength && pin.all { it in '0'..'9' }
     }
 }

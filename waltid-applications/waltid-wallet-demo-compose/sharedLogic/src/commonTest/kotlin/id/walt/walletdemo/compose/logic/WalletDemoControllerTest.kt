@@ -234,9 +234,9 @@ class WalletDemoControllerTest {
 
         assertTrue(controller.state.value.auth is WalletAuthState.StorageUnavailable)
 
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         runCurrent()
 
         assertTrue(controller.state.value.auth is WalletAuthState.StorageUnavailable)
@@ -293,7 +293,7 @@ class WalletDemoControllerTest {
 
     @Test
     fun setupPinRejectsInvalidLengthAndNonDigits() = runTest {
-        for (pin in listOf("1234", "12345", "1234567", "12a456", "１２３４５６", "1️⃣2️⃣3️⃣4️⃣5️⃣6️⃣", "12345\n")) {
+        for (pin in listOf("123", "12345", "123456", "12a4", "１２３４", "1️⃣2️⃣3️⃣4️⃣", "1234\n")) {
             val store = InMemoryDemoPinStore()
             val biometrics = FakeDemoBiometricAuthenticator()
             val controller = controllerWith(FakeDemoWallet(), this, store, biometrics)
@@ -301,7 +301,7 @@ class WalletDemoControllerTest {
             controller.submitPin()
             val auth = controller.state.value.auth as WalletAuthState.Setup
             assertEquals(PinSetupStep.Choose, auth.step)
-            assertEquals("Choose a six-digit PIN", auth.error)
+            assertEquals("PIN must contain four digits", auth.error)
             assertFalse(store.hasPin())
             assertEquals(0, biometrics.authenticateCalls)
         }
@@ -312,38 +312,38 @@ class WalletDemoControllerTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         val store = InMemoryDemoPinStore()
         val controller = controllerWith(wallet, this, store)
-        controller.updatePin("123456")
-        controller.updatePinConfirmation("123456") // Choosing cannot bypass confirmation.
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234") // Choosing cannot bypass confirmation.
         controller.submitPin()
         assertEquals(PinSetupStep.Confirm, (controller.state.value.auth as WalletAuthState.Setup).step)
         assertFalse(store.hasPin())
         assertEquals(0, wallet.bootstrapCalls)
-        controller.updatePinConfirmation("654321")
+        controller.updatePinConfirmation("4321")
         val mismatch = controller.state.value.auth as WalletAuthState.Setup
         assertEquals("PIN confirmation does not match", mismatch.error)
         assertEquals("", mismatch.confirmation)
         assertFalse(store.hasPin())
-        controller.updatePinConfirmation("123456") // A complete match submits without another button.
+        controller.updatePinConfirmation("1234") // A complete match submits without another button.
         runCurrent()
         assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
         assertEquals(listOf(sampleCredential), (controller.state.value.session as WalletSessionState.Ready).credentials)
         assertEquals(1, wallet.bootstrapCalls)
-        assertTrue(store.verifyPin("123456"))
+        assertTrue(store.verifyPin("1234"))
         assertFalse(store.isBiometricUnlockEnabled())
     }
 
     @Test
     fun editingChosenPinInvalidatesThePreviousConfirmation() = runTest {
         val controller = controllerWith(FakeDemoWallet(), this)
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
         controller.updatePinConfirmation("123")
         controller.editSetupPin()
         assertEquals(PinSetupStep.Choose, (controller.state.value.auth as WalletAuthState.Setup).step)
         assertEquals("", (controller.state.value.auth as WalletAuthState.Setup).confirmation)
-        controller.updatePin("654321")
+        controller.updatePin("4321")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         assertEquals("PIN confirmation does not match", (controller.state.value.auth as WalletAuthState.Setup).error)
         assertFalse(controller.state.value.isAuthenticating)
     }
@@ -365,10 +365,10 @@ class WalletDemoControllerTest {
             }
             val wallet = FakeDemoWallet()
             val controller = controllerWith(wallet, this, store, biometrics)
-            controller.updatePin("123456")
+            controller.updatePin("1234")
             controller.submitPin()
             assertEquals(0, calls)
-            controller.updatePinConfirmation("123456")
+            controller.updatePinConfirmation("1234")
             repeat(2) { controller.submitPin() }
             runCurrent()
             assertEquals(1, calls)
@@ -376,7 +376,7 @@ class WalletDemoControllerTest {
             assertEquals(0, wallet.bootstrapCalls)
             controller.updatePin("999999")
             controller.editSetupPin()
-            assertEquals("123456", (controller.state.value.auth as WalletAuthState.Setup).pin)
+            assertEquals("1234", (controller.state.value.auth as WalletAuthState.Setup).pin)
             gate.complete(result)
             runCurrent()
             assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
@@ -399,9 +399,9 @@ class WalletDemoControllerTest {
                 }
             }
             val controller = controllerWith(FakeDemoWallet(), this, store, biometrics)
-            controller.updatePin("123456")
+            controller.updatePin("1234")
             controller.submitPin()
-            controller.updatePinConfirmation("123456")
+            controller.updatePinConfirmation("1234")
             runCurrent()
             assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
             assertFalse(store.isBiometricUnlockEnabled())
@@ -421,9 +421,9 @@ class WalletDemoControllerTest {
         }
         val biometrics = FakeDemoBiometricAuthenticator()
         val controller = controllerWith(FakeDemoWallet(), this, store, biometrics)
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         runCurrent()
         assertEquals("PIN could not be saved. Try again.", (controller.state.value.auth as WalletAuthState.Setup).error)
         assertFalse(controller.state.value.isAuthenticating)
@@ -445,9 +445,9 @@ class WalletDemoControllerTest {
         }
         val wallet = FakeDemoWallet()
         val controller = controllerWith(wallet, this, store, biometrics)
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         runCurrent()
         controller.resetWallet()
         runCurrent()
@@ -554,9 +554,9 @@ class WalletDemoControllerTest {
         val controller = controllerWith(wallet, this, signingProtectionStore = store)
 
         controller.selectSigningProtection(WalletDemoSigningProtection.None)
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         runCurrent()
 
         assertEquals(WalletDemoSigningProtection.None, store.load())
@@ -578,9 +578,9 @@ class WalletDemoControllerTest {
             signingProtectionMode = WalletDemoSigningProtectionMode.Required,
         )
 
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         runCurrent()
 
         assertEquals(WalletAuthState.Unlocked, controller.state.value.auth)
@@ -814,9 +814,9 @@ class WalletDemoControllerTest {
             scope = this,
             signingProtectionMode = WalletDemoSigningProtectionMode.Disabled,
         )
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         runCurrent()
         wallet.signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
 
@@ -838,9 +838,9 @@ class WalletDemoControllerTest {
             scope = this,
             signingProtectionMode = WalletDemoSigningProtectionMode.Required,
         )
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         runCurrent()
         wallet.signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
 
@@ -862,7 +862,7 @@ class WalletDemoControllerTest {
         runCurrent()
         assertNull(controller.state.value.signingProtectionWarning)
 
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
         runCurrent()
 
@@ -892,9 +892,9 @@ class WalletDemoControllerTest {
         val wallet = FakeDemoWallet()
         val controller = controllerWith(wallet, this)
         controller.selectSigningProtection(WalletDemoSigningProtection.None)
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         runCurrent()
         wallet.signingProtectionAvailability = WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
 
@@ -913,9 +913,9 @@ class WalletDemoControllerTest {
         val pinStore = InMemoryDemoPinStore()
         val store = InMemoryWalletDemoSigningProtectionStore()
         val controller = controllerWith(wallet, this, pinStore, signingProtectionStore = store)
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         runCurrent()
 
         controller.requestSigningProtectionChange(WalletDemoSigningProtection.None)
@@ -943,9 +943,9 @@ class WalletDemoControllerTest {
         val pinStore = InMemoryDemoPinStore()
         val store = InMemoryWalletDemoSigningProtectionStore()
         val controller = controllerWith(wallet, this, pinStore, signingProtectionStore = store)
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         runCurrent()
         wallet.bootstrapError = IllegalStateException("provisioning failed")
 
@@ -1103,9 +1103,9 @@ class WalletDemoControllerTest {
         val pinStore = InMemoryDemoPinStore()
         val sharingSettings = InMemoryDemoSharingSettingsStore()
         val controller = controllerWith(wallet, this, pinStore, sharingSettings = sharingSettings)
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         runCurrent()
         assertTrue(pinStore.hasPin())
         controller.setShowDcApiPresentationPreview(false)
@@ -1169,9 +1169,9 @@ class WalletDemoControllerTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         val pinStore = FailingClearDemoPinStore()
         val controller = controllerWith(wallet, this, pinStore)
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         runCurrent()
         assertTrue(pinStore.hasPin())
         assertTrue(controller.state.value.session is WalletSessionState.Ready)
@@ -1221,16 +1221,16 @@ class WalletDemoControllerTest {
     fun configuredPinStartsRecreatedControllerInLoginAndUnlocksWithOriginalPin() = runTest {
         val pinStore = InMemoryDemoPinStore()
         val firstController = controllerWith(FakeDemoWallet(), this, pinStore)
-        firstController.updatePin("123456")
+        firstController.updatePin("1234")
         firstController.submitPin()
-        firstController.updatePinConfirmation("123456")
+        firstController.updatePinConfirmation("1234")
         runCurrent()
 
         val recreatedWallet = FakeDemoWallet()
         val recreatedController = controllerWith(recreatedWallet, this, pinStore)
 
         assertTrue(recreatedController.state.value.auth is WalletAuthState.Login)
-        recreatedController.updatePin("123456")
+        recreatedController.updatePin("1234")
         recreatedController.submitPin()
         runCurrent()
 
@@ -1255,6 +1255,24 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun unlockRequiresFourDigitsBeforeCheckingTheStoredPin() = runTest {
+        val controller = unlockedControllerWith(FakeDemoWallet(), this)
+        controller.lock()
+        for (pin in listOf("123", "12345", "123456", "１２３４", "12a4")) {
+            controller.updatePin(pin)
+            controller.submitPin()
+            runCurrent()
+            val auth = controller.state.value.auth as WalletAuthState.Login
+            assertEquals("PIN must contain four digits", auth.error)
+            assertFalse(controller.state.value.isAuthenticating)
+        }
+        controller.updatePin("1234")
+        controller.submitPin()
+        runCurrent()
+        assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
+    }
+
+    @Test
     fun wrongLoginPinKeepsWalletLocked() = runTest {
         val controller = unlockedControllerWith(FakeDemoWallet(), this)
 
@@ -1275,7 +1293,7 @@ class WalletDemoControllerTest {
         assertEquals(1, wallet.bootstrapCalls)
 
         controller.lock()
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
         runCurrent()
 
@@ -2651,9 +2669,9 @@ class WalletDemoControllerTest {
         val controller = controllerWith(wallet, this)
         controller.handleDeepLink("openid://callback?code=orphan&state=lost")
         assertTrue(controller.state.value.externalFlow is WalletExternalFlow.UnavailableCallback)
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         runCurrent()
         controller.prepareExternalFlow()
         runCurrent()
@@ -2672,9 +2690,9 @@ class WalletDemoControllerTest {
         runCurrent()
         assertEquals(0, wallet.startIssuanceCalls)
         assertTrue(controller.state.value.externalFlow is WalletExternalFlow.Pending)
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         runCurrent()
         repeat(2) { controller.prepareExternalFlow(); runCurrent() }
         controller.handleDeepLink(url)
@@ -3083,9 +3101,9 @@ class WalletDemoControllerTest {
 
     private fun unlockedControllerWith(wallet: DemoWallet, scope: TestScope): WalletDemoController {
         val controller = controllerWith(wallet, scope)
-        controller.updatePin("123456")
+        controller.updatePin("1234")
         controller.submitPin()
-        controller.updatePinConfirmation("123456")
+        controller.updatePinConfirmation("1234")
         scope.runCurrent()
         return controller
     }

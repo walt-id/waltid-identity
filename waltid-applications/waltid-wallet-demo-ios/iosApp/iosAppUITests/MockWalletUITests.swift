@@ -37,9 +37,9 @@ final class MockWalletUITests: XCTestCase {
         let pin = ui.textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
         XCTAssertTrue(pin.waitForExistence(timeout: 15))
         XCTAssertFalse(app.buttons["wallet.scanButton"].exists)
-        ui.replaceText(in: pin, value: "123456")
+        ui.replaceText(in: pin, value: "1234")
         ui.tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Continue")
-        ui.replaceText(in: ui.textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN"), value: "123456")
+        ui.replaceText(in: ui.textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN"), value: "1234")
         XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.textFields["wallet.offerInput"].exists)
         XCTAssertFalse(app.buttons["wallet.settingsButton"].exists)
@@ -125,7 +125,7 @@ final class MockWalletUITests: XCTestCase {
         capture.name = "pin-keyboard-on-cold-launch"; capture.lifetime = .keepAlways; add(capture)
     }
 
-    func testPinCreationUsesSeparateSixDigitScreensAndKeyboardSafeUnlock() {
+    func testPinCreationUsesSeparateFourDigitScreensAndKeyboardSafeUnlock() {
         continueAfterFailure = false
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
@@ -138,12 +138,12 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertFalse(app.secureTextFields["wallet.pinConfirmationInput"].exists)
         XCTAssertFalse(app.switches["wallet.pinBiometricToggle"].exists)
         assertPinKeyboardAboveAction(app) // Choose must focus without tapping the input.
-        ui.replaceText(in: input, value: "1234")
+        ui.replaceText(in: input, value: "123")
         XCTAssertFalse(app.buttons["wallet.pinSubmitButton"].isEnabled)
-        ui.replaceText(in: input, value: "123456")
+        ui.replaceText(in: input, value: "1234")
         XCTAssertTrue(app.buttons["wallet.pinSubmitButton"].isEnabled)
         let choose = XCTAttachment(screenshot: app.screenshot())
-        choose.name = "pin-choose-six-positions"; choose.lifetime = .keepAlways; add(choose)
+        choose.name = "pin-choose-four-positions"; choose.lifetime = .keepAlways; add(choose)
         ui.tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Continue")
         let confirmation = ui.textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
         XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
@@ -157,18 +157,18 @@ final class MockWalletUITests: XCTestCase {
         ui.tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Continue")
         XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
         XCTAssertEqual(confirmation.value as? String, "")
-        ui.replaceText(in: confirmation, value: "654321")
+        ui.replaceText(in: confirmation, value: "4321")
         XCTAssertTrue(app.staticTexts["PIN confirmation does not match"].waitForExistence(timeout: 5))
         let mismatch = XCTAttachment(screenshot: app.screenshot())
         mismatch.name = "pin-confirm-mismatch"; mismatch.lifetime = .keepAlways; add(mismatch)
-        ui.replaceText(in: confirmation, value: "123456")
+        ui.replaceText(in: confirmation, value: "1234")
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10), "Wallet ready")
 
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
         ui.tapButton(identifier: "wallet.settingsLock", fallbackLabel: "Lock wallet")
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         assertPinKeyboardAboveAction(app) // PIN-only Unlock must focus without tapping the input.
-        input.typeText("123456")
+        input.typeText("1234")
         let done = app.buttons["wallet.pinKeyboardAction"]
         XCTAssertTrue(done.waitForExistence(timeout: 5), "The numeric keyboard needs a dismissal action")
         let unlock = app.buttons["wallet.pinSubmitButton"]
