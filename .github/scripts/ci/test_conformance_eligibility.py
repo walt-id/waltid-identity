@@ -24,7 +24,7 @@ def step_script(workflow, name):
 class ConformanceEligibilityTest(unittest.TestCase):
     def decide(self, labels=(), *, event="pull_request", draft=False,
                fork=False, file="waltid-services/waltid-issuer-api2/src/main/Example.kt",
-               ref="refs/heads/main", script=None):
+               ref="refs/heads/main", script=None, gh_exit=0, expected_exit=0):
         wrapper = CONFORMANCE.read_text()
         expression = re.search(r"pr-require-label: (.+)", wrapper).group(1)
         self.assertEqual(expression, "${{ contains(fromJson(inputs.pr-labels), 'ci:conformance-deferred') }}")
@@ -38,10 +38,11 @@ class ConformanceEligibilityTest(unittest.TestCase):
             output, calls = root / "output", root / "calls"
             output.touch()
             gh = root / "gh"
-            gh.write_text('#!/bin/sh\necho called >> "$GH_CALL_LOG"\nprintf "%s\\n" "$CHANGED_FILE"\n')
+            gh.write_text('#!/bin/sh\necho called >> "$GH_CALL_LOG"\nprintf "%s\\n" "$CHANGED_FILE"\nexit "$FAKE_GH_EXIT_CODE"\n')
             gh.chmod(0o755)
             env = {**os.environ, "PATH": str(root) + os.pathsep + os.environ["PATH"],
                    "GH_TOKEN": "", "GH_CALL_LOG": str(calls), "CHANGED_FILE": file,
+                   "FAKE_GH_EXIT_CODE": str(gh_exit),
                    "GITHUB_OUTPUT": str(output), "GITHUB_REPOSITORY": "walt-id/waltid-identity",
                    "EVENT_NAME": event, "REF": ref, "PR_NUMBER": "1",
                    "PR_HEAD_REPO": "contributor/fork" if fork else "walt-id/waltid-identity",
@@ -53,7 +54,7 @@ class ConformanceEligibilityTest(unittest.TestCase):
                 ["bash", "-c", script if script is not None else step_script(PLATFORM, "Decide whether platform jobs should run")],
                 env=env, capture_output=True, text=True, timeout=10,
             )
-            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.returncode, expected_exit, result.stderr)
             return dict(line.split("=", 1) for line in output.read_text().splitlines()), calls.exists()
 
     def test_default_preserves_automatic_path_selection(self):
@@ -69,6 +70,11 @@ class ConformanceEligibilityTest(unittest.TestCase):
         self.assertEqual(output["should-run"], "false")
         self.assertIn("requires ci:conformance or ci:issuer-conformance label", output["reason"])
         self.assertFalse(called)
+
+    def test_changed_file_api_failure_fails_without_skip_outputs(self):
+        output, called = self.decide(file="README.md", gh_exit=17, expected_exit=17)
+        self.assertTrue(called)
+        self.assertEqual(output, {})
 
     def test_both_opt_ins_override_deferral_and_draft(self):
         for label in OPT_INS:
@@ -162,6 +168,25 @@ class ConformanceEligibilityTest(unittest.TestCase):
                     capture_output=True, text=True, timeout=10,
                 )
                 self.assertEqual(gate.returncode, expected, gate.stderr)
+
+    def test_cancelled_workflow_cannot_publish_a_skipped_gate(self):
+        gate = BUILD.read_text().split("  ci-gate:\n", 1)[1]
+        self.assertEqual(re.search(r"    if: (.+)", gate).group(1), "always()")
+        rejection = gate.split("      - name: Reject cancelled workflow\n", 1)[1]
+        self.assertEqual(re.search(r"        if: (.+)", rejection).group(1), "cancelled()")
+        result = subprocess.run(
+            ["bash", "-c", step_script(BUILD, "Reject cancelled workflow")],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 1, result.stderr)
+
+    def test_gate_fails_when_dependency_results_cannot_be_parsed(self):
+        result = subprocess.run(
+            ["bash", "-c", step_script(BUILD, "Evaluate merge gate")],
+            env={**os.environ, "NEEDS": "{invalid JSON}"},
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
 
 
 if __name__ == "__main__":

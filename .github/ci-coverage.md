@@ -8,11 +8,14 @@ does not currently require individual job names. The stable check to require is
 including explicitly deferred conformance. A failed or cancelled lane fails the
 gate. The gate's summary records live conformance selection and its reason; a
 successful gate with deferred coverage is not evidence of a conformance pass.
+The gate also rejects cancelled workflows and invalid dependency-result data.
+Eligibility fails when the changed-file API query fails.
 
 The Build workflow is not skipped for documentation or asset-only changes.
-Those runs still emit `ci-gate` so a required check cannot stay pending;
-`gradle-build` and `macos-predicate-tests` are skipped instead. Path
-eligibility still runs so `docs/mobile-sdk-api` can start `sdk-docs`.
+Those runs still emit `ci-gate` so a required check cannot stay pending.
+Ordinary Gradle work is skipped unless an eligible explicit conformance opt-in
+requests it. Predicate tests and path eligibility still run so
+`docs/mobile-sdk-api` can start `sdk-docs`.
 
 Release candidate Maven publish is a separate job that waits for the
 Gradle job and, when requested, the live conformance job.

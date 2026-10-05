@@ -167,7 +167,8 @@ jobs:
 
   ci-gate:
     name: ci-gate
-    if: always() && !cancelled()
+    if: always()
+    timeout-minutes: 5
     needs:
       - macos-predicate-tests
       - android-eligibility
@@ -203,12 +204,19 @@ jobs:
             echo
             echo "Selection reason: ${REASON:-eligibility decision unavailable}"
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Reject cancelled workflow
+        if: cancelled()
+        run: |
+          echo '::error::Workflow was cancelled; coverage is incomplete.'
+          exit 1
       - name: Evaluate merge gate
+        if: always()
         env:
           NEEDS: ${{ toJson(needs) }}
         run: |
           set -euo pipefail
           fail=0
+          job_results="$(jq -r 'to_entries[] | "\(.key)=\(.value.result)"' <<< "$NEEDS")"
           while IFS= read -r line; do
             job="${line%%=*}"
             result="${line#*=}"
@@ -220,5 +228,5 @@ jobs:
                 fail=1
                 ;;
             esac
-          done < <(jq -r 'to_entries[] | "\(.key)=\(.value.result)"' <<< "$NEEDS")
+          done <<< "$job_results"
           exit "$fail"
