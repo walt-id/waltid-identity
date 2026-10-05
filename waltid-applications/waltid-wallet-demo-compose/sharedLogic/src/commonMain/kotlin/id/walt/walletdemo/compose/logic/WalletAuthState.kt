@@ -6,8 +6,8 @@ sealed interface WalletAuthState {
     data class Setup(
         val pin: String = "",
         val confirmation: String = "",
-        val useBiometrics: Boolean = false,
         val error: String? = null,
+        val step: PinSetupStep = PinSetupStep.Choose,
     ) : PinEntry
 
     data class Login(
@@ -22,3 +22,5 @@ sealed interface WalletAuthState {
 
     data object Unlocked : WalletAuthState
 }
+
+enum class PinSetupStep { Choose, Confirm }
