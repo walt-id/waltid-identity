@@ -2,7 +2,7 @@
 
 An application serving several tenants - organizations, customers - where each tenant configures its own login.
 The complete, compiled and tested example is
-[`examples/multitenant`](../src/test/kotlin/id/walt/ktorauthnz/examples/multitenant/MultiTenantApp.kt), with four
+[`examples/multitenant`](../src/test/kotlin/id/walt/ktorauthnz/examples/multitenant/MultiTenantApp.kt), with five
 tenants:
 
 | tenant | login |
@@ -11,6 +11,7 @@ tenants:
 | org2 | OIDC with the tenant's identity provider |
 | org3 | LDAP against the tenant's directory, then TOTP |
 | org4 | a verifiable credential presented from a wallet |
+| org5 | username + password, accounts its users sign up for themselves (`signUp`) |
 
 ## 1. Scope routes to a tenant
 
@@ -89,11 +90,12 @@ sign-ups, the application decides:
 
 ```kotlin
 authFlows(...) {
-    registerUnknownAccounts(LDAP, VerifiableCredential) { identifier ->
-        accounts.addAccountIdentifierToAccount(Uuid.random().toString(), identifier)
-    }
+    registerUnknownAccounts(LDAP, VerifiableCredential)   // a new account each, through `registerAccount`
 }
 ```
+
+Pass a function to register differently; see [registration.md](registration.md) for the `onAccountRegistered` hook
+and sign-up.
 
 The tenant is known there too (`currentAuthnzTenant()`), e.g. to register only for some tenants.
 
