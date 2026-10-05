@@ -88,6 +88,14 @@ class ValkeySessionStore(
         }
     }
 
+    override suspend fun listSessionsForAccount(accountId: String): List<AuthSession> {
+        val sessionIds = redis.execute(KedisHashCommands.hashKeys("account-sessions:${accountId}")).orEmpty()
+        return sessionIds.mapNotNull { id ->
+            // Expired sessions are gone; their index entries are cleaned up here.
+            findSessionById(id) ?: run { removeSessionIdFromAccountSessions(id, accountId); null }
+        }
+    }
+
     override suspend fun invalidateAllSessionsForAccount(accountId: String) {
         val sessionIds = redis.execute(KedisHashCommands.hashKeys("account-sessions:${accountId}")).orEmpty()
         if (sessionIds.isNotEmpty()) redis.execute(del(*sessionIds.map { "session:$it" }.toTypedArray()))
