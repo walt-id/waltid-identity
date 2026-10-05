@@ -261,12 +261,9 @@ object OIDC : AuthenticationMethod("oidc") {
                 )
                 session.setOidcTokenValidationPolicy(tokenValidationPolicy)
 
-                val accountId = identifier.resolveIfExists() ?: run {
-                    // No account for this issuer + subject yet: provision one (the AccountStore implementation, e.g.
-                    // Enterprise, creates it). Its id is new - never the IdP's `sub`, which another IdP could also
-                    // use, and which need not have the store's id format.
-                    registerAccount(details = userInfo ?: idTokenPayload) { identifier(identifier) }
-                }
+                // No account for this issuer + subject yet: provision one, with a new id - never the IdP's `sub`, which
+                // another IdP could also use, and which need not have the store's id format.
+                val accountId = accountFor(session, identifier) { registerAccount(details = userInfo ?: idTokenPayload) { identifier(it) } }
 
                 val authContext = authContext(call)
 
