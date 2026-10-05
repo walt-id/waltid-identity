@@ -39,6 +39,9 @@ object KtorAuthnzManager {
     /** Sending of one-time email codes, for the `email-code` method; off when null. */
     var emailCodes: id.walt.ktorauthnz.methods.config.EmailCodeSettings? = null
 
+    /** Runs for every new account, e.g. to create the application's own records; failing it fails the registration. */
+    var onAccountRegistered: (suspend (id.walt.ktorauthnz.accounts.RegisteredAccount) -> Unit)? = null
+
     /** Receivers of authentication events (audit, alerts, metrics). */
     val eventListeners: MutableList<AuthnzEventListener> = java.util.concurrent.CopyOnWriteArrayList()
 
