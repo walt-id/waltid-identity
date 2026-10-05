@@ -24,7 +24,7 @@ import id.walt.walletdemo.compose.ui.components.*
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
 
-/** Choose and confirm are separate screens; existing 4–8 digit PINs remain valid for unlock. */
+/** Choose, confirm and unlock use the same fixed four-digit PIN input. */
 @Composable
 internal fun PinScreen(
     controller: WalletDemoController,
@@ -44,7 +44,7 @@ internal fun PinScreen(
         biometricUnlockEnabled && biometricAvailable
     val error = setup?.error ?: login?.error
     val value = if (confirming) setup.confirmation else setup?.pin ?: login?.pin.orEmpty()
-    val digits = WalletDemoController.SetupPinLength
+    val digits = WalletDemoController.PinLength
     LaunchedEffect(login != null, biometricUnlockEnabled, biometricAvailable) {
         if (login != null && biometricUnlockEnabled && biometricAvailable) controller.unlockWithBiometrics()
     }
@@ -59,7 +59,7 @@ internal fun PinScreen(
         }
     }
     fun submit() {
-        if (!isBusy && (setup == null || value.length == digits)) {
+        if (!isBusy && value.length == digits) {
             focus.clearFocus()
             controller.submitPin()
         }
@@ -71,7 +71,7 @@ internal fun PinScreen(
             else -> Res.string.pin_continue
         }),
         onClick = { submit() },
-        enabled = !isBusy && if (setup != null) value.length == digits else value.length in 4..8,
+        enabled = !isBusy && value.length == digits,
         testTag = WalletUiTestTags.PinSubmitButton,
         icon = if (setup != null && !confirming) WalletSymbol.Next else WalletSymbol.Lock,
     )
@@ -107,17 +107,13 @@ internal fun PinScreen(
                     value = value,
                     onValueChange = if (confirming) controller::updatePinConfirmation else controller::updatePin,
                     label = stringResource(if (confirming) Res.string.pin_confirmation_label else Res.string.pin_label),
-                    progressDescription = stringResource(Res.string.pin_digit_progress, value.length, if (setup != null) digits else 8),
-                    maxLength = if (setup != null) digits else 8,
-                    digitCount = if (setup != null) digits else maxOf(digits, value.length),
-                    allowUnicodeDigits = setup == null,
+                    progressDescription = stringResource(Res.string.pin_digit_progress, value.length, digits),
+                    digitCount = digits,
                     enabled = !isBusy,
                     isError = error != null,
                     onSubmit = { submit() },
                     modifier = Modifier.focusRequester(inputFocus).testTag(if (confirming) WalletUiTestTags.PinConfirmationInput else WalletUiTestTags.PinInput),
                 )
-                if (setup == null) Text(stringResource(Res.string.pin_existing_length),
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(stringResource(when {
                 setup == null -> Res.string.pin_enter_help
