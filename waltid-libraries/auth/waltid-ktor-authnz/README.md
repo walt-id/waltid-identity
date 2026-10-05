@@ -118,6 +118,13 @@ authenticate("ktor-authnz") {
 
 The token is read from the `ktor-authnz-auth` header, a Bearer `Authorization` header, or the session cookie.
 
+### Registration
+
+`signUp(EmailPass)` serves `signup` (with the address verified by a code, `signup/confirm`); new OIDC identities and
+`registerUnknownAccounts(...)` register on first login; `registerAccount { password(...); totp(...) }` registers from
+code. Every new account runs the `onAccountRegistered` hook, e.g. to create a profile. See
+[registration.md](docs/registration.md).
+
 ### Enrolment and account routes
 
 Place inside `authenticate { }`:
@@ -192,6 +199,7 @@ The tests double as examples: `AuthFlowRoutesTest` (flows, tenants, provider hoo
 - [1.Quickstart.md](docs/1.Quickstart.md): flows and requests, step by step
 - [multi-tenant.md](docs/multi-tenant.md): a login configured per tenant
 - [identifier-first.md](docs/identifier-first.md): the account decides how it logs in
+- [registration.md](docs/registration.md): sign-up, registration on first login, and from code
 - [new-auth-method.md](docs/new-auth-method.md): adding an authentication method
 - [oidc.md](docs/oidc.md): OpenID Connect
 - [radius.md](docs/radius.md): RADIUS
