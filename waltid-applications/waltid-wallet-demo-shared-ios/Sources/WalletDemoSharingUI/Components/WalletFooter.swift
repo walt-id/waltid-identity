@@ -15,6 +15,7 @@ public struct WalletFooter<Content: View>: View {
                 if reduceTransparency { Color(.systemGroupedBackground) }
                 else { Rectangle().fill(.regularMaterial) }
             }
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("wallet.footer")
     }
 }

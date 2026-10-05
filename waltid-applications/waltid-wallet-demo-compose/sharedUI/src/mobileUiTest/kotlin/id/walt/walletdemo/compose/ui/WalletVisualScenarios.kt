@@ -14,6 +14,9 @@ import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletDemoContinuationStatus
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceProblem
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
+import id.walt.walletdemo.compose.ui.components.StatusCard
+import id.walt.walletdemo.compose.ui.components.WalletStatusPlacement
+import id.walt.walletdemo.compose.ui.components.WalletFooter
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
 import id.walt.wallet2.mobile.ProximityEngagement
@@ -212,8 +215,9 @@ internal class WalletVisualScenarios(
         )
         content {
             Column(Modifier.fillMaxSize()) {
-                WalletHeader(state, onSettings = {}, onDismissStatus = {}, onToggleStatusExpanded = {}, onScan = {}, onShareNearby = {})
+                WalletHeader(state, onSettings = {}, onScan = {}, onShareNearby = {})
                 CredentialsTab(state.session, modifier = Modifier.weight(1f))
+                WalletFooter(feedback = { StatusCard(state, {}, {}, WalletStatusPlacement.Footer) })
             }
         }
         if (empty) onNodeWithTag(WalletUiTestTags.CredentialsEmpty).assertIsDisplayed()
@@ -358,10 +362,12 @@ internal class WalletVisualScenarios(
         )
         content {
             Column(Modifier.fillMaxSize()) {
-                WalletHeader(state, onSettings = {}, onDismissStatus = {}, onToggleStatusExpanded = {})
+                WalletHeader(state, onSettings = {})
                 ReceiveTab(state, state.requestDrafts, onOfferUrlChange = {}, onTxCodeChange = {},
                     onCopiesChange = { _, _ -> }, onPreviewOffer = {}, onAcceptOffer = {}, onDeclineOffer = {},
-                    onResumeDeferred = {}, onDone = {}, onRefresh = {}, modifier = Modifier.weight(1f))
+                    onResumeDeferred = {}, onDone = {}, onRefresh = {}, modifier = Modifier.weight(1f),
+                    contextualStatus = if (failure) ({ StatusCard(state, {}, {}, WalletStatusPlacement.Contextual) }) else null,
+                    feedback = if (failure) null else ({ StatusCard(state, {}, {}, WalletStatusPlacement.Footer) }))
             }
         }
         if (failure) {

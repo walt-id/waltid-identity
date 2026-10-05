@@ -22,7 +22,6 @@ import id.walt.walletdemo.compose.ui.LocalWalletDemoBranding
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsCloseButton
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsOverflowMenu
-import id.walt.walletdemo.compose.ui.components.StatusCard
 import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
 import id.walt.walletdemo.compose.ui.resources.Res
 import id.walt.walletdemo.compose.ui.resources.proximity_qr
@@ -33,8 +32,6 @@ import org.jetbrains.compose.resources.painterResource
 internal fun WalletHeader(
     state: WalletDemoUiState,
     onSettings: () -> Unit,
-    onDismissStatus: () -> Unit,
-    onToggleStatusExpanded: () -> Unit,
     onScan: (() -> Unit)? = null,
     onShareNearby: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
@@ -76,7 +73,6 @@ internal fun WalletHeader(
             }
         }
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusCard(state, onDismissStatus, onToggleStatusExpanded)
             state.warning?.let { warning -> WarningCard(warning) }
         }
     }

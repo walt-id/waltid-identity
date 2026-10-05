@@ -907,7 +907,8 @@ class WalletDemoAppTestScenarios(
         onNodeWithText("Embedded in-person journey").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.AppTitle).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsButton).assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.Status).assertIsDisplayed()
+        // The embedded journey owns its progress; wallet readiness is unrelated to its transport.
+        onAllNodesWithTag(WalletUiTestTags.Status).assertCountEquals(0)
         onAllNodesWithTag(WalletUiTestTags.PresentationInput).assertCountEquals(0)
     }
 
@@ -1951,7 +1952,7 @@ class WalletDemoAppTestScenarios(
         onAllNodesWithTag("wallet.credentialDetailsScreen").assertCountEquals(0)
     }
 
-    fun successStatusCanBeDismissedFromTheHeader() = runComposeUiTest {
+    fun successStatusCanBeDismissedFromTheFooter() = runComposeUiTest {
         val wallet = WalletUiTestWallet()
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
@@ -1963,8 +1964,13 @@ class WalletDemoAppTestScenarios(
                 controller.state.value.isStatusVisible
         }
         onNodeWithTag("wallet.status").assertTextContains("Wallet ready")
+        onNodeWithTag("wallet.status.feedback").assertIsDisplayed()
+        onAllNodesWithTag("wallet.status.contextual").assertCountEquals(0)
+        val headerTop = onNodeWithTag("wallet.screen.header").getUnclippedBoundsInRoot().top
         onNodeWithTag(WalletUiTestTags.StatusDismiss).performClick()
         onAllNodesWithTag("wallet.status").assertCountEquals(0)
+        onAllNodesWithTag("wallet.footer").assertCountEquals(0)
+        assertEquals(headerTop, onNodeWithTag("wallet.screen.header").getUnclippedBoundsInRoot().top)
     }
 
     private fun ComposeUiTest.setWalletContent(content: @Composable () -> Unit) {

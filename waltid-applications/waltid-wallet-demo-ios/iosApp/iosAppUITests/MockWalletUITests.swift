@@ -406,21 +406,29 @@ final class MockWalletUITests: XCTestCase {
         }
     }
 
-    func testStatusBannerPrecedesContentAcrossFlows() {
+    func testFeedbackFollowsContentAndStaysAboveReviewActions() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10), "Wallet ready")
         let status = app.descendants(matching: .any)["wallet.status"]
-        XCTAssertLessThan(status.frame.minY, app.staticTexts["No credentials yet"].frame.minY)
+        XCTAssertGreaterThan(status.frame.minY, app.staticTexts["No credentials yet"].frame.maxY)
+        let initialHeaderTop = app.navigationBars.firstMatch.frame.minY
         ui.openWalletLink("openid-credential-offer://mock")
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10), "Review credential offer")
         ui.assertExists(identifier: "wallet.offerCredentialsSection")
-        XCTAssertLessThan(status.frame.minY, app.staticTexts["wallet.offerCredentialsSection"].frame.minY)
+        XCTAssertGreaterThan(status.frame.minY, app.staticTexts["wallet.offerCredentialsSection"].frame.maxY)
+        XCTAssertLessThanOrEqual(status.frame.maxY, app.buttons["wallet.offerAcceptButton"].frame.minY)
+        XCTAssertEqual(initialHeaderTop, app.navigationBars.firstMatch.frame.minY)
+        let offer = XCTAttachment(screenshot: app.screenshot())
+        offer.name = "receive-review-bottom-feedback"; offer.lifetime = .keepAlways; add(offer)
         ui.openWalletLink("openid4vp://mock")
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Review presentation request", "Preview failed"], timeout: 10), "Review presentation request")
         ui.assertExists(identifier: "wallet.presentTabContent")
         XCTAssertTrue(app.buttons["wallet.presentationRejectButton"].isEnabled)
+        XCTAssertLessThanOrEqual(status.frame.maxY, app.buttons["wallet.presentationRejectButton"].frame.minY)
+        let share = XCTAttachment(screenshot: app.screenshot())
+        share.name = "share-review-bottom-feedback"; share.lifetime = .keepAlways; add(share)
     }
 
     func testWalletHomeOffersScanAndNearbySharing() {

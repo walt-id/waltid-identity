@@ -1,12 +1,21 @@
 import SwiftUI
 import WalletDemoSharingUI
 
+enum WalletStatusPlacement { case contextual, footer }
+
 struct WalletTabStatusBanner: View {
     @ObservedObject var viewModel: WalletViewModel
     let tab: WalletTab
+    let placement: WalletStatusPlacement
+
+    var isVisible: Bool {
+        guard viewModel.isStatusVisible(for: tab), let kind = viewModel.statusKind(for: tab) else { return false }
+        return (kind == .error) == (placement == .contextual)
+            && (viewModel.externalFlow == nil || kind == .busy || kind == .error)
+    }
 
     var body: some View {
-        if viewModel.isStatusVisible(for: tab) && (viewModel.externalFlow == nil || viewModel.statusIsLoading(for: tab) || viewModel.statusIsError(for: tab)) {
+        if isVisible {
             StatusBannerView(
                 message: viewModel.statusMessage(for: tab),
                 isLoading: viewModel.statusIsLoading(for: tab),
@@ -15,6 +24,8 @@ struct WalletTabStatusBanner: View {
                 onDismiss: dismissAction,
                 onToggleExpanded: expandAction
             )
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(placement == .contextual ? "wallet.status.contextual" : "wallet.status.feedback")
         }
     }
 
@@ -30,6 +41,17 @@ struct WalletTabStatusBanner: View {
     private var expandAction: (() -> Void)? {
         guard viewModel.statusKind(for: tab) == .error else { return nil }
         return { viewModel.toggleStatusExpanded() }
+    }
+}
+
+/// Feedback without actions uses the same measured safe-area footer as review controls.
+struct WalletTabFeedback: View {
+    @ObservedObject var viewModel: WalletViewModel
+    let tab: WalletTab
+
+    var body: some View {
+        let banner = WalletTabStatusBanner(viewModel: viewModel, tab: tab, placement: .footer)
+        if banner.isVisible { WalletFooter { banner } }
     }
 }
 

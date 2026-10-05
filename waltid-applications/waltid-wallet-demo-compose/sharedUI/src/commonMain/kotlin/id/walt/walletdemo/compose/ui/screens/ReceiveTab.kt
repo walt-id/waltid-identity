@@ -1,18 +1,9 @@
 package id.walt.walletdemo.compose.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.isBusy
-import id.walt.walletdemo.compose.logic.isError
-import id.walt.walletdemo.compose.logic.statusText
 import id.walt.walletdemo.compose.logic.receivedCredentials
 import id.walt.walletdemo.compose.ui.components.*
 import id.walt.walletdemo.compose.ui.resources.*
@@ -44,12 +35,15 @@ internal fun ReceiveTab(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
     fillViewport: Boolean = true,
+    feedback: (@Composable () -> Unit)? = null,
+    contextualStatus: (@Composable () -> Unit)? = null,
 ) {
     val preview = state.offerPreview
     if (preview != null) {
         ReviewScaffold(
             fillViewport = fillViewport,
             modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent),
+            feedback = feedback,
             actions = {
                 OfferReviewActions(
                     requiresIssuerAuthentication = preview.requiresIssuerAuthentication,
@@ -60,9 +54,7 @@ internal fun ReceiveTab(
                 )
             },
         ) {
-            if (state.externalFlow != null && state.isError) {
-                SettingsNotice(state.statusText, error = true, modifier = Modifier.testTag(WalletUiTestTags.Status))
-            }
+            contextualStatus?.invoke()
             OfferReviewSection(
                 preview = preview,
                 acceptEnabled = state.acceptOfferEnabled,
@@ -81,7 +73,8 @@ internal fun ReceiveTab(
 
     if (state.issuanceReceipt != null || state.deferredCredentials.isNotEmpty()) {
         val pending = state.deferredCredentials.filter { state.issuanceReceipt?.pendingIds?.contains(it.id) ?: true }
-        ReviewScaffold(fillViewport = fillViewport, modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent), actions = {
+        ReviewScaffold(fillViewport = fillViewport, feedback = feedback,
+            modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent), actions = {
             WalletActions(WalletAction(stringResource(Res.string.issuance_done), onDone,
                 enabled = !state.isBusy, testTag = "issuance-done", icon = WalletSymbol.Accept),
                 secondary = pending.takeIf { it.isNotEmpty() }?.let {
@@ -89,6 +82,7 @@ internal fun ReceiveTab(
                         enabled = !state.isBusy, testTag = "issuance-refresh", icon = WalletSymbol.Retry)
                 })
         }) {
+            contextualStatus?.invoke()
             IssuanceResultContent(state.issuanceReceipt, state.receivedCredentials(), pending, state.isBusy, onResumeDeferred)
         }
         return
@@ -99,14 +93,9 @@ internal fun ReceiveTab(
         return
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag(WalletUiTestTags.ReceiveTabContent)
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
+    ReviewScaffold(modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent),
+        fillViewport = fillViewport, feedback = feedback) {
+        contextualStatus?.invoke()
         UrlActionSection(
             value = requestDrafts.offerUrl,
             onValueChange = onOfferUrlChange,

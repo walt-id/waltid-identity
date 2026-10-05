@@ -125,13 +125,13 @@ struct PresentView: View {
     private var entryContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                WalletTabStatusBanner(viewModel: viewModel, tab: .present)
+                WalletTabStatusBanner(viewModel: viewModel, tab: .present, placement: .contextual)
 
                 Text("Online presentation")
                     .font(.headline)
 
                 ScannableUrlEditor(
-                    title: "Present",
+                    title: "",
                     label: "OpenID4VP request URL",
                     text: $viewModel.presentationRequestUrl,
                     inputIdentifier: WalletAccessibilityID.presentationInput,
@@ -179,6 +179,7 @@ struct PresentView: View {
             }
             .padding()
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) { WalletTabFeedback(viewModel: viewModel, tab: .present) }
     }
 
     private func onlineReviewContent(review: SharingReviewModel) -> some View {
@@ -191,7 +192,7 @@ struct PresentView: View {
             viewModel.submitPresentation()
         }
         return WalletReviewScaffold(showsActions: true) {
-            WalletTabStatusBanner(viewModel: viewModel, tab: .present)
+            WalletTabStatusBanner(viewModel: viewModel, tab: .present, placement: .contextual)
             if let warning = viewModel.transactionDataProfilesWarning {
                 WarningBannerView(message: warning)
             }
@@ -212,6 +213,7 @@ struct PresentView: View {
                 paymentReview: viewModel.paymentReview
             )
         } actions: {
+            WalletTabStatusBanner(viewModel: viewModel, tab: .present, placement: .footer)
             ReviewActions(
                 selectionComplete: viewModel.presentationCredentialSelectionComplete,
                 isLoading: !viewModel.presentationReviewEnabled,

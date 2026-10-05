@@ -5,6 +5,11 @@ import androidx.compose.ui.Modifier
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletStatusKind
+import id.walt.walletdemo.compose.logic.isStatusVisible
+import id.walt.walletdemo.compose.logic.statusBanner
+import id.walt.walletdemo.compose.ui.components.StatusCard
+import id.walt.walletdemo.compose.ui.components.WalletStatusPlacement
 
 /** The in-app route and external host bind exactly the same content and current consent. */
 @Composable
@@ -17,6 +22,14 @@ internal fun WalletFlowContent(
     onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
 ) {
+    val banner = state.statusBanner().takeIf { state.isStatusVisible }
+    val contextualStatus: (@Composable () -> Unit)? = if (banner?.kind == WalletStatusKind.Error) {
+        { StatusCard(state, controller::dismissStatus, controller::toggleStatusExpanded, WalletStatusPlacement.Contextual) }
+    } else null
+    val feedback: (@Composable () -> Unit)? = if (banner != null && banner.kind != WalletStatusKind.Error &&
+        (state.externalFlow == null || banner.kind == WalletStatusKind.Busy)) {
+        { StatusCard(state, controller::dismissStatus, controller::toggleStatusExpanded, WalletStatusPlacement.Footer) }
+    } else null
     when (state.selectedTab) {
         WalletDemoTab.Receive -> {
             ReceiveTab(
@@ -33,6 +46,8 @@ internal fun WalletFlowContent(
                 onRefresh = controller::refreshIssuanceStatus,
                 modifier = modifier,
                 fillViewport = fillViewport,
+                feedback = feedback,
+                contextualStatus = contextualStatus,
             )
         }
         WalletDemoTab.Present -> {
@@ -58,6 +73,8 @@ internal fun WalletFlowContent(
                 presentationContent = presentationContent,
                 modifier = modifier,
                 fillViewport = fillViewport,
+                feedback = feedback,
+                contextualStatus = contextualStatus,
             )
         }
         WalletDemoTab.Credentials -> Unit

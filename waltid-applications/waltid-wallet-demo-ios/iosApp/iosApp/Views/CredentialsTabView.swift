@@ -33,7 +33,7 @@ struct CredentialsTabView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if selectedDetailsID == nil {
-                        WalletTabStatusBanner(viewModel: viewModel, tab: .credentials)
+                        WalletTabStatusBanner(viewModel: viewModel, tab: .credentials, placement: .contextual)
                         if !viewModel.deferredCredentials.isEmpty {
                             WalletSection {
                                 WalletNavigationRow(String(format: String(localized: "Pending · %d"), viewModel.deferredCredentials.count)) {
@@ -84,6 +84,9 @@ struct CredentialsTabView: View {
                 .padding(.top, 8)
                 .padding(.bottom)
                 .animation(.easeOut(duration: 0.16), value: showDetailsBody)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if selectedDetailsID == nil { WalletTabFeedback(viewModel: viewModel, tab: .credentials) }
             }
             .background(Color(.systemGroupedBackground))
             .animation(.easeOut(duration: 0.2), value: selectedDetailsID)
