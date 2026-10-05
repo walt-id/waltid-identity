@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.utils.MetadataCache
 import id.walt.ktorauthnz.methods.sessiondata.IdentifiedSessionData
 import id.walt.ktorauthnz.exceptions.AuthSessionNotFoundException
 import id.walt.ktorauthnz.auth.getEffectiveRequestAuthToken
@@ -74,14 +75,18 @@ object OIDC : AuthenticationMethod("oidc") {
     /** The IdP calls back (and logs out) without the session in the path. */
     override val hasSessionlessRoutes = true
 
-    private val configurationCache = mutableMapOf<Url, OpenIdConfiguration>()
+    /** Discovery documents of identity providers, fetched again hourly. */
+    val configurationCache = MetadataCache<Url, OpenIdConfiguration>("OpenID configuration")
 
-    private val jwksCache = mutableMapOf<String, List<JsonObject>>()
+    /** Signing keys of identity providers; a key id they lack is looked up again at most once a minute. */
+    val jwksCache = MetadataCache<String, List<JsonObject>>("JWKS")
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     suspend fun resolveConfiguration(configUrl: Url): OpenIdConfiguration {
-        return configurationCache.getOrPut(configUrl) {
-            http.get(configUrl).body<OpenIdConfiguration>()
+        return configurationCache.get(configUrl) {
+            val response = http.get(configUrl)
+            check(response.status.isSuccess()) { "OpenID configuration at $configUrl answered ${response.status}" }
+            response.body<OpenIdConfiguration>()
         }
     }
 
@@ -571,13 +576,17 @@ object OIDC : AuthenticationMethod("oidc") {
         kid: String,
         forceRefresh: Boolean = false,
     ): Crypto2Key {
-        var keys = jwksCache[jwksUrl]
-        if (forceRefresh || keys == null || keys.none { it["kid"]?.jsonPrimitive?.contentOrNull == kid }) {
-            val jwks = http.get(jwksUrl).body<JsonObject>()
-            keys = jwks["keys"]?.jsonArray?.map { it.jsonObject }
+        suspend fun fetch(): List<JsonObject> {
+            val response = http.get(jwksUrl)
+            check(response.status.isSuccess()) { "JWKS at $jwksUrl answered ${response.status}" }
+            return response.body<JsonObject>()["keys"]?.jsonArray?.map { it.jsonObject }
                 ?: throw IllegalArgumentException("OIDC JWKS response is missing keys")
-            jwksCache[jwksUrl] = keys
         }
+        fun List<JsonObject>.hasKid() = any { it["kid"]?.jsonPrimitive?.contentOrNull == kid }
+
+        var keys = jwksCache.get(jwksUrl, ::fetch)
+        // The provider may have rotated its keys: look again, but not more than once a minute.
+        if (forceRefresh || !keys.hasKid()) keys = jwksCache.refresh(jwksUrl, ::fetch)
         val matches = keys.filter { it["kid"]?.jsonPrimitive?.contentOrNull == kid }
         require(matches.size == 1) { "OIDC JWKS must contain exactly one key for kid: $kid" }
         val jwk = matches.single()
