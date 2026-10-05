@@ -7,7 +7,7 @@ import id.walt.ktorauthnz.methods.config.IdentifyConfiguration
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.tenants.authnzTenant
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.AuthSessionStateException
 import id.walt.ktorauthnz.methods.AuthMethodManager
 import id.walt.ktorauthnz.methods.AuthenticationMethod
