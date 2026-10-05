@@ -1,7 +1,6 @@
 package id.walt.ktorauthnz.flows
 
-import io.klogging.logger
-import kotlinx.coroutines.runBlocking
+import io.klogging.noCoLogger
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -33,7 +32,7 @@ data class AuthFlow(
 ) {
 
     companion object {
-        private val log = logger("AuthFlow")
+        private val log = noCoLogger("AuthFlow")
 
         fun fromConfig(config: String): AuthFlow = Json.decodeFromString<AuthFlow>(config)
 
@@ -50,7 +49,7 @@ data class AuthFlow(
         @Suppress("DEPRECATION")
         if (ok != null) {
             val msg = "Your AuthFlow configuration contains deprecated end-condition \"ok\" - use \"success\" instead."
-            runBlocking { log.warn { msg } }
+            log.warn(msg)
         }
 
         // `identify` decides what follows from the account it finds.
