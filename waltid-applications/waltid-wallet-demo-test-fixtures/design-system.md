@@ -17,7 +17,7 @@ Wallet home exposes Scan or paste, Share nearby and Settings. The scanner resolv
 
 In-app requests use full-screen flows; supported external entry uses a sheet. Share the review state/content and pin actions outside the content scroll area. Preserve selection and transaction-code edits during detail navigation and host recreation. Busy operations prevent duplicate submission. A new incoming link cannot replace an operation already consuming an offer or submitting consent. See [external flows](visual/external-flows.md).
 
-PIN, confirmation and biometric opt-in belong to one form. Signing-key setup starts with supported defaults and one Create/Restore confirmation; individual rows open focused customization. Settings reuses the same summary, with immutable properties read-only and existing reset consequences explicit. App unlock never substitutes for signing approval.
+PIN onboarding uses separate Choose and Confirm screens, with six large circular masked positions backed by one secure input. A matching confirmation opens the available OS biometric prompt; its outcome controls opt-in without an app toggle. Cancellation completes PIN-only setup. Follow the [PIN interaction contract](pin-onboarding.md). Signing-key setup starts with supported defaults and one Create/Restore confirmation; individual rows open focused customization. Settings reuses the same summary, with immutable properties read-only and existing reset consequences explicit. App unlock never substitutes for signing approval.
 
 ## Structure and evidence workflow
 

@@ -86,10 +86,8 @@ internal object WalletComposeE2EHelper {
         launch(context)
 
         assertNotNull("PIN input not found on initial launch", waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT))
-        assertNotNull(
-            "PIN setup was not shown on initial launch",
-            waitForResource(device, "wallet.pinConfirmationInput", UI_ELEMENT_TIMEOUT),
-        )
+        assertTrue("PIN setup was not shown on initial launch",
+            device.wait(Until.hasObject(By.text("Step 1 of 2")), UI_ELEMENT_TIMEOUT))
         unlock(device)
     }
 
@@ -97,14 +95,11 @@ internal object WalletComposeE2EHelper {
         launch(context)
 
         assertNotNull("PIN input not found after relaunch", waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT))
-        assertNull(
-            "PIN setup was shown after relaunch",
-            waitForResource(device, "wallet.pinConfirmationInput", 2_000L),
-        )
+        assertTrue("PIN setup was shown after relaunch", !device.hasObject(By.text("Step 1 of 2")))
         unlock(device)
     }
 
-    private fun launch(context: Context, signingProtectionMode: String = "disabled") {
+    fun launch(context: Context, signingProtectionMode: String = "disabled") {
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             ?.apply {
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
@@ -117,11 +112,15 @@ internal object WalletComposeE2EHelper {
     fun unlock(device: UiDevice, initializeSigningIdentity: Boolean = true) {
         val pinInput = waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT)
             ?: throw AssertionError("PIN input not found. ${foregroundWindowSnapshot(device)}")
+        val setup = device.hasObject(By.text("Step 1 of 2"))
         pinInput.setText(PIN)
-
-        waitForResource(device, "wallet.pinConfirmationInput", 2_000L)?.setText(PIN)
         dismissKeyboard(device)
         clickByTag(device, "wallet.pinSubmitButton")
+        if (setup) {
+            assertTrue(device.wait(Until.hasObject(By.text("Step 2 of 2")), UI_ELEMENT_TIMEOUT))
+            val confirmation = requireNotNull(waitForResource(device, "wallet.pinConfirmationInput", UI_ELEMENT_TIMEOUT))
+            confirmation.setText(PIN) // Matching confirmation advances directly to OS opt-in / signing setup.
+        }
         if (initializeSigningIdentity) awaitWalletReady(device)
     }
 
@@ -144,7 +143,7 @@ internal object WalletComposeE2EHelper {
         device.waitForIdle()
     }
 
-    private fun awaitWalletReady(device: UiDevice) {
+    fun awaitWalletReady(device: UiDevice) {
         val deadline = System.currentTimeMillis() + WALLET_READY_TIMEOUT
         var creationRequested = false
         while (System.currentTimeMillis() < deadline) {

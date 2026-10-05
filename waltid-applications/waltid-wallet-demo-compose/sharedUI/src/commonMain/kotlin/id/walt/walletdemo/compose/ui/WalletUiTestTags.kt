@@ -133,7 +133,7 @@ internal object WalletUiTestTags {
     val PinScreen = tag("pinScreen")
     val PinConfirmationInput = tag("pinConfirmationInput")
     val PinSubmitButton = tag("pinSubmitButton")
-    val PinBiometricToggle = tag("pinBiometricToggle")
+    val PinBackButton = tag("pinBackButton")
     val PinBiometricButton = tag("pinBiometricButton")
     val AccountAuthScreen = tag("accountAuthScreen")
     val AccountEmailInput = tag("accountEmailInput")
