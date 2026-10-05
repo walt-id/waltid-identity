@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.tokens.ktorauthnztoken
 
+import id.walt.ktorauthnz.exceptions.InvalidTokenException
 import id.walt.ktorauthnz.valkey.ValkeyConnection
 import io.github.domgew.kedis.commands.KedisValueCommands
 import io.klogging.logger
@@ -36,7 +37,7 @@ class ValkeyAuthnzTokenStore(
     override suspend fun getTokenSessionId(token: String): String {
         return redis.execute(
             KedisValueCommands.get("authnz-token:$token"),
-        ) ?: throw IllegalArgumentException("Unknown token: $token")
+        ) ?: throw InvalidTokenException("Unknown token")
     }
 
     override suspend fun validateToken(token: String): Boolean {
