@@ -59,6 +59,9 @@ object Issuer2RequestExamples {
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
     )
 
+    val EUDI_IDENTITY_OFFER = PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = "identityCredentialSdJwtEudi")
+    val EUDI_PHOTO_ID_OFFER = PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = "isoPhotoIdEudi")
+
     val PROFILE_PRE_AUTHORIZED_OFFER_BY_VALUE = PROFILE_PRE_AUTHORIZED_OFFER.copy(
         valueMode = CredentialOfferValueMode.BY_VALUE,
     )
@@ -536,6 +539,8 @@ object Issuer2RequestExamples {
         "[authorized][multiple][by-value][same format, different datasets][SD-JWT VC]" to PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE,
         "[authorized][multiple][by-reference][runtime overrides]" to PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_RUNTIME_OVERRIDES,
         "[pre-authorized][single][by-reference]" to PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE,
+        "EUDI identity - required JWT key attestation" to EUDI_IDENTITY_OFFER,
+        "EUDI photo ID - required JWT key attestation" to EUDI_PHOTO_ID_OFFER,
         "[pre-authorized][single][shared status][W3C]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS,
         "[pre-authorized][single][shared status][SD-JWT]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_SD_JWT_STATUS,
         "[pre-authorized][single][shared status][mdoc]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_MDOC_STATUS,
