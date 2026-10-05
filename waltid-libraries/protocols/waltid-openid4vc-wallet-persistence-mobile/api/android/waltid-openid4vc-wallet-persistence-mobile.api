@@ -81,6 +81,8 @@ public final class id/walt/wallet2/persistence/db/WalletPersistenceDatabase$Comp
 
 public final class id/walt/wallet2/persistence/db/WalletPersistenceQueries : app/cash/sqldelight/TransacterImpl {
 	public fun <init> (Lapp/cash/sqldelight/db/SqlDriver;)V
+	public final fun compareAndRemoveIssuanceSessionRecord (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun compareAndSetIssuanceSessionRecord (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun deleteByKeyId (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun deleteCredentialById (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun deleteDidByDid (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
@@ -90,6 +92,7 @@ public final class id/walt/wallet2/persistence/db/WalletPersistenceQueries : app
 	public final fun insertCredential (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun insertDid (Ljava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun insertIssuanceSessionRecord (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun issuanceSessionRecordChanges ()Lapp/cash/sqldelight/ExecutableQuery;
 	public final fun putIdentityRecord (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun selectActiveIdentity (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
 	public final fun selectActiveIdentity (Ljava/lang/String;Lkotlin/jvm/functions/Function4;)Lapp/cash/sqldelight/Query;
@@ -406,8 +409,9 @@ public final class id/walt/wallet2/persistence/stores/SqlDelightDidStore : id/wa
 	public fun removeDid (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
-public final class id/walt/wallet2/persistence/stores/SqlDelightIssuanceSessionStore : id/walt/wallet2/handlers/WalletIssuanceSessionStore {
+public final class id/walt/wallet2/persistence/stores/SqlDelightIssuanceSessionStore : id/walt/wallet2/handlers/AtomicWalletIssuanceSessionStore {
 	public fun <init> (Lid/walt/wallet2/persistence/db/WalletPersistenceQueries;)V
+	public fun compareAndSet (Lid/walt/wallet2/handlers/WalletIssuanceSessionRecord;Lid/walt/wallet2/handlers/WalletIssuanceSessionRecord;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun get (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun list (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun put (Lid/walt/wallet2/handlers/WalletIssuanceSessionRecord;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
