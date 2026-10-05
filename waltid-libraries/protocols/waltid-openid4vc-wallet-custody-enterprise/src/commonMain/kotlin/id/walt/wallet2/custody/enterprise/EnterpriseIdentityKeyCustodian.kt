@@ -12,7 +12,7 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.*
 import io.ktor.http.content.TextContent
-import io.ktor.utils.io.readRemaining
+import io.ktor.utils.io.readBuffer
 import kotlinx.coroutines.CancellationException
 import kotlinx.io.readByteArray
 import kotlinx.serialization.json.*
@@ -60,7 +60,7 @@ public class EnterpriseIdentityKeyCustodian(
                     429, in 500..599 -> throw IdentityProviderException(IdentityProviderFailure.TemporarilyUnavailable)
                     else -> throw IdentityProviderException(IdentityProviderFailure.Rejected)
                 }
-                val bytes = response.bodyAsChannel().readRemaining(65_537).readByteArray()
+                val bytes = response.bodyAsChannel().readBuffer(65_537L).readByteArray()
                 try {
                     if (bytes.size > 65_536) throw IdentityProviderException(IdentityProviderFailure.Rejected)
                     val view = Json.parseToJsonElement(bytes.decodeToString()).jsonObject

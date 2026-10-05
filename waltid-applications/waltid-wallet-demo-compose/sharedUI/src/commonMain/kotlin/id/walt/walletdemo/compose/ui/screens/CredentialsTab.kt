@@ -24,12 +24,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.CredentialCardDisplayData
@@ -39,10 +39,12 @@ import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.plainTextClipEntry
 import id.walt.walletdemo.compose.ui.components.CredentialCardStack
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -61,7 +63,8 @@ internal fun CredentialsTab(
     var showDetailsBody by remember { mutableStateOf(false) }
     var closing by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     val selectedCredential = credentials.firstOrNull { it.id == expandedId }
     val expanded by produceState<CredentialDetails?>(null, selectedCredential) {
         value = null
@@ -103,12 +106,12 @@ internal fun CredentialsTab(
         closing = false
     }
 
-    LaunchedEffect(showingDetails, rawCredential, onDeleteCredential) {
+    LaunchedEffect(showingDetails, rawCredential, onDeleteCredential, clipboard) {
         onDetailsChromeChange(
             if (showingDetails) {
                 CredentialDetailsChrome(
                     onClose = ::requestClose,
-                    onCopy = { clipboard.setText(AnnotatedString(rawCredential)) },
+                    onCopy = { scope.launch { clipboard.setClipEntry(plainTextClipEntry(rawCredential)) } },
                     onDelete = if (onDeleteCredential != null) {
                         { confirmDelete = true }
                     } else {
