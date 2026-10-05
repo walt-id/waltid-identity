@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.accounts.registerAccount
 import id.walt.ktorauthnz.utils.MetadataCache
 import id.walt.ktorauthnz.methods.sessiondata.IdentifiedSessionData
 import id.walt.ktorauthnz.exceptions.AuthSessionNotFoundException
@@ -264,8 +265,7 @@ object OIDC : AuthenticationMethod("oidc") {
                     // No account for this issuer + subject yet: provision one (the AccountStore implementation, e.g.
                     // Enterprise, creates it). Its id is new - never the IdP's `sub`, which another IdP could also
                     // use, and which need not have the store's id format.
-                    KtorAuthnzManager.accountStore.addAccountIdentifierToAccount(Uuid.random().toString(), identifier)
-                    identifier.resolveToAccountId()
+                    registerAccount(details = userInfo ?: idTokenPayload) { identifier(identifier) }
                 }
 
                 val authContext = authContext(call)
