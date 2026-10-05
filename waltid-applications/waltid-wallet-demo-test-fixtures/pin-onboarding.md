@@ -11,6 +11,8 @@
 
 Both renderers use the real numeric keyboard and a **single** secure editing control. Separate visual positions are decorative, so screen readers encounter one labelled password input. Entered digits are always masked, including during paste. The component accepts editing, deletion and paste, filters ASCII digits, and caps setup at six characters. The current empty position has an accent ring; errors mark all positions and include readable text. Actions stay outside the scroll region and above the keyboard; native numeric input has a Done action.
 
+Choose and Confirm automatically focus the secure input and show the numeric keyboard, including after Back or a failed save. Unlock gives configured, available biometrics the first attempt with the keyboard hidden. Cancellation or failure then focuses the PIN automatically, without repeatedly reopening the biometric prompt. When biometrics are unavailable or disabled, Unlock shows the keyboard immediately. An explicit wallet lock begins a fresh unlock attempt; foreground notifications cannot duplicate its biometric prompt. Manual keyboard dismissal stays effective until the step changes or authentication completes.
+
 Existing 4–8 digit PINs remain accepted on unlock, retaining the prior platform digit filtering and validator, including previously accepted Unicode digits. Unlock allows a flexible count, adds positions for seventh/eighth digits, and explains legacy lengths; its action is available from four digits. The stored verifier format and PIN derivation are unchanged. Unknown legacy length is not guessed from a hash, and setup does not silently accept a shorter PIN.
 
 ## UI references and decision

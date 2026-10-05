@@ -39,7 +39,7 @@ class PinPersistenceTest {
         assertTrue(device.hasObject(By.text("Step 1 of 2")))
         assertTrue(!device.hasObject(By.res("wallet.pinConfirmationInput")))
         assertTrue(!device.hasObject(By.res("wallet.pinBiometricToggle")))
-        input.click()
+        assertPinSubmitAboveKeyboard(instrumentation, device) // No tap: Choose opens the IME itself.
         input.setText("1234")
         assertPinSubmitAboveKeyboard(instrumentation, device)
         assertTrue(!requireNotNull(device.findObject(By.res("wallet.pinSubmitButton"))).isEnabled)
@@ -48,17 +48,24 @@ class PinPersistenceTest {
         WalletComposeE2EHelper.clickByTag(device, "wallet.pinSubmitButton")
         val confirmation = requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinConfirmationInput", 10_000))
         assertTrue(!device.hasObject(By.res("wallet.pinInput")))
+        assertPinSubmitAboveKeyboard(instrumentation, device) // Confirm also restores a dismissed IME.
         confirmation.setText("123")
         assertPinSubmitAboveKeyboard(instrumentation, device)
         device.pressBack() // Hide the IME first.
         device.pressBack() // The system Back action returns to Choose, rather than exiting.
         assertTrue(device.wait(Until.hasObject(By.text("Step 1 of 2")), 10_000))
+        assertPinSubmitAboveKeyboard(instrumentation, device)
         WalletComposeE2EHelper.clickByTag(device, "wallet.pinSubmitButton")
         val retry = requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinConfirmationInput", 10_000))
         retry.setText("654321")
         assertTrue(device.wait(Until.hasObject(By.text("PIN confirmation does not match")), 10_000))
         retry.setText("123456")
         WalletComposeE2EHelper.awaitWalletReady(device)
+        WalletComposeE2EHelper.launch(context)
+        requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 30_000))
+        assertTrue(!device.hasObject(By.text("Step 1 of 2")))
+        assertPinSubmitAboveKeyboard(instrumentation, device) // PIN-only Unlock focuses without a tap.
+        WalletComposeE2EHelper.unlock(device)
     }
 
     @Test

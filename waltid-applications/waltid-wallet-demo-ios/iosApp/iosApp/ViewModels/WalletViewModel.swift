@@ -420,7 +420,7 @@ class WalletViewModel: ObservableObject {
         pinConfirmation = ""
         pinError = nil
         isAuthenticating = false
-        biometricPromptConsumed = true
+        biometricPromptConsumed = false
         auth = .login
     }
 
@@ -497,6 +497,10 @@ class WalletViewModel: ObservableObject {
     }
 
     var isBiometricUnlockEnabled: Bool { pinStore.isBiometricUnlockEnabled }
+
+    var shouldPromptBiometricUnlock: Bool {
+        auth == .login && !biometricPromptConsumed && isBiometricUnlockEnabled && isBiometricUnlockAvailable
+    }
 
     func refreshBiometricAvailability() {
         isBiometricUnlockAvailable = biometricAuthenticator.isAvailable

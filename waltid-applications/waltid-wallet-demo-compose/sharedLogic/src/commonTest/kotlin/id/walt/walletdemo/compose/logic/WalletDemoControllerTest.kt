@@ -492,6 +492,11 @@ class WalletDemoControllerTest {
 
         assertTrue(controller.state.value.auth is WalletAuthState.Login)
         assertEquals(0, wallet.bootstrapCalls)
+        controller.handleApplicationForegrounded()
+        controller.unlockWithBiometrics()
+        runCurrent()
+        assertEquals(1, biometrics.authenticateCalls)
+        assertTrue((controller.state.value.auth as WalletAuthState.Login).biometricPromptConsumed)
 
         controller.updatePin("1234")
         controller.submitPin()
@@ -502,7 +507,7 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun lockDoesNotAutoPromptBiometrics() = runTest {
+    fun newUnlockAttemptPromptsBiometricsOnceAfterLock() = runTest {
         val pinStore = InMemoryDemoPinStore()
         pinStore.setPin("1234")
         pinStore.setBiometricUnlockEnabled(true)
@@ -517,14 +522,10 @@ class WalletDemoControllerTest {
 
         controller.lock()
         val login = controller.state.value.auth as WalletAuthState.Login
-        assertTrue(login.biometricPromptConsumed)
+        assertFalse(login.biometricPromptConsumed)
 
         controller.unlockWithBiometrics()
-        runCurrent()
-        assertEquals(1, biometrics.authenticateCalls)
-        assertTrue(controller.state.value.auth is WalletAuthState.Login)
-
-        controller.unlockWithBiometrics(force = true)
+        controller.handleApplicationForegrounded()
         runCurrent()
         assertEquals(2, biometrics.authenticateCalls)
         assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)

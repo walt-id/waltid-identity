@@ -117,17 +117,58 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         #endif
     }
 
+    func testPinKeyboardOpensOnColdLaunchWithoutInput() {
+        let app = XCUIApplication()
+        app.launchEnvironment = isolatedWalletEnvironment()
+        app.launch()
+        let ui = WalletE2EUI(app: app)
+        XCTAssertTrue(ui.textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN").waitForExistence(timeout: 10))
+        assertPinKeyboardAboveAction(app)
+        let capture = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        capture.name = "pin-keyboard-on-cold-launch"; capture.lifetime = .keepAlways; add(capture)
+    }
+
     func testPinPersistsAcrossAppRestart() throws {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         let environment = isolatedWalletEnvironment()
-
-        ui.launch(environment: environment)
+        app.launchEnvironment = environment.merging(["WALLET_SIGNING_PROTECTION_MODE": "disabled"]) { _, new in new }
+        app.launch()
+        let input = ui.textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Step 1 of 2"].exists)
+        assertPinKeyboardAboveAction(app)
+        input.typeText("123456") // No tap: the screen owns focus.
+        app.buttons["wallet.pinSubmitButton"].tap()
+        let confirmation = ui.textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 10))
+        assertPinKeyboardAboveAction(app)
+        confirmation.typeText("123")
+        app.buttons["wallet.pinBackButton"].tap()
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        assertPinKeyboardAboveAction(app)
+        app.buttons["wallet.pinSubmitButton"].tap()
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 10))
+        assertPinKeyboardAboveAction(app)
+        confirmation.typeText("123456")
+        ui.completeKeySetupIfNeeded()
         let readyStatus = ui.waitUntilWalletReady(timeout: walletReadyTimeout)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         app.terminate()
-        ui.launchExpectingLoginAndUnlock(environment: environment, walletReadyTimeout: walletReadyTimeout)
+        app.launch()
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Step 1 of 2"].exists)
+        assertPinKeyboardAboveAction(app)
+        input.typeText("123456")
+        app.buttons["wallet.pinSubmitButton"].tap()
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+    }
+
+    private func assertPinKeyboardAboveAction(_ app: XCUIApplication) {
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "PIN input must open the keyboard automatically")
+        XCTAssertLessThanOrEqual(app.buttons["wallet.pinSubmitButton"].frame.maxY, app.keyboards.firstMatch.frame.minY,
+            "The keyboard must not cover the PIN action")
     }
 
     func testBootstrapCreatesDid() async throws {

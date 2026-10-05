@@ -397,7 +397,7 @@ class WalletDemoController(
         presentationJob?.cancel()
         val previous = getAndUpdateState {
             it.copy(
-                auth = WalletAuthState.Login(biometricPromptConsumed = true),
+                auth = WalletAuthState.Login(),
                 isAuthenticating = false,
                 operation = WalletOperationState.Idle,
                 requestDrafts = it.requestDrafts.copy(txCode = ""),

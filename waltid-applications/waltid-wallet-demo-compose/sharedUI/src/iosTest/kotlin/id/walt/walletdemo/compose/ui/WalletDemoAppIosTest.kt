@@ -15,6 +15,8 @@ class WalletDemoAppIosTest {
 
     @Test fun pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt() = scenarios.pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt()
 
+    @Test fun biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline() = scenarios.biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline()
+
     @Test fun pinSetupRequiresSixDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresSixDigitsAndMatchingConfirmation()
     @Test fun pinConfirmationPromptsBiometricsAndDeclineCompletesSetup() = scenarios.pinConfirmationPromptsBiometricsAndDeclineCompletesSetup()
 
@@ -188,8 +190,8 @@ class WalletDemoAppIosTest {
         scenarios.readerTrustSettingsReviewAndPersistPublicCa()
 
     @Test
-    fun lockDoesNotAutoPromptBiometrics() =
-        scenarios.lockDoesNotAutoPromptBiometrics()
+    fun newUnlockAttemptPromptsBiometricsOnceAfterLock() =
+        scenarios.newUnlockAttemptPromptsBiometricsOnceAfterLock()
 
     @Test
     fun settingsConfirmsAndAppliesSigningProtectionChange() =

@@ -10,6 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.PinSetupStep
@@ -34,16 +36,28 @@ internal fun PinScreen(
     val login = auth as? WalletAuthState.Login
     val confirming = setup?.step == PinSetupStep.Confirm
     val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
     val inputFocus = remember { FocusRequester() }
     val biometricUnlockEnabled = controller.isBiometricUnlockEnabled()
+    val biometricPromptPending = login != null && !login.biometricPromptConsumed &&
+        biometricUnlockEnabled && biometricAvailable
     val error = setup?.error ?: login?.error
     val value = if (confirming) setup.confirmation else setup?.pin ?: login?.pin.orEmpty()
     val digits = WalletDemoController.SetupPinLength
     LaunchedEffect(login != null, biometricUnlockEnabled, biometricAvailable) {
         if (login != null && biometricUnlockEnabled && biometricAvailable) controller.unlockWithBiometrics()
     }
-    LaunchedEffect(confirming) { if (confirming) inputFocus.requestFocus() }
-    LaunchedEffect(isBusy) { if (isBusy) focus.clearFocus() }
+    LaunchedEffect(login != null, setup?.step, isBusy, biometricPromptPending, windowFocused) {
+        if (isBusy || biometricPromptPending || !windowFocused) {
+            focus.clearFocus()
+        } else {
+            // Let the host attach the secure editor before requesting its input session.
+            withFrameNanos { }
+            inputFocus.requestFocus()
+            keyboard?.show()
+        }
+    }
     fun submit() {
         if (!isBusy && (setup == null || value.length == digits)) {
             focus.clearFocus()

@@ -113,6 +113,18 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertFalse(app.alerts.firstMatch.exists)
     }
 
+    func testPinKeyboardOpensOnColdLaunchWithoutInput() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchEnvironment = ["E2E_WALLET_ID": "pin-keyboard-\(UUID().uuidString)", "E2E_MOCK_WALLET": "1"]
+        app.launch()
+        let ui = WalletE2EUI(app: app)
+        XCTAssertTrue(ui.textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN").waitForExistence(timeout: 10))
+        assertPinKeyboardAboveAction(app)
+        let capture = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        capture.name = "pin-keyboard-on-cold-launch"; capture.lifetime = .keepAlways; add(capture)
+    }
+
     func testPinCreationUsesSeparateSixDigitScreensAndKeyboardSafeUnlock() {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -125,6 +137,7 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Step 1 of 2"].exists)
         XCTAssertFalse(app.secureTextFields["wallet.pinConfirmationInput"].exists)
         XCTAssertFalse(app.switches["wallet.pinBiometricToggle"].exists)
+        assertPinKeyboardAboveAction(app) // Choose must focus without tapping the input.
         ui.replaceText(in: input, value: "1234")
         XCTAssertFalse(app.buttons["wallet.pinSubmitButton"].isEnabled)
         ui.replaceText(in: input, value: "123456")
@@ -136,9 +149,11 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
         XCTAssertFalse(input.exists)
         XCTAssertTrue(app.staticTexts["Step 2 of 2"].exists)
+        assertPinKeyboardAboveAction(app)
         ui.replaceText(in: confirmation, value: "123")
         ui.tapButton(identifier: "wallet.pinBackButton", fallbackLabel: "Back")
         XCTAssertTrue(input.waitForExistence(timeout: 5))
+        assertPinKeyboardAboveAction(app)
         ui.tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Continue")
         XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
         XCTAssertEqual(confirmation.value as? String, "")
@@ -152,16 +167,30 @@ final class MockWalletUITests: XCTestCase {
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
         ui.tapButton(identifier: "wallet.settingsLock", fallbackLabel: "Lock wallet")
         XCTAssertTrue(input.waitForExistence(timeout: 10))
-        input.tap()
+        assertPinKeyboardAboveAction(app) // PIN-only Unlock must focus without tapping the input.
         input.typeText("123456")
         let done = app.buttons["wallet.pinKeyboardAction"]
         XCTAssertTrue(done.waitForExistence(timeout: 5), "The numeric keyboard needs a dismissal action")
         let unlock = app.buttons["wallet.pinSubmitButton"]
         XCTAssertLessThanOrEqual(unlock.frame.maxY, app.keyboards.firstMatch.frame.minY,
             "The keyboard must not cover Unlock")
+        done.tap()
+        let keyboardHidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
+            object: app.keyboards.firstMatch)
+        XCTAssertEqual(XCTWaiter.wait(for: [keyboardHidden], timeout: 5), .completed)
+        XCTAssertTrue(unlock.isEnabled)
+        input.tap()
+        assertPinKeyboardAboveAction(app)
+        XCTAssertTrue(unlock.isEnabled, "Refocusing must retain the entered PIN")
         unlock.tap()
         XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(input.exists)
+    }
+
+    private func assertPinKeyboardAboveAction(_ app: XCUIApplication) {
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "PIN input must open the keyboard automatically")
+        XCTAssertLessThanOrEqual(app.buttons["wallet.pinSubmitButton"].frame.maxY, app.keyboards.firstMatch.frame.minY,
+            "The keyboard must not cover the PIN action")
     }
 
     func testWalletHomeScannerRoutesOfferAndBackCancelsReview() {

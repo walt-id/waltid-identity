@@ -28,6 +28,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsNotSelected
@@ -132,12 +134,35 @@ class WalletDemoAppTestScenarios(
     private val contentWrapper: @Composable (@Composable () -> Unit) -> Unit = { it() },
 ) {
 
+    fun biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline() = runComposeUiTest {
+        val memory = InMemoryDemoPinStore()
+        memory.setBiometricUnlockEnabled(true)
+        val store = object : DemoPinStore by memory { override fun hasPin() = true }
+        val gate = CompletableDeferred<DemoBiometricResult>()
+        var prompts = 0
+        val biometrics = object : DemoBiometricAuthenticator {
+            override fun isAvailable() = true
+            override suspend fun authenticate(reason: String): DemoBiometricResult { prompts++; return gate.await() }
+        }
+        val controller = WalletDemoController(WalletUiTestWallet(), store, biometrics)
+        setWalletContent { WalletDemoApp(controller) }
+        waitUntil { prompts == 1 }
+        onNodeWithTag(WalletUiTestTags.PinInput).assert(isFocused().not()).assertIsNotEnabled()
+        gate.complete(DemoBiometricResult.Failed)
+        waitUntil { !controller.state.value.isAuthenticating }
+        waitForIdle()
+        onNodeWithTag(WalletUiTestTags.PinInput).assertIsFocused().assertIsEnabled()
+        controller.handleApplicationForegrounded()
+        waitForIdle()
+        assertEquals(1, prompts)
+    }
+
     fun pinSetupRequiresSixDigitsAndMatchingConfirmation() = runComposeUiTest {
         val pinStore = InMemoryDemoPinStore()
         val controller = WalletDemoController(WalletUiTestWallet(), pinStore)
         setWalletContent { WalletDemoApp(controller) }
         onNodeWithText("Step 1 of 2").assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.PinInput).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PinInput).assertIsDisplayed().assertIsFocused()
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
         onAllNodesWithTag(WalletUiTestTags.PinConfirmationInput).assertCountEquals(0)
         onAllNodesWithTag("wallet.pinBiometricToggle").assertCountEquals(0)
@@ -148,7 +173,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsEnabled().performClick()
         onNodeWithText("Step 2 of 2").assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.PinInput).assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.PinConfirmationInput).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PinConfirmationInput).assertIsDisplayed().assertIsFocused()
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Password))
         onNodeWithTag(WalletUiTestTags.PinConfirmationInput).performTextInput("123")
         onNodeWithTag(WalletUiTestTags.PinBackButton).performClick()
@@ -1748,7 +1773,7 @@ class WalletDemoAppTestScenarios(
         assertEquals(ProximityReaderPolicy.AllowAnonymousOrUntrusted, store.load().readerPolicy)
     }
 
-    fun lockDoesNotAutoPromptBiometrics() = runComposeUiTest {
+    fun newUnlockAttemptPromptsBiometricsOnceAfterLock() = runComposeUiTest {
         val pinStore = InMemoryDemoPinStore()
         val biometrics = RecordingDemoBiometricAuthenticator()
         val controller = WalletDemoController(WalletUiTestWallet(), pinStore, biometrics)
@@ -1764,12 +1789,7 @@ class WalletDemoAppTestScenarios(
             .performClick()
         waitForIdle()
 
-        onNodeWithText("Enter your PIN").assertIsDisplayed()
-        assertEquals(1, biometrics.authenticateCalls)
-        val login = controller.state.value.auth as WalletAuthState.Login
-        assertTrue(login.biometricPromptConsumed)
-
-        onNodeWithTag(WalletUiTestTags.PinBiometricButton).performClick()
+        controller.handleApplicationForegrounded()
         waitForIdle()
         waitUntil(timeoutMillis = 5_000) {
             controller.state.value.auth is WalletAuthState.Unlocked

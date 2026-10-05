@@ -16,6 +16,8 @@ class WalletDemoAppAndroidTest {
 
     private val scenarios = WalletDemoAppTestScenarios()
 
+    @Test fun biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline() = scenarios.biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline()
+
     @Test fun pinSetupRequiresSixDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresSixDigitsAndMatchingConfirmation()
     @Test fun pinConfirmationPromptsBiometricsAndDeclineCompletesSetup() = scenarios.pinConfirmationPromptsBiometricsAndDeclineCompletesSetup()
 
@@ -178,8 +180,8 @@ class WalletDemoAppAndroidTest {
         scenarios.readerTrustSettingsReviewAndPersistPublicCa()
 
     @Test
-    fun lockDoesNotAutoPromptBiometrics() =
-        scenarios.lockDoesNotAutoPromptBiometrics()
+    fun newUnlockAttemptPromptsBiometricsOnceAfterLock() =
+        scenarios.newUnlockAttemptPromptsBiometricsOnceAfterLock()
 
     @Test
     fun settingsConfirmsAndAppliesSigningProtectionChange() =
