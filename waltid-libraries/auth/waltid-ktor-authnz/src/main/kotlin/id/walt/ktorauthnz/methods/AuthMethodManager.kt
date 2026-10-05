@@ -19,7 +19,6 @@ object AuthMethodManager {
             EmailPass,
             Identify,
             JWT,
-            // Kerberos,
             LDAP,
             OIDC,
             Passkey,
