@@ -34,7 +34,12 @@ def main():
                         default=["android", "compose-ios", "swiftui"])
     parser.add_argument("--output", type=Path, default=ROOT / "build/reports/wallet-visual")
     parser.add_argument("--derived-data", type=Path, default=ROOT / "build/wallet-visual-derived")
+    parser.add_argument("--gradle-root", type=Path, default=ROOT,
+                        help="Identity checkout or unified build whose waltid-identity resolves to this checkout")
     args = parser.parse_args()
+    args.gradle_root = args.gradle_root.resolve()
+    if args.gradle_root != ROOT and (args.gradle_root / "waltid-identity").resolve() != ROOT:
+        parser.error("--gradle-root must build this Identity checkout")
     args.output = args.output.resolve()
     args.output.mkdir(parents=True, exist_ok=True)
     uses_ios = bool(set(args.renderers) & {"compose-ios", "swiftui"})
@@ -43,7 +48,7 @@ def main():
             parser.error("--simulator is required for iOS renderers")
         check_apple_environment(args.simulator)
     env = dict(os.environ, TZ="UTC")
-    gradle = [str(ROOT / "gradlew"), "--console=plain", "--max-workers=2",
+    gradle = [str(args.gradle_root / "gradlew"), "--console=plain", "--max-workers=2",
               f"-PenableAndroidBuild={'true' if 'android' in args.renderers else 'false'}",
               f"-PenableIosBuild={'true' if uses_ios else 'false'}",
               "-Proborazzi.test.record=false", "-Proborazzi.test.verify=true"]
@@ -51,7 +56,7 @@ def main():
     def run(command, log):
         print(f"Running {log}; output: {args.output / log}", flush=True)
         with (args.output / log).open("w") as output:
-            return subprocess.run(command, cwd=ROOT, env=env, stdout=output, stderr=subprocess.STDOUT).returncode
+            return subprocess.run(command, cwd=args.gradle_root, env=env, stdout=output, stderr=subprocess.STDOUT).returncode
 
     # Build before freezing source/baseline fingerprints. This also prepares the Swift consumer.
     if "swiftui" in args.renderers:

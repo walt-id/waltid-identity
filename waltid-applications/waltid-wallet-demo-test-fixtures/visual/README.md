@@ -30,6 +30,10 @@ artifacts. Android-only runs do not require Xcode or a simulator. The individual
 are rerun without forcing their dependency compilation. The report rejects stale results,
 missing tests, unlisted baselines, record-only results, and source/baseline changes during a run.
 
+For coordinated Enterprise/License source validation, pass `--gradle-root` with the matching
+unified checkout. Its `waltid-identity` directory must resolve to this exact Identity checkout;
+the runner rejects another source tree. Record the companion revisions with the local evidence.
+
 The matching GitHub workflow retains the gallery, JUnit results and difference images as job
 artifacts. Apple comparisons require **Xcode 27.0 (27A266a), iOS 26.5 and XcodeBuildMCP 2.7.0**;
 all fixture clocks use UTC, and the native nearby receipt pins its locale's 24-hour cycle independently
@@ -48,7 +52,7 @@ Ordinary Gradle runs verify through the `roborazzi.test.verify` project property
 
 ## Deliberate baseline updates
 
-Use the same destinations and fixture configuration. Use the corresponding `recordRoborazziAndroidHostTest` or `recordRoborazziIosSimulatorArm64` task for Compose, with the appropriate test class filter and device. The comparison runner intentionally has no recording option. For native tests, add `"WALLET_VISUAL_RECORD":"1"` to `testRunnerEnv`. Point-Free deliberately reports record-mode assertions as failures; this is not a successful verification run.
+Use the same destinations and fixture configuration. For Compose, invoke `sharedUI:testAndroidHostTest --tests '*WalletVisualAndroidTest'` or `sharedUI:iosSimulatorArm64Test --device "$WALLET_VISUAL_SIMULATOR_ID" --tests '*WalletVisualIosTest'` with `-Proborazzi.test.record=true -Proborazzi.test.verify=false`. The task paths use the full `:waltid-applications:waltid-wallet-demo-compose:` prefix. The outer `recordRoborazziIosSimulatorArm64` task does not accept the native test's `--device` argument. The comparison runner intentionally has no recording option. For native tests, add `"WALLET_VISUAL_RECORD":"1"` to `testRunnerEnv`. Point-Free deliberately reports record-mode assertions as failures; this is not a successful verification run.
 
 Inspect each expected/actual/diff image and its semantic assertions before committing an intentional change. Then compare again with recording disabled. Both integrations reject recording when a CI environment is detected. Do not relax pixel thresholds to conceal missing text, images or action clipping. Keep toolchain-only refreshes separate from design changes.
 
