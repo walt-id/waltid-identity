@@ -225,12 +225,15 @@ class WalletDemoAppTestScenarios(
             override suspend fun setClipEntry(clipEntry: ClipEntry?) = Unit
         }
         setWalletContent {
-            CompositionLocalProvider(LocalClipboard provides clipboard) {
-                id.walt.walletdemo.compose.ui.screens.WalletScanScreen(onBack = {},
-                    onOpen = { _, _ -> opened = true }, initialInput = "Original")
-            }
+            // Keep TextField's platform clipboard-availability probes outside the paste-button fixture.
+            id.walt.walletdemo.compose.ui.screens.WalletScanScreen(onBack = {},
+                onOpen = { _, _ -> opened = true }, initialInput = "Original", clipboard = clipboard)
         }
-        onNodeWithText("Paste link").performClick().assertIsNotEnabled()
+        assertEquals(0, reads, "Clipboard access starts with the user's paste gesture")
+        onNodeWithText("Paste link").performClick()
+        waitUntil(timeoutMillis = 5_000) { reads > 0 }
+        assertEquals(1, reads, "A pending paste must start only one clipboard read")
+        onNodeWithText("Paste link").assertIsNotEnabled()
         onNodeWithTag(WalletUiTestTags.ScanInput).performTextReplacement("Edited while waiting")
         gate.complete(plainTextClipEntry(url))
         waitUntil { !onNodeWithText("Paste link").fetchSemanticsNode().config.contains(SemanticsProperties.Disabled) }
