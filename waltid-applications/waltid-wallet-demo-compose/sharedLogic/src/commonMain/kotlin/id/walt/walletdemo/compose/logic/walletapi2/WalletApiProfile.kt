@@ -85,6 +85,11 @@ internal fun selectWalletId(available: List<String>, remembered: String?): Strin
     remembered?.takeIf { it in available } ?: available.firstOrNull()
 
 /** The wallet that started an authorization-code issuance, when it is still available. */
+internal fun sessionMatchesDeployedProfile(savedProfile: String?, deployed: WalletApiKind): Boolean {
+    if (savedProfile.isNullOrBlank()) return deployed == WalletApiKind.OpenSource
+    return parseWalletApiKind(savedProfile) == deployed
+}
+
 internal fun walletForAuthorizationCallback(
     currentWalletId: String,
     availableWalletIds: List<String>,

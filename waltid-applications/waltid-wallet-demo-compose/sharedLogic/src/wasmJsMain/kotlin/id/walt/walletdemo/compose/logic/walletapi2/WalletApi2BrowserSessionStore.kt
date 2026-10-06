@@ -12,6 +12,7 @@ private const val WalletIdKey = "waltid.wallet2.walletId"
 private const val EmailKey = "waltid.wallet2.email"
 private const val BaseUrlKey = "waltid.wallet2.baseUrl"
 private const val TargetsKey = "waltid.wallet2.walletTargets"
+private const val ApiKindKey = "waltid.wallet2.apiKind"
 private const val WalletIdCookie = "waltid_wallet_id"
 private const val PendingIssuanceKey = "waltid.wallet2.pendingIssuance"
 
@@ -22,8 +23,15 @@ object WalletApi2BrowserSessionStore {
             ?: readCookie(WalletIdCookie)
             ?: return null
         val email = localStorage.getItem(EmailKey).orEmpty()
+        val deployedKind = walletApiKind()
+        val savedProfile = localStorage.getItem(ApiKindKey)
+        if (!sessionMatchesDeployedProfile(savedProfile, deployedKind)) {
+            clearAuth()
+            return null
+        }
+        if (savedProfile.isNullOrBlank()) localStorage.setItem(ApiKindKey, deployedKind.name)
         return WalletApi2Session(
-            kind = walletApiKind(),
+            kind = deployedKind,
             baseUrl = walletApi2BaseUrl(),
             token = token,
             walletId = walletId,
@@ -36,6 +44,7 @@ object WalletApi2BrowserSessionStore {
         localStorage.setItem(TokenKey, session.token)
         localStorage.setItem(WalletIdKey, session.walletId)
         localStorage.setItem(EmailKey, session.email)
+        localStorage.setItem(ApiKindKey, session.kind.name)
         localStorage.setItem(TargetsKey, walletApi2Json.encodeToString(session.walletTargets))
         writeCookie(WalletIdCookie, session.walletId)
     }
@@ -91,6 +100,7 @@ object WalletApi2BrowserSessionStore {
     fun clearAuth() {
         localStorage.removeItem(TokenKey)
         localStorage.removeItem(EmailKey)
+        localStorage.removeItem(ApiKindKey)
         clearPendingIssuance()
     }
 

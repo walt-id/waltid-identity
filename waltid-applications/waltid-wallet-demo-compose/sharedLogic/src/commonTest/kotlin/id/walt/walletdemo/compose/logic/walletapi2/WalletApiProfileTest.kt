@@ -124,6 +124,16 @@ class WalletApiProfileTest {
     }
 
     @Test
+    fun savedSessionRequiresTheDeployedApiProfile() {
+        assertTrue(sessionMatchesDeployedProfile(null, WalletApiKind.OpenSource))
+        assertFalse(sessionMatchesDeployedProfile(null, WalletApiKind.Enterprise))
+        assertTrue(sessionMatchesDeployedProfile("OpenSource", WalletApiKind.OpenSource))
+        assertFalse(sessionMatchesDeployedProfile("OpenSource", WalletApiKind.Enterprise))
+        assertTrue(sessionMatchesDeployedProfile("Enterprise", WalletApiKind.Enterprise))
+        assertFalse(sessionMatchesDeployedProfile("enterprise", WalletApiKind.OpenSource))
+    }
+
+    @Test
     fun holderPairsMatchTheDidThatPublishesTheKey() {
         val first = publicJwk("x1")
         val second = publicJwk("x2")

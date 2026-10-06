@@ -362,6 +362,7 @@ class WalletApi2IssuanceOwnershipTest {
             assertTrue(identity.publicJwk.contains("x1"))
             val session = wallet.startIssuance("openid-credential-offer://offer", "https://wallet.example/callback", identity.did)
             assertEquals(2, session.preview.batchSize)
+            assertEquals(2, session.preview.holderKeyBudget)
             assertFailsWith<IllegalArgumentException> { wallet.continuePreAuthorizedIssuance(session.id, null, copies(3)) }
             assertIs<WalletDemoIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(session.id, null, copies(2)))
             val bindings = receiveBodies.single()["credentials"]!!.jsonArray.single().jsonObject["holderBindings"]!!.jsonArray

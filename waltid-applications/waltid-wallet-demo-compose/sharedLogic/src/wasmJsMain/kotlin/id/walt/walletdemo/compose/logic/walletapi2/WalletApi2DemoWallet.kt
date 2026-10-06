@@ -95,7 +95,7 @@ internal class WalletApi2DemoWallet(
             redirectUri = redirectUri.ifBlank { this.redirectUri },
             did = did ?: this.did,
             grant = resolved.toDemoGrant(),
-            preview = resolved.toDemoPreview(issuanceBatchSize(batchOffer.batchSize)),
+            preview = issuancePreview(resolved, batchOffer.batchSize),
             credentialIssuer = resolved.credentialIssuer,
             credentialEndpoint = resolved.credentialEndpoint,
             nonceEndpoint = resolved.nonceEndpoint,
@@ -424,6 +424,16 @@ internal class WalletApi2DemoWallet(
             did = resolvedDid.did,
             publicJwk = publicJwkFromDidDocument(resolvedDid.document),
         )
+    }
+
+    private suspend fun issuancePreview(
+        resolved: ResolveOfferDetailedResponseDto,
+        offeredBatchSize: Int?,
+    ): WalletDemoOfferPreview {
+        val batchSize = issuanceBatchSize(offeredBatchSize)
+        val preview = resolved.toDemoPreview(batchSize)
+        if (kind.canGenerateIdentity) return preview
+        return preview.copy(holderKeyBudget = holderPairs.size)
     }
 
     private suspend fun issuanceBatchSize(offered: Int?): Int? {
