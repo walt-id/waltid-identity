@@ -88,7 +88,7 @@ internal fun SettingsScreen(
             predictivePopTransitionSpec = if (reduceMotion) ({ _ -> walletNavigationMotion(false, true, rtl) }) else predictivePop,
         ) { destination ->
             NavEntry(destination) {
-                Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+                Column(Modifier.fillMaxSize().walletNavigationBackground().safeDrawingPadding()) {
                     WalletScreenHeader(stringResource(destination.title), leading = {
                         IconButton(back, Modifier.testTag(WalletUiTestTags.SettingsBack)) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.settings_back))

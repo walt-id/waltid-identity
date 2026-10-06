@@ -13,12 +13,14 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import id.walt.walletdemo.compose.ui.components.LocalWalletNavigationBackground
 
 /** Request state belongs above this host, so changing presentation cannot discard consent choices. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,7 +69,11 @@ internal fun WalletReviewHost(
                     ),
                 ) {
                     // The sheet owns a separate window; export semantics in that window too.
-                    Box(Modifier.exportTestTagsForPlatformAutomation()) { content(false) }
+                    Box(Modifier.exportTestTagsForPlatformAutomation()) {
+                        CompositionLocalProvider(LocalWalletNavigationBackground provides MaterialTheme.colorScheme.surfaceContainer) {
+                            content(false)
+                        }
+                    }
                 }
             }
         }
