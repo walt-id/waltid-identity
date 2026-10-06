@@ -17,7 +17,7 @@ dependencies {
 
     // Testing
     implementation(kotlin("test"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    implementation(identityLibs.kotlinx.coroutines.service.test)
     implementation(identityLibs.ktor.client.java)
     implementation(identityLibs.ktor.client.content.negotiation)
     implementation(identityLibs.ktor.serialization.kotlinx.json)
@@ -34,7 +34,7 @@ configurations {
 }
 
 // Package the test classes in a jar
-val testJar by tasks.register<Jar>(Jar::class.toString()) {
+val testJar = tasks.register<Jar>(Jar::class.toString()) {
     archiveClassifier.set("test")
     from(sourceSets["test"].output)
 }

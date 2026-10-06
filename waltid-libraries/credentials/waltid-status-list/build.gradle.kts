@@ -12,7 +12,7 @@ kotlin {
     }
 
     sourceSets {
-        val korlibsMain by creating {
+        val korlibsMain = create("korlibsMain") {
             dependsOn(commonMain.get())
             dependencies {
                 implementation(identityLibs.korlibs.io)

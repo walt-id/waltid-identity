@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
-
 package id.walt.androidSample.app.features.walkthrough
 
 import android.content.Intent
@@ -12,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -58,14 +55,16 @@ fun StepOneScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
+    val secureLockScreenNotEnabled = stringResource(R.string.secure_lock_screen_not_enabled)
+    val enableNow = stringResource(R.string.label_enable_now)
 
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
             WalkthroughEvent.Biometrics.SecureLockScreenNotEnabled -> {
                 scope.launch {
                     val snackbarResult = snackbarHostState.showSnackbar(
-                        message = ctx.getString(R.string.secure_lock_screen_not_enabled),
-                        actionLabel = ctx.getString(R.string.label_enable_now),
+                        message = secureLockScreenNotEnabled,
+                        actionLabel = enableNow,
                         withDismissAction = false,
                         duration = SnackbarDuration.Short
                     )
