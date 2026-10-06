@@ -69,7 +69,7 @@ private enum WalletStatusText {
     static let invalidOfferURL = "invalid offer URL"
     static let invalidRequestURL = "invalid request URL"
     static let selectCredentialForEveryRequest = "select a credential for every requested credential"
-    static let pinMustContain4To8Digits = "PIN must contain 4 to 8 digits"
+    static let pinMustContain4Digits = "PIN must contain four digits"
     static let pinConfirmationDoesNotMatch = "PIN confirmation does not match"
     static let wrongPin = "Wrong PIN"
     static let enableBiometricUnlock = "Enable biometric unlock"
@@ -1572,7 +1572,7 @@ class WalletViewModel: ObservableObject {
 
     private func submitSetupPin() {
         guard Self.isValidPin(pin) else {
-            pinError = WalletStatusText.pinMustContain4To8Digits
+            pinError = WalletStatusText.pinMustContain4Digits
             return
         }
         guard pin == pinConfirmation else {
@@ -1600,7 +1600,7 @@ class WalletViewModel: ObservableObject {
 
     private func submitLoginPin() {
         guard Self.isValidPin(pin) else {
-            pinError = WalletStatusText.pinMustContain4To8Digits
+            pinError = WalletStatusText.pinMustContain4Digits
             return
         }
         isAuthenticating = true
@@ -1622,8 +1622,10 @@ class WalletViewModel: ObservableObject {
     }
 
     private static func isValidPin(_ pin: String) -> Bool {
-        pin.range(of: #"^\d{4,8}$"#, options: .regularExpression) != nil
+        pin.utf8.count == pinLength && pin.utf8.allSatisfy { (48...57).contains($0) }
     }
+
+    static let pinLength = 4
 
     private func bootstrap(signingProtection: WalletDemoSigningProtection) {
         setLoading(WalletStatusText.bootstrappingWallet)

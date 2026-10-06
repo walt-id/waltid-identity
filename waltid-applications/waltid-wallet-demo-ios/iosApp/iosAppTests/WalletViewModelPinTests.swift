@@ -5,6 +5,26 @@ import XCTest
 
 @MainActor
 final class WalletViewModelPinTests: XCTestCase {
+    func testSetupRejectsPinsOutsideFourAsciiDigits() {
+        for pin in ["123", "12345", "123456", "12a4", "١٢٣٤", "１２３４", "1234\n"] {
+            let store = InMemoryDemoPinStore()
+            let model = WalletViewModel(
+                walletID: "pin-invalid-\(UUID().uuidString)",
+                walletClient: MockWalletClient(),
+                identityDocumentRegistrationUpdate: {},
+                pinStore: store
+            )
+            model.pin = pin
+            model.pinConfirmation = pin
+            model.submitPin()
+
+            XCTAssertEqual(model.auth, .setup)
+            XCTAssertEqual(model.pinError, "PIN must contain four digits")
+            XCTAssertFalse(store.hasPin)
+            XCTAssertFalse(model.isReady)
+        }
+    }
+
     func testSetupPinUnlocksAndBootstrapsWallet() async throws {
         let pinStore = InMemoryDemoPinStore()
         let viewModel = WalletViewModel(
@@ -164,6 +184,7 @@ final class WalletViewModelPinTests: XCTestCase {
         let viewModel = WalletViewModel(
             walletID: "pin-lock-no-auto-\(UUID().uuidString)",
             walletClient: walletClient,
+            identityDocumentRegistrationUpdate: {},
             pinStore: pinStore,
             biometricAuthenticator: biometrics
         )

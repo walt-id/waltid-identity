@@ -1590,7 +1590,7 @@ class WalletDemoController(
     private fun submitSetupPin(auth: WalletAuthState.Setup) {
         val pin = auth.pin
         if (!isValidPin(pin)) {
-            setSetupPinError(WalletDisplayText.PinMustContain4To8Digits)
+            setSetupPinError(WalletDisplayText.PinMustContain4Digits)
             return
         }
 
@@ -1626,7 +1626,7 @@ class WalletDemoController(
     private fun submitLoginPin(auth: WalletAuthState.Login) {
         val pin = auth.pin
         if (!isValidPin(pin)) {
-            setLoginPinError(WalletDisplayText.PinMustContain4To8Digits)
+            setLoginPinError(WalletDisplayText.PinMustContain4Digits)
             return
         }
 
@@ -1957,10 +1957,10 @@ class WalletDemoController(
             }
         }
 
-    private companion object {
-        val pinPattern = Regex("\\d{4,8}")
-        val SuccessBannerAutoHide = 4.seconds
+    companion object {
+        const val PinLength = 4
+        private val SuccessBannerAutoHide = 4.seconds
 
-        fun isValidPin(pin: String): Boolean = pin.matches(pinPattern)
+        private fun isValidPin(pin: String): Boolean = pin.length == PinLength && pin.all { it in '0'..'9' }
     }
 }

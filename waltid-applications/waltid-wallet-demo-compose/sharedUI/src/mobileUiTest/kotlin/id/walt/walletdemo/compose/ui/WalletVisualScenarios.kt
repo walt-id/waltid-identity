@@ -58,8 +58,8 @@ internal class WalletVisualScenarios(
         val controller = id.walt.walletdemo.compose.logic.WalletDemoController(
             WalletUiTestWallet(), id.walt.walletdemo.compose.logic.InMemoryDemoPinStore(), biometrics)
         if (state != "setup") {
-            controller.updatePin("123456")
-            controller.updatePinConfirmation(if (state == "mismatch") "654321" else "123456")
+            controller.updatePin("1234")
+            controller.updatePinConfirmation(if (state == "mismatch") "4321" else "1234")
         }
         if (state == "mismatch") controller.submitPin()
         if (state == "biometrics_enabled") {

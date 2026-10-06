@@ -18,8 +18,10 @@ struct WalletDemoApp: App {
             let delayMilliseconds = UInt64(env["E2E_MOCK_WALLET_DELAY_MS"] ?? "") ?? 0
             #if DEBUG
             let imageCredential = Self.mockImageCredential(environment: env)
+            let registrationUpdate: (@Sendable () async throws -> Void)? = {}
             #else
             let imageCredential: (dataJSON: String, portraitValueJSON: String)? = nil
+            let registrationUpdate: (@Sendable () async throws -> Void)? = nil
             #endif
             return WalletViewModel(
                 walletID: walletID,
@@ -33,7 +35,8 @@ struct WalletDemoApp: App {
                     mdocMetadata: env["E2E_MOCK_MDOC_METADATA"] == "1",
                     sampleCredentialDataJSON: imageCredential?.dataJSON,
                     samplePortraitDisclosureValueJSON: imageCredential?.portraitValueJSON
-                )
+                ),
+                identityDocumentRegistrationUpdate: registrationUpdate
             )
         }
         let baseUrl = env["ATTESTATION_BASE_URL"] ?? defaults.string(forKey: "ATTESTATION_BASE_URL") ?? DemoBackendDefaults.attestationBaseURL

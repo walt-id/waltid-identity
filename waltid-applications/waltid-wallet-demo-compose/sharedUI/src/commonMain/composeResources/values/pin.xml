@@ -1,6 +1,6 @@
 <resources>
     <string name="pin_create">Create a PIN</string>
-    <string name="pin_create_help">Choose six digits and enter them again to confirm.</string>
+    <string name="pin_create_help">Choose four digits and enter them again to confirm.</string>
     <string name="pin_create_action">Create PIN</string>
     <string name="pin_enter">Enter your PIN</string>
     <string name="pin_enter_help">Enter your PIN to unlock this wallet.</string>

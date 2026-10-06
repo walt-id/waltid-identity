@@ -293,15 +293,18 @@ class WalletDemoControllerTest {
 
     @Test
     fun setupPinRejectsInvalidLengthAndNonDigits() = runTest {
-        val controller = controllerWith(FakeDemoWallet(), this)
+        for (pin in listOf("123", "12345", "123456", "12a4", "١٢٣٤", "１２３４", "1234\n")) {
+            val store = InMemoryDemoPinStore()
+            val controller = controllerWith(FakeDemoWallet(), this, store)
+            controller.updatePin(pin)
+            controller.updatePinConfirmation(pin)
+            controller.submitPin()
 
-        controller.updatePin("12a4")
-        controller.updatePinConfirmation("12a4")
-        controller.submitPin()
-
-        val auth = controller.state.value.auth as WalletAuthState.Setup
-        assertEquals("PIN must contain 4 to 8 digits", auth.error)
-        assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
+            val auth = controller.state.value.auth as WalletAuthState.Setup
+            assertEquals("PIN must contain four digits", auth.error)
+            assertFalse(store.hasPin())
+            assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
+        }
     }
 
     @Test

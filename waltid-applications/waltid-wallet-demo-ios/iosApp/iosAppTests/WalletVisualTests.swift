@@ -16,8 +16,8 @@ final class WalletVisualTests: XCTestCase {
         let model = makeModel(biometricsAvailable: state == "biometrics_enabled")
         await model.readerTrustSettings.awaitPendingOperations()
         if state != "setup" {
-            model.pin = "123456"
-            model.pinConfirmation = state == "mismatch" ? "654321" : "123456"
+            model.pin = "1234"
+            model.pinConfirmation = state == "mismatch" ? "4321" : "1234"
         }
         if state == "mismatch" { model.submitPin() }
         if state == "biometrics_enabled" { model.useBiometrics = true }
