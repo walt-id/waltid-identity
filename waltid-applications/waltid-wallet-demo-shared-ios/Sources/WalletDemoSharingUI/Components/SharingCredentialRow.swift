@@ -96,9 +96,9 @@ private struct SharingClaimsSheet: View {
                 }
             }
             .walletDetailDestination(isPresented: $allInformationOpen) {
-                WalletDetailPage(String(localized: "All credential information", bundle: .module), onDismiss: onDismiss) {
+                WalletDetailPage(String(localized: "All credential information", bundle: .module)) {
                     Text("Includes information outside this request.", bundle: .module).font(.body)
-                    CredentialInformationContent(details: details, onDismiss: onDismiss)
+                    CredentialInformationContent(details: details)
                 }
                 .accessibilityIdentifier("review-all-information-details")
             }

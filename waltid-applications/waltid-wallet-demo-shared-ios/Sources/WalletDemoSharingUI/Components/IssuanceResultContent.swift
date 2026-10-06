@@ -72,7 +72,7 @@ private struct SavedCredentialRow: View {
         }.buttonStyle(.plain).accessibilityIdentifier("issuance-saved-\(credential.id)")
         .sheet(isPresented: $detailsOpen) {
             WalletDetailSheet(String(localized: "Credential information", bundle: .module), onDismiss: { detailsOpen = false }) {
-                CredentialInformationContent(details: CredentialDisplayNormalizer.details(for: credential), onDismiss: { detailsOpen = false })
+                CredentialInformationContent(details: CredentialDisplayNormalizer.details(for: credential))
             }
         }
     }
