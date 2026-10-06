@@ -1,13 +1,11 @@
 package id.walt.walletdemo.compose.ui
 
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 internal expect object SyntheticCredentialImageFiles {
     fun read(name: String): ByteArray
 }
 
-@OptIn(ExperimentalEncodingApi::class)
 internal object SyntheticCredentialImageFixtures {
     val portraitBytes: ByteArray by lazy { read("synthetic-portrait.jpg") }
     val portraitDataUrl: String by lazy { dataUrl("image/jpeg", portraitBytes) }

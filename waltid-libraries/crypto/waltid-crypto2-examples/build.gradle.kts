@@ -193,7 +193,7 @@ kotlin {
             implementation(identityLibs.junit.jupiter.api)
         }
 
-        val didCoseMain by creating {
+        val didCoseMain = create("didCoseMain") {
             dependsOn(commonMain.get())
             dependencies {
                 implementation(project(":waltid-libraries:crypto:waltid-cose"))
@@ -202,7 +202,7 @@ kotlin {
         }
         jvmMain.get().dependsOn(didCoseMain)
 
-        val opensslMain by creating {
+        val opensslMain = create("opensslMain") {
             dependsOn(nativeMain.get())
         }
         linuxMain.get().dependsOn(opensslMain)
@@ -210,7 +210,7 @@ kotlin {
     }
 }
 
-val provisionSoftHsmExample by tasks.registering(ProvisionSoftHsmExampleTask::class) {
+val provisionSoftHsmExample = tasks.register<ProvisionSoftHsmExampleTask>("provisionSoftHsmExample") {
     group = "application"
     description = "Initializes the disposable SoftHSM token used by the PKCS11 example"
     softHsmExecutable?.let { executablePath.set(it.absolutePath) }

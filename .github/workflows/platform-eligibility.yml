@@ -103,6 +103,8 @@ jobs:
             local pattern
 
             while IFS= read -r pattern; do
+              # Match configured globs, rather than literal pattern text.
+              # shellcheck disable=SC2053
               if [[ "$path" == $pattern ]]; then
                 return 0
               fi
@@ -167,12 +169,11 @@ jobs:
                 exit 0
               fi
 
+              changed_file_list="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename')"
               changed_files=()
               while IFS= read -r changed_file; do
                 changed_files+=("$changed_file")
-              done < <(
-                gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename'
-              )
+              done <<< "$changed_file_list"
 
               for file in "${changed_files[@]}"; do
                 if is_relevant_path "$file"; then

@@ -40,7 +40,7 @@ kotlin {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }
-        val jvmAndroidMain by getting {
+        val jvmAndroidMain = getByName("jvmAndroidMain") {
             dependencies {
                 implementation(identityLibs.tink)
                 implementation(identityLibs.bouncycastle.prov)
@@ -51,7 +51,7 @@ kotlin {
             }
         }
         if (enableAndroidBuild || enableIosBuild) {
-            val mobileMain by creating {
+            val mobileMain = create("mobileMain") {
                 dependsOn(commonMain.get())
                 dependencies {
                     implementation(identityLibs.signum.indispensable)

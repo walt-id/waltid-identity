@@ -80,11 +80,11 @@ configure<JibExtension> {
 
 // Required for hoplite to run correctly with buildFatJar task
 tasks.withType<ShadowJar> {
-    // Keep service descriptor merging, but exclude all other duplicate paths to
-    // avoid building shadow jars with duplicate entries and the associated log flood.
+    // Let the service and Kotlin metadata transformers see every matching entry;
+    // exclude duplicate paths that have no transformer.
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     mergeServiceFiles()
-    filesMatching("META-INF/services/**") {
+    filesMatching(listOf("META-INF/services/**", "META-INF/*.kotlin_module")) {
         duplicatesStrategy = DuplicatesStrategy.INCLUDE
     }
 }

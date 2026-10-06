@@ -13,6 +13,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.Crypto2DidJwkRegistrar
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
+import id.walt.issuer2.issuer2Module
 import id.walt.issuer2.repository.IssuanceSessionStorageCodec
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.models.CredentialOfferCreateResponse
@@ -28,8 +29,10 @@ import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
 import id.walt.issuer2.testsupport.createCredentialOffer
 import id.walt.issuer2.testsupport.createIssuer2ClientAttestationTestMaterial
 import id.walt.issuer2.testsupport.credentialRequest
+import id.walt.issuer2.testsupport.installIssuer2AuthenticationForTests
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.issuer2.testsupport.issuer2TestJson
+import id.walt.issuer2.testsupport.loadIssuer2ConfigFiles
 import id.walt.issuer2.testsupport.resolveOffer
 import id.walt.ktornotifications.SseNotifier
 import id.walt.ktornotifications.core.KtorSessionUpdate
@@ -43,6 +46,9 @@ import id.waltid.openid4vci.wallet.proof.ProofKeyBinding
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.engine.cio.CIO as ClientCIO
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
+import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.forms.FormDataContent
@@ -60,9 +66,15 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.http.contentType
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.install
+import io.ktor.server.cio.CIO as ServerCIO
+import io.ktor.server.engine.embeddedServer
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 import io.ktor.server.testing.testApplication
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readUTF8Line
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -651,9 +663,7 @@ class IssuanceNotificationRouteTest {
     }
 
     @Test
-    fun sseRouteStreamsEnterpriseNotificationEnvelope() = testApplication {
-        installIssuer2WithConfigFiles()
-        val client = apiClient()
+    fun sseRouteStreamsEnterpriseNotificationEnvelope() = withIssuer2HttpServer { client ->
         val createdOffer = client.createCredentialOffer(Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE)
 
         var resolvedOfferCredentialIssuer: String? = null
@@ -676,9 +686,7 @@ class IssuanceNotificationRouteTest {
     }
 
     @Test
-    fun sseCredentialSuccessRetainsSingleOfferShapeWithSharedBatchStatus() = testApplication {
-        installIssuer2WithConfigFiles()
-        val client = apiClient()
+    fun sseCredentialSuccessRetainsSingleOfferShapeWithSharedBatchStatus() = withIssuer2HttpServer { client ->
         val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS
         val createdOffer = client.createCredentialOffer(example)
         val wallet = Issuer2WalletFlowDriver(client)
@@ -776,6 +784,33 @@ class IssuanceNotificationRouteTest {
         require(parts.size == 3)
         val replacement = if (parts[2].first() == 'A') 'B' else 'A'
         return "${parts[0]}.${parts[1]}.$replacement${parts[2].drop(1)}"
+    }
+
+    // Ktor 3.6's test engine waits for the WriteChannelContent writer to finish.
+    // SSE never finishes until cancelled, so exercise streaming over a real socket.
+    private fun withIssuer2HttpServer(block: suspend (HttpClient) -> Unit) = runBlocking {
+        val server = embeddedServer(ServerCIO, host = "127.0.0.1", port = 0, module = {}).start(wait = false)
+        try {
+            val baseUrl = "http://127.0.0.1:${server.engine.resolvedConnectors().single().port}"
+            loadIssuer2ConfigFiles(baseUrl)
+            server.application.apply {
+                install(ServerContentNegotiation) { json(issuer2TestJson) }
+                installIssuer2AuthenticationForTests()
+                issuer2Module(withPlugins = true)
+            }
+            val client = HttpClient(ClientCIO) {
+                followRedirects = false
+                defaultRequest { url(baseUrl) }
+                install(ClientContentNegotiation) { json(issuer2TestJson) }
+            }
+            try {
+                block(client)
+            } finally {
+                client.close()
+            }
+        } finally {
+            server.stop(gracePeriodMillis = 0, timeoutMillis = 5_000)
+        }
     }
 
     private suspend fun HttpClient.readFirstSseUpdate(

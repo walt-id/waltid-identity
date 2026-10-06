@@ -6,6 +6,7 @@ import dev.whyoleg.cryptography.CryptographyProviderApi
 import dev.whyoleg.cryptography.algorithms.PBKDF2
 import dev.whyoleg.cryptography.algorithms.SHA256
 import dev.whyoleg.cryptography.random.CryptographyRandom
+import okio.ByteString.Companion.toByteString
 import kotlin.io.encoding.Base64
 
 @OptIn(CryptographyProviderApi::class)
@@ -59,7 +60,7 @@ internal class PersistentDemoPinStore(
             "Invalid PIN verifier record"
         }
 
-        return derive(pin, salt, iterations).constantTimeEquals(expected)
+        return derive(pin, salt, iterations).toByteString().equals(expected.toByteString(), constantTime = true)
     }
 
     private suspend fun derive(pin: String, salt: ByteArray, iterations: Int): ByteArray =
@@ -69,14 +70,6 @@ internal class PersistentDemoPinStore(
             outputSize = VERIFIER_SIZE_BYTES.bytes,
             salt = salt,
         ).deriveSecretToByteArray(pin.encodeToByteArray())
-
-    private fun ByteArray.constantTimeEquals(other: ByteArray): Boolean {
-        var difference = size xor other.size
-        for (index in indices) {
-            difference = difference or (this[index].toInt() xor other[index].toInt())
-        }
-        return difference == 0
-    }
 
     private companion object {
         const val RECORD_VERSION = "1"

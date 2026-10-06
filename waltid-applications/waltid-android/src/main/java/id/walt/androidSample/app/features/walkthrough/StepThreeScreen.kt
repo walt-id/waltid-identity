@@ -15,7 +15,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -51,7 +50,6 @@ import id.walt.androidSample.utils.ObserveAsEvents
 import kotlinx.coroutines.launch
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StepThreeScreen(
     viewModel: WalkthroughViewModel,
@@ -64,6 +62,7 @@ fun StepThreeScreen(
     val generatedDID by viewModel.did.collectAsStateWithLifecycle()
 
     val ctx = LocalContext.current
+    val enrollNow = stringResource(R.string.label_enroll_now)
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val biometricManager = remember { BiometricManager.from(ctx) }
@@ -74,7 +73,7 @@ fun StepThreeScreen(
                 scope.launch {
                     val snackbarResult = snackbarHostState.showSnackbar(
                         message = event.msg,
-                        actionLabel = ctx.getString(R.string.label_enroll_now),
+                        actionLabel = enrollNow,
                         withDismissAction = false,
                         duration = SnackbarDuration.Short
                     )

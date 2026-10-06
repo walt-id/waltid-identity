@@ -31,7 +31,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.encodeToByteArray
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -603,15 +602,12 @@ private fun String.trustCertificateDer(): CertificateDer = CertificateDer(decode
     X509CertificateUtil.parseCertificateDerEncoded(it.bytes)
 }
 
-@OptIn(ExperimentalEncodingApi::class)
 private fun String.decodeTrustBase64Url(): ByteArray =
     Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).decode(this)
 
-@OptIn(ExperimentalEncodingApi::class)
 private fun ByteArray.encodeTrustBase64Url(): String =
     Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(this)
 
-@OptIn(ExperimentalEncodingApi::class)
 private fun String.isTrustBase64Url(): Boolean =
     isNotBlank() && !contains('=') && runCatching { decodeTrustBase64Url().isNotEmpty() }.getOrDefault(false)
 

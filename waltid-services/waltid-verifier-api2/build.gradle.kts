@@ -1,9 +1,5 @@
 import io.ktor.plugin.features.*
 
-object Versions {
-    const val HOPLITE_VERSION = "2.9.0"
-}
-
 plugins {
     id("waltid.ktorbackend")   // Handles Kotlin, App config, Start scripts, Version props
     id("waltid.ktordocker")    // Handles Jib, Docker credentials, Platforms
@@ -57,8 +53,8 @@ dependencies {
     /* -- Misc --*/
 
     // Config
-    implementation("com.sksamuel.hoplite:hoplite-core:${Versions.HOPLITE_VERSION}")
-    implementation("com.sksamuel.hoplite:hoplite-hocon:${Versions.HOPLITE_VERSION}")
+    implementation(identityLibs.hoplite.core)
+    implementation(identityLibs.hoplite.hocon)
 
     // Logging
     implementation(identityLibs.oshai.kotlinlogging)

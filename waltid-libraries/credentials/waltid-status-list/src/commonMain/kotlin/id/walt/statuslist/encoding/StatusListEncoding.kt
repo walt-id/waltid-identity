@@ -1,7 +1,6 @@
 package id.walt.statuslist.encoding
 
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 private const val MULTIBASE_BASE64_URL_PREFIX = 'u'
 
@@ -11,7 +10,6 @@ enum class StatusListStringEncoding {
     MultibaseBase64Url,
 }
 
-@OptIn(ExperimentalEncodingApi::class)
 object StatusListEncoding {
     private val base64 = Base64.Default
     private val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
