@@ -5,11 +5,9 @@ plugins {
 group = "id.walt"
 
 dependencies {
-    val ktorVersion = "3.3.3"
-
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.10.2")
+    testImplementation(identityLibs.kotlinx.coroutines.service.test.jvm)
     testImplementation(identityLibs.ktor.server.test.host)
     testImplementation(identityLibs.ktor.client.java)
     testImplementation(identityLibs.ktor.client.content.negotiation)
@@ -17,7 +15,7 @@ dependencies {
 
 
     // Command line formatting
-    testImplementation("com.github.ajalt.mordant:mordant:3.0.2")
+    testImplementation(identityLibs.mordant)
 
     // Libraries to test
     testImplementation(project(":waltid-services:waltid-service-commons-test"))
@@ -25,8 +23,8 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-verifier-api"))
     testImplementation(project(":waltid-services:waltid-wallet-api"))
 
-    testImplementation("com.nimbusds:nimbus-jose-jwt:10.6")
-    implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
+    testImplementation(identityLibs.nimbus.e2e)
+    implementation(identityLibs.java.cose)
     testImplementation(identityLibs.bouncycastle.pkix)
 
     // Multiplatform / Hashes

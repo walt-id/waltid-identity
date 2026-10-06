@@ -40,8 +40,8 @@ kotlin {
             // CLI
             implementation(identityLibs.clikt.core)
             implementation(identityLibs.clikt.markdown)
-            implementation("com.github.ajalt.mordant:mordant:3.0.2")
-            implementation("com.github.ajalt.mordant:mordant-markdown:3.0.2")
+            implementation(identityLibs.mordant)
+            implementation(identityLibs.mordant.markdown)
 
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
@@ -51,7 +51,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.service.test)
         }
         jvmMain.dependencies {
             // Logging
@@ -62,7 +62,7 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation(identityLibs.kotlinx.serialization.json)
-            implementation("com.wolpl.clikt-testkit:clikt-testkit:3.1.1")
+            implementation(identityLibs.clikt.testkit)
 
             implementation(identityLibs.junit.jupiter.params)
 

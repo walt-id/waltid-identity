@@ -108,7 +108,11 @@ internal fun DemoReaderTrustSettings(controller: DemoReaderTrustSettingsControll
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReaderTrustImportReview(preview: ProximityReaderTrustImportPreview, onImport: () -> Unit, onCancel: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onCancel, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    val sheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+    )
+    ModalBottomSheet(onDismissRequest = onCancel, sheetState = sheetState) {
         Column(Modifier.exportTestTagsForPlatformAutomation().testTag(WalletUiTestTags.SettingsReaderTrustImportReview).fillMaxWidth().fillMaxHeight(.9f).padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(Res.string.reader_trust_review_reader_trust_import), style = MaterialTheme.typography.titleLarge)

@@ -18,6 +18,7 @@ import id.walt.x509.iso.IsoSharedTestHarnessValidResources
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.toHexString
 import kotlin.test.*
 
@@ -55,6 +56,10 @@ class IsoIaCaRootX509CertificateProfileTest {
                     issuerDn = "cn=Walt ID,C=Austria",
                     issuerEmailAddress = "office@walt.id",
                     issuerUri = "https://walt.id"
+                )
+                // Existing malformed DER names remain readable; new string names reject C=Austria.
+                subjectDnRaw = ByteString(
+                    "30243110300e06035504030c0757616c742049443110300e0603550406130741757374726961".hexToByteArray()
                 )
             }
             assertEquals("CN=Walt ID,C=Austria", cert.data.subjectDn)

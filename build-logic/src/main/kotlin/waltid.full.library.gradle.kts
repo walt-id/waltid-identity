@@ -1,7 +1,3 @@
-@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
-
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-
 plugins {
     id("waltid.multiplatform.library.common")
     id("love.forte.plugin.suspend-transform")
@@ -32,7 +28,7 @@ kotlin {
     }
 
     sourceSets {
-        val jvmAndroidMain by creating {
+        val jvmAndroidMain = create("jvmAndroidMain") {
             dependsOn(commonMain.get())
         }
         jvmMain.get().dependsOn(jvmAndroidMain)
@@ -40,7 +36,7 @@ kotlin {
             androidMain.get().dependsOn(jvmAndroidMain)
         }
 
-        val jvmAndroidTest by creating {
+        val jvmAndroidTest = create("jvmAndroidTest") {
             dependsOn(commonTest.get())
         }
         jvmTest.get().dependsOn(jvmAndroidTest)

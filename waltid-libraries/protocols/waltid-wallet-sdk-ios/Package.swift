@@ -17,7 +17,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.5.0"),
-        .package(url: "https://github.com/sqlcipher/SQLCipher.swift.git", exact: "4.16.0"),
+        .package(url: "https://github.com/sqlcipher/SQLCipher.swift.git", exact: "4.19.0"),
     ],
     targets: [
         .binaryTarget(

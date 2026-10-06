@@ -1,7 +1,3 @@
-@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
-
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-
 plugins {
     id("waltid.full.library")
     id("waltid.publish.maven")
@@ -42,7 +38,7 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
         }
 
-        val jvmBouncyMain by creating {
+        val jvmBouncyMain = create("jvmBouncyMain") {
             dependsOn(commonMain.get())
             dependencies {
                 implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
@@ -52,12 +48,12 @@ kotlin {
             }
         }
 
-        val jvmBouncyTest by creating {
+        val jvmBouncyTest = create("jvmBouncyTest") {
             dependsOn(commonTest.get())
         }
 
 
-        val signumMain by creating {
+        val signumMain = create("signumMain") {
             dependsOn(commonMain.get())
             dependencies {
                 implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
@@ -66,11 +62,11 @@ kotlin {
             }
         }
 
-        val jvmCommon by creating {
+        val jvmCommon = create("jvmCommon") {
             dependsOn(commonMain.get())
         }
 
-        val jvmIosMain by creating {
+        val jvmIosMain = create("jvmIosMain") {
             dependsOn(signumMain)
             dependencies {
                 implementation(identityLibs.signum.supreme)

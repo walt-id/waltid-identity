@@ -340,23 +340,39 @@ The Kotlin mobile SDK modules use explicit API mode. Public and protected
 declarations must name their visibility and public return types, which keeps the
 Android/KMP source API intentional before it reaches generated docs or Swift.
 
-Kotlin ABI validation is enabled for:
+The modules that configure Kotlin `abiValidation` own committed ABI baselines in
+`api/`. This includes mdoc proximity, crypto2 and its provider/interop modules,
+JOSE, wallet-mobile, persistence-mobile, recovery and enterprise custody. Gradle's
+unqualified `checkKotlinAbi` task selects every configured module, so new ABI-enabled
+modules join the contract checks without adding another task to the workflow.
 
-- `waltid-openid4vc-wallet-mobile`
-- `waltid-openid4vc-wallet-persistence-mobile`
-
-The Kotlin Gradle plugin writes the tracked KMP/native ABI baselines under each
-module's `api/` directory. Check them with:
-
-```bash
-./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:checkKotlinAbi :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:checkKotlinAbi -PenableAndroidBuild=true -PenableIosBuild=true
-```
-
-When the public KMP surface intentionally changes, regenerate the baselines:
+Check the complete Android and native contracts from the Identity root on macOS
+with the Android SDK and Xcode installed:
 
 ```bash
-./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:updateKotlinAbi :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:updateKotlinAbi -PenableAndroidBuild=true -PenableIosBuild=true
+./gradlew checkKotlinAbi -PenableAndroidBuild=true -PenableIosBuild=true
 ```
+
+Ordinary `check`/`build` tasks also run ABI validation for the modules and targets
+enabled in that build. The macOS SDK contract job enables Android and both iOS
+targets. Its path filters select the job for ABI files and mobile SDK source
+changes; pushes to main also run the job.
+
+Checks generate current dumps in `build/` and compare them with the committed
+references. A difference fails the check. Intentional source API changes and
+compiler or code-generator changes require review and an explicit reference update:
+
+```bash
+./gradlew updateKotlinAbi -PenableAndroidBuild=true -PenableIosBuild=true
+```
+
+Review the generated diff and rerun `checkKotlinAbi` before committing the updated
+references. Enable both platforms when updating: a build with a platform disabled
+cannot regenerate that platform's API. The optional-iOS helper prevents updates
+with iOS disabled and uses a temporary non-iOS projection for checks; it keeps the
+canonical committed baseline intact. CI generates API documentation and performs
+contract comparisons, but does not automatically accept or commit changed ABI
+references.
 
 If those ABI baselines change, reviewers also need evidence that the Swift
 facade was considered. This can be a Swift source/test/docs update, or an entry
