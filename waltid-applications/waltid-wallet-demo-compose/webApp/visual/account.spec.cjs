@@ -21,13 +21,13 @@ async function fillControl(page, locator, value, inputMode) {
   await expect(editor).toHaveValue(value);
 }
 
-async function waitForSettledImage(page) {
+async function waitForSettledImage(page, clip) {
   let previous;
   let unchangedSince;
   // CSS animation controls do not stop Compose's canvas animations. Two equal
   // frames can occur before the enabled-state color transition has finished.
   await expect.poll(async () => {
-    const pixels = await page.screenshot({ animations: 'disabled', caret: 'hide' });
+    const pixels = await page.screenshot({ animations: 'disabled', caret: 'hide', ...(clip ? { clip } : {}) });
     const current = createHash('sha256').update(pixels).digest('hex');
     const now = performance.now();
     if (current !== previous) {
@@ -36,6 +36,16 @@ async function waitForSettledImage(page) {
     }
     return now - unchangedSince >= 500;
   }, { timeout: 10000, intervals: [100] }).toBe(true);
+}
+
+async function submitEditedForm(page, locator) {
+  await page.keyboard.press('Tab');
+  // Filling the backing editor precedes Compose's rendered form/enabled state.
+  // Settle the action without waiting on a blinking canvas caret, then click once.
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  await waitForSettledImage(page, box);
+  await clickControl(page, locator);
 }
 
 for (const scenario of catalogue.states) {
@@ -72,11 +82,9 @@ for (const scenario of catalogue.states) {
         await expect(password).toBeVisible();
         await fillControl(page, email, 'wallet@example.test', 'email');
         await fillControl(page, password, 'synthetic-password', 'password');
-        // The browser's hidden input owns focus; the ARIA mirror is not document.activeElement.
-        await page.keyboard.press('Tab');
         const submit = scenario.state === 'registered'
           ? page.getByRole('button', { name: 'Create account', exact: true }) : signIn;
-        await clickControl(page, submit);
+        await submitEditedForm(page, submit);
         await expect.poll(() => pending?.method()).toBe('POST');
         expect(new URL(pending.url()).pathname).toBe(`/auth/${scenario.state === 'registered' ? 'register' : 'emailpass'}`);
         expect(pending.postDataJSON()).toEqual({ email: 'wallet@example.test', password: 'synthetic-password' });
@@ -130,16 +138,14 @@ test('immediate registration failure restores editable controls and retry', asyn
   await expect(email).toBeVisible();
   await fillControl(page, email, 'wallet@example.test', 'email');
   await fillControl(page, password, 'synthetic-password', 'password');
-  await page.keyboard.press('Tab');
-  await clickControl(page, register);
+  await submitEditedForm(page, register);
   await expect(page.getByText('An account with this email already exists. Sign in instead.', { exact: true })).toBeVisible();
 
   // Use actual canvas pointer/backing-editor input to prove recovery; the ARIA mirror's
   // enabled attribute does not establish that a Compose field accepts edits.
   await fillControl(page, email, 'retry@example.test', 'email');
   await fillControl(page, password, 'retry-password', 'password');
-  await page.keyboard.press('Tab');
-  await clickControl(page, register);
+  await submitEditedForm(page, register);
   await expect.poll(() => submitted).toEqual([
     { email: 'wallet@example.test', password: 'synthetic-password' },
     { email: 'retry@example.test', password: 'retry-password' },

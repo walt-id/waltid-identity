@@ -102,7 +102,7 @@ internal fun PinScreen(
                     keyboard?.show()
                 } else if (active) focus.clearFocus()
             }
-            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Column(Modifier.fillMaxWidth().walletNavigationBackground(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 Text(LocalWalletDemoBranding.current.appTitle, style = MaterialTheme.typography.headlineSmall)
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (setup != null) Text(stringResource(if (displayedConfirm) Res.string.pin_step_confirm else Res.string.pin_step_choose),
