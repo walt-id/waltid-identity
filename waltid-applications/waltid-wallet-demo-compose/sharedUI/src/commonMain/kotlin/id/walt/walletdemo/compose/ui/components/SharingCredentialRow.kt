@@ -106,10 +106,11 @@ private fun SharingClaimsDialog(
         SharingInformationPage.All -> ({ page = SharingInformationPage.Requested })
         SharingInformationPage.Technical -> ({ page = SharingInformationPage.All })
     }
-    WalletDetailSheet(title, onDismiss, onBack = back, pageKey = page.name,
+    WalletDetailSheet(title, onDismiss, onBack = back,
+        pagePath = SharingInformationPage.entries.take(page.ordinal + 1).map { it.name },
         modifier = Modifier.testTag(WalletUiTestTags.PresentationClaimsDialog),
         closeTag = WalletUiTestTags.PresentationClaimsClose) {
-        when (page) {
+        when (SharingInformationPage.valueOf(it)) {
             SharingInformationPage.Requested -> {
                 val summary = details.toCardDisplayData()
                 CredentialSummaryRow(summary.toCardArt())

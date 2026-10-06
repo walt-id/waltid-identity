@@ -18,10 +18,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import id.walt.walletdemo.compose.logic.CredentialCardDisplayData
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun CredentialCardStack(
@@ -34,18 +38,29 @@ internal fun CredentialCardStack(
     val othersVisibility = remember { Animatable(1f) }
     val selectedProgress = remember { Animatable(0f) }
     var displayedExpandedId by remember { mutableStateOf(expandedId) }
+    val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
 
-    LaunchedEffect(expandedId) {
-        if (expandedId != null) {
-            displayedExpandedId = expandedId
-            othersVisibility.animateTo(0f, tween(durationMillis = 220, easing = FastOutSlowInEasing))
-            selectedProgress.animateTo(1f, tween(durationMillis = 380, easing = FastOutSlowInEasing))
+    LaunchedEffect(expandedId, reduceMotion) {
+        if (expandedId != null) displayedExpandedId = expandedId
+        val expanded = expandedId != null
+        if (reduceMotion) {
+            othersVisibility.snapTo(if (expanded) 0f else 1f)
+            selectedProgress.snapTo(if (expanded) 1f else 0f)
         } else {
-            selectedProgress.animateTo(0f, tween(durationMillis = 380, easing = FastOutSlowInEasing))
-            othersVisibility.animateTo(1f, tween(durationMillis = 220, easing = FastOutSlowInEasing))
-            displayedExpandedId = null
+            // Cancellation reverses from the current values; no timer can reopen stale details.
+            coroutineScope {
+                launch { othersVisibility.animateTo(if (expanded) 0f else 1f, tween(220, easing = FastOutSlowInEasing)) }
+                launch { selectedProgress.animateTo(if (expanded) 1f else 0f, tween(220, easing = FastOutSlowInEasing)) }
+            }
         }
+        if (!expanded) displayedExpandedId = null
     }
+
+    // Reduced motion renders the destination directly, including its accessible children.
+    // It must not wait for a launched animation effect to hide the other credentials.
+    val selectedId = if (reduceMotion) expandedId else displayedExpandedId
+    val visibility = if (reduceMotion) if (expandedId == null) 1f else 0f else othersVisibility.value
+    val progress = if (reduceMotion) if (expandedId == null) 0f else 1f else selectedProgress.value
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val cardHeight = maxWidth / Id1AspectRatio
@@ -55,7 +70,7 @@ internal fun CredentialCardStack(
             cardHeight = cardHeight,
         )
         val restHeight = offsets.last() + cardHeight
-        val stackHeight = restHeight + ((cardHeight - restHeight) * selectedProgress.value)
+        val stackHeight = restHeight + ((cardHeight - restHeight) * progress)
 
         Box(
             modifier = Modifier
@@ -65,18 +80,20 @@ internal fun CredentialCardStack(
         ) {
             cards.forEachIndexed { index, item ->
                 val id = item.id
-                val isSelected = id == displayedExpandedId
+                val isSelected = id == selectedId
+                val interactive = isSelected || visibility >= .99f
                 val restOffset = offsets.getOrElse(index) { 0.dp }
-                val y = if (isSelected) restOffset * (1f - selectedProgress.value) else restOffset
+                val y = if (isSelected) restOffset * (1f - progress) else restOffset
                 Box(
                     modifier = Modifier
                         .offset(y = y)
                         .zIndex(if (isSelected) cards.size.toFloat() else index.toFloat())
-                        .alpha(if (isSelected) 1f else othersVisibility.value),
+                        .alpha(if (isSelected) 1f else visibility)
+                        .then(if (interactive) Modifier else Modifier.clearAndSetSemantics {}),
                 ) {
                     CredentialCardArt(
                         art = remember(item) { item.toCardArt() },
-                        modifier = Modifier.fillMaxWidth().clickable { onOpenDetails(id) },
+                        modifier = Modifier.fillMaxWidth().clickable(enabled = interactive) { onOpenDetails(id) },
                     )
                 }
             }

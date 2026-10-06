@@ -145,6 +145,7 @@ public struct CredentialCardButton: View {
 }
 
 public struct CredentialCardStackView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     public let cards: [CredentialCardItem]
     public let onOpenDetails: (String) -> Void
     public var expandedID: String? = nil
@@ -189,6 +190,7 @@ public struct CredentialCardStackView: View {
                 .opacity(isSelected || !othersHidden ? 1 : 0)
                 .zIndex(isSelected ? Double(cards.count) : Double(index))
                 .allowsHitTesting(isSelected || !othersHidden)
+                .accessibilityHidden(!isSelected && othersHidden)
             }
         }
         .frame(maxWidth: .infinity)
@@ -199,8 +201,8 @@ public struct CredentialCardStackView: View {
             }
         )
         .onPreferenceChange(CredentialCardStackWidthKey.self) { stackWidth = $0 }
-        .animation(.spring(response: 0.42, dampingFraction: 0.86), value: selectedAtTop)
-        .animation(.easeInOut(duration: 0.22), value: othersHidden)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: selectedAtTop)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: othersHidden)
     }
 
     private func displayedHeight(forWidth width: CGFloat) -> CGFloat {

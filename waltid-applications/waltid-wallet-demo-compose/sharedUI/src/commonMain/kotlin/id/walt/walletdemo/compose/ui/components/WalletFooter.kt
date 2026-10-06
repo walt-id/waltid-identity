@@ -17,6 +17,7 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.HazeColorEffect
 import dev.chrisbanes.haze.blur.hazeBlur
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 
 /** One control surface; only its own screen's content can contribute to the backdrop. */
 @Composable
@@ -36,7 +37,7 @@ internal fun WalletFooter(
             fallbackColorEffect(HazeColorEffect.tint(background))
         }
     }
-    val backdrop = if (hazeState == null) Modifier.background(background) else Modifier.hazeBlur(
+    val backdrop = if (hazeState == null || LocalWalletVisualPreferences.current.opaqueControls) Modifier.background(background) else Modifier.hazeBlur(
         input = HazeInput.Sources(hazeState, retention = HazeSourceRetention.ClearWhenUnavailable),
         style = style,
     )
