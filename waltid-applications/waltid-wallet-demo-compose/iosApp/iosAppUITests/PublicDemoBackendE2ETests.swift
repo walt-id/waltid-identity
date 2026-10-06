@@ -45,6 +45,57 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     private let presentationOperationTimeout: TimeInterval = 180
     private let verifierPollingTimeout: TimeInterval = 30
 
+    func testScannerModesKeepDraftAndActionsAboveTheKeyboard() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: isolatedWalletEnvironment())
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+        ui.tapButton(identifier: "wallet.scanButton", fallbackLabel: "Scan QR code")
+        let title = app.descendants(matching: .any)["wallet.screen.title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        XCTAssertEqual(title.label, "Scan QR code")
+        let preview = app.descendants(matching: .any)["wallet.scanPreview"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertGreaterThan(preview.frame.height, 100)
+        let cameraPermission = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch
+        if cameraPermission.waitForExistence(timeout: 5),
+           cameraPermission.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "camera")).firstMatch.exists {
+            let allow = cameraPermission.buttons["Allow"].exists
+                ? cameraPermission.buttons["Allow"] : cameraPermission.buttons["OK"]
+            XCTAssertTrue(allow.exists, "Camera permission prompt must have an approval action")
+            allow.tap()
+        }
+        XCTAssertFalse(app.buttons["wallet.scanContinue"].exists)
+        ui.tapButton(identifier: "wallet.scanMode", fallbackLabel: "Enter a link")
+        let input = ui.textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request")
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        ui.replaceText(in: input, value: "openid4vp://fixture", dismiss: false)
+        let action = app.buttons["wallet.scanContinue"]
+        let paste = app.buttons["wallet.scanPaste"]
+        XCTAssertTrue(action.isEnabled && action.isHittable, app.debugDescription)
+        XCTAssertTrue(paste.exists && paste.isHittable, app.debugDescription)
+        XCTAssertTrue(app.frame.contains(action.frame), app.debugDescription)
+        XCTAssertLessThanOrEqual(action.frame.maxY, app.keyboards.firstMatch.frame.minY + 1)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "scanner-manual-keyboard-clearance"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        app.buttons["wallet.scanMode"].tap()
+        XCTAssertEqual(title.label, "Scan QR code")
+        XCTAssertTrue(preview.waitForExistence(timeout: 5))
+        XCTAssertFalse(input.exists)
+        let keyboardHidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch)
+        XCTAssertEqual(XCTWaiter.wait(for: [keyboardHidden], timeout: 5), .completed)
+        ui.tapButton(identifier: "wallet.scanMode", fallbackLabel: "Enter a link")
+        XCTAssertTrue(ui.waitForTextInputValue(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request",
+            value: "openid4vp://fixture", timeout: 5))
+        ui.tapButton(identifier: "wallet.flowBack", fallbackLabel: "Close scanner")
+        XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
+    }
+
     /// Run explicitly on enrolled physical hardware with WALLET_SCA_OPERATOR=approve.
     func testScaPaymentWithNativeAuthorization() async throws {
         continueAfterFailure = false

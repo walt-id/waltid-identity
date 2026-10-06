@@ -16,6 +16,8 @@ internal class PersistentDemoPinStore(
     private val clearRecord: () -> Unit,
     private val readBiometricUnlock: () -> Boolean,
     private val writeBiometricUnlock: (Boolean) -> Unit,
+    private val readBiometricSetupPending: () -> Boolean,
+    private val writeBiometricSetupPending: (Boolean) -> Unit,
     private val provider: CryptographyProvider = CryptographyProvider.Default,
     private val randomSalt: () -> ByteArray = { CryptographyRandom.nextBytes(SALT_SIZE_BYTES) },
 ) : DemoPinStore {
@@ -28,6 +30,9 @@ internal class PersistentDemoPinStore(
     override fun setBiometricUnlockEnabled(enabled: Boolean) {
         writeBiometricUnlock(enabled)
     }
+
+    override fun isBiometricSetupPending(): Boolean = readBiometricSetupPending()
+    override fun setBiometricSetupPending(pending: Boolean) = writeBiometricSetupPending(pending)
 
     override suspend fun setPin(pin: String) {
         val salt = randomSalt()

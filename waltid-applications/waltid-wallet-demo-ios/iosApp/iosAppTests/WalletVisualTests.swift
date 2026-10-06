@@ -1,4 +1,5 @@
 import SnapshotTesting
+import CoreImage
 import SwiftUI
 import WalletDemoIdentityDocumentSupport
 import WalletSDK
@@ -67,7 +68,7 @@ final class WalletVisualTests: XCTestCase {
         let selected = try XCTUnwrap(options.first)
         try capture(NavigationView {
             List { SigningKeySetupContent(options: options, selected: selected, step: step, onSelect: { _ in }, onEdit: { _ in }) }
-                .navigationTitle("Set up your wallet").navigationBarTitleDisplayMode(.inline)
+                .navigationTitle(step == .summary ? "Set up your wallet" : step.title).navigationBarTitleDisplayMode(.inline)
                 .safeAreaInset(edge: .bottom) {
                     WalletActionBar(primary: WalletAction(step == .summary ? "Create signing key" : "Done", perform: {}),
                         secondary: step == .summary ? nil : WalletAction("Back", perform: {}))
@@ -81,6 +82,16 @@ final class WalletVisualTests: XCTestCase {
     func testPinBiometricPrompt() async throws { try await pin("biometric_prompt") }
     func testPinUnlock() async throws { try await pin("unlock") }
     func testPinCompact() async throws { try await pin("compact_dark_large_text") }
+    func testBiometricCancelled() async throws { try await biometricSetup(unavailable: false) }
+    func testBiometricUnavailable() async throws { try await biometricSetup(unavailable: true) }
+
+    private func biometricSetup(unavailable: Bool) async throws {
+        let model = makeModel(biometricAuthenticator: FakeDemoBiometricAuthenticator(isAvailable: !unavailable))
+        await model.readerTrustSettings.awaitPendingOperations()
+        model.auth = .biometricSetup(unavailable ? .unavailable : .cancelled)
+        try capture(BiometricSetupView(viewModel: model),
+            id: "onboarding.biometric.\(unavailable ? "unavailable" : "cancelled")")
+    }
 
     private func pin(_ state: String) async throws {
         let gate = DemoBiometricTestGate()
@@ -209,6 +220,20 @@ final class WalletVisualTests: XCTestCase {
 
     func testBatchOffer() async throws {
         try await batchOffer(noneSelected: false)
+    }
+
+    func testSingleOffer() async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        let offer = try WalletVisualFixtures().offer()
+        let credential = try XCTUnwrap(offer.credentials.first)
+        model.isReady = true
+        model.statusMessage = ""
+        model.offerPreview = IssuanceOfferPreview(grant: offer.grant, issuer: offer.issuer,
+            credentials: [credential], transactionCode: offer.transactionCode, batchSize: offer.batchSize)
+        model.issuanceCopyCounts = [credential.configurationID: 1]
+        XCTAssertTrue(model.acceptOfferEnabled)
+        try capture(ReceiveView(viewModel: model, onOpenSettings: {}), id: "batch.offer.single_full_art")
     }
 
     func testOfferDefinitions() throws {
@@ -375,8 +400,16 @@ final class WalletVisualTests: XCTestCase {
         let details = CredentialDisplayNormalizer.details(for: try WalletVisualFixtures().nearbyCredential())
         let screen = NavigationView {
             ProximityPresentationView(viewModel: model.proximityPresentation, approvalMode: .constant(.askEachTime),
+                headerOwnsClose: true,
                 credentialDetailsByID: [details.id: details])
                 .navigationTitle("Share nearby").navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: model.proximityPresentation.requestClose) {
+                            Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44)
+                        }.accessibilityLabel("Close nearby sharing")
+                    }
+                }
         }.navigationViewStyle(.stack)
             // Pin the receipt's hour cycle independently of the machine's 12/24-hour preference.
             .environment(\.locale, Locale(identifier: "en_US@hours=h23"))
@@ -398,7 +431,18 @@ final class WalletVisualTests: XCTestCase {
         let model = try await makeWalletVisualProximityModel(qrPayload: WalletVisualFixtures().nearbyQrPayload())
         defer { model.proximityPresentation.dismiss() }
         XCTAssertNotNil(model.proximityPresentation.qrPayload)
-        try capture(PresentView(viewModel: model, onOpenSettings: {}), id: "nearby.ready.qr")
+        let detector = try XCTUnwrap(CIDetector(ofType: CIDetectorTypeQRCode, context: nil,
+            options: [CIDetectorAccuracy: CIDetectorAccuracyHigh]))
+        let screen = PresentView(viewModel: model, onOpenSettings: {})
+            .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
+            .environment(\.locale, Locale(identifier: "en_US")).environment(\.sizeCategory, .large)
+        try await captureWhenReady(screen, id: "nearby.ready.qr", isReady: { model.proximityPresentation.qrPayload != nil },
+            isImageReady: { image in
+                guard let pixels = CIImage(image: image) else { return false }
+                return detector.features(in: pixels).contains {
+                    ($0 as? CIQRCodeFeature)?.messageString == model.proximityPresentation.qrPayload
+                }
+            }, failure: "The engagement QR must actually render and decode before capture")
     }
 
     private func batchOffer(noneSelected: Bool) async throws {
@@ -440,7 +484,8 @@ final class WalletVisualTests: XCTestCase {
     }
 
     private func captureWhenReady<Content: View>(_ content: Content, id: String, config: ViewImageConfig = .iPhone13,
-                                                 isReady: () -> Bool, failure: String, readinessDescription: () -> String = { "" },
+                                                 isReady: () -> Bool, isImageReady: ((UIImage) -> Bool)? = nil,
+                                                 failure: String, readinessDescription: () -> String = { "" },
                                                  scrollToBottom: Bool = false, scrollFraction: CGFloat = 1) async throws {
         let size = try XCTUnwrap(config.size)
         let host = WalletVisualHostingController(rootView: content)
@@ -456,12 +501,20 @@ final class WalletVisualTests: XCTestCase {
         // time, still gates every capture; the deadline only bounds a genuine failure.
         window.layoutIfNeeded()
         host.view.layoutIfNeeded()
+        func renderedReady() -> Bool {
+            guard isReady() else { return false }
+            guard let isImageReady else { return true }
+            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            return isImageReady(image)
+        }
         let deadline = ProcessInfo.processInfo.systemUptime + 30
-        while !isReady() && ProcessInfo.processInfo.systemUptime < deadline {
+        while !renderedReady() && ProcessInfo.processInfo.systemUptime < deadline {
             host.view.layoutIfNeeded()
             try await Task.sleep(nanoseconds: 10_000_000)
         }
-        guard isReady() else {
+        guard renderedReady() else {
             let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
                 window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
             }

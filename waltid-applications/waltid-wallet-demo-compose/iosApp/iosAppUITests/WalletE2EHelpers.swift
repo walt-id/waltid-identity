@@ -213,6 +213,17 @@ final class WalletE2EUI {
         return nil
     }
 
+    func openWalletLink(_ value: String) {
+        for identifier in ["wallet.presentationDone", "issuance-done", "wallet-detail-close", "wallet.presentationClaimsClose", "wallet.detailsBack", "wallet.flowBack"] {
+            let button = app.buttons[identifier]
+            if button.exists && button.isHittable { button.tap() }
+        }
+        tapButton(identifier: "wallet.scanButton", fallbackLabel: "Scan QR code")
+        tapButton(identifier: "wallet.scanMode", fallbackLabel: "Enter a link")
+        replaceText(in: textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request"), value: value)
+        tapButton(identifier: "wallet.scanContinue", fallbackLabel: "Continue")
+    }
+
     func presentationReviewVisible() -> Bool {
         app.descendants(matching: .any)["wallet.presentationReview"].exists
     }
@@ -231,7 +242,7 @@ final class WalletE2EUI {
         }
     }
 
-    func replaceText(in element: XCUIElement, value: String) {
+    func replaceText(in element: XCUIElement, value: String, dismiss: Bool = true) {
         XCTAssertTrue(element.waitForExistence(timeout: 20), "Input element not found")
         makeHittable(element)
         XCTAssertTrue(element.isHittable, "Input element is not hittable")
@@ -247,8 +258,11 @@ final class WalletE2EUI {
             }
         }
 
+        let scannerInput = element.identifier == "wallet.scanInput"
         element.typeText(value)
-        dismissKeyboard(focusedElement: element)
+        // Scanner Go now starts resolution. Keep explicit Continue tests in
+        // charge of submission, including assertions while the IME is visible.
+        if dismiss && !scannerInput { dismissKeyboard(focusedElement: element) }
     }
 
     private func focusTextInput(_ element: XCUIElement, timeout: TimeInterval = 15) -> Bool {

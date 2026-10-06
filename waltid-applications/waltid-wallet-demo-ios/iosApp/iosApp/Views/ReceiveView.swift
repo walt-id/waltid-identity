@@ -10,7 +10,7 @@ struct ReceiveView: View {
     @Environment(\.walletDemoBranding) private var branding
 
     var body: some View {
-        NavigationView {
+        WalletNavigationContainer {
             Group {
                 if case .unavailableCallback = viewModel.externalFlow {
                     Text("The original receiving session is no longer available. Check your wallet before starting again.")
@@ -27,14 +27,15 @@ struct ReceiveView: View {
                 }
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("Receive credentials")
+            .navigationTitle(viewModel.offerPreview == nil && (viewModel.issuanceReceipt != nil || !viewModel.deferredCredentials.isEmpty)
+                ? "Receiving result" : "Receive credentials")
             .navigationBarTitleDisplayMode(.inline)
             .walletFlowToolbar(onBack: onBack, backEnabled: viewModel.externalFlow != nil ? viewModel.canDismissExternalFlow : !viewModel.isLoading,
-                onOpenSettings: viewModel.externalFlow == nil ? onOpenSettings : nil, external: viewModel.externalFlow != nil)
+                onOpenSettings: nil, external: viewModel.externalFlow != nil)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
         }
-        .navigationViewStyle(.stack)
+        .id(viewModel.receiveNavigationResetKey)
         .onChange(of: viewModel.authorizationRequestURL) { authorizationURL in
             guard let authorizationURL else { return }
             openURL(authorizationURL)
@@ -45,7 +46,6 @@ struct ReceiveView: View {
     private var entryContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                WalletTabStatusBanner(viewModel: viewModel, tab: .receive, placement: .contextual)
 
                 ScannableUrlEditor(
                     title: "",
@@ -68,7 +68,6 @@ struct ReceiveView: View {
 
     private func reviewContent(preview: IssuanceOfferPreview) -> some View {
         WalletReviewScaffold {
-            WalletTabStatusBanner(viewModel: viewModel, tab: .receive, placement: .contextual)
 
             OfferReviewView(
                 preview: preview,
@@ -88,7 +87,7 @@ struct ReceiveView: View {
             }
 
         } actions: {
-            WalletTabStatusBanner(viewModel: viewModel, tab: .receive, placement: .footer)
+            WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
             OfferReviewActions(
                 requiresIssuerAuthentication: preview.grant == .authorizationCode,
                 isAcceptEnabled: viewModel.acceptOfferEnabled,
@@ -105,12 +104,11 @@ struct ReceiveView: View {
 
     private var resultContent: some View {
         WalletReviewScaffold {
-            WalletTabStatusBanner(viewModel: viewModel, tab: .receive, placement: .contextual)
             IssuanceResultContent(receipt: viewModel.issuanceReceipt, saved: viewModel.receivedCredentials,
                 pending: pendingCredentials,
                 busy: viewModel.isLoading, onResume: viewModel.resumeDeferredCredential)
         } actions: {
-            WalletTabStatusBanner(viewModel: viewModel, tab: .receive, placement: .footer)
+            WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
             WalletActions(primary: WalletAction("Done", enabled: !viewModel.isLoading, identifier: "issuance-done") {
                 if viewModel.externalFlow != nil { viewModel.closeExternalFlow() } else { viewModel.selectedTab = .credentials }
             }, secondary: pendingCredentials.isEmpty ? nil : WalletAction("Refresh status",

@@ -63,22 +63,31 @@ public struct SharingReviewScreen: View {
     }
 
     public var body: some View {
-        WalletReviewScaffold {
-            Text(title).font(.title2.weight(.semibold))
-            content
-        } actions: {
-            if review != nil && failure == nil {
-                ReviewActions(
-                    selectionComplete: selectionComplete,
-                    isLoading: isSubmitting,
-                    onSubmit: onSubmit,
-                    onReject: onReject,
-                    onCancel: onCancel,
-                    paymentReview: paymentReview
-                )
-            } else {
-                WalletActions(secondary: WalletAction("Cancel", enabled: !isSubmitting,
-                    identifier: WalletAccessibilityID.presentationCancelButton, perform: onCancel))
+        WalletNavigationContainer {
+            WalletReviewScaffold(showsActions: review != nil || failure != nil) {
+                content
+            } actions: {
+                if review != nil && failure == nil {
+                    ReviewActions(
+                        selectionComplete: selectionComplete,
+                        isLoading: isSubmitting,
+                        onSubmit: onSubmit,
+                        onReject: onReject,
+                        onCancel: onCancel,
+                        paymentReview: paymentReview, showCancelWithReject: false
+                    )
+                } else if let failure {
+                    Text(failure).font(.subheadline).foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: onCancel) { Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44) }
+                        .accessibilityLabel("Close request").disabled(isSubmitting)
+                        .accessibilityIdentifier("wallet.flowBack")
+                }
             }
         }
         .interactiveDismissDisabled(isSubmitting)
@@ -86,8 +95,9 @@ public struct SharingReviewScreen: View {
 
     @ViewBuilder
     private var content: some View {
-        if let failure {
-            SharingReviewFailureView(message: failure)
+        if failure != nil {
+            Label("Unable to share", systemImage: "exclamationmark.shield")
+                .font(.headline).accessibilityIdentifier(WalletAccessibilityID.presentationError)
         } else if let review {
             SharingReviewView(
                 review: review,
@@ -110,21 +120,5 @@ public struct SharingReviewScreen: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .accessibilityIdentifier(WalletAccessibilityID.presentationPreparing)
         }
-    }
-}
-
-/// Why the wallet will not continue, with the only action left.
-struct SharingReviewFailureView: View {
-    let message: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Unable to share", systemImage: "exclamationmark.shield")
-                .font(.headline)
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-        .accessibilityIdentifier(WalletAccessibilityID.presentationError)
     }
 }

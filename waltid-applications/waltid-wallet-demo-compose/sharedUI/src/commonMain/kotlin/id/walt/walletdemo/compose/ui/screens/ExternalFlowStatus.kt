@@ -18,7 +18,7 @@ internal fun ExternalFlowStatus(
     fillViewport: Boolean = true,
 ) {
     ReviewScaffold(modifier, fillViewport, actions = if (state.operation is WalletOperationState.Failed) {
-        { WalletActions(WalletAction("Try again", onRetry, icon = WalletSymbol.Retry, testTag = "wallet.external.retry")) }
+        { WalletActions(WalletAction("Try again", onRetry, testTag = "wallet.external.retry")) }
     } else null) {
         if (state.isBusy || state.externalFlow is WalletExternalFlow.Pending) CircularProgressIndicator()
         Text(state.statusText.ifBlank { "Preparing request…" }, Modifier.testTag(WalletUiTestTags.Status))

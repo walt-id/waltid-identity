@@ -149,7 +149,7 @@ class WalletDemoSharingReviewTestScenarios {
         }
         onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick()
-        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
+        onNodeWithTag("wallet-detail-back").performClick()
         waitForIdle()
         val revision = prepared
         assertEquals(2, revision) // Initial selection and the explicit optional disclosure.
@@ -158,7 +158,7 @@ class WalletDemoSharingReviewTestScenarios {
         runOnIdle { visible.value = true; presentation.value = WalletReviewPresentation.Sheet }
         onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOn()
-        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
+        onNodeWithTag("wallet-detail-back").performClick()
         onNodeWithText("Approve").performClick()
         assertEquals(revision, prepared)
         assertEquals(setOf(optional), submitted?.disclosures)
@@ -200,7 +200,7 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithTag("wallet-detail-back").performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOn()
         onNodeWithText("For my own reference").assertDoesNotExist()
-        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
+        onNodeWithTag("wallet-detail-back").performClick()
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(setOf(option.selection), submitted?.credentials)
         assertEquals(setOf(optional), submitted?.disclosures)
@@ -220,7 +220,8 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick()
         onNodeWithTag("review-all-credential-information").performScrollTo().performClick()
         onNodeWithTag("credential-technical-details").performScrollTo().performClick()
-        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
+        onAllNodesWithTag(WalletUiTestTags.PresentationSubmitButton).assertCountEquals(0)
+        repeat(3) { onNodeWithTag("wallet-detail-back").performClick() }
         onAllNodesWithTag(WalletUiTestTags.PresentationClaimsDialog).assertCountEquals(0)
         onAllNodesWithTag("wallet.screen.header").assertCountEquals(1)
         assertEquals(0, submissions)
@@ -544,7 +545,7 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(firstOptionalDisclosure.id))
             .performScrollTo()
             .assertIsOn()
-        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
+        onNodeWithTag("wallet-detail-back").performClick()
 
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(second.selection.id))
             .performScrollTo()
@@ -584,7 +585,7 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithText("Required by request").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOff()
         onNodeWithText("Optional disclosure").performScrollTo().assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
+        onNodeWithTag("wallet-detail-back").performClick()
 
         // A required disclosure is not carried as a selection, so an empty disclosure set is what
         // "the user approved nothing optional" looks like.
@@ -593,7 +594,7 @@ class WalletDemoSharingReviewTestScenarios {
 
         onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick()
-        onNodeWithTag(WalletUiTestTags.PresentationClaimsClose).performClick()
+        onNodeWithTag("wallet-detail-back").performClick()
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(setOf(optional), submitted?.disclosures)
 

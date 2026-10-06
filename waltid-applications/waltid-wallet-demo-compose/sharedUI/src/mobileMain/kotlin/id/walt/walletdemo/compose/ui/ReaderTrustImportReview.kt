@@ -27,9 +27,9 @@ internal fun ReaderTrustImportReview(
             actions = {
                 WalletActions(
                     WalletAction(stringResource(Res.string.reader_trust_import), onImport,
-                        testTag = WalletUiTestTags.SettingsReaderTrustImportConfirm, icon = WalletSymbol.Accept),
+                        testTag = WalletUiTestTags.SettingsReaderTrustImportConfirm),
                     WalletAction(stringResource(Res.string.reader_trust_cancel), onCancel,
-                        testTag = WalletUiTestTags.SettingsReaderTrustImportCancel, icon = WalletSymbol.Decline),
+                        testTag = WalletUiTestTags.SettingsReaderTrustImportCancel),
                 )
             },
         ) {

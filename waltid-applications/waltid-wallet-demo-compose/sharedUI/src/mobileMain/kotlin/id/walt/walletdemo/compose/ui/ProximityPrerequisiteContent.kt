@@ -38,10 +38,9 @@ internal fun ProximityPrerequisiteContent(
         WalletActions(
             primary = WalletAction(action?.let(hostActionForDisplay)?.label() ?: stringResource(Res.string.proximity_check_again),
                 onClick = { if (action != null) onRemediate(action) else onRetry() },
-                enabled = hostActionInProgress == null, testTag = if (action == null) WalletUiTestTags.ProximityRetry else null,
-                icon = WalletSymbol.Retry),
+                enabled = hostActionInProgress == null, testTag = if (action == null) WalletUiTestTags.ProximityRetry else null),
             secondary = if (capabilities.mayStart) WalletAction(stringResource(Res.string.proximity_continue_available),
-                onContinueWithAvailableConnection, enabled = hostActionInProgress == null, icon = WalletSymbol.Next) else null,
+                onContinueWithAvailableConnection, enabled = hostActionInProgress == null) else null,
         )
     }
 }

@@ -3,20 +3,19 @@ import WalletDemoSharingUI
 
 struct EmptyCredentialsView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: "wallet.pass")
-                .font(.title)
-                .foregroundStyle(.secondary)
+        VStack(spacing: 8) {
             Text("No credentials yet")
                 .font(.headline)
-            Text("Received credentials will appear here automatically.")
+            Text("Scan a credential offer to add your first credential.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .multilineTextAlignment(.center)
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .aspectRatio(id1AspectRatio, contentMode: .fit)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
         .accessibilityIdentifier(WalletAccessibilityID.credentialsEmpty)
     }
 }

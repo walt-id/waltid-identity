@@ -18,8 +18,6 @@ struct SigningKeySetupContent: View {
     var body: some View {
         Section {
             VStack(alignment: .leading, spacing: 12) {
-                if step == .summary { Text("Your wallet uses a signing key to prove that you hold your credentials.") }
-                if step != .summary { Text(step.title).font(.title3.weight(.semibold)) }
                 Text(stepDescription).font(.callout).foregroundStyle(.secondary)
                 if step == .storage && selected.recovery.id != "new" {
                     Text("The Secure Enclave cannot restore a key. Recoverable keys use Keychain or the encrypted wallet database.").font(.callout)
@@ -34,7 +32,7 @@ struct SigningKeySetupContent: View {
                 Section("Restore an existing key") { selectionRows(restoring: true) }
             }
         } else if step != .summary {
-            Section(step.title) { selectionRows() }
+            Section { selectionRows() }
         }
         if step == .summary {
             Section {
@@ -54,7 +52,7 @@ struct SigningKeySetupContent: View {
         case .recovery: "Create a new signing key or restore an existing one. New keys can be created with or without a backup."
         case .storage: "Choose how to store and protect your signing key. Only options compatible with your recovery choice are shown."
         case .approval: "Choose how to approve signing. This is separate from unlocking the app."
-        case .summary: "Use these settings or tap a row to customize your signing key."
+        case .summary: "Create your signing key with these settings, or tap a row to customize."
         }
     }
 

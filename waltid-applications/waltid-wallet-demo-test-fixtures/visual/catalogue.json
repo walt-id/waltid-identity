@@ -54,7 +54,8 @@
         "R15"
       ],
       "composeTest": "scanEmpty",
-      "swiftTest": "testScanEmpty"
+      "swiftTest": "testScanEmpty",
+      "note": "F011: scanner-first wallet chrome; sensor preview and permission UI require actual-host evidence."
     },
     {
       "id": "wallet.scan.unsupported",
@@ -896,6 +897,40 @@
       "composeTest": "controlsRtl",
       "swiftTest": "testControlsRtl",
       "note": "Side-effect-free controls fixture shared with IDE previews. RTL checks reading-direction mirroring, not translated labels."
+    },
+    {
+      "id": "onboarding.biometric.cancelled",
+      "composeTest": "biometricCancelled",
+      "swiftTest": "testBiometricCancelled",
+      "requirements": [
+        "R01",
+        "R11",
+        "R13"
+      ],
+      "note": "F002: OS cancellation preserves explicit Retry and PIN-only choices; synthetic wallet content, no OS dialog."
+    },
+    {
+      "id": "onboarding.biometric.unavailable",
+      "composeTest": "biometricUnavailable",
+      "swiftTest": "testBiometricUnavailable",
+      "requirements": [
+        "R01",
+        "R11",
+        "R13"
+      ],
+      "note": "F002: no unavailable retry; explicit PIN-only continuation remains reachable."
+    },
+    {
+      "id": "batch.offer.single_full_art",
+      "composeTest": "singleOffer",
+      "swiftTest": "testSingleOffer",
+      "requirements": [
+        "R04",
+        "R06",
+        "R10",
+        "R18"
+      ],
+      "note": "F013-F014: one offered configuration uses full art; multi-offer and sharing thumbnails remain flat metadata colors."
     }
   ]
 }

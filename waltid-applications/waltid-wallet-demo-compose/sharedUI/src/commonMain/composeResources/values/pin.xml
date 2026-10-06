@@ -16,4 +16,12 @@
     <string name="pin_unlock">Unlock</string>
     <string name="pin_unlock_biometrics">Unlock with biometrics</string>
     <string name="pin_authenticating">Authenticating…</string>
+    <string name="pin_biometric_title">Unlock with biometrics</string>
+    <string name="pin_biometric_ready">Your PIN is ready. Use biometrics for quicker unlock, or continue with your PIN.</string>
+    <string name="pin_biometric_cancelled">Setup was cancelled. You can try again or continue with your PIN.</string>
+    <string name="pin_biometric_unavailable">Biometrics are unavailable. You can continue with your PIN.</string>
+    <string name="pin_biometric_locked_out">Biometrics are temporarily locked. Try again when available, or continue with your PIN.</string>
+    <string name="pin_biometric_failed">Biometric setup did not finish. You can try again or continue with your PIN.</string>
+    <string name="pin_biometric_retry">Try again</string>
+    <string name="pin_biometric_continue">Use PIN only</string>
 </resources>

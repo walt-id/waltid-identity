@@ -25,8 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -37,7 +35,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletStatusKind
-import id.walt.walletdemo.compose.logic.isError
 import id.walt.walletdemo.compose.logic.isStatusBusy
 import id.walt.walletdemo.compose.logic.isStatusExpanded
 import id.walt.walletdemo.compose.logic.isStatusVisible
@@ -48,37 +45,28 @@ import kotlin.math.abs
 private val CollapsedErrorHeight = 64.dp
 private const val SwipeDismissThreshold = 80f
 
-internal enum class WalletStatusPlacement { Contextual, Footer }
-
 @Composable
 internal fun StatusCard(
     state: WalletDemoUiState,
     onDismiss: () -> Unit,
     onToggleExpanded: () -> Unit,
-    placement: WalletStatusPlacement,
 ) {
     if (!state.isStatusVisible) return
     val banner = state.statusBanner() ?: return
-    if ((banner.kind == WalletStatusKind.Error) != (placement == WalletStatusPlacement.Contextual)) return
     val dismissable = banner.kind == WalletStatusKind.Success || banner.kind == WalletStatusKind.Error
     val expanded = state.isStatusExpanded
-    val containerColor = when {
-        state.isError -> MaterialTheme.colorScheme.errorContainer
-        else -> Color.Transparent
-    }
-    val contentColor = when {
-        state.isError -> MaterialTheme.colorScheme.onErrorContainer
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    val contentColor = if (banner.kind == WalletStatusKind.Error) MaterialTheme.colorScheme.error
+        else MaterialTheme.colorScheme.onSurfaceVariant
 
     var dragDistance by remember(banner.key) { mutableStateOf(0f) }
 
     Surface(
         color = containerColor, contentColor = contentColor,
-        shape = if (placement == WalletStatusPlacement.Contextual) RoundedCornerShape(12.dp) else RectangleShape,
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .testTag(if (placement == WalletStatusPlacement.Contextual) "wallet.status.contextual" else "wallet.status.feedback")
+            .testTag("wallet.status.feedback")
             .semantics { liveRegion = LiveRegionMode.Polite }
             .then(
                 if (dismissable) {
@@ -118,8 +106,7 @@ internal fun StatusCard(
                         Modifier
                     },
                 )
-                .padding(start = if (placement == WalletStatusPlacement.Contextual) 16.dp else 0.dp,
-                    end = 4.dp, top = 4.dp, bottom = 4.dp),
+                .heightIn(min = 48.dp).padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (state.isStatusBusy) {

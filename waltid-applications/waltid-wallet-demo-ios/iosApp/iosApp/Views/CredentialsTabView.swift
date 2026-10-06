@@ -26,11 +26,17 @@ struct CredentialsTabView: View {
     }
 
     var body: some View {
-        NavigationView {
+        WalletNavigationContainer {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if selectedDetailsID == nil {
-                        WalletTabStatusBanner(viewModel: viewModel, tab: .credentials, placement: .contextual)
+                        if let onShareNearby {
+                            HStack {
+                                Spacer()
+                                Button("Share nearby", action: onShareNearby).frame(minHeight: 44)
+                                    .accessibilityIdentifier(WalletAccessibilityID.proximityStartButton)
+                            }
+                        }
                         if !viewModel.deferredCredentials.isEmpty {
                             WalletSection {
                                 WalletNavigationRow(String(format: String(localized: "Pending · %d"), viewModel.deferredCredentials.count)) {
@@ -101,6 +107,8 @@ struct CredentialsTabView: View {
                                 Image(systemName: "xmark")
                                     .font(.system(size: 14, weight: .semibold))
                             }
+                            .accessibilityLabel("Close credential information")
+                            .frame(minWidth: 44, minHeight: 44)
                             .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
                         }
                     }
@@ -123,11 +131,6 @@ struct CredentialsTabView: View {
                             }
                             .accessibilityIdentifier(WalletAccessibilityID.detailsMenu)
                         } else {
-                            if let onShareNearby {
-                                Button(action: onShareNearby) { Image(systemName: "dot.radiowaves.left.and.right") }
-                                    .accessibilityLabel("Share nearby")
-                                    .accessibilityIdentifier(WalletAccessibilityID.proximityStartButton)
-                            }
                             if let onScan {
                                 Button(action: onScan) { Image(systemName: "qrcode.viewfinder") }
                                     .accessibilityLabel("Scan or paste a link")
@@ -162,7 +165,6 @@ struct CredentialsTabView: View {
                 Text("This removes the credential from the wallet. This cannot be undone.")
             }
         }
-        .navigationViewStyle(.stack)
         .task(id: selectedCredential) {
             expanded = nil
             guard let selectedCredential else { return }

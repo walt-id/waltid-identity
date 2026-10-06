@@ -44,16 +44,38 @@ internal fun PresentTab(
     onSubmit: () -> Unit,
     onReject: () -> Unit,
     onCancel: () -> Unit,
+    onDone: () -> Unit,
     onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
     fillViewport: Boolean = true,
     feedback: (@Composable () -> Unit)? = null,
-    contextualStatus: (@Composable () -> Unit)? = null,
 ) {
     val credentials = (state.session as? WalletSessionState.Ready)?.credentials.orEmpty()
     val preview = state.presentationPreview
     val error = state.presentationError
+
+    if (state.presentationCompleted) {
+        ReviewScaffold(modifier = modifier.testTag("wallet.presentationResult"), fillViewport = fillViewport,
+            actions = { id.walt.walletdemo.compose.ui.components.WalletActions(
+                id.walt.walletdemo.compose.ui.components.WalletAction("Done", onDone, testTag = "wallet.presentationDone")) }) {
+            val result = state.operation
+            Text(when (result) {
+                is id.walt.walletdemo.compose.logic.WalletOperationState.Succeeded -> result.message
+                is id.walt.walletdemo.compose.logic.WalletOperationState.Failed -> result.message
+                else -> "The sharing operation has ended."
+            }, style = MaterialTheme.typography.bodyLarge,
+                color = if (result is id.walt.walletdemo.compose.logic.WalletOperationState.Failed)
+                    MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+        }
+        return
+    }
+    if (state.pendingPresentationContinuation != null) {
+        ReviewScaffold(modifier = modifier, fillViewport = fillViewport, feedback = feedback) {
+            Text("Finishing the response…", style = MaterialTheme.typography.bodyLarge)
+        }
+        return
+    }
 
     if (presentationContent != null) {
         Box(
@@ -79,10 +101,10 @@ internal fun PresentTab(
                     onSubmit = onSubmit,
                     onCancel = onCancel,
                     onReject = onReject,
+                    showCancelWithReject = false,
                 )
             },
         ) {
-            contextualStatus?.invoke()
             SharingReviewSection(
                 paymentReview = state.paymentReview,
                 review = preview.toSharingReview(),
@@ -113,7 +135,6 @@ internal fun PresentTab(
 
     ReviewScaffold(modifier = modifier.testTag(WalletUiTestTags.PresentTabContent),
         fillViewport = fillViewport, feedback = feedback) {
-        contextualStatus?.invoke()
         UrlActionSection(
             title = stringResource(Res.string.proximity_online_request),
             value = requestDrafts.presentationRequestUrl,
@@ -152,7 +173,6 @@ internal fun PresentTab(
                             stringResource(Res.string.proximity_in_person_title), start,
                             enabled = credentials.isNotEmpty() && state.presentationUrlEntryEnabled,
                             testTag = WalletUiTestTags.ProximityStartButton,
-                            icon = id.walt.walletdemo.compose.ui.components.WalletSymbol.Nearby,
                         ),
                     )
                 }

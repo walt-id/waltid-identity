@@ -6,15 +6,19 @@ fun createIosDemoPinStore(walletId: String): DemoPinStore {
     val defaults = NSUserDefaults.standardUserDefaults
     val recordKey = "$RECORD_KEY_PREFIX$walletId"
     val biometricKey = "$BIOMETRIC_KEY_PREFIX$walletId"
+    val pendingKey = "id.walt.walletdemo.pin.biometric.pending.$walletId"
     return PersistentDemoPinStore(
         readRecord = { defaults.stringForKey(recordKey) },
         writeRecord = { record -> defaults.setObject(record, forKey = recordKey) },
         clearRecord = {
             defaults.removeObjectForKey(recordKey)
             defaults.removeObjectForKey(biometricKey)
+            defaults.removeObjectForKey(pendingKey)
         },
         readBiometricUnlock = { defaults.boolForKey(biometricKey) },
         writeBiometricUnlock = { enabled -> defaults.setBool(enabled, forKey = biometricKey) },
+        readBiometricSetupPending = { defaults.boolForKey(pendingKey) },
+        writeBiometricSetupPending = { pending -> defaults.setBool(pending, forKey = pendingKey) },
     )
 }
 

@@ -8,6 +8,9 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class WalletDemoOfferReviewAndroidTest {
+    @Test fun receivedCredentialDetailsStayInTheProviderHost() =
+        WalletDemoOfferReviewTestScenarios().receivedCredentialDetailsStayInTheProviderHost()
+
     @Test fun selectedCopiesAndTransactionCodeSurviveHostChangesAndSubmitOnce() =
         WalletDemoOfferReviewTestScenarios().selectedCopiesAndTransactionCodeSurviveHostChangesAndSubmitOnce()
 }

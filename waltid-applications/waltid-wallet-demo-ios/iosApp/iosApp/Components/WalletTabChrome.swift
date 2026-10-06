@@ -1,17 +1,13 @@
 import SwiftUI
 import WalletDemoSharingUI
 
-enum WalletStatusPlacement { case contextual, footer }
-
 struct WalletTabStatusBanner: View {
     @ObservedObject var viewModel: WalletViewModel
     let tab: WalletTab
-    let placement: WalletStatusPlacement
 
     var isVisible: Bool {
         guard viewModel.isStatusVisible(for: tab), let kind = viewModel.statusKind(for: tab) else { return false }
-        return (kind == .error) == (placement == .contextual)
-            && (viewModel.externalFlow == nil || kind == .busy || kind == .error)
+        return viewModel.externalFlow == nil || kind == .busy || kind == .error
     }
 
     var body: some View {
@@ -25,7 +21,7 @@ struct WalletTabStatusBanner: View {
                 onToggleExpanded: expandAction
             )
             .accessibilityElement(children: .contain)
-            .accessibilityIdentifier(placement == .contextual ? "wallet.status.contextual" : "wallet.status.feedback")
+            .accessibilityIdentifier("wallet.status.feedback")
         }
     }
 
@@ -50,7 +46,7 @@ struct WalletTabFeedback: View {
     let tab: WalletTab
 
     var body: some View {
-        let banner = WalletTabStatusBanner(viewModel: viewModel, tab: tab, placement: .footer)
+        let banner = WalletTabStatusBanner(viewModel: viewModel, tab: tab)
         if banner.isVisible { WalletFooter { banner } }
     }
 }
@@ -60,7 +56,8 @@ extension View {
         walletSettingsToolbar(onOpenSettings: onOpenSettings).toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 if let onBack {
-                    Button(action: onBack) { Label(external ? "Close request" : "Back to wallet", systemImage: external ? "xmark" : "chevron.backward") }
+                    Button(action: onBack) { Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44) }
+                        .accessibilityLabel("Close request")
                         .disabled(!backEnabled)
                         .accessibilityIdentifier(external ? "wallet.external.close" : "wallet.flowBack")
                 }

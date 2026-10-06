@@ -29,9 +29,9 @@ import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-internal fun CredentialDetailsContent(details: CredentialDetails, modifier: Modifier = Modifier) {
+internal fun CredentialDetailsContent(details: CredentialDetails, modifier: Modifier = Modifier, onTechnicalDetails: (() -> Unit)? = null) {
     var technicalOpen by remember(details.summary.id) { mutableStateOf(false) }
-    CredentialDetailsBody(details, onTechnicalDetails = { technicalOpen = true }, modifier = modifier)
+    CredentialDetailsBody(details, onTechnicalDetails = onTechnicalDetails ?: { technicalOpen = true }, modifier = modifier)
     if (technicalOpen) WalletDetailSheet(stringResource(Res.string.credential_technical_details), { technicalOpen = false }) {
         CredentialTechnicalInformation(details)
     }

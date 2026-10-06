@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
@@ -97,19 +98,23 @@ internal fun SettingsChoiceRow(
     extra: (@Composable () -> Unit)? = null,
 ) {
     val selection = if (selectable) Modifier.selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onSelect) else Modifier
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = if (detail != null || extra != null) ({
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                detail?.let { Text(it) }
+    Surface(
+        color = if (selected && selectable) MaterialTheme.colorScheme.primaryContainer.copy(alpha = .25f)
+            else MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).then(selection),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else .38f))
+                detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 extra?.invoke()
             }
-        }) else null,
-        trailingContent = if (selectable) ({ RadioButton(selected, onClick = null, enabled = enabled) }) else null,
-        colors = ListItemDefaults.colors(containerColor = if (selected && selectable)
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = .45f) else MaterialTheme.colorScheme.surfaceContainerLow),
-        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).then(selection),
-    )
+            if (selectable) RadioButton(selected, onClick = null, enabled = enabled)
+        }
+    }
 }
 
 @Composable

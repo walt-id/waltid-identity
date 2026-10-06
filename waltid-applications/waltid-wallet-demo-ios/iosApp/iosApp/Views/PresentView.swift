@@ -19,6 +19,7 @@ struct PresentView: View {
     @ObservedObject private var readerTrustSettings: DemoReaderTrustSettingsController
     @ObservedObject private var proximityPresentation: ProximityPresentationViewModel
     @StateObject private var proximityScreenPolicy = ProximityScreenPolicy()
+    @State private var showingConnectionOptions = false
     @State private var credentialDetailsByID: [String: CredentialDetails] = [:]
 
     init(viewModel: WalletViewModel, onOpenSettings: @escaping () -> Void, onBack: (() -> Void)? = nil) {
@@ -30,26 +31,29 @@ struct PresentView: View {
     }
 
     var body: some View {
-        NavigationView {
+        WalletNavigationContainer {
             Group {
-                if let review = viewModel.presentationSharingReview {
+                if viewModel.presentationCompleted { resultContent }
+                else if let review = viewModel.presentationSharingReview {
                     onlineReviewContent(review: review)
                 } else if proximityPresentation.active {
                     proximityContent
-                } else if viewModel.externalFlow != nil {
+                } else if viewModel.externalFlow != nil || viewModel.pendingPresentationContinuationURL != nil || viewModel.pendingPresentationFormPostHTML != nil {
                     WalletExternalFlowStatus(viewModel: viewModel, onRetry: viewModel.previewPresentation)
                 } else {
                     entryContent
                 }
             }
-            .navigationTitle(proximityPresentation.active ? "Share nearby" : "Share credentials")
+            .navigationTitle(proximityPresentation.active ? "Share nearby" : viewModel.presentationCompleted ? "Sharing result" : "Share credentials")
             .navigationBarTitleDisplayMode(.inline)
-            .walletFlowToolbar(onBack: onBack, backEnabled: viewModel.externalFlow != nil ? viewModel.canDismissExternalFlow : !viewModel.isLoading,
-                onOpenSettings: viewModel.externalFlow == nil ? onOpenSettings : nil, external: viewModel.externalFlow != nil)
+            .walletDetailDestination(isPresented: $showingConnectionOptions) { ConnectionSettingsView(viewModel: viewModel) }
+            .walletFlowToolbar(onBack: proximityPresentation.active ? proximityPresentation.requestClose : onBack,
+                backEnabled: proximityPresentation.active ? proximityPresentation.canClose : viewModel.externalFlow != nil ? viewModel.canDismissExternalFlow : !viewModel.isLoading,
+                onOpenSettings: nil, external: viewModel.externalFlow != nil)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
         }
-        .navigationViewStyle(.stack)
+        .id(viewModel.presentationNavigationResetKey)
         .onChange(of: viewModel.pendingPresentationContinuationURL) { url in
             guard let url else { return }
             openURL(url) { accepted in
@@ -79,6 +83,9 @@ struct PresentView: View {
         .onDisappear { proximityScreenPolicy.restore() }
         .onChange(of: proximityPresentation.displayedEngagement == .qr) { _ in
             updateProximityScreenPolicy()
+        }
+        .onChange(of: proximityPresentation.canChangeConnectionOptions) { allowed in
+            if !allowed { showingConnectionOptions = false }
         }
         .onChange(of: proximityPresentation.active) { _ in
             updateProximityScreenPolicy()
@@ -122,10 +129,23 @@ struct PresentView: View {
         )
     }
 
+    private func closeReview() {
+        if let onBack { onBack() }
+        else { viewModel.cancelPresentationReview(); viewModel.selectedTab = .credentials }
+    }
+
+    private var resultContent: some View {
+        WalletReviewScaffold {
+            Text(viewModel.statusMessage(for: .present)).font(.body)
+                .foregroundStyle(viewModel.statusIsError(for: .present) ? Color.red : Color.primary)
+        } actions: {
+            WalletActions(primary: WalletAction("Done", identifier: "wallet.presentationDone", perform: closeReview))
+        }.accessibilityIdentifier("wallet.presentationResult")
+    }
+
     private var entryContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                WalletTabStatusBanner(viewModel: viewModel, tab: .present, placement: .contextual)
 
                 Text("Online presentation")
                     .font(.headline)
@@ -173,7 +193,7 @@ struct PresentView: View {
                         error: error,
                         isEnabled: viewModel.presentationReviewEnabled,
                         onNotifyVerifier: viewModel.rejectPresentation,
-                        onDismiss: viewModel.cancelPresentationReview
+                        onDismiss: closeReview
                     )
                 }
             }
@@ -192,7 +212,6 @@ struct PresentView: View {
             viewModel.submitPresentation()
         }
         return WalletReviewScaffold(showsActions: true) {
-            WalletTabStatusBanner(viewModel: viewModel, tab: .present, placement: .contextual)
             if let warning = viewModel.transactionDataProfilesWarning {
                 WarningBannerView(message: warning)
             }
@@ -207,26 +226,30 @@ struct PresentView: View {
                 onToggleDisclosure: viewModel.togglePresentationDisclosure,
                 onSubmit: submit,
                 onReject: viewModel.rejectPresentation,
-                onCancel: viewModel.cancelPresentationReview,
+                onCancel: closeReview,
                 compact: false,
                 showActions: false,
                 paymentReview: viewModel.paymentReview
             )
         } actions: {
-            WalletTabStatusBanner(viewModel: viewModel, tab: .present, placement: .footer)
+            WalletTabStatusBanner(viewModel: viewModel, tab: .present)
             ReviewActions(
                 selectionComplete: viewModel.presentationCredentialSelectionComplete,
                 isLoading: !viewModel.presentationReviewEnabled,
                 onSubmit: submit,
                 onReject: viewModel.rejectPresentation,
-                onCancel: viewModel.cancelPresentationReview,
-                paymentReview: viewModel.paymentReview
+                onCancel: closeReview,
+                paymentReview: viewModel.paymentReview,
+                showCancelWithReject: false
             )
         }
     }
 
     private var proximityContent: some View {
         ProximityPresentationView(viewModel: proximityPresentation, approvalMode: $viewModel.proximityApprovalMode,
+            headerOwnsClose: true,
+            onConnectionOptions: proximityPresentation.canChangeConnectionOptions || proximityPresentation.refreshingEngagement
+                ? { showingConnectionOptions = true } : nil,
             credentialDetailsByID: credentialDetailsByID)
             .id(proximityPresentation.review?.reviewID)
     }

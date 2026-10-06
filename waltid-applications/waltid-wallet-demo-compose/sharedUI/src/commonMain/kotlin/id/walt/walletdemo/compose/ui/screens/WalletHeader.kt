@@ -12,6 +12,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -20,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.ui.LocalWalletDemoBranding
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.components.WalletIcon
+import id.walt.walletdemo.compose.ui.components.WalletSymbol
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsCloseButton
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsOverflowMenu
 import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
@@ -31,10 +36,11 @@ import org.jetbrains.compose.resources.painterResource
 @Composable
 internal fun WalletHeader(
     state: WalletDemoUiState,
-    onSettings: () -> Unit,
+    onSettings: (() -> Unit)?,
     onScan: (() -> Unit)? = null,
     onShareNearby: (() -> Unit)? = null,
     onBack: (() -> Unit)? = null,
+    onClose: (() -> Unit)? = null,
     title: String? = null,
 ) {
     Column(
@@ -52,24 +58,26 @@ internal fun WalletHeader(
                 }
             },
         ) {
-            onShareNearby?.let { nearby ->
-                IconButton(onClick = nearby, modifier = Modifier.testTag(WalletUiTestTags.ProximityStartButton)) {
-                    Icon(painterResource(Res.drawable.settings_nearby), "Share nearby")
-                }
-            }
             onScan?.let { scan ->
                 IconButton(onClick = scan, modifier = Modifier.testTag(WalletUiTestTags.ScanButton)) {
                     Icon(painterResource(Res.drawable.proximity_qr), "Scan or paste a link")
                 }
             }
-            IconButton(
-                onClick = onSettings,
-                modifier = Modifier.testTag(WalletUiTestTags.SettingsButton),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Settings,
-                    contentDescription = "Settings",
-                )
+            onSettings?.let { settings ->
+                IconButton(onClick = settings, modifier = Modifier.testTag(WalletUiTestTags.SettingsButton)) {
+                    Icon(Icons.Filled.Settings, "Settings")
+                }
+            }
+            onClose?.let { close ->
+                IconButton(onClick = close, modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
+                    WalletIcon(WalletSymbol.Decline, "Close request")
+                }
+            }
+        }
+        onShareNearby?.let { nearby ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = nearby, contentPadding = PaddingValues(horizontal = 8.dp),
+                    modifier = Modifier.testTag(WalletUiTestTags.ProximityStartButton)) { Text("Share nearby") }
             }
         }
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -82,11 +90,17 @@ internal data class CredentialDetailsChrome(
     val onClose: () -> Unit,
     val onCopy: () -> Unit,
     val onDelete: (() -> Unit)?,
+    val title: String? = null,
+    val onBack: (() -> Unit)? = null,
 )
 
 @Composable
 internal fun CredentialDetailsTopBar(chrome: CredentialDetailsChrome) {
-    WalletScreenHeader(title = null, leading = { CredentialDetailsCloseButton(onClose = chrome.onClose) }) {
+    WalletScreenHeader(title = chrome.title, leading = {
+        if (chrome.onBack != null) IconButton(chrome.onBack, Modifier.testTag("wallet-detail-back")) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+        } else CredentialDetailsCloseButton(onClose = chrome.onClose)
+    }) {
         CredentialDetailsOverflowMenu(
             onCopy = chrome.onCopy,
             onDelete = chrome.onDelete,

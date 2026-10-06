@@ -50,6 +50,7 @@ internal fun ProximityEngagementContent(
     credentialDetailsById: Map<String, CredentialDetails>,
     onShowEngagement: (ProximityEngagementMethod) -> Unit,
     onApprovalModeChange: (WalletDemoProximityApprovalMode) -> Unit,
+    onConnectionOptions: (() -> Unit)? = null,
 ) {
     val method = state.displayedEngagement
     val choices = state.engagementChoices
@@ -70,8 +71,7 @@ internal fun ProximityEngagementContent(
     }
     val header: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            state.actionError?.let { ProximityErrorCard(it) }
-            Text(stringResource(when {
+            if (sharing != null || method != null) Text(stringResource(when {
                 sharing != null -> Res.string.proximity_prepared_ready
                 method == ProximityEngagementMethod.Qr -> Res.string.proximity_show_qr
                 method == ProximityEngagementMethod.Nfc -> Res.string.proximity_reader_hold_title
@@ -107,6 +107,14 @@ internal fun ProximityEngagementContent(
                     }
                 }
             }
+            onConnectionOptions?.let { options ->
+                id.walt.walletdemo.compose.ui.components.WalletSection {
+                    id.walt.walletdemo.compose.ui.components.WalletNavigationRow(
+                        "Connection options", options, Modifier.testTag("proximity-connection-options"),
+                        enabled = state.canChangeConnectionOptions,
+                    )
+                }
+            }
             state.connectedRoute?.let { ProximityConnectionDetails(it) }
         }
     }
@@ -137,7 +145,12 @@ internal fun ProximityEngagementContent(
     } else {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             header()
-            if (method == null) choices.forEach { choice -> ProximityEngagementChoice(choice, enabled = !state.refreshingEngagement) { onShowEngagement(choice) } }
+            if (method == null) id.walt.walletdemo.compose.ui.components.WalletSection {
+                choices.forEachIndexed { index, choice ->
+                    if (index > 0) id.walt.walletdemo.compose.ui.components.SettingsDivider()
+                    ProximityEngagementChoice(choice, enabled = !state.refreshingEngagement) { onShowEngagement(choice) }
+                }
+            }
             footer()
         }
     }

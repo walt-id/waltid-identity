@@ -55,8 +55,11 @@ internal fun IssuanceResultContent(
 @Composable
 private fun SavedCredentialRow(credential: WalletDemoCredential) {
     var detailsOpen by rememberSaveable(credential.id) { mutableStateOf(false) }
+    val navigation = LocalWalletReviewNavigation.current
     val summary = remember(credential) { credential.toCardDisplayData() }
-    Row(Modifier.fillMaxWidth().clickable(role = Role.Button) { detailsOpen = true }
+    Row(Modifier.fillMaxWidth().clickable(role = Role.Button) {
+        if (navigation != null) navigation.openStored(credential.id) else detailsOpen = true
+    }
         .testTag("issuance-saved-${credential.id}").padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
         CredentialSummaryRow(summary.toCardArt(), summary.issuer, Modifier.weight(1f))
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
@@ -88,9 +91,6 @@ private fun PendingCredentialRow(credential: WalletDemoDeferredCredential, busy:
         if (credential.status.canResume) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             TextButton(onClick = { onResume(credential.id) }, enabled = !busy,
                 modifier = Modifier.heightIn(min = 48.dp).testTag("issuance-resume-${credential.id}")) {
-                WalletIcon(if (credential.status == WalletDemoContinuationStatus.AwaitingLocalSave) WalletSymbol.Receive else WalletSymbol.Retry, null,
-                    Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
                 Text(stringResource(when (credential.status) {
                     WalletDemoContinuationStatus.AwaitingLocalSave -> Res.string.issuance_finish_saving
                     WalletDemoContinuationStatus.AwaitingIssuer -> Res.string.issuance_check_issuer

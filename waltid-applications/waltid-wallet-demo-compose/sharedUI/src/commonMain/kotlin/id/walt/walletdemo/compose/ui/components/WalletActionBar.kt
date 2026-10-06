@@ -8,7 +8,6 @@ internal data class WalletAction(
     val onClick: () -> Unit,
     val enabled: Boolean = true,
     val testTag: String? = null,
-    val icon: WalletSymbol? = null,
 )
 
 /** Actions stay trailing and wrap at large text sizes instead of truncating consent labels. */

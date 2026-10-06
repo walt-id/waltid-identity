@@ -2,6 +2,9 @@ import LocalAuthentication
 
 enum DemoBiometricResult: Equatable {
     case succeeded
+    case cancelled
+    case unavailable
+    case lockedOut
     case failed
 }
 
@@ -14,7 +17,7 @@ struct UnavailableDemoBiometricAuthenticator: DemoBiometricAuthenticator {
     var isAvailable: Bool { false }
 
     func authenticate(reason: String) async -> DemoBiometricResult {
-        .failed
+        .unavailable
     }
 }
 
@@ -31,17 +34,23 @@ struct LocalAuthenticationBiometricAuthenticator: DemoBiometricAuthenticator {
     private func authenticateOnMain(reason: String) async -> DemoBiometricResult {
         let context = LAContext()
         guard Self.canEvaluateBiometrics(context: context) else {
-            return .failed
+            return .unavailable
         }
-        do {
-            let success = try await context.evaluatePolicy(
-                .deviceOwnerAuthenticationWithBiometrics,
-                localizedReason: reason
-            )
-            return success ? .succeeded : .failed
-        } catch {
-            return .failed
-        }
+        return await withTaskCancellationHandler {
+            do {
+                let success = try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason)
+                return success ? .succeeded : .failed
+            } catch {
+                let error = error as NSError
+                guard error.domain == LAError.errorDomain else { return .failed }
+                switch LAError.Code(rawValue: error.code) {
+                case .userCancel, .appCancel, .systemCancel, .userFallback: return .cancelled
+                case .biometryLockout: return .lockedOut
+                case .biometryNotAvailable, .biometryNotEnrolled: return .unavailable
+                default: return .failed
+                }
+            }
+        } onCancel: { context.invalidate() }
     }
 
     private static func canEvaluateBiometrics(context: LAContext = LAContext()) -> Bool {

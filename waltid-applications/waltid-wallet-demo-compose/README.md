@@ -26,6 +26,14 @@ For setup, IDE guidance, and mobile integration test commands, see the [Mobile W
 
 The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM linkage package for native iOS linkage.
 
+## Navigation and visual system
+
+Home is the stable collection destination. Scan opens a scanner-first sheet with a reversible manual-input mode and a field-adjacent Paste control; links resolve automatically to the supported issuance or presentation flow. Android can also open an available system camera. Apple uses the embedded scanner because there is no supported standalone Camera-app launch contract.
+
+Reviews and details share one navigation host with directional Back/forward transitions and a reduced-motion alternative. Local Close, protocol Decline/Reject and result Done remain separate actions. A sent presentation keeps its accurate result visible until Done returns to Home or the external caller. In-app offer decline returns to Home. Active reviews do not expose a generic Settings detour.
+
+Decisions use text-first controls: a filled primary action, quiet secondary choices, and destructive color for irreversible confirmation. Meaningful Scan, Paste, Close and navigation icons remain. Operation feedback occupies the footer; trust, disclosure requirements and field validation stay with their context. Scroll content ends above the footer and keyboard, with material/blur and accessibility fallbacks. See the [design system](../waltid-wallet-demo-test-fixtures/design-system.md).
+
 ## Credential issuance
 
 The shared Android/iOS offer review lets users select credential types and request copies up to the issuer's advertised limit. Each type defaults to one copy. Additional holder keys are created only after acceptance; the same selections are forwarded to pre-authorized and browser authorization flows and reused for a supported transaction-code retry.
@@ -60,7 +68,7 @@ Use an isolated test wallet: the sharing E2E fixture provisions and replaces its
 
 ## In-person presentation
 
-The Android and iOS apps expose a dedicated **Present in person** journey for holder-side ISO mdoc
+The Android and iOS apps expose **Share nearby** from Home in a focused sheet for holder-side ISO mdoc
 proximity presentation. The Wallet SDK remains the source of session, request, reader-authentication,
 trust, disclosure, and terminal-state meaning; the shared Compose UI renders those facts and performs
 only platform-owned permission, settings, lifecycle, screen-awake, and brightness actions.
@@ -94,7 +102,7 @@ Device support and permissions are checked at startup; NFCv2 retains its mandato
 
 **Approval** in Nearby sharing settings stores **Ask each time** (default) or
 **Prepare sharing**, independently of the connection profile. The same choice is
-available before connecting. Both switches update one saved preference, retained
+available before connecting. The Prepare sharing control updates one saved preference, retained
 for subsequent shares. Changing it before connection refreshes the engagement in
 place; the previous QR is hidden until its replacement is ready. Changes made
 during an exchange apply to the next presentation. Preparation first identifies a
@@ -148,7 +156,7 @@ The ready screen prioritizes the full QR within the available space. **Prepare s
 switch: off means review each request; on means review, approve, then reconnect. Selecting the mode
 does not authorize disclosure. The same switch is available in Nearby sharing settings. Once armed,
 the reader and expiry countdown stay visible, and **Approved data** opens the already reviewed
-selection. Cancel stays separate from scrolling content. Short screens and larger text retain
+selection. Close is an accessible X in the task header. It requests cancellation only when the SDK permits it, waits for cleanup and returns to Home without another cancelled-result acknowledgement. Connection options returns to the active nearby phase. Short screens and larger text retain
 scrolling for secondary controls; landscape places the QR beside the controls.
 
 Review actions carry the identity of the displayed review. Each new review resets
@@ -158,7 +166,7 @@ Terminal recovery creates a new single-use session.
 
 ## Signing key setup
 
-PIN onboarding follows [WAL-1440](https://linear.app/walt-new/issue/WAL-1440/follow-up-on-wal-749): choose a four-digit PIN, then confirm it on a separate screen. Four circular masked positions make the length visible. Matching confirmation saves the PIN and opens the available OS biometric prompt; success enables biometric unlock, while cancellation, rejection or unavailability finishes PIN-only setup. Back allows editing without committing a PIN. Choose, Confirm and Unlock share the same fixed four-digit validation; PIN verifier records are unchanged. See the [PIN interaction contract](../waltid-wallet-demo-test-fixtures/pin-onboarding.md). Signing-key setup starts with a summary of the default supported configuration. Create signing key needs one confirmation. Recovery, Key storage and Signing approval each open one focused options page; Done returns to the summary and does not create a key. A single supported option is shown as a fact. Customization retains a complete SDK-provided configuration, including changes required by the selected recovery/storage combination. The same summary rows show the active key in Settings, where immutable storage/signing policies are read-only and supported backup actions remain available. Only Create signing key or Restore signing key executes the selected option. The SDK revalidates the selected option before executing it.
+PIN onboarding follows [WAL-1440](https://linear.app/walt-new/issue/WAL-1440/follow-up-on-wal-749): choose a four-digit PIN, then confirm it on a separate screen. Four underline positions with masked dots make the length visible. Matching confirmation saves the PIN and opens the available OS biometric prompt. Success enables biometric unlock; cancellation or failure offers Try again and Use PIN only. An unresolved choice survives restart and resumes after PIN verification. Back allows editing without committing a PIN. Choose, Confirm and Unlock share the same fixed four-digit validation; PIN verifier records are unchanged. See the [PIN interaction contract](../waltid-wallet-demo-test-fixtures/pin-onboarding.md). Signing-key setup starts with a summary of the default supported configuration. Create signing key needs one confirmation. Recovery, Key storage and Signing approval each open one focused options page; Done returns to the summary and does not create a key. A single supported option is shown as a fact. Customization retains a complete SDK-provided configuration, including changes required by the selected recovery/storage combination. The same summary rows show the active key in Settings, where immutable storage/signing policies are read-only and supported backup actions remain available. Only Create signing key or Restore signing key executes the selected option. The SDK revalidates the selected option before executing it.
 
 Key recovery restores the original key and DID, not credentials. A local save does not prove delivery to another device. Unavailable providers show their reported reason and can be checked again; returning to the app also refreshes the choices.
 

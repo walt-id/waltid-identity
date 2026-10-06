@@ -1,13 +1,16 @@
 package id.walt.walletdemo.compose.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
@@ -15,8 +18,9 @@ import id.walt.walletdemo.compose.logic.WalletDemoContinuationStatus
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceProblem
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.StatusCard
-import id.walt.walletdemo.compose.ui.components.WalletStatusPlacement
 import id.walt.walletdemo.compose.ui.components.WalletFooter
+import id.walt.walletdemo.compose.ui.components.WalletIcon
+import id.walt.walletdemo.compose.ui.components.WalletSymbol
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
 import id.walt.wallet2.mobile.ProximityEngagement
@@ -27,6 +31,7 @@ import id.walt.walletdemo.compose.ui.components.OfferedCredentialDetails
 import id.walt.walletdemo.compose.ui.screens.ReceiveTab
 import id.walt.walletdemo.compose.ui.screens.SettingsScreen
 import id.walt.walletdemo.compose.ui.screens.WalletHeader
+import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
 import id.walt.walletdemo.compose.ui.screens.WalletScanScreen
 import id.walt.walletdemo.compose.ui.screens.CredentialsTab
 import id.walt.walletdemo.compose.logic.WalletSessionState
@@ -144,6 +149,20 @@ internal class WalletVisualScenarios(
         capture("onboarding.key.$page")
     }
 
+    fun biometricSetup(unavailable: Boolean = false) = with(test) {
+        content {
+            id.walt.walletdemo.compose.ui.screens.BiometricSetupScreen(
+                id.walt.walletdemo.compose.logic.WalletAuthState.BiometricSetup(
+                    if (unavailable) id.walt.walletdemo.compose.logic.DemoBiometricResult.Unavailable
+                    else id.walt.walletdemo.compose.logic.DemoBiometricResult.Cancelled),
+                busy = false, available = !unavailable, onRetry = {}, onContinue = {})
+        }
+        onNodeWithTag(WalletUiTestTags.BiometricSetupContinue).assertIsDisplayed().assertIsEnabled()
+        if (unavailable) onAllNodesWithTag(WalletUiTestTags.BiometricSetupRetry).assertCountEquals(0)
+        else onNodeWithTag(WalletUiTestTags.BiometricSetupRetry).assertIsDisplayed().assertIsEnabled()
+        capture("onboarding.biometric.${if (unavailable) "unavailable" else "cancelled"}")
+    }
+
     fun account(state: String) = with(test) {
         content {
             id.walt.walletdemo.compose.ui.screens.AccountAuthScreen(
@@ -217,7 +236,7 @@ internal class WalletVisualScenarios(
             Column(Modifier.fillMaxSize()) {
                 WalletHeader(state, onSettings = {}, onScan = {}, onShareNearby = {})
                 CredentialsTab(state.session, modifier = Modifier.weight(1f))
-                WalletFooter(feedback = { StatusCard(state, {}, {}, WalletStatusPlacement.Footer) })
+                WalletFooter(feedback = { StatusCard(state, {}, {}) })
             }
         }
         if (empty) onNodeWithTag(WalletUiTestTags.CredentialsEmpty).assertIsDisplayed()
@@ -237,8 +256,27 @@ internal class WalletVisualScenarios(
             onNodeWithTag(WalletUiTestTags.ScanContinue).assertIsDisplayed().assertIsEnabled()
             onNodeWithText("Receive credentials").assertDoesNotExist()
             onNodeWithText("Share credentials").assertDoesNotExist()
+        } else if (state == "empty") {
+            onAllNodesWithTag(WalletUiTestTags.ScanInput).assertCountEquals(0)
+            onAllNodesWithTag(WalletUiTestTags.ScanContinue).assertCountEquals(0)
+            onNodeWithTag("wallet.scanMode").assertIsDisplayed().assertIsEnabled()
         } else onNodeWithTag(WalletUiTestTags.ScanContinue).assertIsDisplayed().assertIsNotEnabled()
         capture("wallet.scan.$state")
+    }
+
+    fun singleOffer() = with(test) {
+        val credential = WalletVisualFixtures.offer.offeredCredentials.first()
+        val state = WalletDemoUiState(
+            offerPreview = WalletVisualFixtures.offer.copy(offeredCredentials = listOf(credential)),
+            issuanceCopyCounts = mapOf(credential.configurationId to 1))
+        content {
+            ReceiveTab(state, state.requestDrafts, onOfferUrlChange = {}, onTxCodeChange = {},
+                onCopiesChange = { _, _ -> }, onPreviewOffer = {}, onAcceptOffer = {},
+                onDeclineOffer = {}, onResumeDeferred = {}, onDone = {}, onRefresh = {})
+        }
+        onNodeWithTag("issuance-select-${credential.configurationId}").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsDisplayed().assertIsEnabled()
+        capture("batch.offer.single_full_art")
     }
 
     fun credentialDetails() = with(test) {
@@ -362,12 +400,11 @@ internal class WalletVisualScenarios(
         )
         content {
             Column(Modifier.fillMaxSize()) {
-                WalletHeader(state, onSettings = {})
+                WalletHeader(state, onSettings = null, onClose = {}, title = "Receiving result")
                 ReceiveTab(state, state.requestDrafts, onOfferUrlChange = {}, onTxCodeChange = {},
                     onCopiesChange = { _, _ -> }, onPreviewOffer = {}, onAcceptOffer = {}, onDeclineOffer = {},
                     onResumeDeferred = {}, onDone = {}, onRefresh = {}, modifier = Modifier.weight(1f),
-                    contextualStatus = if (failure) ({ StatusCard(state, {}, {}, WalletStatusPlacement.Contextual) }) else null,
-                    feedback = if (failure) null else ({ StatusCard(state, {}, {}, WalletStatusPlacement.Footer) }))
+                    feedback = { StatusCard(state, {}, {}) })
             }
         }
         if (failure) {
@@ -394,7 +431,7 @@ internal class WalletVisualScenarios(
     fun nearbyState(kind: String) = with(test) {
         val fixtures = WalletVisualProximityFixtures
         val state = fixtures.state(kind)
-        content {
+        content { nearbyVisualHost {
             if (kind == "receipt") ReviewScaffold(actions = {
                 ProximityOutcomeActions(state, { it }, {}, {}, {}, {})
             }) {
@@ -406,8 +443,8 @@ internal class WalletVisualScenarios(
                 WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
                 onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> }, onContinueAfterResponseChange = {},
                 onApprove = {}, onDecline = {}, onRetry = {}, onRemediate = { _, _ -> },
-                onCancel = {}, onDismiss = {}, onRestart = {})
-        }
+                onCancel = {}, onDismiss = {}, onRestart = {}, headerOwnsClose = true)
+        } }
         when (kind) {
             "permission" -> onNode(hasText("Allow Bluetooth access") and hasClickAction()).assertIsDisplayed()
             "expired" -> { onNodeWithTag(WalletUiTestTags.ProximityRetry).assertIsDisplayed(); onNodeWithTag(WalletUiTestTags.ProximityDone).assertIsDisplayed() }
@@ -424,7 +461,7 @@ internal class WalletVisualScenarios(
     }
 
     fun nearbyReady() = with(test) {
-        content {
+        content { nearbyVisualHost {
             WalletDemoProximityScreen(
                 state = WalletDemoProximityUiState(active = true, sessionState = ProximityState.EngagementReady(
                     listOf(ProximityEngagement.Qr(WalletVisualFixtures.nearbyQrPayload)))),
@@ -432,12 +469,24 @@ internal class WalletVisualScenarios(
                 hostActions = WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
                 onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> }, onContinueAfterResponseChange = {},
                 onApprove = {}, onDecline = {}, onRetry = {}, onRemediate = { _, _ -> },
-                onCancel = {}, onDismiss = {}, onRestart = {},
+                onCancel = {}, onDismiss = {}, onRestart = {}, headerOwnsClose = true,
             )
-        }
+        } }
         onNodeWithTag(WalletUiTestTags.ProximityQr).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.ProximityCancel).assertIsDisplayed()
         capture("nearby.ready.qr")
+    }
+
+    @Composable
+    private fun nearbyVisualHost(content: @Composable () -> Unit) {
+        Column(Modifier.fillMaxSize()) {
+            WalletScreenHeader("Share nearby", leading = {
+                IconButton({}, modifier = Modifier.testTag(WalletUiTestTags.ProximityCancel)) {
+                    WalletIcon(WalletSymbol.Decline, "Close nearby sharing")
+                }
+            })
+            Box(Modifier.weight(1f)) { content() }
+        }
     }
 
     fun providerSharingReview(compact: Boolean = false) = with(test) {
@@ -485,7 +534,7 @@ internal class WalletVisualScenarios(
                 onNodeWithText("Not attempted: 2").performScrollTo().assertIsDisplayed()
                 onNodeWithTag("wallet.provider.done").assertIsDisplayed()
             }
-            is WalletDemoOfferCreateUiState.Failure -> onNodeWithText("Close").assertIsDisplayed()
+            is WalletDemoOfferCreateUiState.Failure -> onNodeWithContentDescription("Close request").assertIsDisplayed()
             else -> onNodeWithText("Cancel").assertIsDisplayed()
         }
         capture("receiving.provider.$kind")
@@ -496,7 +545,7 @@ internal class WalletVisualScenarios(
             WalletProviderStatusScreen(title = if (failure) "Unable to share" else "Preparing request…",
                 message = if (failure) "The request could not be verified." else null, onClose = {}, onDismiss = {})
         }
-        onNodeWithText(if (failure) "Close" else "Cancel").assertIsDisplayed()
+        onNodeWithContentDescription("Close request").assertIsDisplayed()
         capture(if (failure) "sharing.provider.failure" else "sharing.provider.preparing")
     }
 

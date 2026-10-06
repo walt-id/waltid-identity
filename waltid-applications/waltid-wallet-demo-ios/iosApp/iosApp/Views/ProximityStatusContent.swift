@@ -72,7 +72,7 @@ struct ProximityOutcomeActions: View {
 
     private var done: WalletAction {
         WalletAction(String(localized: "Done"), enabled: viewModel.hostActionInProgress == nil,
-            identifier: WalletAccessibilityID.proximityDoneButton, perform: viewModel.dismiss)
+            identifier: WalletAccessibilityID.proximityDoneButton, perform: viewModel.requestClose)
     }
 
     private var error: ProximityError? {

@@ -213,26 +213,28 @@ final class WalletE2EUI {
 
     func returnToWallet() {
         dismissKeyboardIfPresent()
-        // Automatic issuance completion may already have returned home. Avoid
-        // tapping a disappearing back button from the previous navigation frame.
         let home = app.buttons["wallet.scanButton"]
-        if home.exists && home.isHittable { return }
-        // Close only known wallet destinations, starting with the innermost sheet.
-        for identifier in ["wallet-detail-close", "wallet.presentationClaimsClose", "wallet.detailsBack", "wallet.flowBack"] {
-            let button = app.buttons[identifier]
-            if home.exists && home.isHittable { break }
-            if button.exists && button.isHittable {
+        for _ in 0..<6 {
+            if home.exists && home.isHittable { return }
+            let identifiers = ["wallet.presentationDone", "issuance-done", "wallet-detail-close",
+                "wallet.detailsBack", "wallet.flowBack", "wallet.external.close"]
+            if let button = identifiers.map({ app.buttons[$0] }).first(where: { $0.exists && $0.isHittable }) {
                 button.tap()
-                let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: button)
-                XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 5), .completed)
+            } else {
+                tapNavigationBack()
             }
         }
-        XCTAssertTrue(home.waitForExistence(timeout: 10), "Wallet home did not appear")
+        XCTAssertTrue(home.exists && home.isHittable, "Wallet home did not appear: \(app.debugDescription)")
     }
 
     func openScanner() {
         returnToWallet()
-        tapButton(identifier: "wallet.scanButton", fallbackLabel: "Scan or paste")
+        tapButton(identifier: "wallet.scanButton", fallbackLabel: "Scan QR code")
+        XCTAssertTrue(app.buttons["wallet.scanMode"].waitForExistence(timeout: 10))
+        // A simulator may report the camera unavailable; manual entry is then already offered.
+        if !textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request").exists {
+            tapButton(identifier: "wallet.scanMode", fallbackLabel: "Enter a link")
+        }
         XCTAssertTrue(textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request").waitForExistence(timeout: 10))
     }
 
@@ -261,8 +263,10 @@ final class WalletE2EUI {
             }
         }
 
+        let scannerInput = element.identifier == "wallet.scanInput"
         element.typeText(value)
-        submitFocusedInput(element)
+        // Scanner Go starts resolution. Keep the draft editable until the caller chooses Continue.
+        if !scannerInput { submitFocusedInput(element) }
     }
 
     private func makeHittable(_ element: XCUIElement) {

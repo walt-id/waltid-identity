@@ -18,7 +18,9 @@ An offer can show issuer-provided claim definitions and mandatory/optional facts
 
 Offer rows reuse credential thumbnails and provide separate inclusion, copy-count and information controls. Opening or closing information does not change selection. Unselected rows remain inspectable. Definitions use issuer order and labels with the same vocabulary fallback as stored details; the UI never inserts sample values. The shared batch fixture covers two selected types/three copies, no selection, and definitions. Compact dark fixtures exercise scrolling and retained actions at large text sizes.
 
-Review thumbnails show the credential logo centered on its supplied background color/image (with the existing default when absent). The title is rendered beside the thumbnail, never overlaid inside it. Supplied image pixels remain intact; any lettering already embedded in that image is not edited out. At large text sizes the thumbnail becomes smaller and the title wraps beside it; the user’s chosen text size is preserved.
+Review thumbnails use the credential logo centered on the supplied background color, ignoring credential artwork when that color is available. Without a usable background color, use available credential artwork; when artwork is missing or fails to load, use the supplied logo on the default background. A missing logo stays absent. The title is rendered beside the thumbnail, never overlaid inside it. Supplied artwork pixels remain intact, including embedded lettering. A single offered configuration uses larger full artwork; multiple offered configurations and sharing use compact thumbnails. At large text sizes the thumbnail becomes smaller and the title wraps beside it; the user's chosen text size is preserved.
+
+Details push within their current screen or sheet with one navigation header. Back restores the offer or sharing choices. Requested data, all readable data and technical details remain separate destinations; no live acceptance or sharing actions remain behind a detail page.
 
 ## Values and media
 

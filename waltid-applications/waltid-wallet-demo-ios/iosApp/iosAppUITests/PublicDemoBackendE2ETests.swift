@@ -148,7 +148,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.")
         ui.assertExists(identifier: "wallet.presentationClaimsDialog")
         XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForExistence(timeout: 20))
-        ui.tapButton(identifier: "wallet.presentationClaimsClose", fallbackLabel: "Close")
+        ui.tapNavigationBack()
 
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
 

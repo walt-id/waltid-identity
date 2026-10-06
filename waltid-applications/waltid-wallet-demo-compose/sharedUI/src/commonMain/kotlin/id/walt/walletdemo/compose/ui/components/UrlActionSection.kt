@@ -55,8 +55,8 @@ internal fun UrlActionSection(
         )
         contentBeforeActions()
         WalletActions(
-            primary = WalletAction(buttonText, onClick, enabled, buttonTestTag, WalletSymbol.Next),
-            secondary = WalletAction("Scan QR", { scannerVisible = true }, inputEnabled, scanButtonTestTag, WalletSymbol.Scan),
+            primary = WalletAction(buttonText, onClick, enabled, buttonTestTag),
+            secondary = WalletAction("Scan QR", { scannerVisible = true }, inputEnabled, scanButtonTestTag),
         )
     }
 

@@ -36,7 +36,6 @@ internal fun ReceiveTab(
     modifier: Modifier = Modifier,
     fillViewport: Boolean = true,
     feedback: (@Composable () -> Unit)? = null,
-    contextualStatus: (@Composable () -> Unit)? = null,
 ) {
     val preview = state.offerPreview
     if (preview != null) {
@@ -54,7 +53,6 @@ internal fun ReceiveTab(
                 )
             },
         ) {
-            contextualStatus?.invoke()
             OfferReviewSection(
                 preview = preview,
                 acceptEnabled = state.acceptOfferEnabled,
@@ -76,13 +74,12 @@ internal fun ReceiveTab(
         ReviewScaffold(fillViewport = fillViewport, feedback = feedback,
             modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent), actions = {
             WalletActions(WalletAction(stringResource(Res.string.issuance_done), onDone,
-                enabled = !state.isBusy, testTag = "issuance-done", icon = WalletSymbol.Accept),
+                enabled = !state.isBusy, testTag = "issuance-done"),
                 secondary = pending.takeIf { it.isNotEmpty() }?.let {
                     WalletAction(stringResource(Res.string.issuance_refresh_status), onRefresh,
-                        enabled = !state.isBusy, testTag = "issuance-refresh", icon = WalletSymbol.Retry)
+                        enabled = !state.isBusy, testTag = "issuance-refresh")
                 })
         }) {
-            contextualStatus?.invoke()
             IssuanceResultContent(state.issuanceReceipt, state.receivedCredentials(), pending, state.isBusy, onResumeDeferred)
         }
         return
@@ -95,7 +92,6 @@ internal fun ReceiveTab(
 
     ReviewScaffold(modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent),
         fillViewport = fillViewport, feedback = feedback) {
-        contextualStatus?.invoke()
         UrlActionSection(
             value = requestDrafts.offerUrl,
             onValueChange = onOfferUrlChange,

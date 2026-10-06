@@ -66,6 +66,7 @@ internal fun OfferReviewSection(
                         count = copies[credential.configurationId] ?: 1,
                         limit = issuanceCopyLimit(preview, copies, credential.configurationId),
                         enabled = reviewEnabled,
+                        largeArt = preview.offeredCredentials.size == 1,
                         onCountChange = onCopiesChange?.let { change -> { count -> change(credential.configurationId, count) } },
                     )
                 }

@@ -84,6 +84,8 @@ class WalletVisualIosTest {
     @Test fun pinConfirmation() = scenario { pin("confirmation") }
     @Test fun pinBiometricPrompt() = scenario { pin("biometric_prompt") }
     @Test fun pinUnlock() = scenario { pin("unlock") }
+    @Test fun biometricCancelled() = scenario { biometricSetup() }
+    @Test fun biometricUnavailable() = scenario { biometricSetup(unavailable = true) }
     @Test fun pinCompact() = scenario(size = Size(320f, 568f), fontScale = 1.5f, dark = true) { pin("compact_dark_large_text") }
 
     @Test fun homeEmpty() = scenario { walletHome(empty = true) }
@@ -103,6 +105,8 @@ class WalletVisualIosTest {
 
     @Test
     fun batchOffer() = scenario { batchOffer() }
+
+    @Test fun singleOffer() = scenario { singleOffer() }
 
     @Test
     fun offerDefinitions() = scenario { offerDefinitions() }

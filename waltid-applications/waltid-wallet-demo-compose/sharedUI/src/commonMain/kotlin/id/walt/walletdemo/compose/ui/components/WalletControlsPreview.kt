@@ -18,12 +18,12 @@ internal fun WalletControlsPreview() {
     Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Text("Actions and counts", style = MaterialTheme.typography.titleLarge)
         WalletActions(
-            primary = WalletAction("Continue", {}, icon = WalletSymbol.Next),
-            secondary = WalletAction("Cancel", {}, icon = WalletSymbol.Decline),
+            primary = WalletAction("Continue", {}),
+            secondary = WalletAction("Cancel", {}),
         )
         WalletActions(
-            primary = WalletAction("Working…", {}, enabled = false, icon = WalletSymbol.Accept),
-            secondary = WalletAction("Cancel", {}, enabled = false, icon = WalletSymbol.Decline),
+            primary = WalletAction("Working…", {}, enabled = false),
+            secondary = WalletAction("Cancel", {}, enabled = false),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically) {

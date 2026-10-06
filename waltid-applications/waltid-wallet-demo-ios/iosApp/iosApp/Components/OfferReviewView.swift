@@ -28,7 +28,7 @@ struct OfferReviewView: View {
                                 issuerIdentifier: preview.issuer.identifier,
                                 copies: Binding(get: { copies[credential.configurationID] ?? 1 },
                                                 set: { onCopiesChange(credential.configurationID, $0) }),
-                                limit: preview.batchSize ?? 1, enabled: isReviewEnabled)
+                                limit: preview.batchSize ?? 1, enabled: isReviewEnabled, largeArt: preview.credentials.count == 1)
                             if credential.configurationID != preview.credentials.last?.configurationID { Divider() }
                         }
                     }

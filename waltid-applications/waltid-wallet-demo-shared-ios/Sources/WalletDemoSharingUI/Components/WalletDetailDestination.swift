@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension View {
+public extension View {
     /// One compatibility seam keeps information pages in the same native navigation container.
     @ViewBuilder
     func walletDetailDestination<Destination: View>(

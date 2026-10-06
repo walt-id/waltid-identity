@@ -42,7 +42,7 @@ struct SharingCredentialRow: View {
         .padding(.horizontal, 12).padding(.vertical, 8)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(WalletAccessibilityID.presentationCredential(option.selection.id))
-        .sheet(isPresented: $claimsOpen) {
+        .walletReviewDestination(isPresented: $claimsOpen) {
             SharingClaimsSheet(
                 option: option,
                 details: details,
@@ -71,10 +71,20 @@ private struct SharingClaimsSheet: View {
     let onDismiss: () -> Void
 
     @State private var allInformationOpen = false
+    @Environment(\.walletReviewNavigationAvailable) private var hasNavigation
 
     var body: some View {
-        WalletDetailSheet(String(localized: "Credential information", bundle: .module), onDismiss: onDismiss,
-            closeIdentifier: WalletAccessibilityID.presentationClaimsClose) {
+        Group {
+            if hasNavigation { WalletDetailPage(String(localized: "Credential information", bundle: .module)) { content } }
+            else {
+                WalletDetailSheet(String(localized: "Credential information", bundle: .module), onDismiss: onDismiss,
+                    closeIdentifier: WalletAccessibilityID.presentationClaimsClose) { content }
+            }
+        }
+        .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsDialog)
+    }
+
+    private var content: some View {
             VStack(alignment: .leading, spacing: 16) {
                 CredentialSummaryRow(summary: details.cardSummary, showsIssuer: false)
                 SharingClaimsIssuerRow(details: details)
@@ -102,8 +112,6 @@ private struct SharingClaimsSheet: View {
                 }
                 .accessibilityIdentifier("review-all-information-details")
             }
-        }
-        .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsDialog)
     }
 }
 

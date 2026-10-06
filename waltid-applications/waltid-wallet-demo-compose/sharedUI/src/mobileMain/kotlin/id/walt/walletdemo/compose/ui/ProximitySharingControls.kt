@@ -32,23 +32,13 @@ internal fun ProximityEngagementChoice(
     onClick: () -> Unit,
 ) {
     val nfc = method == ProximityEngagementMethod.Nfc
-    TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth().testTag("proximity-show-${method.name}")) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(painterResource(if (nfc) Res.drawable.proximity_nfc else Res.drawable.proximity_qr),
-                contentDescription = null, modifier = Modifier.size(24.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(if (nfc) Res.string.proximity_tap_reader else Res.string.proximity_show_qr),
-                    style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(if (nfc) Res.string.proximity_tap_description else Res.string.proximity_qr_description),
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-    HorizontalDivider()
+    id.walt.walletdemo.compose.ui.components.WalletNavigationRow(
+        title = stringResource(if (nfc) Res.string.proximity_tap_reader else Res.string.proximity_show_qr),
+        summary = stringResource(if (nfc) Res.string.proximity_tap_description else Res.string.proximity_qr_description),
+        onClick = onClick, enabled = enabled, modifier = Modifier.testTag("proximity-show-${method.name}"),
+        icon = { Icon(painterResource(if (nfc) Res.drawable.proximity_nfc else Res.drawable.proximity_qr),
+            contentDescription = null, modifier = Modifier.size(24.dp)) },
+    )
 }
 
 @Composable

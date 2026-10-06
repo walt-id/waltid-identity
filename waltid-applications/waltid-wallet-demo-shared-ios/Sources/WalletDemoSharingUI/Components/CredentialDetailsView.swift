@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Standalone credential content presents its one technical-information destination.
+/// Credential content pushes technical information within its existing navigation owner.
 public struct CredentialDetailsView: View {
     public let details: CredentialDetails
     @State private var technicalOpen = false
@@ -9,8 +9,8 @@ public struct CredentialDetailsView: View {
 
     public var body: some View {
         CredentialDetailsBody(details: details, onTechnicalDetails: { technicalOpen = true })
-            .sheet(isPresented: $technicalOpen) {
-                WalletDetailSheet(String(localized: "Technical details", bundle: .module), onDismiss: { technicalOpen = false }) {
+            .walletDetailDestination(isPresented: $technicalOpen) {
+                WalletDetailPage(String(localized: "Technical details", bundle: .module)) {
                     CredentialTechnicalInformation(details: details)
                 }
             }

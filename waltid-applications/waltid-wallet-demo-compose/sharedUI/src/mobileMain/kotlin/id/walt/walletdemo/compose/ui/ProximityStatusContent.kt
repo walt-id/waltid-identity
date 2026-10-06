@@ -79,7 +79,7 @@ internal fun ProximityOutcomeActions(
     onReviewRecentRequest: () -> Unit,
 ) {
     val done = WalletAction(stringResource(Res.string.proximity_done), onDismiss,
-        enabled = state.hostActionInProgress == null, testTag = WalletUiTestTags.ProximityDone, icon = WalletSymbol.Accept)
+        enabled = state.hostActionInProgress == null, testTag = WalletUiTestTags.ProximityDone)
     val failed = state.sessionState as? ProximityState.Failed
     val remediation = failed?.error?.remediationActions?.firstOrNull {
         it != ProximityRemediationAction.Retry && it != ProximityRemediationAction.UseSupportedDevice
@@ -87,14 +87,14 @@ internal fun ProximityOutcomeActions(
     when {
         remediation != null -> WalletActions(
             primary = WalletAction(hostActionForDisplay(remediation).label(), { onRemediate(remediation) },
-                enabled = state.hostActionInProgress == null, icon = WalletSymbol.Retry), secondary = done)
+                enabled = state.hostActionInProgress == null), secondary = done)
         failed?.error?.recovery == ProximityRecovery.StartNewSession -> WalletActions(
             primary = WalletAction(stringResource(Res.string.proximity_try_again), onRestart,
-                testTag = WalletUiTestTags.ProximityRetry, icon = WalletSymbol.Retry), secondary = done)
+                testTag = WalletUiTestTags.ProximityRetry), secondary = done)
         else -> WalletActions(primary = done, secondary =
             if (state.sessionState is ProximityState.Completed && state.recentPlan?.isExpired == false)
                 WalletAction(stringResource(Res.string.proximity_prepare_again), onReviewRecentRequest,
-                    testTag = "proximity-prepare-again", icon = WalletSymbol.Nearby)
+                    testTag = "proximity-prepare-again")
             else null)
     }
 }

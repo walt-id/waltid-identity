@@ -7,8 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -29,8 +28,8 @@ internal fun QrScannerDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 WalletScreenHeader("Scan QR code") {
-                    TextButton(onClick = onDismiss) {
-                        Text("Close")
+                    IconButton(onClick = onDismiss) {
+                        WalletIcon(WalletSymbol.Decline, "Close scanner")
                     }
                 }
                 PlatformQrScanner(

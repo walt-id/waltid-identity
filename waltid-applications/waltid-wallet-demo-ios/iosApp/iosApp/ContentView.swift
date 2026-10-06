@@ -15,7 +15,8 @@ struct ContentView: View {
                 if viewModel.auth != .unlocked || !viewModel.isReady {
                     HStack {
                         Spacer()
-                        Button { viewModel.closeExternalFlow() } label: { Label("Close request", systemImage: "xmark") }
+                        Button { viewModel.closeExternalFlow() } label: { Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44) }
+                            .accessibilityLabel("Close request")
                             .disabled(!viewModel.canDismissExternalFlow)
                             .accessibilityIdentifier("wallet.external.close")
                     }.padding()
@@ -62,6 +63,8 @@ struct ContentView: View {
             switch viewModel.auth {
             case .setup, .login:
                 PinView(viewModel: viewModel)
+            case .biometricSetup:
+                BiometricSetupView(viewModel: viewModel)
             case .storageUnavailable(let message):
                 pinStorageUnavailable(message)
             case .unlocked:

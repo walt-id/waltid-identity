@@ -49,6 +49,7 @@ struct ProximityDocumentSelection: Equatable {
 @MainActor
 final class ProximityPresentationViewModel: ObservableObject {
     @Published private(set) var active = false
+    @Published private(set) var closing = false
     @Published private(set) var pendingReviewID: ProximityReviewID?
     @Published private(set) var sessionState: ProximityState?
     @Published private(set) var selections: [ProximityDocumentSelection] = []
@@ -119,8 +120,17 @@ final class ProximityPresentationViewModel: ObservableObject {
         return false
     }
 
+    var canClose: Bool {
+        active && !closing && (isTerminal || preparingApproval || sessionState == nil || sessionState?.legalActions.contains(.cancel) == true)
+    }
+
+    var canChangeConnectionOptions: Bool {
+        guard active, !closing, preparedSharing == nil, hostActionInProgress == nil else { return false }
+        switch sessionState { case .checkingPrerequisites, .engagementReady: return true; default: return false }
+    }
+
     var canApprove: Bool {
-        guard pendingReviewID == nil, let review else { return false }
+        guard !closing, pendingReviewID == nil, let review else { return false }
         return Set(selections.map(\.requestIndex)) == Set(review.documents.map(\.requestIndex))
             && selections.allSatisfy { selected in
                 !selected.disclosedElements.isEmpty && review.documents.first(where: { $0.requestIndex == selected.requestIndex })?
@@ -415,6 +425,42 @@ final class ProximityPresentationViewModel: ObservableObject {
         }
     }
 
+    /// Hide only after the accepted cancellation and session cleanup; a rejected cancellation stays visible.
+    func requestClose() {
+        guard canClose else { return }
+        let currentSession = session
+        let shouldCancel = currentSession != nil && !isTerminal && !preparingApproval && sessionState != nil
+        let generation = sessionGeneration
+        closing = true
+        actionErrorMessage = nil
+        Task { [weak self] in
+            guard let self else { return }
+            if shouldCancel, let currentSession {
+                do {
+                    let result = try await currentSession.dispatch(.cancel)
+                    guard active, sessionGeneration == generation else { return }
+                    if case .rejected(let error) = result {
+                        closing = false
+                        actionErrorMessage = error.message
+                        return
+                    }
+                } catch {
+                    guard active, sessionGeneration == generation else { return }
+                    closing = false
+                    actionErrorMessage = Self.demoSessionFailureMessage
+                    return
+                }
+            }
+            guard active, sessionGeneration == generation else { return }
+            dismiss(resetUI: false)
+            let closingGeneration = sessionGeneration
+            await cleanupTask?.value
+            guard sessionGeneration == closingGeneration else { return }
+            closing = false
+            active = false
+        }
+    }
+
     func cancel() {
         if preparingApproval { dismiss(); return }
         guard session != nil else {
@@ -450,7 +496,9 @@ final class ProximityPresentationViewModel: ObservableObject {
         await cleanupTask?.value
     }
 
-    func dismiss() {
+    func dismiss() { dismiss(resetUI: true) }
+
+    private func dismiss(resetUI: Bool) {
         sessionGeneration &+= 1
         let starting = observationTask
         let hostAction = hostActionTask
@@ -468,7 +516,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         let revoking = preparedSharing
         preparedSharing = nil
         recentPlan = nil
-        active = false
+        if resetUI { active = false; self.closing = false }
         pendingReviewID = nil
         refreshingEngagementChoices = []
         sessionState = nil
@@ -504,7 +552,7 @@ final class ProximityPresentationViewModel: ObservableObject {
 
     /// Applies saved settings only before connection, without issuing or changing an approval.
     func refreshPreferences() {
-        guard active, preparedSharing == nil, hostActionInProgress == nil,
+        guard active, !closing, preparedSharing == nil, hostActionInProgress == nil,
               let previous = effectiveConfiguration else { return }
         switch sessionState {
         case .engagementReady: break
