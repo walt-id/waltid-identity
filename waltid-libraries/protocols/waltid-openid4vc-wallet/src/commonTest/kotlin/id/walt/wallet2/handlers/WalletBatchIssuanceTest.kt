@@ -72,7 +72,7 @@ class WalletBatchIssuanceTest {
         var tokenCalls = 0
         var proofs = emptyList<String>()
         var credentialCalls = 0
-        val records = MemorySessionStore()
+        val records = InMemoryIssuanceSessionStore()
         val http = batchTestClient(metadata = metadata.toString(), token = { tokenCalls++; BATCH_TEST_TOKEN },
             credentialStatus = if (deferred) HttpStatusCode.Accepted else HttpStatusCode.OK,
             credential = {
