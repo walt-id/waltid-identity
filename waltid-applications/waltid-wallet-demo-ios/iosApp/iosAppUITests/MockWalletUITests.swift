@@ -27,14 +27,14 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["PIN confirmation does not match"].waitForExistence(timeout: 5))
         ui.replaceText(in: confirmation, value: "1234")
         ui.tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Continue")
-        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10), "Wallet ready")
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: 10), "Wallet ready")
     }
 
     func testWalletHomeScannerRoutesOfferAndBackCancelsReview() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
-        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10), "Wallet ready")
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: 10), "Wallet ready")
         XCTAssertFalse(app.tabBars.firstMatch.exists)
         XCTAssertTrue(app.buttons["wallet.proximityStartButton"].exists)
         ui.tapButton(identifier: "wallet.scanButton", fallbackLabel: "Scan or paste a link")
