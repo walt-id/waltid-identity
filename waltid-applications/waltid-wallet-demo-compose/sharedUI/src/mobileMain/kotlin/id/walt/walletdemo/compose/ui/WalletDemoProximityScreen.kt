@@ -34,6 +34,7 @@ import id.walt.walletdemo.compose.ui.components.WalletAction
 import id.walt.walletdemo.compose.ui.components.WalletActions
 import id.walt.walletdemo.compose.ui.components.WalletFooter
 import id.walt.walletdemo.compose.ui.components.WalletSymbol
+import id.walt.walletdemo.compose.ui.components.rememberSuccessDismissal
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -76,6 +77,10 @@ internal fun WalletDemoProximityScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .then(rememberSuccessDismissal(key = sessionState ?: "nearby-preparing",
+                enabled = sessionState is ProximityState.Completed && !sessionState.declined && sessionState.receipt != null
+                    && !state.closing && state.actionError == null && state.hostActionInProgress == null,
+                onDone = onDismiss))
             .testTag(WalletUiTestTags.ProximityScreen)
             .semantics { paneTitle = screenTitle },
     ) {

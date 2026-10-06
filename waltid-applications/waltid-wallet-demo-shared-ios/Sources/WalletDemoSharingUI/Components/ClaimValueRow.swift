@@ -10,14 +10,8 @@ public struct ClaimValueRow: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(item.label)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityIdentifier(WalletAccessibilityID.claim(item.path.id))
+        CredentialDataRow(item.label, labelIdentifier: WalletAccessibilityID.claim(item.path.id)) {
             ClaimValueView(value: item.value, path: item.path)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

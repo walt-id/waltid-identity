@@ -8,6 +8,8 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class WalletDemoAppAndroidTest {
+    @Test fun openingExternalReviewInAppPreservesSelectionsWithoutReplayingTheRequest() = scenarios.openingExternalReviewInAppPreservesSelectionsWithoutReplayingTheRequest()
+
     @Test fun externalOfferFailureRemainsVisibleAndCanBeCorrected() = scenarios.externalOfferFailureRemainsVisibleAndCanBeCorrected()
 
     @Test fun keySetupDefaultNeedsOneConfirmation() = scenarios.keySetupDefaultNeedsOneConfirmation()

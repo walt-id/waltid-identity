@@ -71,6 +71,7 @@ class MainActivity : FragmentActivity() {
         setContent {
             MobileWalletDemoApp(controller, proximityController, readerTrustSettingsController,
                 externalBackground = if (launchedForExternalFlow && !isTaskRoot) WalletExternalBackground.Caller else WalletExternalBackground.Wallet,
+                onOpenExternalInApp = { launchedForExternalFlow = false },
                 onExternalFlowClosed = { if (launchedForExternalFlow) finish() })
         }
     }

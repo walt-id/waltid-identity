@@ -21,23 +21,22 @@ public struct OfferedCredentialDetails: View {
         Text(String(localized: "Values have not been received yet.", bundle: .module))
             .foregroundStyle(.secondary)
         WalletSection(String(localized: "Claim definitions", bundle: .module)) {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
                 if definitions.isEmpty {
-                    Text(String(localized: "The issuer has not supplied claim definitions.", bundle: .module)).padding(16)
+                    Text(String(localized: "The issuer has not supplied claim definitions.", bundle: .module))
                 } else {
                     ForEach(definitions, id: \.path) { claim in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(claim.name ?? MdocClaimDisplaySemantics.describe(format: credential.format, path: claim.path)?.label
-                                 ?? CredentialDisplayVocabulary.humanizedLabel(claim.path.last ?? ""))
+                        CredentialDataRow(claim.name ?? MdocClaimDisplaySemantics.describe(format: credential.format, path: claim.path)?.label
+                                 ?? CredentialDisplayVocabulary.humanizedLabel(claim.path.last ?? "")) {
                             Text(claim.mandatory == true
                                  ? String(localized: "Always included", bundle: .module)
                                  : String(localized: "May be included", bundle: .module))
-                                .font(.footnote).foregroundStyle(.secondary)
-                        }.frame(maxWidth: .infinity, alignment: .leading).padding(16)
-                        if claim.path != definitions.last?.path { Divider().padding(.leading, 16) }
+                                .font(.body)
+                        }
+                        if claim.path != definitions.last?.path { Divider() }
                     }
                 }
-            }
+            }.padding(16)
         }
         Text(String(localized: "These definitions describe the offer. Review the actual values after receiving.", bundle: .module))
             .font(.footnote).foregroundStyle(.secondary)

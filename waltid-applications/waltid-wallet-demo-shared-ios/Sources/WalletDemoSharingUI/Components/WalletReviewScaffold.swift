@@ -4,15 +4,18 @@ import SwiftUI
 /// The parent owns the sheet/full-screen presentation and the request's state.
 public struct WalletReviewScaffold<Content: View, Actions: View>: View {
     private let showsActions: Bool
+    private let background: Color
     private let content: Content
     private let actions: Actions
 
     public init(
         showsActions: Bool = true,
+        background: Color = Color(.systemGroupedBackground),
         @ViewBuilder content: () -> Content,
         @ViewBuilder actions: () -> Actions
     ) {
         self.showsActions = showsActions
+        self.background = background
         self.content = content()
         self.actions = actions()
     }
@@ -28,6 +31,6 @@ public struct WalletReviewScaffold<Content: View, Actions: View>: View {
                 WalletFooter { actions }
             }
         }
-        .background(Color(.systemGroupedBackground))
+        .background(background)
     }
 }

@@ -31,7 +31,8 @@ struct WalletScanView: View {
 
     var body: some View {
         WalletNavigationContainer {
-            WalletReviewScaffold(showsActions: manual || resolving || resolutionError != nil) {
+            WalletReviewScaffold(showsActions: manual || resolving || resolutionError != nil,
+                background: Color(.secondarySystemGroupedBackground)) {
                 if manual { manualInput }
                 else if scenePhase == .active && !resolving && !dispatched {
                     CodeScannerView(codeTypes: [.qr], scanMode: .once, showViewfinder: true, requiresPhotoOutput: false) { result in
@@ -49,6 +50,7 @@ struct WalletScanView: View {
                     .accessibilityIdentifier("wallet.scanPreview")
                 }
                 if let explanation, manual { Text(explanation).font(.subheadline).foregroundStyle(.secondary) }
+                Color.clear.frame(height: 16)
             } actions: {
                 if resolving { ProgressView("Opening link…").frame(maxWidth: .infinity, alignment: .leading) }
                 if let resolutionError { Text(resolutionError).font(.subheadline).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading) }
@@ -59,6 +61,7 @@ struct WalletScanView: View {
                         enabled: !dispatched && !resolving && [.offer, .presentation, .authorizationCallback, .web].contains(kind),
                         identifier: "wallet.scanContinue"
                     ) { open(input) })
+                    .padding(.bottom, inputFocused ? 48 : 0)
                 }
             }
             .navigationTitle(manual ? "Enter a link" : "Scan QR code")
@@ -77,6 +80,7 @@ struct WalletScanView: View {
             }
         }
         .accessibilityIdentifier("wallet.scanScreen")
+        .modifier(ScannerSheetSurface(expanded: manual))
         .onChange(of: input) { _ in resolutionError = nil }
         .onChange(of: manual) { manual in inputFocused = manual }
         .onDisappear { resolutionTask?.cancel() }
@@ -129,5 +133,21 @@ struct WalletScanView: View {
                     ?? "Could not open this link. Check your connection and try again."
             }
         }
+    }
+}
+
+/// Native sheet chrome provides the shadow/scrim; a separate surface keeps it visible in dark mode.
+private struct ScannerSheetSurface: ViewModifier {
+    let expanded: Bool
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 16.4, *) {
+            content.presentationDetents(expanded ? [.large] : [.fraction(0.65), .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color(.secondarySystemGroupedBackground))
+                .presentationCornerRadius(28)
+        } else if #available(iOS 16, *) {
+            content.presentationDetents(expanded ? [.large] : [.fraction(0.65), .large])
+                .presentationDragIndicator(.visible)
+        } else { content }
     }
 }

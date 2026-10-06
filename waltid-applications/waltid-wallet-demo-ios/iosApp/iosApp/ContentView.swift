@@ -3,17 +3,22 @@ import WalletDemoSharingUI
 
 struct ContentView: View {
     @ObservedObject var viewModel: WalletViewModel
+    @State private var expandingExternalFlow = false
+    @State private var expandedExternalFlow = false
 
     var body: some View {
         Group {
             if viewModel.externalFlow != nil { Color(.systemGroupedBackground).ignoresSafeArea() }
             else { walletContent }
         }
-        .sheet(isPresented: Binding(get: { viewModel.externalFlow != nil },
-            set: { if !$0 { viewModel.closeExternalFlow() } })) {
+        .sheet(isPresented: Binding(get: { viewModel.externalFlow != nil && !expandingExternalFlow },
+            set: { if !$0 && !expandingExternalFlow { viewModel.closeExternalFlow() } }), onDismiss: {
+                if expandingExternalFlow && viewModel.externalFlow != nil { expandedExternalFlow = true }
+            }) {
             VStack(spacing: 0) {
                 if viewModel.auth != .unlocked || !viewModel.isReady {
                     HStack {
+                        WalletOpenInAppButton()
                         Spacer()
                         Button { viewModel.closeExternalFlow() } label: { Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44) }
                             .accessibilityLabel("Close request")
@@ -27,9 +32,17 @@ struct ContentView: View {
             .interactiveDismissDisabled(!viewModel.canDismissExternalFlow || !viewModel.isReady)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("wallet.external.flow")
+            .environment(\.walletOpenInApp, { expandingExternalFlow = true })
         }
+        .fullScreenCover(isPresented: Binding(get: { expandedExternalFlow && viewModel.externalFlow != nil },
+            set: { if !$0 { viewModel.closeExternalFlow() } })) {
+                walletContent.accessibilityIdentifier("wallet.external.expanded")
+            }
         .task { viewModel.prepareExternalFlow() }
-        .onChange(of: viewModel.externalFlow) { _ in viewModel.prepareExternalFlow() }
+        .onChange(of: viewModel.externalFlow) { flow in
+            if flow == nil { expandingExternalFlow = false; expandedExternalFlow = false }
+            viewModel.prepareExternalFlow()
+        }
         .onChange(of: viewModel.isReady) { _ in viewModel.prepareExternalFlow() }
         .onChange(of: viewModel.isLoading) { _ in viewModel.prepareExternalFlow() }
         .onChange(of: viewModel.auth) { _ in viewModel.prepareExternalFlow() }

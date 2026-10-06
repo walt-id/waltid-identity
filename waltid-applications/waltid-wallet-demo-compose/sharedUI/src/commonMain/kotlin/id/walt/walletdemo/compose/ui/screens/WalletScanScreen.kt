@@ -90,7 +90,7 @@ internal fun WalletScanScreen(
     }
     SystemBackHandler(onBack = onBack, enabled = true)
     ReviewScaffold(
-        modifier = Modifier.heightIn(max = 640.dp).testTag(WalletUiTestTags.ScanScreen), fillViewport = false,
+        modifier = Modifier.heightIn(max = 700.dp).padding(bottom = 20.dp).testTag(WalletUiTestTags.ScanScreen), fillViewport = false,
         header = {
             WalletScreenHeader(if (manual) "Enter a link" else "Scan QR code", leading = {
                 IconButton(onClick = onBack, modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {

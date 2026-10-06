@@ -4,7 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 
 /** Platform accessibility choices affect presentation, never the wallet's consent or flow state. */
-internal data class WalletVisualPreferences(val reduceMotion: Boolean = false, val opaqueControls: Boolean = false)
+internal data class WalletVisualPreferences(
+    val reduceMotion: Boolean = false,
+    val opaqueControls: Boolean = false,
+    val screenReaderEnabled: Boolean = false,
+)
 
 internal val LocalWalletVisualPreferences = staticCompositionLocalOf { WalletVisualPreferences() }
 

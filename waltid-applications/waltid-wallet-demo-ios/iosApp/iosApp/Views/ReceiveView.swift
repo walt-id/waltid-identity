@@ -110,9 +110,18 @@ struct ReceiveView: View {
         } actions: {
             WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
             WalletActions(primary: WalletAction("Done", enabled: !viewModel.isLoading, identifier: "issuance-done") {
-                if viewModel.externalFlow != nil { viewModel.closeExternalFlow() } else { viewModel.selectedTab = .credentials }
+                finishReceiving()
             }, secondary: pendingCredentials.isEmpty ? nil : WalletAction("Refresh status",
                 enabled: !viewModel.isLoading, identifier: "issuance-refresh", perform: viewModel.refreshIssuanceStatus))
         }
+        .walletSuccessDismissal(key: viewModel.receiveNavigationResetKey,
+            enabled: viewModel.receiveCompleted && !viewModel.isLoading && !viewModel.statusIsError(for: .receive)
+                && viewModel.issuanceReceipt?.problem == nil && pendingCredentials.isEmpty
+                && !viewModel.receivedCredentials.isEmpty, onDone: finishReceiving)
+    }
+
+    private func finishReceiving() {
+        if viewModel.externalFlow != nil { viewModel.closeExternalFlow() }
+        else { viewModel.selectedTab = .credentials }
     }
 }

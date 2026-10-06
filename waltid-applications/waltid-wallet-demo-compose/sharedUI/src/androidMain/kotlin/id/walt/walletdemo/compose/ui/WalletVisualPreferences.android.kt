@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.ui
 
 import android.app.UiModeManager
 import android.os.Build
+import android.view.accessibility.AccessibilityManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -17,6 +18,13 @@ internal actual fun rememberWalletVisualPreferences(): WalletVisualPreferences {
     val motion = rememberCoroutineScope().coroutineContext[MotionDurationScale]
     val context = LocalContext.current
     val manager = remember(context) { context.getSystemService(UiModeManager::class.java) }
+    val accessibility = remember(context) { context.getSystemService(AccessibilityManager::class.java) }
+    var screenReader by remember(accessibility) { mutableStateOf(accessibility?.isTouchExplorationEnabled == true) }
+    DisposableEffect(accessibility) {
+        val listener = AccessibilityManager.TouchExplorationStateChangeListener { screenReader = it }
+        accessibility?.addTouchExplorationStateChangeListener(listener)
+        onDispose { accessibility?.removeTouchExplorationStateChangeListener(listener) }
+    }
     var contrast by remember(manager) { mutableStateOf(if (Build.VERSION.SDK_INT >= 34) manager?.contrast ?: 0f else 0f) }
     DisposableEffect(manager, context) {
         if (Build.VERSION.SDK_INT >= 34 && manager != null) {
@@ -28,5 +36,5 @@ internal actual fun rememberWalletVisualPreferences(): WalletVisualPreferences {
     // Keep older RenderNode invalidation workarounds out of the scrolling footer.
     // The Android 12 physical release comparison favors the designed opaque surface.
     return WalletVisualPreferences(reduceMotion = motion?.scaleFactor == 0f,
-        opaqueControls = Build.VERSION.SDK_INT < 33 || contrast >= .5f)
+        opaqueControls = Build.VERSION.SDK_INT < 33 || contrast >= .5f, screenReaderEnabled = screenReader)
 }

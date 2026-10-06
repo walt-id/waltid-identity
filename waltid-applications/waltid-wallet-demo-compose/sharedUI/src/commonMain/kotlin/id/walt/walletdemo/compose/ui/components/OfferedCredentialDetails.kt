@@ -21,12 +21,15 @@ internal fun OfferedCredentialDetails(credential: WalletDemoOfferedCredentialMet
         val definitions = credential.claimDisplayGroups().flatMap { it.claims }
         if (definitions.isEmpty()) {
             Text(stringResource(Res.string.issuance_no_definitions), Modifier.padding(16.dp))
-        } else definitions.forEachIndexed { index, definition ->
-            if (index > 0) HorizontalDivider(Modifier.padding(start = 16.dp))
-            ListItem(headlineContent = { Text(definition.label) },
-                supportingContent = { Text(stringResource(if (credential.claims[index].mandatory == true)
-                    Res.string.issuance_always_included else Res.string.issuance_may_be_included)) },
-                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow))
+        } else Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            definitions.forEachIndexed { index, definition ->
+                if (index > 0) MetadataRowDivider()
+                CredentialDataRow(definition.label) {
+                    Text(stringResource(if (credential.claims[index].mandatory == true)
+                        Res.string.issuance_always_included else Res.string.issuance_may_be_included),
+                        style = MaterialTheme.typography.bodyLarge)
+                }
+            }
         }
     }
     WalletSection(title = stringResource(Res.string.credential_technical_details)) {
