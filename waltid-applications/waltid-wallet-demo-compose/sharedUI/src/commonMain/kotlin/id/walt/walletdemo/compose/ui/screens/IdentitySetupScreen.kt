@@ -136,7 +136,6 @@ internal fun IdentitySetupScreen(
                 }
             }
             if (selected != null) {
-                HorizontalDivider()
                 WalletActionBar(
                     primary = WalletAction(
                         label = if (page != IdentitySetupPage.Summary) stringResource(Res.string.issuance_done)

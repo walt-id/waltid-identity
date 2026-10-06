@@ -2,6 +2,7 @@
     <string name="issuance_offered_credentials">Offered credentials</string>
     <string name="issuance_information">Credential information</string>
     <string name="issuance_receive_named">Receive %1$s</string>
+    <string name="issuance_receive">Receive</string>
     <string name="issuance_copies">Copies: %1$d</string>
     <string name="issuance_more_copies">More copies of %1$s</string>
     <string name="issuance_fewer_copies">Fewer copies of %1$s</string>
