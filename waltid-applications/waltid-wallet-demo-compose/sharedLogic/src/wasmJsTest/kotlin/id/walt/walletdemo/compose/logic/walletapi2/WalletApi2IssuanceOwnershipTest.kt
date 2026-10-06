@@ -23,6 +23,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -304,6 +305,73 @@ class WalletApi2IssuanceOwnershipTest {
         }
     }
 
+    @Test
+    fun authorizationCallbackIsNotDeliveredToADifferentWallet() = runTest {
+        withFixture {
+            val session = start(authorization = true)
+            wallet.beginAuthorizationIssuance(session, copies(1))
+            assertEquals("wallet", WalletApi2BrowserSessionStore.loadPendingIssuance()?.walletId)
+            val other = walletFor("other-wallet")
+            assertNull(other.pendingAuthorizationIssuance())
+            assertFailsWith<IllegalStateException> {
+                other.continueAuthorizationIssuance(session, "https://wallet.example/callback?code=code&state=state")
+            }
+            assertEquals(session, wallet.pendingAuthorizationIssuance()?.id)
+            assertTrue(receiveBodies.isEmpty())
+        }
+    }
+
+    @Test
+    fun enterpriseUsesMatchingStoredKeysInsteadOfGeneratingCopies() = runTest {
+        val requests = mutableListOf<String>()
+        val receiveBodies = mutableListOf<JsonObject>()
+        val http = HttpClient(MockEngine { request ->
+            requests += "${request.method.value} ${request.url.encodedPath}"
+            val path = request.url.encodedPath
+            val body = when {
+                path.endsWith("/keys") -> """[
+                  {"keyId":"key-0","keyType":"secp256r1","publicJwk":{"kty":"EC","crv":"P-256","x":"x0","y":"yy"}},
+                  {"keyId":"key-1","keyType":"secp256r1","publicJwk":{"kty":"EC","crv":"P-256","x":"x1","y":"yy"}},
+                  {"keyId":"key-2","keyType":"secp256r1","publicJwk":{"kty":"EC","crv":"P-256","x":"x2","y":"yy"}}
+                ]"""
+                path.endsWith("/dids") -> """[
+                  {"did":"did:jwk:one","document":{"verificationMethod":[{"publicKeyJwk":{"kty":"EC","crv":"P-256","x":"x1","y":"yy"}}]}},
+                  {"did":"did:jwk:two","document":{"verificationMethod":[{"publicKeyJwk":{"kty":"EC","crv":"P-256","x":"x2","y":"yy"}}]}}
+                ]"""
+                path.endsWith("resolve-offer/batch") -> """{"offer":{"credentialIssuer":"https://issuer.example","credentialEndpoint":"https://issuer.example/credential","preAuthorizedCode":"pre","issuer":{"credentialIssuer":"https://issuer.example"},"offeredCredentials":[{"configurationId":"pid","format":"mso_mdoc"}]},"batchSize":3}"""
+                path.endsWith("/receive") -> {
+                    receiveBodies += walletApi2Json.parseToJsonElement((request.body as TextContent).text).jsonObject
+                    """{"credentialIds":["credential-1","credential-2"]}"""
+                }
+                else -> error("Unexpected request: ${request.method} $path")
+            }
+            respond(body, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        }) {
+            install(ContentNegotiation) { json(walletApi2Json) }
+        }
+        val wallet = WalletApi2DemoWallet(
+            WalletApi2Client("https://wallet-api.example", "token", WalletApiKind.Enterprise, http),
+            WalletApiKind.Enterprise,
+            "tenant.wallet",
+            "https://wallet.example/callback",
+        ) {}
+        try {
+            val identity = wallet.bootstrap(WalletDemoSigningProtection.None)
+            assertEquals("key-1", identity.keyId)
+            assertEquals("did:jwk:one", identity.did)
+            assertTrue(identity.publicJwk.contains("x1"))
+            val session = wallet.startIssuance("openid-credential-offer://offer", "https://wallet.example/callback", identity.did)
+            assertEquals(2, session.preview.batchSize)
+            assertFailsWith<IllegalArgumentException> { wallet.continuePreAuthorizedIssuance(session.id, null, copies(3)) }
+            assertIs<WalletDemoIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(session.id, null, copies(2)))
+            val bindings = receiveBodies.single()["credentials"]!!.jsonArray.single().jsonObject["holderBindings"]!!.jsonArray
+            assertEquals(listOf("key-1", "key-2"), bindings.map { it.jsonObject.getValue("keyReference").jsonPrimitive.content })
+            assertTrue(requests.none { it.contains("keys/generate") })
+        } finally {
+            http.close()
+        }
+    }
+
     private fun copies(count: Int = 2) = listOf(
         WalletDemoCredentialSelection("pid", WalletDemoCredentialHolders.NewKeys(count)),
     )
@@ -404,6 +472,12 @@ class WalletApi2IssuanceOwnershipTest {
         }
         private val client = WalletApi2Client("https://wallet-api.example", "token", http = http)
         val wallet = newWallet()
+        fun walletFor(id: String) = WalletApi2DemoWallet(
+            client,
+            WalletApiKind.OpenSource,
+            id,
+            "https://wallet.example/callback",
+        ) {}
         fun newWallet() = WalletApi2DemoWallet(
             client,
             WalletApiKind.OpenSource,

@@ -51,6 +51,7 @@ class WalletApi2MappingsTest {
             nonceEndpoint = "https://issuer.example/nonce",
             codeVerifier = "verifier",
             authorizationState = "state-1",
+            walletId = "wallet-1",
             credentials = listOf(IssuanceCredentialSelectionDto("UniversityDegree", listOf(
                 HolderBindingDto("holder-1", "did:key:one"), HolderBindingDto("holder-2", "did:key:two"),
             ))),

@@ -36,6 +36,7 @@ internal data class PersistedAuthorizationIssuance(
     val codeVerifier: String? = null,
     val authorizationState: String? = null,
     val credentials: List<IssuanceCredentialSelectionDto>,
+    val walletId: String? = null,
 )
 
 @Serializable
@@ -81,6 +82,7 @@ internal data class WalletKeyInfo(
     val keyId: String,
     val keyType: String? = null,
     val algorithm: String? = null,
+    val publicJwk: JsonObject? = null,
 )
 
 @Serializable

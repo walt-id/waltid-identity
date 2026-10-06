@@ -60,6 +60,27 @@ private fun WebWalletRoot(branding: WalletDemoBranding) {
     val kind = remember { walletApiKind() }
     val scope = rememberCoroutineScope()
 
+    val authorizationCallback = remember { isAuthorizationCallbackHref(window.location.href) }
+    var authorizationReady by remember { mutableStateOf(!authorizationCallback) }
+    var authorizationNotice by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        if (!authorizationCallback) return@LaunchedEffect
+        val currentSession = session
+        if (currentSession == null) {
+            authorizationReady = true
+            return@LaunchedEffect
+        }
+        val available = runCatching { refreshWalletTargets(currentSession) }.getOrDefault(currentSession.walletTargets)
+        val aligned = WalletApi2BrowserSessionStore.prepareIncomingAuthorizationWallet(currentSession, available)
+        if (aligned == null) {
+            authorizationNotice = "This authorization was started for a different wallet, and that wallet is no longer available."
+            clearAuthorizationCallbackFromAddressBar()
+        } else if (aligned.walletId != currentSession.walletId) {
+            session = aligned
+        }
+        authorizationReady = true
+    }
+
     val current = session
     if (current == null) {
         AccountAuthScreen(
@@ -89,10 +110,12 @@ private fun WebWalletRoot(branding: WalletDemoBranding) {
         )
         return
     }
+    if (!authorizationReady) return
 
     WebWalletSession(
         session = current,
         branding = branding,
+        authorizationNotice = authorizationNotice,
         onSessionChange = { session = it },
         onSignOut = {
             scope.launch {
@@ -107,6 +130,7 @@ private fun WebWalletRoot(branding: WalletDemoBranding) {
 private fun WebWalletSession(
     session: WalletApi2Session,
     branding: WalletDemoBranding,
+    authorizationNotice: String?,
     onSessionChange: (WalletApi2Session?) -> Unit,
     onSignOut: () -> Unit,
 ) {
@@ -147,6 +171,7 @@ private fun WebWalletSession(
         }
     }
 
+    if (authorizationNotice != null) Text(authorizationNotice)
     WalletDemoApp(
         controller,
         branding = branding,

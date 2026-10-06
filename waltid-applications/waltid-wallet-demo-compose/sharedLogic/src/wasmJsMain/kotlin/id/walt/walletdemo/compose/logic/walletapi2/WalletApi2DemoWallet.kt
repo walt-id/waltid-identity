@@ -57,6 +57,7 @@ internal class WalletApi2DemoWallet(
     private var resetInProgress = false
     private var keyId: String? = null
     private var did: String? = null
+    private var holderPairs: List<VerifiedHolder> = emptyList()
 
     override suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult = useWallet {
         val identity = ensureIdentity()
@@ -94,7 +95,7 @@ internal class WalletApi2DemoWallet(
             redirectUri = redirectUri.ifBlank { this.redirectUri },
             did = did ?: this.did,
             grant = resolved.toDemoGrant(),
-            preview = resolved.toDemoPreview(batchOffer.batchSize),
+            preview = resolved.toDemoPreview(issuanceBatchSize(batchOffer.batchSize)),
             credentialIssuer = resolved.credentialIssuer,
             credentialEndpoint = resolved.credentialEndpoint,
             nonceEndpoint = resolved.nonceEndpoint,
@@ -124,7 +125,7 @@ internal class WalletApi2DemoWallet(
             nonceEndpoint = result.nonceEndpoint,
         )
         issuanceSessions[sessionId] = updated
-        WalletApi2BrowserSessionStore.savePendingIssuance(updated.toPersisted())
+        WalletApi2BrowserSessionStore.savePendingIssuance(updated.toPersisted(walletId))
         WalletDemoIssuanceAuthorization(url = result.authorizationUrl)
     }
 
@@ -239,21 +240,26 @@ internal class WalletApi2DemoWallet(
             return previous
         }
         val generated = mutableListOf<WalletDemoHolderBinding>()
+        val reservedKeys = mutableSetOf<String>()
         try {
             val resolved = requested.map { selection ->
                 val bindings = when (val holders = selection.holders) {
                     is WalletDemoCredentialHolders.Existing -> holders.bindings
-                    is WalletDemoCredentialHolders.NewKeys -> buildList {
-                        repeat(holders.count) {
-                            currentCoroutineContext().ensureActive()
-                            val key = client.generateKey(walletId)
-                            generated += WalletDemoHolderBinding(key.keyId)
-                            currentCoroutineContext().ensureActive()
-                            val did = client.createDid(walletId, key.keyId)
-                            val binding = WalletDemoHolderBinding(key.keyId, did.did)
-                            generated[generated.lastIndex] = binding
-                            add(binding)
+                    is WalletDemoCredentialHolders.NewKeys -> if (kind.canGenerateIdentity) {
+                        buildList {
+                            repeat(holders.count) {
+                                currentCoroutineContext().ensureActive()
+                                val key = client.generateKey(walletId)
+                                generated += WalletDemoHolderBinding(key.keyId)
+                                currentCoroutineContext().ensureActive()
+                                val did = client.createDid(walletId, key.keyId)
+                                val binding = WalletDemoHolderBinding(key.keyId, did.did)
+                                generated[generated.lastIndex] = binding
+                                add(binding)
+                            }
                         }
+                    } else {
+                        existingHolderBindings(holders.count, reservedKeys)
                     }
                 }
                 IssuanceCredentialSelectionDto(selection.credentialConfigurationId, bindings.map { HolderBindingDto(it.keyId, it.did) })
@@ -393,7 +399,7 @@ internal class WalletApi2DemoWallet(
 
     override fun pendingAuthorizationIssuance(): WalletDemoIssuanceSession? {
         if (resetStage != null) return null
-        val persisted = WalletApi2BrowserSessionStore.loadPendingIssuance() ?: return null
+        val persisted = WalletApi2BrowserSessionStore.loadPendingIssuance()?.takeIf { it.matchesWallet(walletId) } ?: return null
         val session = issuanceSessions.getOrPut(persisted.id) { persisted.toApi2Session() }
         return WalletDemoIssuanceSession(
             id = session.id,
@@ -420,24 +426,54 @@ internal class WalletApi2DemoWallet(
         )
     }
 
+    private suspend fun issuanceBatchSize(offered: Int?): Int? {
+        if (kind.canGenerateIdentity) return offered
+        val available = refreshHolderPairs().size
+        return minOf(offered ?: 1, available.coerceAtLeast(1))
+    }
+
+    private suspend fun refreshHolderPairs(): List<VerifiedHolder> =
+        verifiedHolderPairs(client.listKeys(walletId), client.listDids(walletId)).also { holderPairs = it }
+
+    private suspend fun existingHolderBindings(count: Int, reserved: MutableSet<String>): List<WalletDemoHolderBinding> {
+        val available = (if (holderPairs.isEmpty()) refreshHolderPairs() else holderPairs).filter { it.keyId !in reserved }
+        require(available.size >= count) { "This wallet does not have enough distinct keys for the requested copies" }
+        return available.take(count).map { holder ->
+            reserved += holder.keyId
+            WalletDemoHolderBinding(holder.keyId, holder.did)
+        }
+    }
+
     private suspend fun useExistingIdentity(): WalletIdentity {
-        val resolvedKey = client.listKeys(walletId).firstOrNull()
-            ?: error("This wallet has no keys in its linked key store")
-        val resolvedDid = client.listDids(walletId).firstOrNull()
-            ?: error("This wallet has no DIDs in its linked DID store")
-        keyId = resolvedKey.keyId
-        did = resolvedDid.did
-        return WalletIdentity(
-            keyId = resolvedKey.keyId,
-            did = resolvedDid.did,
-            publicJwk = publicJwkFromDidDocument(resolvedDid.document),
-        )
+        val keys = client.listKeys(walletId)
+        val dids = client.listDids(walletId)
+        val pairs = verifiedHolderPairs(keys, dids)
+        if (pairs.isNotEmpty()) {
+            holderPairs = pairs
+            return pairs.first().asIdentity()
+        }
+        val onlyKey = keys.singleOrNull()
+        val onlyDid = dids.singleOrNull()
+        if (onlyKey != null && onlyDid != null && onlyKey.publicJwk == null) {
+            keyId = onlyKey.keyId
+            did = onlyDid.did
+            return WalletIdentity(onlyKey.keyId, onlyDid.did, publicJwkFromDidDocument(onlyDid.document))
+        }
+        if (keys.isEmpty()) error("This wallet has no keys in its linked key store")
+        if (dids.isEmpty()) error("This wallet has no DIDs in its linked DID store")
+        error("This wallet has no key whose public key matches a stored DID")
+    }
+
+    private fun VerifiedHolder.asIdentity(): WalletIdentity {
+        this@WalletApi2DemoWallet.keyId = keyId
+        this@WalletApi2DemoWallet.did = did
+        return WalletIdentity(keyId = keyId, did = did, publicJwk = publicJwk)
     }
 
     private fun requireIssuance(sessionId: String): Api2IssuanceSession =
         issuanceSessions[sessionId]
             ?: WalletApi2BrowserSessionStore.loadPendingIssuance()
-                ?.takeIf { it.id == sessionId }
+                ?.takeIf { it.id == sessionId && it.matchesWallet(walletId) }
                 ?.toApi2Session()
                 ?.also { issuanceSessions[it.id] = it }
             ?: error("Issuance session is missing")
@@ -477,7 +513,10 @@ private data class Api2PresentationSession(
     val keyId: String?,
 )
 
-private fun Api2IssuanceSession.toPersisted() = PersistedAuthorizationIssuance(
+private fun PersistedAuthorizationIssuance.matchesWallet(currentWalletId: String): Boolean =
+    walletId == null || walletId == currentWalletId
+
+private fun Api2IssuanceSession.toPersisted(walletId: String) = PersistedAuthorizationIssuance(
     id = id,
     offerUrl = offerUrl,
     redirectUri = redirectUri,
@@ -488,6 +527,7 @@ private fun Api2IssuanceSession.toPersisted() = PersistedAuthorizationIssuance(
     codeVerifier = codeVerifier,
     authorizationState = authorizationState,
     credentials = requireNotNull(credentials),
+    walletId = walletId,
 )
 
 private fun PersistedAuthorizationIssuance.toApi2Session() = Api2IssuanceSession(

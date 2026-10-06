@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.logic.walletapi2
 
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -112,4 +113,51 @@ class WalletApiProfileTest {
         assertEquals(WalletApiKind.OpenSource, parseWalletApiKind("oss"))
         assertEquals(WalletApiKind.OpenSource, parseWalletApiKind(null))
     }
+
+    @Test
+    fun authorizationCallbackStaysWithTheWalletThatStartedIt() {
+        val available = listOf("wallet-a", "wallet-b")
+        assertEquals("wallet-a", walletForAuthorizationCallback("wallet-b", available, "wallet-a"))
+        assertEquals("wallet-b", walletForAuthorizationCallback("wallet-b", available, "wallet-b"))
+        assertEquals("wallet-b", walletForAuthorizationCallback("wallet-b", available, null))
+        assertNull(walletForAuthorizationCallback("wallet-b", available, "wallet-c"))
+    }
+
+    @Test
+    fun holderPairsMatchTheDidThatPublishesTheKey() {
+        val first = publicJwk("x1")
+        val second = publicJwk("x2")
+        val pairs = verifiedHolderPairs(
+            keys = listOf(
+                WalletKeyInfo(keyId = "key-1", publicJwk = first),
+                WalletKeyInfo(keyId = "key-2", publicJwk = second),
+            ),
+            dids = listOf(WalletDidEntry(did = "did:jwk:second", document = didDocument(second))),
+        )
+        assertEquals("key-2", pairs.single().keyId)
+        assertEquals("did:jwk:second", pairs.single().did)
+        assertTrue(pairs.single().publicJwk.contains("x2"))
+    }
+
+    @Test
+    fun holderPairsIgnoreKeysWithoutPublicMaterial() {
+        val pairs = verifiedHolderPairs(
+            keys = listOf(WalletKeyInfo(keyId = "key-1"), WalletKeyInfo(keyId = "key-2")),
+            dids = listOf(WalletDidEntry(did = "did:jwk:one", document = didDocument(publicJwk("x1")))),
+        )
+        assertTrue(pairs.isEmpty())
+    }
+}
+
+private fun publicJwk(x: String): JsonObject = buildJsonObject {
+    put("kty", "EC")
+    put("crv", "P-256")
+    put("x", x)
+    put("y", "yy")
+}
+
+private fun didDocument(jwk: JsonObject): JsonObject = buildJsonObject {
+    put("verificationMethod", buildJsonArray {
+        add(buildJsonObject { put("publicKeyJwk", jwk) })
+    })
 }

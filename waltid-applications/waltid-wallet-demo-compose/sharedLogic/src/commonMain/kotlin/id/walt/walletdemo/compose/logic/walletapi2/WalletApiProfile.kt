@@ -84,5 +84,15 @@ internal fun wallet2TargetsFromResourceTree(tree: JsonObject): List<String> {
 internal fun selectWalletId(available: List<String>, remembered: String?): String? =
     remembered?.takeIf { it in available } ?: available.firstOrNull()
 
+/** The wallet that started an authorization-code issuance, when it is still available. */
+internal fun walletForAuthorizationCallback(
+    currentWalletId: String,
+    availableWalletIds: List<String>,
+    pendingWalletId: String?,
+): String? {
+    if (pendingWalletId.isNullOrBlank() || pendingWalletId == currentWalletId) return currentWalletId
+    return pendingWalletId.takeIf { it in availableWalletIds }
+}
+
 private fun JsonObject.stringField(name: String): String? =
     (this[name] as? JsonPrimitive)?.contentOrNull

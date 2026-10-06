@@ -45,6 +45,25 @@ object WalletApi2BrowserSessionStore {
         writeCookie(WalletIdCookie, walletId)
     }
 
+    fun prepareIncomingAuthorizationWallet(
+        session: WalletApi2Session,
+        availableWalletIds: List<String>,
+    ): WalletApi2Session? {
+        val selected = walletForAuthorizationCallback(
+            currentWalletId = session.walletId,
+            availableWalletIds = availableWalletIds,
+            pendingWalletId = loadPendingIssuance()?.walletId,
+        ) ?: run {
+            clearPendingIssuance()
+            return null
+        }
+        if (selected == session.walletId) return session
+        return session.copy(
+            walletId = selected,
+            walletTargets = availableWalletIds.ifEmpty { session.walletTargets },
+        ).also(::save)
+    }
+
     internal fun savePendingIssuance(session: PersistedAuthorizationIssuance) {
         val encoded = walletApi2Json.encodeToString(session)
         localStorage.setItem(PendingIssuanceKey, encoded)
