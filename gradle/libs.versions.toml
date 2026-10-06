@@ -78,10 +78,12 @@ java-cose = "1.1.1-WALT-SNAPSHOT"
 aws-kms = "1.6.97"
 azure-identity = "1.18.4"
 azure-keyvault-keys = "4.11.0"
-netty = "4.1.135.Final"
-netty-4_2 = "4.2.15.Final"
-jackson-core = "2.22.0"
-jackson-core-3 = "3.1.1"
+netty = "4.1.138.Final"
+netty-4_2 = "4.2.18.Final"
+jackson-core = "2.22.3"
+jackson-core-3 = "3.1.7"
+vertx = "4.5.34"
+rhino = "1.7.15.1"
 oci-sdk = "3.90.0"
 
 # JVM-only: auth (platform-specific, not multiplatform)
@@ -422,7 +424,11 @@ netty-codec-compression = { module = "io.netty:netty-codec-compression", version
 netty-codec-http-v2 = { module = "io.netty:netty-codec-http", version.ref = "netty-4_2" }
 netty-transport-classes-epoll = { module = "io.netty:netty-transport-classes-epoll", version.ref = "netty-4_2" }
 jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson-core" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson-core" }
 jackson-core-tools = { module = "tools.jackson.core:jackson-core", version.ref = "jackson-core-3" }
+jackson-databind-tools = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson-core-3" }
+vertx-core = { module = "io.vertx:vertx-core", version.ref = "vertx" }
+rhino = { module = "org.mozilla:rhino", version.ref = "rhino" }
 oci-sdk = { module = "com.oracle.oci.sdk:oci-java-sdk-shaded-full", version.ref = "oci-sdk" }
 
 ## JVM-only: auth
