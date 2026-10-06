@@ -8,7 +8,9 @@ The [browser catalogue](catalogue.json) records exact states, requirements and e
 
 The tests intercept only synthetic local account/wallet HTTP requests. They exercise the actual
 Compose form, validate submitted credentials and recovery messages, and check that empty/busy
-actions cannot send an extra request. No application test route, separate gallery app or live
+actions cannot send an extra request. Submitted responses are held until the working state
+has rendered; recovery cases release that gate after its image settles, so fast synthetic
+responses cannot skip the intermediate state. No application test route, separate gallery app or live
 account is needed. Real API2 authentication and protocol tests remain separate evidence.
 
 From the Identity repository:
@@ -29,8 +31,10 @@ another browser. The test-owned server binds localhost:8073 and is removed by Pl
 `npm run record` deliberately replaces references outside CI. Inspect those images, then run
 `npm test` twice to check determinism. Record output is not comparison evidence. CI rejects
 recording flags; ordinary comparisons reject missing/orphaned references and tolerate zero
-different pixels. Assertions establish the intended state before Playwright waits for stable
-screenshots. The native HTML/JSON reports include source SHA, dirty status, renderer, requirements,
+different pixels. Assertions establish the intended state, then capture requires unchanged
+pixels for at least 0.5 seconds within a bounded ten-second wait. Compose canvas transitions
+are not stopped by Playwright's CSS-animation controls; two equal frames alone can precede
+their completion. The native HTML/JSON reports include source SHA, dirty status, renderer, requirements,
 duration, rendered images and failure differences under `webApp/build/reports/browser-visual`.
 Hosted execution uploads those files even on failure. Synthetic baselines are test fixtures,
 not PR screenshot hosting.

@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { createHash } = require('node:crypto');
 const catalogue = require('./catalogue.json');
 
 // Compose's ARIA mirror supplies bounds, while the canvas receives the actual pointer input.
@@ -7,6 +8,23 @@ async function clickControl(page, locator) {
   const box = await locator.boundingBox();
   expect(box).not.toBeNull();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+}
+
+async function waitForSettledImage(page) {
+  let previous;
+  let unchangedSince;
+  // CSS animation controls do not stop Compose's canvas animations. Two equal
+  // frames can occur before the enabled-state color transition has finished.
+  await expect.poll(async () => {
+    const pixels = await page.screenshot({ animations: 'disabled', caret: 'hide' });
+    const current = createHash('sha256').update(pixels).digest('hex');
+    const now = performance.now();
+    if (current !== previous) {
+      previous = current;
+      unchangedSince = now;
+    }
+    return now - unchangedSince >= 500;
+  }, { timeout: 10000, intervals: [100] }).toBe(true);
 }
 
 for (const scenario of catalogue.states) {
@@ -27,7 +45,7 @@ for (const scenario of catalogue.states) {
     await page.route(url => /^\/(auth|wallet)(\/|$)/.test(url.pathname), async route => {
       pending = route.request();
       requests++;
-      if (scenario.state === 'busy') await responseReady;
+      if (!['empty', 'expired'].includes(scenario.state)) await responseReady;
       await route.fulfill({ status: scenario.state === 'registered' ? 409 : 401,
         contentType: 'application/json', body: '{}' });
     });
@@ -51,6 +69,11 @@ for (const scenario of catalogue.states) {
         await expect.poll(() => pending?.method()).toBe('POST');
         expect(new URL(pending.url()).pathname).toBe(`/auth/${scenario.state === 'registered' ? 'register' : 'emailpass'}`);
         expect(pending.postDataJSON()).toEqual({ email: 'wallet@example.test', password: 'synthetic-password' });
+        await expect(page.getByRole('button', { name: 'Working…', exact: true })).toBeVisible();
+        if (scenario.state !== 'busy') {
+          await waitForSettledImage(page);
+          release();
+        }
       }
       if (scenario.state === 'busy') {
         await expect(page.getByRole('button', { name: 'Working…', exact: true })).toBeVisible();
@@ -66,6 +89,11 @@ for (const scenario of catalogue.states) {
         await clickControl(page, signIn);
       }
       expect(errors).toEqual([]);
+      if (scenario.state !== 'busy') {
+        await expect(signIn).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Working…', exact: true })).toHaveCount(0);
+      }
+      await waitForSettledImage(page);
       await expect(page).toHaveScreenshot(`${scenario.id}.png`, { animations: 'disabled', caret: 'hide' });
       if (scenario.state === 'empty') expect(requests).toBe(0);
       if (scenario.state === 'busy') expect(requests).toBe(1);
