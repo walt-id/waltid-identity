@@ -35,6 +35,9 @@ export async function logout() {
     if (!userWasOidc) {
         await signOut({ callbackUrl: "/login" }).then((x) => { });
     } else {
-        await signOut({ callbackUrl: "/wallet-api/auth/logout-oidc", external: true })
+        // PTRID-753: external navigateTo target, not resolved against auth.baseURL -- needs the
+        // absolute wallet-api origin now that it's cross-origin (see nuxt.config.ts).
+        const apiBase = useRuntimeConfig().public.walletApiBaseUrl;
+        await signOut({ callbackUrl: `${apiBase}/wallet-api/auth/logout-oidc`, external: true })
     }
 }
