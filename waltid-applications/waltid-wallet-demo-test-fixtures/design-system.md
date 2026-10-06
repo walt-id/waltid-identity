@@ -24,7 +24,8 @@ Compose `ReviewScaffold` measures header and footer before the body, so its inte
 
 | Renderer | Footer treatment and accessibility fallback |
 |---|---|
-| Compose Android / iOS / Wasm | Haze core + blur, one screen-owned source, 18 dp uniform blur and background tint. Clear unavailable sources rather than retaining credential pixels. Unsupported rendering and increased-contrast / available reduced-transparency preferences use the opaque background. No experimental Android window-backdrop or optical-refraction API. |
+| Compose Android | API 30–32 uses the opaque surface after the Android 12 physical release comparison. API 33+ uses Haze core + blur in its default Balanced mode, one screen-owned source, 18 dp uniform blur and background tint. Increased contrast or unavailable rendering uses the opaque background. No experimental window-backdrop or optical-refraction API. |
+| Compose iOS / Wasm | The same bounded Haze blur/tint; available reduced-transparency and contrast preferences use the opaque background. Clear unavailable sources rather than retaining credential pixels. |
 | Native SwiftUI | Regular system material; Reduce Transparency or increased contrast uses the opaque grouped background. Native navigation owns presentation/back transitions. |
 
 Use existing navigation/animation APIs. Hierarchical Compose navigation uses a short directional slide/fade with matching Back and RTL direction; card/detail transitions follow selected identity, without delayed callbacks. Disclosure height and chevron animate together. Reduce Motion removes custom spatial movement; removed/hidden cards cannot remain accessible or actionable. Animations never submit, retry or authorize a wallet operation. Test rapid reversal, interruption and disposal, and inspect short real-renderer clips separately from settled screenshots.
