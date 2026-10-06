@@ -1,6 +1,8 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -15,6 +17,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
 /** Request state belongs above this host, so changing presentation cannot discard consent choices. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,10 +52,14 @@ internal fun WalletReviewHost(
                     confirmValueChange = { it != SheetValue.Hidden || canDismiss },
                 )
                 ModalBottomSheet(
-                    modifier = Modifier.testTag("wallet.review.sheet"),
+                    modifier = Modifier.testTag("wallet.review.sheet")
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                            RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)),
                     onDismissRequest = { if (canDismiss) dismiss?.invoke() },
                     sheetState = sheetState,
-                    containerColor = MaterialTheme.colorScheme.background,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    scrimColor = Color.Black.copy(alpha = 0.48f),
+                    tonalElevation = 3.dp,
                     sheetGesturesEnabled = canDismiss,
                     properties = ModalBottomSheetProperties(
                         shouldDismissOnBackPress = canDismiss,

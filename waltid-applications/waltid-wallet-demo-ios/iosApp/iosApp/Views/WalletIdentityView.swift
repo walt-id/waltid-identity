@@ -12,11 +12,10 @@ struct WalletIdentityView: View {
         ZStack {
             identityList
                 .id(model.identity == nil ? model.step : .summary)
-                .transition(reduceMotion ? .identity : .asymmetric(
-                    insertion: .move(edge: model.step == .summary ? .leading : .trailing).combined(with: .opacity),
-                    removal: .move(edge: model.step == .summary ? .trailing : .leading).combined(with: .opacity)))
+                .transition(WalletMotion.page(forward: model.step != .summary, reduceMotion: reduceMotion))
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: model.step)
+        .animation(WalletMotion.navigation(reduceMotion: reduceMotion), value: model.step)
+        .clipped()
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if model.identity == nil {
                 WalletFooter {

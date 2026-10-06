@@ -259,7 +259,7 @@
         "R12",
         "R13"
       ],
-      "note": "Confirmed PIN waits for the OS biometric result with Back and confirmation disabled. The screenshot shows only the in-app progress, not an imitation system dialog."
+      "note": "After PIN confirmation, the wallet waits for the OS biometric result with setup actions disabled. The screenshot shows the platform's actual in-app waiting view, not an imitation system dialog."
     },
     {
       "id": "onboarding.pin.compact_dark_large_text",
@@ -435,6 +435,17 @@
       "composeTest": "providerSharingReview",
       "swiftTest": "testProviderSharingReview",
       "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome."
+    },
+    {
+      "id": "sharing.credential_information",
+      "requirements": [
+        "R04",
+        "R05",
+        "R15"
+      ],
+      "composeTest": "sharingCredentialInformation",
+      "swiftTest": "testSharingCredentialInformation",
+      "note": "Production requested-disclosure information uses the same label/value hierarchy as stored credentials; one header owns the destination and parent decisions are absent."
     },
     {
       "id": "sharing.provider.compact_dark_large_text",

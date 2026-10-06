@@ -16,18 +16,22 @@ import platform.UIKit.UIAccessibilityIsReduceTransparencyEnabled
 import platform.UIKit.UIAccessibilityDarkerSystemColorsStatusDidChangeNotification
 import platform.UIKit.UIAccessibilityReduceMotionStatusDidChangeNotification
 import platform.UIKit.UIAccessibilityReduceTransparencyStatusDidChangeNotification
+import platform.UIKit.UIAccessibilityIsVoiceOverRunning
+import platform.UIKit.UIAccessibilityVoiceOverStatusDidChangeNotification
 
 @Composable
 internal actual fun rememberWalletVisualPreferences(): WalletVisualPreferences {
     fun current() = WalletVisualPreferences(
         reduceMotion = UIAccessibilityIsReduceMotionEnabled(),
         opaqueControls = UIAccessibilityIsReduceTransparencyEnabled() || UIAccessibilityDarkerSystemColorsEnabled(),
+        screenReaderEnabled = UIAccessibilityIsVoiceOverRunning(),
     )
     var preferences by remember { mutableStateOf(current()) }
     DisposableEffect(Unit) {
         val center = NSNotificationCenter.defaultCenter
         val observers = listOf(UIAccessibilityReduceMotionStatusDidChangeNotification,
-            UIAccessibilityReduceTransparencyStatusDidChangeNotification, UIAccessibilityDarkerSystemColorsStatusDidChangeNotification)
+            UIAccessibilityReduceTransparencyStatusDidChangeNotification, UIAccessibilityDarkerSystemColorsStatusDidChangeNotification,
+            UIAccessibilityVoiceOverStatusDidChangeNotification)
             .map { name -> center.addObserverForName(name, null, NSOperationQueue.mainQueue) { preferences = current() } }
         onDispose { observers.forEach(center::removeObserver) }
     }

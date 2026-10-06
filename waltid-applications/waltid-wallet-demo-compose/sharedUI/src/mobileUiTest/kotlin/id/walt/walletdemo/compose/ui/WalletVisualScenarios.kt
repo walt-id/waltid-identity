@@ -84,10 +84,11 @@ internal class WalletVisualScenarios(
             offerPreview = if (unavailable) null else WalletVisualFixtures.offer, issuanceCopyCounts = WalletVisualFixtures.copies)
         content {
             WalletReviewHost(WalletReviewPresentation.Sheet, true, {}) {
-                id.walt.walletdemo.compose.ui.screens.WalletExternalFlowScreen(controller, state, {})
+                id.walt.walletdemo.compose.ui.screens.WalletExternalFlowScreen(controller, state, {}, onOpenInApp = {})
             }
         }
         onNodeWithTag("wallet.external.close").assertIsDisplayed().assertIsEnabled()
+        onNodeWithTag("wallet.external.openInApp").assertIsDisplayed().assertIsEnabled()
         onAllNodesWithTag(WalletUiTestTags.OfferInput).assertCountEquals(0)
         if (unavailable) onNodeWithTag("wallet.external.unavailable").assertIsDisplayed()
         else onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsDisplayed().assertIsEnabled()
@@ -497,6 +498,23 @@ internal class WalletVisualScenarios(
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationVerifierSection).performScrollTo().assertIsDisplayed()
         capture(if (compact) "sharing.provider.compact_dark_large_text" else "sharing.provider.review")
+    }
+
+    fun sharingCredentialInformation() = with(test) {
+        val review = WalletVisualFixtures.providerReview
+        val option = review.credentialOptions.first()
+        content {
+            WalletDemoSharingReviewScreen(review = review, title = "Share documents",
+                onSubmit = {}, onCancel = {}, onBackAtRoot = {}, presentation = WalletReviewPresentation.Sheet)
+        }
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performClick()
+        onNodeWithText("Requested disclosures").assertIsDisplayed()
+        option.disclosures.forEach { disclosure ->
+            onNodeWithText(requireNotNull(disclosure.displayValue)).assertIsDisplayed()
+        }
+        onAllNodesWithText("Credential information").assertCountEquals(1)
+        onAllNodesWithTag(WalletUiTestTags.PresentationSubmitButton).assertCountEquals(0)
+        capture("sharing.credential_information")
     }
 
     fun providerOfferReview() = with(test) {

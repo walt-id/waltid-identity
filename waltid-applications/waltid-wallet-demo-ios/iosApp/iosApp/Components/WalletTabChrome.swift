@@ -54,6 +54,7 @@ struct WalletTabFeedback: View {
 extension View {
     func walletFlowToolbar(onBack: (() -> Void)?, backEnabled: Bool, onOpenSettings: (() -> Void)?, external: Bool = false) -> some View {
         walletSettingsToolbar(onOpenSettings: onOpenSettings).toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) { WalletOpenInAppButton() }
             ToolbarItem(placement: .navigationBarLeading) {
                 if let onBack {
                     Button(action: onBack) { Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44) }

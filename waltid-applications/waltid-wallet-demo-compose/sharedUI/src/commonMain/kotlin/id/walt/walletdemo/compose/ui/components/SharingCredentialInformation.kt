@@ -4,10 +4,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
@@ -77,16 +77,10 @@ private fun SharingDisclosureList(
     readOnly: Boolean,
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            "Requested disclosures",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        option.disclosures.withIndex().sortedBy { requestedDisclosureItems.getOrNull(it.index)?.displayOrder ?: Int.MAX_VALUE }.forEach { (index, disclosure) ->
+    WalletSection(title = "Requested disclosures") {
+      Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        option.disclosures.withIndex().sortedBy { requestedDisclosureItems.getOrNull(it.index)?.displayOrder ?: Int.MAX_VALUE }.forEachIndexed { position, (index, disclosure) ->
+            if (position > 0) MetadataRowDivider()
             val selection = WalletDemoPresentationDisclosureSelection(
                 queryId = option.queryId,
                 credentialId = option.credentialId,
@@ -98,6 +92,7 @@ private fun SharingDisclosureList(
                     .fillMaxWidth()
                     .testTag(WalletUiTestTags.presentationDisclosure(selection.id)),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (disclosure.selectable && !readOnly) {
                     Checkbox(
@@ -108,16 +103,13 @@ private fun SharingDisclosureList(
                             .semantics { contentDescription = item?.label ?: disclosure.label },
                     )
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (item != null) {
                         ClaimValueRow(item = item)
                     } else {
-                        Text(disclosure.label, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                        Text(
-                            disclosure.displayValue ?: disclosure.valueJson,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        CredentialDataRow(disclosure.label) {
+                            Text(disclosure.displayValue ?: disclosure.valueJson, style = MaterialTheme.typography.bodyLarge)
+                        }
                     }
                     Text(
                         when {
@@ -132,5 +124,6 @@ private fun SharingDisclosureList(
                 }
             }
         }
+      }
     }
 }

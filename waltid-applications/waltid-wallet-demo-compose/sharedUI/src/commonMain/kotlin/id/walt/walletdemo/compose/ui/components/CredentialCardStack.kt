@@ -49,8 +49,8 @@ internal fun CredentialCardStack(
         } else {
             // Cancellation reverses from the current values; no timer can reopen stale details.
             coroutineScope {
-                launch { othersVisibility.animateTo(if (expanded) 0f else 1f, tween(220, easing = FastOutSlowInEasing)) }
-                launch { selectedProgress.animateTo(if (expanded) 1f else 0f, tween(220, easing = FastOutSlowInEasing)) }
+                launch { othersVisibility.animateTo(if (expanded) 0f else 1f, tween(340, easing = FastOutSlowInEasing)) }
+                launch { selectedProgress.animateTo(if (expanded) 1f else 0f, tween(340, easing = FastOutSlowInEasing)) }
             }
         }
         if (!expanded) displayedExpandedId = null

@@ -20,6 +20,8 @@ internal fun WalletExternalFlowScreen(
     controller: WalletDemoController,
     state: WalletDemoUiState,
     onClose: () -> Unit,
+    fillViewport: Boolean = false,
+    onOpenInApp: (() -> Unit)? = null,
 ) {
     val openAuthorization = rememberAuthorizationRequestOpener()
     LaunchedEffect(state.authorizationRequestUrl) {
@@ -34,9 +36,12 @@ internal fun WalletExternalFlowScreen(
         enabled = !state.isBusy, onToggleDisclosure = controller::togglePresentationDisclosure,
         onClose = onClose.takeIf { state.canDismissExternalFlow },
     ) {
-    Column(Modifier.fillMaxWidth().testTag("wallet.external.flow")) {
+    Column(Modifier.fillMaxWidth().then(if (fillViewport) Modifier.fillMaxHeight() else Modifier).testTag("wallet.external.flow")) {
         WalletScreenHeader(if (state.externalFlow?.tab == WalletDemoTab.Receive) "Receive credentials" else "Share credentials",
             titleTag = "wallet.external.title") {
+            onOpenInApp?.let { open ->
+                TextButton(onClick = open, modifier = Modifier.testTag("wallet.external.openInApp")) { Text("Open in app") }
+            }
             IconButton(onClick = onClose, enabled = state.canDismissExternalFlow,
                 modifier = Modifier.testTag("wallet.external.close")) { Icon(Icons.Default.Close, "Close request") }
         }
@@ -44,7 +49,7 @@ internal fun WalletExternalFlowScreen(
             Text("The original receiving session is no longer available. Check your wallet before starting again.",
                 Modifier.padding(20.dp).testTag("wallet.external.unavailable"))
         } else WalletFlowContent(controller, state, onDone = onClose,
-            fillViewport = false, modifier = Modifier.weight(1f, fill = false))
+            fillViewport = fillViewport, modifier = Modifier.weight(1f, fill = fillViewport))
     }
     }
 }

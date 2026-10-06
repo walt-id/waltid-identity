@@ -43,6 +43,7 @@ fun MobileWalletDemoApp(
     readerTrustSettingsController: DemoReaderTrustSettingsController,
     branding: WalletDemoBranding = WalletDemoBranding(),
     onExternalFlowClosed: () -> Unit = {},
+    onOpenExternalInApp: () -> Unit = {},
     externalBackground: WalletExternalBackground = WalletExternalBackground.Wallet,
 ) {
     val walletState by controller.state.collectAsState()
@@ -101,6 +102,7 @@ fun MobileWalletDemoApp(
         controller = controller,
         branding = branding,
         onExternalFlowClosed = onExternalFlowClosed,
+        onOpenExternalInApp = onOpenExternalInApp,
         externalBackground = externalBackground,
         onStartProximityPresentation = (proximityController::start).takeUnless { trustSettings.loading },
         onResetWallet = { controller.resetWallet { proximityController.closeAndAwait() } },

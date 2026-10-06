@@ -21,10 +21,13 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.util.regex.Pattern
 
 @RunWith(AndroidJUnit4::class)
 class PublicDemoBackendE2ETest {
@@ -75,13 +78,36 @@ class PublicDemoBackendE2ETest {
 
         sendDeepLink(context, offer.offerUrl)
         assertReview(device, "wallet.offerAcceptButton")
+        val offeredInformation = requireNotNull(device.findObject(By.res(Pattern.compile("issuance-details-.*"))))
+        clickByTag(device, offeredInformation.resourceName)
+        assertReview(device, "issuance-credential-details")
+        assertEquals("One information header must own the offer details", 1,
+            device.findObjects(By.text("Credential information")).size)
+        assertFalse("Offer actions must not remain under details", device.hasObject(By.res("wallet.offerAcceptButton")))
+        captureHost(device, "offer-information")
+        clickByTag(device, "wallet-detail-back")
+        assertReview(device, "wallet.offerAcceptButton")
         clickByTag(device, "wallet.offerAcceptButton")
         assertReview(device, "issuance-done")
         assertTrue("No credentials were shown in UI", device.findObject(By.text("No credentials")) == null)
 
         clickByTag(device, "issuance-done")
+        assertHome(device)
         val session = DemoTestBackend.createVerifierSession(scenario)
         sendDeepLink(context, session.authorizationRequestUri)
+        assertReview(device, "wallet.presentationSubmitButton")
+        val information = requireNotNull(device.findObject(By.res(Pattern.compile("wallet\\.presentationClaimsToggle\\..*"))))
+        clickByTag(device, information.resourceName)
+        assertReview(device, "wallet.presentationClaimsDialog")
+        assertEquals(1, device.findObjects(By.text("Credential information")).size)
+        assertFalse("Share actions must not remain under details", device.hasObject(By.res("wallet.presentationSubmitButton")))
+        captureHost(device, "requested-information")
+        clickByTag(device, "review-all-credential-information")
+        assertReview(device, "review-all-information-details")
+        captureHost(device, "all-information")
+        clickByTag(device, "wallet-detail-back")
+        assertReview(device, "wallet.presentationClaimsDialog")
+        clickByTag(device, "wallet-detail-back")
         assertReview(device, "wallet.presentationSubmitButton")
 
         clickByTag(device, "wallet.presentationSubmitButton")
@@ -106,6 +132,11 @@ class PublicDemoBackendE2ETest {
         )
 
         DemoTestBackend.waitForVerifierSuccess(session.sessionId, timeoutMs = VERIFIER_POLLING_TIMEOUT)
+        assertReview(device, "wallet.presentationDone")
+        assertFalse(device.hasObject(By.res("wallet.presentationInput")))
+        captureHost(device, "sharing-result")
+        clickByTag(device, "wallet.presentationDone")
+        assertHome(device)
     }
 
     @Test
@@ -170,6 +201,19 @@ class PublicDemoBackendE2ETest {
     private fun assertReview(device: UiDevice, tag: String) {
         assertNotNull("Wallet surface $tag did not appear. Latest status: ${latestStatus(device)}",
             waitForResource(device, tag, CREDENTIAL_OPERATION_TIMEOUT))
+    }
+
+    private fun assertHome(device: UiDevice) {
+        assertReview(device, "wallet.scanButton")
+        assertFalse("Completion must return Home, not the legacy request form",
+            device.hasObject(By.res("wallet.presentationInput")))
+        assertFalse(device.hasObject(By.res("wallet.presentationSubmitButton")))
+    }
+
+    private fun captureHost(device: UiDevice, name: String) {
+        val output = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir") ?: return
+        val directory = File(output, "wallet-refinement-host").apply { mkdirs() }
+        assertTrue("Could not capture $name", device.takeScreenshot(File(directory, "$name.png")))
     }
 
     private fun incorrectCodeFor(code: String): String {

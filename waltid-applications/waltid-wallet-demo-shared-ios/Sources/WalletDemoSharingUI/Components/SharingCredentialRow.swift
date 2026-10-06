@@ -59,7 +59,7 @@ struct SharingCredentialRow: View {
 }
 
 /// Scrollable claim review the user can leave without changing the Share decision.
-private struct SharingClaimsSheet: View {
+struct SharingClaimsSheet: View {
     let option: PresentationCredentialOption
     let details: CredentialDetails
     let credentialSelected: Bool
@@ -145,15 +145,13 @@ struct DisclosureList: View {
     let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
 
     var body: some View {
-        LazyVStack(alignment: .leading, spacing: 8) {
-            Text(CredentialDisplayVocabulary.requestedDisclosuresTitle)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            ForEach(Array(option.disclosures.enumerated()).sorted {
+        let disclosures = Array(option.disclosures.enumerated()).sorted {
                 (requestedDisclosureItems.indices.contains($0.offset) ? requestedDisclosureItems[$0.offset].displayOrder ?? .max : .max)
                     < (requestedDisclosureItems.indices.contains($1.offset) ? requestedDisclosureItems[$1.offset].displayOrder ?? .max : .max)
-            }, id: \.element.id) { index, disclosure in
+        }
+        return WalletSection(CredentialDisplayVocabulary.requestedDisclosuresTitle) {
+          LazyVStack(alignment: .leading, spacing: 12) {
+            ForEach(disclosures, id: \.element.id) { index, disclosure in
                 let selection = PresentationDisclosureSelection(
                     queryID: option.queryID,
                     credentialID: option.credentialID,
@@ -167,23 +165,27 @@ struct DisclosureList: View {
                         }, set: { _ in
                             onToggleDisclosure(selection)
                         })) {
-                            disclosureLabel(index: index, disclosure: disclosure)
+                            disclosureContent(index: index, disclosure: disclosure)
                         }
+                        .toggleStyle(ReviewCheckboxToggleStyle())
                         .disabled(isLoading || !credentialSelected)
                         .accessibilityIdentifier(WalletAccessibilityID.presentationDisclosureToggle(selection.id))
                     } else {
-                        disclosureLabel(index: index, disclosure: disclosure)
+                        disclosureContent(index: index, disclosure: disclosure)
                     }
 
-                    Text(disclosure.disclosureStatusText)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
                 }
-                .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                if disclosure.id != disclosures.last?.element.id { Divider() }
             }
+          }.padding(16)
+        }
+    }
+
+    private func disclosureContent(index: Int, disclosure: PresentationDisclosure) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            disclosureLabel(index: index, disclosure: disclosure)
+            Text(disclosure.disclosureStatusText).font(.caption2).foregroundStyle(.secondary)
         }
     }
 
@@ -212,14 +214,9 @@ private struct DisclosureTextView: View {
     let disclosure: PresentationDisclosure
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(disclosure.name ?? disclosure.path)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.primary)
+        CredentialDataRow(disclosure.name ?? disclosure.path) {
             Text(disclosure.displayValue ?? disclosure.valueJSON)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(4)
+                .font(.body)
         }
     }
 }

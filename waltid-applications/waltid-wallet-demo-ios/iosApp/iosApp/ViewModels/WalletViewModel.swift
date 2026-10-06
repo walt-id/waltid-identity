@@ -1231,9 +1231,9 @@ class WalletViewModel: ObservableObject {
         issuanceReceipt = IssuanceReceipt(issuer: issuer)
         self.txCode = ""
         offerUrl = ""
-        receiveCompleted = false
+        receiveCompleted = true
         receiveNavigationResetKey += 1
-        selectedTab = externalFlow == nil ? .credentials : .receive
+        selectedTab = .receive
         setSuccess(WalletStatusText.receivedCredentials(displayableReceivedCredentialIDs.count), tab: selectedTab)
     }
 
@@ -1270,11 +1270,11 @@ class WalletViewModel: ObservableObject {
                     deferredCredentials.removeAll { $0.id == credential.id }
                     lastReceivedCredentialIDs = receivedIDs(credentialIDs)
                     issuanceReceipt = receipt([])
-                    receiveCompleted = false
+                    receiveCompleted = issuanceReceipt?.problem == nil && issuanceReceipt?.pendingIDs.isEmpty == true
                     if deferredCredentials.isEmpty && !credentialIDs.isEmpty {
                         offerUrl = ""
                         receiveNavigationResetKey += 1
-                        selectedTab = externalFlow == nil ? .credentials : .receive
+                        selectedTab = .receive
                         setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: selectedTab)
                     } else {
                         setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: .receive)

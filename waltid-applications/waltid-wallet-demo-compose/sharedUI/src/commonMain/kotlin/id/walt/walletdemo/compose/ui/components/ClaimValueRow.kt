@@ -53,18 +53,7 @@ import kotlinx.coroutines.withContext
 
 @Composable
 internal fun ClaimValueRow(item: ClaimItem, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag(WalletUiTestTags.claim(item.path.id)),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            item.label,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    CredentialDataRow(item.label, modifier.testTag(WalletUiTestTags.claim(item.path.id))) {
         ClaimValue(value = item.value, path = item.path, modifier = Modifier.fillMaxWidth())
     }
 }

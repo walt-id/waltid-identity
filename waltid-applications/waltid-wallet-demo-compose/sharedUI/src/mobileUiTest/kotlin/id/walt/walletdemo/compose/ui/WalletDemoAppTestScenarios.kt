@@ -586,10 +586,14 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag("issuance-identity-ExampleCredential").assertExists()
         onAllNodesWithText("vc+sd-jwt").assertCountEquals(0)
         assertIssuerDetailsCollapsedUntilRequested()
+        mainClock.autoAdvance = false
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
-
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.receiveCompleted }
+        mainClock.advanceTimeBy(500)
         onNodeWithTag("wallet.status").assertTextContains("Received 1 credential(s)")
+        onNodeWithTag("issuance-done").assertIsDisplayed().performClick()
+        mainClock.autoAdvance = true
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
         onAllNodesWithTag("wallet.receiveNewButton").assertCountEquals(0)
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
@@ -1345,6 +1349,27 @@ class WalletDemoAppTestScenarios(
         assertEquals(offerUrl, wallet.receivedOfferUrl)
         assertEquals(requestUrl, wallet.previewedRequestUrl)
         assertEquals(requestUrl, wallet.submittedRequestUrl)
+        onNodeWithTag("wallet.external.close").performClick()
+        onAllNodesWithTag("wallet.external.flow").assertCountEquals(0)
+    }
+
+    fun openingExternalReviewInAppPreservesSelectionsWithoutReplayingTheRequest() = runComposeUiTest {
+        val wallet = WalletUiTestWallet(credentialsAfterReceive = listOf(sampleCredential))
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+        controller.handleDeepLink("openid-credential-offer://example")
+        setWalletContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
+        val original = controller.state.value.offerPreview
+        val configuration = original!!.offeredCredentials.first().configurationId
+        runOnIdle { controller.updateIssuanceCopies(configuration, 0) }
+        val choices = controller.state.value.issuanceCopyCounts
+        onNodeWithTag("wallet.external.openInApp").performClick()
+        onAllNodesWithTag("wallet.review.sheet").assertCountEquals(0)
+        onAllNodesWithTag("wallet.external.openInApp").assertCountEquals(0)
+        assertEquals(original, controller.state.value.offerPreview)
+        assertEquals(choices, controller.state.value.issuanceCopyCounts)
+        onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsNotEnabled()
         onNodeWithTag("wallet.external.close").performClick()
         onAllNodesWithTag("wallet.external.flow").assertCountEquals(0)
     }

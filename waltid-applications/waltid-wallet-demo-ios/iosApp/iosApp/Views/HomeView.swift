@@ -34,10 +34,7 @@ struct HomeView: View {
             } else { walletContent }
         }
         .sheet(isPresented: $showingScanner) {
-            if #available(iOS 16, *) {
-                WalletScanView(onBack: { showingScanner = false }, onOpen: openLink)
-                    .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
-            } else { WalletScanView(onBack: { showingScanner = false }, onOpen: openLink) }
+            WalletScanView(onBack: { showingScanner = false }, onOpen: openLink)
         }
         .sheet(isPresented: Binding(get: { proximity.active }, set: { if !$0 { proximity.requestClose() } })) {
             PresentView(viewModel: viewModel, onOpenSettings: openSettings, onBack: returnHome)

@@ -12,9 +12,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.TextButton
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -28,10 +25,6 @@ import id.walt.walletdemo.compose.ui.components.WalletSymbol
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsCloseButton
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsOverflowMenu
 import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
-import id.walt.walletdemo.compose.ui.resources.Res
-import id.walt.walletdemo.compose.ui.resources.proximity_qr
-import id.walt.walletdemo.compose.ui.resources.settings_nearby
-import org.jetbrains.compose.resources.painterResource
 
 @Composable
 internal fun WalletHeader(
@@ -58,9 +51,14 @@ internal fun WalletHeader(
                 }
             },
         ) {
+            onShareNearby?.let { nearby ->
+                IconButton(onClick = nearby, modifier = Modifier.testTag(WalletUiTestTags.ProximityStartButton)) {
+                    WalletIcon(WalletSymbol.Nearby, "Share nearby")
+                }
+            }
             onScan?.let { scan ->
                 IconButton(onClick = scan, modifier = Modifier.testTag(WalletUiTestTags.ScanButton)) {
-                    Icon(painterResource(Res.drawable.proximity_qr), "Scan or paste a link")
+                    WalletIcon(WalletSymbol.Scan, "Scan or paste a link")
                 }
             }
             onSettings?.let { settings ->
@@ -72,12 +70,6 @@ internal fun WalletHeader(
                 IconButton(onClick = close, modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
                     WalletIcon(WalletSymbol.Decline, "Close request")
                 }
-            }
-        }
-        onShareNearby?.let { nearby ->
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = nearby, contentPadding = PaddingValues(horizontal = 8.dp),
-                    modifier = Modifier.testTag(WalletUiTestTags.ProximityStartButton)) { Text("Share nearby") }
             }
         }
         Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

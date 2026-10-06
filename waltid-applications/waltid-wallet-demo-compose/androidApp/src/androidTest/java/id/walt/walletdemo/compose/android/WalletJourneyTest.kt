@@ -18,6 +18,25 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class WalletJourneyTest {
     @Test
+    fun nearbyConnectionOptionsReturnToTheTaskAndCloseOnce() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val device = UiDevice.getInstance(instrumentation)
+        WalletComposeE2EHelper.launchAndUnlock(context, device)
+        WalletComposeE2EHelper.clickByTag(device, "wallet.proximityStartButton")
+        assertTrue(device.wait(Until.hasObject(By.res("wallet.proximityScreen")), 10_000))
+        WalletComposeE2EHelper.clickByTag(device, "proximity-connection-options")
+        assertTrue(device.wait(Until.hasObject(By.res("wallet.settingsProximityDefault")), 10_000))
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsBack")
+        assertTrue(device.wait(Until.hasObject(By.res("wallet.proximityScreen")), 10_000))
+        assertFalse(device.hasObject(By.res("wallet.presentationInput")))
+        WalletComposeE2EHelper.clickByTag(device, "wallet.proximityCancelButton")
+        assertTrue(device.wait(Until.gone(By.res("wallet.proximityScreen")), 10_000))
+        assertTrue(device.hasObject(By.res("wallet.scanButton")))
+        assertFalse(device.hasObject(By.res("wallet.presentationInput")))
+    }
+
+    @Test
     fun scannerModesKeepDraftAndActionsAboveKeyboard() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
@@ -34,7 +53,9 @@ class WalletJourneyTest {
         assertTrue(device.wait(Until.hasObject(By.res("wallet.scanPaste")), 10_000))
         assertActionAboveKeyboard(device)
         assertTrue(requireNotNull(device.findObject(By.res("wallet.scanContinue"))).isEnabled)
-        val directory = File(context.cacheDir, "wallet-journey-evidence").apply { mkdirs() }
+        val output = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")?.let(::File)
+            ?: context.cacheDir
+        val directory = File(output, "wallet-journey-evidence").apply { mkdirs() }
         assertTrue(device.takeScreenshot(File(directory, "scanner-manual-keyboard-clearance.png")))
 
         WalletComposeE2EHelper.clickByTag(device, "wallet.scanMode")

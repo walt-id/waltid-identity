@@ -212,8 +212,8 @@ public struct CredentialCardStackView: View {
             }
         )
         .onPreferenceChange(CredentialCardStackWidthKey.self) { stackWidth = $0 }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: selectedAtTop)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: othersHidden)
+        .animation(WalletMotion.navigation(reduceMotion: reduceMotion), value: selectedAtTop)
+        .animation(WalletMotion.navigation(reduceMotion: reduceMotion), value: othersHidden)
     }
 
     private func displayedHeight(forWidth width: CGFloat) -> CGFloat {

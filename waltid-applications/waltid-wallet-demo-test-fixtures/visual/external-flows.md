@@ -2,6 +2,8 @@
 
 A recognized credential offer or presentation request opens a wallet-owned review sheet. Unlock and signing setup, when needed, stay in that sheet; the request is prepared once the wallet is ready. Reviewing never accepts an offer or sends credentials. Links opened with the in-app scanner remain full-screen journeys.
 
+Open in app expands a wallet-owned external review to the full app presentation without preparing another request or changing credential/copy/disclosure choices. Its result and Close remain owned by that request. Android keeps the wallet open after this explicit promotion. An OS-owned Credential Manager/provider handoff cannot be transferred to a second activity or replayed as a new request; it retains its caller-owned result contract.
+
 ## Ownership and navigation
 
 - Reopening the same external URL preserves its review, choices and detail presentation.

@@ -1016,13 +1016,13 @@ class WalletDemoController(
                 requestDrafts = it.requestDrafts.copy(offerUrl = "", txCode = ""),
                 operation = WalletOperationState.Succeeded(
                     WalletDisplayText.receivedCredentials(displayableReceivedCredentialIds.size),
-                    WalletDemoTab.Credentials,
+                    WalletDemoTab.Receive,
                 ),
                 lastReceivedCredentialIds = displayableReceivedCredentialIds,
                 issuanceReceipt = WalletDemoIssuanceReceipt(issuer),
-                receiveCompleted = false,
+                receiveCompleted = true,
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
-                selectedTab = if (it.externalFlow != null) WalletDemoTab.Receive else WalletDemoTab.Credentials,
+                selectedTab = WalletDemoTab.Receive,
             ).withPublishedStatus()
         }
     }
@@ -1059,7 +1059,7 @@ class WalletDemoController(
                                 deferredCredentials = remainingDeferred,
                                 lastReceivedCredentialIds = (priorIds + outcome.credentialIds).distinct(),
                                 issuanceReceipt = receipt(emptyList()),
-                                receiveCompleted = false,
+                                receiveCompleted = received,
                                 offerPreview = if (received) null else it.offerPreview,
                                 requestDrafts = if (received) {
                                     it.requestDrafts.copy(offerUrl = "", txCode = "")
@@ -1071,10 +1071,10 @@ class WalletDemoController(
                                 } else {
                                     it.receiveNavigationResetKey
                                 },
-                                selectedTab = if (received && it.externalFlow == null) WalletDemoTab.Credentials else it.selectedTab,
+                                selectedTab = WalletDemoTab.Receive,
                                 operation = WalletOperationState.Succeeded(
                                     WalletDisplayText.receivedCredentials(outcome.credentialIds.size),
-                                    if (received) WalletDemoTab.Credentials else WalletDemoTab.Receive,
+                                    WalletDemoTab.Receive,
                                 ),
                             ).withPublishedStatus()
                         }

@@ -257,7 +257,9 @@ final class WalletViewModelReceiveTests: XCTestCase {
         viewModel.txCode = " abc-123 "
         XCTAssertTrue(viewModel.acceptOfferEnabled)
         viewModel.acceptOffer()
-        try await waitUntil { viewModel.selectedTab == .credentials && !viewModel.receivedCredentials.isEmpty }
+        try await waitUntil { viewModel.receiveCompleted && !viewModel.isLoading }
+        XCTAssertEqual(viewModel.selectedTab, .receive)
+        XCTAssertNotNil(viewModel.issuanceReceipt)
 
         let receiveCalls = await client.issuanceContinuationCalls
         let receivedTxCodes = await client.receivedTxCodes

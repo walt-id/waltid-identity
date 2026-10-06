@@ -71,8 +71,12 @@ internal fun ReceiveTab(
 
     if (state.issuanceReceipt != null || state.deferredCredentials.isNotEmpty()) {
         val pending = state.deferredCredentials.filter { state.issuanceReceipt?.pendingIds?.contains(it.id) ?: true }
+        val dismissal = rememberSuccessDismissal(state.receiveNavigationResetKey,
+            enabled = state.receiveCompleted && !state.isBusy && state.issuanceReceipt?.problem == null && pending.isEmpty()
+                && state.operation is id.walt.walletdemo.compose.logic.WalletOperationState.Succeeded
+                && state.receivedCredentials().isNotEmpty(), onDone = onDone)
         ReviewScaffold(fillViewport = fillViewport, feedback = feedback,
-            modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent), actions = {
+            modifier = modifier.then(dismissal).testTag(WalletUiTestTags.ReceiveTabContent), actions = {
             WalletActions(WalletAction(stringResource(Res.string.issuance_done), onDone,
                 enabled = !state.isBusy, testTag = "issuance-done"),
                 secondary = pending.takeIf { it.isNotEmpty() }?.let {

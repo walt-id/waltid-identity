@@ -54,7 +54,7 @@ final class WalletVisualTests: XCTestCase {
             model.issuanceCopyCounts = try fixtures.copies()
         }
         // The real native sheet/window is covered by the URL-launch UI journey; this pins its content.
-        try capture(ReceiveView(viewModel: model, onOpenSettings: {}, onBack: {}),
+        try capture(ReceiveView(viewModel: model, onOpenSettings: {}, onBack: {}).environment(\.walletOpenInApp, {}),
             id: unavailable ? "external.callback.unavailable" : "external.receiving.review", config: .iPhoneSe)
     }
 
@@ -116,9 +116,14 @@ final class WalletVisualTests: XCTestCase {
         }
         if state == "mismatch" { XCTAssertEqual(model.pinError, "PIN confirmation does not match") }
         let compact = state == "compact_dark_large_text"
-        try capture(PinView(viewModel: model), id: "onboarding.pin.\(state)",
-            config: compact ? .iPhoneSe : .iPhone13,
-            colorScheme: compact ? .dark : .light, sizeCategory: compact ? .accessibilityMedium : .large)
+        if state == "biometric_prompt" {
+            XCTAssertEqual(model.auth, .biometricSetup(nil))
+            try capture(BiometricSetupView(viewModel: model), id: "onboarding.pin.\(state)")
+        } else {
+            try capture(PinView(viewModel: model), id: "onboarding.pin.\(state)",
+                config: compact ? .iPhoneSe : .iPhone13,
+                colorScheme: compact ? .dark : .light, sizeCategory: compact ? .accessibilityMedium : .large)
+        }
         await gate.complete(.failed)
     }
 
@@ -265,6 +270,15 @@ final class WalletVisualTests: XCTestCase {
     }
 
     func testProviderSharingReview() async throws { try await providerSharingReview() }
+    func testSharingCredentialInformation() throws {
+        let review = try WalletVisualFixtures().sharingReview()
+        let option = try XCTUnwrap(review.credentialOptions.first)
+        let details = CredentialDisplayNormalizer.details(for: option)
+        let screen = SharingClaimsSheet(option: option, details: details, credentialSelected: true,
+            selectedDisclosureOptions: [], requestedDisclosureItems: details.groups.first { $0.id == "requested" }?.items ?? [],
+            isLoading: false, isReadOnly: false, onToggleDisclosure: { _ in }, onDismiss: {})
+        try capture(screen, id: "sharing.credential_information")
+    }
     func testCompactProviderSharingReview() async throws { try await providerSharingReview(compact: true) }
 
     private func providerSharingReview(compact: Bool = false) async throws {

@@ -37,6 +37,8 @@
 		A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000430AAAA000000000030 /* OfferReviewView.swift */; };
 		A1000440AAAA000100000040 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000440AAAA000000000040 /* SettingsView.swift */; };
 		A1000441AAAA000100000041 /* WalletTabChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000441AAAA000000000041 /* WalletTabChrome.swift */; };
+		13330036AAAA000100000002 /* WalletSuccessDismissal.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330036AAAA000000000002 /* WalletSuccessDismissal.swift */; };
+		13330036AAAA000100000001 /* WalletExternalPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330036AAAA000000000001 /* WalletExternalPresentation.swift */; };
 		13330030AAAA000100000030 /* BiometricSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330030AAAA000000000030 /* BiometricSetupView.swift */; };
 		A1000442AAAA000100000042 /* PinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000442AAAA000000000042 /* PinView.swift */; };
 		A1000443AAAA000100000043 /* DemoPinStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000443AAAA000000000043 /* DemoPinStore.swift */; };
@@ -188,6 +190,8 @@
 		A1000430AAAA000000000030 /* OfferReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfferReviewView.swift; sourceTree = "<group>"; };
 		A1000440AAAA000000000040 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1000441AAAA000000000041 /* WalletTabChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletTabChrome.swift; sourceTree = "<group>"; };
+		13330036AAAA000000000002 /* WalletSuccessDismissal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletSuccessDismissal.swift; sourceTree = "<group>"; };
+		13330036AAAA000000000001 /* WalletExternalPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletExternalPresentation.swift; sourceTree = "<group>"; };
 		13330030AAAA000000000030 /* BiometricSetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricSetupView.swift; sourceTree = "<group>"; };
 		A1000442AAAA000000000042 /* PinView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinView.swift; sourceTree = "<group>"; };
 		A1000443AAAA000000000043 /* DemoPinStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoPinStore.swift; sourceTree = "<group>"; };
@@ -368,6 +372,8 @@
 				A1000006AAAA000000000006 /* StatusBannerView.swift */,
 				A1000470AAAA000000000070 /* WalletPinInput.swift */,
 				A1000441AAAA000000000041 /* WalletTabChrome.swift */,
+				13330036AAAA000000000002 /* WalletSuccessDismissal.swift */,
+				13330036AAAA000000000001 /* WalletExternalPresentation.swift */,
 				A1000425AAAA000000000025 /* UrlEditor.swift */,
 				13330002AAAA000000000002 /* ScanCodeButton.swift */,
 				A1000424AAAA000000000024 /* EmptyCredentialsView.swift */,
@@ -791,6 +797,8 @@
 				BB7491000000000000000001 /* NearbySettingsView.swift in Sources */,
 				A1000470AAAA000100000070 /* WalletPinInput.swift in Sources */,
 				A1000441AAAA000100000041 /* WalletTabChrome.swift in Sources */,
+				13330036AAAA000100000002 /* WalletSuccessDismissal.swift in Sources */,
+				13330036AAAA000100000001 /* WalletExternalPresentation.swift in Sources */,
 				A1000442AAAA000100000042 /* PinView.swift in Sources */,
 				13330030AAAA000100000030 /* BiometricSetupView.swift in Sources */,
 				A1000443AAAA000100000043 /* DemoPinStore.swift in Sources */,

@@ -56,10 +56,13 @@ internal fun PresentTab(
     val error = state.presentationError
 
     if (state.presentationCompleted) {
-        ReviewScaffold(modifier = modifier.testTag("wallet.presentationResult"), fillViewport = fillViewport,
+        val result = state.operation
+        val dismissal = id.walt.walletdemo.compose.ui.components.rememberSuccessDismissal(
+            state.presentationNavigationResetKey, result is id.walt.walletdemo.compose.logic.WalletOperationState.Succeeded,
+            onDone)
+        ReviewScaffold(modifier = modifier.then(dismissal).testTag("wallet.presentationResult"), fillViewport = fillViewport,
             actions = { id.walt.walletdemo.compose.ui.components.WalletActions(
                 id.walt.walletdemo.compose.ui.components.WalletAction("Done", onDone, testTag = "wallet.presentationDone")) }) {
-            val result = state.operation
             Text(when (result) {
                 is id.walt.walletdemo.compose.logic.WalletOperationState.Succeeded -> result.message
                 is id.walt.walletdemo.compose.logic.WalletOperationState.Failed -> result.message
