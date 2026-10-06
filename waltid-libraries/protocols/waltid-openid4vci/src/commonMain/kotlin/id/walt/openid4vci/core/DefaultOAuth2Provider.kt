@@ -702,12 +702,14 @@ class DefaultOAuth2Provider(
     override fun writeCredentialError(request: CredentialRequest, error: CredentialError): CredentialResponseHttp =
         writeCredentialError(error)
 
-    override fun writeCredentialError(error: OAuthError): CredentialResponseHttp =
-        CredentialResponseHttp(
-            status = credentialOAuthJsonErrorStatus(error),
-            payload = oauthErrorPayload(error),
-            headers = noStoreHeaders() + credentialOAuthErrorHeaders(error),
+    override fun writeCredentialError(error: OAuthError): CredentialResponseHttp {
+        val oauth = protectedResourceOAuthErrorHttp(error, AccessTokenAuthorizationScheme.DPOP)
+        return CredentialResponseHttp(
+            status = oauth.status,
+            payload = oauth.payload,
+            headers = oauth.headers,
         )
+    }
 
     override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
         writeCredentialError(error)
