@@ -28,11 +28,11 @@ private class AndroidDemoBiometricAuthenticator(
 
     override suspend fun authenticate(reason: String): DemoBiometricResult =
         withContext(Dispatchers.Main.immediate) {
-            val activity = activityProvider() ?: return@withContext DemoBiometricResult.Failed
+            val activity = activityProvider() ?: return@withContext DemoBiometricResult.Unavailable
             if (!activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-                return@withContext DemoBiometricResult.Failed
+                return@withContext DemoBiometricResult.Cancelled
             }
-            if (!isAvailable()) return@withContext DemoBiometricResult.Failed
+            if (!isAvailable()) return@withContext DemoBiometricResult.Unavailable
 
             suspendCancellableCoroutine { continuation ->
                 val prompt = BiometricPrompt(
@@ -47,7 +47,14 @@ private class AndroidDemoBiometricAuthenticator(
 
                         override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                             if (continuation.isActive) {
-                                continuation.resume(DemoBiometricResult.Failed)
+                                continuation.resume(when (errorCode) {
+                                    BiometricPrompt.ERROR_CANCELED, BiometricPrompt.ERROR_USER_CANCELED,
+                                    BiometricPrompt.ERROR_NEGATIVE_BUTTON -> DemoBiometricResult.Cancelled
+                                    BiometricPrompt.ERROR_LOCKOUT, BiometricPrompt.ERROR_LOCKOUT_PERMANENT -> DemoBiometricResult.LockedOut
+                                    BiometricPrompt.ERROR_NO_BIOMETRICS, BiometricPrompt.ERROR_HW_NOT_PRESENT,
+                                    BiometricPrompt.ERROR_HW_UNAVAILABLE -> DemoBiometricResult.Unavailable
+                                    else -> DemoBiometricResult.Failed
+                                })
                             }
                         }
                     },

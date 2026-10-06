@@ -1,8 +1,7 @@
 package id.walt.walletdemo.compose.ui.screens
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -12,12 +11,15 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.PinSetupStep
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.ui.SystemBackHandler
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import id.walt.walletdemo.compose.ui.LocalWalletDemoBranding
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.*
@@ -38,7 +40,6 @@ internal fun PinScreen(
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val windowFocused = LocalWindowInfo.current.isWindowFocused
-    val inputFocus = remember { FocusRequester() }
     val biometricUnlockEnabled = controller.isBiometricUnlockEnabled()
     val biometricPromptPending = login != null && !login.biometricPromptConsumed &&
         biometricUnlockEnabled && biometricAvailable
@@ -47,16 +48,6 @@ internal fun PinScreen(
     val digits = WalletDemoController.PinLength
     LaunchedEffect(login != null, biometricUnlockEnabled, biometricAvailable) {
         if (login != null && biometricUnlockEnabled && biometricAvailable) controller.unlockWithBiometrics()
-    }
-    LaunchedEffect(login != null, setup?.step, isBusy, biometricPromptPending, windowFocused) {
-        if (isBusy || biometricPromptPending || !windowFocused) {
-            focus.clearFocus()
-        } else {
-            // Let the host attach the secure editor before requesting its input session.
-            withFrameNanos { }
-            inputFocus.requestFocus()
-            keyboard?.show()
-        }
     }
     fun submit() {
         if (!isBusy && value.length == digits) {
@@ -73,7 +64,6 @@ internal fun PinScreen(
         onClick = { submit() },
         enabled = !isBusy && value.length == digits,
         testTag = WalletUiTestTags.PinSubmitButton,
-        icon = if (setup != null && !confirming) WalletSymbol.Next else WalletSymbol.Lock,
     )
     SystemBackHandler(enabled = confirming) { if (!isBusy) { focus.clearFocus(); controller.editSetupPin() } }
     val secondary = when {
@@ -82,50 +72,59 @@ internal fun PinScreen(
         login != null && biometricUnlockEnabled && biometricAvailable ->
             WalletAction(stringResource(Res.string.pin_unlock_biometrics),
                 { focus.clearFocus(); controller.unlockWithBiometrics(force = true) }, !isBusy,
-                WalletUiTestTags.PinBiometricButton, WalletSymbol.Lock)
+                WalletUiTestTags.PinBiometricButton)
         else -> null
     }
-    Scaffold(
-        modifier = Modifier.fillMaxSize().safeDrawingPadding().imePadding().testTag(WalletUiTestTags.PinScreen),
-        bottomBar = { WalletActionBar(primary, secondary) },
-    ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())
-            .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 640.dp).padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            Text(LocalWalletDemoBranding.current.appTitle, style = MaterialTheme.typography.headlineSmall)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (setup != null) Text(stringResource(if (confirming) Res.string.pin_step_confirm else Res.string.pin_step_choose),
-                    style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                Text(stringResource(when {
-                    setup == null -> Res.string.pin_enter
-                    confirming -> Res.string.pin_confirm
-                    else -> Res.string.pin_create
-                }), style = MaterialTheme.typography.headlineMedium)
+    val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    ReviewScaffold(
+        modifier = Modifier.fillMaxSize().safeDrawingPadding().testTag(WalletUiTestTags.PinScreen)
+            .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 640.dp),
+        actions = { WalletActions(primary, secondary) },
+        feedback = if (isBusy || error != null) ({
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (isBusy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                Text(if (isBusy) stringResource(Res.string.pin_authenticating) else error.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (!isBusy && error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        }) else null,
+    ) {
+        AnimatedContent(confirming, modifier = Modifier.fillMaxWidth(),
+            transitionSpec = { walletNavigationMotion(targetState, reduceMotion, rtl) }, label = "PIN step") { displayedConfirm ->
+            val active = displayedConfirm == confirming
+            val inputFocus = remember { FocusRequester() }
+            val displayedValue = if (displayedConfirm) setup?.confirmation.orEmpty() else setup?.pin ?: login?.pin.orEmpty()
+            LaunchedEffect(active, isBusy, biometricPromptPending, windowFocused) {
+                if (active && !isBusy && !biometricPromptPending && windowFocused) {
+                    withFrameNanos { }
+                    inputFocus.requestFocus()
+                    keyboard?.show()
+                } else if (active) focus.clearFocus()
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                Text(LocalWalletDemoBranding.current.appTitle, style = MaterialTheme.typography.headlineSmall)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (setup != null) Text(stringResource(if (displayedConfirm) Res.string.pin_step_confirm else Res.string.pin_step_choose),
+                        style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(when {
+                        setup == null -> Res.string.pin_enter
+                        displayedConfirm -> Res.string.pin_confirm
+                        else -> Res.string.pin_create
+                    }), style = MaterialTheme.typography.headlineMedium)
+                }
                 WalletPinInput(
-                    value = value,
-                    onValueChange = if (confirming) controller::updatePinConfirmation else controller::updatePin,
-                    label = stringResource(if (confirming) Res.string.pin_confirmation_label else Res.string.pin_label),
-                    progressDescription = stringResource(Res.string.pin_digit_progress, value.length, digits),
-                    digitCount = digits,
-                    enabled = !isBusy,
-                    isError = error != null,
-                    onSubmit = { submit() },
-                    modifier = Modifier.focusRequester(inputFocus).testTag(if (confirming) WalletUiTestTags.PinConfirmationInput else WalletUiTestTags.PinInput),
+                    value = displayedValue,
+                    onValueChange = { input -> if (active) {
+                        if (displayedConfirm) controller.updatePinConfirmation(input) else controller.updatePin(input)
+                    } },
+                    label = stringResource(if (displayedConfirm) Res.string.pin_confirmation_label else Res.string.pin_label),
+                    progressDescription = stringResource(Res.string.pin_digit_progress, displayedValue.length, digits),
+                    digitCount = digits, enabled = active && !isBusy, isError = active && error != null,
+                    onSubmit = { if (active) submit() },
+                    modifier = Modifier.focusRequester(inputFocus).testTag(if (displayedConfirm) WalletUiTestTags.PinConfirmationInput else WalletUiTestTags.PinInput),
                 )
             }
-            Text(stringResource(when {
-                setup == null -> Res.string.pin_enter_help
-                confirming -> Res.string.pin_confirm_help
-                else -> Res.string.pin_create_help
-            }), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (confirming && biometricAvailable) SettingsNotice(stringResource(Res.string.pin_biometric_next))
-            if (isBusy) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CircularProgressIndicator(Modifier.size(24.dp))
-                Text(stringResource(Res.string.pin_authenticating))
-            }
-            error?.let { SettingsNotice(it, error = true) }
         }
     }
 }

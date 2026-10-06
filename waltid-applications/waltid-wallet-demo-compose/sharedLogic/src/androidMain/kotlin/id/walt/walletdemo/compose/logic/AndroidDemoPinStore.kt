@@ -12,6 +12,7 @@ fun createAndroidDemoPinStore(
     val preferences = context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     val recordKey = "$RECORD_KEY_PREFIX$walletId"
     val biometricKey = "$BIOMETRIC_KEY_PREFIX$walletId"
+    val pendingKey = "biometric.pending.$walletId"
     return PersistentDemoPinStore(
         readRecord = { preferences.getString(recordKey, null) },
         writeRecord = { record ->
@@ -20,7 +21,7 @@ fun createAndroidDemoPinStore(
             }
         },
         clearRecord = {
-            check(preferences.edit().remove(recordKey).remove(biometricKey).commit()) {
+            check(preferences.edit().remove(recordKey).remove(biometricKey).remove(pendingKey).commit()) {
                 "PIN verifier could not be cleared"
             }
         },
@@ -28,6 +29,12 @@ fun createAndroidDemoPinStore(
         writeBiometricUnlock = { enabled ->
             check(preferences.edit().putBoolean(biometricKey, enabled).commit()) {
                 "Biometric unlock preference could not be persisted"
+            }
+        },
+        readBiometricSetupPending = { preferences.getBoolean(pendingKey, false) },
+        writeBiometricSetupPending = { pending ->
+            check(preferences.edit().putBoolean(pendingKey, pending).commit()) {
+                "Biometric setup choice could not be persisted"
             }
         },
         provider = androidPinCryptographyProvider,

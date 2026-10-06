@@ -6,15 +6,19 @@ import WalletDemoIdentityDocumentSupport
 struct ProximityPresentationView: View {
     @ObservedObject var viewModel: ProximityPresentationViewModel
     @Binding var approvalMode: WalletDemoProximityApprovalMode
+    var headerOwnsClose = false
+    var onConnectionOptions: (() -> Void)? = nil
     let credentialDetailsByID: [String: CredentialDetails]
 
     var body: some View {
         Group {
-            if viewModel.showsEngagement {
+            if viewModel.closing {
+                WalletReviewScaffold { EmptyView() } actions: { ProgressView("Closing the secure connection…").frame(maxWidth: .infinity, alignment: .leading) }
+            } else if viewModel.showsEngagement {
                 presentationBody.padding(.horizontal).padding(.vertical, 8)
                     .safeAreaInset(edge: .bottom, spacing: 0) { WalletFooter { actions } }
             } else {
-                WalletReviewScaffold(showsActions: canCancel || viewModel.review != nil || viewModel.isTerminal) {
+                WalletReviewScaffold(showsActions: (!headerOwnsClose && canCancel) || viewModel.review != nil || viewModel.isTerminal || viewModel.actionErrorMessage != nil) {
                     presentationBody
                 } actions: { actions }
             }
@@ -24,11 +28,13 @@ struct ProximityPresentationView: View {
     private var presentationBody: some View {
         Group {
             if viewModel.showsEngagement {
-                ProximityEngagementContent(viewModel: viewModel, approvalMode: $approvalMode, credentialDetailsByID: credentialDetailsByID)
+                ProximityEngagementContent(viewModel: viewModel, approvalMode: $approvalMode, credentialDetailsByID: credentialDetailsByID,
+                    onConnectionOptions: onConnectionOptions)
             } else {
                 VStack(alignment: .leading, spacing: 16) {
-                    if let message = viewModel.actionErrorMessage {
-                        StatusBannerView(message: String(localized: "Action failed: \(message)"), isLoading: false, isError: true)
+                    if let onConnectionOptions {
+                        WalletSection { WalletNavigationRow("Connection options", symbol: "network", action: onConnectionOptions)
+                            .accessibilityIdentifier("proximity-connection-options") }
                     }
                     if let sharing = pendingPreparedSharing {
                         ProximityPreparedSharingSummary(sharing: sharing, credentialDetailsByID: credentialDetailsByID)
@@ -44,11 +50,13 @@ struct ProximityPresentationView: View {
     }
 
     private var canCancel: Bool {
-        !viewModel.isTerminal && (viewModel.sessionState == nil || viewModel.sessionState?.legalActions.contains(.cancel) == true)
+        !viewModel.closing && !viewModel.isTerminal && (viewModel.sessionState == nil || viewModel.sessionState?.legalActions.contains(.cancel) == true)
     }
 
     @ViewBuilder private var actions: some View {
-
+            if let message = viewModel.actionErrorMessage {
+                StatusBannerView(message: message, isLoading: false, isError: true)
+            }
             if viewModel.preparingApproval {
                 let expired = viewModel.recentPlan?.isExpired == true
                 WalletActions(
@@ -56,8 +64,8 @@ struct ProximityPresentationView: View {
                         enabled: expired || viewModel.canApprove, identifier: WalletAccessibilityID.proximityApproveButton) {
                             if expired { viewModel.restart() } else { viewModel.approve() }
                         },
-                    secondary: WalletAction(String(localized: "Cancel"), identifier: WalletAccessibilityID.proximityCancelButton,
-                        perform: viewModel.cancel)
+                    secondary: headerOwnsClose ? nil : WalletAction(String(localized: "Cancel"), identifier: WalletAccessibilityID.proximityCancelButton,
+                        perform: viewModel.requestClose)
                 )
             } else if viewModel.review != nil {
                 ReviewActions(
@@ -65,12 +73,12 @@ struct ProximityPresentationView: View {
                     isLoading: viewModel.pendingReviewID != nil,
                     onSubmit: { viewModel.approve() },
                     onReject: viewModel.decline,
-                    onCancel: viewModel.cancel,
-                    presentation: .proximity
+                    onCancel: viewModel.requestClose,
+                    presentation: .proximity, showCancelWithReject: !headerOwnsClose
                 )
-            } else if canCancel {
+            } else if canCancel && !headerOwnsClose {
                 WalletActions(secondary: WalletAction("Cancel", identifier: WalletAccessibilityID.proximityCancelButton,
-                    perform: viewModel.cancel))
+                    perform: viewModel.requestClose))
             } else if viewModel.isTerminal {
                 ProximityOutcomeActions(viewModel: viewModel)
             }
@@ -107,7 +115,8 @@ struct ProximityPresentationView: View {
             case .preparing:
                 ProximityProgressContent(message: String(localized: "Preparing a secure presentation…"))
             case .engagementReady:
-                ProximityEngagementContent(viewModel: viewModel, approvalMode: $approvalMode, credentialDetailsByID: credentialDetailsByID)
+                ProximityEngagementContent(viewModel: viewModel, approvalMode: $approvalMode, credentialDetailsByID: credentialDetailsByID,
+                    onConnectionOptions: onConnectionOptions)
             case .connecting:
                 ProximityProgressContent(message: String(localized: "Connecting to reader…"))
             case .awaitingRequest:

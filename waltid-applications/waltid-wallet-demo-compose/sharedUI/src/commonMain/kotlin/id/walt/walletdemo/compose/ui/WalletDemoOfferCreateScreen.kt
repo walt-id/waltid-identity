@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +23,9 @@ import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.WalletAction
 import id.walt.walletdemo.compose.ui.components.WalletActions
 import id.walt.walletdemo.compose.ui.components.WalletSymbol
+import id.walt.walletdemo.compose.ui.components.WalletReviewNavigationHost
+import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
+import id.walt.walletdemo.compose.ui.components.WalletIcon
 
 /**
  * Receiving review for platform hosts, using the same batch rows and actions as in-app receiving.
@@ -60,7 +64,7 @@ fun WalletDemoOfferCreateScreen(
     }) { fillViewport ->
         when (state) {
             WalletDemoOfferCreateUiState.Loading -> ReviewScaffold(fillViewport = fillViewport,
-                actions = { WalletActions(secondary = WalletAction("Cancel", onDecline, icon = WalletSymbol.Decline)) }) {
+                actions = { WalletActions(secondary = WalletAction("Cancel", onDecline)) }) {
                 OfferCreateLoadingContent()
             }
             is WalletDemoOfferCreateUiState.Review -> {
@@ -74,56 +78,77 @@ fun WalletDemoOfferCreateScreen(
                         txCode.trim().ifBlank { null }?.takeIf { requirement != null }, copies,
                     )
                 }
-                ReviewScaffold(
-                    fillViewport = fillViewport,
-                    actions = {
-                        OfferReviewActions(offer.requiresIssuerAuthentication, acceptEnabled, enabled, accept, onDecline)
-                    },
-                ) {
-                    Text(state.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    state.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                    OfferReviewSection(
-                        preview = offer,
-                        acceptEnabled = acceptEnabled,
-                        reviewEnabled = enabled,
-                        txCode = txCode,
-                        onTxCodeChange = { choices.transactionCode = requirement?.normalizeInput(it) ?: it },
-                        copies = copies,
-                        onCopiesChange = { id, count ->
-                            if (enabled && offer.offeredCredentials.any { it.configurationId == id }) {
-                                choices.copies = copies + (id to count.coerceIn(0, (offer.batchSize ?: 1).coerceAtLeast(1)))
+                WalletReviewNavigationHost(requestKey = offer.hashCode().toString(), offer = offer,
+                    enabled = enabled, onClose = onDismiss.takeIf { enabled }) {
+                    ReviewScaffold(
+                        fillViewport = fillViewport,
+                        header = {
+                            WalletScreenHeader(state.title) {
+                                IconButton(onClick = onDismiss, enabled = enabled) { WalletIcon(WalletSymbol.Decline, "Close request") }
                             }
                         },
-                        onAccept = accept,
-                        onDecline = onDecline,
-                        showActions = false,
-                    )
+                        feedback = state.errorMessage?.let { message -> { Text(message, color = MaterialTheme.colorScheme.error) } },
+                        actions = {
+                            OfferReviewActions(offer.requiresIssuerAuthentication, acceptEnabled, enabled, accept, onDecline)
+                        },
+                    ) {
+                        OfferReviewSection(
+                            preview = offer,
+                            acceptEnabled = acceptEnabled,
+                            reviewEnabled = enabled,
+                            txCode = txCode,
+                            onTxCodeChange = { choices.transactionCode = requirement?.normalizeInput(it) ?: it },
+                            copies = copies,
+                            onCopiesChange = { id, count ->
+                                if (enabled && offer.offeredCredentials.any { it.configurationId == id }) {
+                                    choices.copies = copies + (id to count.coerceIn(0, (offer.batchSize ?: 1).coerceAtLeast(1)))
+                                }
+                            },
+                            onAccept = accept,
+                            onDecline = onDecline,
+                            showActions = false,
+                        )
+                    }
                 }
             }
-            is WalletDemoOfferCreateUiState.Receipt -> ReviewScaffold(
-                fillViewport = fillViewport,
-                actions = {
-                    WalletActions(
-                        WalletAction("Done", onDone, enabled = !state.busy, icon = WalletSymbol.Accept, testTag = "wallet.provider.done"),
-                        if (state.pending.isEmpty()) null else WalletAction("Refresh", onRefresh, enabled = !state.busy, icon = WalletSymbol.Retry),
-                    )
-                },
+            is WalletDemoOfferCreateUiState.Receipt -> WalletReviewNavigationHost(
+                requestKey = "provider-receipt", savedCredentials = state.saved,
+                enabled = !state.busy, onClose = onDone.takeIf { !state.busy },
             ) {
-                Text("Receiving result", style = MaterialTheme.typography.titleLarge)
-                IssuanceResultContent(state.receipt, state.saved, state.pending, state.busy, onResumeDeferred)
-                state.refreshError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                ReviewScaffold(
+                    fillViewport = fillViewport,
+                    header = {
+                        WalletScreenHeader("Receiving result") {
+                            IconButton(onClick = onDone, enabled = !state.busy) {
+                                WalletIcon(WalletSymbol.Decline, "Close request")
+                            }
+                        }
+                    },
+                    feedback = state.refreshError?.let { message -> { Text(message, color = MaterialTheme.colorScheme.error) } },
+                    actions = {
+                        WalletActions(
+                            WalletAction("Done", onDone, enabled = !state.busy, testTag = "wallet.provider.done"),
+                            if (state.pending.isEmpty()) null else WalletAction("Refresh", onRefresh, enabled = !state.busy),
+                        )
+                    },
+                ) {
+                    IssuanceResultContent(state.receipt, state.saved, state.pending, state.busy, onResumeDeferred)
+                }
             }
             is WalletDemoOfferCreateUiState.Failure -> ReviewScaffold(
                 fillViewport = fillViewport,
-                actions = { WalletActions(secondary = WalletAction("Close", onDecline, icon = WalletSymbol.Decline)) },
+                header = {
+                    WalletScreenHeader("Unable to receive credentials") {
+                        IconButton(onDecline) { WalletIcon(WalletSymbol.Decline, "Close request") }
+                    }
+                },
+                feedback = { Text(state.message, color = MaterialTheme.colorScheme.error) },
             ) {
-                Text("Unable to receive credentials", style = MaterialTheme.typography.titleLarge)
-                Text(state.message, color = MaterialTheme.colorScheme.error)
             }
             is WalletDemoOfferCreateUiState.WaitingForAuthorization -> ReviewScaffold(
                 fillViewport = fillViewport,
                 actions = if (state.completing) null else ({
-                    WalletActions(secondary = WalletAction("Cancel", onCancelAuthorization, icon = WalletSymbol.Decline))
+                    WalletActions(secondary = WalletAction("Cancel", onCancelAuthorization))
                 }),
             ) {
                 Column(

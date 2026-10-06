@@ -33,7 +33,7 @@ import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
-private enum class SettingsDestination(val title: StringResource) {
+internal enum class SettingsDestination(val title: StringResource) {
     Main(Res.string.settings_title),
     SigningKey(Res.string.settings_signing_key),
     Technical(Res.string.settings_technical),
@@ -64,15 +64,16 @@ internal fun SettingsScreen(
     resetWalletDescription: String? = null,
     allowWalletReset: Boolean = true,
     serverSettingsContent: (@Composable () -> Unit)? = null,
+    initialDestination: SettingsDestination = SettingsDestination.Main,
 ) {
     val currentState by rememberUpdatedState(state)
     val currentReaderPolicy by rememberUpdatedState(readerTrustPolicySummary)
     var deleteRecovery by remember { mutableStateOf<String?>(null) }
     var confirmReset by rememberSaveable { mutableStateOf(false) }
-    var path by rememberSaveable(stateSaver = listSaver(
+    var path by rememberSaveable(initialDestination, stateSaver = listSaver(
         save = { entries: List<SettingsDestination> -> entries.map { it.name } },
-        restore = { entries -> entries.map(SettingsDestination::valueOf) },
-    )) { mutableStateOf(listOf(SettingsDestination.Main)) }
+        restore = { entries -> entries.map(SettingsDestination::valueOf).takeIf { it.firstOrNull() == initialDestination } ?: listOf(initialDestination) },
+    )) { mutableStateOf(listOf(initialDestination)) }
     val back = { if (path.size > 1) path = path.dropLast(1) else onBack() }
     fun open(destination: SettingsDestination) { path = path + destination }
     SystemBackHandler(enabled = path.size == 1, onBack = back)
@@ -258,18 +259,18 @@ internal fun SettingsScreen(
         AlertDialog(onDismissRequest = { deleteRecovery = null }, title = { Text(stringResource(Res.string.settings_delete_backup_question)) },
             text = { Text(stringResource(Res.string.settings_delete_backup_notice,
                 (currentState.identityDetails as? WalletDemoIdentityDetailsState.Available)?.details?.choices?.find { it.id == id }?.detail ?: "the backup provider")) },
-            confirmButton = { TextButton(onClick = { deleteRecovery = null; onIdentityAction(id) }) { Text(stringResource(Res.string.settings_delete_backup)) } },
+            confirmButton = { TextButton(onClick = { deleteRecovery = null; onIdentityAction(id) }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(stringResource(Res.string.settings_delete_backup)) } },
             dismissButton = { TextButton(onClick = { deleteRecovery = null }) { Text(stringResource(Res.string.settings_cancel)) } })
     }
     currentState.pendingSigningProtectionChange?.let { target ->
         AlertDialog(onDismissRequest = onCancelSigningProtectionChange, title = { Text("Change signing protection?") },
             text = { Text("Changing to ${target.title().lowercase()} creates a new wallet key and DID. Your current credentials will be removed and must be issued again.") },
-            confirmButton = { TextButton(onConfirmSigningProtectionChange, Modifier.testTag(WalletUiTestTags.SigningProtectionConfirm)) { Text("Create new wallet") } },
+            confirmButton = { TextButton(onConfirmSigningProtectionChange, Modifier.testTag(WalletUiTestTags.SigningProtectionConfirm), colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Create new wallet") } },
             dismissButton = { TextButton(onCancelSigningProtectionChange) { Text(stringResource(Res.string.settings_cancel)) } })
     }
     if (confirmReset) AlertDialog(onDismissRequest = { confirmReset = false },
         title = { Text(stringResource(Res.string.settings_reset_question)) }, text = { Text(resetWalletDescription ?: stringResource(Res.string.settings_reset_description)) },
-        confirmButton = { TextButton({ confirmReset = false; onResetWallet() }, Modifier.testTag(WalletUiTestTags.SettingsResetConfirm)) { Text(stringResource(Res.string.settings_reset)) } },
+        confirmButton = { TextButton({ confirmReset = false; onResetWallet() }, Modifier.testTag(WalletUiTestTags.SettingsResetConfirm), colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(stringResource(Res.string.settings_reset)) } },
         dismissButton = { TextButton({ confirmReset = false }) { Text(stringResource(Res.string.settings_cancel)) } })
 }
 

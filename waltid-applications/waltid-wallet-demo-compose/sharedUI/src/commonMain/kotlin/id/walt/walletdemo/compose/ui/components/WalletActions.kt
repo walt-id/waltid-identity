@@ -5,10 +5,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -49,10 +45,6 @@ private fun WalletAction.modifier(): Modifier = Modifier.heightIn(min = 48.dp)
     .then(testTag?.let { Modifier.testTag(it) } ?: Modifier)
 
 @Composable
-private fun RowScope.ActionLabel(action: WalletAction) {
-    action.icon?.let {
-        WalletIcon(it, contentDescription = null, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(8.dp))
-    }
-    Text(action.label, modifier = Modifier.weight(1f, fill = false))
+private fun ActionLabel(action: WalletAction) {
+    Text(action.label)
 }

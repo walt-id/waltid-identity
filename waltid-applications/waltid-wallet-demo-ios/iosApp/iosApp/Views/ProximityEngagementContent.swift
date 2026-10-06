@@ -7,6 +7,7 @@ struct ProximityEngagementContent: View {
     @ObservedObject var viewModel: ProximityPresentationViewModel
     @Binding var approvalMode: WalletDemoProximityApprovalMode
     let credentialDetailsByID: [String: CredentialDetails]
+    var onConnectionOptions: (() -> Void)? = nil
     @State private var showApprovedData = false
     @State private var sectionHeights: [ProximityEngagementSection: CGFloat] = [:]
 
@@ -101,14 +102,11 @@ struct ProximityEngagementContent: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if let message = viewModel.actionErrorMessage {
-                StatusBannerView(message: String(localized: "Action failed: \(message)"), isLoading: false, isError: true)
-            }
-            Text(viewModel.preparedSharing != nil ? String(localized: "Ready for one share")
+            if viewModel.preparedSharing != nil || viewModel.displayedEngagement != nil { Text(viewModel.preparedSharing != nil ? String(localized: "Ready for one share")
                 : viewModel.displayedEngagement == .qr ? String(localized: "Show QR code")
                 : viewModel.displayedEngagement == .nfc ? String(localized: "Hold near the reader")
                 : String(localized: "Share in person"))
-                .font(.title3.bold()).accessibilityAddTraits(.isHeader)
+                .font(.title3.bold()).accessibilityAddTraits(.isHeader) }
             if let sharing = viewModel.preparedSharing {
                 Text(Array(Set(sharing.review.readerAuthentication.compactMap(\.displayName))).sorted().joined(separator: ", "))
                     .font(.subheadline.weight(.semibold))
@@ -138,37 +136,29 @@ struct ProximityEngagementContent: View {
                 }.frame(maxWidth: .infinity, minHeight: 44)
                     .disabled(viewModel.refreshingEngagement)
             }
+            if let onConnectionOptions {
+                WalletSection { WalletNavigationRow("Connection options", symbol: "network", action: onConnectionOptions)
+                    .disabled(!viewModel.canChangeConnectionOptions)
+                    .accessibilityIdentifier("proximity-connection-options") }
+            }
             if let route = viewModel.connectedRoute { ProximityConnectionDetails(route: route) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var choices: some View {
-        ForEach(Array(viewModel.engagementChoices.enumerated()), id: \.offset) { _, method in
-            Button { viewModel.showEngagement(method) } label: {
-                HStack(spacing: 16) {
-                    Image(systemName: method == .qr ? "qrcode" : "wave.3.right")
-                        .font(.title2).foregroundStyle(Color.accentColor)
-                        .frame(width: 28).accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(method == .qr ? String(localized: "Show QR code") : String(localized: "Hold near the reader"))
-                            .font(.headline).foregroundStyle(.primary)
-                        Text(method == .qr ? String(localized: "Let the reader scan your screen.")
-                            : String(localized: "Bring your phone close to connect."))
-                            .font(.subheadline).foregroundStyle(.secondary)
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, 12).frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+        WalletSection {
+            ForEach(Array(viewModel.engagementChoices.enumerated()), id: \.offset) { index, method in
+                if index > 0 { Divider() }
+                WalletNavigationRow(method == .qr ? String(localized: "Show QR code") : String(localized: "Hold near the reader"),
+                    subtitle: method == .qr ? String(localized: "Let the reader scan your screen.") : String(localized: "Bring your phone close to connect."),
+                    symbol: method == .qr ? "qrcode" : "wave.3.right") { viewModel.showEngagement(method) }
+                    .disabled(viewModel.refreshingEngagement)
+                    .accessibilityIdentifier(method == .qr ? "proximity-show-Qr" : "proximity-show-Nfc")
             }
-            .buttonStyle(.plain)
-            .disabled(viewModel.refreshingEngagement)
-            .accessibilityIdentifier(method == .qr ? "proximity-show-Qr" : "proximity-show-Nfc")
-            Divider()
         }
     }
+
 }
 
 private enum ProximityEngagementSection { case header, footer }

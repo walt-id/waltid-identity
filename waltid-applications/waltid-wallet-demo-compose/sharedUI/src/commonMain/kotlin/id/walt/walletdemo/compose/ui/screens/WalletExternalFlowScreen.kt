@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.ui.rememberAuthorizationRequestOpener
 import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
+import id.walt.walletdemo.compose.ui.components.WalletReviewNavigationHost
 
 /** Wallet-owned external surface. Platform windows decide what can appear behind this sheet. */
 @Composable
@@ -24,6 +25,15 @@ internal fun WalletExternalFlowScreen(
     LaunchedEffect(state.authorizationRequestUrl) {
         state.authorizationRequestUrl?.let { openAuthorization(it); controller.authorizationRequestOpened() }
     }
+    WalletReviewNavigationHost(
+        requestKey = "external:${state.receiveNavigationResetKey}:${state.presentationNavigationResetKey}",
+        offer = state.offerPreview, sharingOptions = state.presentationPreview?.credentialOptions.orEmpty(),
+        savedCredentials = state.receivedCredentials(),
+        selectedCredentials = state.selectedPresentationCredentialOptions,
+        selectedDisclosures = state.selectedPresentationDisclosureOptions,
+        enabled = !state.isBusy, onToggleDisclosure = controller::togglePresentationDisclosure,
+        onClose = onClose.takeIf { state.canDismissExternalFlow },
+    ) {
     Column(Modifier.fillMaxWidth().testTag("wallet.external.flow")) {
         WalletScreenHeader(if (state.externalFlow?.tab == WalletDemoTab.Receive) "Receive credentials" else "Share credentials",
             titleTag = "wallet.external.title") {
@@ -35,5 +45,6 @@ internal fun WalletExternalFlowScreen(
                 Modifier.padding(20.dp).testTag("wallet.external.unavailable"))
         } else WalletFlowContent(controller, state, onDone = onClose,
             fillViewport = false, modifier = Modifier.weight(1f, fill = false))
+    }
     }
 }

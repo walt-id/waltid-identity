@@ -30,6 +30,7 @@ public struct CredentialCardArtView: View {
     public let summary: CredentialCardSummary
     public var compact: Bool = false
     @State private var loadedMetadataArt: UIImage?
+    @State private var loadedMetadataArtURI: String?
     @State private var metadataArtFailed = false
 
     public init(summary: CredentialCardSummary, compact: Bool = false) {
@@ -42,21 +43,26 @@ public struct CredentialCardArtView: View {
         let padding: CGFloat = compact ? 4 : 16
         let background = Color(css: summary.backgroundColor) ?? defaultWaltCardBlue
         let label = Color(css: summary.textColor) ?? .white
+        let artURI = credentialCardMetadataArtURI(
+            backgroundColor: summary.backgroundColor,
+            backgroundImageURI: summary.backgroundImageURI,
+            compact: compact
+        )
 
         GeometryReader { proxy in
             let logoSize: CGFloat = compact ? min(28, max(0, proxy.size.height - 8)) : 36
             ZStack(alignment: .topLeading) {
                 background
-                if let loadedMetadataArt {
+                if artURI != nil, loadedMetadataArtURI == artURI, let loadedMetadataArt {
                     Image(uiImage: loadedMetadataArt)
                         .resizable()
                         .scaledToFill()
                         .frame(width: proxy.size.width, height: proxy.size.height)
                         .clipped()
                 }
-                if compact || showsConstructedCardArtOverlay(
-                    backgroundImageURI: summary.backgroundImageURI,
-                    hasLoadedMetadataArt: loadedMetadataArt != nil,
+                if showsConstructedCardArtOverlay(
+                    backgroundImageURI: artURI,
+                    hasLoadedMetadataArt: loadedMetadataArtURI == artURI && loadedMetadataArt != nil,
                     metadataArtFailed: metadataArtFailed
                 ) {
                     if !compact { Text(summary.title)
@@ -72,13 +78,18 @@ public struct CredentialCardArtView: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
-            .shadow(color: .black.opacity(compact ? 0.22 : 0.34), radius: compact ? 4 : 16, y: compact ? 2 : 6)
+            .shadow(color: .black.opacity(compact ? 0 : 0.34), radius: compact ? 0 : 16, y: compact ? 0 : 6)
         }
         .aspectRatio(id1AspectRatio, contentMode: .fit)
-        .task(id: summary.backgroundImageURI) {
+        .task(id: artURI) {
+            loadedMetadataArt = nil
+            loadedMetadataArtURI = nil
             metadataArtFailed = false
-            loadedMetadataArt = await loadMetadataArt(from: summary.backgroundImageURI)
-            metadataArtFailed = loadedMetadataArt == nil && httpsURL(summary.backgroundImageURI) != nil
+            let image = await loadMetadataArt(from: artURI)
+            guard !Task.isCancelled else { return }
+            loadedMetadataArt = image
+            loadedMetadataArtURI = artURI
+            metadataArtFailed = image == nil && artURI != nil
         }
     }
 
@@ -100,7 +111,7 @@ public struct CredentialCardArtView: View {
                 }
             }
         case .bundledWalt:
-            DefaultWaltLogo()
+            if !compact { DefaultWaltLogo() }
         }
     }
 
@@ -265,6 +276,16 @@ public enum CredentialCardLogoSource: Equatable {
 
 public func credentialCardLogoSource(_ value: String?) -> CredentialCardLogoSource {
     httpsURL(value).map(CredentialCardLogoSource.metadata) ?? .bundledWalt
+}
+
+public func credentialCardMetadataArtURI(
+    backgroundColor: String?,
+    backgroundImageURI: String?,
+    compact: Bool
+) -> String? {
+    guard !compact || Color(css: backgroundColor) == nil,
+          httpsURL(backgroundImageURI) != nil else { return nil }
+    return backgroundImageURI
 }
 
 public func showsConstructedCardArtOverlay(

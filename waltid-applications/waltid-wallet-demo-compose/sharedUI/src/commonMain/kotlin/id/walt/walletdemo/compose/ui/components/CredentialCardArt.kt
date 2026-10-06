@@ -85,6 +85,12 @@ internal fun credentialCardLogoSource(uri: String?): CredentialCardLogoSource =
 internal fun credentialCardLogoContentDescription(name: String, altText: String?): String =
     altText?.trim()?.takeIf(String::isNotEmpty) ?: "$name logo"
 
+/** Thumbnails favor a supplied background and logo; full cards favor credential artwork. */
+internal fun credentialCardMetadataArtUri(art: CredentialCardArtModel, compact: Boolean): String? =
+    art.backgroundImageUri?.takeIf {
+        (!compact || parseCssColor(art.backgroundColor) == null) && RasterImageSupport.isHttpsDisplayImageUrl(it)
+    }
+
 @Composable
 internal fun CredentialCardArt(
     art: CredentialCardArtModel,
@@ -94,7 +100,7 @@ internal fun CredentialCardArt(
     val shape = RoundedCornerShape(if (compact) 10.dp else 14.dp)
     val constructedColor = parseCssColor(art.backgroundColor) ?: DefaultWaltCardBlue
     val labelColor = parseCssColor(art.textColor) ?: Color.White
-    val backgroundImageUri = art.backgroundImageUri?.takeIf(RasterImageSupport::isHttpsDisplayImageUrl)
+    val backgroundImageUri = credentialCardMetadataArtUri(art, compact)
     val logoSource = credentialCardLogoSource(art.logoUri)
     var metadataArtState by remember(backgroundImageUri) {
         mutableStateOf(
@@ -110,7 +116,7 @@ internal fun CredentialCardArt(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(Id1AspectRatio)
-            .shadow(if (compact) 4.dp else 16.dp, shape, clip = false)
+            .then(if (compact) Modifier else Modifier.shadow(16.dp, shape, clip = false))
             .clip(shape)
             .testTag(WalletUiTestTags.credentialCard(art.id)),
     ) {
@@ -150,7 +156,7 @@ internal fun CredentialCardArt(
             )
         }
 
-        if (compact || showConstructedCardArtOverlay(metadataArtState)) {
+        if (showConstructedCardArtOverlay(metadataArtState)) {
             val logoModifier = Modifier
                 .align(if (compact) Alignment.Center else Alignment.BottomEnd)
                 .padding(namePadding)
@@ -173,7 +179,7 @@ internal fun CredentialCardArt(
                     loading = {},
                     error = {},
                 )
-                CredentialCardLogoSource.BundledWalt -> DefaultWaltLogo(logoModifier)
+                CredentialCardLogoSource.BundledWalt -> if (!compact) DefaultWaltLogo(logoModifier)
             }
             if (!compact) Text(
                 text = art.name,

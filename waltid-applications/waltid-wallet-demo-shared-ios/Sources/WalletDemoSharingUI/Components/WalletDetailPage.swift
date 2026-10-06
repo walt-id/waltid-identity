@@ -28,8 +28,11 @@ public struct WalletDetailPage<Content: View>: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if let dismissal {
-                    Button(String(localized: "Close", bundle: .module), action: dismissal.perform)
+                    Button(action: dismissal.perform) {
+                        Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44)
+                    }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(String(localized: "Close", bundle: .module))
                         .accessibilityIdentifier(dismissal.identifier)
                 }
             }

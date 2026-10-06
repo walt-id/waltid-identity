@@ -39,9 +39,8 @@ struct ScanCodeButton: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Close") {
-                            scannerVisible = false
-                        }
+                        Button { scannerVisible = false } label: { Image(systemName: "xmark") }
+                            .accessibilityLabel("Close")
                     }
                 }
             }

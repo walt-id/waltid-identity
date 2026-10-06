@@ -43,8 +43,8 @@ struct StatusBannerView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(minHeight: isError && !isExpanded ? 44 : nil, alignment: .top)
-        .padding(.horizontal, isError ? 16 : 0)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(backgroundColor)
         .foregroundColor(foregroundColor)
         .cornerRadius(8)
@@ -81,8 +81,7 @@ struct StatusBannerView: View {
     }
 
     private var backgroundColor: Color {
-        if isError { return Color.red.opacity(0.12) }
-        return .clear
+        return Color.secondary.opacity(0.08)
     }
 
     private var foregroundColor: Color {

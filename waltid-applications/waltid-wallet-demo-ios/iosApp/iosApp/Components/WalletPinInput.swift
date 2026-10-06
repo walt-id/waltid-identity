@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// One native secure editor owns input and accessibility. The circles never display the PIN itself.
+/// One native secure editor owns input and accessibility. Decorative positions never reveal digits.
 struct WalletPinInput: View {
     @Binding var value: String
     let label: String
@@ -19,22 +19,20 @@ struct WalletPinInput: View {
             .privacySensitive()
             .overlay {
                 GeometryReader { geometry in
-                    let diameter = min(44, (geometry.size.width - CGFloat(digitCount - 1) * 8) / CGFloat(digitCount))
-                    HStack(spacing: 8) {
+                    let width = min(40, (geometry.size.width - CGFloat(digitCount - 1) * 16) / CGFloat(digitCount))
+                    HStack(spacing: 16) {
                         ForEach(0..<digitCount, id: \.self) { index in
                             let active = focus.wrappedValue && isEnabled && index == value.count
-                            ZStack {
-                                Circle().fill(active ? Color.accentColor.opacity(0.12) : Color(uiColor: .tertiarySystemFill))
-                                if active || isError {
-                                    Circle().strokeBorder(isError ? Color.red : Color.accentColor, lineWidth: 2)
-                                }
+                            VStack(spacing: 12) {
                                 if index < value.count {
-                                    Circle().fill(Color.primary).frame(width: 12, height: 12)
+                                    Circle().fill(Color.primary).frame(width: 10, height: 10)
                                 } else {
-                                    Circle().strokeBorder(Color.secondary, lineWidth: 1.5).frame(width: 8, height: 8)
+                                    Color.clear.frame(width: 10, height: 10)
                                 }
+                                Capsule().fill(isError ? Color.red : active ? Color.accentColor : Color.secondary.opacity(0.4))
+                                    .frame(height: active || isError ? 3 : 2)
                             }
-                            .frame(width: diameter, height: diameter)
+                            .frame(width: width, height: 44)
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -66,6 +64,19 @@ private struct PinSecureEditor: UIViewRepresentable {
         field.tintColor = .clear
         field.delegate = context.coordinator
         field.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .editingChanged)
+        context.coordinator.field = field
+        let toolbar = UIToolbar()
+        let done = UIButton(type: .system)
+        done.setTitle("Done", for: .normal)
+        done.titleLabel?.font = .preferredFont(forTextStyle: .body)
+        done.titleLabel?.adjustsFontForContentSizeCategory = true
+        done.accessibilityIdentifier = "wallet.pinKeyboardAction"
+        done.addTarget(context.coordinator, action: #selector(Coordinator.dismissKeyboard), for: .touchUpInside)
+        done.frame = CGRect(x: 0, y: 0, width: 64, height: 44)
+        toolbar.items = [UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
+                         UIBarButtonItem(customView: done)]
+        toolbar.sizeToFit()
+        field.inputAccessoryView = toolbar
         return field
     }
 
@@ -88,7 +99,14 @@ private struct PinSecureEditor: UIViewRepresentable {
 
     final class Coordinator: NSObject, UITextFieldDelegate {
         var parent: PinSecureEditor
+        weak var field: UITextField?
         init(_ parent: PinSecureEditor) { self.parent = parent }
+
+        @objc func dismissKeyboard() {
+            parent.focus = false
+            field?.resignFirstResponder()
+            parent.onSubmit()
+        }
 
         @objc func changed(_ field: UITextField) {
             parent.value = field.text ?? ""

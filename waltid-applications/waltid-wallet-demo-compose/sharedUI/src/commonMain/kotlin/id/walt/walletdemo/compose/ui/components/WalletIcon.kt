@@ -19,7 +19,7 @@ import org.jetbrains.compose.resources.painterResource
 
 /** App actions only. Transaction field display remains controlled by its verified metadata. */
 internal enum class WalletSymbol {
-    Back, Next, Accept, Decline, Share, Receive, Retry, Scan, Paste, Lock, Key, Nearby, Info, Delete,
+    Back, Next, Accept, Decline, Share, Receive, Retry, Scan, Paste, Manual, Camera, Lock, Key, Nearby, Info, Delete,
 }
 
 /** Pass null beside a text label so assistive technology announces the action only once. */
@@ -27,7 +27,9 @@ internal enum class WalletSymbol {
 internal fun WalletIcon(symbol: WalletSymbol, contentDescription: String?, modifier: Modifier = Modifier) {
     val painter = when (symbol) {
         WalletSymbol.Scan -> painterResource(Res.drawable.proximity_qr)
-        WalletSymbol.Paste -> painterResource(Res.drawable.settings_copy)
+        WalletSymbol.Paste -> painterResource(Res.drawable.scan_paste)
+        WalletSymbol.Manual -> painterResource(Res.drawable.scan_manual)
+        WalletSymbol.Camera -> painterResource(Res.drawable.scan_camera)
         WalletSymbol.Receive -> painterResource(Res.drawable.settings_import)
         WalletSymbol.Nearby -> painterResource(Res.drawable.settings_nearby)
         WalletSymbol.Key -> painterResource(Res.drawable.settings_key)

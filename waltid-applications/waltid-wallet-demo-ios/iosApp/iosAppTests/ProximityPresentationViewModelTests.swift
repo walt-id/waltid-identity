@@ -10,6 +10,73 @@ import WalletDemoIdentityDocumentSupport
 @preconcurrency import WalletCore
 
 final class ProximityPresentationViewModelTests: XCTestCase {
+    @MainActor
+    func testOneCloseCancelsOnceAndKeepsTaskVisibleUntilCleanup() async throws {
+        let session = FakeProximitySession(suspendClose: true)
+        let client = FakeProximityWalletClient(session: session)
+        let model = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        model.start()
+        try await waitUntil { client.startCount == 1 }
+        await session.emit(.engagementReady([.qr(payload: "mdoc:test")]))
+        try await waitUntil { model.canChangeConnectionOptions }
+        model.requestClose()
+        model.requestClose()
+        try await waitUntilAsync { await session.closeCount == 1 }
+        let actions = await session.actions
+        XCTAssertEqual(actions.count, 1)
+        guard case .cancel = try XCTUnwrap(actions.first) else { return XCTFail("Close must dispatch cancellation") }
+        XCTAssertTrue(model.active)
+        XCTAssertTrue(model.closing)
+        XCTAssertFalse(model.canClose)
+        await session.resumeClose()
+        try await waitUntil { !model.active }
+        XCTAssertFalse(model.closing)
+    }
+
+    @MainActor
+    func testRejectedCloseRetainsTaskAndActualError() async throws {
+        let error = WalletSDK.ProximityError(category: .transport, code: "close_rejected", message: "The request is still active", recovery: .startNewSession)
+        let session = FakeProximitySession(actionResult: .rejected(error))
+        let client = FakeProximityWalletClient(session: session)
+        let model = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        model.start()
+        try await waitUntil { client.startCount == 1 }
+        await session.emit(.engagementReady([.qr(payload: "mdoc:test")]))
+        try await waitUntil { model.canChangeConnectionOptions }
+        model.requestClose()
+        try await waitUntil { model.actionErrorMessage != nil }
+        XCTAssertTrue(model.active)
+        XCTAssertFalse(model.closing)
+        XCTAssertEqual(model.actionErrorMessage, error.message)
+        XCTAssertEqual(model.qrPayload, "mdoc:test")
+        let closeCount = await session.closeCount
+        XCTAssertEqual(closeCount, 0)
+        await model.closeAndAwait()
+    }
+
+    @MainActor
+    func testTerminatingDisallowsCloseAndTerminalDoneDoesNotCancelAgain() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        let model = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        model.start()
+        try await waitUntil { client.startCount == 1 }
+        await session.emit(.terminating(exchange: 1))
+        try await waitUntil { if case .terminating = model.sessionState { return true }; return false }
+        XCTAssertFalse(model.canClose)
+        model.requestClose()
+        await Task.yield()
+        XCTAssertTrue(model.active)
+        let before = await session.actions
+        XCTAssertTrue(before.isEmpty)
+        await session.emit(.cancelled)
+        try await waitUntil { model.isTerminal }
+        model.requestClose()
+        try await waitUntil { !model.active }
+        let after = await session.actions
+        XCTAssertTrue(after.isEmpty)
+    }
+
     func testSessionConfigurationMatrixRoundTripsThroughKotlinBridge() throws {
         let ble = WalletSDK.ProximityBLEConfiguration(roles: .centralClient, bearerPolicy: .gattOnly)
         let plans: [WalletSDK.ProximityRetrievalOptions] = [
@@ -1343,6 +1410,7 @@ private actor FakeProximitySession: DemoProximityPresentationSession {
     nonisolated let presentment = FakePresentmentState()
     nonisolated let connectedRoute: WalletSDK.ProximityConnectedRoute?
     private var suspendClose: Bool
+    private let actionResult: WalletSDK.ProximityActionResult
     private var closeContinuation: CheckedContinuation<Void, Never>?
     nonisolated var systemPresentationActive: Bool { presentment.active }
     nonisolated let states: AsyncStream<WalletSDK.ProximityState>
@@ -1353,8 +1421,9 @@ private actor FakeProximitySession: DemoProximityPresentationSession {
 
     func presentNfc() async { presentNfcCalls += 1 }
 
-    init(suspendClose: Bool = false, connectedRoute: WalletSDK.ProximityConnectedRoute? = nil) {
+    init(suspendClose: Bool = false, connectedRoute: WalletSDK.ProximityConnectedRoute? = nil, actionResult: WalletSDK.ProximityActionResult = .accepted) {
         self.suspendClose = suspendClose
+        self.actionResult = actionResult
         self.connectedRoute = connectedRoute
         var continuation: AsyncStream<WalletSDK.ProximityState>.Continuation!
         states = AsyncStream { continuation = $0 }
@@ -1367,7 +1436,7 @@ private actor FakeProximitySession: DemoProximityPresentationSession {
 
     func dispatch(_ action: WalletSDK.ProximityAction) async throws -> WalletSDK.ProximityActionResult {
         actions.append(action)
-        return .accepted
+        return actionResult
     }
 
     func close() async {

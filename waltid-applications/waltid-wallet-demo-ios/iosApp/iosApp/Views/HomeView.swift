@@ -3,10 +3,16 @@ import WalletDemoSharingUI
 
 struct HomeView: View {
     @ObservedObject var viewModel: WalletViewModel
+    @ObservedObject private var proximity: ProximityPresentationViewModel
     @State private var selectedCredentialDetailsID: String?
     @State private var showingSettings = false
     @State private var showingScanner = false
     @State private var credentialCards: [CredentialCardItem] = []
+
+    init(viewModel: WalletViewModel) {
+        self.viewModel = viewModel
+        self.proximity = viewModel.proximityPresentation
+    }
 
     var body: some View {
         Group {
@@ -25,9 +31,18 @@ struct HomeView: View {
                         }
                     }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-            } else if showingScanner {
-                WalletScanView(onBack: { showingScanner = false }, onOpen: openLink)
             } else { walletContent }
+        }
+        .sheet(isPresented: $showingScanner) {
+            if #available(iOS 16, *) {
+                WalletScanView(onBack: { showingScanner = false }, onOpen: openLink)
+                    .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+            } else { WalletScanView(onBack: { showingScanner = false }, onOpen: openLink) }
+        }
+        .sheet(isPresented: Binding(get: { proximity.active }, set: { if !$0 { proximity.requestClose() } })) {
+            PresentView(viewModel: viewModel, onOpenSettings: openSettings, onBack: returnHome)
+                .interactiveDismissDisabled(!proximity.canClose)
+                .modifier(NearbySheetSize(expanded: proximity.review != nil || proximity.displayedEngagement == .qr))
         }
         .fullScreenCover(isPresented: $showingSettings) {
             NavigationView {
@@ -42,7 +57,13 @@ struct HomeView: View {
                     }
             }.navigationViewStyle(.stack)
         }
-        .onChange(of: viewModel.isReady) { ready in if !ready { showingSettings = false } }
+        .onChange(of: viewModel.isReady) { ready in if !ready { showingSettings = false; showingScanner = false } }
+        .onChange(of: proximity.active) { active in
+            if !active && viewModel.externalFlow == nil && viewModel.presentationSharingReview == nil && !viewModel.presentationCompleted {
+                viewModel.startNewPresentationFlow()
+                viewModel.selectedTab = .credentials
+            }
+        }
         .onChange(of: viewModel.selectedTab) { tab in if tab != .credentials { showingScanner = false } }
         .task(id: viewModel.credentials) {
             credentialCards = []
@@ -53,30 +74,27 @@ struct HomeView: View {
     }
 
     private func openSettings() {
-        viewModel.proximityPresentation.dismiss()
         showingSettings = true
     }
 
     @ViewBuilder private var walletContent: some View {
-        switch viewModel.selectedTab {
-        case .credentials:
-            CredentialsTabView(
-                viewModel: viewModel,
-                selectedDetailsID: $selectedCredentialDetailsID,
-                cards: credentialCards,
-                onOpenSettings: openSettings,
-                onScan: { showingScanner = true },
-                onShareNearby: {
-                    viewModel.startNewPresentationFlow()
-                    viewModel.selectedTab = .present
-                    viewModel.proximityPresentation.start()
-                }
-            )
-        case .receive:
-            ReceiveView(viewModel: viewModel, onOpenSettings: openSettings, onBack: returnHome)
-        case .present:
-            PresentView(viewModel: viewModel, onOpenSettings: openSettings, onBack: returnHome)
+        if proximity.active { credentialsContent }
+        else {
+            switch viewModel.selectedTab {
+            case .credentials: credentialsContent
+            case .receive: ReceiveView(viewModel: viewModel, onOpenSettings: openSettings, onBack: returnHome)
+            case .present: PresentView(viewModel: viewModel, onOpenSettings: openSettings, onBack: returnHome)
+            }
         }
+    }
+
+    private var credentialsContent: some View {
+        CredentialsTabView(viewModel: viewModel, selectedDetailsID: $selectedCredentialDetailsID, cards: credentialCards,
+            onOpenSettings: openSettings, onScan: { showingScanner = true }, onShareNearby: {
+                viewModel.startNewPresentationFlow()
+                viewModel.selectedTab = .present
+                viewModel.proximityPresentation.start()
+            })
     }
 
     private func returnHome() {
@@ -132,5 +150,13 @@ private struct WalletSetupView: View {
             .navigationTitle("Set up your wallet")
             .navigationBarTitleDisplayMode(.inline)
         }
+    }
+}
+
+private struct NearbySheetSize: ViewModifier {
+    let expanded: Bool
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 16, *) { content.presentationDetents(expanded ? [.large] : [.medium, .large]).presentationDragIndicator(.visible) }
+        else { content }
     }
 }

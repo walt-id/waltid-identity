@@ -63,6 +63,7 @@ public struct IssuanceResultContent: View {
 private struct SavedCredentialRow: View {
     let credential: Credential
     @State private var detailsOpen = false
+    @Environment(\.walletReviewNavigationAvailable) private var hasNavigation
     var body: some View {
         Button { detailsOpen = true } label: {
             HStack {
@@ -70,9 +71,15 @@ private struct SavedCredentialRow: View {
                 Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
             }.padding(16).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityIdentifier("issuance-saved-\(credential.id)")
-        .sheet(isPresented: $detailsOpen) {
-            WalletDetailSheet(String(localized: "Credential information", bundle: .module), onDismiss: { detailsOpen = false }) {
-                CredentialInformationContent(details: CredentialDisplayNormalizer.details(for: credential))
+        .walletReviewDestination(isPresented: $detailsOpen) {
+            if hasNavigation {
+                WalletDetailPage(String(localized: "Credential information", bundle: .module)) {
+                    CredentialInformationContent(details: CredentialDisplayNormalizer.details(for: credential))
+                }
+            } else {
+                WalletDetailSheet(String(localized: "Credential information", bundle: .module), onDismiss: { detailsOpen = false }) {
+                    CredentialInformationContent(details: CredentialDisplayNormalizer.details(for: credential))
+                }
             }
         }
     }

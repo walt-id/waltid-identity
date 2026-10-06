@@ -1,5 +1,8 @@
 package id.walt.walletdemo.compose.ui
 
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -16,6 +19,9 @@ import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
 import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
+import id.walt.walletdemo.compose.ui.components.WalletReviewNavigationHost
+import id.walt.walletdemo.compose.ui.components.WalletIcon
+import id.walt.walletdemo.compose.ui.components.WalletSymbol
 
 /**
  * One sharing review for full-screen and platform-invoked sheet hosts.
@@ -54,35 +60,50 @@ fun WalletDemoSharingReviewScreen(
     val selectionComplete = review.hasCompleteCredentialSelection(selection.credentials)
 
     WalletReviewHost(presentation, dismissEnabled = enabled, onDismiss = onBackAtRoot) { fillViewport ->
-        ReviewScaffold(
-            fillViewport = fillViewport,
-            header = { WalletScreenHeader(title) },
-            actions = {
-                SharingActionsRow(
+        WalletReviewNavigationHost(
+            requestKey = review.hashCode().toString(), sharingOptions = review.credentialOptions,
+            selectedCredentials = selection.credentials, selectedDisclosures = selection.disclosures,
+            enabled = enabled, onToggleDisclosure = owner::toggleDisclosure,
+            onClose = (onBackAtRoot ?: onCancel).takeIf { enabled },
+        ) {
+            ReviewScaffold(
+                fillViewport = fillViewport,
+                header = {
+                    WalletScreenHeader(title) {
+                        IconButton(onClick = onBackAtRoot ?: onCancel, enabled = enabled,
+                            modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
+                            WalletIcon(WalletSymbol.Decline, "Close request")
+                        }
+                    }
+                },
+                actions = {
+                    SharingActionsRow(
+                        paymentReview = paymentReview,
+                        enabled = enabled,
+                        selectionComplete = selectionComplete,
+                        onSubmit = submit,
+                        onCancel = onCancel,
+                        onReject = onReject,
+                        showCancelWithReject = false,
+                    )
+                },
+            ) {
+                SharingReviewSection(
                     paymentReview = paymentReview,
-                    enabled = enabled,
+                    review = review,
+                    selectedCredentialOptions = selection.credentials,
+                    selectedDisclosureOptions = selection.disclosures,
                     selectionComplete = selectionComplete,
+                    enabled = enabled,
+                    compact = compact,
+                    showActions = false,
+                    onToggleCredential = owner::toggleCredential,
+                    onToggleDisclosure = owner::toggleDisclosure,
                     onSubmit = submit,
                     onCancel = onCancel,
                     onReject = onReject,
                 )
-            },
-        ) {
-            SharingReviewSection(
-                paymentReview = paymentReview,
-                review = review,
-                selectedCredentialOptions = selection.credentials,
-                selectedDisclosureOptions = selection.disclosures,
-                selectionComplete = selectionComplete,
-                enabled = enabled,
-                compact = compact,
-                showActions = false,
-                onToggleCredential = owner::toggleCredential,
-                onToggleDisclosure = owner::toggleDisclosure,
-                onSubmit = submit,
-                onCancel = onCancel,
-                onReject = onReject,
-            )
+            }
         }
     }
 }
