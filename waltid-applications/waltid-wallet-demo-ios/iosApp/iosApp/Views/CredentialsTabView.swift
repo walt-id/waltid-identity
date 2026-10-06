@@ -11,10 +11,7 @@ struct CredentialsTabView: View {
     var onScan: (() -> Void)? = nil
     var onShareNearby: (() -> Void)? = nil
     @Environment(\.walletDemoBranding) private var branding
-    @State private var othersHidden = false
-    @State private var selectedAtTop = false
-    @State private var showDetailsBody = false
-    @State private var motionGeneration = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var confirmDelete = false
 
     @State private var expanded: CredentialDetails?
@@ -62,8 +59,8 @@ struct CredentialsTabView: View {
                         CredentialCardStackView(
                             cards: cards,
                             expandedID: selectedDetailsID,
-                            othersHidden: othersHidden,
-                            selectedAtTop: selectedAtTop
+                            othersHidden: selectedDetailsID != nil,
+                            selectedAtTop: selectedDetailsID != nil
                         ) { id in
                             if selectedDetailsID == id {
                                 closeDetails()
@@ -72,10 +69,10 @@ struct CredentialsTabView: View {
                             }
                         }
 
-                        if showDetailsBody, let expanded {
+                        if selectedDetailsID != nil, let expanded, expanded.id == selectedDetailsID {
                             CredentialDetailsView(details: expanded)
                             .transition(.opacity)
-                        } else if showDetailsBody, selectedCredential != nil {
+                        } else if selectedCredential != nil {
                             ProgressView("Loading details…")
                         }
                     }
@@ -83,13 +80,13 @@ struct CredentialsTabView: View {
                 .padding(.horizontal)
                 .padding(.top, 8)
                 .padding(.bottom)
-                .animation(.easeOut(duration: 0.16), value: showDetailsBody)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: expanded?.id)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if selectedDetailsID == nil { WalletTabFeedback(viewModel: viewModel, tab: .credentials) }
             }
             .background(Color(.systemGroupedBackground))
-            .animation(.easeOut(duration: 0.2), value: selectedDetailsID)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: selectedDetailsID)
             .navigationTitle(selectedDetailsID == nil ? branding.appTitle : "")
             .accessibilityIdentifier(WalletAccessibilityID.appTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -156,11 +153,7 @@ struct CredentialsTabView: View {
             ) {
                 Button("Delete", role: .destructive) {
                     if let id = selectedDetailsID {
-                        motionGeneration += 1
                         selectedDetailsID = nil
-                        showDetailsBody = false
-                        othersHidden = false
-                        selectedAtTop = false
                         viewModel.deleteCredential(id: id)
                     }
                 }
@@ -180,46 +173,11 @@ struct CredentialsTabView: View {
     }
 
     private func openDetails(_ id: String) {
-        motionGeneration += 1
-        let generation = motionGeneration
-        selectedDetailsID = id
-        showDetailsBody = false
-        selectedAtTop = false
-        withAnimation(.easeOut(duration: 0.22)) {
-            othersHidden = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            guard generation == motionGeneration, selectedDetailsID == id else { return }
-            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
-                selectedAtTop = true
-            }
-            withAnimation(.easeIn(duration: 0.16)) {
-                showDetailsBody = true
-            }
-        }
+        expanded = nil
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) { selectedDetailsID = id }
     }
 
-    private func closeDetails(resetSelection: Bool = true) {
-        guard selectedDetailsID != nil else { return }
-        motionGeneration += 1
-        let generation = motionGeneration
-        withAnimation(.easeOut(duration: 0.2)) {
-            showDetailsBody = false
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            guard generation == motionGeneration else { return }
-            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
-                selectedAtTop = false
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) {
-                guard generation == motionGeneration else { return }
-                withAnimation(.easeIn(duration: 0.22)) {
-                    othersHidden = false
-                }
-                if resetSelection {
-                    selectedDetailsID = nil
-                }
-            }
-        }
+    private func closeDetails() {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) { selectedDetailsID = nil }
     }
 }

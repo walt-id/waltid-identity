@@ -4,6 +4,7 @@ import SwiftUI
 public struct WalletFooter<Content: View>: View {
     private let content: Content
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
 
     public init(@ViewBuilder content: () -> Content) { self.content = content() }
 
@@ -12,7 +13,7 @@ public struct WalletFooter<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .trailing)
             .padding(.horizontal, 16).padding(.vertical, 10)
             .background {
-                if reduceTransparency { Color(.systemGroupedBackground) }
+                if reduceTransparency || contrast == .increased { Color(.systemGroupedBackground) }
                 else { Rectangle().fill(.regularMaterial) }
             }
             .accessibilityElement(children: .contain)

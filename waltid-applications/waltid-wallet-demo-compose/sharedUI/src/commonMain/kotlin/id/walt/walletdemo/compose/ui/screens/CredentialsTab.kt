@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -39,12 +40,12 @@ import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import id.walt.walletdemo.compose.ui.plainTextClipEntry
 import id.walt.walletdemo.compose.ui.components.CredentialCardStack
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -61,8 +62,6 @@ internal fun CredentialsTab(
         value = withContext(Dispatchers.Default) { credentials.map { it.toCardDisplayData() } }
     }
     var expandedId by remember { mutableStateOf<String?>(null) }
-    var showDetailsBody by remember { mutableStateOf(false) }
-    var closing by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
@@ -75,37 +74,11 @@ internal fun CredentialsTab(
     }
     val rawCredential = selectedCredential?.credentialDataJson?.takeIf { it.isNotBlank() }
         ?: "No raw credential available"
-    val showingDetails = selectedCredential != null || closing
+    val showingDetails = selectedCredential != null
+    val motionDuration = if (LocalWalletVisualPreferences.current.reduceMotion) 0 else 160
 
-    fun requestClose() {
-        if (expandedId == null || closing) return
-        closing = true
-        showDetailsBody = false
-    }
-
-    fun toggleCard(id: String) {
-        if (closing) return
-        if (expandedId == id) {
-            requestClose()
-        } else {
-            expandedId = id
-            showDetailsBody = false
-        }
-    }
-
-    LaunchedEffect(expandedId) {
-        if (expandedId != null && !closing) {
-            delay(DetailsRevealDelayMillis)
-            if (expandedId != null && !closing) showDetailsBody = true
-        }
-    }
-
-    LaunchedEffect(closing) {
-        if (!closing) return@LaunchedEffect
-        delay(220)
-        expandedId = null
-        closing = false
-    }
+    fun requestClose() { expandedId = null }
+    fun toggleCard(id: String) { expandedId = id.takeUnless { it == expandedId } }
 
     LaunchedEffect(showingDetails, rawCredential, onDeleteCredential, clipboard) {
         onDetailsChromeChange(
@@ -163,18 +136,18 @@ internal fun CredentialsTab(
             } else {
                 CredentialCardStack(
                     cards = cards,
-                    expandedId = expandedId,
+                    expandedId = expandedId.takeIf { showingDetails },
                     onOpenDetails = ::toggleCard,
                 )
-                if (showDetailsBody && selectedCredential != null && expanded == null) {
+                if (selectedCredential != null && expanded == null) {
                     CircularProgressIndicator()
                 }
-                AnimatedVisibility(
-                    visible = showDetailsBody && expanded != null,
-                    enter = fadeIn(tween(160)),
-                    exit = fadeOut(tween(180)),
-                ) {
-                    expanded?.let { selected ->
+                AnimatedContent(
+                    targetState = expanded.takeIf { showingDetails },
+                    transitionSpec = { fadeIn(tween(motionDuration)) togetherWith fadeOut(tween(motionDuration)) },
+                    label = "stored-credential-information",
+                ) { details ->
+                    details?.let { selected ->
                         CredentialDetailsContent(
                             details = selected,
                         )
@@ -196,8 +169,6 @@ internal fun CredentialsTab(
                         confirmDelete = false
                         if (id != null) {
                             expandedId = null
-                            closing = false
-                            showDetailsBody = false
                             onDeleteCredential?.invoke(id)
                         }
                     },
@@ -214,8 +185,6 @@ internal fun CredentialsTab(
         )
     }
 }
-
-private const val DetailsRevealDelayMillis = 220L
 
 @Composable
 private fun EmptyCredentialsState() {

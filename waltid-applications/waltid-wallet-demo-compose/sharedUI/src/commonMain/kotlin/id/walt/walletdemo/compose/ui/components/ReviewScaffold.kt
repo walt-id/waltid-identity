@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.constrainHeight
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 
 /**
  * Review chrome for receive and share: details scroll, actions stay pinned.
@@ -35,6 +36,7 @@ internal fun ReviewScaffold(
 ) {
     val scrollState = rememberScrollState()
     val hazeState = rememberHazeState()
+    val blurEnabled = !LocalWalletVisualPreferences.current.opaqueControls
     // Measure the controls before the body so the first frame has correct end clearance.
     // The scroll viewport ends above the controls. An overlay with end padding alone leaves
     // bring-into-view, accessibility scrolling and hit testing unaware of the obstruction.
@@ -50,8 +52,11 @@ internal fun ReviewScaffold(
         val body = subcompose("content") {
             Column(
                 Modifier.fillMaxWidth().testTag("wallet.review.content")
-                    .then(if (controls != null) Modifier.hazeSource(hazeState) else Modifier)
-                    .verticalScroll(scrollState).padding(horizontal = 20.dp)
+                    .verticalScroll(scrollState)
+                    // Capture the scrolling content inside its visual clip. The footer can sample
+                    // that source without extending the interactive/accessibility viewport beneath it.
+                    .then(if (controls != null && blurEnabled) Modifier.hazeSource(hazeState) else Modifier)
+                    .padding(horizontal = 20.dp)
                     .padding(top = 20.dp, bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp), content = content,
             )

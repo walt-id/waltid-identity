@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,13 +26,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
 import id.walt.walletdemo.compose.ui.resources.*
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import org.jetbrains.compose.resources.stringResource
 
 /** One accessible expansion target; animation never changes the underlying claim state. */
@@ -45,7 +48,9 @@ internal fun MetadataDisclosure(
 ) {
     var expanded by rememberSaveable(title) { mutableStateOf(initiallyExpanded) }
     val stateLabel = stringResource(if (expanded) Res.string.metadata_expanded else Res.string.metadata_collapsed)
-    val rotation by animateFloatAsState(if (expanded) 180f else 0f, tween(180), label = "disclosure-chevron")
+    val duration = if (LocalWalletVisualPreferences.current.reduceMotion) 0 else 180
+    val expandedRotation = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -90f else 90f
+    val rotation by animateFloatAsState(if (expanded) expandedRotation else 0f, tween(duration), label = "disclosure-chevron")
 
     Column {
         Row(
@@ -58,12 +63,12 @@ internal fun MetadataDisclosure(
         ) {
             Text(title, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null,
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
                 modifier = Modifier.rotate(rotation), tint = MaterialTheme.colorScheme.primary)
         }
         AnimatedVisibility(expanded,
-            enter = expandVertically(tween(180)) + fadeIn(tween(140)),
-            exit = shrinkVertically(tween(180)) + fadeOut(tween(140))) {
+            enter = expandVertically(tween(duration)) + fadeIn(tween(duration)),
+            exit = shrinkVertically(tween(duration)) + fadeOut(tween(duration))) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
         }
     }

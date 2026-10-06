@@ -74,7 +74,8 @@ fun WalletDemoTheme(
     branding: WalletDemoBranding = WalletDemoBranding(),
     content: @Composable () -> Unit,
 ) {
-    CompositionLocalProvider(LocalWalletDemoBranding provides branding) {
+    val preferences = rememberWalletVisualPreferences()
+    CompositionLocalProvider(LocalWalletDemoBranding provides branding, LocalWalletVisualPreferences provides preferences) {
         MaterialTheme(
             colorScheme = if (isSystemInDarkTheme()) darkColorScheme(
                 primary = branding.secondary,
