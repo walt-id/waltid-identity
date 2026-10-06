@@ -81,7 +81,7 @@ azure-keyvault-keys = "4.11.0"
 netty = "4.1.138.Final"
 netty-4_2 = "4.2.18.Final"
 jackson-core = "2.22.3"
-jackson-core-3 = "3.1.7"
+jackson-core-3 = "3.2.3"
 vertx = "4.5.34"
 rhino = "1.7.15.1"
 oci-sdk = "3.90.0"
@@ -430,6 +430,7 @@ jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", ver
 jackson-core-tools = { module = "tools.jackson.core:jackson-core", version.ref = "jackson-core-3" }
 jackson-databind-tools = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson-core-3" }
 jackson-dataformat-cbor-tools = { module = "tools.jackson.dataformat:jackson-dataformat-cbor", version.ref = "jackson-core-3" }
+jackson-bom-tools = { module = "tools.jackson:jackson-bom", version.ref = "jackson-core-3" }
 vertx-core = { module = "io.vertx:vertx-core", version.ref = "vertx" }
 rhino = { module = "org.mozilla:rhino", version.ref = "rhino" }
 oci-sdk = { module = "com.oracle.oci.sdk:oci-java-sdk-shaded-full", version.ref = "oci-sdk" }
