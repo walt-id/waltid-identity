@@ -10,6 +10,17 @@ async function clickControl(page, locator) {
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 }
 
+async function fillControl(page, locator, value, inputMode) {
+  await clickControl(page, locator);
+  // ARIA textboxes are contenteditable mirrors. Filling them can race the
+  // canvas focus change without delivering text to Compose's backing editor.
+  const editor = page.locator('input.compose-backing-field');
+  await expect(editor).toHaveAttribute('inputmode', inputMode);
+  await expect(editor).toBeFocused();
+  await editor.fill(value);
+  await expect(editor).toHaveValue(value);
+}
+
 async function waitForSettledImage(page) {
   let previous;
   let unchangedSince;
@@ -59,10 +70,10 @@ for (const scenario of catalogue.states) {
         const email = page.getByRole('textbox', { name: 'Email', exact: true });
         const password = page.getByRole('textbox', { name: 'Password', exact: true });
         await expect(password).toBeVisible();
-        await email.fill('wallet@example.test');
-        await password.fill('synthetic-password');
+        await fillControl(page, email, 'wallet@example.test', 'email');
+        await fillControl(page, password, 'synthetic-password', 'password');
         // The browser's hidden input owns focus; the ARIA mirror is not document.activeElement.
-        await password.press('Tab');
+        await page.keyboard.press('Tab');
         const submit = scenario.state === 'registered'
           ? page.getByRole('button', { name: 'Create account', exact: true }) : signIn;
         await clickControl(page, submit);
@@ -117,20 +128,16 @@ test('immediate registration failure restores editable controls and retry', asyn
   const password = page.getByRole('textbox', { name: 'Password', exact: true });
   const register = page.getByRole('button', { name: 'Create account', exact: true });
   await expect(email).toBeVisible();
-  await email.fill('wallet@example.test');
-  await password.fill('synthetic-password');
-  await password.press('Tab');
+  await fillControl(page, email, 'wallet@example.test', 'email');
+  await fillControl(page, password, 'synthetic-password', 'password');
+  await page.keyboard.press('Tab');
   await clickControl(page, register);
   await expect(page.getByText('An account with this email already exists. Sign in instead.', { exact: true })).toBeVisible();
 
-  // Use actual canvas pointer/keyboard input to prove recovery; the ARIA mirror's
+  // Use actual canvas pointer/backing-editor input to prove recovery; the ARIA mirror's
   // enabled attribute does not establish that a Compose field accepts edits.
-  await clickControl(page, email);
-  await page.keyboard.press('ControlOrMeta+A');
-  await page.keyboard.type('retry@example.test');
-  await clickControl(page, password);
-  await page.keyboard.press('ControlOrMeta+A');
-  await page.keyboard.type('retry-password');
+  await fillControl(page, email, 'retry@example.test', 'email');
+  await fillControl(page, password, 'retry-password', 'password');
   await page.keyboard.press('Tab');
   await clickControl(page, register);
   await expect.poll(() => submitted).toEqual([
