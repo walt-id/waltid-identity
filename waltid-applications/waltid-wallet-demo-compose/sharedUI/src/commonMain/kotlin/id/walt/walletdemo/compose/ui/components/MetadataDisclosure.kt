@@ -28,9 +28,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -56,12 +59,16 @@ internal fun MetadataDisclosure(
         Row(
             modifier = modifier.fillMaxWidth()
                 .clickable(role = Role.Button) { expanded = !expanded }
-                .semantics(mergeDescendants = true) { heading(); stateDescription = stateLabel }
+                .semantics(mergeDescendants = true) {
+                    heading()
+                    text = AnnotatedString(title)
+                    stateDescription = stateLabel
+                }
                 .heightIn(min = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge,
+            Text(title, Modifier.weight(1f).clearAndSetSemantics {}, style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
                 modifier = Modifier.rotate(rotation), tint = MaterialTheme.colorScheme.primary)
