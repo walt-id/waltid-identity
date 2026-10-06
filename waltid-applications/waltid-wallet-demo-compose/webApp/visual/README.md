@@ -12,7 +12,7 @@ actions cannot send an extra request. Submitted responses are held until the wor
 has rendered; recovery cases release that gate after its image settles, so fast synthetic
 responses cannot skip the intermediate state. No application test route, separate gallery app or live
 account is needed. Real API2 authentication and protocol tests remain separate evidence.
-A separate immediate-response interaction case uses actual canvas pointer/keyboard input to
+A separate immediate-response interaction case uses actual canvas pointer/backing-editor input to
 prove that registration failure restores editable fields and permits a retry with new credentials.
 
 From the Identity repository:
@@ -41,7 +41,10 @@ duration, rendered images and failure differences under `webApp/build/reports/br
 Hosted execution uploads those files even on failure. Synthetic baselines are test fixtures,
 not PR screenshot hosting.
 
-Compose's ARIA nodes mirror the canvas geometry. Pointer actions target their measured bounds;
-DOM focus and disabled attributes are not reliable proxies for Compose state in the pinned
-version. The tests assert actual requests instead. This pilot does not prove screen-reader
-acceptance, every browser/viewport, browser authorization redirects or mobile system hosts.
+Compose's ARIA nodes mirror the canvas geometry. Pointer actions target their measured bounds.
+Text entry waits for the actual backing editor's input mode and focus, fills that input,
+then verifies its value. Keyboard navigation also targets that editor. Filling the contenteditable
+ARIA mirror can race canvas focus without entering text into Compose. ARIA focus and disabled attributes are not reliable
+proxies for Compose state in the pinned version; submitted request assertions remain required.
+This pilot does not prove screen-reader acceptance, every browser/viewport, browser authorization
+redirects or mobile system hosts.
