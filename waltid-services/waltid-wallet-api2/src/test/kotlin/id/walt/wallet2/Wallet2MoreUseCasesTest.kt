@@ -20,7 +20,7 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandle
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
-import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
@@ -286,7 +286,7 @@ class Wallet2MoreUseCasesTest {
         val sdJwtInfra = startIssuer(host, issuerPort1, sdJwtConfig,
             CredentialConfiguration(format = VciCredentialFormat.SD_JWT_VC, vct = pidVct,
                 cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.DidKey),
-                proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
+                proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
             sdJwtCode,
             buildJsonObject { put("given_name","Alice"); put("family_name","Wallet"); put("issuing_country","AT") },
             SDMapBuilder().addField("given_name",true).addField("family_name",true).build()
@@ -294,7 +294,7 @@ class Wallet2MoreUseCasesTest {
         val jwtInfra = startIssuer(host, issuerPort2, jwtConfig,
             CredentialConfiguration(format = VciCredentialFormat.JWT_VC_JSON, vct = null,
                 cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.DidKey),
-                proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
+                proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
             jwtCode,
             buildJsonObject {
                 put("@context", buildJsonArray { add("https://www.w3.org/2018/credentials/v1") })
@@ -435,7 +435,7 @@ class Wallet2MoreUseCasesTest {
             CredentialConfiguration(
                 format = VciCredentialFormat.SD_JWT_VC, vct = "eu.europa.ec.eudi.pid.1",
                 cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
-                proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))
+                proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))
             ),
             preAuthCode,
             buildJsonObject { put("given_name", "Deferred"); put("family_name", "Holder"); put("issuing_country", "AT") },
@@ -605,7 +605,7 @@ class Wallet2MoreUseCasesTest {
         val infra = startIssuer(host, issuerPort, credConfigId,
             CredentialConfiguration(format = VciCredentialFormat.SD_JWT_VC, vct = "eu.europa.ec.eudi.pid.1",
                 cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
-                proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
+                proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
             preAuthCode,
             buildJsonObject { put("given_name","NoDid"); put("family_name","Holder"); put("issuing_country","AT") }
         )
@@ -679,7 +679,7 @@ class Wallet2MoreUseCasesTest {
         val infra = startIssuer(host, issuerPort, credConfigId,
             CredentialConfiguration(format = VciCredentialFormat.SD_JWT_VC, vct = pidVct,
                 cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.DidKey),
-                proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
+                proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
             preAuthCode,
             buildJsonObject { put("given_name","Isolated"); put("family_name","Presenter"); put("issuing_country","AT") }
         )

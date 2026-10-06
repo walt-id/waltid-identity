@@ -13,6 +13,7 @@ import id.walt.openid4vci.metadata.issuer.KeyAttestationsRequired
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.openid4vci.proofs.ProofType
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
@@ -434,7 +435,7 @@ class KeyAttestationProofTest {
                 "$ISSUER/credential" -> {
                     val body = (request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
                     val proof = Json.parseToJsonElement(body).jsonObject.getValue("proofs")
-                        .jsonObject.getValue("jwt").jsonArray.single().jsonPrimitive.content
+                        .jsonObject.getValue(ProofType.JWT.value).jsonArray.single().jsonPrimitive.content
                     credential(proof)
                 }
                 else -> error("Unexpected issuance request: ${request.url}")

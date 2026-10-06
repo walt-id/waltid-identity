@@ -16,16 +16,17 @@ import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
-import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.metadata.issuer.KeyAttestationsRequired
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.TxCode
-import id.walt.openid4vci.prooftypes.Proofs
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.waltid.openid4vci.wallet.credential.CredentialIssuanceTarget
 import id.waltid.openid4vci.wallet.credential.validateCredentialResponse
 import id.waltid.openid4vci.wallet.credential.CredentialRequestBuilder
+import id.walt.openid4vci.proofs.ProofType
+import id.walt.openid4vci.proofs.Proofs
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.*
 import id.walt.wallet2.handlers.WalletIssuanceHandler.exchangeCode
@@ -2921,7 +2922,7 @@ object WalletIssuanceHandler {
 }
 
 internal fun supportedJwtProofAlgorithms(
-    proofTypes: Map<String, ProofType>?,
+    proofTypes: Map<String, ProofTypeMetadata>?,
     keyAttestationProviderAvailable: Boolean = false,
 ): Set<String>? {
     if (proofTypes.isNullOrEmpty()) return null
