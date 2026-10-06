@@ -145,10 +145,21 @@ final class WalletVisualTests: XCTestCase {
             .contains { environment[$0] != nil }
         XCTAssertFalse(record && isCI, "CI must only verify reviewed baselines", file: file, line: line)
         guard !(record && isCI) else { return }
+        var strategy = Snapshotting<UIViewController, UIImage>.image(
+            on: .iPhone13, drawHierarchyInKeyWindow: true, precision: 1)
+        let diffing = strategy.diffing
+        // Compare the same PNG representation on both sides. Core Image's perceptual path is
+        // inconsistent on the pinned simulator. Bound measured edge noise in each sRGB channel;
+        // unlike a percentage tolerance this never ignores a small missing label or icon.
+        strategy.diffing.diffV2 = { reference, actual in
+            let decoded = diffing.fromData(diffing.toData(actual))
+            if matchesWithinRasterNoise(reference, decoded) { return nil }
+            return diffing.diffV2(reference, decoded)
+        }
         withSnapshotTesting(record: record ? .all : .never) {
             assertSnapshot(
                 of: controller,
-                as: .image(on: .iPhone13, drawHierarchyInKeyWindow: true),
+                as: strategy,
                 named: "native-ios26_5-phone-en-light",
                 file: file, testName: id, line: line
             )
@@ -162,4 +173,30 @@ private struct ImageRowHeightKey: PreferenceKey {
     static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
         value.merge(nextValue(), uniquingKeysWith: { _, next in next })
     }
+}
+
+/// Every channel must stay within the measured SF Symbol edge noise (5/255); dimensions must match.
+private func matchesWithinRasterNoise(_ reference: UIImage, _ actual: UIImage) -> Bool {
+    guard let lhs = reference.cgImage, let rhs = actual.cgImage,
+          lhs.width == rhs.width, lhs.height == rhs.height,
+          let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return false }
+    let byteCount = lhs.width * lhs.height * 4
+    func pixels(_ image: CGImage) -> [UInt8]? {
+        var bytes = [UInt8](repeating: 0, count: byteCount)
+        let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: image.width, height: image.height,
+                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            return true
+        }
+        return drawn ? bytes : nil
+    }
+    guard let a = pixels(lhs), let b = pixels(rhs) else { return false }
+    var index = 0
+    while index < byteCount {
+        if abs(Int(a[index]) - Int(b[index])) > 5 { return false }
+        index += 1
+    }
+    return true
 }
