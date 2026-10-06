@@ -2097,7 +2097,7 @@ object WalletIssuanceHandler {
         request.effectiveProofs?.let { validateIsolatedStorageBindings(it, bindings) }
         val result = fetchCredentials(request, httpClient, dpop)
         if (result.deferredCredential != null) return result
-        storeAndNotify(
+        return storeAndNotify(
             httpClient = httpClient,
             target = IssuerNotificationTarget(
                 notificationEndpoint = storage.notificationEndpoint,
@@ -2129,7 +2129,7 @@ object WalletIssuanceHandler {
      */
     suspend fun rejectIssuedCredential(
         request: RejectIssuedCredentialRequest,
-        httpClient: HttpClient = defaultHttpClient(),
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
     ) {
         val notificationEndpoint = request.notificationEndpoint?.takeIf { it.isNotBlank() }
             ?: request.credentialIssuerBaseUrl?.takeIf { it.isNotBlank() }?.let { issuer ->
