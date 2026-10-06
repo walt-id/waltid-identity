@@ -11,6 +11,23 @@ These rules apply to Compose Android/iOS/Web, the native SwiftUI demo, and walle
 - Use the same credential identity, art and typed values in every context. Review thumbnails center the logo on the supplied background; the title sits alongside. Follow the [credential-information contract](credential-information.md) for metadata, disclosure scope and unavailable values.
 - Make compact reviews answer who, what information and what action. Keep required payment fields in their authoritative positions. Technical details are reachable but do not displace human-readable information.
 
+## Screen chrome, feedback and motion
+
+Each active destination has one header owner. Compose uses `WalletScreenHeader`; native screens use their navigation title/toolbar. Content owns section labels and credential identity. Information reviews have one `WalletDetailSheet` navigation host: Requested → All → Technical pushes within it. Back preserves the preceding page; Close returns to the unchanged review and never grants consent. Native pages receive the presentation's dismissal action through the host environment.
+
+Use `MetadataDisclosure` for expandable fact groups. Its full row is a single named button with heading and expanded/collapsed semantics, a semibold body label and a rotating directional chevron. Keep 48 dp / 44 pt targets, wrapping labels and compact content spacing. Expansion state belongs to its page or request revision; a replacement payment request starts collapsed.
+
+`WalletFooter` owns the background and padding for feedback/actions. Transient success and ongoing operation feedback belongs immediately above actions or bottom navigation. Keep input errors, request failures, trust warnings, transaction terms, consent and receipts in context. Never place a global status over an embedded proximity flow. Secondary actions are text; the trailing primary action is filled. A numeric keyboard's Done action shares this row; text fields use their keyboard submit key. Avoid an independent keyboard toolbar overlapping pinned controls.
+
+Compose `ReviewScaffold` measures header and footer before the body, so its interactive scroll viewport ends above the actual footer. The captured source can draw behind the material without extending hit testing or accessibility scrolling there. Native hosts use a single `safeAreaInset` for the footer. The final item must scroll fully clear of feedback, wrapped actions and the keyboard; do not substitute a fixed bottom spacer.
+
+| Renderer | Footer treatment and accessibility fallback |
+|---|---|
+| Compose Android / iOS / Wasm | Haze core + blur, one screen-owned source, 18 dp uniform blur and background tint. Clear unavailable sources rather than retaining credential pixels. Unsupported rendering and increased-contrast / available reduced-transparency preferences use the opaque background. No experimental Android window-backdrop or optical-refraction API. |
+| Native SwiftUI | Regular system material; Reduce Transparency or increased contrast uses the opaque grouped background. Native navigation owns presentation/back transitions. |
+
+Use existing navigation/animation APIs. Hierarchical Compose navigation uses a short directional slide/fade with matching Back and RTL direction; card/detail transitions follow selected identity, without delayed callbacks. Disclosure height and chevron animate together. Reduce Motion removes custom spatial movement; removed/hidden cards cannot remain accessible or actionable. Animations never submit, retry or authorize a wallet operation. Test rapid reversal, interruption and disposal, and inspect short real-renderer clips separately from settled screenshots.
+
 ## Navigation and state
 
 Wallet home exposes Scan or paste, Share nearby and Settings. The scanner resolves supported links automatically; users do not choose a protocol. Unknown content remains editable. Resolving a link never submits it. A FIDO hybrid code receives an honest platform-camera instruction, not a pretend wallet flow.

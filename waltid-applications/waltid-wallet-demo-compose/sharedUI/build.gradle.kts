@@ -127,6 +127,11 @@ kotlin {
                         implementation(identityLibs.roborazzi.compose)
                     }
                 }
+                getByName("androidDeviceTest").dependencies {
+                    implementation(identityLibs.androidx.test.ext.junit)
+                    implementation(identityLibs.androidx.test.runner)
+                    implementation(identityLibs.androidx.test.uiautomator)
+                }
             }
         }
     }
