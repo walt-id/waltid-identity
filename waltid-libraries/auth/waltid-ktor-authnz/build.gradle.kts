@@ -103,12 +103,17 @@ dependencies {
 //   CWE-327 (broken crypto, CVSS 8.7), CWE-1240 (timing attack), CWE-90 (LDAP injection)
 //   Snyk said "no supported fix" at 1.80; 1.84 is now available
 //
+// webauthn4j → tools.jackson.dataformat:jackson-dataformat-cbor:3.2.1, allocation without limits (Snyk, fixed in
+//   3.1.6 / 3.2.2); it also lifted the Jackson 3 BOM above the version core and databind are pinned to.
+//   Pinned to the jackson-core-3 catalog version as well.
+//
 // ktor-openapi → io.netty (4.2.x branch), pinned to the netty-4_2 catalog version.
 // web3j → tuweni → vertx-core. swagger-parser → json-schema-core → rhino.
 configurations.all {
     resolutionStrategy.force(
         identityLibs.jackson.core.tools,
         identityLibs.jackson.databind.tools,
+        identityLibs.jackson.dataformat.cbor.tools,
         identityLibs.jackson.core,
         identityLibs.jackson.databind,
         identityLibs.bouncycastle.prov,
