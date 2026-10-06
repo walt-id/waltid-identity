@@ -10,14 +10,10 @@ data class WalletDemoOfferPreview(
 )
 
 fun initialIssuanceCopyCounts(preview: WalletDemoOfferPreview): Map<String, Int> {
-    val budget = preview.holderKeyBudget ?: return preview.offeredCredentials.associate { it.configurationId to 1 }
-    var remaining = budget.coerceAtLeast(0)
     val perType = (preview.batchSize ?: 1).coerceAtLeast(1)
-    return preview.offeredCredentials.associate { credential ->
-        val count = minOf(1, perType, remaining)
-        remaining -= count
-        credential.configurationId to count
-    }
+    val budget = preview.holderKeyBudget
+    val single = if (budget == null || budget >= 1) minOf(1, perType) else 0
+    return preview.offeredCredentials.associate { it.configurationId to single }
 }
 
 fun issuanceCopyLimit(
@@ -27,15 +23,22 @@ fun issuanceCopyLimit(
 ): Int {
     val perType = (preview.batchSize ?: 1).coerceAtLeast(1)
     val budget = preview.holderKeyBudget ?: return perType
-    val others = preview.offeredCredentials.sumOf { credential ->
+    val reservedByOthers = preview.offeredCredentials.sumOf { credential ->
         if (credential.configurationId == configurationId) 0
-        else counts[credential.configurationId] ?: 1
+        else distinctHolderKeysRequired(counts[credential.configurationId] ?: 1)
     }
-    return minOf(perType, (budget - others).coerceAtLeast(0))
+    val remaining = (budget - reservedByOthers).coerceAtLeast(0)
+    val sharedSingle = if (budget >= 1) 1 else 0
+    return minOf(perType, maxOf(sharedSingle, remaining))
 }
 
 fun issuanceSelectionFitsHolderBudget(preview: WalletDemoOfferPreview, counts: Map<String, Int>): Boolean {
     val budget = preview.holderKeyBudget ?: return true
-    val selected = preview.offeredCredentials.sumOf { counts[it.configurationId] ?: 1 }
-    return selected <= budget
+    val reserved = preview.offeredCredentials.sumOf { distinctHolderKeysRequired(counts[it.configurationId] ?: 1) }
+    val needsCurrentHolder = preview.offeredCredentials.any { (counts[it.configurationId] ?: 1) == 1 }
+    val required = if (needsCurrentHolder) maxOf(reserved, 1) else reserved
+    return required <= budget
 }
+
+/** One copy reuses the current holder. Further copies each need their own stored key. */
+private fun distinctHolderKeysRequired(count: Int): Int = if (count > 1) count else 0

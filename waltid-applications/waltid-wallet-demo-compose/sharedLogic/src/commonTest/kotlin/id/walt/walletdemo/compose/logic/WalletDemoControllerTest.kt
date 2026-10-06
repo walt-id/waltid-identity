@@ -1242,23 +1242,54 @@ class WalletDemoControllerTest {
         controller.previewOffer()
         runCurrent()
         assertEquals(
-            mapOf("ExampleCredential" to 1, "OtherCredential" to 1, "ThirdCredential" to 0),
+            mapOf("ExampleCredential" to 1, "OtherCredential" to 1, "ThirdCredential" to 1),
             controller.state.value.issuanceCopyCounts,
         )
         assertTrue(controller.state.value.acceptOfferEnabled)
         controller.updateIssuanceCopies("ExampleCredential", 2)
-        assertEquals(1, controller.state.value.issuanceCopyCounts["ExampleCredential"])
-        controller.updateIssuanceCopies("ThirdCredential", 1)
-        assertEquals(0, controller.state.value.issuanceCopyCounts["ThirdCredential"])
+        assertEquals(
+            mapOf("ExampleCredential" to 2, "OtherCredential" to 1, "ThirdCredential" to 1),
+            controller.state.value.issuanceCopyCounts,
+        )
+        controller.updateIssuanceCopies("OtherCredential", 2)
+        assertEquals(1, controller.state.value.issuanceCopyCounts["OtherCredential"])
         assertTrue(controller.state.value.acceptOfferEnabled)
         controller.updateIssuanceCopies("OtherCredential", 0)
-        controller.updateIssuanceCopies("ExampleCredential", 2)
+        controller.updateIssuanceCopies("ThirdCredential", 0)
         assertEquals(mapOf("ExampleCredential" to 2, "OtherCredential" to 0, "ThirdCredential" to 0), controller.state.value.issuanceCopyCounts)
         controller.acceptOffer()
         runCurrent()
         val selection = wallet.receivedIssuanceSelections.single().single()
         assertEquals("ExampleCredential", selection.credentialConfigurationId)
         assertEquals(WalletDemoCredentialHolders.NewKeys(2), selection.holders)
+    }
+
+    @Test
+    fun singleCopiesOfSeveralTypesShareTheCurrentHolder() = runTest {
+        val example = offerPreview().offeredCredentials.single()
+        val offered = offerPreview().copy(
+            batchSize = 2,
+            holderKeyBudget = 1,
+            offeredCredentials = listOf(example, example.copy(configurationId = "OtherCredential")),
+        )
+        val wallet = FakeDemoWallet(offerResolution = offered)
+        val controller = unlockedControllerWith(wallet, this)
+        controller.updateOfferUrl("openid-credential-offer://shared-holder")
+        controller.previewOffer()
+        runCurrent()
+        assertEquals(mapOf("ExampleCredential" to 1, "OtherCredential" to 1), controller.state.value.issuanceCopyCounts)
+        assertTrue(controller.state.value.acceptOfferEnabled)
+        controller.updateIssuanceCopies("ExampleCredential", 2)
+        assertEquals(1, controller.state.value.issuanceCopyCounts["ExampleCredential"])
+        val currentKey = (controller.state.value.session as WalletSessionState.Ready).keyId
+        controller.acceptOffer()
+        runCurrent()
+        val selections = wallet.receivedIssuanceSelections.single()
+        assertEquals(listOf("ExampleCredential", "OtherCredential"), selections.map { it.credentialConfigurationId })
+        selections.forEach { selection ->
+            val holders = selection.holders as WalletDemoCredentialHolders.Existing
+            assertEquals(listOf(currentKey), holders.bindings.map { it.keyId })
+        }
     }
 
     @Test
