@@ -25,5 +25,8 @@ internal actual fun rememberWalletVisualPreferences(): WalletVisualPreferences {
             onDispose { manager.removeContrastChangeListener(listener) }
         } else onDispose {}
     }
-    return WalletVisualPreferences(reduceMotion = motion?.scaleFactor == 0f, opaqueControls = contrast >= .5f)
+    // Keep older RenderNode invalidation workarounds out of the scrolling footer.
+    // The Android 12 physical release comparison favors the designed opaque surface.
+    return WalletVisualPreferences(reduceMotion = motion?.scaleFactor == 0f,
+        opaqueControls = Build.VERSION.SDK_INT < 33 || contrast >= .5f)
 }
