@@ -5,6 +5,5 @@
     <string name="payment_loading">Loading payment instructions…</string>
     <string name="payment_review_title">Review payment</string>
     <string name="payment_unsigned_warning">This payment request is unsigned. Confirm only if you recognize the requester and approve the payment below.</string>
-    <string name="payment_show_details">Show payment details</string>
-    <string name="payment_hide_details">Hide payment details</string>
+    <string name="payment_details_title">Payment details</string>
 </resources>

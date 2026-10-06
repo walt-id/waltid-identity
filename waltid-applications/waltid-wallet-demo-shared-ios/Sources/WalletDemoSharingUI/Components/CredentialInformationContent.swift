@@ -3,12 +3,10 @@ import SwiftUI
 /// Actual values use one identity row and push technical information within their current sheet.
 public struct CredentialInformationContent: View {
     public let details: CredentialDetails
-    private let onDismiss: () -> Void
     @State private var technicalOpen = false
 
-    public init(details: CredentialDetails, onDismiss: @escaping () -> Void) {
+    public init(details: CredentialDetails) {
         self.details = details
-        self.onDismiss = onDismiss
     }
 
     public var body: some View {
@@ -17,7 +15,7 @@ public struct CredentialInformationContent: View {
             CredentialDetailsBody(details: details, onTechnicalDetails: { technicalOpen = true })
         }
         .walletDetailDestination(isPresented: $technicalOpen) {
-            WalletDetailPage(String(localized: "Technical details", bundle: .module), onDismiss: onDismiss) {
+            WalletDetailPage(String(localized: "Technical details", bundle: .module)) {
                 CredentialTechnicalInformation(details: details)
             }
         }

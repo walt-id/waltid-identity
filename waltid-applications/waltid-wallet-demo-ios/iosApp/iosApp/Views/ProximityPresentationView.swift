@@ -12,9 +12,7 @@ struct ProximityPresentationView: View {
         Group {
             if viewModel.showsEngagement {
                 presentationBody.padding(.horizontal).padding(.vertical, 8)
-                    .safeAreaInset(edge: .bottom) {
-                        actions.padding().frame(maxWidth: .infinity, alignment: .trailing).background(.bar)
-                    }
+                    .safeAreaInset(edge: .bottom, spacing: 0) { WalletFooter { actions } }
             } else {
                 WalletReviewScaffold(showsActions: canCancel || viewModel.review != nil || viewModel.isTerminal) {
                     presentationBody
@@ -72,7 +70,9 @@ struct ProximityPresentationView: View {
                 )
             } else if canCancel {
                 Button("Cancel", action: viewModel.cancel)
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tint)
+                    .padding(.horizontal, 20).frame(minHeight: 44)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .accessibilityIdentifier(WalletAccessibilityID.proximityCancelButton)
             } else if viewModel.isTerminal {

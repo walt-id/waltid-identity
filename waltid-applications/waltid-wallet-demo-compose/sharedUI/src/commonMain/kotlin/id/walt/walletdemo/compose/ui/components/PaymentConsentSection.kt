@@ -35,11 +35,12 @@ internal fun PaymentConsentSection(review: WalletDemoPaymentReview) {
                 consent.fields.filter { it.placement == WalletDemoPaymentFieldPlacement.Main }.forEach { PaymentField(it, false) }
                 val details = consent.fields.filter { it.placement == WalletDemoPaymentFieldPlacement.Details }
                 if (details.isNotEmpty()) {
-                    var expanded by remember(consent.revision) { mutableStateOf(false) }
-                    TextButton(onClick = { expanded = !expanded }, modifier = Modifier.testTag("payment-details-toggle")) {
-                        Text(stringResource(if (expanded) Res.string.payment_hide_details else Res.string.payment_show_details))
+                    key(consent.revision) {
+                        MetadataDisclosure(title = stringResource(Res.string.payment_details_title), initiallyExpanded = false,
+                            modifier = Modifier.testTag("payment-details-toggle")) {
+                            details.forEach { PaymentField(it, false) }
+                        }
                     }
-                    if (expanded) details.forEach { PaymentField(it, false) }
                 }
             }
         }

@@ -95,14 +95,12 @@ struct ProximityConnectionDetails: View {
     let route: ProximityConnectedRoute
 
     var body: some View {
-        DisclosureGroup {
+        MetadataDisclosure(title: String(localized: "Connection details"), initiallyExpanded: false) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Started with: \(route.engagement == .qr ? String(localized: "Show QR code") : String(localized: "Hold near the reader"))")
                 Text("Data connection: \(transport)")
             }
             .font(.subheadline).frame(maxWidth: .infinity, alignment: .leading)
-        } label: {
-            Text("Connection details").font(.subheadline).frame(minHeight: 44)
         }
     }
 
