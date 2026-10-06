@@ -16,8 +16,10 @@ import id.walt.did.dids.DidService
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -62,6 +64,59 @@ class Crypto2DidKeyResolverTest {
 
         assertEquals(KeyId("did:example:123#key-1"), key.id)
         assertTrue(key.capabilities.verifier!!.verify(message, signature, algorithm))
+    }
+
+    @Test
+    fun `encryption JWK does not abort signing key resolution`() = runTest {
+        val provider = CryptographySoftwareKeyProvider()
+        val runtime = CryptoRuntime(listOf(provider))
+        suspend fun generatePublicJwk(id: String): JsonObject {
+            val privateKey = runtime.generateSoftwareKey(
+                GenerateSoftwareKeyRequest(
+                    id = KeyId(id),
+                    spec = KeySpec.Ec(EcCurve.P256),
+                    usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                )
+            )
+            val publicJwk = privateKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk
+            return Json.parseToJsonElement(publicJwk.data.toByteArray().decodeToString()).jsonObject
+        }
+
+        val signingJwk = generatePublicJwk("signing-private")
+        val encryptionJwk = JsonObject(
+            generatePublicJwk("encryption-private")
+                .filterKeys { it !in setOf("use", "key_ops", "alg") } +
+                    mapOf(
+                        "use" to JsonPrimitive("enc"),
+                        "alg" to JsonPrimitive("ECDH-ES+A256KW"),
+                    )
+        )
+        val did = "did:example:123"
+        val signingMethodId = "$did#sig"
+        val encryptionMethodId = "$did#enc"
+        val document = buildJsonObject {
+            put("id", did)
+            put("verificationMethod", buildJsonArray {
+                add(buildJsonObject {
+                    put("id", signingMethodId)
+                    put("type", "JsonWebKey2020")
+                    put("controller", did)
+                    put("publicKeyJwk", signingJwk)
+                })
+                add(buildJsonObject {
+                    put("id", encryptionMethodId)
+                    put("type", "JsonWebKey2020")
+                    put("controller", did)
+                    put("publicKeyJwk", encryptionJwk)
+                })
+            })
+            put("authentication", buildJsonArray { add(JsonPrimitive(signingMethodId)) })
+            put("keyAgreement", buildJsonArray { add(JsonPrimitive(encryptionMethodId)) })
+        }
+
+        val keys = DidDocumentCrypto2KeyResolver(FakeResolver(document), runtime).resolveToKeys(did)
+
+        assertEquals(setOf(KeyId(signingMethodId)), keys.map { it.id }.toSet())
     }
 
     @Test

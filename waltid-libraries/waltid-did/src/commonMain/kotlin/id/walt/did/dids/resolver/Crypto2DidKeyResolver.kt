@@ -54,11 +54,11 @@ class DidDocumentCrypto2KeyResolver(
                 }
             val verificationMethodId = method["id"]?.jsonPrimitive?.content?.takeIf(String::isNotBlank)
                 ?: throw IllegalArgumentException("DID verification method has no ID")
-            val stored = EncodedKey.Jwk(
-                BinaryData(Json.encodeToString(jwk).encodeToByteArray()),
-                privateMaterial = false,
-            ).toStoredSoftwareKey(KeyId(verificationMethodId), setOf(KeyUsage.VERIFY))
             try {
+                val stored = EncodedKey.Jwk(
+                    BinaryData(Json.encodeToString(jwk).encodeToByteArray()),
+                    privateMaterial = false,
+                ).toStoredSoftwareKey(KeyId(verificationMethodId), setOf(KeyUsage.VERIFY))
                 runtime.restore(stored)
             } catch (cause: CancellationException) {
                 throw cause
