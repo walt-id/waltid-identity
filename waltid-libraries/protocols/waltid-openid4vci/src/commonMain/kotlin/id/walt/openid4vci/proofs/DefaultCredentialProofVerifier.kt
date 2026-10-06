@@ -11,6 +11,7 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidUtils
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.ProofType
@@ -191,8 +192,11 @@ class DefaultCredentialProofVerifier(
      * common), so a DID exposing exactly one verification method is accepted without fragment matching.
      */
     private suspend fun resolveHolderDidKey(did: String, holderKid: String): Key =
-        runCatching { didKeyResolver.resolveFromDid(did, holderKid) }
-            .recoverCatching { didKeyResolver.resolveFromDid(did) }
+        runCatching {
+            didKeyResolver.resolveFromDid(did, holderKid, VerificationRelationshipType.Authentication)
+        }.recoverCatching {
+            didKeyResolver.resolveFromDid(did, relationship = VerificationRelationshipType.Authentication)
+        }
             .getOrElse { throw invalidCredentialProof("Could not resolve credential proof DID key", it) }
 
     /** Restores an inline holder JWK as a verification-only crypto2 key. */

@@ -13,6 +13,7 @@ import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.exportPublicJwkObject
 import id.walt.did.dids.DidUtils
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
@@ -193,7 +194,11 @@ object SdJwtVcCredentialSigner {
             JWT_HEADER_KID in proofHeader -> {
                 val holderKid = requireNotNull(proofHeader[JWT_HEADER_KID]?.jsonPrimitive).content
                 require(DidUtils.isDidUrl(holderKid))
-                Crypto2JwtKeyResolver().resolveFromDid(holderKid.substringBefore("#"), holderKid)
+                Crypto2JwtKeyResolver().resolveFromDid(
+                    holderKid.substringBefore("#"),
+                    holderKid,
+                    VerificationRelationshipType.Authentication,
+                )
             }
 
             else -> throw IllegalArgumentException("Proof JWT header must contain kid or jwk claim")

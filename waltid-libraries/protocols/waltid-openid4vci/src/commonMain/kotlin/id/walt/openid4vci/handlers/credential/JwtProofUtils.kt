@@ -9,6 +9,7 @@ import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidUtils
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -46,7 +47,11 @@ internal object JwtProofUtils {
                 }
 
                 Crypto2JwtKeyResolver()
-                    .resolveFromDid(holderKid.substringBefore("#"), holderKid)
+                    .resolveFromDid(
+                        holderKid.substringBefore("#"),
+                        holderKid,
+                        VerificationRelationshipType.Authentication,
+                    )
                     .exportPublicJwk()
                     .toCoseKey()
             }
