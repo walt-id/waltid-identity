@@ -21,6 +21,7 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -184,7 +185,12 @@ class WalletDemoSharingReviewTestScenarios {
         onNode(hasText("Includes information outside this request.") and hasAnyAncestor(hasTestTag("review-all-information-details"))).assertIsDisplayed()
         onNodeWithText("For my own reference").performScrollTo().assertIsDisplayed()
         val group = option.toCredentialDetails().groups.first { it.id != "requested" && it.id != "technical" }
-        onNodeWithTag(WalletUiTestTags.claimGroup(group.title)).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.claimGroup(group.title)).performScrollTo()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Text, listOf(AnnotatedString(group.title))))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Expanded"))
+            .performClick()
+        onNodeWithTag(WalletUiTestTags.claimGroup(group.title))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Collapsed"))
         onNodeWithTag("credential-technical-details").performScrollTo().performClick()
         onAllNodes(hasTestTag("wallet.screen.header") and inInformation).assertCountEquals(1)
         onNodeWithTag("wallet-detail-back").performClick()
