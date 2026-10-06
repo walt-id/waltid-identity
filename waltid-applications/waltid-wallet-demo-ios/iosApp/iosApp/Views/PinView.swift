@@ -41,9 +41,10 @@ struct PinView: View {
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            WalletActions(primary: primary, secondary: secondary ?? keyboardAction,
-                tertiary: secondary == nil ? nil : keyboardAction)
-                .padding(.horizontal, 20).padding(.vertical, 12).background(.regularMaterial)
+            WalletFooter {
+                WalletActions(primary: primary, secondary: secondary ?? keyboardAction,
+                    tertiary: secondary == nil ? nil : keyboardAction)
+            }
         }
         .walletScrollDismissesKeyboard()
         .onAppear {

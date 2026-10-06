@@ -17,7 +17,6 @@ public enum PaymentReviewState: Equatable {
 
 struct PaymentConsentView: View {
     let state: PaymentReviewState
-    @State private var detailsExpanded = false
 
     var body: some View {
         switch state {
@@ -39,14 +38,14 @@ struct PaymentConsentView: View {
                 fields(consent.fields.filter { $0.placement == .main }) { fieldView($0, prominent: false) }
                 let details = consent.fields.filter { $0.placement == .details }
                 if !details.isEmpty {
-                    DisclosureGroup(isExpanded: $detailsExpanded) {
+                    MetadataDisclosure(title: String(localized: "Payment details", bundle: .module), initiallyExpanded: false,
+                        accessibilityIdentifier: "payment-details-toggle") {
                         fields(details) { fieldView($0, prominent: false) }
-                    } label: { Text("Payment details", bundle: .module) }.accessibilityIdentifier("payment-details-toggle")
+                    }.id(consent.revision)
                 }
             }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("payment-consent")
-            .onChange(of: consent.revision) { _ in detailsExpanded = false }
         }
     }
 

@@ -20,10 +20,32 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.buttons["wallet.presentationClaimsClose"].waitForExistence(timeout: 10))
 
         func assertSingleHeaderAndCapture(_ name: String) {
-            XCTAssertEqual(app.navigationBars.allElementsBoundByIndex.filter(\.isHittable).count, 1, app.debugDescription)
-            XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label == %@", "Close"))
-                .allElementsBoundByIndex.filter(\.isHittable).count, 1, app.debugDescription)
-            let capture = XCTAttachment(screenshot: app.screenshot())
+            let bars = app.navigationBars.allElementsBoundByIndex.filter(\.isHittable)
+            XCTAssertEqual(bars.count, 1, app.debugDescription)
+            guard let bar = bars.first else { return }
+            let closes = bar.buttons.matching(NSPredicate(format: "label == %@", "Close"))
+                .allElementsBoundByIndex.filter(\.isHittable)
+            XCTAssertEqual(closes.count, 1, app.debugDescription)
+            if let close = closes.first { XCTAssertTrue(bar.frame.contains(close.frame), app.debugDescription) }
+            // AX layout can lead native toolbar rendering. Capture the app surface
+            // and require unchanged frames over a bounded settling interval.
+            var previous: Data?
+            var unchangedSince: TimeInterval?
+            var settled: XCUIScreenshot?
+            let stableFrame = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                let frame = app.screenshot()
+                let bytes = frame.pngRepresentation
+                let now = ProcessInfo.processInfo.systemUptime
+                defer { previous = bytes }
+                guard bytes == previous else { unchangedSince = nil; return false }
+                guard let unchangedSince else { unchangedSince = now; return false }
+                guard now - unchangedSince >= 0.5 else { return false }
+                settled = frame
+                return true
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [stableFrame], timeout: 10), .completed)
+            guard let settled else { return }
+            let capture = XCTAttachment(screenshot: settled)
             capture.name = name; capture.lifetime = .keepAlways; add(capture)
         }
 
@@ -230,6 +252,25 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "PIN input must open the keyboard automatically")
         XCTAssertLessThanOrEqual(app.buttons["wallet.pinSubmitButton"].frame.maxY, app.keyboards.firstMatch.frame.minY,
             "The keyboard must not cover the PIN action")
+    }
+
+    func testScannerContinueWorksWithTheKeyboardOpen() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+        ui.openScanner()
+        let input = ui.textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request")
+        input.tap()
+        input.typeText("openid-credential-offer://mock")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        let action = app.buttons["wallet.scanContinue"]
+        XCTAssertTrue(action.isEnabled)
+        XCTAssertLessThanOrEqual(action.frame.maxY, app.keyboards.firstMatch.frame.minY)
+        let capture = XCTAttachment(screenshot: app.screenshot())
+        capture.name = "scanner-keyboard-action-clearance"; capture.lifetime = .keepAlways; add(capture)
+        action.tap()
+        XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(input.exists)
     }
 
     func testWalletHomeScannerRoutesOfferAndBackCancelsReview() {

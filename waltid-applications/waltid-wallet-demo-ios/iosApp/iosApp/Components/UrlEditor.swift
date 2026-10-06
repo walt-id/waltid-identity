@@ -35,14 +35,6 @@ struct UrlEditor: View {
                 .focused($isInputFocused)
                 .accessibilityIdentifier(inputIdentifier)
         }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") {
-                    isInputFocused = false
-                }
-            }
-        }
         .onChange(of: isEnabled) { enabled in
             if !enabled {
                 isInputFocused = false
