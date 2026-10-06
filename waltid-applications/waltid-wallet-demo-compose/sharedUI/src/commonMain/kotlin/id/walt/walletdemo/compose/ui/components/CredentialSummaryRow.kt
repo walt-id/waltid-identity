@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 
 /** Credential identity at review scale. Selection and navigation belong to distinct host controls. */
 @Composable
@@ -23,13 +24,16 @@ internal fun CredentialSummaryRow(
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier) {
-        val thumbnailWidth = if (LocalDensity.current.fontScale >= 1.3f || maxWidth < 180.dp) 48.dp else 64.dp
+        val thumbnailWidth = credentialThumbnailWidth(maxWidth, LocalDensity.current.fontScale)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             CredentialCardArt(art, compact = true, modifier = Modifier.width(thumbnailWidth).clearAndSetSemantics {})
             SummaryText(art.name, supportingText, Modifier.weight(1f))
         }
     }
 }
+
+internal fun credentialThumbnailWidth(availableWidth: Dp, fontScale: Float): Dp =
+    if (fontScale >= 1.3f || availableWidth < 180.dp) 48.dp else 64.dp
 
 @Composable
 private fun SummaryText(title: String, supportingText: String?, modifier: Modifier = Modifier) {

@@ -6,6 +6,10 @@ class WalletDemoSharingReviewIosTest {
     private val scenarios = WalletDemoSharingReviewTestScenarios()
 
     @Test
+    fun resizingAnOfferPreservesSelectionAndKeepsItsTitleReadable() =
+        scenarios.resizingAnOfferPreservesSelectionAndKeepsItsTitleReadable()
+
+    @Test
     fun closingTechnicalInformationReturnsToReviewWithoutSubmitting() =
         scenarios.closingTechnicalInformationReturnsToReviewWithoutSubmitting()
 

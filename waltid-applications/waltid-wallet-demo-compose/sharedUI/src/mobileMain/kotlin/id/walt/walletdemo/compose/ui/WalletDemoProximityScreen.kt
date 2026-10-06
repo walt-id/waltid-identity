@@ -2,18 +2,11 @@ package id.walt.walletdemo.compose.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -39,7 +32,7 @@ import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.WalletAction
 import id.walt.walletdemo.compose.ui.components.WalletActions
-import id.walt.walletdemo.compose.ui.components.WalletIcon
+import id.walt.walletdemo.compose.ui.components.WalletFooter
 import id.walt.walletdemo.compose.ui.components.WalletSymbol
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -103,12 +96,7 @@ internal fun WalletDemoProximityScreen(
                 ProximityEngagementContent(state, credentialDetailsById, onShowEngagement, onApprovalModeChange)
             }
             if (canCancel) {
-                HorizontalDivider()
-                Surface {
-                    Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
-                        ProximityCancelAction(onCancel)
-                    }
-                }
+                WalletFooter(actions = { ProximityCancelAction(onCancel) })
             }
         } else {
             ReviewScaffold(
@@ -258,11 +246,6 @@ private fun WalletDemoProximityReview(
 
 @Composable
 private fun ProximityCancelAction(onCancel: () -> Unit) {
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-        OutlinedButton(onClick = onCancel, modifier = Modifier.testTag(WalletUiTestTags.ProximityCancel)) {
-            WalletIcon(WalletSymbol.Decline, contentDescription = null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.size(8.dp))
-            Text(stringResource(Res.string.proximity_cancel))
-        }
-    }
+    WalletActions(secondary = WalletAction(stringResource(Res.string.proximity_cancel), onCancel,
+        testTag = WalletUiTestTags.ProximityCancel, icon = WalletSymbol.Decline))
 }

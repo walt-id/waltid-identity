@@ -60,7 +60,7 @@ fun WalletDemoOfferCreateScreen(
     }) { fillViewport ->
         when (state) {
             WalletDemoOfferCreateUiState.Loading -> ReviewScaffold(fillViewport = fillViewport,
-                actions = { WalletActions(WalletAction("Cancel", onDecline, icon = WalletSymbol.Decline)) }) {
+                actions = { WalletActions(secondary = WalletAction("Cancel", onDecline, icon = WalletSymbol.Decline)) }) {
                 OfferCreateLoadingContent()
             }
             is WalletDemoOfferCreateUiState.Review -> {
@@ -115,7 +115,7 @@ fun WalletDemoOfferCreateScreen(
             }
             is WalletDemoOfferCreateUiState.Failure -> ReviewScaffold(
                 fillViewport = fillViewport,
-                actions = { WalletActions(WalletAction("Close", onDecline, icon = WalletSymbol.Decline)) },
+                actions = { WalletActions(secondary = WalletAction("Close", onDecline, icon = WalletSymbol.Decline)) },
             ) {
                 Text("Unable to receive credentials", style = MaterialTheme.typography.titleLarge)
                 Text(state.message, color = MaterialTheme.colorScheme.error)
@@ -123,7 +123,7 @@ fun WalletDemoOfferCreateScreen(
             is WalletDemoOfferCreateUiState.WaitingForAuthorization -> ReviewScaffold(
                 fillViewport = fillViewport,
                 actions = if (state.completing) null else ({
-                    WalletActions(WalletAction("Cancel", onCancelAuthorization, icon = WalletSymbol.Decline))
+                    WalletActions(secondary = WalletAction("Cancel", onCancelAuthorization, icon = WalletSymbol.Decline))
                 }),
             ) {
                 Column(

@@ -1,6 +1,14 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
@@ -12,6 +20,7 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -20,8 +29,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.v2.runComposeUiTest
 import id.walt.walletdemo.compose.logic.*
+import id.walt.walletdemo.compose.ui.components.OfferedCredentialRow
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
@@ -38,6 +49,7 @@ import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewFixtures.optionalDis
 import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewFixtures.requiredDisclosure
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -53,6 +65,44 @@ import kotlinx.coroutines.cancel
  */
 @OptIn(ExperimentalTestApi::class)
 class WalletDemoSharingReviewTestScenarios {
+
+    fun resizingAnOfferPreservesSelectionAndKeepsItsTitleReadable() = runComposeUiTest {
+        val credential = WalletVisualFixtures.offer.offeredCredentials.last()
+        val title = credential.resolvedCardTitle()
+        val width = mutableStateOf(393)
+        val fontScale = mutableStateOf(1f)
+        val copies = mutableStateOf(2)
+        val selectionTag = "issuance-select-${credential.configurationId}"
+        setContent {
+            WalletDemoTheme {
+                CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale.value)) {
+                    Box(Modifier.width(width.value.dp)) {
+                        OfferedCredentialRow(credential, "Example City", "https://issuer.example",
+                            copies.value, 3, true, { copies.value = it })
+                    }
+                }
+            }
+        }
+        onAllNodesWithTag(selectionTag).assertCountEquals(1)
+        onNodeWithTag(selectionTag).assertIsOn()
+        runOnIdle { width.value = 320; fontScale.value = 1.5f }
+        onAllNodesWithTag(selectionTag).assertCountEquals(1)
+        onNodeWithText(title).assertIsDisplayed()
+        val layouts = mutableListOf<TextLayoutResult>()
+        onNodeWithText(title).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val layout = layouts.single()
+        repeat(layout.lineCount - 1) { line ->
+            val end = layout.getLineEnd(line)
+            assertTrue(title[end - 1].isWhitespace() || title.getOrNull(end)?.isWhitespace() == true,
+                "Enlarged text must not split a word while the selection control takes its space")
+        }
+        assertEquals(2, copies.value)
+        onNodeWithTag(selectionTag).performClick().assertIsOff()
+        runOnIdle { width.value = 393; fontScale.value = 1f }
+        onAllNodesWithTag(selectionTag).assertCountEquals(1)
+        onNodeWithTag(selectionTag).assertIsOff().performClick().assertIsOn()
+        assertEquals(1, copies.value)
+    }
 
     fun unsignedConfirmationIsInvalidatedByNewConsentAndDisabledState() = runComposeUiTest {
         val consent = WalletDemoPaymentConsent("first", "en", null, null, "Pay", null, true, emptyList())
