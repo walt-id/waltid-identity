@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
@@ -42,6 +43,7 @@ internal fun WalletScanScreen(
     onOpen: (String, WalletLinkKind) -> Unit,
     initialInput: String = "",
     resolveLink: suspend (String) -> ResolvedWalletLink = { resolveWalletLink(it) },
+    clipboard: Clipboard = LocalClipboard.current,
 ) {
     var input by rememberSaveable { mutableStateOf(initialInput) }
     var scannerVisible by rememberSaveable { mutableStateOf(false) }
@@ -50,7 +52,6 @@ internal fun WalletScanScreen(
     var resolutionError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val kind = WalletLinkKind.classify(input)
-    val clipboard = LocalClipboard.current
     var pasting by remember { mutableStateOf(false) }
     fun open(value: String) {
         if (dispatched || resolving) return
