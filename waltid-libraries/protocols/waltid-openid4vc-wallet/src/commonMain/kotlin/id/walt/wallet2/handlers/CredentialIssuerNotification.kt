@@ -31,7 +31,7 @@ internal suspend inline fun <T> storeAndNotify(
     httpClient: HttpClient,
     target: IssuerNotificationTarget,
     eventDescription: String? = null,
-    block: () -> T,
+    block: suspend () -> T,
 ): T = try {
     val stored = block()
     deliverCredentialNotification(
