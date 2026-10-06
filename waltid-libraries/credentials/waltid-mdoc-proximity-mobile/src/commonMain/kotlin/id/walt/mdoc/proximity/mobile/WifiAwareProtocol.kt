@@ -3,7 +3,6 @@ package id.walt.mdoc.proximity.mobile
 import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.crypto.MdocKdf
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 /** Pure ISO/IEC 18013-5 Wi-Fi Aware transaction derivations. */
 internal object WifiAwareProtocol {
@@ -28,7 +27,6 @@ internal object WifiAwareProtocol {
         }
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     fun derivePassphrase(eDeviceKeyBytes: ByteString): String {
         val derived = derive(eDeviceKeyBytes, "NANPassphrase", DERIVED_BYTES)
         return try {

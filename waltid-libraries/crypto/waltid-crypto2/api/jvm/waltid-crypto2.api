@@ -2568,6 +2568,7 @@ public final class id/walt/crypto2/providers/SoftwareKeyProvider$DefaultImpls {
 }
 
 public final class id/walt/crypto2/providers/cryptography/BouncyCastleSecp256k1SoftwareKeyProvider : id/walt/crypto2/providers/SoftwareKeyProvider {
+	public fun <init> ()V
 	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -2615,6 +2616,7 @@ public final class id/walt/crypto2/providers/cryptography/CryptographyCapability
 
 public final class id/walt/crypto2/providers/cryptography/CryptographySoftwareKeyProvider : id/walt/crypto2/providers/SoftwareKeyProvider {
 	public static final field Companion Lid/walt/crypto2/providers/cryptography/CryptographySoftwareKeyProvider$Companion;
+	public fun <init> ()V
 	public synthetic fun <init> (Ldev/whyoleg/cryptography/CryptographyProvider;Ljava/lang/String;Lid/walt/crypto2/providers/cryptography/CryptographyCapabilityProfile;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public synthetic fun <init> (Ldev/whyoleg/cryptography/CryptographyProvider;Ljava/lang/String;Lid/walt/crypto2/providers/cryptography/CryptographyCapabilityProfile;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun close (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;

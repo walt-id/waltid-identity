@@ -16,7 +16,6 @@ import id.walt.mdoc.objects.mso.ValidityInfo
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.*
 import kotlin.time.Clock
 
@@ -79,7 +78,6 @@ class MdocsCredentialSerializationTest {
 
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun `crypto2 holder key is read from the mobile security object for verification only`() = runTest {
         val x = "2Z3gxK7IatHaxPWLYkBYn1XS0wKdL7fMQQuF_nGw2Kw"
@@ -106,7 +104,6 @@ class MdocsCredentialSerializationTest {
         assertNull(holderKey.capabilities.privateKeyExporter)
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun `crypto2 holder key rejects device keys without verify permission`() = runTest {
         every { mockExtractor.invoke(any()) } returns createDummyMso(

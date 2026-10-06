@@ -121,7 +121,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -1382,7 +1381,6 @@ class MobileWalletTest {
         }
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun annexCReaderAuthenticationUsesVerifierTranscriptBuildsResponseAndRejectsTampering() = runTest {
         val origin = "https://verifier.example"
@@ -1493,7 +1491,6 @@ class MobileWalletTest {
      * a signature that failed to verify. On Apple's deferred path the preview cannot check the signature
      * at all, so a bad one arriving with the raw request has to reject the submission.
      */
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun annexCDistinguishesReaderTrustStatesAndRejectsBadSignaturesAfterConsent() = runTest {
         val origin = "https://verifier.example"
@@ -1600,7 +1597,6 @@ class MobileWalletTest {
      * Every rejected case below is a *valid* request that parses to exactly what the user saw, because
      * the parsed request carries no reader authentication, no `deviceRequestInfo` and no version.
      */
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun annexCAnswersOnlyTheExactRawRequestConsentWasGivenFor() = runTest {
         val origin = "https://verifier.example"
@@ -1856,7 +1852,6 @@ class MobileWalletTest {
      * authenticated the request. The mismatch is checked before signature verification, so the second
      * signature here can be arbitrary bytes.
      */
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun annexCRejectsReaderAuthenticationSignaturesFromDifferentCertificateChains() = runTest {
         val wallet = annexCWalletWithMdl("annex-c-reader-chain-mismatch-wallet")
@@ -2222,7 +2217,6 @@ class MobileWalletTest {
     private fun Throwable.causeChainMessages(): List<String> =
         generateSequence(this) { it.cause }.mapNotNull { it.message }.toList()
 
-    @OptIn(ExperimentalEncodingApi::class)
     private fun String.decodeBase64Url(): ByteArray =
         Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL).decode(this)
 

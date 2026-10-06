@@ -35,7 +35,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -750,7 +749,6 @@ class ProximityReaderTrustTest {
             )
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     private fun X509Certificate.base64Url(): String =
         Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(encodedDer.toByteArray())
 

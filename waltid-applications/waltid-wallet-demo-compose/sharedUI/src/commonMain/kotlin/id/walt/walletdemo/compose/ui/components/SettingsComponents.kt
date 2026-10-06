@@ -15,12 +15,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import id.walt.walletdemo.compose.ui.plainTextClipEntry
 import id.walt.walletdemo.compose.ui.resources.*
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -205,7 +206,8 @@ internal fun SettingsCopyRow(
     disclosureLabels: Pair<String, String>? = null,
     formatJson: Boolean = false,
 ) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     val displayValue = remember(value, formatJson) {
         if (formatJson && value != null) runCatching {
             readableJson.encodeToString(JsonElement.serializer(), Json.parseToJsonElement(value))
@@ -225,7 +227,13 @@ internal fun SettingsCopyRow(
                             if (expanded) disclosureLabels.second else disclosureLabels.first)
                     }
                     SettingsIconButton(copyLabel, enabled = !value.isNullOrBlank(), onClick = {
-                        value?.let { clipboard.setText(AnnotatedString(it)); copied = true }
+                        value?.let { text ->
+                            // Web clipboard permissions require starting within the click gesture.
+                            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                                clipboard.setClipEntry(plainTextClipEntry(text))
+                                copied = true
+                            }
+                        }
                     }, modifier = Modifier.testTag(copyTag).semantics {
                         liveRegion = LiveRegionMode.Polite
                         if (copied) stateDescription = copyAnnouncement
