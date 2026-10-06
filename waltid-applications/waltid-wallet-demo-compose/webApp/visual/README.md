@@ -12,6 +12,8 @@ actions cannot send an extra request. Submitted responses are held until the wor
 has rendered; recovery cases release that gate after its image settles, so fast synthetic
 responses cannot skip the intermediate state. No application test route, separate gallery app or live
 account is needed. Real API2 authentication and protocol tests remain separate evidence.
+A separate immediate-response interaction case uses actual canvas pointer/keyboard input to
+prove that registration failure restores editable fields and permits a retry with new credentials.
 
 From the Identity repository:
 

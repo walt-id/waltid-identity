@@ -104,3 +104,37 @@ for (const scenario of catalogue.states) {
     }
   });
 }
+
+test('immediate registration failure restores editable controls and retry', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('waltid.wallet2.baseUrl', location.origin));
+  const submitted = [];
+  await page.route('**/auth/register', async route => {
+    submitted.push(route.request().postDataJSON());
+    await route.fulfill({ status: 409, contentType: 'application/json', body: '{}' });
+  });
+  await page.goto('/');
+  const email = page.getByRole('textbox', { name: 'Email', exact: true });
+  const password = page.getByRole('textbox', { name: 'Password', exact: true });
+  const register = page.getByRole('button', { name: 'Create account', exact: true });
+  await expect(email).toBeVisible();
+  await email.fill('wallet@example.test');
+  await password.fill('synthetic-password');
+  await password.press('Tab');
+  await clickControl(page, register);
+  await expect(page.getByText('An account with this email already exists. Sign in instead.', { exact: true })).toBeVisible();
+
+  // Use actual canvas pointer/keyboard input to prove recovery; the ARIA mirror's
+  // enabled attribute does not establish that a Compose field accepts edits.
+  await clickControl(page, email);
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.type('retry@example.test');
+  await clickControl(page, password);
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.type('retry-password');
+  await page.keyboard.press('Tab');
+  await clickControl(page, register);
+  await expect.poll(() => submitted).toEqual([
+    { email: 'wallet@example.test', password: 'synthetic-password' },
+    { email: 'retry@example.test', password: 'retry-password' },
+  ]);
+});
