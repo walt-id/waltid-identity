@@ -26,6 +26,8 @@ dependencies {
         exclude("org.apache.commons:commons-lang3") // Manually updated due to security CVE
     }
     implementation(identityLibs.mina.core)
+    // Not used directly: pins the version ktor-openapi brings (CVE-2025-48924) for users of this library too.
+    implementation(identityLibs.commons.lang3)
 
     // TOTP/HOTP
     implementation(identityLibs.onetime)
@@ -69,8 +71,10 @@ dependencies {
     // Redis
     implementation(identityLibs.kedis)
 
-    // Passkeys (WebAuthn)
+    // Passkeys (WebAuthn). It parses the CBOR browsers send with Jackson 3, whose BOM it lifts to 3.2.1 (vulnerable
+    // core, databind and CBOR). The forced versions below only hold in this build, so the BOM is also published.
     implementation(identityLibs.webauthn4j.core)
+    implementation(platform(identityLibs.jackson.bom.tools))
 
     /* --- Testing --- */
     testImplementation(identityLibs.ktor.client.logging)
@@ -103,9 +107,9 @@ dependencies {
 //   CWE-327 (broken crypto, CVSS 8.7), CWE-1240 (timing attack), CWE-90 (LDAP injection)
 //   Snyk said "no supported fix" at 1.80; 1.84 is now available
 //
-// webauthn4j → tools.jackson.dataformat:jackson-dataformat-cbor:3.2.1, allocation without limits (Snyk, fixed in
-//   3.1.6 / 3.2.2); it also lifted the Jackson 3 BOM above the version core and databind are pinned to.
-//   Pinned to the jackson-core-3 catalog version as well.
+// webauthn4j → tools.jackson.dataformat:jackson-dataformat-cbor:3.2.1, allocation without limits
+//   (CVE-2026-68495, fixed in 3.2.2), and through its BOM core and databind 3.2.1. Pinned to the jackson-core-3
+//   catalog version as well; users of this library get it through the published BOM (see the dependencies).
 //
 // ktor-openapi → io.netty (4.2.x branch), pinned to the netty-4_2 catalog version.
 // web3j → tuweni → vertx-core. swagger-parser → json-schema-core → rhino.
