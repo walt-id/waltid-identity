@@ -13,12 +13,11 @@ struct PinView: View {
             ZStack {
                 pinContent(confirming: confirming)
                     .id(confirming)
-                    .transition(reduceMotion ? .identity : .asymmetric(
-                        insertion: .move(edge: confirming ? .trailing : .leading).combined(with: .opacity),
-                        removal: .move(edge: confirming ? .leading : .trailing).combined(with: .opacity)))
+                    .transition(WalletMotion.page(forward: confirming, reduceMotion: reduceMotion))
             }
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: confirming)
+            .animation(WalletMotion.navigation(reduceMotion: reduceMotion), value: confirming)
             .frame(maxWidth: 640, alignment: .leading)
+            .clipped()
             .padding(20)
             .frame(maxWidth: .infinity)
         }
@@ -45,8 +44,10 @@ struct PinView: View {
         }
     }
 
-    private var isSetup: Bool { viewModel.auth == .setup }
-    private var confirming: Bool { isSetup && viewModel.pinSetupStep == .confirm }
+    private var isSetup: Bool { viewModel.auth == .setup || confirming }
+    // Finishing setup removes this view; it must not start a reverse page transition
+    // and recreate the Choose editor while the sheet is dismissing its keyboard.
+    private var confirming: Bool { viewModel.pinSetupStep == .confirm && viewModel.auth != .login }
     private var value: String { confirming ? viewModel.pinConfirmation : viewModel.pin }
     private enum InputFocusTarget: Hashable { case none, choose, confirm, unlock }
     private struct InputFocusRequest: Equatable {

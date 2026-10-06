@@ -141,6 +141,8 @@ struct PresentView: View {
         } actions: {
             WalletActions(primary: WalletAction("Done", identifier: "wallet.presentationDone", perform: closeReview))
         }.accessibilityIdentifier("wallet.presentationResult")
+            .walletSuccessDismissal(key: viewModel.presentationNavigationResetKey,
+                enabled: !viewModel.isLoading && !viewModel.statusIsError(for: .present), onDone: closeReview)
     }
 
     private var entryContent: some View {

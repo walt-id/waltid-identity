@@ -160,6 +160,9 @@ struct ProximityPresentationView: View {
                         : String(localized: "The approved credential data was sent to the reader."),
                     receipt: receipt, credentialDetailsByID: credentialDetailsByID
                 )
+                .walletSuccessDismissal(key: 0,
+                    enabled: !declined && receipt != nil && viewModel.actionErrorMessage == nil
+                        && viewModel.hostActionInProgress == nil, onDone: viewModel.requestClose)
             case .noData:
                 ProximityTerminalContent(
                     title: String(localized: "No data shared"),

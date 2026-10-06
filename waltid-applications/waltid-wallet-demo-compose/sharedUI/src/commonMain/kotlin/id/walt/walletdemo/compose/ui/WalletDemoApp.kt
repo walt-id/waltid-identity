@@ -17,6 +17,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import id.walt.walletdemo.compose.logic.WalletAuthState
@@ -60,6 +63,7 @@ internal fun WalletDemoAppHost(
     onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
     onExternalFlowClosed: () -> Unit = {},
+    onOpenExternalInApp: () -> Unit = {},
     externalBackground: WalletExternalBackground = WalletExternalBackground.Wallet,
     readerTrustSettingsContent: (@Composable () -> Unit)? = null,
     readerTrustPolicySummary: String? = null,
@@ -72,6 +76,7 @@ internal fun WalletDemoAppHost(
     serverSettingsContent: (@Composable () -> Unit)? = null,
 ) {
     val state by controller.state.collectAsState()
+    var externalExpanded by rememberSaveable(state.externalFlow?.url) { mutableStateOf(false) }
     LaunchedEffect(state.externalFlow, state.auth, state.session, state.isBusy) { controller.prepareExternalFlow() }
     val closeExternalFlow = { if (controller.closeExternalFlow()) onExternalFlowClosed() }
     PresentationContinuationEffect(
@@ -138,3 +143,69 @@ internal fun WalletDemoAppHost(
                             serverSettingsContent = serverSettingsContent,
                         )
                     }
+                }
+            }
+        }
+        if (state.externalFlow != null) {
+            if (externalBackground == WalletExternalBackground.Wallet) {
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
+            }
+            WalletReviewHost(if (externalExpanded) WalletReviewPresentation.FullScreen else WalletReviewPresentation.Sheet,
+                state.canDismissExternalFlow, closeExternalFlow) { fillViewport ->
+                if (state.auth == WalletAuthState.Unlocked && state.session is WalletSessionState.Ready) {
+                    WalletExternalFlowScreen(controller, state, closeExternalFlow, fillViewport = fillViewport,
+                        onOpenInApp = if (externalExpanded) null else ({
+                            externalExpanded = true
+                            onOpenExternalInApp()
+                        }))
+                } else appContent()
+            }
+        } else appContent()
+        state.incomingLinkNotice?.let { notice ->
+            AlertDialog(onDismissRequest = controller::dismissIncomingLinkNotice,
+                title = { Text("Request already in progress") }, text = { Text(notice) },
+                confirmButton = { TextButton(onClick = controller::dismissIncomingLinkNotice) { Text("OK") } })
+        }
+        state.signingProtectionWarning?.let { warning ->
+            AlertDialog(
+                onDismissRequest = controller::dismissSigningProtectionWarning,
+                title = { Text("Biometric signing unavailable") },
+                text = {
+                    Text(
+                        warning,
+                        modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionWarning),
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = controller::dismissSigningProtectionWarning,
+                        modifier = Modifier.testTag(WalletUiTestTags.SigningProtectionWarningDismiss),
+                    ) {
+                        Text("OK")
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PresentationContinuationEffect(
+    continuation: WalletDemoPresentationContinuation?,
+    onCompleted: () -> Unit,
+    onFailed: (String) -> Unit,
+) {
+    when (continuation) {
+        is WalletDemoPresentationContinuation.Url -> OpenPresentationContinuationUrlEffect(
+            url = continuation.value,
+            onCompleted = onCompleted,
+            onFailed = onFailed,
+        )
+        is WalletDemoPresentationContinuation.FormPostHtml -> PlatformFormPostEffect(
+            html = continuation.value,
+            onCompleted = onCompleted,
+            onFailed = onFailed,
+        )
+        null -> Unit
+    }
+}

@@ -30,13 +30,6 @@ struct CredentialsTabView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if selectedDetailsID == nil {
-                        if let onShareNearby {
-                            HStack {
-                                Spacer()
-                                Button("Share nearby", action: onShareNearby).frame(minHeight: 44)
-                                    .accessibilityIdentifier(WalletAccessibilityID.proximityStartButton)
-                            }
-                        }
                         if !viewModel.deferredCredentials.isEmpty {
                             WalletSection {
                                 WalletNavigationRow(String(format: String(localized: "Pending · %d"), viewModel.deferredCredentials.count)) {
@@ -92,7 +85,7 @@ struct CredentialsTabView: View {
                 if selectedDetailsID == nil { WalletTabFeedback(viewModel: viewModel, tab: .credentials) }
             }
             .background(Color(.systemGroupedBackground))
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: selectedDetailsID)
+            .animation(WalletMotion.navigation(reduceMotion: reduceMotion), value: selectedDetailsID)
             .navigationTitle(selectedDetailsID == nil ? branding.appTitle : "")
             .accessibilityIdentifier(WalletAccessibilityID.appTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -131,6 +124,11 @@ struct CredentialsTabView: View {
                             }
                             .accessibilityIdentifier(WalletAccessibilityID.detailsMenu)
                         } else {
+                            if let onShareNearby {
+                                Button(action: onShareNearby) { Image(systemName: "dot.radiowaves.left.and.right") }
+                                    .accessibilityLabel("Share nearby")
+                                    .accessibilityIdentifier(WalletAccessibilityID.proximityStartButton)
+                            }
                             if let onScan {
                                 Button(action: onScan) { Image(systemName: "qrcode.viewfinder") }
                                     .accessibilityLabel("Scan or paste a link")
@@ -176,10 +174,10 @@ struct CredentialsTabView: View {
 
     private func openDetails(_ id: String) {
         expanded = nil
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) { selectedDetailsID = id }
+        withAnimation(WalletMotion.navigation(reduceMotion: reduceMotion)) { selectedDetailsID = id }
     }
 
     private func closeDetails() {
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) { selectedDetailsID = nil }
+        withAnimation(WalletMotion.navigation(reduceMotion: reduceMotion)) { selectedDetailsID = nil }
     }
 }

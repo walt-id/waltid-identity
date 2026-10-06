@@ -22,6 +22,8 @@ Review thumbnails use the credential logo centered on the supplied background co
 
 Details push within their current screen or sheet with one navigation header. Back restores the offer or sharing choices. Requested data, all readable data and technical details remain separate destinations; no live acceptance or sharing actions remain behind a detail page.
 
+Stored data, requested disclosures and offered definitions share `CredentialDataRow`: a small secondary label above the full-sized value/status, grouped spacing and dividers. Optional disclosure controls sit beside the same row and retain their original selection identities. Context changes the information and available controls, not the label/value hierarchy. Technical summaries remain clearly separate.
+
 ## Values and media
 
 Keep null, empty text, false, zero, empty objects and empty lists distinct. Collections initially show 25 items, their total and an explicit next-page action. Preserve indices when revealing more items. Retain deferred, bounded image decoding; loading and failed images have visible placeholders. Full-screen image inspection is available after successful decoding. Credential artwork identifies the credential and stays separate from claim images and issuer/verifier logos.

@@ -19,7 +19,7 @@ struct WalletPinInput: View {
             .privacySensitive()
             .overlay {
                 GeometryReader { geometry in
-                    let width = min(40, (geometry.size.width - CGFloat(digitCount - 1) * 16) / CGFloat(digitCount))
+                    let width = max(0, min(40, (geometry.size.width - CGFloat(digitCount - 1) * 16) / CGFloat(digitCount)))
                     HStack(spacing: 16) {
                         ForEach(0..<digitCount, id: \.self) { index in
                             let active = focus.wrappedValue && isEnabled && index == value.count
@@ -83,18 +83,16 @@ private struct PinSecureEditor: UIViewRepresentable {
     func updateUIView(_ field: TextField, context: Context) {
         context.coordinator.parent = self
         if field.text != value { field.text = value }
-        field.isEnabled = isEnabled
         field.accessibilityLabel = label
         field.accessibilityHint = "\(value.count) digits entered"
         field.accessibilityIdentifier = identifier
-        field.requestFocus(focus && isEnabled)
+        field.requestInteraction(enabled: isEnabled, focused: focus)
     }
 
     static func dismantleUIView(_ field: TextField, coordinator: Coordinator) {
         field.delegate = nil
         field.requestFocus(false)
         field.stopObservingWindow()
-        field.resignFirstResponder()
     }
 
     final class Coordinator: NSObject, UITextFieldDelegate {
@@ -133,7 +131,13 @@ private struct PinSecureEditor: UIViewRepresentable {
 
     final class TextField: UITextField {
         private var wantsFocus = false
+        private var wantsEnabled = true
         private var observations: [NSObjectProtocol] = []
+
+        func requestInteraction(enabled: Bool, focused: Bool) {
+            wantsEnabled = enabled
+            requestFocus(focused && enabled)
+        }
 
         func requestFocus(_ requested: Bool) {
             wantsFocus = requested
@@ -164,10 +168,13 @@ private struct PinSecureEditor: UIViewRepresentable {
         }
 
         private func applyFocus() {
-            guard wantsFocus else {
+            // Disabling a focused field also resigns it. Both operations must occur
+            // outside updateUIView, where UIKit can re-enter SwiftUI's responder graph.
+            if !wantsFocus || !wantsEnabled {
                 if isFirstResponder { resignFirstResponder() }
-                return
             }
+            if isEnabled != wantsEnabled { isEnabled = wantsEnabled }
+            guard wantsFocus else { return }
             guard isEnabled, let window, window.isKeyWindow,
                   window.windowScene?.activationState == .foregroundActive else { return }
             if !isFirstResponder { becomeFirstResponder() }
