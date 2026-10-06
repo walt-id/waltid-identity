@@ -429,6 +429,7 @@ jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson-core" }
 jackson-core-tools = { module = "tools.jackson.core:jackson-core", version.ref = "jackson-core-3" }
 jackson-databind-tools = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson-core-3" }
+jackson-dataformat-cbor-tools = { module = "tools.jackson.dataformat:jackson-dataformat-cbor", version.ref = "jackson-core-3" }
 vertx-core = { module = "io.vertx:vertx-core", version.ref = "vertx" }
 rhino = { module = "org.mozilla:rhino", version.ref = "rhino" }
 oci-sdk = { module = "com.oracle.oci.sdk:oci-java-sdk-shaded-full", version.ref = "oci-sdk" }
