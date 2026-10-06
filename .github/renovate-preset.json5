@@ -1,0 +1,78 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  // Shared Renovate rules for all walt.id repositories. Each repository's renovate.json5 only
+  // extends this file with github>walt-id/waltid-identity//.github/renovate-preset.json5.
+  //
+  // The aim is as few PRs as possible: every manager Renovate detects (Gradle, npm/bun,
+  // GitHub Actions, Docker, Helm, SwiftPM, Gradle wrapper) and every directory share one PR
+  // per kind of update, instead of one PR per dependency and directory.
+  extends: [
+    'config:recommended',
+    ':semanticCommitTypeAll(chore)',
+  ],
+  timezone: 'Europe/Vienna',
+  // Same slot in every repository, so coordinated pins (e.g. Kotlin and Ktor in waltid-identity
+  // and waltid-unified-build) arrive as PRs at the same time.
+  schedule: ['before 6am on monday'],
+  labels: ['dependencies'],
+  // Fresh releases are not proposed until they are a few days old, so yanked or compromised
+  // versions rarely make it into the weekly PR.
+  minimumReleaseAge: '3 days',
+  // config:recommended also skips examples/ and test directories; keep covering the JS examples.
+  ignorePaths: ['**/node_modules/**'],
+
+  packageRules: [
+    {
+      description: 'One PR for all non-major updates, across all managers and directories.',
+      matchPackageNames: ['*'],
+      matchUpdateTypes: ['minor', 'patch', 'digest', 'pin', 'pinDigest'],
+      groupName: 'all non-major dependencies',
+      groupSlug: 'all-minor-patch',
+    },
+    {
+      description: 'Majors usually need code changes: one grouped PR, opened only when requested from the Dependency Dashboard.',
+      matchPackageNames: ['*'],
+      matchUpdateTypes: ['major'],
+      groupName: 'all major dependencies',
+      groupSlug: 'all',
+      dependencyDashboardApproval: true,
+    },
+    {
+      description: 'AGP 9.4 truncates comma-separated instrumentation filters; see android-gradle in the version catalogs.',
+      matchDepNames: [
+        'com.android.application',
+        'com.android.library',
+        'com.android.kotlin.multiplatform.library',
+        'com.android.tools.build:gradle',
+      ],
+      allowedVersions: '/^9\\.[0-3]\\./',
+    },
+    {
+      description: 'walt.id forks (e.g. 1.11.1-waltid-20260811, 1.1.1-WALT-SNAPSHOT) are bumped by hand; an upstream version would drop our patches.',
+      matchCurrentVersion: '/-(waltid|WALT)-/',
+      enabled: false,
+    },
+    {
+      description: 'Our own actions and reusable workflows are pinned to a commit or main on purpose.',
+      matchManagers: ['github-actions'],
+      matchPackageNames: ['/^walt-id\\//'],
+      enabled: false,
+    },
+  ],
+
+  // Security fixes skip the weekly schedule and the release-age wait, and share one PR.
+  // Needs Dependabot alerts to stay enabled on the repository.
+  vulnerabilityAlerts: {
+    groupName: 'security updates',
+    groupSlug: 'security',
+    // Otherwise major fixes get a second security PR.
+    separateMajorMinor: false,
+  },
+  osvVulnerabilityAlerts: true,
+
+  // Renovate cannot fix vulnerable transitive deps in npm v3 lockfiles directly (most past
+  // Dependabot PRs were these), so refresh all lockfiles weekly in one PR instead.
+  lockFileMaintenance: {
+    enabled: true,
+  },
+}

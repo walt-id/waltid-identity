@@ -1,0 +1,5 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  // The rules are shared by all walt.id repositories; see .github/renovate-preset.json5.
+  extends: ['github>walt-id/waltid-identity//.github/renovate-preset.json5'],
+}
