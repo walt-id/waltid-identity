@@ -77,7 +77,7 @@ public struct SharingReviewScreen: View {
                     paymentReview: paymentReview
                 )
             } else {
-                WalletActions(primary: WalletAction("Cancel", enabled: !isSubmitting,
+                WalletActions(secondary: WalletAction("Cancel", enabled: !isSubmitting,
                     identifier: WalletAccessibilityID.presentationCancelButton, perform: onCancel))
             }
         }

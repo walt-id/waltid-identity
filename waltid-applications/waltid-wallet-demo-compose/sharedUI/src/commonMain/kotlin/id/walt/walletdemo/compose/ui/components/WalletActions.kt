@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 /** Intrinsic-width decisions in reading order, wrapping when their labels need more space. */
 @Composable
 internal fun WalletActions(
-    primary: WalletAction,
+    primary: WalletAction? = null,
     secondary: WalletAction? = null,
     tertiary: WalletAction? = null,
     modifier: Modifier = Modifier,
@@ -37,9 +37,11 @@ internal fun WalletActions(
                 modifier = action.modifier(), shape = RoundedCornerShape(24.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) { ActionLabel(action) }
         }
-        Button(onClick = primary.onClick, enabled = primary.enabled,
-            modifier = primary.modifier(), shape = RoundedCornerShape(24.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) { ActionLabel(primary) }
+        primary?.let { action ->
+            Button(onClick = action.onClick, enabled = action.enabled,
+                modifier = action.modifier(), shape = RoundedCornerShape(24.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) { ActionLabel(action) }
+        }
     }
 }
 

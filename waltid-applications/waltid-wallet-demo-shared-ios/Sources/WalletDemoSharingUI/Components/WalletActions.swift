@@ -2,11 +2,11 @@ import SwiftUI
 
 /// Reusable action content for full screens, sheets and platform provider containers.
 public struct WalletActions: View {
-    private let primary: WalletAction
+    private let primary: WalletAction?
     private let secondary: WalletAction?
     private let tertiary: WalletAction?
 
-    public init(primary: WalletAction, secondary: WalletAction? = nil, tertiary: WalletAction? = nil) {
+    public init(primary: WalletAction? = nil, secondary: WalletAction? = nil, tertiary: WalletAction? = nil) {
         self.primary = primary
         self.secondary = secondary
         self.tertiary = tertiary
@@ -30,7 +30,7 @@ public struct WalletActions: View {
     @ViewBuilder private var actions: some View {
         if let tertiary { action(tertiary, prominence: .tertiary) }
         if let secondary { action(secondary, prominence: .secondary) }
-        action(primary, prominence: .primary)
+        if let primary { action(primary, prominence: .primary) }
     }
 
     private func action(_ action: WalletAction, prominence: WalletActionProminence) -> some View {

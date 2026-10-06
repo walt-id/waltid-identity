@@ -10,6 +10,7 @@ public struct OfferedCredentialRow: View {
     private let limit: Int
     private let enabled: Bool
     @State private var showDetails = false
+    @Environment(\.sizeCategory) private var sizeCategory
 
     public init(credential: IssuanceCredentialPreview, issuerName: String, issuerIdentifier: String,
                 copies: Binding<Int>, limit: Int, enabled: Bool) {
@@ -23,17 +24,7 @@ public struct OfferedCredentialRow: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 12) {
-                CredentialSummaryRow(summary: .offered(from: credential))
-                    .accessibilityIdentifier("issuance-identity-\(credential.configurationID)")
-                Toggle(isOn: Binding(get: { copies.wrappedValue > 0 }, set: { copies.wrappedValue = $0 ? 1 : 0 })) {
-                    Text(String(format: String(localized: "Receive %@", bundle: .module), CredentialCardSummary.offered(from: credential).title))
-                }
-                .labelsHidden()
-                .fixedSize()
-                .disabled(!enabled)
-                .accessibilityIdentifier("issuance-select-\(credential.configurationID)")
-            }.padding(16)
+            identity.padding(16)
             if copies.wrappedValue > 0 {
                 if limit > 1 {
                     HStack {
@@ -59,5 +50,41 @@ public struct OfferedCredentialRow: View {
                 OfferedCredentialDetails(credential: credential, issuerName: issuerName, issuerIdentifier: issuerIdentifier)
             }.accessibilityIdentifier("issuance-credential-details")
         }
+    }
+
+    @ViewBuilder private var identity: some View {
+        if #available(iOS 16, *) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { summary; selection(showsLabel: false) }
+                    .fixedSize(horizontal: true, vertical: false)
+                stackedIdentity
+            }
+        } else if sizeCategory.isAccessibilityCategory {
+            stackedIdentity
+        } else {
+            HStack(spacing: 12) { summary; selection(showsLabel: false) }
+        }
+    }
+
+    private var summary: some View {
+        CredentialSummaryRow(summary: .offered(from: credential))
+            .accessibilityIdentifier("issuance-identity-\(credential.configurationID)")
+    }
+
+    private var stackedIdentity: some View {
+        VStack(alignment: .leading, spacing: 8) { summary; selection(showsLabel: true) }
+    }
+
+    @ViewBuilder private func selection(showsLabel: Bool) -> some View {
+        if showsLabel { toggle }
+        else { toggle.labelsHidden().fixedSize() }
+    }
+
+    private var toggle: some View {
+        Toggle(String(localized: "Receive", bundle: .module), isOn: Binding(
+            get: { copies.wrappedValue > 0 }, set: { copies.wrappedValue = $0 ? 1 : 0 }))
+            .accessibilityLabel(String(format: String(localized: "Receive %@", bundle: .module), CredentialCardSummary.offered(from: credential).title))
+            .disabled(!enabled)
+            .accessibilityIdentifier("issuance-select-\(credential.configurationID)")
     }
 }

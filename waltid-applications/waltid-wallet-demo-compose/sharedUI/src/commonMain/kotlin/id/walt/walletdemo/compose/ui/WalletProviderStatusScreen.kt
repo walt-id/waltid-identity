@@ -28,7 +28,7 @@ fun WalletProviderStatusScreen(
 ) {
     WalletReviewHost(WalletReviewPresentation.Sheet, dismissEnabled = enabled, onDismiss = onDismiss) { fill ->
         ReviewScaffold(fillViewport = fill, actions = {
-            WalletActions(WalletAction(if (message == null) "Cancel" else "Close", onClose, enabled = enabled, icon = WalletSymbol.Decline))
+            WalletActions(secondary = WalletAction(if (message == null) "Cancel" else "Close", onClose, enabled = enabled, icon = WalletSymbol.Decline))
         }) {
             Column(Modifier.fillMaxWidth().testTag("wallet.provider.status"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(title, style = MaterialTheme.typography.titleLarge)

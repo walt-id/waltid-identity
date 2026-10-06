@@ -69,12 +69,8 @@ struct ProximityPresentationView: View {
                     presentation: .proximity
                 )
             } else if canCancel {
-                Button("Cancel", action: viewModel.cancel)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.tint)
-                    .padding(.horizontal, 20).frame(minHeight: 44)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .accessibilityIdentifier(WalletAccessibilityID.proximityCancelButton)
+                WalletActions(secondary: WalletAction("Cancel", identifier: WalletAccessibilityID.proximityCancelButton,
+                    perform: viewModel.cancel))
             } else if viewModel.isTerminal {
                 ProximityOutcomeActions(viewModel: viewModel)
             }

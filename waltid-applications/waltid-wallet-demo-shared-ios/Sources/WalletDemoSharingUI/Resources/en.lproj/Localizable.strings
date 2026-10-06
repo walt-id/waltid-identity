@@ -79,4 +79,5 @@
 
 "This request has no signature to verify its sender. Do you want to proceed with the payment you reviewed?" = "This request has no signature to verify its sender. Do you want to proceed with the payment you reviewed?";
 "Expanded" = "Expanded";
+"Receive" = "Receive";
 "Collapsed" = "Collapsed";
