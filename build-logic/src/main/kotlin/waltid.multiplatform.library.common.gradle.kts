@@ -19,6 +19,5 @@ kotlin {
 }
 
 powerAssert {
-    includedSourceSets = listOf("commonTest")
     functions = BuildConstants.POWER_ASSERT_FUNCTIONS
 }

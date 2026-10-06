@@ -38,7 +38,7 @@ kotlin {
             implementation(identityLibs.slf4j.simple)
         }
         jsMain.dependencies {
-            implementation(npm("jose", "5.10.0"))
+            implementation(npm("jose", identityLibs.versions.jose.npm.get()))
         }
     }
 

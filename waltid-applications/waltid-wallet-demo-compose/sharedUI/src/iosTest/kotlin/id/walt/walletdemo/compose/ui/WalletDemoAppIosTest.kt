@@ -15,6 +15,8 @@ class WalletDemoAppIosTest {
 
     private val scenarios = WalletDemoAppTestScenarios { content ->
         // Headless Skiko tests have no UIKit window; reading its fallback display theme can block.
+        // Compose 1.12 has no replacement for this override yet:
+        // https://kotlinlang.org/docs/multiplatform/whats-new-compose-112.html#breaking-changes-and-deprecations
         CompositionLocalProvider(LocalSystemTheme provides SystemTheme.Light, content = content)
     }
 
@@ -158,6 +160,9 @@ class WalletDemoAppIosTest {
     @Test
     fun technicalCopyPreservesFullValueWithoutChangingExpansion() =
         scenarios.technicalCopyPreservesFullValueWithoutChangingExpansion()
+
+    @Test
+    fun copyIsCancelledWhenRowLeavesComposition() = scenarios.copyIsCancelledWhenRowLeavesComposition()
 
     @Test
     fun readerTrustSettingsReviewAndPersistPublicCa() =

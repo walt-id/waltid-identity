@@ -1,7 +1,3 @@
-@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
-
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-
 plugins {
     id("waltid.multiplatform.library")
     id("waltid.publish.maven")
@@ -31,6 +27,7 @@ kotlin {
             api(project(":waltid-libraries:crypto:waltid-crypto2"))
 
             implementation(identityLibs.kotlinx.coroutines.core)
+            implementation(identityLibs.okio)
         }
         commonTest.dependencies {
             implementation(identityLibs.kotlinx.serialization.json)

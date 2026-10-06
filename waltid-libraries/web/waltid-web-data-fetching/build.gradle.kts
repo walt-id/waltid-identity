@@ -31,6 +31,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(identityLibs.bundles.waltid.kotlintesting)
+            implementation(identityLibs.ktor.client.mock)
         }
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)

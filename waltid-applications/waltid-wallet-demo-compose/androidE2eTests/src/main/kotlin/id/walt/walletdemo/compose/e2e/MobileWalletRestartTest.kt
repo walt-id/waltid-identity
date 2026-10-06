@@ -1,11 +1,13 @@
 package id.walt.walletdemo.compose.e2e
 
+import android.os.Build
 import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.Condition
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.Until
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
@@ -13,6 +15,7 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.VERIFIER_POLLIN
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.WALLET_READY_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceTextEquals
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.foregroundWindowSnapshot
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.latestStatus
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
@@ -90,8 +93,24 @@ class MobileWalletRestartTest {
     private fun credentialIds(): Set<String> {
         clickByTag(device, "wallet.tab.credentials")
         val cards = By.res(Pattern.compile("wallet\\.credentialCard\\..*"))
-        assertTrue("Saved credential must remain visible", device.wait(Until.hasObject(cards), UI_ELEMENT_TIMEOUT))
-        return device.findObjects(cards).map { it.resourceName }.toSet().also {
+        val ids = device.wait(Condition<UiDevice, Set<String>?> { currentDevice ->
+            try {
+                // A cached tree can omit cards composed after the new process becomes ready.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    instrumentation.uiAutomation.clearCache()
+                }
+                currentDevice.findObjects(cards).map { it.resourceName }.toSet().takeIf { it.isNotEmpty() }
+            } catch (_: StaleObjectException) {
+                // Reacquire every card if Compose replaces a node while reading the snapshot.
+                null
+            }
+        }, UI_ELEMENT_TIMEOUT)
+        assertTrue(
+            "Saved credential must remain visible" +
+                if (ids == null) "\n${foregroundWindowSnapshot(device)}" else "",
+            ids != null,
+        )
+        return requireNotNull(ids).also {
             assertEquals("The fresh wallet must contain the one issued credential", 1, it.size)
         }
     }

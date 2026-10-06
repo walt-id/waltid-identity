@@ -5,7 +5,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.*
-import io.ktor.utils.io.readRemaining
+import io.ktor.utils.io.readBuffer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.io.readByteArray
@@ -65,7 +65,7 @@ internal class PaymentMetadataFetchSession(
                 }
                 if (!response.status.isSuccess()) consentFailure(PaymentConsentFailure.METADATA_UNAVAILABLE)
                 if ((response.contentLength() ?: 0) > MAX_BYTES) consentFailure(PaymentConsentFailure.METADATA_UNAVAILABLE)
-                val data = response.bodyAsChannel().readRemaining(MAX_BYTES + 1L).readByteArray()
+                val data = response.bodyAsChannel().readBuffer(MAX_BYTES + 1L).readByteArray()
                 if (data.size > MAX_BYTES) consentFailure(PaymentConsentFailure.METADATA_UNAVAILABLE)
                 data
             }

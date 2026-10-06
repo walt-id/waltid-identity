@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 
 plugins {
     id("waltid.full.library")
+    id("waltid.optional-ios-abi")
     id("waltid.publish.maven")
 }
 
