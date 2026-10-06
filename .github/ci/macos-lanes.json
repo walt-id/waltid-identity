@@ -87,9 +87,12 @@
         ".github/actions/gradle-mobile-sdk-docs/*",
         "scripts/check-mobile-swift-parity-decision.sh",
         "docs/mobile-sdk-api/*",
-        "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
-        "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
-        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-*/*",
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*",
+        "waltid-libraries/*/api/*.api",
+        "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/*",
+        "waltid-libraries/crypto/waltid-crypto2*/*",
+        "waltid-libraries/crypto/waltid-jose/*"
       ]
     }
   }

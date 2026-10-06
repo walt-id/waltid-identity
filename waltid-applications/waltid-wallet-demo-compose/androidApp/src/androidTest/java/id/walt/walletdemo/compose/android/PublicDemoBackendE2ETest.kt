@@ -4,6 +4,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.activeWindow
+import androidx.test.uiautomator.waitForStable
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
@@ -221,6 +223,9 @@ class PublicDemoBackendE2ETest {
         )
         assertTrue("Transaction-data preview did not load. Latest status: ${latestStatus(device)}", previewReady)
 
+        val stableWindow = device.activeWindow().waitForStable(stableTimeoutMs = UI_ELEMENT_TIMEOUT)
+        assertTrue("Transaction-data review did not stabilize before capture", !stableWindow.isTimeout)
+        stableWindow.screenshot?.recycle()
         val screenshot = File("/sdcard/Download/wal1077-compose-android-transaction-data.png")
         if (device.takeScreenshot(screenshot)) {
             println("WAL1077_SCREENSHOT=${screenshot.absolutePath}")

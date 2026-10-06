@@ -68,7 +68,7 @@ jobs:
   ios-simulator-tests:
     if: ${{ inputs.run-ios-simulator }}
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 115
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
@@ -81,7 +81,7 @@ jobs:
         uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Compile iOS targets and run Kotlin iOS simulator tests
-        timeout-minutes: 60
+        timeout-minutes: 75
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
@@ -131,7 +131,7 @@ jobs:
   wallet-core-framework:
     if: ${{ inputs.run-native || inputs.run-compose || inputs.run-enterprise || inputs.run-sdk-docs }}
     runs-on: macos-26
-    timeout-minutes: 50
+    timeout-minutes: 70
     outputs:
       checkout-refs: ${{ steps.revisions.outputs.refs }}
       artifact-name: wallet-core-release-${{ github.run_attempt }}
@@ -168,7 +168,7 @@ jobs:
             konan-${{ runner.os }}-${{ runner.arch }}-
       # Concurrent device/simulator links cause heavy swapping on the hosted runner.
       - name: Build the full release WalletCore
-        timeout-minutes: 40
+        timeout-minutes: 60
         working-directory: waltid-identity
         run: |
           exec python3 .github/scripts/mobile-ci/run-ios-phase.py \
@@ -197,7 +197,7 @@ jobs:
     needs: wallet-core-framework
     if: ${{ inputs.run-native || inputs.run-compose }}
     runs-on: macos-26
-    timeout-minutes: 110
+    timeout-minutes: 130
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
@@ -220,8 +220,8 @@ jobs:
         uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Run selected WalletCore consumer tests
-        # Main budgets 60 minutes for demos/providers; allow 40 more for the isolated bridge fixture and tests.
-        timeout-minutes: 100
+        # Keep headroom for all five phases, including cold Compose provider compilation.
+        timeout-minutes: 120
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
@@ -293,6 +293,8 @@ jobs:
           sudo xcode-select -s "$XCODE_DEVELOPER_DIR"
           echo "DEVELOPER_DIR=$XCODE_DEVELOPER_DIR" >> "$GITHUB_ENV"
           xcodebuild -version
+          destination=$(python3 waltid-identity/.github/scripts/mobile-ci/ensure_ios_simulator.py)
+          echo "IOS_SIMULATOR_DESTINATION=$destination" >> "$GITHUB_ENV"
 
       - name: Execute Enterprise iOS mobile platform tests
         id: enterprise_ios_mobile_tests

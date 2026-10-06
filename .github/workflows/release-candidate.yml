@@ -1,6 +1,6 @@
 name: Release candidate on manual push
-# release-evidence.yml in waltid-identity-enterprise finds this run by its name to collect the test results,
-# and the release-sonar-snapshot.yml run dispatched by the sonar-snapshot job by the tag.
+# release-evidence.yml in waltid-identity-enterprise finds this run by the released commit (its head_sha)
+# to collect the test results. run-name just keeps the version visible in the Actions UI.
 run-name: Release candidate ${{ inputs.release_version }}
 
 on:

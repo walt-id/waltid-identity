@@ -30,6 +30,9 @@
 
 ---
 
+For runnable examples of all four Issuer2 offer contracts, both grants, explicit copies and
+deferred resumption, see [Issuer2 offers through Wallet2](examples/issuer2-batch.md).
+
 ## Features
 
 | Area                             | Capability                                                                                                           |

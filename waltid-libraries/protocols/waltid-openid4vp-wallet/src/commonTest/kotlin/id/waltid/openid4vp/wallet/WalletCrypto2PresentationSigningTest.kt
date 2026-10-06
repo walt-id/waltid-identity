@@ -3,6 +3,8 @@
 package id.waltid.openid4vp.wallet
 
 import id.walt.cose.*
+import id.walt.credentials.formats.W3C11
+import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
@@ -13,10 +15,12 @@ import id.walt.crypto2.migration.v1.V1KeyMigration
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
+import id.walt.did.dids.DidService
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
+import id.walt.dcql.models.meta.NoMeta
 import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
@@ -205,6 +209,48 @@ class WalletCrypto2PresentationSigningTest {
             coseCompliantCbor.encodeToByteArray(cleartextTranscript)
                 .contentEquals(coseCompliantCbor.encodeToByteArray(encryptedTranscript))
         )
+    }
+
+    @Test
+    fun `per credential presentation selects key and DID together`() = runTest {
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+        val keys = listOf("default", "selected").map { id ->
+            runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
+                KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY)))
+        }
+        DidService.minimalInit()
+        val dids = keys.map { DidService.registerByKey("key", it).did }
+        val credential = W3C11(credentialData = buildJsonObject {},
+            signature = JwtCredentialSignature("signature", buildJsonObject {}), signed = "issuer.jwt.signature")
+        val query = CredentialQuery("vc", CredentialFormat.JWT_VC_JSON, meta = NoMeta)
+        val matches = mapOf(query.id to listOf(DcqlMatcher.DcqlMatchResult(
+            credential = RawDcqlCredential("credential", CredentialFormat.JWT_VC_JSON.id.first(),
+                buildJsonObject {}, originalCredential = credential),
+            selectedDisclosures = null, originalQuery = query)))
+        suspend fun present(selected: CredentialPresentationKey?) = WalletPresentFunctionality2.generateVpTokenForRequest(
+            authorizationRequest = AuthorizationRequest(clientId = "verifier", nonce = "nonce"),
+            matchedData = matches, holderKey = null, holderDid = dids[0],
+            typeRegistry = TransactionDataTypeRegistry(), verifierJwkThumbprint = null,
+            holderCrypto2Key = keys[0], credentialHolderKeyResolver = { _, _ -> selected },
+        )
+        val missingDid = assertFailsWith<IllegalArgumentException> {
+            present(CredentialPresentationKey(keys[1], did = null))
+        }
+        assertEquals("Missing DID for presentation", missingDid.message)
+        for (selected in listOf(false, true)) {
+            val did = dids[if (selected) 1 else 0]
+            val signingKey = keys[if (selected) 1 else 0]
+            val vpToken = Json.parseToJsonElement(present(
+                if (selected) CredentialPresentationKey(signingKey, did) else null)).jsonObject
+                .getValue("vc").jsonArray.single().jsonPrimitive.content
+            val payload = Json.parseToJsonElement(CompactJws.verify(vpToken, signingKey, JwsAlgorithm.ES256)
+                .payload.decodeToString()).jsonObject
+            assertEquals(did, payload.getValue("iss").jsonPrimitive.content)
+            assertEquals("nonce", payload.getValue("nonce").jsonPrimitive.content)
+            assertFailsWith<Exception> {
+                CompactJws.verify(vpToken, keys[if (selected) 0 else 1], JwsAlgorithm.ES256)
+            }
+        }
     }
 
     @Test

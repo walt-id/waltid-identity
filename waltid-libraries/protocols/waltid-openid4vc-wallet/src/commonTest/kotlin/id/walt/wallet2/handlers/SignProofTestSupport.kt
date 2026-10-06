@@ -20,14 +20,17 @@ internal object SignProofTestSupport {
         proofAlgorithms: Set<String> = setOf("ES256", "EdDSA"),
         bindingMethods: Set<String> = setOf("jwk"),
         requiresKeyAttestation: Boolean = false,
+        batchSize: Int? = null,
     ): HttpClient {
         val algorithmsJson = proofAlgorithms.joinToString(",") { "\"$it\"" }
         val bindingMethodsJson = bindingMethods.joinToString(",") { "\"$it\"" }
         val attestationRequirement = if (requiresKeyAttestation) ",\"key_attestations_required\":{}" else ""
+        val batchMetadata = batchSize?.let { "\"batch_credential_issuance\":{\"batch_size\":$it}," }.orEmpty()
         val body = """
             {
               "credential_issuer":"$ISSUER",
               "credential_endpoint":"$ISSUER/credential",
+              $batchMetadata
               "credential_configurations_supported":{
                 "$configurationId":{
                   "format":"jwt_vc_json",

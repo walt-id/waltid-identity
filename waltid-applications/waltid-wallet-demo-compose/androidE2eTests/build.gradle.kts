@@ -26,7 +26,8 @@ android {
         sourceCompatibility = javaVersion
         targetCompatibility = javaVersion
     }
-    sourceSets["main"].kotlin.srcDir("../androidTestFixtures/kotlin")
+    packaging.resources.merges.add("META-INF/LICENSE.md")
+    sourceSets["main"].kotlin.directories.add("../androidTestFixtures/kotlin")
 }
 
 dependencies {
