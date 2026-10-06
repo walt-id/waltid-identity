@@ -129,6 +129,19 @@ Issuance uses DPoP consistently for authorization binding, token exchange, and
 protected credential requests whenever the authorization server advertises
 supported DPoP signing algorithms.
 
+## Batch issuance
+
+Pass `[IssuanceCredentialSelection]` to `continuePreAuthorizedIssuance` or
+`beginAuthorizationIssuance`. Each selection contains a configuration and explicit
+`IssuanceHolderBinding` entries, one per requested copy. Omission still requests one
+copy; `session.offer.batchSize` only limits explicit requests. Create extra keys with
+`createIssuanceHolderKeys(count:)` after user acceptance, or reuse existing wallet keys.
+
+Failed outcomes retain stored IDs, deferred handles and target failure details. Recover
+pending handles after restart with `listDeferredIssuance()` and honor their polling
+intervals. See [Issuing Credentials](Sources/WalletSDK/Documentation.docc/IssuingCredentials.md)
+for both grants and partial-result handling.
+
 ## In-person proximity presentation
 
 Use the Swift-native proximity API for ISO/IEC 18013-5 device engagement and

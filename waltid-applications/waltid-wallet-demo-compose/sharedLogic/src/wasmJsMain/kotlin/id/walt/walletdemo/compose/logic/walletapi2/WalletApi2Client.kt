@@ -17,6 +17,7 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.encodeURLPathPart
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
@@ -58,6 +59,14 @@ internal class WalletApi2Client(
     suspend fun listKeys(walletId: String): List<WalletKeyInfo> =
         request { get("/wallet/$walletId/keys") }.body()
 
+    suspend fun deleteKey(walletId: String, keyId: String) {
+        request(HttpStatusCode.NoContent) { delete("/wallet/$walletId/keys/$keyId") }
+    }
+
+    suspend fun deleteDid(walletId: String, did: String) {
+        request(HttpStatusCode.NoContent) { delete("/wallet/$walletId/dids/$did") }
+    }
+
     suspend fun setDefaultKey(walletId: String, keyId: String) {
         request(HttpStatusCode.NoContent) { put("/wallet/$walletId/keys/$keyId/set-default") }
     }
@@ -93,9 +102,9 @@ internal class WalletApi2Client(
         }
     }
 
-    suspend fun resolveOffer(walletId: String, offerUrl: String): ResolveOfferDetailedResponseDto =
+    suspend fun resolveOffer(walletId: String, offerUrl: String): ResolveBatchOfferResponseDto =
         request {
-            post("/wallet/$walletId/credentials/receive/resolve-offer") {
+            post("/wallet/$walletId/credentials/receive/resolve-offer/batch") {
                 jsonBody(OfferUrlRequest(offerUrl))
             }
         }.body()
@@ -106,8 +115,9 @@ internal class WalletApi2Client(
         txCode: String?,
         did: String?,
         redirectUri: String,
+        credentials: List<IssuanceCredentialSelectionDto>,
     ): ReceiveCredentialResultDto =
-        request {
+        receiveResult {
             post("/wallet/$walletId/credentials/receive") {
                 jsonBody(
                     ReceiveCredentialRequestDto(
@@ -115,22 +125,25 @@ internal class WalletApi2Client(
                         txCode = txCode,
                         did = did,
                         redirectUri = redirectUri,
+                        credentials = credentials,
                     ),
                 )
             }
-        }.body()
+        }
 
     suspend fun authorizationUrl(
         walletId: String,
         offerUrl: String,
         redirectUri: String,
+        credentialConfigurationIds: List<String>,
     ): GenerateAuthorizationUrlResultDto =
         request {
-            post("/wallet/$walletId/credentials/receive/authorization-url") {
+            post("/wallet/$walletId/credentials/receive/authorization-url/batch") {
                 jsonBody(
                     GenerateAuthorizationUrlRequestDto(
                         offerUrl = offerUrl,
                         redirectUri = redirectUri,
+                        credentialConfigurationIds = credentialConfigurationIds,
                     ),
                 )
             }
@@ -140,9 +153,28 @@ internal class WalletApi2Client(
         walletId: String,
         request: ReceiveAuthorizedCredentialRequestDto,
     ): ReceiveCredentialResultDto =
+        receiveResult {
+            post("/wallet/$walletId/credentials/receive/authorized/batch") { jsonBody(request) }
+        }
+
+    suspend fun listDeferred(walletId: String): List<DeferredCredentialHandleDto> =
+        request { get("/wallet/$walletId/credentials/receive/deferred") }.body()
+
+    suspend fun resumeDeferred(walletId: String, deferredCredentialId: String): DeferredIssuanceOutcomeDto =
         request {
-            post("/wallet/$walletId/credentials/receive/authorized") { jsonBody(request) }
+            post("/wallet/$walletId/credentials/receive/deferred/${deferredCredentialId.encodeURLPathPart()}")
         }.body()
+
+    private suspend fun receiveResult(block: suspend HttpClient.() -> HttpResponse): ReceiveCredentialResultDto {
+        val response = http.block()
+        if (response.status.isSuccess()) return response.body()
+        val body = response.bodyAsText()
+        if (response.status.value in setOf(422, 500, 502)) {
+            val result = runCatching { walletApi2Json.decodeFromString<ReceiveCredentialResultDto>(body) }.getOrNull()
+            if (result?.failure != null) return result
+        }
+        throw WalletApi2Exception(response.status, "Wallet API ${response.status.value}: ${body.ifBlank { response.status.description }}")
+    }
 
     suspend fun previewPresentation(
         walletId: String,

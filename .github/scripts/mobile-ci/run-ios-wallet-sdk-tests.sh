@@ -104,6 +104,7 @@ WALLET_SDK_BRIDGE_FIXTURES=1 xcodebuild test \
   -workspace "$root/WalletSDK.xcworkspace" -scheme WalletSDKTests \
   -destination "$destination" \
   -only-testing:WalletSDKTests/WalletAPITests \
+  -only-testing:WalletSDKTests/IssuanceBridgeContractTests \
   -only-testing:WalletSDKTests/KMPKeyAttestationProviderTests \
   -only-testing:WalletSDKTests/KMPProximityProjectionTests \
   -only-testing:WalletSDKTests/ProximityBridgeContractTests \
@@ -131,4 +132,7 @@ xcresultparser "$run_dir/Tests.xcresult" --output-format=junit > "$run_dir/resul
 python3 "$script_dir/verify_test_results.py" \
   --manifest "$script_dir/proximity-test-suites.json" --suite swift-bridge \
   --reports "$run_dir/results.xml" | tee "$run_dir/discovery.json" || test_status=1
+python3 "$script_dir/verify_test_results.py" \
+  --manifest "$script_dir/wallet-batch-test-suites.json" --suite swift-batch-bridge \
+  --reports "$run_dir/results.xml" | tee "$run_dir/batch-discovery.json" || test_status=1
 exit "$test_status"

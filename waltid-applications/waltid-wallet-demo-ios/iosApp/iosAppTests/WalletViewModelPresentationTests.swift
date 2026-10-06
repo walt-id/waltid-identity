@@ -360,6 +360,9 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertNil(viewModel.pendingPresentationFormPostHTML)
         XCTAssertFalse(viewModel.presentationCompleted)
         XCTAssertEqual(viewModel.auth, .unlocked)
+        XCTAssertFalse(viewModel.isReady)
+        XCTAssertTrue(viewModel.credentials.isEmpty)
+        XCTAssertTrue(viewModel.keyID.isEmpty)
     }
 
     @MainActor

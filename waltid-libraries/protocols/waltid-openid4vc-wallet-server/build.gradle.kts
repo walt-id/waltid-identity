@@ -31,6 +31,9 @@ dependencies {
 
     // Tests
     testImplementation(kotlin("test"))
+    testImplementation(identityLibs.ktor.server.test.host)
+    testImplementation(identityLibs.ktor.client.mock)
+    testImplementation(identityLibs.ktor.client.content.negotiation)
     testImplementation(identityLibs.kotlinx.coroutines.test)
 }
 

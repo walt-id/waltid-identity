@@ -1,0 +1,301 @@
+package id.walt.wallet2.handlers
+
+import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.MdocsCredential
+import id.walt.credentials.formats.DigitalCredential
+import id.walt.did.dids.DidService
+import id.walt.openid4vci.CryptographicBindingMethod
+import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
+import id.walt.crypto2.keys.toPublicJwk
+import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto2.jose.selectJwsAlgorithm
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
+import id.walt.openid4vci.requests.authorization.AuthorizationDetail
+import id.walt.wallet2.data.*
+import id.waltid.openid4vci.wallet.credential.CredentialIssuanceTarget
+import id.waltid.openid4vci.wallet.credential.CredentialRequestBuilder
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.*
+import kotlin.time.Clock
+import kotlin.uuid.Uuid
+
+/**
+ * One requested instance. Storage-producing flows require [keyId] or the wallet's default key.
+ * Inline [key] is only supported by isolated proof operations, even when it matches a stored key.
+ * Key references are resolved by the wallet, never generated implicitly; copies require distinct public keys.
+ */
+@Serializable
+data class CredentialHolderBinding(
+    val keyId: String? = null,
+    val did: String? = null,
+    val key: DirectSerializedKey? = null,
+) {
+    init {
+        require(key == null || keyId == null) { "Specify an inline holder key or a holder key ID, not both" }
+        require(keyId == null || keyId.isNotBlank()) { "Holder key ID must not be blank" }
+        require(did == null || did.isNotBlank()) { "Holder DID must not be blank" }
+    }
+}
+
+/** One configuration/dataset request; holderBindings determines its requested instance count. */
+@Serializable
+data class WalletCredentialSelection(
+    val credentialConfigurationId: String,
+    val credentialIdentifier: String? = null,
+    val holderBindings: List<CredentialHolderBinding> = listOf(CredentialHolderBinding()),
+) {
+    init {
+        require(credentialConfigurationId.isNotBlank())
+        require(credentialIdentifier == null || credentialIdentifier.isNotBlank())
+        require(holderBindings.isNotEmpty()) { "At least one holder binding is required" }
+        require(holderBindings.none { it.key != null }) { "Stored selections require wallet-owned holder keys" }
+    }
+}
+
+internal data class ResolvedCredentialHolderBinding(
+    val material: WalletKeyStoreEntry,
+    val did: String?,
+)
+
+internal data class ResolvedWalletCredentialSelection(
+    val selection: WalletCredentialSelection,
+    val bindings: List<ResolvedCredentialHolderBinding>,
+)
+
+internal suspend fun Wallet.resolveCredentialSelections(
+    selections: List<WalletCredentialSelection>?,
+    offeredConfigurationIds: List<String>,
+    metadata: CredentialIssuerMetadata,
+    defaultKey: WalletKeyStoreEntry,
+    defaultDid: String?,
+): List<ResolvedWalletCredentialSelection> {
+    val selected = selections ?: offeredConfigurationIds.map { WalletCredentialSelection(it) }
+    require(selected.isNotEmpty()) { "At least one credential must be selected" }
+    require(selected.map { it.credentialConfigurationId to it.credentialIdentifier }.distinct().size == selected.size) {
+        "Select each configuration/dataset once; use holderBindings for multiple instances"
+    }
+    require(selected.groupBy { it.credentialConfigurationId }.values.none { group ->
+        group.size > 1 && group.any { it.credentialIdentifier == null }
+    }) { "Do not combine a whole configuration selection with its individual dataset identifiers" }
+    return selected.map { selection ->
+        require(selection.credentialConfigurationId in offeredConfigurationIds) { "Selected credential is not offered" }
+        val configuration = requireNotNull(metadata.credentialConfigurationsSupported[selection.credentialConfigurationId])
+        val bindings = resolveProofHolderBindings(selection.holderBindings, metadata, configuration, defaultKey, defaultDid)
+            .also { it.requireStoredHolderKeys() }
+        ResolvedWalletCredentialSelection(selection, bindings)
+    }
+}
+
+/** Isolated proof holders may be inline; storing selections validate wallet ownership separately. */
+internal suspend fun Wallet.resolveProofHolderBindings(
+    holders: List<CredentialHolderBinding>,
+    metadata: CredentialIssuerMetadata,
+    configuration: CredentialConfiguration,
+    defaultKey: WalletKeyStoreEntry,
+    defaultDid: String?,
+): List<ResolvedCredentialHolderBinding> {
+    CredentialRequestBuilder.validateBatchSize(metadata, holders.size)
+    require(holders.size == 1 || supportedJwtProofAlgorithms(configuration.proofTypesSupported, attachedKeyAttestationProvider() != null) != null) {
+        "Multiple instances require an advertised JWT proof type"
+    }
+    val bindings = holders.map { binding ->
+        val material = binding.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
+            ?: binding.keyId?.let { requireNotNull(resolveKeyMaterial(it, setOf(KeyUsage.SIGN))) { "Holder key '$it' is unavailable" } }
+            ?: defaultKey
+        require(configuration.proofTypesSupported?.get("jwt")?.keyAttestationsRequired == null || material.crypto2Key != null) {
+            "Key attestation requires a Crypto2 holder key"
+        }
+        supportedJwtProofAlgorithms(configuration.proofTypesSupported, attachedKeyAttestationProvider() != null)?.let { algorithms ->
+            if (material.crypto2Key != null) material.crypto2Key.selectJwsAlgorithm(algorithms)
+            else require(requireNotNull(material.legacyKey).keyType.jwsAlg in algorithms) {
+                "Issuer does not support the selected holder key's proof algorithm"
+            }
+        }
+        ResolvedCredentialHolderBinding(material, resolveProofDid(
+            binding.did ?: defaultDid.takeIf { material.keyId == defaultKey.keyId }, material, configuration))
+    }
+    bindings.requireDistinctHolderKeys()
+    return bindings
+}
+
+/** Resolve isolated storage inputs before consuming a credential or deferred response. */
+internal suspend fun Wallet.resolveStoredCredentialBindings(
+    holders: List<CredentialHolderBinding>,
+    keyId: String?,
+    proofRequired: Boolean,
+): List<ResolvedCredentialHolderBinding> {
+    require(holders.isNotEmpty()) { "At least one holder binding is required" }
+    require(holders.none { it.key != null }) {
+        "Wallet storage requires holder keys selected by wallet key ID; inline holder keys are only supported by isolated proof operations"
+    }
+    val defaultKey = resolveKeyMaterial(keyId, setOf(KeyUsage.SIGN))
+    require(keyId == null || defaultKey != null) { "Holder key '$keyId' is unavailable" }
+    return holders.mapNotNull { binding ->
+        val material = binding.keyId?.let {
+            requireNotNull(resolveKeyMaterial(it, setOf(KeyUsage.SIGN))) { "Holder key '$it' is unavailable" }
+        } ?: defaultKey
+        if (material == null) {
+            require(!proofRequired && holders.size == 1 && binding.did == null) { "Holder keys are unavailable" }
+            null
+        } else ResolvedCredentialHolderBinding(material, binding.did)
+    }.also {
+        it.requireStoredHolderKeys()
+        it.requireDistinctHolderKeys()
+    }
+}
+
+/** A storage-producing flow must reject process-local keys before consuming authorization. */
+internal fun List<ResolvedCredentialHolderBinding>.requireStoredHolderKeys() {
+    require(all { it.material.keyReference != null }) {
+        "Wallet storage requires holder keys selected by wallet key ID; inline holder keys are only supported by isolated proof operations"
+    }
+}
+
+/** Key aliases do not create distinct copies: compare public identities, not key IDs. */
+internal suspend fun List<ResolvedCredentialHolderBinding>.requireDistinctHolderKeys() {
+    if (size > 1) require(map { it.material.publicKeyThumbprint() }.distinct().size == size) {
+        "Each credential copy requires a distinct holder key"
+    }
+}
+
+internal data class ResolvedCredentialIssuanceTarget(
+    val target: CredentialIssuanceTarget,
+    val selection: ResolvedWalletCredentialSelection,
+)
+
+internal fun grantedCredentialSelections(
+    metadata: CredentialIssuerMetadata,
+    selections: List<ResolvedWalletCredentialSelection>,
+    authorizationDetails: List<AuthorizationDetail>?,
+    scope: String?,
+): List<ResolvedCredentialIssuanceTarget> {
+    val targets = CredentialRequestBuilder.resolveTargets(metadata,
+        selections.map { it.selection.credentialConfigurationId }.distinct(), authorizationDetails, scope)
+    return selections.flatMap { selected ->
+        val matches = targets.filter {
+            it.credentialConfigurationId == selected.selection.credentialConfigurationId &&
+                (selected.selection.credentialIdentifier == null || it.credentialIdentifier == selected.selection.credentialIdentifier)
+        }
+        require(selected.selection.credentialIdentifier == null || matches.isNotEmpty()) { "Selected credential identifier was not granted" }
+        matches.map { ResolvedCredentialIssuanceTarget(it, selected) }
+    }.also { require(it.isNotEmpty()) { "Token grants none of the selected credentials" } }
+}
+
+/**
+ * Validate the entire response before the first write. Issuers may return fewer instances or reorder
+ * them. Match by cryptographic holder binding, not by array position, then persist each independently.
+ * Only proof-bound requests impose one credential per supplied key; proofless response arrays
+ * do not acquire a count limit or holder binding from the wallet's default key.
+ */
+internal suspend fun Wallet.prepareIssuedCredentials(
+    rawCredentials: List<String>,
+    bindings: List<ResolvedCredentialHolderBinding>,
+    label: String?,
+    metadata: JsonObject?,
+    proofRequired: Boolean,
+    holderBindingKnown: Boolean = true,
+    expectedConfiguration: CredentialConfiguration? = null,
+): List<StoredCredential> {
+    require(rawCredentials.isNotEmpty()) { "Credential response contained no credentials" }
+    require(!proofRequired || rawCredentials.size <= bindings.size) { "Issuer returned more credentials than requested" }
+    require(bindings.isNotEmpty() || !proofRequired) { "Holder keys are required for proof-bound issuance" }
+    val remaining = bindings.toMutableList()
+    val parsedCredentials = rawCredentials.map { CredentialParser.detectAndParse(it).second }
+    require(parsedCredentials.map { it.format }.distinct().size == 1) {
+        "Credentials in one response must share the same format"
+    }
+    expectedConfiguration?.let { configuration ->
+        parsedCredentials.forEach { it.requireRequestedConfiguration(configuration) }
+    }
+    return parsedCredentials.map { parsed ->
+        require(holderBindingKnown || parsed !is MdocsCredential) {
+            "Exact issuance holder-key material is required when storing an mdoc"
+        }
+        // A subject DID is not proof of holder binding in a proofless W3C issuance.
+        val identities = parsed.holderKeyThumbprints(includeSubjectDid = proofRequired)
+        require("cnf" !in parsed.credentialData || identities.isNotEmpty()) {
+            "Issued credential contains an unsupported or invalid holder confirmation"
+        }
+        if (bindings.isEmpty()) {
+            require(parsed !is MdocsCredential) { "Exact issuance holder-key material is required when storing an mdoc" }
+            require(identities.isEmpty()) { "Issued credential is bound to an unrequested holder key" }
+            return@map StoredCredential(Uuid.random().toString(), parsed, label, Clock.System.now(), metadata)
+        }
+        val match = if (identities.isEmpty()) {
+            require(!proofRequired) { "Issued credential contains no verifiable holder binding" }
+            remaining.first()
+        } else {
+            remaining.firstOrNull { it.material.publicKeyThumbprint() in identities }
+                ?: error("Issued credential is bound to an unrequested holder key")
+        }
+        if (proofRequired) remaining.remove(match)
+        val stored = StoredCredential(Uuid.random().toString(), parsed, label, Clock.System.now(), metadata)
+        if (identities.isEmpty()) stored else withVerifiedIssuanceHolderKeyBinding(stored, match.material)
+    }
+}
+
+/** Choose a DID only when its verification method belongs to the selected key. */
+private suspend fun Wallet.resolveProofDid(did: String?, material: WalletKeyStoreEntry, configuration: CredentialConfiguration): String? {
+    if (supportedJwtProofAlgorithms(configuration.proofTypesSupported, attachedKeyAttestationProvider() != null) == null) return null
+    val methods = configuration.cryptographicBindingMethodsSupported.orEmpty()
+    val permitsJwk = methods.isEmpty() || methods.any { it is CryptographicBindingMethod.Jwk || it is CryptographicBindingMethod.CoseKey }
+    val method = did?.removePrefix("did:")?.substringBefore(':')
+    val permitsDid = method != null && methods.any { it is CryptographicBindingMethod.Did && it.method == method }
+    if (did != null && permitsDid) {
+        val baseDid = did.substringBefore('#')
+        val document = didStore?.getDid(baseDid)?.document
+        if (document != null) {
+            val publicJwk = material.crypto2Key?.let {
+                val encoded = it.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(it.spec)
+                Json.parseToJsonElement(encoded.data.toByteArray().decodeToString()).jsonObject
+            } ?: material.legacyKey!!.getPublicKey().exportJWKObject()
+            val fields = when (publicJwk["kty"]?.jsonPrimitive?.content) {
+                "EC" -> listOf("kty", "crv", "x", "y")
+                "OKP" -> listOf("kty", "crv", "x")
+                "RSA" -> listOf("kty", "n", "e")
+                else -> emptyList()
+            }
+            document["verificationMethod"]?.jsonArray?.forEach { entry ->
+                val vm = entry.jsonObject
+                val id = vm["id"]?.jsonPrimitive?.content ?: return@forEach
+                val key = vm["publicKeyJwk"]?.jsonObject ?: return@forEach
+                if (('#' !in did || id == did) && fields.isNotEmpty() && fields.all { key[it] != null && key[it] == publicJwk[it] }) return id
+            }
+        } else if (staticDid?.substringBefore('#') == baseDid && staticKey?.publicKeyThumbprint() == material.publicKeyThumbprint()) {
+            return did
+        } else {
+            val keys = DidService.resolveToKeys(did).getOrNull().orEmpty()
+            if (keys.any { it.publicKeyThumbprint() == material.publicKeyThumbprint() }) {
+                return DidService.resolveAuthenticationMethodId(did, material.keyId)
+            }
+        }
+    }
+    require(permitsJwk) { "Issuer requires a DID bound to the selected holder key" }
+    return null
+}
+
+/** Check the requested credential kind independently of its holder-key association. */
+private fun DigitalCredential.requireRequestedConfiguration(configuration: CredentialConfiguration) {
+    require(format == configuration.format.value) {
+        "Issued credential format does not match the selected configuration"
+    }
+    configuration.vct?.takeIf { format == "dc+sd-jwt" }?.let { expected ->
+        require(credentialData["vct"]?.jsonPrimitive?.contentOrNull == expected) {
+            "Issued credential vct does not match the selected configuration"
+        }
+    }
+    configuration.doctype?.takeIf { format == "mso_mdoc" }?.let { expected ->
+        require(this is MdocsCredential && docType == expected) {
+            "Issued credential document type does not match the selected configuration"
+        }
+    }
+    configuration.credentialDefinition?.type?.takeIf { format in setOf("jwt_vc_json", "jwt_vc_json-ld", "jwt_vc", "ldp_vc") }?.let { expected ->
+        val types = when (val value = credentialData["type"]) {
+            is JsonArray -> value.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+            is JsonPrimitive -> listOfNotNull(value.contentOrNull)
+            else -> emptyList()
+        }
+        require(types.containsAll(expected)) { "Issued credential types do not match the selected configuration" }
+    }
+}
