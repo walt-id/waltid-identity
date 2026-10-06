@@ -5,7 +5,7 @@ import XCTest
 final class MockWalletUITests: XCTestCase {
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
-    func testPinCreationRequiresSixDigitsAndMatchingConfirmationOnOneScreen() {
+    func testPinCreationRequiresFourDigitsAndMatchingConfirmationOnOneScreen() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         app.launchEnvironment = ["E2E_WALLET_ID": "pin-form-\(UUID().uuidString)", "E2E_MOCK_WALLET": "1",
@@ -15,17 +15,17 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         XCTAssertTrue(app.secureTextFields["wallet.pinConfirmationInput"].exists)
         XCTAssertTrue(app.switches["wallet.pinBiometricToggle"].exists)
-        ui.replaceText(in: input, value: "1234")
+        ui.replaceText(in: input, value: "12")
         XCTAssertFalse(app.buttons["wallet.pinSubmitButton"].isEnabled)
-        ui.replaceText(in: input, value: "123456")
+        ui.replaceText(in: input, value: "1234")
         XCTAssertFalse(app.buttons["wallet.pinSubmitButton"].isEnabled)
         let confirmation = ui.textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
         XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
         XCTAssertTrue(input.exists)
-        ui.replaceText(in: confirmation, value: "654321")
+        ui.replaceText(in: confirmation, value: "4321")
         ui.tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Continue")
         XCTAssertTrue(app.staticTexts["PIN confirmation does not match"].waitForExistence(timeout: 5))
-        ui.replaceText(in: confirmation, value: "123456")
+        ui.replaceText(in: confirmation, value: "1234")
         ui.tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Continue")
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10), "Wallet ready")
     }

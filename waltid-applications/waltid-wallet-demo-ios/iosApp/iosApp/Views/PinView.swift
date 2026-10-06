@@ -12,7 +12,7 @@ struct PinView: View {
                 Text(branding.appTitle).font(.title2.weight(.semibold))
                 VStack(alignment: .leading, spacing: 8) {
                     Text(isSetup ? "Create a PIN" : "Enter your PIN").font(.largeTitle.weight(.bold))
-                    Text(isSetup ? "Choose six digits and enter them again to confirm."
+                    Text(isSetup ? "Choose four digits and enter them again to confirm."
                          : "Enter your PIN to unlock this wallet.").foregroundColor(.secondary)
                 }
                 WalletSection {
@@ -83,7 +83,7 @@ struct PinView: View {
 
     private func pinBinding(for input: Input) -> Binding<String> {
         Binding(get: { input == .confirmation ? viewModel.pinConfirmation : viewModel.pin }, set: { value in
-            let digits = String(value.filter { $0 >= "0" && $0 <= "9" }.prefix(isSetup ? 6 : 8))
+            let digits = String(value.filter { $0 >= "0" && $0 <= "9" }.prefix(WalletViewModel.pinLength))
             guard digits != (input == .confirmation ? viewModel.pinConfirmation : viewModel.pin) else { return }
             viewModel.pinError = nil
             if input == .confirmation { viewModel.pinConfirmation = digits } else { viewModel.pin = digits }
@@ -100,7 +100,7 @@ struct PinView: View {
 
     private var primary: WalletAction {
         WalletAction(isSetup ? "Create PIN" : "Unlock",
-            enabled: !viewModel.isAuthenticating && (!isSetup || (viewModel.pin.count == 6 && viewModel.pinConfirmation.count == 6)),
+            enabled: !viewModel.isAuthenticating && (!isSetup || (viewModel.pin.count == WalletViewModel.pinLength && viewModel.pinConfirmation.count == WalletViewModel.pinLength)),
             identifier: WalletAccessibilityID.pinSubmitButton) {
             focusedInput = nil
             viewModel.submitPin()
