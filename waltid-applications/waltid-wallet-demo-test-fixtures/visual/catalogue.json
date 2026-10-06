@@ -9,7 +9,7 @@
       "suite": "id.walt.walletdemo.compose.ui.WalletVisualAndroidTest"
     },
     "compose-ios": {
-      "environment": "Compose 1.11.1 / iOS 26.5 / headless Skia / density 1 / 393x852 / light",
+      "environment": "Compose 1.12.1 / iOS 26.5 / headless Skia / density 1 / 393x852 / light",
       "baselineDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light",
       "resultDirectory": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/roborazzi/iosSimulatorArm64/results",
       "junit": "waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results/iosSimulatorArm64Test/TEST-iosSimulatorArm64Test.id.walt.walletdemo.compose.ui.WalletVisualIosTest.xml",
