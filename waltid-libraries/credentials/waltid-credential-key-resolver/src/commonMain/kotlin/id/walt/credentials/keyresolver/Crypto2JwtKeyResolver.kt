@@ -9,7 +9,9 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.did.dids.resolver.Crypto2DidKeyResolver
+import id.walt.did.dids.resolver.DidDocumentCrypto2KeyResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
@@ -34,11 +36,12 @@ fun interface Crypto2JwtVerificationKeyResolver {
 }
 
 class Crypto2JwtKeyResolver(
-    private val didResolver: Crypto2DidKeyResolver = Crypto2DidKeyResolver { did ->
-        DidService.resolveToCrypto2Keys(did).getOrThrow()
-    },
+    private val didResolver: Crypto2DidKeyResolver = DidDocumentCrypto2KeyResolver(
+        resolveDocument = { did -> DidService.resolve(did) },
+    ),
     private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
     private val allowInlineJwk: Boolean = false,
+    private val didVerificationRelationship: VerificationRelationshipType? = null,
 ) : Crypto2JwtVerificationKeyResolver {
     override suspend fun resolveFromJwt(jwtHeader: JsonObject?, jwtPayload: JsonObject): ResolvedJwtVerificationKey? {
         val signerIdentifier = extractSignerIdentifier(jwtPayload)
@@ -47,7 +50,7 @@ class Crypto2JwtKeyResolver(
             when {
                 // 1. DID resolution is authoritative for DID issuer identifiers.
                 signerIdentifier != null && DidUtils.isDidUrl(signerIdentifier) -> {
-                    val key = resolveFromDid(signerIdentifier, kid)
+                    val key = resolveFromDid(signerIdentifier, kid, didVerificationRelationship)
                     ResolvedJwtVerificationKey(key, JwtKeyResolutionSource.DID, signerIdentifier, kid)
                 }
                 // 2. Inline X.509 certificate chain.
@@ -88,8 +91,17 @@ class Crypto2JwtKeyResolver(
         }
     }
 
-    suspend fun resolveFromDid(did: String, keyId: String? = null): Key =
-        selectDidKey(didResolver.resolveToKeys(did), did, keyId)
+    suspend fun resolveFromDid(
+        did: String,
+        keyId: String? = null,
+        relationship: VerificationRelationshipType? = null,
+    ): Key {
+        val resolutionKeyId = keyId.takeUnless {
+            did.startsWith("did:jwk:") || (did.startsWith("did:key:") && keyId == did)
+        }
+        val keys = didResolver.resolveToKeys(did, resolutionKeyId, relationship)
+        return selectDidKey(keys, did, keyId)
+    }
 
     private suspend fun resolveX5c(
         x5c: JsonArray,
