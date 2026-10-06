@@ -35,3 +35,5 @@ Committed PNGs are synthetic test assets. Generated reports and diffs stay under
 Add shared data only for a distinct risk. Render the real component through `WalletVisualScenarios` and/or `WalletVisualTests`, assert its content/actions, and wait for asynchronous readiness. Add the stable state ID, test method, requirement IDs and exact renderer applicability to the catalogue. Record on the pinned environment, inspect and verify. Include compact, large-text, dark, RTL or other variants where they expose a different layout risk instead of multiplying every state by every configuration.
 
 Simulator pixels do not prove external activity/scene lifecycle, OS-owned DC API sheets, signing, physical BLE/NFC or TS-12 conformance. Keep those evidence lanes explicit.
+
+Native comparison normalizes both PNGs to the same representation and bounds SF Symbol edge noise to 5/255 per sRGB channel, with equal dimensions and no ignored percentage of pixels. This reuses the catalogue comparison contract; recording never implies acceptance.
