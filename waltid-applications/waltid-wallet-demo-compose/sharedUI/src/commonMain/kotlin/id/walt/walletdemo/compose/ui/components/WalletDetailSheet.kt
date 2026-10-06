@@ -67,7 +67,7 @@ internal fun WalletDetailSheet(
                 ) { pageKey ->
                     NavEntry(pageKey) {
                         savedPages.SaveableStateProvider(pageKey) {
-                            Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp),
+                            Column(Modifier.fillMaxSize().walletNavigationBackground().verticalScroll(rememberScrollState()).padding(20.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp)) { content(pageKey) }
                         }
                     }

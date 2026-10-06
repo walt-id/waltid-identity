@@ -51,6 +51,7 @@ import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
 import id.walt.walletdemo.compose.ui.components.CredentialTechnicalInformation
 import id.walt.walletdemo.compose.ui.components.Id1AspectRatio
 import id.walt.walletdemo.compose.ui.components.walletNavigationMotion
+import id.walt.walletdemo.compose.ui.components.walletNavigationBackground
 import id.walt.walletdemo.compose.ui.plainTextClipEntry
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -138,6 +139,7 @@ internal fun CredentialsTab(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .walletNavigationBackground()
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = 20.dp)
                         .padding(top = 8.dp, bottom = 20.dp),

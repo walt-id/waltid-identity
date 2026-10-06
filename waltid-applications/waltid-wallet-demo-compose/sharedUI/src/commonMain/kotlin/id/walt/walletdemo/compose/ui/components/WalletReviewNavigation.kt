@@ -102,10 +102,10 @@ internal fun WalletReviewNavigationHost(
                 val selectedDisclosures = latestDisclosures
                 val enabled = latestEnabled
                 savedPages.SaveableStateProvider("$requestKey:$key") {
-                    if (key == "review") latestContent()
+                    if (key == "review") Box(Modifier.fillMaxWidth().walletNavigationBackground()) { latestContent() }
                     else {
                         val displayedPage = CredentialInformationPage.valueOf(key.substringAfterLast(':'))
-                        Column(Modifier.fillMaxSize().testTag(if (offered != null || stored != null) "issuance-credential-details" else WalletUiTestTags.PresentationClaimsDialog)) {
+                        Column(Modifier.fillMaxSize().walletNavigationBackground().testTag(if (offered != null || stored != null) "issuance-credential-details" else WalletUiTestTags.PresentationClaimsDialog)) {
                             WalletScreenHeader(credentialInformationTitle(displayedPage), leading = {
                                 IconButton(onClick = back, modifier = Modifier.testTag("wallet-detail-back")) {
                                     Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
