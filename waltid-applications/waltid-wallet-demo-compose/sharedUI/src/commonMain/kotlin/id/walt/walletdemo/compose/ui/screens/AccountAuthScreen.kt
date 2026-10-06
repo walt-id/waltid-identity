@@ -115,11 +115,11 @@ fun AccountAuthScreen(
                     primary = WalletAction(
                         stringResource(if (isBusy) Res.string.account_working else Res.string.account_sign_in),
                         { onLogin(email.trim(), password) }, canSubmit,
-                        WalletUiTestTags.AccountLoginButton, WalletSymbol.Lock,
+                        WalletUiTestTags.AccountLoginButton,
                     ),
                     secondary = if (allowRegister) WalletAction(stringResource(Res.string.account_create),
                         { onRegister(email.trim(), password) }, canSubmit,
-                        WalletUiTestTags.AccountRegisterButton, WalletSymbol.Next) else null,
+                        WalletUiTestTags.AccountRegisterButton) else null,
                 )
             }
         }

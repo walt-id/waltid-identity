@@ -26,8 +26,7 @@ internal fun WalletOpeningScreen(failure: String?, onRetry: () -> Unit) {
         } else {
             Text("Could not open your wallet", style = MaterialTheme.typography.titleLarge)
             Text(failure, Modifier.testTag(WalletUiTestTags.Status), style = MaterialTheme.typography.bodyMedium)
-            WalletActions(primary = WalletAction("Retry opening wallet", onRetry, testTag = "wallet.openingRetry",
-                icon = id.walt.walletdemo.compose.ui.components.WalletSymbol.Retry))
+            WalletActions(primary = WalletAction("Retry opening wallet", onRetry, testTag = "wallet.openingRetry"))
         }
     }
 }

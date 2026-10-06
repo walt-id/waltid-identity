@@ -27,6 +27,7 @@ import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.canDismissExternalFlow
 import id.walt.walletdemo.compose.ui.screens.WalletExternalFlowScreen
 import id.walt.walletdemo.compose.ui.screens.PinScreen
+import id.walt.walletdemo.compose.ui.screens.BiometricSetupScreen
 import id.walt.walletdemo.compose.ui.screens.PinStorageUnavailableScreen
 import id.walt.walletdemo.compose.ui.screens.WalletScreen
 
@@ -95,6 +96,10 @@ internal fun WalletDemoAppHost(
                         ),
                 ) {
                     when (val auth = state.auth) {
+                        is WalletAuthState.BiometricSetup -> BiometricSetupScreen(
+                            auth, state.isAuthenticating, state.biometricUnlockAvailable,
+                            controller::retryBiometricSetup, controller::continueWithoutBiometrics,
+                        )
                         is WalletAuthState.PinEntry -> Box(
                             modifier = Modifier
                                 .fillMaxSize()

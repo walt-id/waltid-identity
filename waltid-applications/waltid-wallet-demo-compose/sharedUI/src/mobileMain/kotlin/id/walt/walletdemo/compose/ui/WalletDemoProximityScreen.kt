@@ -58,15 +58,17 @@ internal fun WalletDemoProximityScreen(
     onContinueWithAvailableConnection: () -> Unit = {},
     onApprovalModeChange: (WalletDemoProximityApprovalMode) -> Unit = {},
     onReviewRecentRequest: () -> Unit = {},
+    onConnectionOptions: (() -> Unit)? = null,
+    headerOwnsClose: Boolean = false,
 ) {
     val sessionState = state.sessionState
     val terminal = state.isTerminal
-    val canCancel = !terminal && (
+    val canCancel = !state.closing && !terminal && (
         sessionState == null || ProximityActionType.Cancel in sessionState.legalActions
     )
     val screenTitle = stringResource(Res.string.proximity_in_person_title)
     SystemBackHandler(
-        enabled = state.review == null && (terminal || canCancel),
+        enabled = !state.closing && state.review == null && (terminal || canCancel),
     ) {
         if (terminal) onDismiss() else onCancel()
     }
@@ -78,7 +80,9 @@ internal fun WalletDemoProximityScreen(
             .semantics { paneTitle = screenTitle },
     ) {
         val review = state.review
-        if (review != null) {
+        if (state.closing) {
+            ReviewScaffold(feedback = { ProximityProgressContent(stringResource(Res.string.proximity_terminating)) }) {}
+        } else if (review != null) {
             WalletDemoProximityReview(
                 state = state,
                 review = review,
@@ -90,26 +94,34 @@ internal fun WalletDemoProximityScreen(
                 onDecline = onDecline,
                 onCancel = onCancel,
                 onRestart = onRestart,
+                headerOwnsClose = headerOwnsClose,
             )
         } else if (state.showsEngagement) {
             Box(Modifier.weight(1f).padding(horizontal = 20.dp, vertical = 8.dp)) {
-                ProximityEngagementContent(state, credentialDetailsById, onShowEngagement, onApprovalModeChange)
+                ProximityEngagementContent(state, credentialDetailsById, onShowEngagement, onApprovalModeChange, onConnectionOptions)
             }
-            if (canCancel) {
-                WalletFooter(actions = { ProximityCancelAction(onCancel) })
+            if ((canCancel && !headerOwnsClose) || state.actionError != null) {
+                WalletFooter(feedback = state.actionError?.let { error -> { ProximityErrorCard(error) } },
+                    actions = if (canCancel && !headerOwnsClose) ({ ProximityCancelAction(onCancel) }) else null)
             }
         } else {
             ReviewScaffold(
+                feedback = state.actionError?.takeUnless { it == (sessionState as? ProximityState.Failed)?.error }
+                    ?.let { error -> { ProximityErrorCard(error) } },
                 actions = {
                     when {
-                        canCancel -> ProximityCancelAction(onCancel)
+                        canCancel && !headerOwnsClose -> ProximityCancelAction(onCancel)
                         state.isTerminal -> ProximityOutcomeActions(state, hostActionForDisplay,
                             onRemediate = { onRemediate(it, hostActions) }, onDismiss = onDismiss,
                             onRestart = onRestart, onReviewRecentRequest = onReviewRecentRequest)
                     }
                 },
             ) {
-                state.actionError?.takeUnless { it == (sessionState as? ProximityState.Failed)?.error }?.let { ProximityErrorCard(it) }
+                onConnectionOptions?.let { options ->
+                    id.walt.walletdemo.compose.ui.components.WalletSection {
+                        id.walt.walletdemo.compose.ui.components.WalletNavigationRow("Connection options", options, Modifier.testTag("proximity-connection-options"))
+                    }
+                }
                 state.preparedSharing?.takeIf { sessionState is ProximityState.CheckingPrerequisites ||
                     sessionState is ProximityState.Preparing || sessionState is ProximityState.EngagementReady ||
                     sessionState is ProximityState.Connecting || sessionState is ProximityState.AwaitingRequest }?.let {
@@ -187,19 +199,21 @@ private fun WalletDemoProximityReview(
     onCancel: () -> Unit,
     onRestart: () -> Unit,
     modifier: Modifier = Modifier,
+    headerOwnsClose: Boolean = false,
 ) {
     SystemBackHandler(enabled = true, onBack = onCancel)
     ReviewScaffold(
         modifier = modifier,
+        feedback = state.actionError?.let { error -> { ProximityErrorCard(error) } },
         actions = {
             if (state.preparingApproval) {
                 val expired = (state.sessionState as ProximityState.PreparationRequired).plan.isExpired
                 WalletActions(
                     primary = WalletAction(stringResource(if (expired) Res.string.proximity_refresh_request else Res.string.proximity_approve_and_prepare),
                         onClick = if (expired) onRestart else onApprove, enabled = expired || state.canApprove,
-                        testTag = WalletUiTestTags.ProximityApprove, icon = if (expired) WalletSymbol.Retry else WalletSymbol.Accept),
-                    secondary = WalletAction(stringResource(Res.string.proximity_cancel), onCancel,
-                        testTag = WalletUiTestTags.ProximityCancel, icon = WalletSymbol.Decline),
+                        testTag = WalletUiTestTags.ProximityApprove),
+                    secondary = if (headerOwnsClose) null else WalletAction(stringResource(Res.string.proximity_cancel), onCancel,
+                        testTag = WalletUiTestTags.ProximityCancel),
                 )
             } else SharingActionsRow(
                 enabled = state.pendingReviewId == null,
@@ -208,10 +222,10 @@ private fun WalletDemoProximityReview(
                 onCancel = onCancel,
                 onReject = onDecline,
                 presentation = ReviewActionPresentation.Proximity,
+                showCancelWithReject = !headerOwnsClose,
             )
         },
     ) {
-        state.actionError?.let { ProximityErrorCard(it) }
         val reason = when (val current = state.sessionState) {
             is ProximityState.ReviewRequired -> current.reason
             is ProximityState.PreparationRequired -> current.reason
@@ -247,5 +261,5 @@ private fun WalletDemoProximityReview(
 @Composable
 private fun ProximityCancelAction(onCancel: () -> Unit) {
     WalletActions(secondary = WalletAction(stringResource(Res.string.proximity_cancel), onCancel,
-        testTag = WalletUiTestTags.ProximityCancel, icon = WalletSymbol.Decline))
+        testTag = WalletUiTestTags.ProximityCancel))
 }

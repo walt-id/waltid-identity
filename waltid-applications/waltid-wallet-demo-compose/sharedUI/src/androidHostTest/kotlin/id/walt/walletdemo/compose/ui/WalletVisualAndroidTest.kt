@@ -86,6 +86,8 @@ class WalletVisualAndroidTest {
     @Test fun pinConfirmation() = scenario { pin("confirmation") }
     @Test fun pinBiometricPrompt() = scenario { pin("biometric_prompt") }
     @Test fun pinUnlock() = scenario { pin("unlock") }
+    @Test fun biometricCancelled() = scenario { biometricSetup() }
+    @Test fun biometricUnavailable() = scenario { biometricSetup(unavailable = true) }
     @Test
     @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
     fun pinCompact() = scenario(fontScale = 1.5f) { pin("compact_dark_large_text") }
@@ -107,6 +109,8 @@ class WalletVisualAndroidTest {
 
     @Test
     fun batchOffer() = scenario { batchOffer() }
+
+    @Test fun singleOffer() = scenario { singleOffer() }
 
     @Test
     fun offerDefinitions() = scenario { offerDefinitions() }

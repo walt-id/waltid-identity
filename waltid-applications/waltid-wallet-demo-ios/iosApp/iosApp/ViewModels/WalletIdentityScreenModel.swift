@@ -83,6 +83,16 @@ final class WalletIdentityScreenModel: ObservableObject {
     @Published private(set) var identity: SigningIdentity?
     @Published private(set) var choices: [Choice] = []
     @Published private(set) var message: String?
+    private var failedSetupSelection: [String]?
+    private func configuration(_ option: SetupOption) -> [String] {
+        [option.recovery.id, option.storage.id, option.approval.id]
+    }
+    var setupMessage: String? {
+        guard step == .summary else { return nil }
+        if let failedSetupSelection, selected.map(configuration) != failedSetupSelection { return nil }
+        return message
+    }
+    var canRetrySetupOperation: Bool { failedSetupSelection != nil && setupMessage != nil && !loadFailed }
     @Published private(set) var busy = false
     @Published private(set) var refreshing = false
     @Published private(set) var loaded = false
@@ -124,6 +134,7 @@ final class WalletIdentityScreenModel: ObservableObject {
             setupOptions = []
             selectedID = nil
             message = nil
+            failedSetupSelection = nil
             recoveryUnavailableReasons = []
             switch try await service.state() {
             case .active(let identity):
@@ -199,6 +210,8 @@ final class WalletIdentityScreenModel: ObservableObject {
     private func perform(_ label: String, _ action: @escaping @MainActor () async throws -> Void) {
         guard !busy else { return }
         busy = true
+        message = nil
+        failedSetupSelection = nil
         progress = label
         Task {
             defer { busy = false }
@@ -207,7 +220,10 @@ final class WalletIdentityScreenModel: ObservableObject {
                 await refresh()
                 if identity != nil { onActivated() }
             } catch is CancellationError { return }
-            catch { message = (error as? KeyOperationError)?.errorDescription ?? "Could not complete the signing-key operation. Check device and backup availability, then try again." }
+            catch {
+                failedSetupSelection = identity == nil ? selected.map(configuration) : nil
+                message = (error as? KeyOperationError)?.errorDescription ?? "Could not complete the signing-key operation. Check device and backup availability, then try again."
+            }
         }
     }
 

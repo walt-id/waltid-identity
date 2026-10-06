@@ -183,7 +183,7 @@ class WalletDemoProximityTestScenarios {
                 }
             }
         }
-        onNodeWithText("Share in person").assertIsDisplayed()
+        onNodeWithText("Show QR code").performScrollTo().assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
         onAllNodesWithText("Bluetooth").assertCountEquals(0)
         onAllNodesWithText("Wi-Fi Aware").assertCountEquals(0)

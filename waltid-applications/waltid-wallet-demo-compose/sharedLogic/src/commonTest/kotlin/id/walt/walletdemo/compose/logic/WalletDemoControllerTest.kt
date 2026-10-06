@@ -505,9 +505,16 @@ class WalletDemoControllerTest {
             assertEquals(0, wallet.bootstrapCalls)
             controller.updatePin("999999")
             controller.editSetupPin()
-            assertEquals("1234", (controller.state.value.auth as WalletAuthState.Setup).pin)
+            assertIs<WalletAuthState.BiometricSetup>(controller.state.value.auth)
             gate.complete(result)
             runCurrent()
+            if (result != DemoBiometricResult.Succeeded) {
+                assertEquals(result, assertIs<WalletAuthState.BiometricSetup>(controller.state.value.auth).outcome)
+                assertTrue(store.isBiometricSetupPending())
+                assertEquals(0, wallet.bootstrapCalls)
+                controller.continueWithoutBiometrics()
+                runCurrent()
+            }
             assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
             assertFalse(controller.state.value.isAuthenticating)
             assertEquals(result == DemoBiometricResult.Succeeded, store.isBiometricUnlockEnabled())
@@ -516,7 +523,7 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun unavailableOrFailedBiometricPromptCompletesPinOnlySetup() = runTest {
+    fun promptFailureRequiresAnExplicitChoiceButUnavailableDevicesDoNotPrompt() = runTest {
         for (available in listOf(false, true)) {
             val store = InMemoryDemoPinStore()
             var calls = 0
@@ -532,10 +539,71 @@ class WalletDemoControllerTest {
             controller.submitPin()
             controller.updatePinConfirmation("1234")
             runCurrent()
+            if (available) {
+                assertIs<WalletAuthState.BiometricSetup>(controller.state.value.auth)
+                controller.continueWithoutBiometrics()
+                runCurrent()
+            }
             assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
             assertFalse(store.isBiometricUnlockEnabled())
+            assertFalse(store.isBiometricSetupPending())
             assertEquals(if (available) 1 else 0, calls)
         }
+    }
+
+    @Test
+    fun biometricRetrySavesPinOnceAndSuppressesRepeatedActions() = runTest {
+        val memory = InMemoryDemoPinStore()
+        var saves = 0
+        val store = object : DemoPinStore by memory {
+            override suspend fun setPin(pin: String) { saves++; memory.setPin(pin) }
+        }
+        val biometrics = FakeDemoBiometricAuthenticator(result = DemoBiometricResult.Cancelled)
+        val wallet = FakeDemoWallet()
+        val controller = controllerWith(wallet, this, store, biometrics)
+        controller.updatePin("1234")
+        controller.submitPin()
+        controller.updatePinConfirmation("1234")
+        runCurrent()
+        assertEquals(DemoBiometricResult.Cancelled, assertIs<WalletAuthState.BiometricSetup>(controller.state.value.auth).outcome)
+        assertEquals(0, wallet.bootstrapCalls)
+        biometrics.result = DemoBiometricResult.Succeeded
+        controller.retryBiometricSetup()
+        controller.retryBiometricSetup()
+        controller.continueWithoutBiometrics()
+        runCurrent()
+        assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
+        assertEquals(1, saves)
+        assertEquals(2, biometrics.authenticateCalls)
+        assertTrue(store.isBiometricUnlockEnabled())
+        assertFalse(store.isBiometricSetupPending())
+        assertEquals(1, wallet.bootstrapCalls)
+    }
+
+    @Test
+    fun interruptedBiometricChoiceResumesAfterPinWithoutAutomaticPrompt() = runTest {
+        val store = InMemoryDemoPinStore()
+        store.setPin("1234")
+        store.setBiometricSetupPending(true)
+        store.setBiometricUnlockEnabled(true) // Interrupted between saving the choice and clearing pending.
+        val biometrics = FakeDemoBiometricAuthenticator()
+        val wallet = FakeDemoWallet()
+        val controller = controllerWith(wallet, this, store, biometrics)
+        controller.handleApplicationForegrounded()
+        runCurrent()
+        assertIs<WalletAuthState.Login>(controller.state.value.auth)
+        assertEquals(0, biometrics.authenticateCalls)
+        controller.updatePin("1234")
+        controller.submitPin()
+        runCurrent()
+        assertIs<WalletAuthState.BiometricSetup>(controller.state.value.auth)
+        assertEquals(0, wallet.bootstrapCalls)
+        controller.continueWithoutBiometrics()
+        runCurrent()
+        assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
+        assertFalse(store.isBiometricUnlockEnabled())
+        assertFalse(store.isBiometricSetupPending())
+        assertEquals(1, wallet.bootstrapCalls)
     }
 
     @Test
@@ -1561,6 +1629,8 @@ class WalletDemoControllerTest {
 
         assertEquals(listOf("issuance-session"), wallet.cancelledIssuanceSessionIds)
         assertEquals(null, controller.state.value.offerPreview)
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
+        assertEquals("", controller.state.value.requestDrafts.offerUrl)
     }
 
     @Test
@@ -2939,7 +3009,7 @@ class WalletDemoControllerTest {
         runCurrent()
         controller.submitPresentation()
         runCurrent()
-        assertFalse(controller.state.value.presentationCompleted)
+        assertTrue(controller.state.value.presentationCompleted)
         assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
         assertTrue(controller.state.value.presentationUrlEntryEnabled)
 
@@ -3063,7 +3133,7 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun presentationCompletionReturnsToDefaultEntry() = runTest {
+    fun presentationCompletionKeepsItsResultUntilANewFlow() = runTest {
         val preview = WalletDemoPresentationPreview(
             previewHandle = presentationPreviewHandle,
             responseEncryption = WalletDemoResponseEncryption.NotRequired,
@@ -3100,7 +3170,7 @@ class WalletDemoControllerTest {
         controller.submitPresentation()
         runCurrent()
 
-        assertFalse(controller.state.value.presentationCompleted)
+        assertTrue(controller.state.value.presentationCompleted)
         assertEquals(null, controller.state.value.presentationPreview)
         assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
         assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
@@ -3142,7 +3212,7 @@ class WalletDemoControllerTest {
         controller.completePresentationContinuation()
 
         assertEquals(null, controller.state.value.pendingPresentationContinuation)
-        assertFalse(controller.state.value.presentationCompleted)
+        assertTrue(controller.state.value.presentationCompleted)
         assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
         assertTrue(controller.state.value.presentationUrlEntryEnabled)
         assertEquals(
@@ -3178,7 +3248,7 @@ class WalletDemoControllerTest {
         controller.failPresentationContinuation("network unavailable")
 
         assertEquals(null, controller.state.value.pendingPresentationContinuation)
-        assertFalse(controller.state.value.presentationCompleted)
+        assertTrue(controller.state.value.presentationCompleted)
         assertEquals(
             WalletOperationState.Failed(
                 "Could not deliver the verifier response: network unavailable",
@@ -3300,6 +3370,10 @@ private class FailingClearDemoPinStore : DemoPinStore {
 
     override fun setBiometricUnlockEnabled(enabled: Boolean) = Unit
 
+    override fun isBiometricSetupPending(): Boolean = false
+
+    override fun setBiometricSetupPending(pending: Boolean) = Unit
+
     override fun clear() {
         error("PIN verifier could not be cleared")
     }
@@ -3323,6 +3397,10 @@ private class RecoverableDemoPinStore : DemoPinStore {
     override fun isBiometricUnlockEnabled(): Boolean = false
 
     override fun setBiometricUnlockEnabled(enabled: Boolean) = Unit
+
+    override fun isBiometricSetupPending(): Boolean = false
+
+    override fun setBiometricSetupPending(pending: Boolean) = Unit
 
     override fun clear() = Unit
 }

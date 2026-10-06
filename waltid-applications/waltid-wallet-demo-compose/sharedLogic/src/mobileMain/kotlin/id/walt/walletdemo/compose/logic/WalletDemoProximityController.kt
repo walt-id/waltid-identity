@@ -64,6 +64,7 @@ data class WalletDemoProximityDocumentSelection(
 /** Shared Android/iOS Compose state around the SDK-owned protocol state. */
 data class WalletDemoProximityUiState(
     val active: Boolean = false,
+    val closing: Boolean = false,
     val sessionState: ProximityState? = null,
     val selections: List<WalletDemoProximityDocumentSelection> = emptyList(),
     val continueAfterResponse: Boolean = false,
@@ -108,8 +109,16 @@ data class WalletDemoProximityUiState(
 
     val preparingApproval: Boolean get() = sessionState is ProximityState.PreparationRequired
 
+    val canClose: Boolean
+        get() = active && !closing && (isTerminal || preparingApproval || sessionState == null ||
+            ProximityActionType.Cancel in sessionState.legalActions)
+
+    val canChangeConnectionOptions: Boolean
+        get() = active && !closing && preparedSharing == null && hostActionInProgress == null &&
+            (sessionState is ProximityState.EngagementReady || sessionState is ProximityState.CheckingPrerequisites)
+
     val canApprove: Boolean
-        get() = pendingReviewId == null && review?.let { current ->
+        get() = !closing && pendingReviewId == null && review?.let { current ->
             selections.map { it.requestIndex }.toSet() == current.documents.map { it.requestIndex }.toSet() &&
                 selections.all { selected -> selected.disclosedElements.isNotEmpty() &&
                     current.documents.single { it.requestIndex == selected.requestIndex }.requiredElements.all { it in selected.disclosedElements } }
@@ -371,6 +380,31 @@ class WalletDemoProximityController(
         job.start()
     }
 
+    /** One holder exit: dispatch only a legal cancellation, drain cleanup, then hide the task. */
+    fun requestClose() {
+        val current = mutableState.value
+        if (!current.canClose) return
+        val currentSession = session
+        val actionGeneration = generation
+        mutableState.update { it.copy(closing = true, actionError = null) }
+        scope.launch(dispatcher) {
+            val result = if (currentSession != null && !current.isTerminal && !current.preparingApproval && current.sessionState != null) {
+                try { currentSession.dispatch(ProximityAction.Cancel) }
+                catch (error: CancellationException) { throw error }
+                catch (_: Exception) { ProximityActionResult.Rejected(demoSessionFailure) }
+            } else ProximityActionResult.Accepted
+            if (generation != actionGeneration || !mutableState.value.active) return@launch
+            if (result is ProximityActionResult.Rejected) {
+                mutableState.update { it.copy(closing = false, actionError = result.error) }
+                return@launch
+            }
+            dismiss(resetUi = false)
+            val closingGeneration = generation
+            withContext(NonCancellable) { closingJob?.join() }
+            if (generation == closingGeneration) mutableState.value = initialUiState()
+        }
+    }
+
     fun cancel() {
         if (mutableState.value.preparingApproval) { dismiss(); return }
         if (session == null) {
@@ -412,7 +446,9 @@ class WalletDemoProximityController(
         }
     }
 
-    fun dismiss() {
+    fun dismiss() = dismiss(resetUi = true)
+
+    private fun dismiss(resetUi: Boolean) {
         generation += 1
         val starting = sessionJob
         val hostAction = hostActionJob
@@ -425,7 +461,8 @@ class WalletDemoProximityController(
         session = null
         pendingConfiguration = null
         effectiveConfiguration = null
-        mutableState.value = initialUiState()
+        if (resetUi) mutableState.value = initialUiState()
+        else mutableState.update { it.copy(closing = true) }
         scheduleClose(closing, starting, hostAction, revoking)
     }
 
@@ -456,7 +493,7 @@ class WalletDemoProximityController(
         val awaitingPrerequisite = (current.sessionState as? ProximityState.CheckingPrerequisites)?.let {
             !it.capabilities.mayStart || current.automaticPermissionAction != null
         } == true
-        if (!current.active || current.preparedSharing != null || current.hostActionInProgress != null ||
+        if (!current.active || current.closing || current.preparedSharing != null || current.hostActionInProgress != null ||
             (current.sessionState !is ProximityState.EngagementReady && !awaitingPrerequisite)) return
         val configuration = readerTrustSettingsProvider().applyTo(profileProvider().configuration())
             .copy(approval = mode.toApproval())

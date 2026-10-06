@@ -63,8 +63,8 @@
     <string name="settings_nfc_direct_detail">Keep the connection on NFCv2.</string>
     <string name="settings_nfc_wifi_detail">Start with NFCv2 and allow Wi-Fi Aware transfer.</string>
     <string name="setup_title">Set up your wallet</string>
-    <string name="setup_intro">Your wallet uses a signing key to prove that you hold your credentials.</string>
-    <string name="setup_review_description">Use these settings or tap a row to customize your signing key.</string>
+    <string name="setup_intro">Create your signing key with these settings, or tap a row to customize.</string>
+    <string name="setup_review_description">Review your signing key settings.</string>
     <string name="setup_recovery">Recovery</string>
     <string name="setup_storage">Key storage</string>
     <string name="setup_approval">Signing approval</string>

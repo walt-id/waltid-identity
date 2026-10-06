@@ -12,6 +12,14 @@ import kotlinx.coroutines.withContext
 import platform.Foundation.NSError
 import platform.Foundation.NSThread
 import platform.LocalAuthentication.LAContext
+import platform.LocalAuthentication.LAErrorAppCancel
+import platform.LocalAuthentication.LAErrorSystemCancel
+import platform.LocalAuthentication.LAErrorUserCancel
+import platform.LocalAuthentication.LAErrorUserFallback
+import platform.LocalAuthentication.LAErrorBiometryLockout
+import platform.LocalAuthentication.LAErrorBiometryNotAvailable
+import platform.LocalAuthentication.LAErrorBiometryNotEnrolled
+import platform.LocalAuthentication.LAErrorDomain
 import platform.darwin.dispatch_get_main_queue
 import platform.darwin.dispatch_sync
 import platform.LocalAuthentication.LAPolicyDeviceOwnerAuthenticationWithBiometrics
@@ -25,16 +33,22 @@ private class IosDemoBiometricAuthenticator : DemoBiometricAuthenticator {
 
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
     override suspend fun authenticate(reason: String): DemoBiometricResult = withContext(Dispatchers.Main) {
-        if (!evaluateAvailability()) return@withContext DemoBiometricResult.Failed
+        if (!evaluateAvailability()) return@withContext DemoBiometricResult.Unavailable
         val context = LAContext()
         return@withContext suspendCancellableCoroutine { continuation ->
+            continuation.invokeOnCancellation { context.invalidate() }
             context.evaluatePolicy(
                 LAPolicyDeviceOwnerAuthenticationWithBiometrics,
                 localizedReason = reason,
-            ) { success, _ ->
+            ) { success, error ->
                 if (!continuation.isActive) return@evaluatePolicy
                 continuation.resume(
-                    if (success) DemoBiometricResult.Succeeded else DemoBiometricResult.Failed,
+                    if (success) DemoBiometricResult.Succeeded else when (error?.takeIf { it.domain == LAErrorDomain }?.code) {
+                        LAErrorUserCancel, LAErrorSystemCancel, LAErrorAppCancel, LAErrorUserFallback -> DemoBiometricResult.Cancelled
+                        LAErrorBiometryLockout -> DemoBiometricResult.LockedOut
+                        LAErrorBiometryNotAvailable, LAErrorBiometryNotEnrolled -> DemoBiometricResult.Unavailable
+                        else -> DemoBiometricResult.Failed
+                    },
                 )
             }
         }

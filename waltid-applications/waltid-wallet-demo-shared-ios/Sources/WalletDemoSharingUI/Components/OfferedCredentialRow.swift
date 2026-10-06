@@ -9,17 +9,20 @@ public struct OfferedCredentialRow: View {
     private let copies: Binding<Int>
     private let limit: Int
     private let enabled: Bool
+    private let largeArt: Bool
     @State private var showDetails = false
+    @Environment(\.walletReviewNavigationAvailable) private var hasNavigation
     @Environment(\.sizeCategory) private var sizeCategory
 
     public init(credential: IssuanceCredentialPreview, issuerName: String, issuerIdentifier: String,
-                copies: Binding<Int>, limit: Int, enabled: Bool) {
+                copies: Binding<Int>, limit: Int, enabled: Bool, largeArt: Bool = false) {
         self.credential = credential
         self.issuerName = issuerName
         self.issuerIdentifier = issuerIdentifier
         self.copies = copies
         self.limit = limit
         self.enabled = enabled
+        self.largeArt = largeArt
     }
 
     public var body: some View {
@@ -45,15 +48,34 @@ public struct OfferedCredentialRow: View {
             WalletNavigationRow(String(localized: "Credential information", bundle: .module)) { showDetails = true }
                 .accessibilityIdentifier("issuance-details-\(credential.configurationID)")
         }
-        .sheet(isPresented: $showDetails) {
-            WalletDetailSheet(String(localized: "Credential information", bundle: .module), onDismiss: { showDetails = false }) {
-                OfferedCredentialDetails(credential: credential, issuerName: issuerName, issuerIdentifier: issuerIdentifier)
+        .walletReviewDestination(isPresented: $showDetails) {
+            Group {
+                if hasNavigation {
+                    WalletDetailPage(String(localized: "Credential information", bundle: .module)) { information }
+                } else {
+                    WalletDetailSheet(String(localized: "Credential information", bundle: .module), onDismiss: { showDetails = false }) { information }
+                }
             }.accessibilityIdentifier("issuance-credential-details")
         }
     }
 
+    private var information: some View {
+        OfferedCredentialDetails(credential: credential, issuerName: issuerName, issuerIdentifier: issuerIdentifier)
+    }
+
     @ViewBuilder private var identity: some View {
-        if #available(iOS 16, *) {
+        if largeArt {
+            VStack(alignment: .leading, spacing: 16) {
+                CredentialCardArtView(summary: .offered(from: credential))
+                    .accessibilityIdentifier("issuance-large-art-\(credential.configurationID)")
+                HStack(spacing: 12) {
+                    Text(CredentialCardSummary.offered(from: credential).title).font(.headline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("issuance-identity-\(credential.configurationID)")
+                    selection(showsLabel: false)
+                }
+            }
+        } else if #available(iOS 16, *) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) { summary; selection(showsLabel: false) }
                     .fixedSize(horizontal: true, vertical: false)

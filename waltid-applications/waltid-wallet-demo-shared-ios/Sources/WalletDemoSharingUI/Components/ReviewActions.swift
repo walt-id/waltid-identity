@@ -9,6 +9,7 @@ public struct ReviewActions: View {
     let onCancel: () -> Void
     let presentation: ReviewActionPresentation
     let paymentReview: PaymentReviewState
+    let showCancelWithReject: Bool
     @State private var pendingUnsignedRevision: String?
 
     public init(
@@ -18,7 +19,8 @@ public struct ReviewActions: View {
         onReject: (() -> Void)?,
         onCancel: @escaping () -> Void,
         presentation: ReviewActionPresentation = .sharing,
-        paymentReview: PaymentReviewState = .notRequired
+        paymentReview: PaymentReviewState = .notRequired,
+        showCancelWithReject: Bool = true
     ) {
         self.selectionComplete = selectionComplete
         self.isLoading = isLoading
@@ -27,6 +29,7 @@ public struct ReviewActions: View {
         self.onCancel = onCancel
         self.presentation = presentation
         self.paymentReview = paymentReview
+        self.showCancelWithReject = showCancelWithReject
     }
 
     public var body: some View {
@@ -49,7 +52,7 @@ public struct ReviewActions: View {
                 WalletAction(paymentReview.consent?.denialAction ?? presentation.rejectTitle,
                     enabled: !isLoading, identifier: presentation.rejectAccessibilityIdentifier, perform: reject)
             } ?? cancel,
-            tertiary: onReject == nil ? nil : cancel
+            tertiary: onReject == nil || !showCancelWithReject ? nil : cancel
         )
         .alert(String(localized: "Unsigned payment request", bundle: .module), isPresented: Binding(
             get: { pendingUnsignedRevision != nil },

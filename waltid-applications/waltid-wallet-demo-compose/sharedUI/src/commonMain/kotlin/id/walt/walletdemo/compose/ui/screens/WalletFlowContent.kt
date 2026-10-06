@@ -9,7 +9,6 @@ import id.walt.walletdemo.compose.logic.WalletStatusKind
 import id.walt.walletdemo.compose.logic.isStatusVisible
 import id.walt.walletdemo.compose.logic.statusBanner
 import id.walt.walletdemo.compose.ui.components.StatusCard
-import id.walt.walletdemo.compose.ui.components.WalletStatusPlacement
 
 /** The in-app route and external host bind exactly the same content and current consent. */
 @Composable
@@ -23,12 +22,9 @@ internal fun WalletFlowContent(
     presentationContent: (@Composable () -> Unit)? = null,
 ) {
     val banner = state.statusBanner().takeIf { state.isStatusVisible }
-    val contextualStatus: (@Composable () -> Unit)? = if (banner?.kind == WalletStatusKind.Error) {
-        { StatusCard(state, controller::dismissStatus, controller::toggleStatusExpanded, WalletStatusPlacement.Contextual) }
-    } else null
-    val feedback: (@Composable () -> Unit)? = if (banner != null && banner.kind != WalletStatusKind.Error &&
-        (state.externalFlow == null || banner.kind == WalletStatusKind.Busy)) {
-        { StatusCard(state, controller::dismissStatus, controller::toggleStatusExpanded, WalletStatusPlacement.Footer) }
+    val feedback: (@Composable () -> Unit)? = if (banner != null &&
+        (state.externalFlow == null || banner.kind == WalletStatusKind.Busy || banner.kind == WalletStatusKind.Error)) {
+        { StatusCard(state, controller::dismissStatus, controller::toggleStatusExpanded) }
     } else null
     when (state.selectedTab) {
         WalletDemoTab.Receive -> {
@@ -47,7 +43,6 @@ internal fun WalletFlowContent(
                 modifier = modifier,
                 fillViewport = fillViewport,
                 feedback = feedback,
-                contextualStatus = contextualStatus,
             )
         }
         WalletDemoTab.Present -> {
@@ -68,13 +63,16 @@ internal fun WalletFlowContent(
                     }
                 },
                 onReject = controller::rejectPresentation,
-                onCancel = controller::cancelPresentationReview,
+                onCancel = {
+                    if (state.externalFlow != null) onDone()
+                    else { controller.cancelPresentationReview(); controller.selectTab(WalletDemoTab.Credentials) }
+                },
+                onDone = onDone,
                 onStartProximityPresentation = onStartProximityPresentation,
                 presentationContent = presentationContent,
                 modifier = modifier,
                 fillViewport = fillViewport,
                 feedback = feedback,
-                contextualStatus = contextualStatus,
             )
         }
         WalletDemoTab.Credentials -> Unit

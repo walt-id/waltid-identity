@@ -14,6 +14,7 @@ enum WalletTab: Hashable {
 enum WalletAuthState: Equatable {
     case setup
     case login
+    case biometricSetup(DemoBiometricResult?)
     case storageUnavailable(String)
     case unlocked
 }
@@ -448,7 +449,7 @@ class WalletViewModel: ObservableObject {
             submitSetupPin()
         case .login:
             submitLoginPin()
-        case .storageUnavailable, .unlocked:
+        case .storageUnavailable, .biometricSetup, .unlocked:
             break
         }
     }
@@ -457,13 +458,13 @@ class WalletViewModel: ObservableObject {
         guard auth == .login else { return }
         guard force || !biometricPromptConsumed else { return }
         guard !isAuthenticating else { return }
-        guard pinStore.isBiometricUnlockEnabled, biometricAuthenticator.isAvailable else { return }
+        guard !pinStore.isBiometricSetupPending, pinStore.isBiometricUnlockEnabled, biometricAuthenticator.isAvailable else { return }
         biometricPromptConsumed = true
         isAuthenticating = true
-        Task {
+        authenticationTask = Task {
             let result = await biometricAuthenticator.authenticate(reason: "Unlock the wallet")
+            guard !Task.isCancelled, auth == .login else { return }
             isAuthenticating = false
-            guard auth == .login else { return }
             if result == .succeeded {
                 auth = .unlocked
                 showBiometricSigningWarningIfNeeded(
@@ -492,10 +493,10 @@ class WalletViewModel: ObservableObject {
         promptBiometricUnlockIfNeeded()
     }
 
-    var isBiometricUnlockEnabled: Bool { pinStore.isBiometricUnlockEnabled }
+    var isBiometricUnlockEnabled: Bool { !pinStore.isBiometricSetupPending && pinStore.isBiometricUnlockEnabled }
 
     var shouldPromptBiometricUnlock: Bool {
-        auth == .login && !biometricPromptConsumed && isBiometricUnlockEnabled && isBiometricUnlockAvailable
+        auth == .login && !pinStore.isBiometricSetupPending && !biometricPromptConsumed && isBiometricUnlockEnabled && isBiometricUnlockAvailable
     }
 
     func refreshBiometricAvailability() {
@@ -1082,7 +1083,8 @@ class WalletViewModel: ObservableObject {
         txCode = ""
         receiveCompleted = false
         receiveNavigationResetKey += 1
-        setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
+        if externalFlow == nil { selectedTab = .credentials }
+        setSuccess(WalletStatusText.credentialOfferDeclined, tab: externalFlow == nil ? .credentials : .receive)
         if let sessionID {
             Task { try? await walletClient.cancelIssuance(sessionID: sessionID) }
         }
@@ -1536,6 +1538,7 @@ class WalletViewModel: ObservableObject {
             } catch {
                 guard !Task.isCancelled else { return }
                 resetPresentationToEntry()
+                presentationCompleted = true
                 setError(WalletStatusText.failure(WalletStatusText.presentFailed, error), tab: .present)
             }
         }
@@ -1571,6 +1574,7 @@ class WalletViewModel: ObservableObject {
             } catch {
                 guard !Task.isCancelled else { return }
                 resetPresentationToEntry()
+                presentationCompleted = true
                 setError(WalletStatusText.failure(WalletStatusText.rejectFailed, error), tab: .present)
             }
         }
@@ -1582,6 +1586,7 @@ class WalletViewModel: ObservableObject {
 
     private func finishSuccessfulPresentation() {
         resetPresentationToEntry()
+        presentationCompleted = true
     }
 
     private func resetPresentationToEntry() {
@@ -1614,6 +1619,7 @@ class WalletViewModel: ObservableObject {
         guard pendingPresentationSuccessMessage != nil else { return }
         clearPendingPresentationContinuation()
         resetPresentationToEntry()
+        presentationCompleted = true
         setError(
             WalletStatusText.failure(WalletStatusText.presentationContinuationFailed, reason),
             tab: .present
@@ -1628,7 +1634,7 @@ class WalletViewModel: ObservableObject {
         clearPendingPresentationContinuation()
         switch result {
         case .transmitted(.failed):
-            presentationCompleted = false
+            presentationCompleted = true
             setError(failureMessage, tab: .present)
         case .prepared(.openURL(let url)):
             pendingPresentationSuccessMessage = successMessage
@@ -1726,25 +1732,56 @@ class WalletViewModel: ObservableObject {
             do {
                 signingProtectionStore.save(selection)
                 selectedSigningProtection = selection
+                let offerBiometrics = biometricAuthenticator.isAvailable
+                pinStore.isBiometricSetupPending = offerBiometrics
                 try await pinStore.setPin(confirmedPin)
                 guard !Task.isCancelled, auth == .setup else { return }
-                pinStore.isBiometricUnlockEnabled = false
-                // The OS prompt is the app-unlock opt-in; rejection completes PIN-only setup.
-                let result = biometricAuthenticator.isAvailable
-                    ? await biometricAuthenticator.authenticate(reason: WalletStatusText.enableBiometricUnlock) : .failed
-                guard !Task.isCancelled, auth == .setup else { return }
-                pinStore.isBiometricUnlockEnabled = result == .succeeded
-                isAuthenticating = false
+                auth = .biometricSetup(nil)
                 pin = ""
                 pinConfirmation = ""
-                auth = .unlocked
-                bootstrapIfNeeded()
+                pinStore.isBiometricUnlockEnabled = false
+                if offerBiometrics { await authenticateBiometricSetup(expectedAuth: .biometricSetup(nil)) }
+                else { completeBiometricSetup(enabled: false) }
             } catch {
                 guard !Task.isCancelled, auth == .setup else { return }
                 isAuthenticating = false
                 pinError = "PIN could not be saved. Try again."
             }
         }
+    }
+
+    func retryBiometricSetup() {
+        guard case .biometricSetup = auth, !isAuthenticating else { return }
+        let expectedAuth = auth
+        isAuthenticating = true
+        pinError = nil
+        authenticationTask = Task { await authenticateBiometricSetup(expectedAuth: expectedAuth) }
+    }
+
+    func continueWithoutBiometrics() {
+        guard case .biometricSetup = auth, !isAuthenticating else { return }
+        completeBiometricSetup(enabled: false)
+    }
+
+    private func authenticateBiometricSetup(expectedAuth: WalletAuthState) async {
+        let result = await biometricAuthenticator.authenticate(reason: WalletStatusText.enableBiometricUnlock)
+        guard !Task.isCancelled, auth == expectedAuth else { return }
+        if result == .succeeded { completeBiometricSetup(enabled: true) }
+        else {
+            auth = .biometricSetup(result)
+            isAuthenticating = false
+            refreshBiometricAvailability()
+        }
+    }
+
+    private func completeBiometricSetup(enabled: Bool) {
+        guard case .biometricSetup = auth else { return }
+        pinStore.isBiometricUnlockEnabled = enabled
+        pinStore.isBiometricSetupPending = false
+        isAuthenticating = false
+        pinError = nil
+        auth = .unlocked
+        bootstrapIfNeeded()
     }
 
     private func submitLoginPin() {
@@ -1754,11 +1791,17 @@ class WalletViewModel: ObservableObject {
         }
         isAuthenticating = true
         pinError = nil
-        Task {
-            let matches = await pinStore.verifyPin(pin)
+        let enteredPin = pin
+        authenticationTask = Task {
+            let matches = await pinStore.verifyPin(enteredPin)
+            guard !Task.isCancelled, auth == .login else { return }
             isAuthenticating = false
-            guard auth == .login else { return }
             if matches {
+                if pinStore.isBiometricSetupPending {
+                    pin = ""
+                    auth = .biometricSetup(nil)
+                    return
+                }
                 auth = .unlocked
                 showBiometricSigningWarningIfNeeded(
                     warningSequence: foregroundSequence > 0 ? foregroundSequence : nil

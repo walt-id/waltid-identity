@@ -13,8 +13,7 @@ internal fun OfferReviewActions(
 ) {
     WalletActions(
         primary = WalletAction(if (requiresIssuerAuthentication) "Continue to sign in" else "Accept", onAccept,
-            acceptEnabled, WalletUiTestTags.OfferAcceptButton,
-            icon = if (requiresIssuerAuthentication) WalletSymbol.Next else WalletSymbol.Accept),
-        secondary = WalletAction("Decline", onDecline, reviewEnabled, WalletUiTestTags.OfferDeclineButton, WalletSymbol.Decline),
+            acceptEnabled, WalletUiTestTags.OfferAcceptButton),
+        secondary = WalletAction("Decline", onDecline, reviewEnabled, WalletUiTestTags.OfferDeclineButton),
     )
 }

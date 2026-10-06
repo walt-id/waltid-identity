@@ -32,11 +32,11 @@ class AndroidDemoBiometricAuthenticatorTest {
         val authenticator = createAndroidDemoBiometricAuthenticator { activity }
         val result = authenticateFromDefault(authenticator)
 
-        assertTrue(result == DemoBiometricResult.Succeeded || result == DemoBiometricResult.Failed)
+        assertEquals(DemoBiometricResult.Unavailable, result)
     }
 
     @Test
-    fun authenticateFailsWhenHostIsNotResumed() {
+    fun authenticateIsCancelledWhenHostIsNotResumed() {
         val controller = Robolectric.buildActivity(FragmentActivity::class.java).create().start()
         val activity = controller.get()
         assertTrue(activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
@@ -45,7 +45,7 @@ class AndroidDemoBiometricAuthenticatorTest {
         val authenticator = createAndroidDemoBiometricAuthenticator { activity }
         val result = authenticateFromDefault(authenticator)
 
-        assertEquals(DemoBiometricResult.Failed, result)
+        assertEquals(DemoBiometricResult.Cancelled, result)
     }
 
     private fun authenticateFromDefault(
