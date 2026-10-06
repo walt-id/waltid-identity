@@ -25,7 +25,7 @@ import id.walt.walletdemo.compose.ui.components.*
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
 
-/** App unlock has one setup form. Existing PIN storage and legacy unlock formats stay compatible. */
+/** App unlock uses the existing four-digit PIN policy. */
 @Composable
 internal fun PinScreen(
     controller: WalletDemoController,
@@ -49,7 +49,7 @@ internal fun PinScreen(
             focus.clearFocus()
             controller.submitPin()
         },
-        enabled = !isBusy && (setup == null || (setup.pin.length == 6 && setup.confirmation.length == 6)),
+        enabled = !isBusy && (setup == null || (setup.pin.length == WalletDemoController.PinLength && setup.confirmation.length == WalletDemoController.PinLength)),
         testTag = WalletUiTestTags.PinSubmitButton,
         icon = WalletSymbol.Lock,
     )
@@ -77,7 +77,7 @@ internal fun PinScreen(
                     OutlinedTextField(
                         value = setup?.pin ?: login?.pin.orEmpty(),
                         onValueChange = { input ->
-                            controller.updatePin(input.filter { it in '0'..'9' }.take(if (setup != null) 6 else 8))
+                            controller.updatePin(input.filter { it in '0'..'9' }.take(WalletDemoController.PinLength))
                         },
                         label = { Text(stringResource(Res.string.pin_label)) },
                         visualTransformation = PasswordVisualTransformation(),
@@ -91,7 +91,7 @@ internal fun PinScreen(
                     if (setup != null) OutlinedTextField(
                         value = setup.confirmation,
                         onValueChange = { input ->
-                            controller.updatePinConfirmation(input.filter { it in '0'..'9' }.take(6))
+                            controller.updatePinConfirmation(input.filter { it in '0'..'9' }.take(WalletDemoController.PinLength))
                         },
                         label = { Text(stringResource(Res.string.pin_confirmation_label)) },
                         visualTransformation = PasswordVisualTransformation(),
