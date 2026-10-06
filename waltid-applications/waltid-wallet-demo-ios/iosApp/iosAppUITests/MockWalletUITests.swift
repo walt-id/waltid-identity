@@ -530,18 +530,19 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.secureTextFields["wallet.txCodeInput"].waitForExistence(timeout: 10))
         let transactionCodeSection = app.staticTexts["wallet.offerTransactionCodeSection"]
         XCTAssertTrue(transactionCodeSection.waitForExistence(timeout: 10))
-        XCTAssertLessThan(
-            app.staticTexts["wallet.status"].frame.minY,
-            transactionCodeSection.frame.minY,
-            "Receive status should precede the offer review"
-        )
-
         let accept = app.buttons["Accept"]
         let decline = app.buttons["Decline"]
         XCTAssertTrue(accept.waitForExistence(timeout: 10))
         XCTAssertFalse(accept.isEnabled)
         XCTAssertTrue(decline.waitForExistence(timeout: 10))
         XCTAssertTrue(decline.isEnabled)
+        let status = app.descendants(matching: .any)["wallet.status"]
+        XCTAssertGreaterThan(status.frame.minY, transactionCodeSection.frame.maxY,
+            "Receive status must follow the offer content")
+        XCTAssertLessThanOrEqual(status.frame.maxY, decline.frame.minY,
+            "Receive status must clear the decline action")
+        let review = XCTAttachment(screenshot: app.screenshot())
+        review.name = "transaction-code-bottom-feedback"; review.lifetime = .keepAlways; add(review)
         decline.tap()
 
         XCTAssertEqual(
