@@ -25,9 +25,16 @@ import id.walt.walletdemo.compose.ui.screens.WalletHeader
 @OptIn(ExperimentalTestApi::class)
 internal class WalletVisualScenarios(
     private val test: ComposeUiTest,
-    private val capture: (String) -> Unit,
+    private val captureImage: (String) -> Unit,
     private val platformTheme: @Composable (@Composable () -> Unit) -> Unit = { it() },
 ) {
+    private fun capture(id: String) {
+        // Capture settled state independently of host speed; shipping interactions remain animated.
+        test.mainClock.advanceTimeBy(1_000)
+        test.waitForIdle()
+        captureImage(id)
+    }
+
     private fun content(body: @Composable () -> Unit) = test.setContent {
         platformTheme {
             WalletDemoTheme {
