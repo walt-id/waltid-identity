@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -1803,8 +1804,17 @@ class WalletDemoController(
     }
 
     private fun refreshBiometricSigningAvailability(warningSequence: Long? = null) {
-        biometricSigningAvailabilityJob?.cancel()
+        val previous = biometricSigningAvailabilityJob
+        // Cancel on the background dispatcher. Closing the previous call from the main
+        // thread makes the Android HTTP engine throw NetworkOnMainThreadException.
         biometricSigningAvailabilityJob = scope.launch(dispatcher) {
+            try {
+                previous?.cancelAndJoin()
+            } catch (_: CancellationException) {
+                ensureActive()
+            } catch (_: Throwable) {
+                // A completion handler can fail while the socket closes. This check still runs.
+            }
             val availability = try {
                 wallet.signingProtectionAvailability(
                     (_state.value.session as? WalletSessionState.Ready)?.signingProtection
