@@ -17,9 +17,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
+import androidx.navigation3.ui.defaultPredictivePopTransitionSpec
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.ui.digitalCredentialsRequirements
 import id.walt.walletdemo.compose.ui.SystemBackHandler
@@ -72,9 +76,16 @@ internal fun SettingsScreen(
     val back = { if (path.size > 1) path = path.dropLast(1) else onBack() }
     fun open(destination: SettingsDestination) { path = path + destination }
     SystemBackHandler(enabled = path.size == 1, onBack = back)
+    val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val predictivePop = defaultPredictivePopTransitionSpec<SettingsDestination>()
 
     Surface(Modifier.fillMaxSize().testTag(WalletUiTestTags.SettingsScreen), color = MaterialTheme.colorScheme.background) {
-        NavDisplay(backStack = path, onBack = back) { destination ->
+        NavDisplay(backStack = path, onBack = back,
+            transitionSpec = { walletNavigationMotion(true, reduceMotion, rtl) },
+            popTransitionSpec = { walletNavigationMotion(false, reduceMotion, rtl) },
+            predictivePopTransitionSpec = if (reduceMotion) ({ _ -> walletNavigationMotion(false, true, rtl) }) else predictivePop,
+        ) { destination ->
             NavEntry(destination) {
                 Column(Modifier.fillMaxSize().safeDrawingPadding()) {
                     WalletScreenHeader(stringResource(destination.title), leading = {

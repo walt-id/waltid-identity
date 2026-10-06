@@ -16,8 +16,8 @@ internal fun CredentialInformationSheet(details: CredentialDetails, onDismiss: (
     var technical by rememberSaveable(details.summary.id) { mutableStateOf(false) }
     WalletDetailSheet(stringResource(if (technical) Res.string.credential_technical_details else Res.string.issuance_information),
         onDismiss = onDismiss, onBack = if (technical) ({ technical = false }) else null,
-        pageKey = if (technical) "technical" else "credential") {
-        if (technical) CredentialTechnicalInformation(details)
+        pagePath = if (technical) listOf("credential", "technical") else listOf("credential")) { pageKey ->
+        if (pageKey == "technical") CredentialTechnicalInformation(details)
         else {
             val summary = details.toCardDisplayData()
             CredentialSummaryRow(summary.toCardArt())
