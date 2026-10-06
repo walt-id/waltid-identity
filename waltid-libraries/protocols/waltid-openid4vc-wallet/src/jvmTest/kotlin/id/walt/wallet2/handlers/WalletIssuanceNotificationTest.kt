@@ -123,7 +123,7 @@ class WalletIssuanceNotificationTest {
                             if (request.url.toString().endsWith("/notification")) {
                                 respond(content = "", status = HttpStatusCode.NoContent)
                             } else {
-                                respondJson(credentialResponse(1))
+                                respondJson(credentialResponse(signedCredential()))
                             }
                         }
                         else -> error("Unexpected request: ${request.method.value} ${request.url}")
@@ -303,32 +303,41 @@ class WalletIssuanceNotificationTest {
             credentialStores = listOf(store),
         )
 
-    private fun issuanceClient(
+    private suspend fun issuanceClient(
         notifications: MutableList<String>,
         credentialCount: Int = 1,
-    ): HttpClient = HttpClient(MockEngine) {
-        engine {
-            addHandler { request ->
-                when (request.url.toString()) {
-                    "$ISSUER/.well-known/openid-credential-issuer" -> respondJson(ISSUER_METADATA)
-                    "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
-                    "$ISSUER/token" -> respondJson("""{"access_token":"access-token","token_type":"Bearer"}""")
-                    "$ISSUER/credential", "$ISSUER/deferred" -> respondJson(credentialResponse(credentialCount))
-                    "$ISSUER/notification" -> {
-                        notifications += Json.parseToJsonElement(request.bodyText()).jsonObject
-                            .getValue("event").jsonPrimitive.content
-                        assertTrue(request.headers[HttpHeaders.Authorization]?.startsWith("Bearer ") == true)
-                        respond(content = "", status = HttpStatusCode.NoContent)
+    ): HttpClient {
+        val credential = signedCredential()
+        return HttpClient(MockEngine) {
+            engine {
+                addHandler { request ->
+                    when (request.url.toString()) {
+                        "$ISSUER/.well-known/openid-credential-issuer" -> respondJson(ISSUER_METADATA)
+                        "$ISSUER/.well-known/oauth-authorization-server" -> respondJson(AUTHORIZATION_SERVER_METADATA)
+                        "$ISSUER/token" -> respondJson("""{"access_token":"access-token","token_type":"Bearer"}""")
+                        "$ISSUER/credential", "$ISSUER/deferred" -> respondJson(credentialResponse(credential, credentialCount))
+                        "$ISSUER/notification" -> {
+                            notifications += Json.parseToJsonElement(request.bodyText()).jsonObject
+                                .getValue("event").jsonPrimitive.content
+                            assertTrue(request.headers[HttpHeaders.Authorization]?.startsWith("Bearer ") == true)
+                            respond(content = "", status = HttpStatusCode.NoContent)
+                        }
+                        else -> error("Unexpected request: ${request.method.value} ${request.url}")
                     }
-                    else -> error("Unexpected request: ${request.method.value} ${request.url}")
                 }
             }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
         }
-        install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
     }
 
-    private fun credentialResponse(credentialCount: Int): String {
-        val credentials = List(credentialCount) { """{"credential":$CREDENTIAL}""" }.joinToString(",")
+    private suspend fun signedCredential(): String =
+        JWKKey.generate(KeyType.Ed25519).signJws(
+            """{"iss":"$ISSUER","sub":"did:example:holder","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","PID"],"issuer":"did:example:issuer","credentialSubject":{"id":"did:example:holder"}}}"""
+                .encodeToByteArray(),
+        )
+
+    private fun credentialResponse(credential: String, credentialCount: Int = 1): String {
+        val credentials = List(credentialCount) { """{"credential":${Json.encodeToString(credential)}}""" }.joinToString(",")
         return """{"credentials":[$credentials],"notification_id":"notification-id"}"""
     }
 
@@ -387,14 +396,6 @@ class WalletIssuanceNotificationTest {
               "token_endpoint": "$ISSUER/token",
               "response_types_supported": ["code"],
               "dpop_signing_alg_values_supported": ["EdDSA"]
-            }
-        """
-        const val CREDENTIAL = """
-            {
-              "@context": ["https://www.w3.org/2018/credentials/v1"],
-              "type": ["VerifiableCredential"],
-              "issuer": "did:example:issuer",
-              "credentialSubject": {"id": "did:example:holder"}
             }
         """
     }
