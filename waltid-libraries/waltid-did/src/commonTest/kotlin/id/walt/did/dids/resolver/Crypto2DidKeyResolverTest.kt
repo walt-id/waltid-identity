@@ -13,11 +13,14 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -80,6 +83,128 @@ class Crypto2DidKeyResolverTest {
         }
     }
 
+    @Test
+    fun `encryption JWK does not abort signing key resolution`() = runTest {
+        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val signingJwk = generatePublicJwk(runtime, "signing-private")
+        val encryptionJwk = JsonObject(
+            generatePublicJwk(runtime, "encryption-private")
+                .filterKeys { it !in setOf("use", "key_ops", "alg") } +
+                    mapOf(
+                        "use" to JsonPrimitive("enc"),
+                        "alg" to JsonPrimitive("ECDH-ES+A256KW"),
+                    )
+        )
+        val document = didDocument(signingJwk, encryptionJwk)
+        val resolver = DidDocumentCrypto2KeyResolver(FakeResolver(document), runtime)
+
+        val legacyKeys = resolver.resolveToKeys(DID)
+        val authenticationKeys = resolver.resolveToKeys(
+            DID,
+            keyId = null,
+            relationship = VerificationRelationshipType.Authentication,
+        )
+
+        assertEquals(setOf(KeyId(SIGNING_METHOD_ID)), legacyKeys.map { it.id }.toSet())
+        assertEquals(setOf(KeyId(SIGNING_METHOD_ID)), authenticationKeys.map { it.id }.toSet())
+        assertFailsWith<IllegalArgumentException> {
+            resolver.resolveToKeys(
+                DID,
+                keyId = ENCRYPTION_METHOD_ID,
+                relationship = VerificationRelationshipType.KeyAgreement,
+            )
+        }
+    }
+
+    @Test
+    fun `kid narrows methods before unrelated malformed method is imported`() = runTest {
+        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val document = buildJsonObject {
+            put("id", DID)
+            put("verificationMethod", buildJsonArray {
+                add(verificationMethod(SIGNING_METHOD_ID, generatePublicJwk(runtime, "signing-private")))
+                add(buildJsonObject {
+                    put("type", "JsonWebKey2020")
+                    put("controller", DID)
+                    put("publicKeyJwk", buildJsonObject { put("kty", "unsupported") })
+                })
+            })
+        }
+
+        val keys = DidDocumentCrypto2KeyResolver(FakeResolver(document), runtime).resolveToKeys(
+            DID,
+            keyId = SIGNING_METHOD_ID,
+            relationship = null,
+        )
+
+        assertEquals(setOf(KeyId(SIGNING_METHOD_ID)), keys.map { it.id }.toSet())
+    }
+
+    @Test
+    fun `authentication resolution rejects key agreement method`() = runTest {
+        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val document = didDocument(
+            signingJwk = generatePublicJwk(runtime, "signing-private"),
+            encryptionJwk = generatePublicJwk(runtime, "agreement-private"),
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            DidDocumentCrypto2KeyResolver(FakeResolver(document), runtime).resolveToKeys(
+                DID,
+                keyId = ENCRYPTION_METHOD_ID,
+                relationship = VerificationRelationshipType.Authentication,
+            )
+        }
+    }
+
+    @Test
+    fun `embedded authentication method is resolved`() = runTest {
+        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val document = buildJsonObject {
+            put("id", DID)
+            put("authentication", buildJsonArray {
+                add(verificationMethod(SIGNING_METHOD_ID, generatePublicJwk(runtime, "signing-private")))
+            })
+        }
+
+        val keys = DidDocumentCrypto2KeyResolver(FakeResolver(document), runtime).resolveToKeys(
+            DID,
+            keyId = SIGNING_METHOD_ID,
+            relationship = VerificationRelationshipType.Authentication,
+        )
+
+        assertEquals(setOf(KeyId(SIGNING_METHOD_ID)), keys.map { it.id }.toSet())
+    }
+
+    private suspend fun generatePublicJwk(runtime: CryptoRuntime, id: String): JsonObject {
+        val privateKey = runtime.generateSoftwareKey(
+            GenerateSoftwareKeyRequest(
+                id = KeyId(id),
+                spec = KeySpec.Ec(EcCurve.P256),
+                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            )
+        )
+        val publicJwk = privateKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk
+        return Json.parseToJsonElement(publicJwk.data.toByteArray().decodeToString()).jsonObject
+    }
+
+    private fun didDocument(signingJwk: JsonObject, encryptionJwk: JsonObject): JsonObject = buildJsonObject {
+        put("id", DID)
+        put("verificationMethod", buildJsonArray {
+            add(verificationMethod(SIGNING_METHOD_ID, signingJwk))
+            add(verificationMethod(ENCRYPTION_METHOD_ID, encryptionJwk))
+        })
+        put("authentication", buildJsonArray { add(JsonPrimitive(SIGNING_METHOD_ID)) })
+        put("keyAgreement", buildJsonArray { add(JsonPrimitive(ENCRYPTION_METHOD_ID)) })
+    }
+
+    private fun verificationMethod(id: String, jwk: JsonObject): JsonObject = buildJsonObject {
+        put("id", id)
+        put("type", "JsonWebKey2020")
+        put("controller", DID)
+        put("publicKeyJwk", jwk)
+    }
+
     @Suppress("OVERRIDE_DEPRECATION")
     private class FakeResolver(private val document: JsonObject) : DidResolver {
         override val name: String = "fake"
@@ -87,5 +212,11 @@ class Crypto2DidKeyResolverTest {
         override suspend fun resolve(did: String): Result<JsonObject> = Result.success(document)
         override suspend fun resolveToKey(did: String): Result<V1Key> = Result.failure(NotImplementedError())
         override suspend fun resolveToKeys(did: String): Result<Set<V1Key>> = Result.failure(NotImplementedError())
+    }
+
+    private companion object {
+        const val DID = "did:example:123"
+        const val SIGNING_METHOD_ID = "$DID#sig"
+        const val ENCRYPTION_METHOD_ID = "$DID#enc"
     }
 }
