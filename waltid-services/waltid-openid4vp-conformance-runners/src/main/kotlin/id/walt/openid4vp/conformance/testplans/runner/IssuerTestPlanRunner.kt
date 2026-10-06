@@ -4,11 +4,13 @@ import id.walt.openid4vp.conformance.testplans.keyAttestationAcceptanceModules
 import id.walt.openid4vp.conformance.testplans.requireIssuerProofEvidence
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.http.IssuerInterface
+import id.walt.openid4vp.conformance.testplans.http.safeConformanceFailure
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariant
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantModuleRunResult
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantRunResult
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantRunStatus
 import id.walt.openid4vp.conformance.testplans.runner.req.IssuerTestPlanConfiguration
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -145,6 +147,7 @@ class IssuerTestPlanRunner(
         proofType: String?,
     ): IssuerVariantModuleRunResult {
         var testId: String? = null
+        var stage = "Create test"
         val logUrlForTest: (String) -> String = { "https://$conformanceHost:$conformancePort/log-detail.html?log=$it" }
 
         return runCatching {
@@ -157,14 +160,17 @@ class IssuerTestPlanRunner(
             println("View test run at: ${logUrlForTest(testId)}")
             println("Waiting for conformance suite to complete issuer test...")
 
+            stage = "Wait for test completion"
             waitForIssuerTestCompletion(testId, credentialOfferProviderFor(testModule))
 
+            stage = "Read test result"
             val testRunInfo = conformance.getTestRunInfo(testId)
             println("Module $testModule finished with status=${testRunInfo.status}, result=${testRunInfo.result}")
 
             val accepted = acceptsModuleResult(testModule, testRunInfo.status, testRunInfo.result)
             if (proofType != null && testRunInfo.result == "PASSED" &&
                 (testModule in keyAttestationAcceptanceModules || testModule == "oid4vci-1_0-issuer-batch-issuance")) {
+                stage = "Check proof evidence"
                 requireIssuerProofEvidence(proofType, conformance.getTestLog(testId))
             }
             IssuerVariantModuleRunResult(
@@ -177,6 +183,7 @@ class IssuerTestPlanRunner(
                 variant = moduleVariant,
             )
         }.getOrElse { throwable ->
+            if (throwable is CancellationException) throw throwable
             val latestInfo = testId?.let { id -> runCatching { conformance.getTestRunInfo(id) }.getOrNull() }
             IssuerVariantModuleRunResult(
                 testModule = testModule,
@@ -186,6 +193,7 @@ class IssuerTestPlanRunner(
                 result = latestInfo?.result,
                 accepted = false,
                 error = throwable.compactMessage(),
+                failureSummary = "$stage: ${throwable.safeConformanceFailure()}",
                 variant = moduleVariant,
             )
         }
@@ -380,6 +388,7 @@ class IssuerTestPlanRunner(
     ): Boolean {
         val testRun = runCatching { conformance.getTestRun(testId) }
             .getOrElse {
+                if (it is CancellationException) throw it
                 if (shouldLog) {
                     println("Credential offer delivery is pending, but test run details are not available yet: ${it.compactMessage()}")
                 }
@@ -399,6 +408,7 @@ class IssuerTestPlanRunner(
 
         val testLog = runCatching { conformance.getTestLog(testId) }
             .getOrElse {
+                if (it is CancellationException) throw it
                 if (shouldLog) {
                     println("Credential offer delivery is pending, but test log is not available yet: ${it.compactMessage()}")
                 }

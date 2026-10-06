@@ -162,7 +162,7 @@ class ConformanceInterface(
 
     /** Get [TestRunResult] for a test referenced by [testId] */
     suspend fun getTestRun(testId: String): TestRunResult =
-        conformanceHttp.get("/api/runner/$testId").body<TestRunResult>()
+        conformanceHttp.getConformanceState("/api/runner/$testId", "Read test runner state").body<TestRunResult>()
 
     /** Mark a front-channel browser URL as visited, matching the conformance-suite UI behavior. */
     suspend fun markBrowserUrlVisited(testId: String, url: String) {
@@ -192,17 +192,13 @@ class ConformanceInterface(
 
     /** Get [TestRunInfo] for a test referenced by [testId] */
     suspend fun getTestRunInfo(testId: String): TestRunInfo {
-        val response = conformanceHttp.get("/api/info/$testId") {
-            header(HttpHeaders.CacheControl, "no-cache")
-        }
+        val response = conformanceHttp.getConformanceState("/api/info/$testId", "Read test status")
         return response.body<TestRunInfo>()
     }
 
     /** Get the full test log for a test referenced by [testId] */
     suspend fun getTestLog(testId: String): List<TestLogEntry> =
-        conformanceHttp.get("/api/log/$testId") {
-            header(HttpHeaders.CacheControl, "no-cache")
-        }.body<List<TestLogEntry>>()
+        conformanceHttp.getConformanceState("/api/log/$testId", "Read test log").body<List<TestLogEntry>>()
 
     /**
      * Fill the image placeholder [placeholder] of test [testId] with [imageDataUri].

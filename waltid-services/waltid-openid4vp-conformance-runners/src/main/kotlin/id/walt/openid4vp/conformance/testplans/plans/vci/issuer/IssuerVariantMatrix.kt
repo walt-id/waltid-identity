@@ -303,6 +303,8 @@ data class IssuerVariantModuleRunResult(
     val accepted: Boolean = false,
     val error: String? = null,
     val variant: JsonObject = JsonObject(emptyMap()),
+    /** Safe for CI artifacts; excludes raw exception messages and request/response data. */
+    val failureSummary: String? = null,
 )
 
 @Serializable

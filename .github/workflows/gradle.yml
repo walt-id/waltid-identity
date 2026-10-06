@@ -630,11 +630,11 @@ jobs:
                   issuer_reports+=("$ISSUER_REPORT_DIR/matrix.json")
                 fi
                 # Reuse the runner's batch classification; do not duplicate its coverage policy.
-                # Publish only identifiers/statuses, never raw errors, credentials or logs.
+                # Publish identifiers/statuses and the runner's safe failure summary, never raw errors, credentials or logs.
                 jq -s '(.[1] // [] | INDEX(.variantId)) as $matrix | .[0] | map({
                   variantId, status, planId, proofType: .variant.credential_proof_type,
                   batchCoverage: ($matrix[.variantId].batchCoverage // "UNKNOWN"),
-                  modules: [.modules[]? | {testModule, testId, status, result, accepted}]
+                  modules: [.modules[]? | {testModule, testId, status, result, accepted, failureSummary}]
                 })' "${issuer_reports[@]}" > "$ISSUER_DIAGNOSTICS_DIR/results.json"
                 for proof_type in jwt attestation; do
                   mkdir -p "$ISSUER_DIAGNOSTICS_DIR/$proof_type"
