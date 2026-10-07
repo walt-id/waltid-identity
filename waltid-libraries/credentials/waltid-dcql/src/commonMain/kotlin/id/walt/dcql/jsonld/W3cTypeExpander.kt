@@ -18,7 +18,8 @@ import kotlinx.serialization.json.contentOrNull
  * Only the active context at the credential node is used. Type-scoped contexts inside a term
  * definition apply to that term's properties, not to the `type` values themselves.
  * `@import` and document-base resolution are not applied. A context document with no `@context`
- * is ignored.
+ * is ignored. An unavailable context document leaves unprotected expansions that it could have
+ * changed unpublished, so those inferred IRIs do not match.
  */
 object W3cTypeExpander {
     private val log = KotlinLogging.logger {}
@@ -32,7 +33,25 @@ object W3cTypeExpander {
         val types = stringArray(node["type"])
         if (types.isEmpty()) return emptySet()
         val active = activeContext(node["@context"], documents)
-        return types.map { expandIri(it, active, vocabRelative = true) }.toSet()
+        return types.map { publishExpansion(it, active) }.toSet()
+    }
+
+    private fun publishExpansion(value: String, active: JsonLdActiveContext): String {
+        if (active.sawUnresolvedContext && expansionIsUncertain(value, active)) return value
+        return expandIri(value, active, vocabRelative = true)
+    }
+
+    private fun expansionIsUncertain(value: String, active: JsonLdActiveContext): Boolean {
+        if (value.startsWith("@")) return false
+        val colon = value.indexOf(':')
+        if (colon > 0) {
+            val prefix = value.substring(0, colon)
+            val suffix = value.substring(colon + 1)
+            if (prefix == "_" || suffix.startsWith("//")) return false
+            return prefix !in active.terms || prefix in active.uncertainTerms
+        }
+        if (value in active.terms) return value in active.uncertainTerms
+        return true
     }
 
     private fun activeContext(
@@ -43,7 +62,12 @@ object W3cTypeExpander {
         val key = ContextCacheKey(documents, context)
         processedContexts.load()[key]?.let { return it }
         val processed = processContext(JsonLdActiveContext(), context, documents, mutableSetOf())
-        val frozen = JsonLdActiveContext(processed.terms.toMap(), processed.vocab)
+        val frozen = JsonLdActiveContext(
+            terms = processed.terms.toMap(),
+            vocab = processed.vocab,
+            uncertainTerms = processed.uncertainTerms.toSet(),
+            sawUnresolvedContext = processed.sawUnresolvedContext,
+        )
         return remember(key, frozen)
     }
 
@@ -89,6 +113,7 @@ object W3cTypeExpander {
                 when {
                     document == null -> {
                         log.debug { "JSON-LD context document was not available: $url" }
+                        active.noteUnresolvedContext()
                         active
                     }
                     nested == null -> {
@@ -142,6 +167,7 @@ object W3cTypeExpander {
             val existing = session.active.terms[term]
             if (existing?.protected != true) {
                 session.active.terms.remove(term)
+                session.active.uncertainTerms.remove(term)
             }
             return
         }
@@ -156,6 +182,7 @@ object W3cTypeExpander {
             return
         }
         session.active.terms[term] = defined.copy(protected = existing?.protected == true || defined.protected)
+        session.active.uncertainTerms.remove(term)
     }
 
     private fun createTerm(session: TermDefinitionSession, term: String, value: JsonElement): JsonLdTerm? = when (value) {
@@ -253,9 +280,19 @@ private class TermDefinitionSession(
 internal class JsonLdActiveContext(
     terms: Map<String, JsonLdTerm> = emptyMap(),
     var vocab: String? = null,
+    uncertainTerms: Set<String> = emptySet(),
+    var sawUnresolvedContext: Boolean = false,
 ) {
     val terms: MutableMap<String, JsonLdTerm> = terms.toMutableMap()
+    val uncertainTerms: MutableSet<String> = uncertainTerms.toMutableSet()
     val hasProtectedTerms: Boolean get() = terms.values.any { it.protected }
+
+    fun noteUnresolvedContext() {
+        sawUnresolvedContext = true
+        for ((name, term) in terms) {
+            if (!term.protected) uncertainTerms.add(name)
+        }
+    }
 }
 
 internal data class JsonLdTerm(
