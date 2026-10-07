@@ -95,6 +95,32 @@ class KeyAttestationProofTest {
     }
 
     @Test
+    fun `non-DID kid rejects unmatched and ambiguous attested identifiers`() = runTest {
+        val attester = key()
+        val holder = key()
+        val jwk = JsonObject(holder.exportPublicJwkObject() - "kid")
+        val matching = JsonObject(jwk + ("kid" to JsonPrimitive("0")))
+        val other = JsonObject(key().exportPublicJwkObject() + ("kid" to JsonPrimitive("0")))
+        val optional = configuration.copy(proofTypesSupported = mapOf(ProofType.JWT.value to ProofTypeMetadata(setOf("ES256"))))
+        for (jwks in listOf(
+            listOf(JsonObject(jwk + ("kid" to JsonPrimitive("unmatched")))),
+            listOf(JsonObject(jwk + ("kid" to JsonPrimitive(0)))),
+            listOf(matching, other),
+            listOf(matching, matching),
+            listOf(jwk, other), // An explicit matching kid takes precedence over unnamed keys.
+            listOf(JsonObject(jwk + ("kid" to JsonPrimitive("unmatched"))), JsonObject(other - "kid")),
+        )) {
+            val inner = attestation(attester, listOf(holder), mapOf("attested_keys" to JsonArray(jwks)))
+            assertEquals(CredentialErrorCodes.INVALID_PROOF, assertFailsWith<CredentialProofValidationException> {
+                verifier.verify(request(proof(holder, inner, "0")), optional, context(attester))
+            }.errorCode)
+        }
+        assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(request(proof(holder, null, "0")), optional, context(attester))
+        }
+    }
+
+    @Test
     fun `proof signature selects unnamed attested keys without treating kid as an index`() = runTest {
         val attester = key()
         val holders = List(3) { key() }
@@ -120,6 +146,120 @@ class KeyAttestationProofTest {
             assertFailsWith<CredentialProofValidationException> {
                 verifier.verify(request(proof(key(), inner, "0")), configuration, context)
             }
+        }
+    }
+
+    @Test
+    fun `non-DID kid requires trusted valid attestation before key selection`() = runTest {
+        val attester = key()
+        val holder = key()
+        val claims = mapOf("attested_keys" to JsonArray(listOf(
+            JsonObject(holder.exportPublicJwkObject() - "kid"),
+        )))
+        val valid = attestation(attester, listOf(holder), claims)
+        val invalid = listOf(
+            attestation(key(), listOf(holder), claims),
+            valid.substringBeforeLast('.') + "." + attestation(attester, listOf(key())).substringAfterLast('.'),
+            attestation(attester, listOf(holder), claims + ("exp" to JsonPrimitive(now.epochSeconds - 120))),
+            attestation(attester, listOf(holder), claims + ("nbf" to JsonPrimitive(now.epochSeconds + 120))),
+            attestation(attester, listOf(holder), claims + ("iat" to JsonPrimitive(now.epochSeconds + 120))),
+        )
+        for (inner in invalid) {
+            assertFailsWith<CredentialProofValidationException> {
+                verifier.verify(request(proof(holder, inner, "0")), configuration, context(attester))
+            }
+        }
+        val jwt = request(proof(holder, valid, "0"))
+        assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(jwt, configuration, CredentialProofValidationContext(issuer))
+        }
+        val context = context(attester)
+        assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(jwt, configuration, context.copy(keyAttestation = context.keyAttestation!!.copy(
+                policy = KeyAttestationPolicy { _, _, _ -> false },
+            )))
+        }
+        val required = configuration.copy(proofTypesSupported = mapOf(ProofType.JWT.value to ProofTypeMetadata(
+            setOf("ES256"), KeyAttestationsRequired(keyStorage = setOf("iso_18045_high")),
+        )))
+        assertFailsWith<CredentialProofValidationException> { verifier.verify(jwt, required, context) }
+    }
+
+    @Test
+    fun `non-DID kid verifies outer signature claims and both nonces`() = runTest {
+        val attester = key()
+        val holder = key()
+        val claims = mapOf("attested_keys" to JsonArray(listOf(
+            JsonObject(holder.exportPublicJwkObject() - "kid"),
+        )))
+        val inner = attestation(attester, listOf(holder), claims)
+        var nonceChecks = 0
+        val nonceService = object : CredentialNonceService {
+            override suspend fun issue(binding: CredentialNonceBinding) = IssuedCredentialNonce("nonce")
+            override suspend fun validate(nonce: String, binding: CredentialNonceBinding): CredentialNonceValidationResult {
+                nonceChecks++
+                return if (nonce == "nonce") CredentialNonceValidationResult.VALID else CredentialNonceValidationResult.INVALID
+            }
+        }
+        val context = context(attester).copy(
+            clientId = "client",
+            nonceValidation = CredentialNonceValidationContext(nonceService, CredentialNonceBinding(issuer, "$issuer/credential", "$issuer/nonce")),
+        )
+        verifier.verify(request(proof(holder, inner, "0")), configuration, context)
+        assertEquals(2, nonceChecks)
+        assertEquals("Credential proof signature does not match an eligible attested key", assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(request(proof(key(), inner, "0")), configuration, context)
+        }.message)
+        for (invalidClaim in listOf(
+            "aud" to JsonPrimitive("https://other.example"),
+            "iss" to JsonPrimitive("other-client"),
+            "iat" to JsonPrimitive(now.epochSeconds - 600),
+            "nonce" to JsonPrimitive("wrong-nonce"),
+        )) {
+            assertFailsWith<CredentialProofValidationException> {
+                verifier.verify(request(proof(holder, inner, "0", mapOf(invalidClaim))), configuration, context)
+            }
+        }
+        val wrongNonce = attestation(attester, listOf(holder), claims + ("nonce" to JsonPrimitive("wrong-nonce")))
+        assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(request(proof(holder, wrongNonce, "0")), configuration, context)
+        }
+        val didOnly = configuration.copy(cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Did("jwk")))
+        assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(request(proof(holder, inner, "0")), didOnly, context)
+        }
+    }
+
+    @Test
+    fun `non-DID kid respects attested JWK algorithm and advertised proof algorithms`() = runTest {
+        val attester = key()
+        val holder = key(KeySpec.Rsa(2048))
+        val jwk = JsonObject(holder.exportPublicJwkObject() + mapOf(
+            "kid" to JsonPrimitive("0"), "alg" to JsonPrimitive("RS256"),
+        ))
+        val inner = attestation(attester, listOf(holder), mapOf("attested_keys" to JsonArray(listOf(jwk))))
+        val rsaConfiguration = configuration.copy(proofTypesSupported = mapOf(
+            ProofType.JWT.value to ProofTypeMetadata(setOf("ES256", "RS256", "PS256"), KeyAttestationsRequired()),
+        ))
+        val accepted = request(proof(holder, inner, "0", algorithm = JwsAlgorithm.RS256))
+        verifier.verify(accepted, rsaConfiguration, context(attester))
+        assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(accepted, configuration, context(attester))
+        }
+        assertEquals("Attested JWK algorithm does not match the proof algorithm", assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(request(proof(holder, inner, "0", algorithm = JwsAlgorithm.PS256)), rsaConfiguration, context(attester))
+        }.message)
+        val wrongKeyType = attestation(attester, listOf(holder), mapOf("attested_keys" to JsonArray(listOf(JsonObject(jwk - "alg")))))
+        assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(request(proof(key(), wrongKeyType, "0")), configuration, context(attester))
+        }
+        val unnamed = attestation(attester, listOf(holder), mapOf("attested_keys" to JsonArray(listOf(JsonObject(jwk - "kid")))))
+        verifier.verify(request(proof(holder, unnamed, "0", algorithm = JwsAlgorithm.RS256)), rsaConfiguration, context(attester))
+        assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(request(proof(holder, unnamed, "0", algorithm = JwsAlgorithm.PS256)), rsaConfiguration, context(attester))
+        }
+        assertFailsWith<CredentialProofValidationException> {
+            verifier.verify(request(proof(key(), unnamed, "0")), configuration, context(attester))
         }
     }
 
