@@ -35,6 +35,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 internal val walletApi2Json = Json {
     ignoreUnknownKeys = true
@@ -272,6 +273,44 @@ internal fun StoredCredentialMetadataDto.toDemoCredential(): WalletDemoCredentia
 internal fun publicJwkFromDidDocument(document: JsonObject?): String {
     val methods = document?.get("verificationMethod") as? JsonArray ?: return "{}"
     return methods.firstOrNull()?.jsonObject?.get("publicKeyJwk")?.toString() ?: "{}"
+}
+
+internal data class VerifiedHolder(
+    val keyId: String,
+    val did: String,
+    val publicJwk: String,
+)
+
+/** Pair each key with a DID whose verification method publishes that key. */
+internal fun verifiedHolderPairs(keys: List<WalletKeyInfo>, dids: List<WalletDidEntry>): List<VerifiedHolder> {
+    val remaining = dids.toMutableList()
+    return buildList {
+        for (key in keys) {
+            val publicJwk = key.publicJwk ?: continue
+            val index = remaining.indexOfFirst { matchingVerificationKey(it.document, publicJwk) != null }
+            if (index < 0) continue
+            val did = remaining.removeAt(index)
+            val matched = matchingVerificationKey(did.document, publicJwk) ?: continue
+            add(VerifiedHolder(key.keyId, did.did, matched.toString()))
+        }
+    }
+}
+
+internal fun matchingVerificationKey(document: JsonObject?, publicJwk: JsonObject): JsonObject? {
+    val fields = publicKeyFields(publicJwk)
+    if (fields.isEmpty()) return null
+    val methods = document?.get("verificationMethod") as? JsonArray ?: return null
+    return methods.firstNotNullOfOrNull { entry ->
+        val key = (entry as? JsonObject)?.get("publicKeyJwk") as? JsonObject ?: return@firstNotNullOfOrNull null
+        if (fields.all { name -> key[name] != null && key[name] == publicJwk[name] }) key else null
+    }
+}
+
+private fun publicKeyFields(publicJwk: JsonObject): List<String> = when (publicJwk["kty"]?.jsonPrimitive?.contentOrNull) {
+    "EC" -> listOf("kty", "crv", "x", "y")
+    "OKP" -> listOf("kty", "crv", "x")
+    "RSA" -> listOf("kty", "n", "e")
+    else -> emptyList()
 }
 
 private fun jsonElementAsString(value: JsonElement?): String? = when (value) {

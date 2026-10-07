@@ -82,7 +82,9 @@ import kotlin.uuid.Uuid
 import id.walt.crypto2.keys.Key as Crypto2Key
 
 private val log = KotlinLogging.logger {}
-private const val DEFAULT_CLIENT_ID = "eudiw-abca"
+
+const val Wallet2DefaultClientId = "eudiw-abca"
+private const val DEFAULT_CLIENT_ID = Wallet2DefaultClientId
 
 // ---------------------------------------------------------------------------
 // Shared offer-source contract
