@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WalletDemoSharingUI
 
 struct PinView: View {
@@ -32,7 +33,7 @@ struct PinView: View {
             if viewModel.access.operation == .checkingPin || viewModel.access.operation == .savingPin {
                 ProgressView().accessibilityLabel("Checking PIN")
             } else if let error {
-                Text(error).font(.callout).foregroundStyle(.red).accessibilityAddTraits(.updatesFrequently)
+                Text(error).font(.callout).foregroundStyle(.red)
             }
         } actions: {
             WalletActions(primary: retryAction,
@@ -51,6 +52,11 @@ struct PinView: View {
         }
         .onAppear { previousStage = stage }
         .onChange(of: stage) { next in forward = next > previousStage; previousStage = next }
+        .onChange(of: error) { message in
+            guard let message, UIAccessibility.isVoiceOverRunning else { return }
+            UIAccessibility.post(notification: .announcement, argument: NSAttributedString(string: message,
+                attributes: [.accessibilitySpeechQueueAnnouncement: true]))
+        }
     }
 
     private var changing: Bool { viewModel.access.pinChange != nil }
