@@ -1,8 +1,10 @@
 package id.walt.dcql.jsonld
 
+import id.walt.dcql.DcqlCredential
 import id.walt.dcql.DcqlParser
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.DcqlMatcher
+import id.walt.dcql.models.TrustedAuthoritiesQuery
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -147,6 +149,24 @@ class W3cTypeExpanderTest {
     }
 
     @Test
+    fun localTermReferenceDoesNotDependOnKeyOrder() {
+        val expanded = W3cTypeExpander.expandedTypes(
+            json.parseToJsonElement(
+                """
+                {
+                  "@context": {
+                    "Degree": "UniversityDegree",
+                    "UniversityDegree": "https://example.org/#UniversityDegree"
+                  },
+                  "type": ["Degree"]
+                }
+                """.trimIndent()
+            ).jsonObject
+        )
+        assertEquals(setOf("https://example.org/#UniversityDegree"), expanded)
+    }
+
+    @Test
     fun objectTermDefinitionIsNotAPrefixUnlessMarked() {
         val expanded = W3cTypeExpander.expandedTypes(
             json.parseToJsonElement(
@@ -279,6 +299,32 @@ class W3cTypeExpanderTest {
             """.trimIndent()
         ).getOrThrow()
         assertTrue(DcqlMatcher.match(claimsQuery, listOf(credential), contextDocuments = documents).isSuccess)
+    }
+
+    @Test
+    fun defaultMatchOverloadUsesBundledGaiaXContext() {
+        val credential = RawDcqlCredential(
+            id = "legal-person",
+            format = "jwt_vc_json",
+            data = json.parseToJsonElement(
+                """
+                {
+                  "@context": [
+                    "https://www.w3.org/ns/credentials/v2",
+                    "https://w3id.org/gaia-x/development#",
+                    { "vcard": "http://www.w3.org/2006/vcard/ns#", "schema": "https://schema.org/" }
+                  ],
+                  "type": ["VerifiableCredential", "gx:LegalPerson"],
+                  "credentialSubject": { "name": "Example Org" }
+                }
+                """.trimIndent()
+            ).jsonObject,
+        )
+        val expandedQuery = query("""[["VerifiableCredential", "$legalPerson"]]""")
+        assertTrue(DcqlMatcher.match(expandedQuery, listOf(credential)).isSuccess)
+        val checker: (DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean = { _, _ -> true }
+        assertTrue(DcqlMatcher.match(expandedQuery, listOf(credential), checker).isSuccess)
+        assertTrue(DcqlMatcher.match(expandedQuery, listOf(credential)) { _, _ -> true }.isSuccess)
     }
 
     private fun query(typeValues: String) = DcqlParser.parse(
