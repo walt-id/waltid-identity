@@ -1,5 +1,8 @@
 package id.walt.policies2.vc.policies.status
 
+import id.walt.cose.CoseSign1
+import id.walt.cose.coseCompliantCbor
+import id.walt.policies2.vc.policies.status.content.JwtParser
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -7,7 +10,14 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.cbor.CborLabel
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -35,14 +45,16 @@ sealed class StatusListContent {
 }
 
 /**
- * Fetches status-list tokens and, when the response includes a positive `Cache-Control: max-age`,
- * reuses that body until the lifetime elapses. Missing, `no-store`, `no-cache`, or `max-age=0`
- * headers keep the previous always-fetch behavior.
+ * Fetches status-list tokens and reuses a body until the earliest of HTTP freshness and the
+ * token `ttl`/`exp` claims. Missing bounds, `no-store`, `no-cache`, or a non-positive remaining
+ * lifetime keep the previous always-fetch behavior.
  */
 class CredentialFetcher(
     private val client: HttpClient,
-    private val now: () -> Instant = { Clock.System.now() },
+    private val now: () -> Instant,
 ) {
+    constructor(client: HttpClient) : this(client, { Clock.System.now() })
+
     private val logger = KotlinLogging.logger { }
     private val mutex = Mutex()
     private val cache = mutableMapOf<String, CachedStatusList>()
@@ -57,9 +69,10 @@ class CredentialFetcher(
             return@runCatching cached
         }
         logger.debug { "Fetching content from URL: $url" }
+        val requestStart = now()
         val response = download(url)
+        val receivedAt = now()
         val contentType = response.contentType()
-        val cacheControl = response.headers[HttpHeaders.CacheControl]
         val content = if (contentType?.match(ContentType("application", "statuslist+cwt")) == true) {
             logger.debug { "Received binary CWT content" }
             StatusListContent.Binary(response.readRawBytes())
@@ -67,7 +80,13 @@ class CredentialFetcher(
             logger.debug { "Received text content" }
             StatusListContent.Text(response.bodyAsText())
         }
-        remember(url, content, cacheControl)
+        remember(
+            url = url,
+            content = content,
+            cacheControlValues = response.headers.getAll(HttpHeaders.CacheControl).orEmpty(),
+            ageSeconds = response.headers[HttpHeaders.Age]?.toLongOrNull(),
+            responseDelay = receivedAt - requestStart,
+        )
         content
     }.onFailure { logger.error { "Failed to fetch content from URL: $url" } }
 
@@ -91,12 +110,24 @@ class CredentialFetcher(
         }
     }
 
-    private suspend fun remember(url: String, content: StatusListContent, cacheControl: String?) {
-        val maxAge = HttpCacheControl.maxAgeSeconds(cacheControl) ?: return
+    private suspend fun remember(
+        url: String,
+        content: StatusListContent,
+        cacheControlValues: List<String>,
+        ageSeconds: Long?,
+        responseDelay: Duration,
+    ) {
+        val currentTime = now()
+        val (ttlSeconds, expEpochSeconds) = StatusListTokenLifetime.from(content)
+        val expiresAt = StatusListCacheExpiry.of(
+            now = currentTime,
+            httpRemaining = HttpCacheControl.remainingFreshness(cacheControlValues, ageSeconds, responseDelay),
+            ttlSeconds = ttlSeconds,
+            expEpochSeconds = expEpochSeconds,
+        ) ?: return
         mutex.withLock {
-            val currentTime = now()
             cache.entries.removeAll { it.value.expiresAt <= currentTime }
-            cache[url] = CachedStatusList(content, currentTime + maxAge.seconds)
+            cache[url] = CachedStatusList(content, expiresAt)
             while (cache.size > MAX_CACHE_ENTRIES) {
                 val oldest = cache.minBy { it.value.expiresAt }
                 cache.remove(oldest.key)
@@ -115,9 +146,22 @@ class CredentialFetcher(
 }
 
 internal object HttpCacheControl {
+    fun remainingFreshness(
+        cacheControlValues: List<String>,
+        ageSeconds: Long?,
+        responseDelay: Duration,
+    ): Duration? {
+        val combined = cacheControlValues.joinToString(",")
+        val maxAge = maxAgeSeconds(combined) ?: return null
+        val age = (ageSeconds ?: 0L).coerceAtLeast(0L)
+        val delaySeconds = responseDelay.inWholeSeconds.coerceAtLeast(0L)
+        val remaining = maxAge - age - delaySeconds
+        return remaining.takeIf { it > 0 }?.seconds
+    }
+
     fun maxAgeSeconds(header: String?): Long? {
         if (header.isNullOrBlank()) return null
-        val directives = header.split(',').map { it.trim().lowercase() }
+        val directives = header.split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }
         if (directives.any { it == "no-store" || it == "no-cache" || it.startsWith("no-store") || it.startsWith("no-cache") }) {
             return null
         }
@@ -129,4 +173,52 @@ internal object HttpCacheControl {
         }
         return maxAge?.takeIf { it > 0 }
     }
+}
+
+internal object StatusListCacheExpiry {
+    fun of(
+        now: Instant,
+        httpRemaining: Duration?,
+        ttlSeconds: Long?,
+        expEpochSeconds: Long?,
+    ): Instant? {
+        val deadlines = buildList {
+            httpRemaining?.let { add(now + it) }
+            ttlSeconds?.takeIf { it > 0 }?.let { add(now + it.seconds) }
+            expEpochSeconds?.let { add(Instant.fromEpochSeconds(it)) }
+        }
+        return deadlines.minOrNull()?.takeIf { it > now }
+    }
+}
+
+internal object StatusListTokenLifetime {
+    private val jwtParser = JwtParser()
+
+    fun from(content: StatusListContent): Pair<Long?, Long?> = when (content) {
+        is StatusListContent.Text -> fromJwt(content.content)
+        is StatusListContent.Binary -> fromCwt(content.content)
+    }
+
+    fun fromJwt(jwt: String): Pair<Long?, Long?> = runCatching {
+        val payload = jwtParser.parse(jwt)
+        payload["ttl"]?.jsonPrimitive?.longOrNull to payload["exp"]?.jsonPrimitive?.longOrNull
+    }.getOrDefault(null to null)
+
+    fun fromCwt(cwt: ByteArray): Pair<Long?, Long?> = runCatching {
+        val payload = CoseSign1.fromTagged(cwt).payload ?: return null to null
+        fromCwtPayload(payload)
+    }.getOrDefault(null to null)
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun fromCwtPayload(payload: ByteArray): Pair<Long?, Long?> = runCatching {
+        val claims = coseCompliantCbor.decodeFromByteArray<CwtLifetimeClaims>(payload)
+        claims.ttl to claims.exp
+    }.getOrDefault(null to null)
+
+    @OptIn(ExperimentalSerializationApi::class)
+    @Serializable
+    private data class CwtLifetimeClaims(
+        @CborLabel(4) val exp: Long? = null,
+        @CborLabel(65534) val ttl: Long? = null,
+    )
 }
