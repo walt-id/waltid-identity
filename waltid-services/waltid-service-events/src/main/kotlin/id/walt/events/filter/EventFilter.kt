@@ -15,5 +15,6 @@ data class EventFilter(
     val issuanceEventFilter: IssuanceEventFilter? = null,
     val verificationEventFilter: VerificationEventFilter? = null,
     val keyEventFilter: KeyEventFilter? = null,
-    val didEventFilter: DidEventFilter? = null
+    val didEventFilter: DidEventFilter? = null,
+    val usageEventFilter: UsageEventFilter? = null,
 )
