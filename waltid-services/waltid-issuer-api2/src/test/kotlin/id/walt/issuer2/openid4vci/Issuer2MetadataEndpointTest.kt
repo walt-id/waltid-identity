@@ -37,6 +37,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.metadata.issuer.SigningAlgId
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.proofs.ProofType
+import id.walt.openid4vci.metadata.issuer.KeyAttestationsRequired
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
@@ -514,6 +515,17 @@ class Issuer2MetadataEndpointTest {
             }.keys,
             "Required JWT attestation must be confined to the EUDI configurations",
         )
+        val configured = ConfigManager.getConfig<Issuer2MetadataConfig>().credentialConfigurations
+        credentialIssuerMetadata.credentialConfigurationsSupported.forEach { (id, configuration) ->
+            val expectedProofs = configured.getValue(id).jsonObject["proof_types_supported"]?.jsonObject
+            configuration.proofTypesSupported.orEmpty().forEach { (type, proof) ->
+                val expected = expectedProofs?.get(type)?.jsonObject?.get("key_attestations_required")
+                val actual = proof.keyAttestationsRequired?.let {
+                    json.encodeToJsonElement(KeyAttestationsRequired.serializer(), it)
+                }
+                assertEquals(expected, actual, "Expected configured key_attestations_required for $id $type proof")
+            }
+        }
         Issuer2CredentialScenarios.configured.forEach { scenario ->
             val configuration = assertNotNull(
                 credentialIssuerMetadata.credentialConfigurationsSupported[scenario.credentialConfigurationId],
