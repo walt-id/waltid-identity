@@ -34,6 +34,16 @@ interface X509Certificate {
     suspend fun restoreSubjectPublicKey(cryptoRuntime: CryptoRuntime): Key =
         data.subjectPublicKeyInfo.restore(cryptoRuntime)
 
+    /**
+     * should compare encodedDer
+     */
+    override fun equals(other: Any?): Boolean
+
+    /**
+     * should return hashCode of encodedDer
+     */
+    override fun hashCode(): Int
+
     interface CertificateData : Pkcs10CertificateSigningRequest.RequestedCertificateData {
         val version: Int
 
@@ -45,7 +55,6 @@ interface X509Certificate {
         val issuerDnRaw: ByteString
 
         val validity: Validity
-
     }
 
     data class Validity(

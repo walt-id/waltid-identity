@@ -2306,8 +2306,8 @@ public final class id/walt/wallet2/mobile/ProximityReaderTrustSettingsCodec {
 	public static final field MaximumImportBytes I
 	public final fun decode (Ljava/lang/String;)Lid/walt/wallet2/mobile/ProximityReaderTrustSettings;
 	public final fun encode (Lid/walt/wallet2/mobile/ProximityReaderTrustSettings;)Ljava/lang/String;
-	public final fun prepareImport (Ljava/lang/String;[BLid/walt/wallet2/mobile/ProximityReaderTrustSettings;Lkotlin/time/Instant;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun prepareImport$default (Lid/walt/wallet2/mobile/ProximityReaderTrustSettingsCodec;Ljava/lang/String;[BLid/walt/wallet2/mobile/ProximityReaderTrustSettings;Lkotlin/time/Instant;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun prepareImport (Ljava/lang/String;[BLid/walt/wallet2/mobile/ProximityReaderTrustSettings;Lkotlin/time/Clock;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun prepareImport$default (Lid/walt/wallet2/mobile/ProximityReaderTrustSettingsCodec;Ljava/lang/String;[BLid/walt/wallet2/mobile/ProximityReaderTrustSettings;Lkotlin/time/Clock;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class id/walt/wallet2/mobile/ProximityReaderTrustState : java/lang/Enum {
