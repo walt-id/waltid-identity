@@ -1,6 +1,8 @@
 package id.walt.holderpolicies.checks
 
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.jsonld.loadW3cContextDocuments
+import id.walt.webdatafetching.WebDataFetcher
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
@@ -10,6 +12,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+
+private val jsonLdContexts by lazy { WebDataFetcher("holder-policy-jsonld-context") }
 
 @Serializable
 @SerialName("dcql")
@@ -29,7 +33,8 @@ data class DcqlHolderPolicyCheck(
                 else null
             )
         }
-        val match = DcqlMatcher.findMatches(dcqlQuery, dcqlCredentials)
+        val contexts = jsonLdContexts.httpClient.loadW3cContextDocuments(dcqlCredentials)
+        val match = DcqlMatcher.findMatches(dcqlQuery, dcqlCredentials, contextDocuments = contexts)
         return match.isSuccess && match.getOrThrow().isNotEmpty()
     }
 

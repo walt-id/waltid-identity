@@ -30,6 +30,8 @@ kotlin {
             // walt.id
             api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             api(project(":waltid-libraries:credentials:waltid-dcql"))
+            implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
+            implementation(identityLibs.ktor.client.core)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

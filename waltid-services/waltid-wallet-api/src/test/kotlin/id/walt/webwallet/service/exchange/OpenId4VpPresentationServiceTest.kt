@@ -703,7 +703,7 @@ class OpenId4VpPresentationServiceTest {
         val service = OpenId4VpPresentationService(mockk(relaxed = true))
         mockkObject(DcqlMatcher)
         try {
-            every { DcqlMatcher.match(any(), any()) } returns Result.failure(IllegalArgumentException("boom"))
+            every { DcqlMatcher.match(any(), any(), any(), any()) } returns Result.failure(IllegalArgumentException("boom"))
 
             val error = assertFailsWith<IllegalArgumentException> {
                 runBlocking { service.matchCredentialResults(query, listOf(matchingCredential())) }

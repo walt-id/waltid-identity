@@ -1,5 +1,7 @@
 package id.walt.dcql
 
+import id.walt.dcql.jsonld.JsonLdContextDocumentSource
+import id.walt.dcql.jsonld.W3cTypeExpander
 import id.walt.dcql.models.*
 import id.walt.dcql.models.meta.*
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -32,6 +34,7 @@ object DcqlMatcher {
     fun findMatches(
         query: DcqlQuery,
         availableCredentials: List<DcqlCredential>,
+        contextDocuments: JsonLdContextDocumentSource = JsonLdContextDocumentSource.bundled,
         trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ): Result<Map<String, List<DcqlMatchResult>>> {
         log.debug { "Starting DCQL discovery. Query: $query, Available Credentials Count: ${availableCredentials.size}" }
@@ -53,7 +56,7 @@ object DcqlMatcher {
             val successfullyMatchedCredentialsForThisQuery = mutableListOf<DcqlMatchResult>()
 
             for (credential in potentialMatchesByFormat) {
-                val metaCheck = matchesMeta(credential, credentialQuery.meta, credentialQuery.format)
+                val metaCheck = matchesMeta(credential, credentialQuery.meta, credentialQuery.format, contextDocuments)
                 if (!metaCheck) {
                     log.trace { "Credential ${credential.id} failed meta check for query ${credentialQuery.id}" }
                     continue
@@ -112,9 +115,10 @@ object DcqlMatcher {
     fun match(
         query: DcqlQuery,
         availableCredentials: List<DcqlCredential>,
+        contextDocuments: JsonLdContextDocumentSource = JsonLdContextDocumentSource.bundled,
         trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ): Result<Map<String, List<DcqlMatchResult>>> {
-        val discovered = findMatches(query, availableCredentials, trustedAuthoritiesChecker)
+        val discovered = findMatches(query, availableCredentials, contextDocuments, trustedAuthoritiesChecker)
         if (discovered.isFailure) return discovered
         val finalIndividualMatches = discovered.getOrThrow()
         enforceSatisfaction(query, finalIndividualMatches.keys)?.let { return Result.failure(it) }
@@ -134,9 +138,10 @@ object DcqlMatcher {
     fun matchWithoutClaims(
         query: DcqlQuery,
         availableCredentials: List<DcqlCredential>,
+        contextDocuments: JsonLdContextDocumentSource = JsonLdContextDocumentSource.bundled,
         trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ): Result<Map<String, List<DcqlCredential>>> {
-        val discovered = findMatches(query, availableCredentials, trustedAuthoritiesChecker)
+        val discovered = findMatches(query, availableCredentials, contextDocuments, trustedAuthoritiesChecker)
         val individualMatches = discovered.getOrElse { return Result.failure(it) }
             .mapValues { (_, results) -> results.map { it.credential } }
         enforceSatisfaction(query, individualMatches.keys)?.let { return Result.failure(it) }
@@ -325,7 +330,8 @@ object DcqlMatcher {
     private fun matchesMeta(
         credential: DcqlCredential,
         metaQuery: CredentialQueryMeta?,
-        expectedFormat: CredentialFormat
+        expectedFormat: CredentialFormat,
+        contextDocuments: JsonLdContextDocumentSource,
     ): Boolean {
         // If metaQuery is NoMeta, it means no specific constraints from the query side.
         if (metaQuery == null || metaQuery is NoMeta) {
@@ -362,19 +368,22 @@ object DcqlMatcher {
                     log.warn { "W3cCredentialMeta applied to non-W3C format ${credential.format} for ${credential.id}" }
                     return false
                 }
-                val credTypesElement = credential.data["type"] ?: credential.data["vc"]?.jsonObject["type"]
+                val credentialNode = W3cTypeExpander.w3cCredentialNode(credential.data)
+                val credTypesElement = credentialNode["type"]
                 if (credTypesElement !is JsonArray) {
                     log.warn { "W3C credential ${credential.id} 'type' field is missing or not an array." }
                     return false
                 }
                 val credTypes = credTypesElement.mapNotNull { it.jsonPrimitive.contentOrNull }
+                // OpenID4VP 1.0 Appendix B.1.1 compares type_values to types expanded with @context.
+                // Compact type strings are also accepted so existing queries that send the compact
+                // name continue to match.
+                val expandedTypes = W3cTypeExpander.expandedTypes(credential.data, contextDocuments)
 
-                // Spec B.1.1: "Each of the top-level arrays specifies one alternative to match..."
-                // "...Each inner array specifies a set of fully expanded types that MUST be present..."
-                // Spec B.1.1: "type_values: REQUIRED. A non-empty array of string arrays..."
-                // The init block in W3cCredentialMeta now enforces non-empty.
                 metaQuery.typeValues.any { requiredTypeSet ->
-                    requiredTypeSet.all { requiredType -> credTypes.contains(requiredType) }
+                    requiredTypeSet.all { requiredType ->
+                        requiredType in credTypes || requiredType in expandedTypes
+                    }
                 }
             }
 
