@@ -155,18 +155,45 @@ final class WalletE2EUI {
     }
 
     func openDeepLink(_ value: String) {
-        guard let url = URL(string: value) else {
-            XCTFail("Invalid deep link URL: \(value)")
+        guard URL(string: value) != nil else {
+            XCTFail("Invalid deep link URL")
             return
         }
 
-        app.open(url)
-        app.activate()
+        // Use Safari to deliver the URL to the running wallet. XCTest's open
+        // operation starts another launch and replaces its tracked process.
+        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
+        safari.activate()
+        let address = safari.textFields.firstMatch
+        if !address.waitForExistence(timeout: 5), safari.buttons["Continue"].exists {
+            safari.buttons["Continue"].tap()
+        }
+        guard address.waitForExistence(timeout: 10) else {
+            XCTFail("Safari address field was unavailable")
+            return
+        }
+        address.tap()
+        address.typeText(value + XCUIKeyboardKey.return.rawValue)
+
+        let open = safari.buttons["Open"]
+        if open.waitForExistence(timeout: 5) {
+            // The confirmation can lack an XCTest hit point. Use the visible
+            // button's own frame, as in the native demo's deep-link helper.
+            guard !open.frame.isEmpty else {
+                XCTFail("Safari Open confirmation had no visible frame")
+                return
+            }
+            open.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        guard app.wait(for: .runningForeground, timeout: 10) else {
+            XCTFail("The URL handoff did not foreground the Compose wallet")
+            return
+        }
 
         let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
         if pinInput.waitForExistence(timeout: 2) {
             unlockWallet()
-            _ = waitUntilWalletReady(timeout: 60)
+            XCTAssertEqual(waitUntilWalletReady(timeout: 60), "Wallet ready")
         }
     }
 

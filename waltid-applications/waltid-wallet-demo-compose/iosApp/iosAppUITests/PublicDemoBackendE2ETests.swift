@@ -405,7 +405,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertFalse(app.staticTexts["No credentials"].exists)
 
         app.terminate()
-        try await Task.sleep(nanoseconds: 2_000_000_000)
+        XCTAssertEqual(app.state, .notRunning)
 
         ui.launchExpectingLoginAndUnlock(environment: environment, walletReadyTimeout: walletReadyTimeout)
         XCTAssertFalse(app.staticTexts["No credentials"].exists, "Credentials did not persist across app restart")

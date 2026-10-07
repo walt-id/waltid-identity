@@ -174,6 +174,22 @@ runs:
           -parallel-testing-enabled NO \
           OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
 
+    - name: Remove conflicting native demo URL handler
+      if: ${{ inputs.run-native-demo-tests == 'true' && inputs.run-compose-demo-tests == 'true' }}
+      shell: bash
+      run: |
+        # Both demos register the same URL schemes. Keep Safari handoffs scoped to Compose
+        # after the native suite finishes, using the destination recorded in its result bundle.
+        native_results="${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp/TestResults.xcresult"
+        simulator_id=$(xcrun xcresulttool get test-results summary --path "$native_results" | python3 -c '
+        import json, sys
+        devices = {entry["device"]["deviceId"] for entry in json.load(sys.stdin)["devicesAndConfigurations"]}
+        if len(devices) != 1:
+            raise SystemExit("Expected one native demo test destination")
+        print(devices.pop())
+        ')
+        xcrun simctl uninstall "$simulator_id" id.walt.wallet.native
+
     - name: Execute Compose iOS demo app tests
       if: ${{ inputs.run-compose-demo-tests == 'true' }}
       id: compose_ios_demo_app_tests
