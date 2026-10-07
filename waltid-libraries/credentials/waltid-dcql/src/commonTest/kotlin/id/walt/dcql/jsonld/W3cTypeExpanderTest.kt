@@ -13,6 +13,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class W3cTypeExpanderTest {
@@ -325,6 +326,63 @@ class W3cTypeExpanderTest {
         val checker: (DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean = { _, _ -> true }
         assertTrue(DcqlMatcher.match(expandedQuery, listOf(credential), checker).isSuccess)
         assertTrue(DcqlMatcher.match(expandedQuery, listOf(credential)) { _, _ -> true }.isSuccess)
+    }
+
+    @Test
+    fun unavailableLaterContextDoesNotKeepThePreviousExpandedIri() {
+        val revised = "https://example.org/revised#"
+        val credential = RawDcqlCredential(
+            id = "legal-person",
+            format = "jwt_vc_json",
+            data = json.parseToJsonElement(
+                """
+                {
+                  "@context": [
+                    "https://www.w3.org/ns/credentials/v2",
+                    "https://w3id.org/gaia-x/development",
+                    "https://issuer.example/revised"
+                  ],
+                  "type": ["VerifiableCredential", "gx:LegalPerson"]
+                }
+                """.trimIndent()
+            ).jsonObject,
+        )
+        val redefined = LayeredJsonLdContextDocuments(
+            listOf(
+                JsonLdContextDocumentSource.bundled,
+                MapJsonLdContextDocuments(
+                    mapOf(
+                        "https://issuer.example/revised" to json.parseToJsonElement(
+                            """{ "@context": { "gx": "$revised" } }"""
+                        ).jsonObject,
+                    ),
+                ),
+            ),
+        )
+        val withRevision = W3cTypeExpander.expandedTypes(credential.data, redefined)
+        assertEquals(setOf(verifiableCredential, revised + "LegalPerson"), withRevision)
+        assertFalse(legalPerson in withRevision)
+
+        val unresolved = W3cTypeExpander.expandedTypes(credential.data)
+        val unresolvedAgain = W3cTypeExpander.expandedTypes(credential.data)
+        assertEquals(setOf(verifiableCredential, "gx:LegalPerson"), unresolved)
+        assertEquals(unresolved, unresolvedAgain)
+        assertFalse(legalPerson in unresolved)
+
+        val expandedQuery = query("""[["$legalPerson"]]""")
+        val compactQuery = query("""[["gx:LegalPerson"]]""")
+        val protectedQuery = query("""[["$verifiableCredential"]]""")
+        assertTrue(DcqlMatcher.match(expandedQuery, listOf(credential)).isFailure)
+        assertTrue(DcqlMatcher.match(compactQuery, listOf(credential)).isSuccess)
+        assertTrue(DcqlMatcher.match(protectedQuery, listOf(credential)).isSuccess)
+        assertTrue(DcqlMatcher.match(expandedQuery, listOf(credential), contextDocuments = redefined).isFailure)
+        assertTrue(
+            DcqlMatcher.match(
+                query("""[["${revised}LegalPerson"]]"""),
+                listOf(credential),
+                contextDocuments = redefined,
+            ).isSuccess,
+        )
     }
 
     private fun query(typeValues: String) = DcqlParser.parse(
