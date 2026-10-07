@@ -495,8 +495,16 @@ The general variants omit `proof_types_supported.jwt.key_attestations_required`.
 variants advertise ES256 JWT proofs with `key_attestations_required: {}` and require a valid
 `key_attestation` in the proof JWT header. `{}` requires attestation without adding storage or
 user-authentication assurance constraints. The EUDI configurations and profiles are full,
-independent definitions with the same initial credential data and signing settings as the
+independent definitions with the same initial credential data as the
 general profiles, but distinct IDs and scopes. Edits to one definition do not update the other.
+To share the signed-metadata signer with `identityCredentialSdJwtEudi`, `isoPhotoIdEudi`,
+`eudiPidSdJwt`, and `eudiPidMdoc`, set `defaultEudiIssuerKey` and
+`defaultEudiIssuerX5chain` in `issuer2-profiles.conf` and reference them from each
+profile's `issuerKey` and `x5Chain`. Omit `issuerDid` for these certificate-based profiles.
+Use the matching key and certificate from `issuer-service.conf`'s `signedMetadata`;
+mdoc embeds the matching leaf chain in
+`issuerAuth`'s `x5chain`, and SD-JWT publishes it in `x5c`. Replace the key and chain in
+both configurations together when using your own signing material.
 The SD-JWT EUDI
 variant gets its own self-hosted VCT ending in `/identity_credential_eudi`; the photo-ID
 variant retains the original mdoc doctype and namespaces.
