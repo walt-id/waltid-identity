@@ -15,38 +15,11 @@ import id.walt.mdoc.objects.edition2.deviceretrieval.ReaderAuthenticationPayload
 import kotlinx.io.bytestring.ByteString
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
-
-/** Scope is part of the statement identity; whole-request statements have no document index. */
-sealed interface ReaderAuthenticationScope {
-    data class Document(val index: Int) : ReaderAuthenticationScope {
-        init { require(index >= 0) { "Document request index must not be negative" } }
-    }
-    data object WholeRequest : ReaderAuthenticationScope
-}
-
-class ReaderAuthenticationEvidence(
-    val scope: ReaderAuthenticationScope,
-    /** Zero-based statement index within the authentication scope. */
-    val authenticationIndex: Int = 0,
-    certificateChainDer: List<ByteString> = emptyList(),
-) {
-    private val certificateChain = certificateChainDer.toList()
-    val certificateChainDer: List<ByteString> get() = certificateChain.toList()
-
-    init { require(authenticationIndex >= 0) }
-}
-
-enum class ReaderTrustState { NOT_EVALUATED, VALID_BUT_UNTRUSTED, REVOKED, TRUSTED }
-
-data class ReaderTrustDecision(
-    val state: ReaderTrustState,
-    val reason: String? = null,
-    val displayName: String? = null,
-)
-
-fun interface ReaderTrustEvaluator {
-    suspend fun evaluate(evidence: ReaderAuthenticationEvidence): ReaderTrustDecision
-}
+import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
+import id.walt.mdoc.readertrust.ReaderAuthenticationScope
+import id.walt.mdoc.readertrust.ReaderTrustDecision
+import id.walt.mdoc.readertrust.ReaderTrustEvaluator
+import id.walt.mdoc.readertrust.ReaderTrustState
 
 /** Only cryptographically valid statements can carry evidence and an application trust decision. */
 sealed interface ReaderAuthenticationResult {

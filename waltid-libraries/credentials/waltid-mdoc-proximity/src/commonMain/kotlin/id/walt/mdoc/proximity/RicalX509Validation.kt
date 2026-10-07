@@ -12,6 +12,7 @@ import id.walt.mdoc.proximity.MdocX509CertificateUtil.modocReaderAuthentication
 import kotlinx.coroutines.CancellationException
 import kotlinx.io.bytestring.ByteString
 import kotlin.time.Clock
+import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
 
 /**
  * Concrete RICAL (Reader Identity Certificate Authority List) COSE-signature,

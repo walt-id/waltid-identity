@@ -172,18 +172,20 @@ public final class id/walt/wallet2/mobile/MobileWalletAnnexCParsedRequest {
 }
 
 public final class id/walt/wallet2/mobile/MobileWalletAnnexCPreview {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/MobileWalletAnnexCParsedRequest;Ljava/util/List;Lid/walt/wallet2/mobile/MobileWalletReaderTrust;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/MobileWalletAnnexCParsedRequest;Ljava/util/List;Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;Lid/walt/mdoc/readertrust/ReaderTrustDecision;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Lid/walt/wallet2/mobile/MobileWalletAnnexCParsedRequest;
 	public final fun component4 ()Ljava/util/List;
-	public final fun component5 ()Lid/walt/wallet2/mobile/MobileWalletReaderTrust;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/MobileWalletAnnexCParsedRequest;Ljava/util/List;Lid/walt/wallet2/mobile/MobileWalletReaderTrust;)Lid/walt/wallet2/mobile/MobileWalletAnnexCPreview;
-	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/MobileWalletAnnexCPreview;Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/MobileWalletAnnexCParsedRequest;Ljava/util/List;Lid/walt/wallet2/mobile/MobileWalletReaderTrust;ILjava/lang/Object;)Lid/walt/wallet2/mobile/MobileWalletAnnexCPreview;
+	public final fun component5 ()Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;
+	public final fun component6 ()Lid/walt/mdoc/readertrust/ReaderTrustDecision;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/MobileWalletAnnexCParsedRequest;Ljava/util/List;Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;Lid/walt/mdoc/readertrust/ReaderTrustDecision;)Lid/walt/wallet2/mobile/MobileWalletAnnexCPreview;
+	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/MobileWalletAnnexCPreview;Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/MobileWalletAnnexCParsedRequest;Ljava/util/List;Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;Lid/walt/mdoc/readertrust/ReaderTrustDecision;ILjava/lang/Object;)Lid/walt/wallet2/mobile/MobileWalletAnnexCPreview;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCredentialOptions ()Ljava/util/List;
 	public final fun getParsedRequest ()Lid/walt/wallet2/mobile/MobileWalletAnnexCParsedRequest;
-	public final fun getReaderTrust ()Lid/walt/wallet2/mobile/MobileWalletReaderTrust;
+	public final fun getReaderAuthentication ()Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;
+	public final fun getReaderTrust ()Lid/walt/mdoc/readertrust/ReaderTrustDecision;
 	public final fun getRequestId ()Ljava/lang/String;
 	public final fun getVerifiedOrigin ()Ljava/lang/String;
 	public fun hashCode ()I
@@ -244,10 +246,10 @@ public final class id/walt/wallet2/mobile/MobileWalletClientIdScheme : java/lang
 
 public final class id/walt/wallet2/mobile/MobileWalletConfig {
 	public fun <init> ()V
-	public fun <init> (Ljava/lang/String;Lid/walt/wallet2/mobile/WalletAttestationConfig;Lid/walt/wallet2/mobile/MobileWalletPersistence;Lkotlin/jvm/functions/Function2;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lid/waltid/openid4vci/wallet/metadata/CredentialIssuerMetadataTrustResolver;Lid/walt/wallet2/mobile/MobileWalletCredentialRegistry;Lid/walt/wallet2/mobile/MobileWalletReaderTrustEvaluator;Lid/walt/wallet2/mobile/MobileWalletCrossProcessAccess;Lkotlin/jvm/functions/Function1;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;Lid/walt/wallet2/mobile/identity/SigningIdentityConfiguration;)V
-	public synthetic fun <init> (Ljava/lang/String;Lid/walt/wallet2/mobile/WalletAttestationConfig;Lid/walt/wallet2/mobile/MobileWalletPersistence;Lkotlin/jvm/functions/Function2;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lid/waltid/openid4vci/wallet/metadata/CredentialIssuerMetadataTrustResolver;Lid/walt/wallet2/mobile/MobileWalletCredentialRegistry;Lid/walt/wallet2/mobile/MobileWalletReaderTrustEvaluator;Lid/walt/wallet2/mobile/MobileWalletCrossProcessAccess;Lkotlin/jvm/functions/Function1;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;Lid/walt/wallet2/mobile/identity/SigningIdentityConfiguration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lid/walt/wallet2/mobile/WalletAttestationConfig;Lid/walt/wallet2/mobile/MobileWalletPersistence;Lkotlin/jvm/functions/Function2;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lid/waltid/openid4vci/wallet/metadata/CredentialIssuerMetadataTrustResolver;Lid/walt/wallet2/mobile/MobileWalletCredentialRegistry;Lid/walt/mdoc/readertrust/ReaderTrustEvaluator;Lid/walt/wallet2/mobile/MobileWalletCrossProcessAccess;Lkotlin/jvm/functions/Function1;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;Lid/walt/wallet2/mobile/identity/SigningIdentityConfiguration;)V
+	public synthetic fun <init> (Ljava/lang/String;Lid/walt/wallet2/mobile/WalletAttestationConfig;Lid/walt/wallet2/mobile/MobileWalletPersistence;Lkotlin/jvm/functions/Function2;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lid/waltid/openid4vci/wallet/metadata/CredentialIssuerMetadataTrustResolver;Lid/walt/wallet2/mobile/MobileWalletCredentialRegistry;Lid/walt/mdoc/readertrust/ReaderTrustEvaluator;Lid/walt/wallet2/mobile/MobileWalletCrossProcessAccess;Lkotlin/jvm/functions/Function1;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;Lid/walt/wallet2/mobile/identity/SigningIdentityConfiguration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
-	public final fun component10 ()Lid/walt/wallet2/mobile/MobileWalletReaderTrustEvaluator;
+	public final fun component10 ()Lid/walt/mdoc/readertrust/ReaderTrustEvaluator;
 	public final fun component11 ()Lid/walt/wallet2/mobile/MobileWalletCrossProcessAccess;
 	public final fun component12 ()Lkotlin/jvm/functions/Function1;
 	public final fun component13 ()Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;
@@ -261,8 +263,8 @@ public final class id/walt/wallet2/mobile/MobileWalletConfig {
 	public final fun component7 ()Ljava/util/List;
 	public final fun component8 ()Lid/waltid/openid4vci/wallet/metadata/CredentialIssuerMetadataTrustResolver;
 	public final fun component9 ()Lid/walt/wallet2/mobile/MobileWalletCredentialRegistry;
-	public final fun copy (Ljava/lang/String;Lid/walt/wallet2/mobile/WalletAttestationConfig;Lid/walt/wallet2/mobile/MobileWalletPersistence;Lkotlin/jvm/functions/Function2;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lid/waltid/openid4vci/wallet/metadata/CredentialIssuerMetadataTrustResolver;Lid/walt/wallet2/mobile/MobileWalletCredentialRegistry;Lid/walt/wallet2/mobile/MobileWalletReaderTrustEvaluator;Lid/walt/wallet2/mobile/MobileWalletCrossProcessAccess;Lkotlin/jvm/functions/Function1;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;Lid/walt/wallet2/mobile/identity/SigningIdentityConfiguration;)Lid/walt/wallet2/mobile/MobileWalletConfig;
-	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/MobileWalletConfig;Ljava/lang/String;Lid/walt/wallet2/mobile/WalletAttestationConfig;Lid/walt/wallet2/mobile/MobileWalletPersistence;Lkotlin/jvm/functions/Function2;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lid/waltid/openid4vci/wallet/metadata/CredentialIssuerMetadataTrustResolver;Lid/walt/wallet2/mobile/MobileWalletCredentialRegistry;Lid/walt/wallet2/mobile/MobileWalletReaderTrustEvaluator;Lid/walt/wallet2/mobile/MobileWalletCrossProcessAccess;Lkotlin/jvm/functions/Function1;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;Lid/walt/wallet2/mobile/identity/SigningIdentityConfiguration;ILjava/lang/Object;)Lid/walt/wallet2/mobile/MobileWalletConfig;
+	public final fun copy (Ljava/lang/String;Lid/walt/wallet2/mobile/WalletAttestationConfig;Lid/walt/wallet2/mobile/MobileWalletPersistence;Lkotlin/jvm/functions/Function2;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lid/waltid/openid4vci/wallet/metadata/CredentialIssuerMetadataTrustResolver;Lid/walt/wallet2/mobile/MobileWalletCredentialRegistry;Lid/walt/mdoc/readertrust/ReaderTrustEvaluator;Lid/walt/wallet2/mobile/MobileWalletCrossProcessAccess;Lkotlin/jvm/functions/Function1;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;Lid/walt/wallet2/mobile/identity/SigningIdentityConfiguration;)Lid/walt/wallet2/mobile/MobileWalletConfig;
+	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/MobileWalletConfig;Ljava/lang/String;Lid/walt/wallet2/mobile/WalletAttestationConfig;Lid/walt/wallet2/mobile/MobileWalletPersistence;Lkotlin/jvm/functions/Function2;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lid/waltid/openid4vci/wallet/metadata/CredentialIssuerMetadataTrustResolver;Lid/walt/wallet2/mobile/MobileWalletCredentialRegistry;Lid/walt/mdoc/readertrust/ReaderTrustEvaluator;Lid/walt/wallet2/mobile/MobileWalletCrossProcessAccess;Lkotlin/jvm/functions/Function1;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;Lid/walt/wallet2/mobile/identity/SigningIdentityConfiguration;ILjava/lang/Object;)Lid/walt/wallet2/mobile/MobileWalletConfig;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAttestationConfig ()Lid/walt/wallet2/mobile/WalletAttestationConfig;
 	public final fun getCredentialIssuerMetadataTrustResolver ()Lid/waltid/openid4vci/wallet/metadata/CredentialIssuerMetadataTrustResolver;
@@ -275,7 +277,7 @@ public final class id/walt/wallet2/mobile/MobileWalletConfig {
 	public final fun getPaymentCredentialIssuers ()Ljava/util/List;
 	public final fun getPersistence ()Lid/walt/wallet2/mobile/MobileWalletPersistence;
 	public final fun getPreferredLocales ()Ljava/util/List;
-	public final fun getReaderTrustEvaluator ()Lid/walt/wallet2/mobile/MobileWalletReaderTrustEvaluator;
+	public final fun getReaderTrustEvaluator ()Lid/walt/mdoc/readertrust/ReaderTrustEvaluator;
 	public final fun getSigningIdentity ()Lid/walt/wallet2/mobile/identity/SigningIdentityConfiguration;
 	public final fun getTransactionDataProfiles ()Ljava/util/List;
 	public final fun getWalletId ()Ljava/lang/String;
@@ -533,21 +535,23 @@ public final class id/walt/wallet2/mobile/MobileWalletDigitalCredentialFormat : 
 }
 
 public final class id/walt/wallet2/mobile/MobileWalletDigitalCredentialPreview {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialRequestInfo;Ljava/util/List;Ljava/util/List;Lid/walt/wallet2/mobile/MobileWalletReaderTrust;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialRequestInfo;Ljava/util/List;Ljava/util/List;Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;Lid/walt/mdoc/readertrust/ReaderTrustDecision;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Ljava/lang/String;
 	public final fun component4 ()Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialRequestInfo;
 	public final fun component5 ()Ljava/util/List;
 	public final fun component6 ()Ljava/util/List;
-	public final fun component7 ()Lid/walt/wallet2/mobile/MobileWalletReaderTrust;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialRequestInfo;Ljava/util/List;Ljava/util/List;Lid/walt/wallet2/mobile/MobileWalletReaderTrust;)Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialPreview;
-	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialPreview;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialRequestInfo;Ljava/util/List;Ljava/util/List;Lid/walt/wallet2/mobile/MobileWalletReaderTrust;ILjava/lang/Object;)Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialPreview;
+	public final fun component7 ()Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;
+	public final fun component8 ()Lid/walt/mdoc/readertrust/ReaderTrustDecision;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialRequestInfo;Ljava/util/List;Ljava/util/List;Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;Lid/walt/mdoc/readertrust/ReaderTrustDecision;)Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialPreview;
+	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialPreview;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialRequestInfo;Ljava/util/List;Ljava/util/List;Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;Lid/walt/mdoc/readertrust/ReaderTrustDecision;ILjava/lang/Object;)Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialPreview;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCredentialOptions ()Ljava/util/List;
 	public final fun getCredentialRequirements ()Ljava/util/List;
 	public final fun getProtocol ()Ljava/lang/String;
-	public final fun getReaderTrust ()Lid/walt/wallet2/mobile/MobileWalletReaderTrust;
+	public final fun getReaderAuthentication ()Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;
+	public final fun getReaderTrust ()Lid/walt/mdoc/readertrust/ReaderTrustDecision;
 	public final fun getRequest ()Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialRequestInfo;
 	public final fun getRequestId ()Ljava/lang/String;
 	public final fun getVerifiedOrigin ()Ljava/lang/String;
@@ -1062,57 +1066,14 @@ public final class id/walt/wallet2/mobile/MobileWalletProximityModelsKt {
 	public static final fun getLegalActions (Lid/walt/wallet2/mobile/ProximityState;)Ljava/util/Set;
 }
 
-public abstract interface class id/walt/wallet2/mobile/MobileWalletReaderTrust {
-}
-
-public final class id/walt/wallet2/mobile/MobileWalletReaderTrust$NotApplicable : id/walt/wallet2/mobile/MobileWalletReaderTrust {
-	public static final field INSTANCE Lid/walt/wallet2/mobile/MobileWalletReaderTrust$NotApplicable;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class id/walt/wallet2/mobile/MobileWalletReaderTrust$NotAuthenticated : id/walt/wallet2/mobile/MobileWalletReaderTrust {
-	public static final field INSTANCE Lid/walt/wallet2/mobile/MobileWalletReaderTrust$NotAuthenticated;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class id/walt/wallet2/mobile/MobileWalletReaderTrust$PendingRawRequest : id/walt/wallet2/mobile/MobileWalletReaderTrust {
-	public static final field INSTANCE Lid/walt/wallet2/mobile/MobileWalletReaderTrust$PendingRawRequest;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class id/walt/wallet2/mobile/MobileWalletReaderTrust$Trusted : id/walt/wallet2/mobile/MobileWalletReaderTrustDecision {
-	public fun <init> (Ljava/lang/String;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;)Lid/walt/wallet2/mobile/MobileWalletReaderTrust$Trusted;
-	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/MobileWalletReaderTrust$Trusted;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/mobile/MobileWalletReaderTrust$Trusted;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getCertificateSubject ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class id/walt/wallet2/mobile/MobileWalletReaderTrust$Untrusted : id/walt/wallet2/mobile/MobileWalletReaderTrustDecision {
-	public fun <init> (Ljava/lang/String;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;)Lid/walt/wallet2/mobile/MobileWalletReaderTrust$Untrusted;
-	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/MobileWalletReaderTrust$Untrusted;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/mobile/MobileWalletReaderTrust$Untrusted;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getReason ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public abstract interface class id/walt/wallet2/mobile/MobileWalletReaderTrustDecision : id/walt/wallet2/mobile/MobileWalletReaderTrust {
-}
-
-public abstract interface class id/walt/wallet2/mobile/MobileWalletReaderTrustEvaluator {
-	public abstract fun evaluate (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+public final class id/walt/wallet2/mobile/MobileWalletReaderAuthentication : java/lang/Enum {
+	public static final field NOT_APPLICABLE Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;
+	public static final field NOT_AUTHENTICATED Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;
+	public static final field PENDING_RAW_REQUEST Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;
+	public static final field VERIFIED Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;
+	public static fun values ()[Lid/walt/wallet2/mobile/MobileWalletReaderAuthentication;
 }
 
 public abstract interface class id/walt/wallet2/mobile/MobileWalletRequestAuthentication {
@@ -2969,11 +2930,6 @@ public final class id/walt/wallet2/mobile/UnavailableMobileWalletCredentialRegis
 	public fun getCapabilities ()Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialCapabilities;
 	public fun registerCreationOptions (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun replace (Ljava/lang/String;Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
-public final class id/walt/wallet2/mobile/UnconfiguredMobileWalletReaderTrustEvaluator : id/walt/wallet2/mobile/MobileWalletReaderTrustEvaluator {
-	public static final field INSTANCE Lid/walt/wallet2/mobile/UnconfiguredMobileWalletReaderTrustEvaluator;
-	public fun evaluate (Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class id/walt/wallet2/mobile/UnconfiguredProximityCredentialStatusEvaluator : id/walt/wallet2/mobile/ProximityCredentialStatusEvaluator {

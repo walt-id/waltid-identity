@@ -13,9 +13,9 @@ import id.walt.certificate.x509.validation.validator.X509CertificateHasIaCaConta
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.proximity.MdocX509CertificateUtil.modocReaderAuthentication
-import id.walt.mdoc.proximity.ReaderAuthenticationEvidence
-import id.walt.mdoc.proximity.ReaderAuthenticationScope
-import id.walt.mdoc.proximity.ReaderTrustState
+import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
+import id.walt.mdoc.readertrust.ReaderAuthenticationScope
+import id.walt.mdoc.readertrust.ReaderTrustState
 import id.walt.mdoc.proximity.RicalEvaluationState
 import id.walt.mdoc.proximity.RicalPolicy
 import id.walt.mdoc.proximity.RicalProviderResult

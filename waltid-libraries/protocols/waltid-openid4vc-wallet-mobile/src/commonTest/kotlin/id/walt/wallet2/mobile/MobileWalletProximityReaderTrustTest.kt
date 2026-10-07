@@ -23,8 +23,8 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.mdoc.proximity.ReaderAuthenticationEvidence
-import id.walt.mdoc.proximity.ReaderAuthenticationScope
+import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
+import id.walt.mdoc.readertrust.ReaderAuthenticationScope
 import id.walt.mdoc.proximity.Rical
 import id.walt.mdoc.proximity.RicalCertificateInfo
 import id.walt.mdoc.proximity.RicalReaderPathResult

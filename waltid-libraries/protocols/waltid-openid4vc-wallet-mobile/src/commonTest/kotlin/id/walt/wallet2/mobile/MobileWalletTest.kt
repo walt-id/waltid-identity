@@ -2,6 +2,12 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.mdoc.readertrust.UnconfiguredReaderTrustEvaluator
+import id.walt.mdoc.readertrust.ReaderTrustState
+import id.walt.mdoc.readertrust.ReaderTrustEvaluator
+import id.walt.mdoc.readertrust.ReaderTrustDecision
+import id.walt.mdoc.readertrust.ReaderAuthenticationScope
+import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
 import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
@@ -1423,10 +1429,11 @@ class MobileWalletTest {
             ),
             credentialRegistry = registry,
             registrationProjection = MobileWalletRegistryProjection.MdocIdentity,
-            readerTrustEvaluator = MobileWalletReaderTrustEvaluator { chain ->
-                assertEquals(1, chain.size)
-                assertContentEquals(readerCertificate, chain.single())
-                MobileWalletReaderTrust.Trusted("CN=Example")
+            readerTrustEvaluator = ReaderTrustEvaluator { evidence ->
+                assertEquals(ReaderAuthenticationScope.Document(0), evidence.scope)
+                assertEquals(1, evidence.certificateChainDer.size)
+                assertContentEquals(readerCertificate, evidence.certificateChainDer.single().toByteArray())
+                ReaderTrustDecision(ReaderTrustState.TRUSTED, displayName = "CN=Example")
             },
         )
         wallet.refreshDigitalCredentialRegistration()
@@ -1443,7 +1450,8 @@ class MobileWalletTest {
             )
         )
 
-        assertEquals(MobileWalletReaderTrust.Trusted("CN=Example"), preview.readerTrust)
+        assertEquals(MobileWalletReaderAuthentication.VERIFIED, preview.readerAuthentication)
+        assertEquals(ReaderTrustDecision(ReaderTrustState.TRUSTED, displayName = "CN=Example"), preview.readerTrust)
         assertEquals("Ada", preview.credentialOptions.single().disclosures.single().displayValue)
         val submission = MobileWalletAnnexCSubmission(
             requestId = preview.requestId,
@@ -1530,9 +1538,11 @@ class MobileWalletTest {
                 encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
             )
         )
-        val untrusted = assertIs<MobileWalletReaderTrust.Untrusted>(verified.readerTrust)
+        assertEquals(MobileWalletReaderAuthentication.VERIFIED, verified.readerAuthentication)
+        val untrusted = assertNotNull(verified.readerTrust)
+        assertEquals(ReaderTrustState.VALID_BUT_UNTRUSTED, untrusted.state)
         assertTrue(
-            untrusted.reason.contains("no reader trust policy is configured"),
+            untrusted.reason.orEmpty().contains("no reader trust policy is configured"),
             "The default evaluator must say why the reader is untrusted, not imply a rejected policy: " +
                 untrusted.reason,
         )
@@ -1542,23 +1552,23 @@ class MobileWalletTest {
             docType = docType,
             requestedElements = mapOf(namespace to listOf("given_name")),
         )
-        assertEquals(
-            MobileWalletReaderTrust.NotAuthenticated,
-            wallet.previewAnnexCPresentation(
-                MobileWalletAnnexCRequest(
-                    parsedRequest = wallet.parseAnnexCDeviceRequest(unauthenticated.encodeToBase64Url()),
-                    verifiedOrigin = origin,
-                    deviceRequestBase64Url = unauthenticated.encodeToBase64Url(),
-                    encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
-                )
-            ).readerTrust,
+        val anonymous = wallet.previewAnnexCPresentation(
+            MobileWalletAnnexCRequest(
+                parsedRequest = wallet.parseAnnexCDeviceRequest(unauthenticated.encodeToBase64Url()),
+                verifiedOrigin = origin,
+                deviceRequestBase64Url = unauthenticated.encodeToBase64Url(),
+                encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+            )
         )
+        assertEquals(MobileWalletReaderAuthentication.NOT_AUTHENTICATED, anonymous.readerAuthentication)
+        assertEquals(null, anonymous.readerTrust)
 
         // Apple's pre-consent shape: the raw request is withheld, so nothing has been checked yet.
         val deferred = wallet.previewAnnexCPresentation(
             MobileWalletAnnexCRequest(parsedRequest = parsedRequest, verifiedOrigin = origin)
         )
-        assertEquals(MobileWalletReaderTrust.PendingRawRequest, deferred.readerTrust)
+        assertEquals(MobileWalletReaderAuthentication.PENDING_RAW_REQUEST, deferred.readerAuthentication)
+        assertEquals(null, deferred.readerTrust)
 
         val tamperedRequest = signedRequest.copy(
             docRequests = listOf(
@@ -1613,7 +1623,7 @@ class MobileWalletTest {
                 encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
             )
         )
-        assertIs<MobileWalletReaderTrust.Untrusted>(preview.readerTrust)
+        assertEquals(ReaderTrustState.VALID_BUT_UNTRUSTED, preview.readerTrust?.state)
 
         suspend fun submit(deviceRequestBase64Url: String) = wallet.submitAnnexCPresentation(
             MobileWalletAnnexCSubmission(
@@ -1675,7 +1685,8 @@ class MobileWalletTest {
                 )
             ),
         ).encodeToBase64Url()
-        assertIs<MobileWalletReaderTrust.Untrusted>(
+        assertEquals(
+            ReaderTrustState.VALID_BUT_UNTRUSTED,
             wallet.previewAnnexCPresentation(
                 MobileWalletAnnexCRequest(
                     parsedRequest = wallet.parseAnnexCDeviceRequest(substitutedReader),
@@ -1683,7 +1694,7 @@ class MobileWalletTest {
                     deviceRequestBase64Url = substitutedReader,
                     encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
                 )
-            ).readerTrust,
+            ).readerTrust?.state,
         )
         assertRejected(substitutedReader, "a request re-signed by a different valid reader")
 
@@ -1847,7 +1858,7 @@ class MobileWalletTest {
     /**
      * Every reader-authentication signature in one request must come from the same certificate chain.
      *
-     * Otherwise whichever chain reached [MobileWalletReaderTrustEvaluator] would decide the trust state
+     * Otherwise whichever chain reached [ReaderTrustEvaluator] would decide the trust state
      * shown to the user, and the reader identity displayed at consent need not be the one that
      * authenticated the request. The mismatch is checked before signature verification, so the second
      * signature here can be arbitrary bytes.
@@ -1901,8 +1912,11 @@ class MobileWalletTest {
         assertFalse(UnavailableMobileWalletCredentialRegistry.capabilities.registrationAvailable)
         // Untrusted, not Trusted: a wallet with no configured policy has no basis for identifying a
         // reader, however valid its signature.
-        assertIs<MobileWalletReaderTrust.Untrusted>(
-            UnconfiguredMobileWalletReaderTrustEvaluator.evaluate(emptyList())
+        assertEquals(
+            ReaderTrustState.VALID_BUT_UNTRUSTED,
+            UnconfiguredReaderTrustEvaluator.evaluate(
+                ReaderAuthenticationEvidence(ReaderAuthenticationScope.WholeRequest)
+            ).state,
         )
     }
 

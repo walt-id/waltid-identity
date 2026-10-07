@@ -102,7 +102,8 @@ class MobileWalletDigitalCredentialPresentationTest {
         assertEquals("dc_api", preview.request.responseMode)
         assertEquals("dc+sd-jwt", preview.credentialOptions.single().format)
         assertEquals("pid-1", preview.credentialOptions.single().credentialId)
-        assertEquals(MobileWalletReaderTrust.NotApplicable, preview.readerTrust)
+        assertEquals(MobileWalletReaderAuthentication.NOT_APPLICABLE, preview.readerAuthentication)
+        assertEquals(null, preview.readerTrust)
 
         val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
@@ -328,7 +329,8 @@ class MobileWalletDigitalCredentialPresentationTest {
         assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED, preview.protocol)
         assertEquals("verifier2", preview.request.clientId)
         assertEquals("dc_api.jwt", preview.request.responseMode)
-        assertEquals(MobileWalletReaderTrust.NotApplicable, preview.readerTrust)
+        assertEquals(MobileWalletReaderAuthentication.NOT_APPLICABLE, preview.readerAuthentication)
+        assertEquals(null, preview.readerTrust)
 
         val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,

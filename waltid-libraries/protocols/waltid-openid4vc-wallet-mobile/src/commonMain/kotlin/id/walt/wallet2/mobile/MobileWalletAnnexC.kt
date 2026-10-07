@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
@@ -23,6 +24,11 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.handover.AnnexCDcapiHandoverInfo
+import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
+import id.walt.mdoc.readertrust.ReaderAuthenticationScope
+import id.walt.mdoc.readertrust.ReaderTrustDecision
+import id.walt.mdoc.readertrust.ReaderTrustEvaluator
+import id.walt.mdoc.readertrust.ReaderTrustState
 import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
@@ -33,6 +39,8 @@ import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import id.walt.x509.CertificateDer
 import id.walt.x509.crypto2VerificationKey
 import id.walt.x509.verifyOrderedCertificateChainSignatures
+import kotlinx.coroutines.CancellationException
+import kotlinx.io.bytestring.ByteString as IoByteString
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
@@ -85,9 +93,14 @@ internal suspend fun encryptAnnexCHpke(
  */
 internal class MobileWalletAnnexCEngine(
     private val wallet: Wallet,
-    private val readerTrustEvaluator: MobileWalletReaderTrustEvaluator,
+    private val readerTrustEvaluator: ReaderTrustEvaluator,
     private val registryRecords: suspend () -> List<MobileWalletCredentialRegistryRecord>,
 ) {
+
+    init {
+        println("Trust configuration")
+    }
+
     /** A request that passed validation, with everything later steps need already decoded. */
     private data class ValidatedRequest(
         val parsedRequest: MobileWalletAnnexCParsedRequest,
@@ -123,7 +136,8 @@ internal class MobileWalletAnnexCEngine(
         val encryptionInfo: DCAPIEncryptionInfo,
     )
 
-    private val retainedRequests = PreviewSessionStore<RetainedRequest>(sessionName = "Annex C presentation")
+    private val retainedRequests =
+        PreviewSessionStore<RetainedRequest>(sessionName = "Annex C presentation")
 
     fun parseDeviceRequest(base64Url: String): MobileWalletAnnexCParsedRequest =
         decodeAndValidateDeviceRequest(base64Url).toParsedRequest()
@@ -151,7 +165,7 @@ internal class MobileWalletAnnexCEngine(
     suspend fun preview(request: MobileWalletAnnexCRequest): MobileWalletAnnexCPreview {
         val validated = validate(request)
         val options = matchWalletDocuments(validated)
-        val readerTrust = evaluateReaderTrust(validated)
+        val reader = authenticateReader(validated)
         val requestId = retainedRequests.create(
             walletId = wallet.id,
             value = RetainedRequest(
@@ -166,7 +180,8 @@ internal class MobileWalletAnnexCEngine(
             verifiedOrigin = validated.origin,
             parsedRequest = validated.parsedRequest,
             credentialOptions = options,
-            readerTrust = readerTrust,
+            readerAuthentication = reader.authentication,
+            readerTrust = reader.trust,
         )
     }
 
@@ -218,9 +233,12 @@ internal class MobileWalletAnnexCEngine(
     private suspend fun matchWalletDocuments(
         request: ValidatedRequest,
     ): List<MobileWalletPresentationCredentialOption> {
-        val credentialIdsByRegistryId = registryRecords().associate { it.registryEntryId to it.credentialId }
+        val credentialIdsByRegistryId =
+            registryRecords().associate { it.registryEntryId to it.credentialId }
         val selectedCredentialIds = request.selectedRegistryEntryIds.map { registryId ->
-            credentialIdsByRegistryId[registryId] ?: throw MobileWalletStaleRegistryEntryException(registryId)
+            credentialIdsByRegistryId[registryId] ?: throw MobileWalletStaleRegistryEntryException(
+                registryId
+            )
         }.toSet()
         val storedCredentials = wallet.streamAllCredentials().toList()
         val options = request.parsedRequest.documents.flatMapIndexed { index, documentRequest ->
@@ -247,8 +265,14 @@ internal class MobileWalletAnnexCEngine(
         return options
     }
 
-    private suspend fun evaluateReaderTrust(request: ValidatedRequest): MobileWalletReaderTrust =
-        if (request.deviceRequest == null) MobileWalletReaderTrust.PendingRawRequest
+    /** Reader authentication state, with the trust decision present only for a verified reader. */
+    private data class ReaderAuthenticationOutcome(
+        val authentication: MobileWalletReaderAuthentication,
+        val trust: ReaderTrustDecision? = null,
+    )
+
+    private suspend fun authenticateReader(request: ValidatedRequest): ReaderAuthenticationOutcome =
+        if (request.deviceRequest == null) ReaderAuthenticationOutcome(MobileWalletReaderAuthentication.PENDING_RAW_REQUEST)
         else verifyReaderAuthentication(
             deviceRequest = request.deviceRequest,
             transcript = AnnexCDcapiHandoverInfo.sessionTranscript(
@@ -324,7 +348,10 @@ internal class MobileWalletAnnexCEngine(
                 "Selected credential no longer matches the Annex C document request"
             }
             // Resolve the exact credential-bound key. A wallet default is never an mdoc fallback.
-            val holderKey = wallet.resolveHolderKey(stored, setOf(KeyUsage.SIGN)).keyMaterial.requireCrypto2Key()
+            val holderKey = wallet.resolveHolderKey(
+                stored,
+                setOf(KeyUsage.SIGN)
+            ).keyMaterial.requireCrypto2Key()
             MdocPresenter.buildAnnexCDocument(
                 digitalCredential = stored.credential,
                 requestedElements = requested.namespaces,
@@ -360,13 +387,23 @@ internal class MobileWalletAnnexCEngine(
         ).encodeToBase64Url()
         return MobileWalletDigitalCredentialResponse(
             protocol = MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
-            dataJson = buildJsonObject { put("response", JsonPrimitive(responseBase64Url)) }.toString(),
+            dataJson = buildJsonObject {
+                put(
+                    "response",
+                    JsonPrimitive(responseBase64Url)
+                )
+            }.toString(),
         )
     }
 
     private fun decodeAndValidateDeviceRequest(base64Url: String): DeviceRequest =
         DeviceRequest.decodeFromBase64Url(base64Url).also { request ->
-            require(request.version in setOf(DeviceRequest.VERSION, DeviceRequest.VERSION_WITH_SIGNING)) {
+            require(
+                request.version in setOf(
+                    DeviceRequest.VERSION,
+                    DeviceRequest.VERSION_WITH_SIGNING
+                )
+            ) {
                 "Unsupported Annex C DeviceRequest version"
             }
             require(request.docRequests.isNotEmpty()) { "Annex C DeviceRequest has no document requests" }
@@ -392,36 +429,51 @@ internal class MobileWalletAnnexCEngine(
      * policy whether the verified reader is one it recognises.
      *
      * Reader authentication is optional in Annex C, so its absence is reported as
-     * [MobileWalletReaderTrust.NotAuthenticated] and the request stays processable - an anonymous
+     * [MobileWalletReaderAuthentication.NOT_AUTHENTICATED] and the request stays processable - an anonymous
      * reader is a reader the user can still decline. A signature that is *present but does not
      * verify* is different in kind: it means the request was tampered with or replayed, so every
      * such case throws and the request never reaches consent or a response.
+     *
+     * Every verified statement is evaluated separately by the shared [ReaderTrustEvaluator], so one
+     * holder-configured policy decides proximity and Annex C readers alike. The reader counts as
+     * trusted only if every statement is; a revoked reader certificate rejects the request.
      */
     private suspend fun verifyReaderAuthentication(
         deviceRequest: DeviceRequest,
         transcript: SessionTranscript,
-    ): MobileWalletReaderTrust {
+    ): ReaderAuthenticationOutcome {
         val authenticatedRequests = deviceRequest.docRequests.filter { it.readerAuth != null }
         val readerAuthAll = deviceRequest.readerAuthAll.orEmpty()
         if (authenticatedRequests.isEmpty() && readerAuthAll.isEmpty()) {
-            return MobileWalletReaderTrust.NotAuthenticated
+            return ReaderAuthenticationOutcome(MobileWalletReaderAuthentication.NOT_AUTHENTICATED)
         }
         require(readerAuthAll.isNotEmpty() || authenticatedRequests.size == deviceRequest.docRequests.size) {
             "Mixed authenticated and unauthenticated Annex C document requests are rejected"
         }
         var certificateChain: List<ByteArray>? = null
+        val evidence = mutableListOf<ReaderAuthenticationEvidence>()
 
-        suspend fun verifyAuthentication(signature: CoseSign1, detachedPayload: ByteArray) {
+        suspend fun verifyAuthentication(
+            signature: CoseSign1,
+            detachedPayload: ByteArray,
+            scope: ReaderAuthenticationScope,
+            authenticationIndex: Int,
+        ) {
             val protectedHeaders = if (signature.protected.isEmpty()) CoseHeaders()
-                else coseCompliantCbor.decodeFromByteArray(CoseHeaders.serializer(), signature.protected)
+            else coseCompliantCbor.decodeFromByteArray(
+                CoseHeaders.serializer(),
+                signature.protected
+            )
             val chain = (protectedHeaders.x5chain ?: signature.unprotected.x5chain)
                 ?.map { it.rawBytes }
                 ?: throw IllegalArgumentException("Reader authentication has no x5chain")
+  //          TODO()
             verifyOrderedCertificateChainSignatures(chain.map(::CertificateDer))
             if (certificateChain == null) certificateChain = chain
             else require(
                 certificateChain.size == chain.size &&
-                    certificateChain.zip(chain).all { (left, right) -> left.contentEquals(right) },
+                        certificateChain.zip(chain)
+                            .all { (left, right) -> left.contentEquals(right) },
             ) {
                 "Annex C reader authentication signatures use different certificate chains"
             }
@@ -434,6 +486,11 @@ internal class MobileWalletAnnexCEngine(
             ) {
                 "Reader authentication signature is invalid"
             }
+            evidence += ReaderAuthenticationEvidence(
+                scope = scope,
+                authenticationIndex = authenticationIndex,
+                certificateChainDer = chain.map(::IoByteString),
+            )
         }
 
         if (readerAuthAll.isNotEmpty()) {
@@ -444,7 +501,7 @@ internal class MobileWalletAnnexCEngine(
             )
             readerAuthAll.forEachIndexed { index, signature ->
                 try {
-                    verifyAuthentication(signature, detachedPayload)
+                    verifyAuthentication(signature, detachedPayload, ReaderAuthenticationScope.WholeRequest, index)
                 } catch (exception: Exception) {
                     throw IllegalArgumentException(
                         "ReaderAuthAll signature at index $index is invalid",
@@ -453,12 +510,14 @@ internal class MobileWalletAnnexCEngine(
                 }
             }
         }
-        authenticatedRequests.forEachIndexed { index, docRequest ->
-            val readerAuth = requireNotNull(docRequest.readerAuth)
+        deviceRequest.docRequests.forEachIndexed { index, docRequest ->
+            val readerAuth = docRequest.readerAuth ?: return@forEachIndexed
             try {
                 verifyAuthentication(
                     readerAuth,
                     ReaderAuthenticationPayloads.forDocument(transcript, docRequest.itemsRequest),
+                    ReaderAuthenticationScope.Document(index),
+                    0,
                 )
             } catch (exception: Exception) {
                 throw IllegalArgumentException(
@@ -467,8 +526,41 @@ internal class MobileWalletAnnexCEngine(
                 )
             }
         }
-        return readerTrustEvaluator.evaluate(requireNotNull(certificateChain))
+        val decisions = evidence.map { evaluateReaderTrust(it) }
+        require(decisions.none { it.state == ReaderTrustState.REVOKED }) {
+            "Annex C reader certificate is revoked"
+        }
+        val untrusted = decisions.firstOrNull { it.state != ReaderTrustState.TRUSTED }
+        val trust = if (untrusted != null) {
+            // The signatures verified, so an evaluator answering NOT_EVALUATED still leaves a valid but untrusted reader.
+            ReaderTrustDecision(
+                state = ReaderTrustState.VALID_BUT_UNTRUSTED,
+                reason = untrusted.reason ?: "Reader trust policy did not accept the reader",
+                displayName = untrusted.displayName,
+            )
+        } else {
+            ReaderTrustDecision(
+                state = ReaderTrustState.TRUSTED,
+                displayName = decisions.firstNotNullOfOrNull { it.displayName }
+                    ?: X509CertificateUtil.parseCertificateDerEncoded(IoByteString(requireNotNull(certificateChain).first()))
+                        .data.subjectDn,
+            )
+        }
+        return ReaderAuthenticationOutcome(MobileWalletReaderAuthentication.VERIFIED, trust)
     }
+
+    /** Per the [ReaderTrustEvaluator] contract, a failing policy leaves the reader untrusted rather than failing the request. */
+    private suspend fun evaluateReaderTrust(evidence: ReaderAuthenticationEvidence): ReaderTrustDecision =
+        try {
+            readerTrustEvaluator.evaluate(evidence)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            ReaderTrustDecision(
+                state = ReaderTrustState.VALID_BUT_UNTRUSTED,
+                reason = "Reader trust evaluation failed",
+            )
+        }
 
     private fun DeviceRequest.toParsedRequest(): MobileWalletAnnexCParsedRequest =
         MobileWalletAnnexCParsedRequest(

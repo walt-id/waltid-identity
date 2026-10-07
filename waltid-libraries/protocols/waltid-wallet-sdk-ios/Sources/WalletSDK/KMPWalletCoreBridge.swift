@@ -1730,21 +1730,24 @@ private extension MobileWalletAnnexCPreview {
                 }
             ),
             credentialOptions: swiftArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self).map { $0.toSwiftCredentialOption() },
-            readerTrust: readerTrust.toSwiftReaderTrust()
+            readerTrust: readerAuthentication.toSwiftReaderTrust(decision: readerTrust)
         )
     }
 }
 
-private extension MobileWalletReaderTrust {
-    func toSwiftReaderTrust() -> ReaderTrust {
-        if self is MobileWalletReaderTrustNotApplicable { return .notApplicable }
-        if self is MobileWalletReaderTrustNotAuthenticated { return .notAuthenticated }
-        if self is MobileWalletReaderTrustPendingRawRequest { return .pendingRawRequest }
-        if let value = self as? MobileWalletReaderTrustUntrusted { return .untrusted(reason: value.reason) }
-        if let value = self as? MobileWalletReaderTrustTrusted { return .trusted(certificateSubject: value.certificateSubject) }
-        // A state this SDK build does not know about cannot be reported as identifying the reader,
-        // and the reason string says so rather than implying a rejected trust policy.
-        return .untrusted(reason: "Unrecognized reader trust state")
+private extension MobileWalletReaderAuthentication {
+    func toSwiftReaderTrust(decision: Waltid_mdoc_reader_trustReaderTrustDecision?) -> ReaderTrust {
+        switch self {
+        case .notApplicable: return .notApplicable
+        case .notAuthenticated: return .notAuthenticated
+        case .pendingRawRequest: return .pendingRawRequest
+        case .verified:
+            guard let decision else { return .untrusted(reason: "No reader trust decision was made") }
+            if decision.state == .trusted, let displayName = decision.displayName {
+                return .trusted(certificateSubject: displayName)
+            }
+            return .untrusted(reason: decision.reason ?? "The reader is not trusted")
+        }
     }
 }
 

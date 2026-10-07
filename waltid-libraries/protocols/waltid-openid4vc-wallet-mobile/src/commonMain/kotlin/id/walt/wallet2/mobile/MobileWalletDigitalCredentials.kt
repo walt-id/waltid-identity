@@ -1,5 +1,8 @@
 package id.walt.wallet2.mobile
 
+import id.walt.mdoc.readertrust.ReaderTrustDecision
+import id.walt.mdoc.readertrust.ReaderTrustState
+
 /** Protocol identifiers understood by platform Digital Credentials APIs. */
 public object MobileWalletDigitalCredentialProtocols {
     /** Unsigned OpenID4VP Digital Credentials protocol identifier. */
@@ -294,7 +297,9 @@ public data class MobileWalletDigitalCredentialRequestInfo(
  * @property request Parsed presentation request metadata.
  * @property credentialOptions Matching wallet credentials.
  * @property credentialRequirements Required credential-query combinations.
- * @property readerTrust Reader authentication and application-trust state.
+ * @property readerAuthentication Whether and how the reader authenticated the request.
+ * @property readerTrust Trust policy decision for the authenticated reader; present only when
+ * [readerAuthentication] is [MobileWalletReaderAuthentication.VERIFIED].
  */
 public data class MobileWalletDigitalCredentialPreview(
     public val requestId: String,
@@ -303,22 +308,23 @@ public data class MobileWalletDigitalCredentialPreview(
     public val request: MobileWalletDigitalCredentialRequestInfo,
     public val credentialOptions: List<MobileWalletPresentationCredentialOption>,
     public val credentialRequirements: List<MobileWalletPresentationCredentialRequirement>,
-    public val readerTrust: MobileWalletReaderTrust,
+    public val readerAuthentication: MobileWalletReaderAuthentication,
+    public val readerTrust: ReaderTrustDecision?,
 )
 
 /**
- * Reader authentication state. Only [MobileWalletReaderTrust.Trusted] means a reader was identified,
- * and reaching it requires both a valid signature and an accepting application trust policy.
+ * Reader authentication state of a presentation request.
  *
  * A request whose reader authentication fails cryptographic verification is rejected and produces no
- * state at all, so every state here describes a still-processable request.
+ * state at all, so every state here describes a still-processable request. Only [VERIFIED] comes with
+ * a trust decision, and only a [ReaderTrustState.TRUSTED] decision means a reader was identified.
  */
-public sealed interface MobileWalletReaderTrust {
+public enum class MobileWalletReaderAuthentication {
     /** The protocol carries no reader authentication, as with the OpenID4VP Digital Credentials API. */
-    public data object NotApplicable : MobileWalletReaderTrust
+    NOT_APPLICABLE,
 
     /** The request supports reader authentication but carried none, so the reader is anonymous. */
-    public data object NotAuthenticated : MobileWalletReaderTrust
+    NOT_AUTHENTICATED,
 
     /**
      * Reader authentication has not been checked yet because the platform withholds the raw request
@@ -328,32 +334,11 @@ public sealed interface MobileWalletReaderTrust {
      * still verified before any credential data is released, but that happens at submission, so a
      * consent dialog cannot yet name the reader.
      */
-    public data object PendingRawRequest : MobileWalletReaderTrust
+    PENDING_RAW_REQUEST,
 
-    /**
-     * The reader's signature is cryptographically valid, but no application trust policy accepts it.
-     *
-     * Not a verification failure: the wallet simply has no basis for telling the user who the reader is.
-     *
-     * @property reason Reason the trust policy did not accept the reader.
-     */
-    public data class Untrusted(public val reason: String) : MobileWalletReaderTrustDecision
-
-    /**
-     * Reader authentication is cryptographically valid and an application trust policy accepted it.
-     *
-     * @property certificateSubject Subject from the trusted reader certificate.
-     */
-    public data class Trusted(public val certificateSubject: String) : MobileWalletReaderTrustDecision
+    /** Every reader authentication signature verified, and the reader trust policy was consulted. */
+    VERIFIED,
 }
-
-/**
- * The two outcomes an application trust policy may return.
- *
- * Narrower than [MobileWalletReaderTrust]: a policy is only consulted for a reader whose signature
- * already verified, so it cannot report that authentication was absent or deferred.
- */
-public sealed interface MobileWalletReaderTrustDecision : MobileWalletReaderTrust
 
 /**
  * OS-mediated response. [dataJson] is returned to the platform and is never direct-posted over HTTP.
@@ -418,14 +403,17 @@ public data class MobileWalletAnnexCRequest(
  * @property verifiedOrigin Authenticated requesting origin.
  * @property parsedRequest Parsed mdoc request.
  * @property credentialOptions Matching wallet credentials.
- * @property readerTrust Reader authentication and application-trust state.
+ * @property readerAuthentication Whether and how the reader authenticated the request.
+ * @property readerTrust Trust policy decision for the authenticated reader; present only when
+ * [readerAuthentication] is [MobileWalletReaderAuthentication.VERIFIED].
  */
 public data class MobileWalletAnnexCPreview(
     public val requestId: String,
     public val verifiedOrigin: String,
     public val parsedRequest: MobileWalletAnnexCParsedRequest,
     public val credentialOptions: List<MobileWalletPresentationCredentialOption>,
-    public val readerTrust: MobileWalletReaderTrust,
+    public val readerAuthentication: MobileWalletReaderAuthentication,
+    public val readerTrust: ReaderTrustDecision?,
 )
 
 /**
@@ -445,24 +433,3 @@ public data class MobileWalletAnnexCSubmission(
     public val selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
 )
 
-/**
- * Application trust policy for a cryptographically verified Annex C reader certificate chain.
- *
- * The chain's internal signatures and the reader's COSE signature over the session-bound payload are
- * already verified before this is called, so the only question left is whether the application
- * recognises this reader as one it will name to the user. The wallet cannot decide that, which is why
- * an unconfigured wallet answers [MobileWalletReaderTrust.Untrusted].
- */
-public fun interface MobileWalletReaderTrustEvaluator {
-    /** Evaluates the cryptographically verified reader certificate chain against the trust policy. */
-    public suspend fun evaluate(readerCertificateChainDer: List<ByteArray>): MobileWalletReaderTrustDecision
-}
-
-/** Secure default: a valid signature alone does not establish that a reader is trusted. */
-public object UnconfiguredMobileWalletReaderTrustEvaluator : MobileWalletReaderTrustEvaluator {
-    /** Reports the verified reader as untrusted because no application trust policy was configured. */
-    override suspend fun evaluate(readerCertificateChainDer: List<ByteArray>): MobileWalletReaderTrustDecision =
-        MobileWalletReaderTrust.Untrusted(
-            "Reader authentication is cryptographically valid, but no reader trust policy is configured"
-        )
-}
