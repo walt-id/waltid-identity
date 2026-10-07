@@ -333,21 +333,22 @@ final class WalletVisualTests: XCTestCase {
         try capture(screen, id: "sharing.credential_information")
     }
     func testCompactProviderSharingReview() async throws { try await providerSharingReview(compact: true) }
+    func testCompactProviderSharingReviewLastRow() async throws {
+        try await providerSharingReview(compact: true, scrollToBottom: true)
+    }
 
-    private func providerSharingReview(compact: Bool = false) async throws {
+    private func providerSharingReview(compact: Bool = false, scrollToBottom: Bool = false) async throws {
         let review = try WalletVisualFixtures().sharingReview()
         let selection = SharingSelection(credentials: review.defaultCredentialSelection())
         XCTAssertTrue(review.hasCompleteCredentialSelection(selection.credentials))
         let screen = SharingReviewScreen(title: "Share documents", review: review, selection: selection,
             selectionComplete: true, onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {})
-        let id = compact ? "sharing.provider.compact_dark_large_text" : "sharing.provider.review"
+        let id = (compact ? "sharing.provider.compact_dark_large_text" : "sharing.provider.review")
+            + (scrollToBottom ? ".last" : "")
         try await captureReview(screen, id: id,
             config: compact ? .iPhoneSe : .iPhone13, colorScheme: compact ? .dark : .light,
-            sizeCategory: compact ? .accessibilityMedium : .large, expected: Set(review.credentialOptions.map { $0.selection.id }))
-        if compact {
-            try await captureReview(screen, id: "\(id).last", config: .iPhoneSe, colorScheme: .dark,
-                sizeCategory: .accessibilityMedium, expected: Set(review.credentialOptions.map { $0.selection.id }), scrollToBottom: true)
-        }
+            sizeCategory: compact ? .accessibilityMedium : .large,
+            expected: Set(review.credentialOptions.map { $0.selection.id }), scrollToBottom: scrollToBottom)
     }
 
     func testProviderPreparing() throws { try providerStatus(failure: nil) }
@@ -458,10 +459,11 @@ final class WalletVisualTests: XCTestCase {
 
     func testNearbyPermission() async throws { try await nearbyState("permission") }
     func testNearbyReview() async throws { try await nearbyState("review") }
+    func testNearbyReviewDisclosures() async throws { try await nearbyState("review", showDisclosures: true) }
     func testNearbyExpired() async throws { try await nearbyState("expired") }
     func testNearbyReceipt() async throws { try await nearbyState("receipt") }
 
-    private func nearbyState(_ kind: String) async throws {
+    private func nearbyState(_ kind: String, showDisclosures: Bool = false) async throws {
         let model = try await makeWalletVisualProximityState(kind)
         defer { model.proximityPresentation.dismiss() }
         let details = CredentialDisplayNormalizer.details(for: try WalletVisualFixtures().nearbyCredential())
@@ -485,12 +487,13 @@ final class WalletVisualTests: XCTestCase {
             XCTAssertTrue(model.proximityPresentation.canApprove)
             XCTAssertEqual(details.groups.flatMap(\.items).first?.label, "Given name")
         } else if kind == "expired" || kind == "receipt" { XCTAssertTrue(model.proximityPresentation.isTerminal) }
-        try capture(screen, id: "nearby.\(kind)", config: kind == "review" ? .iPhoneSe : .iPhone13,
-            sizeCategory: kind == "review" ? .accessibilityMedium : .large)
-        if kind == "review" {
+        if showDisclosures {
             let content = screen.environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
                 .environment(\.locale, Locale(identifier: "en_US")).environment(\.sizeCategory, .accessibilityMedium)
             try await captureWhenReady(content, id: "nearby.review.disclosures", config: .iPhoneSe, isReady: { true }, failure: "Review not ready", scrollToBottom: true, scrollFraction: 0.55)
+        } else {
+            try capture(screen, id: "nearby.\(kind)", config: kind == "review" ? .iPhoneSe : .iPhone13,
+                sizeCategory: kind == "review" ? .accessibilityMedium : .large)
         }
     }
 

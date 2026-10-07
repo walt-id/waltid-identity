@@ -560,7 +560,7 @@
     },
     {
       "id": "sharing.provider.compact_dark_large_text.last",
-      "swiftTest": "testCompactProviderSharingReview",
+      "swiftTest": "testCompactProviderSharingReviewLastRow",
       "requirements": [
         "R09",
         "R11",
@@ -757,7 +757,7 @@
     {
       "id": "nearby.review.disclosures",
       "composeTest": "nearbyReview",
-      "swiftTest": "testNearbyReview",
+      "swiftTest": "testNearbyReviewDisclosures",
       "requirements": [
         "R04",
         "R05",
