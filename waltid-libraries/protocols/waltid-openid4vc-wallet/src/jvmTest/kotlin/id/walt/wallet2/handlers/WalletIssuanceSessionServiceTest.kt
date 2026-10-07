@@ -1533,13 +1533,16 @@ class WalletIssuanceSessionServiceTest {
                 else -> respondError(HttpStatusCode.NotFound)
             }
         }
+        var current = Clock.System.now()
         val service = WalletIssuanceSessionService(
             Wallet("test", staticKey = key, credentialStores = listOf(store)),
             httpClient = client,
+            now = { current },
         )
 
         val session = service.start(preAuthorizedRequest())
         val deferred = assertIs<WalletIssuanceOutcome.Deferred>(service.continuePreAuthorized(session.id))
+        current += 1.seconds
         assertIs<WalletIssuanceOutcome.Stored>(service.resumeDeferred(deferred.credentials.single().id))
         assertEquals(listOf("credential_accepted"), notifications)
     }
