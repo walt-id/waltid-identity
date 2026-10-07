@@ -1998,16 +1998,14 @@ object WalletIssuanceHandler {
         )
         val result = fetchCredentials(request, httpClient, dpop)
         if (result.deferredCredential != null) return result
-        return storeAndNotify(
-            httpClient = httpClient,
-            target = IssuerNotificationTarget(
-                notificationEndpoint = storage.notificationEndpoint,
-                notificationId = result.notificationId,
-                accessToken = request.accessToken,
-                tokenType = request.tokenType,
-                dpopProofFactory = dpop?.toProofFactory(request.accessToken),
-            ),
-        ) {
+        val target = IssuerNotificationTarget(
+            notificationEndpoint = storage.notificationEndpoint,
+            notificationId = result.notificationId,
+            accessToken = request.accessToken,
+            tokenType = request.tokenType,
+            dpopProofFactory = dpop?.toProofFactory(request.accessToken),
+        )
+        return try {
             val prepared = wallet.prepareIssuedCredentials(result.rawCredentials, bindings, storage.label, storage.metadata,
                 proofRequired = request.effectiveProofs != null,
                 holderBindingKnown = request.keyId != null || request.holderBindings.all { it.keyId != null || it.key != null },
@@ -2017,8 +2015,17 @@ object WalletIssuanceHandler {
                 persistable = true,
                 beforeCredentialsStored = beforeCredentialsStored, onCredentialStored = onCredentialStored,
             )
-            if (outcome is WalletIssuanceOutcome.Failed) throw CredentialStorageException(outcome)
+            notifyCredentialStorageOutcome(httpClient, target, outcome)
             result.copy(storageOutcome = outcome)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            deliverCredentialNotification(
+                httpClient = httpClient,
+                target = target,
+                event = NotificationEvent.CREDENTIAL_FAILURE,
+            )
+            throw error
         }
     }
 
