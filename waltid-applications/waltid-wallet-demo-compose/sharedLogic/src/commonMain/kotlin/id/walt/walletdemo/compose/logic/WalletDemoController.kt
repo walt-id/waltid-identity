@@ -3,6 +3,8 @@ package id.walt.walletdemo.compose.logic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -1803,11 +1805,13 @@ class WalletDemoController(
         }
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     private fun refreshBiometricSigningAvailability(warningSequence: Long? = null) {
         val previous = biometricSigningAvailabilityJob
         // Cancel on the background dispatcher. Closing the previous call from the main
         // thread makes the Android HTTP engine throw NetworkOnMainThreadException.
-        biometricSigningAvailabilityJob = scope.launch(dispatcher) {
+        // ATOMIC still enters when this refresh is cancelled before dispatch.
+        biometricSigningAvailabilityJob = scope.launch(dispatcher, start = CoroutineStart.ATOMIC) {
             try {
                 previous?.cancelAndJoin()
             } catch (_: CancellationException) {
@@ -1815,6 +1819,7 @@ class WalletDemoController(
             } catch (_: Throwable) {
                 // A completion handler can fail while the socket closes. This check still runs.
             }
+            ensureActive()
             val availability = try {
                 wallet.signingProtectionAvailability(
                     (_state.value.session as? WalletSessionState.Ready)?.signingProtection
@@ -1825,6 +1830,7 @@ class WalletDemoController(
             } catch (_: Throwable) {
                 WalletDemoSigningProtectionAvailability.Unsupported
             }
+            ensureActive()
             _state.update {
                 it.copy(
                     biometricSigningAvailability = availability,
