@@ -10,8 +10,10 @@ on GitHub's [`xcode-27` arm64 image](https://github.com/actions/runner-images/bl
 The image currently uses macOS 27 and remains in public preview. Demo, bridge and
 Enterprise tests select the image's iPhone 17 simulator on iOS 27.0 explicitly;
 there is no fallback to an older runtime. `DEVELOPER_DIR` pins Xcode for the whole
-workflow, including framework verification. Keep the producer and SDK-docs
-toolchain pins aligned because framework reuse requires an exact Xcode match.
+workflow, including framework verification. Composite actions inherit that pin
+and use the supplied simulator destination directly, without selecting Xcode again
+or resolving another simulator. Keep the producer and SDK-docs toolchain pins
+aligned because framework reuse requires an exact Xcode match.
 
 ## Shared release framework
 

@@ -85,11 +85,8 @@ jobs:
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
-          xcode-developer-dir: ${{ env.DEVELOPER_DIR }}
           simulator-destination: ${{ env.IOS_SIMULATOR_DESTINATION }}
-          run-compile-smoke: 'true'
           run-ios-simulator-tests: 'true'
-          run-wallet-core-xcframework: 'false'
           run-native-demo-tests: 'false'
           run-compose-demo-tests: 'false'
           test-report-job-name: ${{ env.JOB_NAME_PREFIX }}ios-simulator-tests
@@ -217,11 +214,8 @@ jobs:
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
-          xcode-developer-dir: ${{ env.DEVELOPER_DIR }}
           simulator-destination: ${{ env.IOS_SIMULATOR_DESTINATION }}
-          run-compile-smoke: 'false'
           run-ios-simulator-tests: 'false'
-          run-wallet-core-xcframework: 'false'
           run-wallet-sdk-tests: 'true'
           wallet-core-artifact: ${{ runner.temp }}/wallet-core-artifact
           run-native-demo-tests: ${{ (inputs.run-native) && 'true' || 'false' }}

@@ -136,7 +136,6 @@ jobs:
         uses: ./waltid-identity/.github/actions/gradle-mobile-sdk-docs
         with:
           waltid-directory: 'waltid-identity'
-          xcode-developer-dir: ${{ env.DEVELOPER_DIR }}
           generate-dokka: true
           check-snippets: ${{ inputs.generate-linux-docs && 'false' || 'true' }}
           skip-wallet-core-assemble: ${{ inputs.wallet-core-artifact != '' && 'true' || 'false' }}
