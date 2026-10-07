@@ -668,6 +668,24 @@ private final class WalletVisualHostingController<Content: View>: UIHostingContr
             scroll.setContentOffset(CGPoint(x: 0, y: target), animated: false)
         }
         didScroll = true
+        // Even nonanimated scrolling starts UIKit's scroll-edge backdrop opacity animation.
+        // A static fixture must capture its final frame, not a runner-dependent phase.
+        // Production views and the separate motion journeys retain their animations.
+        finishAnimations(scroll.layer)
+    }
+
+    private func finishAnimations(_ layer: CALayer) {
+        for key in layer.animationKeys() ?? [] {
+            guard let animation = layer.animation(forKey: key)?.copy() as? CAAnimation,
+                  animation.repeatCount == 0, animation.repeatDuration == 0, !animation.autoreverses else { continue }
+            // Keep the animation's final presentation value: removing it can erase native glass.
+            animation.speed = 0
+            animation.timeOffset = animation.duration
+            animation.fillMode = .forwards
+            animation.isRemovedOnCompletion = false
+            layer.add(animation, forKey: key)
+        }
+        layer.sublayers?.forEach(finishAnimations)
     }
 
     private func freezeSpinners(_ view: UIView) {
