@@ -3,6 +3,7 @@ package id.walt.certificate.x509.validation.validator
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
+import id.walt.certificate.x509.validation.IssuerSelection
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
 
@@ -10,21 +11,20 @@ import id.walt.certificate.x509.validation.ValidationResult
  * Validation rules for the Authority Key Identifier (AKI) extension (OID 2.5.29.35, RFC 5280 section 4.2.1.1):
  *
  * Key Identifier Match: If the certificate carries an AKI extension, its `keyIdentifier` must equal the
- * Subject Key Identifier (SKI) of the issuer certificate. The issuer certificate is looked up in the
- * validation context (trust store plus the certificates of the chain already added to it) by matching
- * the certificate's issuer DN against the candidate's subject DN.
+ * Subject Key Identifier (SKI) of the issuer certificate. The issuer certificate is the one selected by
+ * [ValidationContext.selectIssuer] in the validation context (trust store plus the certificates of the
+ * chain already added to it): candidates are found by matching the certificate's issuer DN against their
+ * subject DN and, if several share that DN, told apart by key.
  *
  * The check is deliberately lenient and only reports a mismatch (severity ERROR) when both sides can be compared.
  * Nothing is reported if:
  * - the certificate has no AKI extension (the extension is not required by this validator),
- * - no issuer certificate can be found for the issuer DN (chain building/trust is not judged here), or
+ * - no single issuer certificate can be selected for the issuer DN (not found, none or more than one
+ *   candidate verifies; chain building/trust is not judged here, the signature validator reports it), or
  * - the issuer certificate has no SKI extension.
  *
  * Only the `keyIdentifier` field is compared; `authorityCertIssuer` and `authorityCertSerialNumber` are ignored.
  * A mismatch is not a signature failure; the signature is checked separately by [X509CertificateSignatureValidator].
- *
- * @throws IllegalArgumentException (via `require`) if more than one certificate matches the issuer DN,
- * because selecting the right issuer among several candidates is not supported.
  */
 class X509CertificateAuthorityKeyIdValidator
     : X509CertificateValidator {
@@ -36,11 +36,9 @@ class X509CertificateAuthorityKeyIdValidator
         x509Certificate: X509Certificate
     ) {
         x509Certificate.data.extensionAuthorityKeyIdentifier?.also { aki ->
-            val issuerCerts = context.findCertificateBySubjectDn(x509Certificate.data.issuerDn)
-            if (!issuerCerts.isEmpty()) {
-                require(issuerCerts.size == 1) { "Multiple possible issuer certificates is not supported (subjectDn='${x509Certificate.data.issuerDn}')" }
-                val issuerCert = issuerCerts.first()
-                issuerCert.data.extensionSubjectKeyIdentifier?.also { issuerSki ->
+            val selection = context.selectIssuer(x509Certificate)
+            if (selection is IssuerSelection.Selected) {
+                selection.issuer.data.extensionSubjectKeyIdentifier?.also { issuerSki ->
                     if (aki.keyIdentifier != issuerSki.keyIdentifier) {
                         context.addLogEntry(
                             ValidationResult.Severity.ERROR,
