@@ -24,6 +24,7 @@ import id.walt.openid4vci.proofs.ProofType
 import id.walt.openid4vci.proofs.VerifiedCredentialBindingCandidate
 import id.walt.openid4vci.proofs.VerifiedJwtProof
 import id.walt.openid4vci.proofs.attestation.KeyAttestationVerifier
+import id.walt.openid4vci.proofs.attestation.VerifiedKeyAttestation
 import id.walt.openid4vci.proofs.attestation.resolveBindings
 import id.walt.openid4vci.proofs.invalidCredentialProof
 import id.walt.openid4vci.proofs.validateCredentialNonce
@@ -112,7 +113,17 @@ class JwtCredentialProofHandler(
         }
         rejectUnsupportedTrustHeaders(decoded.header)
 
-        val resolvedHolderKey = resolveHolderKey(decoded.header, credentialConfiguration)
+        val attestationJwt = decoded.header.optionalStringHeader(JWT_HEADER_KEY_ATTESTATION)
+        if (attestationJwt == null && proofType?.keyAttestationsRequired != null) {
+            throw invalidCredentialProof("Key attestation is required for this credential configuration")
+        }
+        val attestation = attestationJwt?.let { jwt ->
+            val options = context.keyAttestation
+                ?: throw invalidCredentialProof("Key attestation verification is not configured")
+            keyAttestationVerifier.verify(jwt, proofType, context, credentialConfiguration, options)
+        }
+
+        val resolvedHolderKey = resolveHolderKey(decoded.header, credentialConfiguration, attestation, proofJwt)
         val verifiedPayload = runCatching {
             CompactJws.verify(proofJwt, resolvedHolderKey.key, setOf(JwsAlgorithm.parse(algorithm)))
         }.getOrElse {
@@ -128,18 +139,10 @@ class JwtCredentialProofHandler(
         validateIssuer(verifiedPayload, context)
         validateCredentialNonce(verifiedPayload, context)
 
-        val attestationJwt = decoded.header.optionalStringHeader(JWT_HEADER_KEY_ATTESTATION)
-        if (attestationJwt == null && proofType?.keyAttestationsRequired != null) {
-            throw invalidCredentialProof("Key attestation is required for this credential configuration")
-        }
-        val attestation = attestationJwt?.let { jwt ->
-            val options = context.keyAttestation
-                ?: throw invalidCredentialProof("Key attestation verification is not configured")
-            keyAttestationVerifier.verify(jwt, proofType, context, credentialConfiguration, options).also { evidence ->
-                val signerThumbprint = Jwk.sha256Thumbprint(resolvedHolderKey.key.exportPublicJwk())
-                requireCredentialProof(evidence.attestedKeys.any { Jwk.sha256Thumbprint(it.exportPublicJwk()) == signerThumbprint }) {
-                    "Credential proof signing key is not an attested key"
-                }
+        attestation?.let { evidence ->
+            val signerThumbprint = Jwk.sha256Thumbprint(resolvedHolderKey.key.exportPublicJwk())
+            requireCredentialProof(evidence.attestedKeys.any { Jwk.sha256Thumbprint(it.exportPublicJwk()) == signerThumbprint }) {
+                "Credential proof signing key is not an attested key"
             }
         }
 
@@ -159,6 +162,8 @@ class JwtCredentialProofHandler(
     private suspend fun resolveHolderKey(
         header: JsonObject,
         credentialConfiguration: CredentialConfiguration,
+        attestation: VerifiedKeyAttestation?,
+        proofJwt: String,
     ): ResolvedHolderKey {
         val hasJwk = JwtHeaderParams.JSON_WEB_KEY in header
         val hasKid = JwtHeaderParams.KEY_ID in header
@@ -193,6 +198,11 @@ class JwtCredentialProofHandler(
 
             hasKid -> {
                 val holderKid = header.requiredStringHeader(JwtHeaderParams.KEY_ID)
+                if (!holderKid.startsWith("did:") && attestation != null) {
+                    validateBindingMethod(credentialConfiguration, setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.CoseKey))
+                    val key = resolveAttestedHolderKey(attestation, holderKid, header.requiredStringHeader(JwtHeaderParams.ALGORITHM), proofJwt)
+                    return ResolvedHolderKey(key = key, kid = holderKid, did = null)
+                }
                 requireCredentialProof(DidUtils.isDidUrl(holderKid)) {
                     "Credential proof kid must be a DID URL when using kid-based holder key resolution: $holderKid"
                 }
@@ -205,6 +215,50 @@ class JwtCredentialProofHandler(
 
             else -> throw invalidCredentialProof("Credential proof JWT header must contain kid or jwk")
         }
+    }
+
+    private suspend fun resolveAttestedHolderKey(
+        attestation: VerifiedKeyAttestation,
+        kid: String,
+        algorithm: String,
+        proofJwt: String,
+    ): Key {
+        // Use the signed JWK identifiers, not restored key IDs or array indexes.
+        val jwks = attestation.payload.getValue("attested_keys").jsonArray.map { it.jsonObject }
+        val kids = jwks.map { it.optionalString(JwtHeaderParams.KEY_ID) }
+        val matches = kids.indices.filter { kids[it] == kid }
+        requireCredentialProof(matches.size <= 1) { "Credential proof kid matches multiple attested JWKs: $kid" }
+        matches.singleOrNull()?.let { index ->
+            jwks[index].optionalString(JwtHeaderParams.ALGORITHM)?.let { jwkAlgorithm ->
+                requireCredentialProof(jwkAlgorithm == algorithm) {
+                    "Attested JWK algorithm does not match the proof algorithm"
+                }
+            }
+            return attestation.attestedKeys[index].also { validateKeyAlgorithm(it, algorithm) }
+        }
+
+        // JWK kid is optional. For unnamed keys, the signature must identify one distinct signer.
+        // A key with an explicit, different kid is never a fallback candidate.
+        val candidates = kids.indices.filter { kids[it] == null }
+        requireCredentialProof(candidates.isNotEmpty()) { "Credential proof kid does not match an attested JWK: $kid" }
+        val jwsAlgorithm = JwsAlgorithm.parse(algorithm)
+        val signers = mutableMapOf<String, Key>()
+        for (index in candidates) {
+            val key = attestation.attestedKeys[index]
+            val declaredAlgorithm = jwks[index].optionalString(JwtHeaderParams.ALGORITHM)
+            if (declaredAlgorithm != null && declaredAlgorithm != algorithm || !key.spec.supportsJwsAlgorithm(jwsAlgorithm)) continue
+            try {
+                CompactJws.verify(proofJwt, key, setOf(jwsAlgorithm))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                continue
+            }
+            signers[Jwk.sha256Thumbprint(key.exportPublicJwk())] = key
+        }
+        requireCredentialProof(signers.isNotEmpty()) { "Credential proof signature does not match an eligible attested key" }
+        return signers.values.singleOrNull()
+            ?: throw invalidCredentialProof("Credential proof signature matches multiple attested keys")
     }
 
     private fun rejectUnsupportedTrustHeaders(header: JsonObject) {
