@@ -9,6 +9,7 @@ import id.walt.credentials.CredentialDetectorTypes.SDJWTVCSubType
 import id.walt.credentials.CredentialDetectorTypes.SignaturePrimaryType
 import id.walt.credentials.CredentialDetectorTypes.W3CSubType
 import id.walt.credentials.formats.*
+import id.walt.w3c.vc.vcs.w3cContextUrls
 import id.walt.credentials.representations.X5CCertificateString
 import id.walt.credentials.representations.X5CList
 import id.walt.credentials.signatures.CoseCredentialSignature
@@ -60,29 +61,15 @@ object CredentialParser {
         // @context may be a JSON array (standard) or a single string (non-conformant but seen in practice).
         // JSON-LD and VC Data Model allow objects in the array (inline context definitions). Version
         // detection only needs the context URLs, so those objects are skipped.
-        val rawContext = data["@context"] ?: error("Missing context from W3C: $data")
-        val contextField = contextIris(rawContext)
-            ?: error("Unexpected @context type in W3C credential: $data")
+        val rawContext = data["@context"] ?: error("Missing @context in W3C credential")
+        val contextField = rawContext.w3cContextUrls()
+            ?: error("@context must be a string or an array, got ${rawContext::class.simpleName}")
 
         return when {
             DM_2_0_CONTEXT_INDICATORS.any { contextField.contains(it) } -> W3CSubType.W3C_2
             DM_1_1_CONTEXT_INDICATORS.any { contextField.contains(it) } -> W3CSubType.W3C_1_1
-            else -> error("Unknown W3C type: $data")
+            else -> error("Unknown W3C data model")
         }
-    }
-
-    /**
-     * Context URLs from a W3C `@context` value.
-     *
-     * Returns null when [rawContext] is neither a string nor an array. Array entries that are
-     * inline JSON-LD context objects are omitted; they are valid and are not version indicators.
-     */
-    private fun contextIris(rawContext: JsonElement): List<String>? = when (rawContext) {
-        is JsonArray -> rawContext.mapNotNull { element ->
-            (element as? JsonPrimitive)?.takeIf { it.isString }?.content
-        }
-        is JsonPrimitive -> if (rawContext.isString) listOf(rawContext.content) else null
-        else -> null
     }
 
     fun JsonElement?.getString(key: String): String? = this?.jsonObject[key]?.jsonPrimitive?.contentOrNull
