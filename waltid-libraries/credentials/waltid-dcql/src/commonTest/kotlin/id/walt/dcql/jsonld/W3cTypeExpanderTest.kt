@@ -99,6 +99,100 @@ class W3cTypeExpanderTest {
     }
 
     @Test
+    fun bundledGaiaXContextExpandsLegalPerson() {
+        val expanded = W3cTypeExpander.expandedTypes(
+            credential(
+                contexts = listOf(
+                    "https://www.w3.org/ns/credentials/v2",
+                    "https://w3id.org/gaia-x/development#",
+                ),
+                "VerifiableCredential",
+                "gx:LegalPerson",
+            ),
+        )
+        assertEquals(setOf(verifiableCredential, legalPerson), expanded)
+    }
+
+    @Test
+    fun vocabDoesNotRewriteAnUndefinedIri() {
+        val expanded = W3cTypeExpander.expandedTypes(
+            json.parseToJsonElement(
+                """
+                {
+                  "@context": {
+                    "@vocab": "https://w3id.org/gaia-x/development#",
+                    "gx": "https://w3id.org/gaia-x/development#"
+                  },
+                  "type": ["urn:example:Foo", "gx:LegalPerson"]
+                }
+                """.trimIndent()
+            ).jsonObject
+        )
+        assertEquals(setOf("urn:example:Foo", legalPerson), expanded)
+    }
+
+    @Test
+    fun termDefinitionOrderDoesNotChangeExpansion() {
+        val expanded = W3cTypeExpander.expandedTypes(
+            json.parseToJsonElement(
+                """
+                {
+                  "@context": { "Degree": "ex:Degree", "ex": "https://example.org/#" },
+                  "type": ["Degree"]
+                }
+                """.trimIndent()
+            ).jsonObject
+        )
+        assertEquals(setOf("https://example.org/#Degree"), expanded)
+    }
+
+    @Test
+    fun objectTermDefinitionIsNotAPrefixUnlessMarked() {
+        val expanded = W3cTypeExpander.expandedTypes(
+            json.parseToJsonElement(
+                """
+                {
+                  "@context": { "ex": { "@id": "https://example.org/examples#" } },
+                  "type": ["ex:Foo"]
+                }
+                """.trimIndent()
+            ).jsonObject
+        )
+        assertEquals(setOf("ex:Foo"), expanded)
+    }
+
+    @Test
+    fun nullContextDoesNotDropProtectedBaseTypes() {
+        val expanded = W3cTypeExpander.expandedTypes(
+            json.parseToJsonElement(
+                """
+                {
+                  "@context": ["https://www.w3.org/2018/credentials/v1", null],
+                  "type": ["VerifiableCredential"]
+                }
+                """.trimIndent()
+            ).jsonObject
+        )
+        assertEquals(setOf(verifiableCredential), expanded)
+    }
+
+    @Test
+    fun contextDocumentWithoutContextIsIgnored() {
+        val documents = MapJsonLdContextDocuments(
+            mapOf(
+                "https://issuer.example/ctx" to json.parseToJsonElement(
+                    """{ "gx": "https://w3id.org/gaia-x/development#" }"""
+                ).jsonObject,
+            ),
+        )
+        val expanded = W3cTypeExpander.expandedTypes(
+            credential(contexts = listOf("https://issuer.example/ctx"), "gx:LegalPerson"),
+            documents,
+        )
+        assertEquals(setOf("gx:LegalPerson"), expanded)
+    }
+
+    @Test
     fun absoluteIriAndUndefinedTermStayUnchanged() {
         val expanded = W3cTypeExpander.expandedTypes(
             credential("https://www.w3.org/2018/credentials/v1", legalPerson, "IdentityCredential"),

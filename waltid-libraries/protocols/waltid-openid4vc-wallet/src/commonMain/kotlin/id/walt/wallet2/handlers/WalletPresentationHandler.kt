@@ -16,12 +16,9 @@ import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
-import id.walt.credentials.jsonld.loadW3cContextDocuments
-import id.walt.dcql.DcqlCredential
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
-import id.walt.dcql.jsonld.JsonLdContextDocumentSource
 import id.walt.dcql.RequiredCredentialUnavailableException
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialQuery
@@ -31,8 +28,6 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier.openid.transactiondata.decodeList
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
-import id.walt.webdatafetching.WebDataFetcher
-import io.ktor.client.HttpClient
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.Wallet
@@ -42,6 +37,7 @@ import id.walt.wallet2.data.resolveKeyMaterial
 import id.walt.wallet2.data.resolveHolderKey
 import id.walt.wallet2.handlers.WalletPresentationHandler.matchCredentials
 import id.walt.wallet2.handlers.WalletPresentationHandler.matchCredentialsFromStore
+import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vp.wallet.PresentationRequestError
 import id.waltid.openid4vp.wallet.PresentationRequestValidationResult
@@ -579,7 +575,7 @@ object WalletPresentationHandler {
             holderDid = did,
             presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
-                DcqlMatcher.match(query, rawCredentials, contextDocuments = contextsFor(rawCredentials)).getOrThrow()
+                DcqlMatcher.match(query, rawCredentials).getOrThrow()
                     .also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
             },
             runPolicies = null,
@@ -1449,11 +1445,7 @@ object WalletPresentationHandler {
         val rawCredentials = request.credentials.mapIndexed { idx, stored ->
             stored.credential.toRawDcqlCredential(idx.toString())
         }
-        val matched = DcqlMatcher.findMatches(
-            request.dcqlQuery,
-            rawCredentials,
-            contextDocuments = contextsFor(rawCredentials),
-        ).getOrThrow()
+        val matched = DcqlMatcher.findMatches(request.dcqlQuery, rawCredentials).getOrThrow()
         return buildMatchResult(matched, idByIndex)
     }
 
@@ -1730,7 +1722,7 @@ object WalletPresentationHandler {
      * `multiple=false` query rematches the OS-selected credential instead of collapsing to the first
      * store match.
      */
-    private suspend fun selectFromSnapshot(
+    private fun selectFromSnapshot(
         wallet: Wallet,
         query: DcqlQuery,
         storedCredentials: List<StoredCredential>,
@@ -1752,11 +1744,7 @@ object WalletPresentationHandler {
         }
 
         log.debug { "DCQL matching against ${candidates.size} stored credential(s), queries=${query.credentials.map { it.id }}" }
-        val matched = DcqlMatcher.findMatches(
-            query,
-            rawCredentials,
-            contextDocuments = contextsFor(rawCredentials),
-        ).getOrThrow()
+        val matched = DcqlMatcher.findMatches(query, rawCredentials).getOrThrow()
         log.trace { "DCQL match result: matchedQueryIds=${matched.keys}, matchCounts=${matched.mapValues { it.value.size }}" }
         return matched
     }
@@ -2256,13 +2244,6 @@ object WalletPresentationHandler {
             }
         }
     }
-
-    private val jsonLdClient: HttpClient by lazy {
-        WebDataFetcher("wallet2-jsonld-context").httpClient
-    }
-
-    private suspend fun contextsFor(credentials: List<DcqlCredential>): JsonLdContextDocumentSource =
-        jsonLdClient.loadW3cContextDocuments(credentials)
 
     private fun DigitalCredential.toRawDcqlCredential(id: String): RawDcqlCredential {
         val sdvc = this as? id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential

@@ -13,8 +13,11 @@ import kotlinx.serialization.Serializable
 data class JwtVcJsonMeta(
     /**
      * REQUIRED. An array of string arrays. Each inner array is a set of fully expanded type
-     * IRIs, after `@context` is applied, that must be present on the credential. Compact type
-     * strings still match, so a verifier can send either the expanded IRI or the compact name.
+     * IRIs, after `@context` is applied, that must be present on the credential.
+     *
+     * OpenID4VP 1.0 Appendix B.1.1 compares expanded IRIs only. Matching also accepts the compact
+     * type string, so existing queries that send `VerifiableCredential` or `OpenBadgeCredential`
+     * keep working. That is a deliberate superset of the spec.
      */
     @SerialName(TYPE_VALUES_KEY)
     val typeValues: List<List<String>> // Now non-nullable, spec says "REQUIRED. A non-empty array..."
