@@ -465,7 +465,14 @@ class Issuer2ProfileEndpointTest {
         profileId: String,
         profilesConfig: Issuer2ProfilesConfig,
     ): IssuerMaterial =
-        if (profileId in HAIP_PROFILE_IDS) {
+        if (profilesConfig.defaultEudiIssuerKey != null &&
+            profileId in setOf("identityCredentialSdJwtEudi", "isoPhotoIdEudi", "eudiPidSdJwt", "eudiPidMdoc")
+        ) {
+            IssuerMaterial(
+                key = assertNotNull(profilesConfig.defaultEudiIssuerKey, "Expected defaultEudiIssuerKey"),
+                x5Chain = profilesConfig.defaultEudiIssuerX5chain,
+            )
+        } else if (profileId in HAIP_PROFILE_IDS) {
             IssuerMaterial(
                 key = assertNotNull(profilesConfig.defaultHaipIssuerKey, "Expected defaultHaipIssuerKey"),
                 x5Chain = if (profileId == ISO_MDL_HAIP_PROFILE_ID) {
