@@ -53,9 +53,15 @@ object WalletApi2BrowserSessionStore {
         return runCatching { walletApi2Json.decodeFromString<PersistedAuthorizationIssuance>(raw) }.getOrNull()
     }
 
-    internal fun clearPendingIssuance() {
-        sessionStorage.removeItem(PendingIssuanceKey)
-        localStorage.removeItem(PendingIssuanceKey)
+    internal fun clearPendingIssuance(sessionId: String? = null) {
+        for (storage in listOf(sessionStorage, localStorage)) {
+            if (sessionId != null) {
+                val raw = storage.getItem(PendingIssuanceKey) ?: continue
+                val pending = runCatching { walletApi2Json.decodeFromString<PersistedAuthorizationIssuance>(raw) }.getOrNull()
+                if (pending?.id != sessionId) continue
+            }
+            storage.removeItem(PendingIssuanceKey)
+        }
     }
 
     fun clear() {

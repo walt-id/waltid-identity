@@ -109,17 +109,32 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertEqual(offerReadyStatus, "Review credential offer", "Offer preview did not appear, status: \(offerReadyStatus ?? "nil")")
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
-        // Successful issuance returns to the credential list, which does not display a status banner.
+        ui.tapTab(label: "Credentials")
         ui.assertExists(identifierPrefix: "wallet.credentialCard.", timeout: credentialOperationTimeout)
 
-        ui.tapTab(label: "Credentials")
         ui.assertExists(identifierPrefix: "wallet.credentialCard.")
         ui.tapElement(identifierPrefix: "wallet.credentialCard.")
         ui.assertExists(identifierPrefix: "wallet.credentialOverview.")
         XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "wallet.credentialDetailsScreen").firstMatch.waitForExistence(timeout: 20))
         ui.tapNavigationBack()
 
-        let session = try await backend.createVerifierSession(scenario: scenario)
+        let savedCredentialIDs = Set(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
+            .allElementsBoundByIndex.map(\.identifier))
+        XCTAssertFalse(savedCredentialIDs.isEmpty)
+        // XCUIApplication.terminate ends the app process; a new wallet object alone is insufficient.
+        app.terminate()
+        ui.launch(initializeSigningIdentity: false)
+        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: walletReadyTimeout), "Wallet ready")
+        ui.tapTab(label: "Credentials")
+        XCTAssertFalse(app.buttons["wallet.keySetupContinue"].exists, "Restart must reuse the saved identity")
+        let reopenedCredentialIDs = Set(app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
+            .allElementsBoundByIndex.map(\.identifier))
+        XCTAssertEqual(reopenedCredentialIDs, savedCredentialIDs)
+        let session = try await backend.createVerifierSession(
+            scenario: scenario, signedRequest: true, clientID: DemoBackend.didVerifierClientID
+        )
         ui.tapTab(label: "Present")
         let presentInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
         ui.replaceText(in: presentInput, value: session.authorizationRequestUri)
@@ -130,11 +145,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         )
         XCTAssertEqual(previewStatus, "Review presentation request", "Preview failed, status: \(previewStatus ?? "nil")")
 
-        ui.assertExists(identifierPrefix: "wallet.credentialCard.")
-        ui.tapElement(identifierPrefix: "wallet.credentialCard.")
-        ui.assertExists(identifierPrefix: "wallet.credentialOverview.")
-        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "wallet.credentialDetailsScreen").firstMatch.waitForExistence(timeout: 20))
-        ui.tapNavigationBack()
+        ui.assertExists(identifierPrefix: "wallet.presentationCredentialToggle.")
 
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
 

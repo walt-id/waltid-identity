@@ -99,9 +99,9 @@
       "lanes": ["sdk-docs"]
     },
     {
-      "name": "unrelated Linux service change selects no macOS lane",
+      "name": "backend API source selects no macOS lane",
       "files": [
-        "waltid-services/waltid-issuer-api2/src/main/kotlin/id/walt/issuer/Issuer.kt"
+        "waltid-services/waltid-issuer-api2/src/main/kotlin/id/walt/issuer2/api/status/StatusApi.kt"
       ],
       "lanes": []
     },
@@ -154,6 +154,41 @@
         ".github/scripts/mobile-ci/run-ios-wallet-recovery-tests.sh"
       ],
       "lanes": ["ios-simulator"]
+    },
+    {
+      "name": "Android ABI-only change selects the contract gate",
+      "files": [
+        "waltid-libraries/crypto/waltid-crypto2/api/android/waltid-crypto2.api"
+      ],
+      "lanes": ["sdk-docs"]
+    },
+    {
+      "name": "native ABI-only change selects the contract gate",
+      "files": [
+        "waltid-libraries/crypto/waltid-crypto2-kms/api/waltid-crypto2-kms.klib.api"
+      ],
+      "lanes": ["sdk-docs"]
+    },
+    {
+      "name": "mdoc platform API source selects compilation and contract checks",
+      "files": [
+        "waltid-libraries/credentials/waltid-mdoc-proximity-mobile/src/iosMain/kotlin/id/walt/mdoc/proximity/mobile/IosApi.kt"
+      ],
+      "lanes": ["ios-simulator", "sdk-docs"]
+    },
+    {
+      "name": "crypto provider common source selects compilation and contract checks",
+      "files": [
+        "waltid-libraries/crypto/waltid-crypto2-signum/src/commonMain/kotlin/id/walt/crypto2/signum/SignumKeyProvider.kt"
+      ],
+      "lanes": ["ios-simulator", "sdk-docs"]
+    },
+    {
+      "name": "wallet recovery common source selects compilation and contract checks",
+      "files": [
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/src/commonMain/kotlin/id/walt/wallet2/recovery/BlockstoreRecovery.kt"
+      ],
+      "lanes": ["ios-simulator", "sdk-docs"]
     }
   ]
 }

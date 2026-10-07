@@ -11,6 +11,10 @@ class WalletDemoAppAndroidTest {
     private val scenarios = WalletDemoAppTestScenarios()
 
     @Test
+    fun batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit() =
+        scenarios.batchCopyControlsRequireSelectionAndRespectTheAdvertisedLimit()
+
+    @Test
     fun keySetupGroupsChoicesAndConfirmsSelectedConfiguration() = scenarios.keySetupGroupsChoicesAndConfirmsSelectedConfiguration()
 
     @Test
@@ -146,6 +150,9 @@ class WalletDemoAppAndroidTest {
     @Test
     fun technicalCopyPreservesFullValueWithoutChangingExpansion() =
         scenarios.technicalCopyPreservesFullValueWithoutChangingExpansion()
+
+    @Test
+    fun copyIsCancelledWhenRowLeavesComposition() = scenarios.copyIsCancelledWhenRowLeavesComposition()
 
     @Test
     fun readerTrustSettingsReviewAndPersistPublicCa() =

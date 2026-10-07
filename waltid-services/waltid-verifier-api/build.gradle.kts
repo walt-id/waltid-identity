@@ -61,7 +61,7 @@ dependencies {
     implementation(identityLibs.ktor.client.java)
 
     // Crypto
-    implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
+    implementation(identityLibs.java.cose)
     implementation(identityLibs.nimbus.jose.jwt)
 
     // Test

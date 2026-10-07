@@ -1,7 +1,3 @@
-@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
-
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-
 plugins {
     id("waltid.multiplatform.library")
     id("waltid.publish.maven")
@@ -27,6 +23,9 @@ kotlin {
 
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
+
+            // Date functions of the issuance templates
+            implementation(identityLibs.kotlinx.datetime)
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)

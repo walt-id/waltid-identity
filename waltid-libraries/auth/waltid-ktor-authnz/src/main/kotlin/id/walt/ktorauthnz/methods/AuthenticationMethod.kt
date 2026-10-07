@@ -1,6 +1,6 @@
 package id.walt.ktorauthnz.methods
 
-import id.walt.commons.web.AccountDataNotFoundException
+import id.walt.ktorauthnz.exceptions.AccountDataNotFoundException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier

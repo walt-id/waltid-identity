@@ -1,8 +1,12 @@
 package id.walt.openid4vci.handlers.credential
 
+import kotlinx.serialization.json.jsonArray
+import id.walt.credentials.issuance.issuanceTemplateContext
 import id.walt.certificate.x509.X509Certificate
 import id.walt.cose.CoseCertificate
+import id.walt.cose.toCoseKey
 import id.walt.crypto.keys.Key
+import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
@@ -16,14 +20,16 @@ import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.requests.credential.CredentialRequest
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
+import id.walt.openid4vci.proofs.CredentialProofValidationException
+import id.walt.openid4vci.proofs.invalidCredentialProof
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
 import id.walt.sdjwt.SDMap
-import id.walt.w3c.issuance.IssuanceClock
-import id.walt.w3c.issuance.InstantClock
-import id.walt.w3c.issuance.dataFunctionsFor
-import id.walt.w3c.utils.CredentialDataMergeUtils.mdocNamespaceMapping
-import id.walt.w3c.utils.CredentialDataMergeUtils.mergeMdocPayloadWithMapping
+import id.walt.credentials.issuance.IssuanceClock
+import id.walt.credentials.issuance.InstantClock
+import id.walt.credentials.issuance.dataFunctionsFor
+import id.walt.credentials.issuance.CredentialDataMergeUtils.mdocNamespaceMapping
+import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeMdocPayloadWithMapping
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -49,6 +55,20 @@ class MdocCredentialHandler(
     private val requireExpectedUpdateWithinWindow: Boolean = false,
     private val now: () -> Instant = { Clock.System.now() },
 ) : CredentialEndpointHandler, Crypto2CredentialEndpointHandler {
+    override suspend fun validateBindings(configuration: CredentialConfiguration, bindings: List<VerifiedCredentialBinding>) {
+        bindings.forEach { binding ->
+            // Export failures are operational; only an unsupported representation is invalid input.
+            val publicJwk = binding.holderKey.exportPublicJwk()
+            try {
+                publicJwk.toCoseKey()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                throw invalidCredentialProof("A selected key cannot be represented by the mdoc credential handler", e)
+            }
+        }
+    }
+
     override suspend fun sign(
         request: CredentialRequest,
         configuration: CredentialConfiguration,
@@ -81,13 +101,12 @@ class MdocCredentialHandler(
                 configuration = configuration,
                 issue = { certificateChain, docType, issuedAt, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                     MdocCredentialSigner.generateMdocCredential(
-                        credentialRequest = request,
                         credentialData = mapMdocData(
                             instance.input.credentialData,
                             dataMapping,
                             issuerId,
                             display,
-                            instance.verifiedProof,
+                            instance.verifiedBinding,
                             issuedAt,
                         ),
                         issuerKey = issuerKey,
@@ -100,7 +119,7 @@ class MdocCredentialHandler(
                         requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
                         status = instance.input.credentialStatus,
                         mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
-                        verifiedProof = instance.verifiedProof,
+                        verifiedBinding = instance.verifiedBinding,
                         authorizedTransactionDataTypes = authorizedTransactionDataTypes,
                     )
                 },
@@ -110,10 +129,8 @@ class MdocCredentialHandler(
                 validFrom = validFrom,
                 validUntil = validUntil,
             )
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            CredentialResponseResult.Failure(e.toCredentialHandlerError())
+        } catch (e: CredentialProofValidationException) {
+            CredentialResponseResult.Failure(CredentialError(e.errorCode, e.message))
         }
     }
 
@@ -144,13 +161,12 @@ class MdocCredentialHandler(
             validUntil = validUntil,
             issue = { certificateChain, docType, issuedAt, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
                 MdocCredentialSigner.generateMdocCredential(
-                    credentialRequest = request,
                     credentialData = mapMdocData(
                         instance.input.credentialData,
                         dataMapping,
                         issuerId,
                         display,
-                        instance.verifiedProof,
+                        instance.verifiedBinding,
                         issuedAt,
                     ),
                     issuerKey = issuerKey.key,
@@ -164,15 +180,13 @@ class MdocCredentialHandler(
                     requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
                     status = instance.input.credentialStatus,
                     mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
-                    verifiedProof = instance.verifiedProof,
+                    verifiedBinding = instance.verifiedBinding,
                     authorizedTransactionDataTypes = authorizedTransactionDataTypes,
                 )
             },
         )
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        CredentialResponseResult.Failure(e.toCredentialHandlerError())
+    } catch (e: CredentialProofValidationException) {
+        CredentialResponseResult.Failure(CredentialError(e.errorCode, e.message))
     }
 
     /** Resolve namespace element mappings before mdoc-specific JSON-to-CBOR conversions. */
@@ -181,14 +195,14 @@ class MdocCredentialHandler(
         dataMapping: JsonObject?,
         issuerId: String,
         display: List<CredentialDisplay>?,
-        verifiedProof: VerifiedCredentialProof?,
+        verifiedBinding: VerifiedCredentialBinding?,
         issuedAt: Instant,
     ): JsonObject {
         if (dataMapping == null || dataMapping.isEmpty()) return credentialData
         val namespaceMapping = dataMapping.mdocNamespaceMapping(credentialData) ?: return credentialData
         return credentialData.mergeMdocPayloadWithMapping(
             mapping = namespaceMapping,
-            context = mdocMappingContext(issuerId, display, verifiedProof?.holderDid),
+            context = mdocMappingContext(issuerId, display, verifiedBinding?.holderDid),
             data = dataFunctionsFor(InstantClock(issuedAt)),
         )
     }
@@ -197,12 +211,11 @@ class MdocCredentialHandler(
         issuerId: String,
         display: List<CredentialDisplay>?,
         subjectDid: String?,
-    ): Map<String, JsonElement> = buildMap {
-        put("issuerId", JsonPrimitive(issuerId))
-        put("issuerDid", JsonPrimitive(issuerId))
-        subjectDid?.takeIf { it.isNotBlank() }?.let { put("subjectDid", JsonPrimitive(it)) }
-        display?.takeIf { it.isNotEmpty() }?.let { put("display", Json.encodeToJsonElement(it)) }
-    }
+    ): Map<String, JsonElement> = issuanceTemplateContext(
+        issuerId = issuerId,
+        subjectDid = subjectDid?.takeIf { it.isNotBlank() },
+        display = display?.let { Json.encodeToJsonElement(it).jsonArray },
+    )
 
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun computeCredentialResult(

@@ -11,7 +11,6 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 internal object MobileWalletRegistryIcons {
     internal val DefaultCardBlueRgb: Int = 0x1B4FDB
@@ -125,7 +124,6 @@ private fun JsonObject.portraitBytes(): ByteArray? {
     return null
 }
 
-@OptIn(ExperimentalEncodingApi::class)
 private fun JsonElement.imageBytes(): ByteArray? = when (this) {
     is JsonArray -> {
         if (isEmpty() || size > MaxRegistryIconBytes) {

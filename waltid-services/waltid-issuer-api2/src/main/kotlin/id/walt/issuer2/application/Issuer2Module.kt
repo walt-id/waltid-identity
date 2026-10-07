@@ -1,5 +1,7 @@
 package id.walt.issuer2.application
 
+import id.walt.openid4vci.proofs.attestation.KeyAttestationKeyReferenceResolver
+import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.commons.config.ConfigManager
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
 import id.walt.issuer2.config.Issuer2MetadataConfig
@@ -31,11 +33,13 @@ class Issuer2Module @JvmOverloads constructor(
     credentialProofKeyCommitment: CredentialProofKeyCommitment? = null,
     issuanceSessionRepository: IssuanceSessionRepository = ConfiguredIssuanceSessionRepository(),
     preAuthorizedCodeRepository: PreAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository(),
+    keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver? = null,
 ) {
     private val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
     private val parRepository = ConfiguredPARRepository()
     private val refreshTokenRepository = ConfiguredRefreshTokenRepository()
     private val notificationService = IssuanceNotificationService()
+    private val credentialProofVerifier = DefaultCredentialProofVerifier()
 
     private val openId4VciModule = OpenId4VciModule.create(
         config = serviceConfig,
@@ -43,6 +47,8 @@ class Issuer2Module @JvmOverloads constructor(
         preAuthorizedCodeRepository = preAuthorizedCodeRepository,
         parRepository = parRepository,
         refreshTokenRepository = refreshTokenRepository,
+        keyAttestationKeyResolver = keyAttestationKeyResolver,
+        credentialProofVerifier = credentialProofVerifier,
     )
 
     private val credentialProfileService = CredentialProfileService(
@@ -81,6 +87,8 @@ class Issuer2Module @JvmOverloads constructor(
         credentialProofKeyAcceptance = credentialProofKeyAcceptance,
         credentialProofKeyCommitment = credentialProofKeyCommitment,
         credentialNonceService = openId4VciModule.credentialNonceService,
+        credentialProofVerifier = credentialProofVerifier,
+        keyAttestation = openId4VciModule.keyAttestation,
     )
 
     val managementController = Issuer2ManagementController(

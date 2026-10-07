@@ -1,6 +1,6 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -9,7 +9,7 @@ import kotlin.test.assertFailsWith
 class WifiAwareProtocolTest {
     @Test
     fun `ISO service name and passphrase derivations match independent HKDF vectors`() {
-        val eDeviceKeyBytes = ImmutableBytes.of("test EDeviceKeyBytes".encodeToByteArray())
+        val eDeviceKeyBytes = ByteString("test EDeviceKeyBytes".encodeToByteArray())
 
         assertEquals("8EB78A0CF910EA14B6DBA7C3D6BBD75D", WifiAwareProtocol.deriveServiceName(eDeviceKeyBytes))
         assertEquals("RQDMjYgxvA0mRB85Jtk37IGeD6P_7cGUCvSVMMSdUEU", WifiAwareProtocol.derivePassphrase(eDeviceKeyBytes))

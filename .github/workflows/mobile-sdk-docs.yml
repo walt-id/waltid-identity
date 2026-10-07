@@ -107,26 +107,29 @@ jobs:
         working-directory: waltid-identity
         env:
           GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          SWIFT_PARITY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
             git fetch --prune --unshallow origin
           fi
           git fetch --prune origin main
+          if [ -n "$SWIFT_PARITY_BASE_SHA" ]; then
+            git fetch origin "$SWIFT_PARITY_BASE_SHA"
+          fi
           ./gradlew \
             :build-logic:test \
-            :waltid-libraries:crypto:waltid-crypto2:checkKotlinAbi \
-            :waltid-libraries:crypto:waltid-crypto2-signum:checkKotlinAbi \
-            :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:checkKotlinAbi \
-            :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:checkKotlinAbi \
-            :waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-blockstore:checkKotlinAbi \
-            :waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-keychain:checkKotlinAbi \
-            :waltid-libraries:protocols:waltid-openid4vc-wallet-custody-enterprise:checkKotlinAbi \
+            checkKotlinAbi \
             :waltid-libraries:protocols:waltid-openid4vc-wallet-custody-enterprise:testAndroidHostTest \
             -PenableAndroidBuild=true \
             -PenableIosBuild=true \
             --no-daemon \
             --console=plain
-          scripts/check-mobile-swift-parity-decision.sh
+          # A stacked base branch may be merged and deleted while this job runs.
+          if [ -n "$SWIFT_PARITY_BASE_SHA" ]; then
+            scripts/check-mobile-swift-parity-decision.sh --base-ref "$SWIFT_PARITY_BASE_SHA"
+          else
+            scripts/check-mobile-swift-parity-decision.sh
+          fi
 
       - name: Generate mobile SDK API docs
         timeout-minutes: 45

@@ -82,6 +82,115 @@ routing {
 }
 ```
 
+The [Issuer2-to-Wallet2 walkthrough](../../../waltid-services/waltid-wallet-api2/examples/issuer2-batch.md)
+shows all four OSS/Enterprise management contracts feeding the public wallet endpoints,
+including both grants and explicit holder copies.
+
+## Batch and multi-credential issuance
+
+The full receive endpoints default to one instance per offered configuration.
+Pass `credentials` to select configurations and `holderBindings` to request
+multiple instances:
+
+```json
+{
+  "offerUrl": "https://issuer.example/offer",
+  "credentials": [{
+    "credentialConfigurationId": "identity_credential",
+    "holderBindings": [{"keyId": "holder-1"}, {"keyId": "holder-2"}]
+  }]
+}
+```
+
+Replace the offer URL, configuration and key IDs with real values. Keys must
+already be available to the wallet. Enterprise uses `keyReference` (an attached
+KMS resource path) in each holder binding instead of OSS `keyId`.
+
+- Resolve the offer through `resolve-offer/batch` first and check `batchSize`; absence means no batch support.
+- One selection is one configuration/dataset. Different formats or datasets use
+  separate requests, sharing the access token.
+- The full handlers use token `authorizationDetails` and `scope` to determine
+  granted targets. Returned dataset identifiers are never replaced by config IDs.
+- Authorization parameters are selected automatically from metadata in both flows:
+  prefer `authorization_details` when the authorization server advertises
+  `openid_credential`; otherwise use the selected configurations' advertised scopes.
+  Authorization-code issuance requires one of these selectors; an offered pre-authorized
+  code already authorizes its credentials and works without either selector.
+  Multiple datasets under one configuration require dataset identifiers.
+  Isolated request-token also negotiates automatically when given `credentialIssuer`
+  and `credentialConfigurationIds`; explicit `authorizationDetails` or `scope` remain
+  available for callers constructing that protocol step themselves.
+- Authorization URL generation accepts `credentialConfigurationIds`. Supply
+  either an offer or `credentialIssuer` for wallet-initiated authorization.
+- Authorized receive accepts plural `credentials` selections. Existing single-copy
+  REST callers can still supply `credentialConfigurationId`; supplying both is rejected.
+- Isolated sign-proof returns `proofJwt` for one proof and `proofs.jwt` for multiple
+  proofs. Pass the returned field to fetch-credential. Pass `credentialIdentifier` when the token returned it;
+  `credentialConfigurationId` is still needed locally for metadata, but only
+  one selector is sent to the issuer. Multi-proof fetch also requires
+  `credentialIssuerBaseUrl` to validate the issuer's batch limit.
+- When storing an isolated response, include a holder binding for every proof.
+  Responses may reorder instances or return fewer; keys are matched from the
+  credential's holder binding, not array position.
+- Full receive results carry `deferredCredentials`, each with an opaque
+  `deferredCredentialId`. List pending handles with
+  `GET /wallet/{walletId}/credentials/receive/deferred`, and resume one with
+  `POST /wallet/{walletId}/credentials/receive/deferred/{deferredCredentialId}`.
+  These routes use the wallet's retained context; clients do not resend access tokens.
+  The resume body has `type` equal to `stored`, `deferred`, `failed`, or `cancelled`.
+  Preserve both saved IDs and pending handles in mixed or failed outcomes.
+- With OSS SQL persistence enabled, store-backed holder bindings and deferred
+  responses awaiting local storage survive service recreation. In-memory deployments
+  have process-local continuation semantics. Storage-producing requests require stored
+  holder keys. Keep them available until completion; a missing or changed key stops
+  resumption before polling.
+- Retained handles persist the next allowed poll time from the issuer's `interval`.
+  An early resume returns a `deferred` outcome with the remaining seconds rounded up,
+  without contacting the issuer or reserving usage. Restart does not reset the deadline;
+  a new pending response updates it. Received batches awaiting only local storage have
+  no polling interval and can be retried immediately. Isolated polling remains a
+  caller-managed step: callers must respect the interval returned by the issuer.
+- Retained deferred polls are claimed with a conditional database update before contacting
+  the issuer. `REMOTE_OUTCOME_UNCERTAIN` means a request is still running or its response
+  was lost; that handle is not automatically polled again, including after restart.
+  A received response whose checkpoint failed can still be saved by the surviving runtime.
+  A process that lost that response needs issuer reconciliation, not a blind retry.
+- Received batches are also claimed before local writes or storage callbacks.
+  `STORAGE_OUTCOME_UNCERTAIN` means another writer is saving, or stopped without
+  releasing its claim. The outcome includes any credential IDs already readable
+  from storage. It does not automatically take over or repeat callbacks. Caught
+  storage failures and cancellations release their own claim and retain the received
+  response; resuming then saves only missing IDs, without another issuer request.
+- Full pre-authorized and authorization-code receive also checkpoint immediate batches
+  before saving. A storage failure returns `storageOutcome` with local-save handles,
+  alongside the full flow's `credentialIds`, issuer-deferred targets and target failure.
+  Resume these handles through the same route, even when no credential was saved
+  (HTTP 207). The top-level IDs cover the whole flow; IDs inside `storageOutcome`
+  cover only the stopped batch and must not be counted twice. Local-save handles
+  have no issuer transaction ID and do not appear in `deferredTransactionIds`.
+- Isolated fetch with `storeInWallet=true` also returns `storageOutcome`. A partial
+  save returns HTTP 207 with the original `rawCredentials`, committed IDs, and a
+  retained handle in that outcome's `deferredCredentials`. Resume the handle through
+  the same deferred-resume route; it saves only missing IDs without another issuer
+  request. A local-save handle has no polling interval. Quota rejection also retains
+  the validated response. Persistence requires the configured continuation store;
+  if its initial checkpoint fails, only the surviving runtime retains the response.
+- Isolated fetch carries `deferredCredential` and `interval`. For the isolated
+  `POST /wallet/{walletId}/credentials/receive/deferred` step, retain the original
+  access token and holder keys, and copy `holderBindings` and `proofRequired` from
+  the fetch result, including `credentialIdentifier` when supplied. No private keys
+  are included in deferred results. A received response whose local save fails returns
+  HTTP 207 with saved IDs and `storageOutcome`; resume its retained handle without
+  sending the transaction to the issuer again. If the original isolated request omitted
+  its configuration ID, the local-save handle retains a null configuration ID.
+
+`resolve-offer` retains its released offer shape. `resolve-offer/batch` returns `{ "offer": { ... }, "batchSize": 2 }`, sharing the same offer projection and adding the issuer batch limit. An absent limit permits one holder binding.
+
+The isolated `request-token` and `exchange-code` routes retain their released three-field token result. Append `/batch` to either route to receive granted `authorizationDetails` and `scope` as well. The same wallet ownership checks apply to both contracts; choose one route before redeeming the code.
+
+Swagger includes ordered single, batch, multi-configuration, and authorization
+examples. Issuance does not implicitly generate keys or increase batch size.
+
 ## API Endpoints
 
 ### Wallet Management
@@ -133,6 +242,8 @@ routing {
 | `POST` | `/wallet/{walletId}/credentials/receive/fetch-credential` | Isolated: fetch credential |
 | `POST` | `/wallet/{walletId}/credentials/receive/authorization-url` | Auth-code: generate redirect URL |
 | `POST` | `/wallet/{walletId}/credentials/receive/exchange-code` | Auth-code: exchange code for token |
+| `GET` | `/wallet/{walletId}/credentials/receive/deferred` | List retained deferred handles |
+| `POST` | `/wallet/{walletId}/credentials/receive/deferred/{deferredCredentialId}` | Resume a retained handle without resending tokens |
 | `POST` | `/wallet/{walletId}/credentials/receive/deferred` | Poll deferred credential |
 
 ### Presentation (OpenID4VP 1.0)
@@ -202,3 +313,9 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
+
+Wallet deletion closes the shared issuance runtime before removing its stores. Late offer
+resolution or credential responses cannot retain new handles or save credentials through
+that runtime. An active retained transition or local save rejects deletion until it finishes.
+Resolvers must share one `WalletIssuanceSessionState` per wallet across requests. The OSS
+persistence adapter also checks wallet existence inside its continuation write transaction.

@@ -3,7 +3,6 @@ package id.walt.wallet2.mobile
 import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Instant
 
 /**
@@ -897,13 +896,11 @@ public data class ProximityApplicationAuthorization(
     }
 }
 
-@OptIn(ExperimentalEncodingApi::class)
 private fun String.isSha256Base64Url(): Boolean =
     isNotBlank() && !contains('=') && runCatching {
         Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).decode(this).size == 32
     }.getOrDefault(false)
 
-@OptIn(ExperimentalEncodingApi::class)
 private fun String.isNonEmptyBase64Url(): Boolean =
     isNotBlank() && !contains('=') && runCatching {
         Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).decode(this).isNotEmpty()

@@ -352,7 +352,8 @@ private actor WalletCoreNfcHostRouter {
     }
 
     func process(_ command: Data) async throws -> Data {
-        try await router.process(encodedCommand: command.nfcKotlinByteArray()).doCopy().nfcData()
+        let response = try await router.process(encodedCommand: command.nfcKotlinByteArray())
+        return response.toByteArray(startIndex: 0, endIndex: response.size).nfcData()
     }
 
     func deactivate(_ reason: IOSNfcHostBridgeCloseReason) async {

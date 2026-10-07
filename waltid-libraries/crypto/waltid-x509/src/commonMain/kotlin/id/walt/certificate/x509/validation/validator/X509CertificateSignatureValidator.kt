@@ -25,10 +25,24 @@ class X509CertificateSignatureValidator(
         x509Certificate: X509Certificate
     ) {
         when (val selection = context.selectIssuer(x509Certificate)) {
-            is IssuerSelection.NotFound -> context.addLogEntry(
-                ValidationResult.Severity.ERROR,
-                "Trusted issuer certificate '${x509Certificate.data.issuerDn}' not found"
-            )
+            is IssuerSelection.NotFound -> {
+                // issuer is not trusted, check if this certificate is trusted
+                val isCertificateTrusted =
+                    context.findCertificateBySubjectDn(x509Certificate.data.subjectDn).any {
+                        it.encodedDer == x509Certificate.encodedDer
+                    }
+                if (isCertificateTrusted) {
+                    context.addLogEntry(
+                        ValidationResult.Severity.INFO,
+                        "Certificate in chain with subjectDn '${x509Certificate.data.issuerDn}' is trusted. Issuer DN '${x509Certificate.data.issuerDn}' not found in trust"
+                    )
+                } else {
+                    context.addLogEntry(
+                        ValidationResult.Severity.ERROR,
+                        "Trusted issuer certificate '${x509Certificate.data.issuerDn}' not found"
+                    )
+                }
+            }
 
             is IssuerSelection.Selected -> validateCertificate(context, selection.issuer, x509Certificate)
 

@@ -56,6 +56,9 @@ object DemoTestBackend {
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
     // Pre-registered client ID trusted by the signed-request integration tests.
     const val PUBLIC_DEMO_VERIFIER_CLIENT_ID = "verifier2"
+    // did:key encoding of the independently pinned P-256 request-object signing key below.
+    const val PUBLIC_DEMO_DID_VERIFIER_CLIENT_ID =
+        "decentralized_identifier:did:key:zDnaeSK6d5Kha2Ac7DxCG3wQp7rY5Mm2YozvUjjVd53wzyC4t"
     // Public ES256 request-object key pinned by the mobile test wallets.
     // This is a pre-registered trust anchor: it must not be learned from the request object itself.
     private const val VERIFIER_REQUEST_OBJECT_SIGNING_KEY_ID = "_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug"
@@ -303,10 +306,12 @@ object DemoTestBackend {
     suspend fun createVerifierSession(
         scenario: CredentialScenario,
         signedRequest: Boolean,
+        clientId: String = PUBLIC_DEMO_VERIFIER_CLIENT_ID,
     ): VerifierSession = createVerifierSession(
         credentialQuery = scenario.verifierCredentialQuery,
         transactionData = emptyList(),
         signedRequest = signedRequest,
+        clientId = clientId,
     )
 
     /** Public key that authenticates signed request objects served by the public verifier2 demo. */
@@ -472,6 +477,7 @@ object DemoTestBackend {
         credentialQuery: JsonObject,
         transactionData: List<JsonObject>,
         signedRequest: Boolean = false,
+        clientId: String = PUBLIC_DEMO_VERIFIER_CLIENT_ID,
     ): VerifierSession {
         val requestedSessionId = Uuid.random().toString().takeUnless { signedRequest }
         val payload = buildJsonObject {
@@ -479,7 +485,7 @@ object DemoTestBackend {
             putJsonObject("core_flow") {
                 put("signed_request", signedRequest)
                 if (signedRequest) {
-                    put("clientId", PUBLIC_DEMO_VERIFIER_CLIENT_ID)
+                    put("clientId", clientId)
                     put("key", verifierRequestSigningKey)
                 }
                 requestedSessionId?.let { sessionId ->

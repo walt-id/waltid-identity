@@ -10,14 +10,14 @@ plugins {
 val javaVersion = identityLibs.versions.java.library.get().toInt()
 val publicDemoTransactionDataProfilesUrl = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
 val walletSigningProtectionMode =
-    ((findProperty("walletSigningProtectionMode") as String?) ?: "optional").trim().lowercase()
+    providers.gradleProperty("walletSigningProtectionMode").getOrElse("optional").trim().lowercase()
 require(walletSigningProtectionMode in setOf("required", "optional", "disabled")) {
     "walletSigningProtectionMode must be required, optional, or disabled"
 }
 
-val appVersionName: String = (findProperty("appVersionName") as String?)?.takeIf { it.isNotBlank() } ?: "0.1.0"
+val appVersionName: String = providers.gradleProperty("appVersionName").orNull?.takeIf { it.isNotBlank() } ?: "0.1.0"
 val appVersionCode: Int = run {
-    val override = (findProperty("appVersionCode") as String?)?.toIntOrNull()
+    val override = providers.gradleProperty("appVersionCode").orNull?.toIntOrNull()
     if (override != null) {
         require(override > 0) { "appVersionCode must be a positive integer" }
         return@run override
@@ -40,11 +40,11 @@ android {
         versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "ATTESTATION_BASE_URL", "\"${findProperty("attestation.baseUrl") ?: ""}\"")
-        buildConfigField("String", "ATTESTATION_ATTESTER_PATH", "\"${findProperty("attestation.attesterPath") ?: ""}\"")
-        buildConfigField("String", "ATTESTATION_BEARER_TOKEN", "\"${findProperty("attestation.bearerToken") ?: ""}\"")
-        buildConfigField("String", "ATTESTATION_HOST_HEADER", "\"${findProperty("attestation.hostHeader") ?: ""}\"")
-        buildConfigField("String", "TRANSACTION_DATA_PROFILES_URL", "\"${findProperty("transactionDataProfiles.url") ?: publicDemoTransactionDataProfilesUrl}\"")
+        buildConfigField("String", "ATTESTATION_BASE_URL", "\"${providers.gradleProperty("attestation.baseUrl").getOrElse("")}\"")
+        buildConfigField("String", "ATTESTATION_ATTESTER_PATH", "\"${providers.gradleProperty("attestation.attesterPath").getOrElse("")}\"")
+        buildConfigField("String", "ATTESTATION_BEARER_TOKEN", "\"${providers.gradleProperty("attestation.bearerToken").getOrElse("")}\"")
+        buildConfigField("String", "ATTESTATION_HOST_HEADER", "\"${providers.gradleProperty("attestation.hostHeader").getOrElse("")}\"")
+        buildConfigField("String", "TRANSACTION_DATA_PROFILES_URL", "\"${providers.gradleProperty("transactionDataProfiles.url").getOrElse(publicDemoTransactionDataProfilesUrl)}\"")
         buildConfigField("String", "WALLET_SIGNING_PROTECTION_MODE", "\"$walletSigningProtectionMode\"")
     }
 
@@ -73,6 +73,7 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/DEPENDENCIES"
+            merges += "META-INF/LICENSE.md"
             excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         }
     }
@@ -86,6 +87,7 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
+    sourceSets["androidTest"].kotlin.directories.add("../androidTestFixtures/kotlin")
 }
 
 dependencies {
@@ -95,7 +97,7 @@ dependencies {
     implementation(identityLibs.androidx.activity.compose)
     implementation(identityLibs.androidx.credentials.registry.provider)
     debugImplementation(identityLibs.androidx.credentials.play.services.auth)
-    debugImplementation(identityLibs.androidx.lifecycle.runtime.ktx)
+    debugImplementation(identityLibs.androidx.lifecycle.runtime)
     implementation(identityLibs.kotlinx.coroutines.android)
     implementation(identityLibs.kotlinx.serialization.json)
     implementation(identityLibs.androidx.fragment)

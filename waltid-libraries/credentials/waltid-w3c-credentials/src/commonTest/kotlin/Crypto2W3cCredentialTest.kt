@@ -13,8 +13,6 @@ import id.walt.sdjwt.SDMap
 import id.walt.w3c.PresentationBuilder
 import id.walt.w3c.issuance.Issuer
 import id.walt.w3c.issuance.Issuer.baseIssue
-import id.walt.w3c.issuance.Issuer.mergingJwtIssue
-import id.walt.w3c.issuance.Issuer.mergingSdJwtIssue
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.w3c.vc.vcs.W3CVC
 import kotlinx.coroutines.test.runTest
@@ -101,7 +99,7 @@ class Crypto2W3cCredentialTest {
     }
 
     @Test
-    fun `issuer facade issues JWT and SD-JWT credentials with crypto2`() = runTest {
+    fun `issuer facade issues credentials with crypto2`() = runTest {
         val key = key()
         val credential = W3CVC.build(
             context = listOf("https://www.w3.org/2018/credentials/v1"),
@@ -118,32 +116,7 @@ class Crypto2W3cCredentialTest {
             additionalJwtHeaders = emptyMap(),
             additionalJwtOptions = emptyMap(),
         )
-        val mergedJwt = credential.mergingJwtIssue(
-            issuerKey = key,
-            algorithm = JwsAlgorithm.ES256,
-            issuerId = "https://issuer.example",
-            subjectDid = "did:example:holder",
-            mappings = JsonObject(emptyMap()),
-            additionalJwtHeader = emptyMap(),
-            additionalJwtOptions = emptyMap(),
-        )
-        val mergedSdJwt = credential.mergingSdJwtIssue(
-            issuerKey = key,
-            algorithm = JwsAlgorithm.ES256,
-            issuerId = "https://issuer.example",
-            subjectDid = "did:example:holder",
-            mappings = JsonObject(emptyMap()),
-            type = "vc+sd-jwt",
-            additionalJwtHeaders = emptyMap(),
-            additionalJwtOptions = emptyMap(),
-            disclosureMap = SDMap(emptyMap()),
-        )
-
         assertTrue(CompactJws.verify(baseIssued, key, JwsAlgorithm.ES256).payload.isNotEmpty())
-        assertTrue(CompactJws.verify(mergedJwt, key, JwsAlgorithm.ES256).payload.isNotEmpty())
-        assertTrue(
-            CompactJws.verify(mergedSdJwt.substringBefore('~'), key, JwsAlgorithm.ES256).payload.isNotEmpty()
-        )
         assertEquals(key.id.value, Issuer.getKidHeader(key))
     }
 

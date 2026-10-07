@@ -175,7 +175,23 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         )
         XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
 
-        let session = try await backend.createVerifierSession(scenario: scenario)
+        ui.tapButton(identifier: "wallet.tab.credentials", fallbackLabel: "Credentials tab")
+        let credentialCards = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
+        XCTAssertTrue(credentialCards.firstMatch.waitForExistence(timeout: 20))
+        let savedCredentialIDs = Set(credentialCards.allElementsBoundByIndex.map(\.identifier))
+        XCTAssertFalse(savedCredentialIDs.isEmpty)
+        // XCUIApplication.terminate ends the app process; a new wallet object alone is insufficient.
+        app.terminate()
+        ui.launch(initializeSigningIdentity: false)
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+        XCTAssertFalse(app.buttons["wallet.keySetupContinue"].exists, "Restart must reuse the saved identity")
+        XCTAssertTrue(credentialCards.firstMatch.waitForExistence(timeout: 20))
+        let reopenedCredentialIDs = Set(credentialCards.allElementsBoundByIndex.map(\.identifier))
+        XCTAssertEqual(reopenedCredentialIDs, savedCredentialIDs)
+        let session = try await backend.createVerifierSession(
+            scenario: scenario, signedRequest: true, clientID: DemoBackend.didVerifierClientID
+        )
         ui.openDeepLink(session.authorizationRequestUri)
         let presentationURLApplied = ui.waitForTextInputValue(
             identifier: "wallet.presentationInput",

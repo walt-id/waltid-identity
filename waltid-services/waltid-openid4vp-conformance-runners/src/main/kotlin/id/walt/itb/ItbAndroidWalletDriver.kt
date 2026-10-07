@@ -31,6 +31,7 @@ internal class ItbAndroidWalletDriver private constructor(
             throw error
         }
         if (result["success"]?.jsonPrimitive?.booleanOrNull != true) {
+            result["tokenFailure"]?.let { throw ItbTokenFailure.decode(it.jsonObject) }
             val trace = result["trace"]?.jsonArray.orEmpty().mapNotNull {
                 it.jsonPrimitive.content.takeIf { value -> value.matches(Regex("[A-Za-z0-9_.$:<>-]{1,240}")) }
             }.take(20)

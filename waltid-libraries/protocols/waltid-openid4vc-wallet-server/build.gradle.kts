@@ -9,8 +9,8 @@ dependencies {
     // The base wallet library — all protocol logic
     api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
 
-    // Service commons (WaltConfig, ServiceFeatureCatalog, etc.)
-    api(project(":waltid-services:waltid-service-commons"))
+    // Errors that carry the HTTP status a service answers with
+    api(project(":waltid-libraries:waltid-library-commons"))
 
     // Ktor server — route handlers, content negotiation, status pages
     implementation(identityLibs.ktor.server.core)
@@ -31,6 +31,9 @@ dependencies {
 
     // Tests
     testImplementation(kotlin("test"))
+    testImplementation(identityLibs.ktor.server.test.host)
+    testImplementation(identityLibs.ktor.client.mock)
+    testImplementation(identityLibs.ktor.client.content.negotiation)
     testImplementation(identityLibs.kotlinx.coroutines.test)
 }
 

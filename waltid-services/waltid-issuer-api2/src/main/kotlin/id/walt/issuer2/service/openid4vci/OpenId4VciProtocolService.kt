@@ -30,8 +30,8 @@ import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigning
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInput
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputProvider
 import id.walt.openid4vci.mdoc.MsoValidityResolver
-import id.walt.w3c.issuance.InstantClock
-import id.walt.w3c.issuance.IssuanceClock
+import id.walt.credentials.issuance.InstantClock
+import id.walt.credentials.issuance.IssuanceClock
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
@@ -50,6 +50,8 @@ import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.proofs.CredentialNonceBinding
 import id.walt.openid4vci.proofs.CredentialNonceService
 import id.walt.openid4vci.proofs.CredentialNonceValidationContext
+import id.walt.openid4vci.proofs.attestation.KeyAttestationVerificationOptions
+import id.walt.openid4vci.proofs.CredentialProofServiceException
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.proofs.CredentialProofValidationException
 import id.walt.openid4vci.proofs.CredentialProofVerifier
@@ -124,6 +126,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     /** Atomically commits proof-key side effects after the complete credential batch was constructed. */
     private val credentialProofKeyCommitment: CredentialProofKeyCommitment? = null,
     private val credentialProofVerifier: CredentialProofVerifier = DefaultCredentialProofVerifier(),
+    private val keyAttestation: KeyAttestationVerificationOptions? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -1016,6 +1019,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 resolveCredentialProofPublicKeyJwks(requestWithSession, configuration, nonceBinding)
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: CredentialProofServiceException) {
+                logger.error(e) { "Credential proof verification unavailable (requestId=$requestId)" }
+                return oauth2Provider.writeCredentialError(OAuthError(OAuthErrorCodes.SERVER_ERROR, "Credential proof verification unavailable"))
             } catch (e: CredentialProofValidationException) {
                 return rejectCredentialRequest(
                     requestWithSession,
@@ -1184,6 +1190,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             }
 
             val proofValidationContext = CredentialProofValidationContext(
+                keyAttestation = keyAttestation,
                 credentialIssuer = nonceBinding.credentialIssuer,
                 clientId = requestWithSession.accessTokenClientId,
                 anonymousPreAuthorizedAccess = requestWithSession.anonymousPreAuthorizedAccess,
@@ -1679,6 +1686,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             credentialRequest = request,
             credentialConfiguration = configuration,
             context = CredentialProofValidationContext(
+                keyAttestation = keyAttestation,
+                batchCredentialIssuance = metadataService.getCredentialIssuerMetadata().batchCredentialIssuance,
                 credentialIssuer = nonceBinding.credentialIssuer,
                 clientId = request.accessTokenClientId,
                 anonymousPreAuthorizedAccess = request.anonymousPreAuthorizedAccess,
@@ -1688,10 +1697,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 ),
             ),
         )
-        require(verifiedProofs.isNotEmpty()) { "Credential request has no credential proof" }
+        require(verifiedProofs.bindings.isNotEmpty()) { "Credential request has no credential proof" }
         // The verified holder key is a crypto2 key since the crypto updates, so the public JWK comes
         // from its public key exporter rather than the legacy getPublicKey().exportJWKObject().
-        return verifiedProofs.map { verifiedProof ->
+        return verifiedProofs.bindings.map { verifiedProof ->
             val holderKey = verifiedProof.holderKey
             val holderPublicJwk = requireNotNull(holderKey.capabilities.publicKeyExporter) {
                 "Credential proof holder key does not export public material"

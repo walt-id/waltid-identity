@@ -1,6 +1,6 @@
 package id.walt.issuer2.testsupport
 
-import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.proofs.Proofs
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put

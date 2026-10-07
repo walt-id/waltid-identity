@@ -31,12 +31,13 @@ case "$phase" in
   compose-demo)
     # The default image has no Google Play services. Keep GMS-only classes out of
     # instrumentation discovery; their class-level assumption would otherwise
-    # collapse the reported test count and make Gradle fail the phase.
-    compose_demo_excluded_classes="id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest,id.walt.walletdemo.compose.android.DigitalCredentialIssuanceE2ETest"
+    # collapse the reported test count and make Gradle fail the phase. Batch UI
+    # acceptance runs with its required fixture in the enterprise-mobile phase.
+    compose_demo_excluded_classes="id.walt.walletdemo.compose.android.DigitalCredentialSharingE2ETest,id.walt.walletdemo.compose.android.DigitalCredentialIssuanceE2ETest,id.walt.walletdemo.compose.android.BatchIssuanceE2ETest"
     script="ANDROID_TEST_NOT_CLASS=$compose_demo_excluded_classes ./waltid-identity/.github/scripts/mobile-ci/run-android-compose-demo-tests.sh"
     emulator_options="-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim"
-    report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**/*.xml"
-    artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**'
+    report_paths="waltid-identity/waltid-applications/waltid-wallet-demo-compose/*/build/outputs/androidTest-results/**/*.xml"
+    artifact_paths=$'waltid-identity/waltid-applications/waltid-wallet-demo-compose/*/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/*/build/outputs/androidTest-results/**'
     emulator_target="default"
     ;;
   dc-api-compose)
@@ -57,8 +58,8 @@ case "$phase" in
   enterprise-mobile)
     script="./waltid-identity/.github/scripts/mobile-ci/run-enterprise-android-mobile-tests.sh"
     emulator_options="-no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -memory 1536"
-    report_paths="waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**/*.xml"
-    artifact_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**\nwaltid-identity-enterprise/waltid-enterprise-integration-tests/build/**'
+    report_paths="waltid-identity/**/build/outputs/androidTest-results/**/*.xml"
+    artifact_paths=$'waltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/reports/androidTests/**\nwaltid-identity/waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/build/outputs/androidTest-results/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/reports/androidTests/**\nwaltid-identity/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/**\nwaltid-identity-enterprise/waltid-enterprise-integration-tests/build/**'
     emulator_target="default"
     ;;
   *)

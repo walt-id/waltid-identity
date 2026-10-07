@@ -20,7 +20,7 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandle
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
-import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
@@ -188,8 +188,8 @@ class Wallet2MoreUseCasesTest {
             install(ContentNegotiation) { json(json) }
             routing {
                 get("/.well-known/openid-credential-issuer") { call.respond(issuerMetadata) }
-                get("/.well-known/oauth-authorization-server") { call.respond(AuthorizationServerMetadata(issuer = issuerBase, authorizationEndpoint = "$issuerBase/authorize", tokenEndpoint = "$issuerBase/token", responseTypesSupported = setOf("code"), grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"))) }
-                get("/.well-known/openid-configuration") { call.respond(AuthorizationServerMetadata(issuer = issuerBase, authorizationEndpoint = "$issuerBase/authorize", tokenEndpoint = "$issuerBase/token", responseTypesSupported = setOf("code"), grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"))) }
+                get("/.well-known/oauth-authorization-server") { call.respond(AuthorizationServerMetadata(issuer = issuerBase, authorizationEndpoint = "$issuerBase/authorize", tokenEndpoint = "$issuerBase/token", authorizationDetailsTypesSupported = setOf("openid_credential"), responseTypesSupported = setOf("code"), grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"))) }
+                get("/.well-known/openid-configuration") { call.respond(AuthorizationServerMetadata(issuer = issuerBase, authorizationEndpoint = "$issuerBase/authorize", tokenEndpoint = "$issuerBase/token", authorizationDetailsTypesSupported = setOf("openid_credential"), responseTypesSupported = setOf("code"), grantTypesSupported = setOf("urn:ietf:params:oauth:grant-type:pre-authorized_code"))) }
                 get("/credential-offer-json") { call.respond(offer) }
                 post("/nonce") {
                     val nonce = proofSupport.issueNonce()
@@ -220,7 +220,7 @@ class Wallet2MoreUseCasesTest {
                         // Store the original CredentialRequest so we can use it when polling
                         val txId = "tx-${Uuid.random()}"
                         deferredCredentials[txId] = Pair(cr.request, credentialData)
-                        call.respond(buildJsonObject { put("transaction_id", txId) })
+                        call.respond(HttpStatusCode.Accepted, buildJsonObject { put("transaction_id", txId); put("interval", 1) })
                         return@post
                     }
 
@@ -286,7 +286,7 @@ class Wallet2MoreUseCasesTest {
         val sdJwtInfra = startIssuer(host, issuerPort1, sdJwtConfig,
             CredentialConfiguration(format = VciCredentialFormat.SD_JWT_VC, vct = pidVct,
                 cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.DidKey),
-                proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
+                proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
             sdJwtCode,
             buildJsonObject { put("given_name","Alice"); put("family_name","Wallet"); put("issuing_country","AT") },
             SDMapBuilder().addField("given_name",true).addField("family_name",true).build()
@@ -294,7 +294,7 @@ class Wallet2MoreUseCasesTest {
         val jwtInfra = startIssuer(host, issuerPort2, jwtConfig,
             CredentialConfiguration(format = VciCredentialFormat.JWT_VC_JSON, vct = null,
                 cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.DidKey),
-                proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
+                proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
             jwtCode,
             buildJsonObject {
                 put("@context", buildJsonArray { add("https://www.w3.org/2018/credentials/v1") })
@@ -435,7 +435,7 @@ class Wallet2MoreUseCasesTest {
             CredentialConfiguration(
                 format = VciCredentialFormat.SD_JWT_VC, vct = "eu.europa.ec.eudi.pid.1",
                 cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
-                proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))
+                proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))
             ),
             preAuthCode,
             buildJsonObject { put("given_name", "Deferred"); put("family_name", "Holder"); put("issuing_country", "AT") },
@@ -463,9 +463,9 @@ class Wallet2MoreUseCasesTest {
                     }.also { assertEquals(HttpStatusCode.Created, it.status) }
                 }
 
-                // Step 1: receive credential via wallet → issuer defers → deferredTransactionIds populated
+                // Step 1: receive credential via wallet → issuer defers → pending target retained
                 val offer = CredentialOffer.withPreAuthorizedCodeGrant(issuerBase, listOf(credConfigId), preAuthCode)
-                val receiveResult = testAndReturn("Deferred: receive returns deferredTransactionIds (no immediate credential)") {
+                val receiveResult = testAndReturn("Deferred: receive returns a pending target (no immediate credential)") {
                     http.post("/wallet/$walletId/credentials/receive") {
                         contentType(ContentType.Application.Json)
                         setBody(ReceiveCredentialRequest(offerJson = Json.encodeToJsonElement(offer).jsonObject))
@@ -473,9 +473,9 @@ class Wallet2MoreUseCasesTest {
                         .body<ReceiveCredentialResult>()
                 }
                 assertEquals(0, receiveResult.credentialIds.size, "Deferred: no immediate credential, expected 0 got ${receiveResult.credentialIds.size}")
-                assertTrue(receiveResult.deferredTransactionIds.isNotEmpty(), "Deferred: must have a transactionId")
+                assertEquals(setOf(credConfigId), receiveResult.deferredTransactionIds.keys, "Deferred: must retain the offered configuration")
 
-                val txId = receiveResult.deferredTransactionIds.values.first()
+                val txId = receiveResult.deferredTransactionIds.getValue(credConfigId)
 
                 // Step 2: get an access token for the deferred poll — exchange a second pre-auth code
                 // We call the isolated request-token endpoint with a fresh code seeded into the issuer.
@@ -605,7 +605,7 @@ class Wallet2MoreUseCasesTest {
         val infra = startIssuer(host, issuerPort, credConfigId,
             CredentialConfiguration(format = VciCredentialFormat.SD_JWT_VC, vct = "eu.europa.ec.eudi.pid.1",
                 cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
-                proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
+                proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
             preAuthCode,
             buildJsonObject { put("given_name","NoDid"); put("family_name","Holder"); put("issuing_country","AT") }
         )
@@ -679,7 +679,7 @@ class Wallet2MoreUseCasesTest {
         val infra = startIssuer(host, issuerPort, credConfigId,
             CredentialConfiguration(format = VciCredentialFormat.SD_JWT_VC, vct = pidVct,
                 cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk, CryptographicBindingMethod.DidKey),
-                proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
+                proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA")))),
             preAuthCode,
             buildJsonObject { put("given_name","Isolated"); put("family_name","Presenter"); put("issuing_country","AT") }
         )

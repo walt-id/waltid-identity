@@ -1,12 +1,16 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
+import id.walt.openid4vp.conformance.testplans.keyAttestationAcceptanceModules
+import id.walt.openid4vp.conformance.testplans.requireIssuerProofEvidence
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.http.IssuerInterface
+import id.walt.openid4vp.conformance.testplans.http.safeConformanceFailure
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariant
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantModuleRunResult
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantRunResult
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantRunStatus
 import id.walt.openid4vp.conformance.testplans.runner.req.IssuerTestPlanConfiguration
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -124,7 +128,7 @@ class IssuerTestPlanRunner(
         modulesToRun.forEach { println("   - ${it.testModule}") }
 
         val moduleResults = modulesToRun.map { module ->
-            runModuleAttempt(testPlanId, module.testModule, module.variant)
+            runModuleAttempt(testPlanId, module.testModule, module.variant, variant.credentialProofType)
         }
 
         return IssuerVariantRunResult(
@@ -140,8 +144,10 @@ class IssuerTestPlanRunner(
         testPlanId: String,
         testModule: String,
         moduleVariant: JsonObject,
+        proofType: String?,
     ): IssuerVariantModuleRunResult {
         var testId: String? = null
+        var stage = "Create test"
         val logUrlForTest: (String) -> String = { "https://$conformanceHost:$conformancePort/log-detail.html?log=$it" }
 
         return runCatching {
@@ -154,12 +160,19 @@ class IssuerTestPlanRunner(
             println("View test run at: ${logUrlForTest(testId)}")
             println("Waiting for conformance suite to complete issuer test...")
 
+            stage = "Wait for test completion"
             waitForIssuerTestCompletion(testId, credentialOfferProviderFor(testModule))
 
+            stage = "Read test result"
             val testRunInfo = conformance.getTestRunInfo(testId)
             println("Module $testModule finished with status=${testRunInfo.status}, result=${testRunInfo.result}")
 
             val accepted = acceptsModuleResult(testModule, testRunInfo.status, testRunInfo.result)
+            if (proofType != null && testRunInfo.result == "PASSED" &&
+                (testModule in keyAttestationAcceptanceModules || testModule == "oid4vci-1_0-issuer-batch-issuance")) {
+                stage = "Check proof evidence"
+                requireIssuerProofEvidence(proofType, conformance.getTestLog(testId))
+            }
             IssuerVariantModuleRunResult(
                 testModule = testModule,
                 testId = testId,
@@ -170,6 +183,7 @@ class IssuerTestPlanRunner(
                 variant = moduleVariant,
             )
         }.getOrElse { throwable ->
+            if (throwable is CancellationException) throw throwable
             val latestInfo = testId?.let { id -> runCatching { conformance.getTestRunInfo(id) }.getOrNull() }
             IssuerVariantModuleRunResult(
                 testModule = testModule,
@@ -179,6 +193,7 @@ class IssuerTestPlanRunner(
                 result = latestInfo?.result,
                 accepted = false,
                 error = throwable.compactMessage(),
+                failureSummary = "$stage: ${throwable.safeConformanceFailure()}",
                 variant = moduleVariant,
             )
         }
@@ -373,6 +388,7 @@ class IssuerTestPlanRunner(
     ): Boolean {
         val testRun = runCatching { conformance.getTestRun(testId) }
             .getOrElse {
+                if (it is CancellationException) throw it
                 if (shouldLog) {
                     println("Credential offer delivery is pending, but test run details are not available yet: ${it.compactMessage()}")
                 }
@@ -392,6 +408,7 @@ class IssuerTestPlanRunner(
 
         val testLog = runCatching { conformance.getTestLog(testId) }
             .getOrElse {
+                if (it is CancellationException) throw it
                 if (shouldLog) {
                     println("Credential offer delivery is pending, but test log is not available yet: ${it.compactMessage()}")
                 }
@@ -529,9 +546,10 @@ internal data class IssuerModuleSelection(
     val groups: Set<String> = emptySet(),
     val modules: Set<String> = emptySet(),
     val excludedModules: Set<String> = emptySet(),
+    val additionalModules: Set<String> = emptySet(),
 ) {
     val isActive: Boolean
-        get() = groups.isNotEmpty() || modules.isNotEmpty() || excludedModules.isNotEmpty()
+        get() = groups.isNotEmpty() || modules.isNotEmpty() || excludedModules.isNotEmpty() || additionalModules.isNotEmpty()
 
     val description: String
         get() = buildList {
@@ -544,10 +562,13 @@ internal data class IssuerModuleSelection(
             if (excludedModules.isNotEmpty()) {
                 add("excluded=${excludedModules.joinToString(",")}")
             }
+            if (additionalModules.isNotEmpty()) {
+                add("additional=${additionalModules.joinToString(",")}")
+            }
         }.joinToString("; ").ifBlank { "all modules" }
 
     fun matches(moduleName: String): Boolean =
-        groups.matchesGroup(moduleName) && modules.matchesName(moduleName)
+        (groups.matchesGroup(moduleName) && modules.matchesName(moduleName)) || moduleName in additionalModules
 
     fun exclusionReason(moduleName: String): String? =
         if (moduleName in excludedModules) "excluded by OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES" else null
@@ -587,6 +608,7 @@ internal data class IssuerModuleSelection(
                 groups = groups,
                 modules = csv("OPENID4VCI_CONFORMANCE_MODULES"),
                 excludedModules = csv("OPENID4VCI_CONFORMANCE_EXCLUDED_MODULES"),
+                additionalModules = csv("OPENID4VCI_CONFORMANCE_ADDITIONAL_MODULES"),
             )
         }
 

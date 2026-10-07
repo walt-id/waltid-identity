@@ -30,6 +30,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MobileWalletEncryptionTest {
@@ -103,6 +104,42 @@ class MobileWalletEncryptionTest {
         }
 
         context.deleteDatabase("$databaseName.db")
+    }
+
+    @Test
+    fun encryptedAndroidDatabasePreservesNullableCredentialFields() {
+        val databaseName = "wallet_android_encryption_null_fields_test"
+        val factory = DriverFactory(context)
+        factory.deleteDatabase(databaseName)
+        val driver = factory.createEncryptedDriver(
+            databaseName = databaseName,
+            encryptionKey = DatabaseEncryptionKey(
+                keyId = "null-fields-key",
+                material = ByteArray(32) { it.toByte() },
+            ),
+            isDeviceLocal = false,
+            walletId = databaseName,
+        )
+        try {
+            val queries = WalletPersistenceDatabase(driver).walletPersistenceQueries
+            queries.insertCredential(
+                id = "nullable-credential",
+                serialized_credential = "{}",
+                format = "vc+sd-jwt",
+                label = null,
+                added_at = 1L,
+                metadata = null,
+                holder_key_binding = null,
+            )
+            val credential = queries.selectCredentialById("nullable-credential").executeAsOne()
+            assertEquals("vc+sd-jwt", credential.format)
+            assertNull(credential.label)
+            assertNull(credential.metadata)
+            assertNull(credential.holder_key_binding)
+        } finally {
+            driver.close()
+            factory.deleteDatabase(databaseName)
+        }
     }
 
     @Test

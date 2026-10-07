@@ -1,5 +1,6 @@
 package id.walt.itb
 
+import id.waltid.openid4vci.wallet.token.TokenRequestException
 import io.ktor.http.Url
 import io.ktor.http.URLProtocol
 import kotlinx.coroutines.*
@@ -132,6 +133,7 @@ internal object ItbDeviceWire {
                             }
                         })
                         if (error is ItbWalletRejection) put("code", error.code)
+                        if (error is TokenRequestException) put("tokenFailure", ItbTokenFailure.encode(error))
                     }
                 }
                 write(socket, JsonObject(result + ("sequence" to request.getValue("sequence"))))

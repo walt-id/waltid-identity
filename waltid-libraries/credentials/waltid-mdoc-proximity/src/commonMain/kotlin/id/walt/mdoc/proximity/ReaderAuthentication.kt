@@ -28,10 +28,10 @@ class ReaderAuthenticationEvidence(
     val scope: ReaderAuthenticationScope,
     /** Zero-based statement index within the authentication scope. */
     val authenticationIndex: Int = 0,
-    certificateChainDer: List<ImmutableBytes> = emptyList(),
+    certificateChainDer: List<ByteString> = emptyList(),
 ) {
     private val certificateChain = certificateChainDer.toList()
-    val certificateChainDer: List<ImmutableBytes> get() = certificateChain.toList()
+    val certificateChainDer: List<ByteString> get() = certificateChain.toList()
 
     init { require(authenticationIndex >= 0) }
 }
@@ -210,7 +210,7 @@ class ReaderAuthenticationVerifier(
             false
         }
         if (!valid) return ReaderAuthenticationResult.Invalid("Reader authentication signature is invalid")
-        val verifiedEvidence = ReaderAuthenticationEvidence(evidence.scope, evidence.authenticationIndex, chain.map { ImmutableBytes.of(it) })
+        val verifiedEvidence = ReaderAuthenticationEvidence(evidence.scope, evidence.authenticationIndex, chain.map { ByteString(it) })
         val trust = try {
             trustEvaluator.evaluate(verifiedEvidence)
         } catch (cancelled: CancellationException) {
