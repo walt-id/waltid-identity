@@ -7,7 +7,6 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -67,7 +66,6 @@ class MobileWalletRegistryIconsTest {
         assertContentEquals(logo, icon)
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun usesPortraitClaimWhenDisplayArtIsMissing() = runTest {
         val portrait = solidColorPng(0xFF0000)

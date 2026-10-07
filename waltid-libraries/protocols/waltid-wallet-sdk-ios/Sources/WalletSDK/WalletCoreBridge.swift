@@ -9,9 +9,11 @@ protocol WalletCoreBridge: Sendable {
         keyType: WalletKeyType,
         policy: WalletKeyUseAuthorizationPolicy
     ) async throws -> WalletKeyUseAuthorizationPreflight
+    func createIssuanceHolderKeys(count: Int, keyType: WalletKeyType, didMethod: String, policy: WalletKeyUseAuthorizationPolicy) async throws -> [IssuanceHolderBinding]
+    func listDeferredIssuance() async throws -> [DeferredCredential]
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession
-    func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization
-    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome
+    func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization
+    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
@@ -89,17 +91,24 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         throw unavailableError()
     }
 
+    func createIssuanceHolderKeys(count: Int, keyType: WalletKeyType, didMethod: String, policy: WalletKeyUseAuthorizationPolicy) async throws -> [IssuanceHolderBinding] {
+        throw unavailableError()
+    }
+
+    func listDeferredIssuance() async throws -> [DeferredCredential] { throw unavailableError() }
+
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
         throw unavailableError()
     }
 
-    func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization {
+    func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
         throw unavailableError()
     }
 
     func continuePreAuthorizedIssuance(
         sessionID: String,
-        transactionCode: String?
+        transactionCode: String?,
+        credentials: [IssuanceCredentialSelection]?
     ) async throws -> IssuanceOutcome {
         throw unavailableError()
     }

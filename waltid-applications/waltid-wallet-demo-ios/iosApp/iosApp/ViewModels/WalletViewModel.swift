@@ -81,6 +81,18 @@ private enum WalletStatusText {
         "Received \(count) credential(s)"
     }
 
+    static func issuanceProgress(saved: Int, pending: Int, notAttempted: Int? = nil) -> String {
+        let progress = "Saved credentials: \(saved). Pending targets: \(pending)."
+        guard let notAttempted else { return progress }
+        return progress + " Failed targets: 1. Not attempted: \(notAttempted)."
+    }
+
+    static func issuanceFailure(_ error: IssuanceFailure, saved: Int, pending: Int) -> String {
+        guard saved > 0 || pending > 0 || error.targetFailure != nil else { return error.message }
+        return error.message + "\n" + issuanceProgress(saved: saved, pending: pending,
+            notAttempted: error.targetFailure?.notAttempted.count)
+    }
+
     static func failure(_ prefix: String, _ reason: String) -> String {
         "\(prefix): \(reason)"
     }
@@ -132,6 +144,7 @@ class WalletViewModel: ObservableObject {
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
     @Published var selectedPresentationDisclosureOptions: Set<PresentationDisclosureSelection> = []
     @Published var selectedTab: WalletTab = .credentials
+    @Published var issuanceCopyCounts: [String: Int] = [:]
     @Published var offerPreview: IssuanceOfferPreview?
     @Published private(set) var authorizationRequestURL: URL?
     @Published var deferredCredentials: [DeferredCredential] = []
@@ -222,7 +235,8 @@ class WalletViewModel: ObservableObject {
     }
 
     var acceptOfferEnabled: Bool {
-        offerReviewEnabled && hasValidTransactionCode
+        offerReviewEnabled && hasValidTransactionCode &&
+            (offerPreview?.credentials.contains { (issuanceCopyCounts[$0.configurationID] ?? 1) > 0 } ?? false)
     }
 
     private var hasValidTransactionCode: Bool {
@@ -356,6 +370,10 @@ class WalletViewModel: ObservableObject {
                     setError(WalletStatusText.failure(WalletStatusText.resetWalletFailed, error))
                 }
             } catch {
+                // Cleanup may have removed keys before failing. Keep reset available, but do not
+                // present the old identity and credentials as a usable wallet.
+                identityScreen = nil
+                clearWalletState()
                 setError(WalletStatusText.failure(WalletStatusText.resetWalletFailed, error))
             }
         }
@@ -910,6 +928,7 @@ class WalletViewModel: ObservableObject {
                 }
                 issuanceSession = session
                 offerPreview = session.offer
+                issuanceCopyCounts = Dictionary(uniqueKeysWithValues: session.offer.credentials.map { ($0.configurationID, 1) })
                 newSession = nil
                 setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)
                 Task {
@@ -933,6 +952,23 @@ class WalletViewModel: ObservableObject {
         }
     }
 
+    func updateIssuanceCopies(_ configurationID: String, _ count: Int) {
+        guard offerReviewEnabled,
+              offerPreview?.credentials.contains(where: { $0.configurationID == configurationID }) == true else { return }
+        issuanceCopyCounts[configurationID] = min(max(0, count), max(1, offerPreview?.batchSize ?? 1))
+    }
+
+    private func issuanceSelections(_ preview: IssuanceOfferPreview) throws -> [IssuanceCredentialSelection] {
+        let selections = try preview.credentials.compactMap { credential -> IssuanceCredentialSelection? in
+            let count = issuanceCopyCounts[credential.configurationID] ?? 1
+            guard count > 0 else { return nil }
+            return try IssuanceCredentialSelection(configurationID: credential.configurationID,
+                holders: count == 1 ? .existing([.init(keyID: keyID, did: did.isEmpty ? nil : did)]) : .newKeys(count: count))
+        }
+        guard !selections.isEmpty else { throw WalletError.invalidInput("Select at least one credential") }
+        return selections
+    }
+
     func acceptOffer() {
         resetInputFocus()
         guard acceptOfferEnabled else { return }
@@ -949,18 +985,24 @@ class WalletViewModel: ObservableObject {
         setLoading(WalletStatusText.receivingCredential, tab: .receive)
         receiveTask = Task {
             do {
+                let selections = try issuanceSelections(session.offer)
+                try Task.checkCancellation()
+                guard isCurrent(request) else { return }
                 switch session.offer.grant {
                 case .preAuthorizedCode:
                     try await completeIssuanceOutcome(
                         try await walletClient.continuePreAuthorizedIssuance(
                             sessionID: session.id,
-                            transactionCode: trimmedTxCode
+                            transactionCode: trimmedTxCode,
+                            credentials: selections
                         ),
                         previousCredentials: previousCredentials,
                         request: request
                     )
                 case .authorizationCode:
-                    let authorization = try await walletClient.beginAuthorizationIssuance(sessionID: session.id)
+                    let authorization = try await walletClient.beginAuthorizationIssuance(sessionID: session.id, credentials: selections)
+                    try Task.checkCancellation()
+                    guard isCurrent(request) else { return }
                     authorizationRequestURL = authorization.url
                     setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)
                 }
@@ -1044,7 +1086,13 @@ class WalletViewModel: ObservableObject {
             }
             lastReceivedCredentialIDs = storedIDs
             receiveCompleted = false
-            setSuccess("Credential issuance deferred", tab: .receive)
+            if !storedIDs.isEmpty {
+                let refreshed = try await walletClient.credentials()
+                try Task.checkCancellation()
+                guard isCurrent(request) else { return }
+                credentials = refreshed
+            }
+            setSuccess(WalletStatusText.issuanceProgress(saved: storedIDs.count, pending: deferred.count), tab: .receive)
             return
         case .cancelled:
             issuanceSession = nil
@@ -1056,8 +1104,24 @@ class WalletViewModel: ObservableObject {
             receiveNavigationResetKey += 1
             setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
             return
-        case let .failed(_, error, _):
-            throw WalletError.internalFailure(error.message)
+        case let .failed(_, error, storedIDs, pending):
+            deferredCredentials = (deferredCredentials + pending).reduce(into: []) { result, credential in
+                if !result.contains(where: { $0.id == credential.id }) { result.append(credential) }
+            }
+            lastReceivedCredentialIDs = storedIDs
+            if error.targetFailure != nil || !storedIDs.isEmpty || !pending.isEmpty {
+                issuanceSession = nil
+                offerPreview = nil
+                authorizationRequestURL = nil
+            }
+            if !storedIDs.isEmpty {
+                let refreshed = try await walletClient.credentials()
+                try Task.checkCancellation()
+                guard isCurrent(request) else { return }
+                credentials = refreshed
+            }
+            setError(WalletStatusText.issuanceFailure(error, saved: storedIDs.count, pending: pending.count), tab: .receive)
+            return
         }
         try Task.checkCancellation()
         guard isCurrent(request) else { return }
@@ -1107,16 +1171,23 @@ class WalletViewModel: ObservableObject {
     }
 
     func resumeDeferredCredential(_ credential: DeferredCredential) {
-        guard !isLoading else { return }
+        guard !isLoading, deferredCredentials.contains(where: { $0.id == credential.id }) else { return }
+        let request = ReceiveRequest(offerURL: offerUrl.trimmingCharacters(in: .whitespacesAndNewlines), navigationResetKey: receiveNavigationResetKey)
         setLoading(WalletStatusText.receivingCredential, tab: .receive)
         receiveTask = Task {
             do {
                 let outcome = try await walletClient.resumeDeferredIssuance(deferredCredentialID: credential.id)
+                try Task.checkCancellation()
+                guard isCurrent(request) else { return }
                 switch outcome {
                 case let .stored(_, credentialIDs):
                     let refreshedCredentials = try await walletClient.credentials()
+                    try Task.checkCancellation()
+                    guard isCurrent(request) else { return }
                     credentials = refreshedCredentials
                     try await reconcileIdentityDocumentRegistrations()
+                    try Task.checkCancellation()
+                    guard isCurrent(request) else { return }
                     deferredCredentials.removeAll { $0.id == credential.id }
                     lastReceivedCredentialIDs = credentialIDs
                     receiveCompleted = false
@@ -1128,20 +1199,38 @@ class WalletViewModel: ObservableObject {
                     } else {
                         setSuccess(WalletStatusText.receivedCredentials(credentialIDs.count), tab: .receive)
                     }
-                case let .deferred(_, _, credentials):
+                case let .deferred(_, storedIDs, pending):
+                    if !storedIDs.isEmpty {
+                        let refreshed = try await walletClient.credentials()
+                        try Task.checkCancellation()
+                        guard isCurrent(request) else { return }
+                        credentials = refreshed
+                    }
+                    lastReceivedCredentialIDs = storedIDs
                     deferredCredentials.removeAll { $0.id == credential.id }
-                    deferredCredentials.append(contentsOf: credentials)
-                    setSuccess("Credential issuance still pending", tab: .receive)
+                    deferredCredentials.append(contentsOf: pending)
+                    setSuccess(WalletStatusText.issuanceProgress(saved: storedIDs.count, pending: pending.count), tab: .receive)
                 case .cancelled:
                     deferredCredentials.removeAll { $0.id == credential.id }
                     setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
-                case let .failed(_, error, _):
-                    throw WalletError.internalFailure(error.message)
+                case let .failed(_, error, storedIDs, pending):
+                    deferredCredentials.removeAll { $0.id == credential.id }
+                    deferredCredentials.append(contentsOf: pending)
+                    lastReceivedCredentialIDs = storedIDs
+                    if !storedIDs.isEmpty {
+                        let refreshed = try await walletClient.credentials()
+                        try Task.checkCancellation()
+                        guard isCurrent(request) else { return }
+                        credentials = refreshed
+                    }
+                    throw WalletError.internalFailure(WalletStatusText.issuanceFailure(error, saved: storedIDs.count, pending: pending.count))
                 }
             } catch is CancellationError {
                 return
             } catch {
-                setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error), tab: .receive)
+                if isCurrent(request) {
+                    setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error), tab: .receive)
+                }
             }
         }
     }
@@ -1584,6 +1673,7 @@ class WalletViewModel: ObservableObject {
         keyID = result.keyID
         publicJWK = result.publicJWK
         credentials = list
+        deferredCredentials = try await walletClient.listDeferredIssuance()
         appliedSigningProtection = appliedProtection
         selectedSigningProtection = signingProtectionMode.resolve(appliedProtection)
         signingProtectionStore.save(selectedSigningProtection)

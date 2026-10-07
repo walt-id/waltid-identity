@@ -9,9 +9,6 @@ group = "id.walt"
 
 dependencies {
     api(project(":waltid-libraries:waltid-library-commons"))
-    // OIDC
-    api(project(":waltid-libraries:protocols:waltid-openid4vc"))
-    api(project(":waltid-libraries:protocols:waltid-openid4vp"))
 
     api(project(":waltid-libraries:web:waltid-web-data-fetching"))
 
@@ -35,9 +32,9 @@ dependencies {
     api(identityLibs.clikt.core)
 
     // Config
-    api("com.sksamuel.hoplite:hoplite-core:2.9.0")
-    api("com.sksamuel.hoplite:hoplite-hocon:2.9.0")
-    api("com.sksamuel.hoplite:hoplite-hikaricp:2.9.0")
+    api(identityLibs.hoplite.core)
+    api(identityLibs.hoplite.hocon)
+    api(identityLibs.hoplite.hikaricp)
 
     // Kotlinx.serialization
     api(identityLibs.kotlinx.serialization.json)
@@ -46,14 +43,14 @@ dependencies {
     api(identityLibs.sksamuel.cohort)
 
     // OpenAPI
-    api("io.github.smiley4:ktor-openapi:5.6.0")
-    implementation("io.github.smiley4:ktor-swagger-ui:5.6.0")
-    implementation("io.github.smiley4:ktor-redoc:5.6.0")
+    api(identityLibs.smiley4.service.openapi)
+    implementation(identityLibs.smiley4.service.swagger.ui)
+    implementation(identityLibs.smiley4.service.redoc)
     implementation(libs.bundles.smiley4.schema.kenerator)
 
     // Persistence
-    api("io.github.reactivecircus.cache4k:cache4k:0.14.0")
-    api("redis.clients:jedis:5.2.0")
+    api(identityLibs.cache4k)
+    api(identityLibs.jedis)
 
     // Testing
     testImplementation(identityLibs.bundles.waltid.ktortesting)

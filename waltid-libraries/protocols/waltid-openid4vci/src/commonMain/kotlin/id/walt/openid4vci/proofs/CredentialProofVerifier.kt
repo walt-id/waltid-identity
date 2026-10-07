@@ -1,6 +1,8 @@
 package id.walt.openid4vci.proofs
 
 import id.walt.crypto2.keys.Key
+import id.walt.openid4vci.proofs.attestation.KeyAttestationVerificationOptions
+import id.walt.openid4vci.proofs.attestation.VerifiedKeyAttestation
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
@@ -12,8 +14,22 @@ fun interface CredentialProofVerifier {
         credentialRequest: CredentialRequest,
         credentialConfiguration: CredentialConfiguration,
         context: CredentialProofValidationContext,
-    ): List<VerifiedCredentialProof>
+    ): CredentialProofVerificationResult
 }
+
+/** Evidence is counted per submitted proof; bindings are counted per credential to issue. */
+data class CredentialProofVerificationResult(
+    val proofs: List<VerifiedCredentialProof>,
+    val bindings: List<VerifiedCredentialBinding>,
+)
+
+/** A selected credential key. Identifiers belong to this key, never to the attester. */
+data class VerifiedCredentialBinding(
+    val holderKey: Key,
+    val holderKid: String? = null,
+    val holderDid: String? = null,
+    val proofIndexes: Set<Int> = emptySet(),
+)
 
 data class CredentialProofValidationContext(
     val credentialIssuer: String,
@@ -21,6 +37,7 @@ data class CredentialProofValidationContext(
     val anonymousPreAuthorizedAccess: Boolean = false,
     val nonceValidation: CredentialNonceValidationContext? = null,
     val batchCredentialIssuance: BatchCredentialIssuance? = null,
+    val keyAttestation: KeyAttestationVerificationOptions? = null,
 ) {
     init {
         require(credentialIssuer.isNotBlank()) { "credentialIssuer must not be blank" }
@@ -28,8 +45,12 @@ data class CredentialProofValidationContext(
     }
 }
 
-data class VerifiedCredentialProof(
-    val proofType: String,
+/** Proof-specific evidence is extensible and is never used to infer issuance keys. */
+interface VerifiedCredentialProof {
+    val proofType: ProofType
+}
+
+data class VerifiedJwtProof(
     val jwt: String,
     val algorithm: String,
     val header: JsonObject,
@@ -38,7 +59,21 @@ data class VerifiedCredentialProof(
     val holderKid: String?,
     val holderDid: String?,
     val nonce: String?,
-)
+    val keyAttestation: VerifiedKeyAttestation? = null,
+) : VerifiedCredentialProof {
+    override val proofType: ProofType = ProofType.JWT
+    fun binding(proofIndex: Int = 0): VerifiedCredentialBinding =
+        VerifiedCredentialBinding(holderKey, holderKid, holderDid, setOf(proofIndex))
+}
+
+data class VerifiedAttestationProof(
+    val attestation: VerifiedKeyAttestation
+) : VerifiedCredentialProof {
+    override val proofType: ProofType = ProofType.ATTESTATION
+}
+
+open class CredentialProofServiceException(message: String, cause: Throwable? = null) :
+    IllegalStateException(message, cause)
 
 class CredentialProofValidationException(
     val errorCode: String,

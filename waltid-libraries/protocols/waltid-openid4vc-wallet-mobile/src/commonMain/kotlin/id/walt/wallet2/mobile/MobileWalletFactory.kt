@@ -2,6 +2,9 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.crypto2.keys.KeyId
+import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
+import kotlin.uuid.Uuid
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.did.dids.Crypto2DidService
 import app.cash.sqldelight.db.SqlDriver
@@ -176,6 +179,8 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
     deleteDatabase: (databaseName: String) -> Unit,
     registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
 ): MobileWallet {
+    // Resolver state belongs to this process, including when all wallet keys already exist.
+    MobileDidSupport.ensureInitialized()
     val databaseName = "wallet_${config.walletId}"
     val databaseKeyProvider = when (val databaseKey = config.persistence.databaseKey) {
         is MobileWalletDatabaseKey.Managed -> managedDatabaseKeyProvider
@@ -231,10 +236,10 @@ internal fun createSqlDelightMobileWallet(
     return MobileWallet(
         scaAuthorizer = NativeScaPresentationAuthorizer(keyProvider),
         walletId = config.walletId,
-        createSigningIdentityManager = { onActive ->
+        createSigningIdentityManager = { lifecycle, onActive ->
             id.walt.wallet2.mobile.identity.SigningIdentityManager(
                 config.walletId, config.signingIdentity, config.defaultKeyUseAuthorizationPolicy, config.keyUseAuthorizationPrompt,
-                keyStore, didStore, keyProvider, queries, didService, onActive,
+                keyStore, didStore, keyProvider, queries, didService, onActive, lifecycle,
             )
         },
         keyStore = keyStore,
@@ -251,6 +256,13 @@ internal fun createSqlDelightMobileWallet(
             )
         },
         defaultKeyUseAuthorizationPolicy = config.defaultKeyUseAuthorizationPolicy,
+        generateAndPersistHolderKey = { keyType, policy ->
+            keyStore.generateKey(WalletKeyCreationRequest(
+                id = KeyId("wallet_holder_${Uuid.random()}"),
+                requirements = WalletKeyRequirements(keyType.toKeySpec(), setOf(KeyUsage.SIGN, KeyUsage.VERIFY), policy),
+                prompt = config.keyUseAuthorizationPrompt,
+            ))
+        },
         attestationConfig = config.attestationConfig,
         preferredLocales = config.preferredLocales,
         transactionDataProfiles = config.transactionDataProfiles,

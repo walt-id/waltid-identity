@@ -641,12 +641,15 @@ final class WalletAPITests: XCTestCase {
             keyID: "key-1",
             did: "did:key:holder"
         )
+        let bindings = try await wallet.createIssuanceHolderKeys(count: 2)
+        let selections = [try IssuanceCredentialSelection(configurationID: "identity", holders: .existing(bindings))]
 
         let session = try await wallet.startIssuance(request)
-        let authorization = try await wallet.beginAuthorizationIssuance(sessionID: session.id)
+        let authorization = try await wallet.beginAuthorizationIssuance(sessionID: session.id, credentials: selections)
         let preAuthorizedOutcome = try await wallet.continuePreAuthorizedIssuance(
             sessionID: session.id,
-            transactionCode: "1234"
+            transactionCode: "1234",
+            credentials: selections
         )
         let callbackURL = URL(string: "wallet.example:/callback?code=authorization-code")!
         let authorizationOutcome = try await wallet.continueAuthorizationIssuance(
@@ -664,6 +667,9 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(deferredOutcome, bridge.issuanceOutcomeResult)
         XCTAssertEqual(bridge.issuanceRequests, [request])
         XCTAssertEqual(bridge.authorizationStartSessionIDs, [session.id])
+        XCTAssertEqual(bridge.createdHolderKeyCounts, [2])
+        XCTAssertEqual(bridge.authorizationSelections, [selections])
+        XCTAssertEqual(bridge.preAuthorizedSelections, [selections])
         XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.count, 1)
         XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.first?.0, session.id)
         XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.first?.1, "1234")
@@ -672,6 +678,24 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(bridge.authorizationIssuanceCalls.first?.1, callbackURL)
         XCTAssertEqual(bridge.cancelledIssuanceSessionIDs, [session.id])
         XCTAssertEqual(bridge.resumedDeferredCredentialIDs, ["deferred-1"])
+    }
+
+    func testIssuanceFailureKeepsStoredAndDeferredProgressAndRecoveryListing() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let pending = DeferredCredential(id: "handle", credentialConfigurationID: "identity", intervalSeconds: 5,
+            credentialIdentifier: "dataset-a")
+        let failure = IssuanceFailure(code: .network, message: "Issuer unavailable",
+            targetFailure: IssuanceTargetFailure(target: .init(configurationID: "identity", credentialIdentifier: "dataset-b"),
+                stage: .request, notAttempted: [.init(configurationID: "identity", credentialIdentifier: "dataset-c")]))
+        bridge.issuanceOutcomeResult = .failed(sessionID: "session", error: failure,
+            storedCredentialIDs: ["stored"], deferredCredentials: [pending])
+        bridge.deferredCredentialsResult = [pending]
+        let wallet = Wallet(bridge: bridge)
+        let result = try await wallet.continuePreAuthorizedIssuance(sessionID: "session")
+        XCTAssertEqual(result, bridge.issuanceOutcomeResult)
+        let recovered = try await wallet.listDeferredIssuance()
+        XCTAssertEqual(recovered, [pending])
+        acceptsSendable(result)
     }
 
     func testCredentialsReturnsWalletCredentials() async throws {
@@ -1319,6 +1343,22 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         )
     }
 
+    var authorizationSelections: [[IssuanceCredentialSelection]?] = []
+    var preAuthorizedSelections: [[IssuanceCredentialSelection]?] = []
+    var createdHolderKeyCounts: [Int] = []
+    var deferredCredentialsResult: [DeferredCredential] = []
+
+    func createIssuanceHolderKeys(count: Int, keyType: WalletKeyType, didMethod: String, policy: WalletKeyUseAuthorizationPolicy) async throws -> [IssuanceHolderBinding] {
+        if let error { throw error }
+        createdHolderKeyCounts.append(count)
+        return (0..<count).map { IssuanceHolderBinding(keyID: "holder-\($0)", did: "did:key:holder-\($0)") }
+    }
+
+    func listDeferredIssuance() async throws -> [DeferredCredential] {
+        if let error { throw error }
+        return deferredCredentialsResult
+    }
+
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
         if let error {
             throw error
@@ -1327,9 +1367,10 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         return issuanceSessionResult
     }
 
-    func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization {
+    func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
         if let error { throw error }
         authorizationStartSessionIDs.append(sessionID)
+        authorizationSelections.append(credentials)
         return IssuanceAuthorization(
             url: URL(string: "https://issuer.example/authorize")!,
             state: "test-state",
@@ -1339,9 +1380,10 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         )
     }
 
-    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?) async throws -> IssuanceOutcome {
+    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
         if let error { throw error }
         preAuthorizedIssuanceCalls.append((sessionID, transactionCode))
+        preAuthorizedSelections.append(credentials)
         return issuanceOutcomeResult
     }
 

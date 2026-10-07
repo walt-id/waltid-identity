@@ -12,6 +12,9 @@ import id.walt.cose.verifyDetached
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.crypto2.algorithms.DigestAlgorithm
@@ -34,6 +37,7 @@ import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
@@ -42,6 +46,12 @@ import id.walt.wallet2.handlers.MatchCredentialsFromStoreRequest
 import id.walt.wallet2.handlers.ImportCredentialRequest
 import id.walt.wallet2.handlers.WalletCredentialHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
+import id.walt.wallet2.handlers.BuildVpTokenRequest
+import id.walt.wallet2.handlers.requireCrypto2SigningKey
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
+import io.ktor.http.Url
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -53,6 +63,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -63,6 +74,46 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class HolderKeyBindingTest {
+
+    @Test
+    fun `mdoc presentation resolves a persisted holder with either key representation`() = runTest {
+        for (legacy in listOf(false, true)) {
+            val keys = InMemoryKeyStore()
+            val defaultKey = signingKey("unrelated-default")
+            keys.addCrypto2Key(defaultKey)
+            val holder = if (legacy) {
+                val key = JWKKey.generate(KeyType.secp256r1)
+                keys.addKey(key)
+                WalletKeyStoreEntry(key.getKeyId(), key, null).requireCrypto2SigningKey()
+            } else signingKey("holder").also { keys.addCrypto2Key(it) }
+            val store = InMemoryCredentialStore()
+            val wallet = Wallet(id = "wallet", keyStores = listOf(keys), credentialStores = listOf(store))
+            val material = assertNotNull(keys.getKeyMaterial(holder.id.value, setOf(KeyUsage.SIGN)))
+                .copy(keyReference = walletStoreKeyReference(0, holder.id.value))
+            val bound = wallet.withVerifiedIssuanceHolderKeyBinding(mdocCredential(holder), material)
+            store.addCredential(bound)
+            // Recreate the wallet facade so the persisted binding, not an issuance handle, selects the key.
+            val reloaded = Wallet(id = wallet.id, keyStores = listOf(keys), credentialStores = listOf(store))
+            val responseUri = "https://verifier.example/response"
+            val request = AuthorizationRequest(
+                clientId = "redirect_uri:$responseUri", responseUri = responseUri, nonce = "holder-binding",
+                responseType = OpenID4VPResponseType.VP_TOKEN, responseMode = OpenID4VPResponseMode.DIRECT_POST,
+                dcqlQuery = DcqlQuery(credentials = listOf(mdocQuery("mdl", MDOC_DOCTYPE))),
+            )
+            val result = WalletPresentationHandler.buildVpToken(reloaded,
+                BuildVpTokenRequest(Url("https://verifier.example/request"), selectedCredentialIds = mapOf("mdl" to listOf(bound.id))),
+                resolveAuthorizationRequest = { ResolvedAuthorizationRequest.Plain(request) })
+            val encoded = Json.parseToJsonElement(result.vpToken).jsonObject.getValue("mdl").jsonArray.single().jsonPrimitive.content
+            val response = coseCompliantCbor.decodeFromByteArray(DeviceResponse.serializer(), encoded.decodeFromBase64Url())
+            val deviceSigned = assertNotNull(response.documents!!.single().deviceSigned)
+            val signature = assertNotNull(deviceSigned.deviceAuth.deviceSignature)
+            val payload = MdocCryptoHelper.buildDeviceAuthenticationBytes(
+                MdocPresenter.buildSessionTranscript(request, responseUri, null), MDOC_DOCTYPE, deviceSigned.namespaces,
+            )
+            assertEquals(true, signature.verifyDetached(holder, payload, Cose.Algorithm.ES256))
+            assertEquals(false, signature.verifyDetached(defaultKey, payload, Cose.Algorithm.ES256))
+        }
+    }
 
     @Test
     fun `binding serialization persists version and algorithm discriminators`() = runTest {

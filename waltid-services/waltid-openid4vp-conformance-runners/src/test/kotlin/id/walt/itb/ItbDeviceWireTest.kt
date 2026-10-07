@@ -1,5 +1,6 @@
 package id.walt.itb
 
+import id.waltid.openid4vci.wallet.token.TokenRequestException
 import io.ktor.http.Url
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
@@ -108,6 +109,54 @@ class ItbDeviceWireTest {
         ItbDeviceWire.write(client, operation(2))
         assertTrue(ItbDeviceWire.read(client).getValue("success").jsonPrimitive.boolean)
         client.close(); job.join()
+    }
+
+    @Test
+    fun `token failure sends only bounded metadata without issuer or transport details`() = withSockets { client, server ->
+        val job = launch {
+            ItbDeviceWire.serve(server) {
+                throw TokenRequestException(400, "invalid_dpop_proof", "private issuer response",
+                    cause = IllegalStateException("private transport details"))
+            }
+        }
+        ItbDeviceWire.write(client, operation(1))
+        val response = ItbDeviceWire.read(client)
+        assertFalse(response.toString().contains("private"))
+        val payload = response.getValue("tokenFailure").jsonObject
+        assertEquals(setOf("statusCode", "oauthError", "nonOAuthErrorBody"), payload.keys)
+        val failure = ItbTokenFailure.decode(payload)
+        assertEquals(400, failure.statusCode)
+        assertEquals("invalid_dpop_proof", failure.oauthError)
+        assertFalse(failure.nonOAuthErrorBody)
+        assertNull(failure.oauthErrorDescription)
+        assertNull(failure.cause)
+        client.close(); job.join()
+    }
+
+    @Test
+    fun `device token metadata is validated and unknown error values are discarded`() {
+        val payload = buildJsonObject { put("statusCode", 400); put("nonOAuthErrorBody", false) }
+        val untrusted = JsonObject(payload + mapOf(
+            "oauthError" to JsonPrimitive("private issuer code"),
+            "oauthErrorDescription" to JsonPrimitive("private issuer response"),
+        ))
+        val failure = ItbTokenFailure.decode(untrusted)
+        assertEquals(400, failure.statusCode)
+        assertNull(failure.oauthError)
+        assertNull(failure.oauthErrorDescription)
+        assertNull(failure.cause)
+        assertFalse(failure.message.orEmpty().contains("private"))
+
+        for (invalid in listOf(
+            payload + ("statusCode" to JsonPrimitive(-1)),
+            payload + ("statusCode" to JsonPrimitive(1000)),
+            payload + ("statusCode" to JsonPrimitive("400")),
+            payload + ("nonOAuthErrorBody" to JsonPrimitive("true")),
+            payload + ("oauthError" to buildJsonObject { put("private", "response") }),
+            payload - "statusCode",
+        )) {
+            assertFailsWith<IllegalArgumentException> { ItbTokenFailure.decode(JsonObject(invalid)) }
+        }
     }
 
     @Test

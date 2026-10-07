@@ -62,14 +62,13 @@ After prerequisites pass, the integration supplies the role configuration and
 exact tagged `EDeviceKeyBytes` from that transaction's Device Engagement:
 
 ```kotlin
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ReaderSelectedTransportProvider
 import id.walt.mdoc.proximity.mobile.*
 
 fun createBleProvider(
     factory: BleProximityTransportFactory,
     roles: BleMdocRoles,
-    eDeviceKeyBytes: ImmutableBytes,
+    eDeviceKeyBytes: ByteString,
 ): ReaderSelectedTransportProvider = factory.create(
     BleProximityTransportConfiguration(
         roles = roles,

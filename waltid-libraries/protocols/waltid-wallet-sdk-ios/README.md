@@ -129,6 +129,19 @@ Issuance uses DPoP consistently for authorization binding, token exchange, and
 protected credential requests whenever the authorization server advertises
 supported DPoP signing algorithms.
 
+## Batch issuance
+
+Pass `[IssuanceCredentialSelection]` to `continuePreAuthorizedIssuance` or
+`beginAuthorizationIssuance`. Each selection contains a configuration and explicit
+`IssuanceHolderBinding` entries, one per requested copy. Omission still requests one
+copy; `session.offer.batchSize` only limits explicit requests. Create extra keys with
+`createIssuanceHolderKeys(count:)` after user acceptance, or reuse existing wallet keys.
+
+Failed outcomes retain stored IDs, deferred handles and target failure details. Recover
+pending handles after restart with `listDeferredIssuance()` and honor their polling
+intervals. See [Issuing Credentials](Sources/WalletSDK/Documentation.docc/IssuingCredentials.md)
+for both grants and partial-result handling.
+
 ## In-person proximity presentation
 
 Use the Swift-native proximity API for ISO/IEC 18013-5 device engagement and
@@ -302,10 +315,9 @@ actual direct or RICAL-validated path. Install it through the configured trust e
 standalone raw evidence returns indeterminate for this scope. The separately explicit
 `.readerCertificateAndIssuingAuthorities` scope retains terminal-authority status checking.
 
-Set `requiredIACAIssuerCertificateDER` when the application identifies a required IACA direct
-issuer. That exact issuer must be on the validated path and the reader must include the
-conditional non-critical email/URI issuer contact extension. Generic imported CAs do not
-supply that role. Without this context, conditional IACA validation is outside the checked scope.
+Set `requiredIACAIssuerCertificateDER` to require an exact application-identified IACA direct
+issuer on the validated path and an `issuerAlternativeName` email or URI contact in the reader
+certificate. The application identifies the issuer's IACA role; this restriction does not add trust.
 
 `ProximityCRLFetcher` receives a Foundation `URL` and byte limit and returns
 `ProximityCRLFetchResult.available(der:)` or `.unavailable`. The application owns timeouts,

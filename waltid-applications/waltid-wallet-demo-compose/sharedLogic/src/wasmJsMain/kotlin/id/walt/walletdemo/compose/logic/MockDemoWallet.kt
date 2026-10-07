@@ -70,14 +70,15 @@ private class MockDemoWallet : DemoWallet {
         ),
     )
 
-    override suspend fun beginAuthorizationIssuance(sessionId: String): WalletDemoIssuanceAuthorization =
+    override suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<WalletDemoCredentialSelection>): WalletDemoIssuanceAuthorization =
         WalletDemoIssuanceAuthorization("https://issuer.example/authorize")
 
     override suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
         transactionCode: String?,
+        credentials: List<WalletDemoCredentialSelection>,
     ): WalletDemoIssuanceOutcome {
-        credentials = listOf(
+        val offered = listOf(
             WalletDemoCredential(
                 id = "mock-credential",
                 format = "jwt_vc_json",
@@ -110,7 +111,19 @@ private class MockDemoWallet : DemoWallet {
                 credentialDataJson = """{"given_name":"Ada"}""",
             ),
         )
-        return WalletDemoIssuanceOutcome.Stored(credentials.map { it.id })
+        val configurations = listOf("MockCredential", "DefaultCardCredential").zip(offered).toMap()
+        val issued = credentials.flatMap { selection ->
+            val template = configurations.getValue(selection.credentialConfigurationId)
+            val holders = when (val choice = selection.holders) {
+                is WalletDemoCredentialHolders.Existing -> choice.bindings
+                is WalletDemoCredentialHolders.NewKeys -> createIssuanceHolderKeys(choice.count)
+            }
+            holders.mapIndexed { index, holder ->
+                template.copy(id = "${template.id}-$index", subject = holder.did ?: holder.keyId)
+            }
+        }
+        this.credentials = issued
+        return WalletDemoIssuanceOutcome.Stored(issued.map { it.id })
     }
 
     override suspend fun continueAuthorizationIssuance(
@@ -120,6 +133,11 @@ private class MockDemoWallet : DemoWallet {
 
     override suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome =
         WalletDemoIssuanceOutcome.Cancelled
+
+    private fun createIssuanceHolderKeys(count: Int) =
+        List(count) { WalletDemoHolderBinding("batch-holder-$it", "did:key:batch-holder-$it") }
+
+    override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> = emptyList()
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =
         WalletDemoIssuanceOutcome.Failed("No mock deferred credential")

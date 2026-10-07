@@ -82,6 +82,8 @@ class ItbWalletDriver internal constructor(
                     credentialEndpoint = resolved.credentialEndpoint,
                     credentialConfigurationId = authorization.credentialConfigurationId,
                     nonceEndpoint = authorization.nonceEndpoint, redirectUri = redirectUri,
+                    // The deployed reference issuer requires DPoP for authorization-code tokens.
+                    useDpop = true,
                 ),
                 httpClient = client,
             )

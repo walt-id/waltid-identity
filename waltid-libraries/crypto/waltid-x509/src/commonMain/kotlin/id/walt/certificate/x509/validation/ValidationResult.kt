@@ -11,6 +11,8 @@ data class ValidationResult(
 
     val hasErrors get() = log.any { it.severity == Severity.ERROR }
 
+    val errorLog: List<ValidationLogEntry> get() = log.filter { it.severity == Severity.ERROR }
+
     data class ValidationLogEntry(
         val timestamp: Instant,
         val severity: Severity,

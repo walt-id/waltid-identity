@@ -1,6 +1,6 @@
 package id.walt.ktorauthnz.methods
 
-import id.walt.commons.web.InvalidCredentialsException
+import id.walt.ktorauthnz.exceptions.InvalidCredentialsException
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier

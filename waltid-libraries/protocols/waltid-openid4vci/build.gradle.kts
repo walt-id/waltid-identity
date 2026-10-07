@@ -23,6 +23,7 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-credential-key-resolver"))
             implementation(project(":waltid-libraries:waltid-did"))
             implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
+            implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
             // HTTP
@@ -59,7 +60,7 @@ kotlin {
             implementation(identityLibs.junit.jupiter.api)
         }
         jsMain.dependencies {
-            implementation(npm("jose", "5.10.0"))
+            implementation(npm("jose", identityLibs.versions.jose.npm.get()))
             implementation(identityLibs.ktor.client.js)
         }
         jsTest.dependencies {

@@ -26,6 +26,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.metadata.issuer.SigningAlgId
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
+import id.walt.openid4vci.proofs.ProofType
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
@@ -449,7 +450,7 @@ class Issuer2MetadataEndpointTest {
             assertEquals("$ISSUER_BASE_URL/$credentialConfigurationId", configuration.vct)
             assertEquals(
                 if (paymentDemo) setOf("ES256") else JWT_PROOF_SIGNING_ALGORITHMS,
-                assertNotNull(configuration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+                assertNotNull(configuration.proofTypesSupported?.get(ProofType.JWT.value)).proofSigningAlgValuesSupported,
             )
         }
     }
@@ -467,7 +468,7 @@ class Issuer2MetadataEndpointTest {
             openBadgeConfiguration.credentialSigningAlgValuesSupported,
         )
         assertEquals(
-            JWT_PROOF_BINDING_METHODS,
+            JWT_PROOF_BINDING_METHODS - CryptographicBindingMethod.Jwk,
             openBadgeConfiguration.cryptographicBindingMethodsSupported,
         )
         assertEquals(
@@ -476,7 +477,11 @@ class Issuer2MetadataEndpointTest {
         )
         assertEquals(
             JWT_PROOF_SIGNING_ALGORITHMS,
-            assertNotNull(openBadgeConfiguration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+            assertNotNull(openBadgeConfiguration.proofTypesSupported?.get(ProofType.JWT.value)).proofSigningAlgValuesSupported,
+        )
+        assertEquals(
+            setOf("ES256"),
+            assertNotNull(openBadgeConfiguration.proofTypesSupported?.get(ProofType.ATTESTATION.value)).proofSigningAlgValuesSupported,
         )
     }
 
@@ -501,7 +506,7 @@ class Issuer2MetadataEndpointTest {
             assertEquals(credentialConfigurationId, mdocConfiguration.scope)
             assertEquals(
                 JWT_PROOF_SIGNING_ALGORITHMS,
-                assertNotNull(mdocConfiguration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+                assertNotNull(mdocConfiguration.proofTypesSupported?.get(ProofType.JWT.value)).proofSigningAlgValuesSupported,
             )
         }
     }
@@ -523,7 +528,7 @@ class Issuer2MetadataEndpointTest {
         assertEquals(INTERNAL_SD_JWT_VCT, sdJwtConfiguration.vct)
         assertEquals(
             JWT_PROOF_SIGNING_ALGORITHMS,
-            assertNotNull(sdJwtConfiguration.proofTypesSupported?.get("jwt")).proofSigningAlgValuesSupported,
+            assertNotNull(sdJwtConfiguration.proofTypesSupported?.get(ProofType.JWT.value)).proofSigningAlgValuesSupported,
         )
     }
 

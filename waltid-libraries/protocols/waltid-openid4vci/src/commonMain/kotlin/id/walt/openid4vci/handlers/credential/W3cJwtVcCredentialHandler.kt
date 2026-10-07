@@ -14,9 +14,9 @@ import id.walt.openid4vci.handlers.endpoints.credential.signEach
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.requests.credential.CredentialRequest
+import id.walt.openid4vci.proofs.CredentialProofValidationException
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.sdjwt.SDMap
-import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
@@ -51,7 +51,6 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         expectedUpdate: Instant?,
     ): CredentialResponseResult = sign(configuration, issuanceBatch) { instance ->
         W3cJwtVcCredentialSigner.generateW3CJwtVC(
-            credentialRequest = request,
             credentialData = instance.input.credentialData,
             issuerId = issuerId,
             issuerKey = issuerKey,
@@ -60,7 +59,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
             x5Chain = x5Chain,
             display = display,
             w3cVersion = w3cVersion,
-            verifiedProof = instance.verifiedProof,
+            verifiedBinding = instance.verifiedBinding,
         )
     }
 
@@ -82,7 +81,6 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
         expectedUpdate: Instant?,
     ): CredentialResponseResult = sign(configuration, issuanceBatch) { instance ->
         W3cJwtVcCredentialSigner.generateW3CJwtVC(
-            credentialRequest = request,
             credentialData = instance.input.credentialData,
             issuerId = issuerId,
             issuerKey = issuerKey.key,
@@ -92,7 +90,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
             x5Chain = x5Chain,
             display = display,
             w3cVersion = w3cVersion,
-            verifiedProof = instance.verifiedProof,
+            verifiedBinding = instance.verifiedBinding,
         )
     }
 
@@ -115,10 +113,8 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler, Crypto2CredentialEn
             }
 
             issuanceBatch.signEach(issue)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            CredentialResponseResult.Failure(e.toCredentialHandlerError())
+        } catch (e: CredentialProofValidationException) {
+            CredentialResponseResult.Failure(CredentialError(e.errorCode, e.message))
         }
     }
 }

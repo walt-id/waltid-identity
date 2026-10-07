@@ -45,7 +45,9 @@ class WebDataFetcher private constructor(
          * Build a [WebDataFetcher] backed by a caller-provided [HttpClient] instead of one created
          * from the configured engine. Use this only when you need engine-specific configuration the
          * [WebDataFetchingConfiguration] cannot express (e.g. a custom TLS trust manager in tests).
-         * The caller is responsible for configuring content negotiation on the provided client.
+         * The caller is responsible for content negotiation and the engine's cache policy.
+         * Clients carrying sensitive wallet data must disable automatic response caching;
+         * on Darwin, configure the session with `URLCache = null`.
          */
         fun wrapping(
             client: HttpClient,

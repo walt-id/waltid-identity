@@ -25,7 +25,7 @@ import kotlinx.serialization.json.*
  * 2. Adapter parses offer and determines grant type (pre-auth or auth code)
  * 3. For pre-auth: directly calls wallet-api2 `/receive` endpoint
  * 4. For auth code: initiates OAuth flow via `/receive/authorization-url`
- * 5. User completes OAuth login (manual browser interaction)
+ * 5. The runner follows the suite's authorization redirects
  * 6. Callback at `/callback` completes token exchange and credential fetch
  *
  * ## Endpoints
@@ -45,9 +45,10 @@ import kotlinx.serialization.json.*
  * @param adapterPort Port to listen on
  * @param walletId Optional existing wallet ID (auto-creates if null)
  * @param testDid Optional DID to use for credential requests
- * @param testKeyId Optional key ID to use for proof signing
+ * @param testKeyId Registered client key, also the holder key in single-copy mode
  * @param attestationAuthority Test attester for plans using attestation-based client authentication
- * @param useScope Authorize by `scope` instead of `authorization_details`, as HAIP requires
+ * @param useScope Authorize the offered configuration by scope, as HAIP requires
+ * @param batchHolderKeyIds Two distinct stored holder keys for the explicit batch gate; empty for single-copy plans
  */
 class VciWalletConformanceAdapter(
     private val walletApiUrl: String = "http://127.0.0.1:7005",
@@ -57,7 +58,14 @@ class VciWalletConformanceAdapter(
     private val testKeyId: String? = null,
     private val attestationAuthority: ClientAttestationTestAuthority? = null,
     private val useScope: Boolean = false,
+    private val batchHolderKeyIds: List<String> = emptyList(),
 ) {
+    init {
+        require(batchHolderKeyIds.isEmpty() ||
+            (batchHolderKeyIds.size == 2 && batchHolderKeyIds.all(String::isNotBlank) && batchHolderKeyIds.distinct().size == 2)) {
+            "The batch conformance adapter requires two distinct stored holder keys"
+        }
+    }
 
     private var server: EmbeddedServer<*, *>? = null
     private var httpClient: HttpClient? = null
@@ -125,25 +133,6 @@ class VciWalletConformanceAdapter(
     // ─────────────────────────────────────────────────────────────────────────────
     // Request Handlers
     // ─────────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Fetch credential format from issuer metadata
-     */
-    private suspend fun getCredentialFormat(credentialIssuerUrl: String, configurationId: String): String? {
-        return try {
-            val metadataUrl = "$credentialIssuerUrl/.well-known/openid-credential-issuer"
-            val response = httpClient?.get(metadataUrl)
-            if (response?.status?.isSuccess() == true) {
-                val metadata = Json.parseToJsonElement(response.bodyAsText()).jsonObject
-                val configurations = metadata["credential_configurations_supported"]?.jsonObject
-                val config = configurations?.get(configurationId)?.jsonObject
-                config?.get("format")?.jsonPrimitive?.content
-            } else null
-        } catch (e: Exception) {
-            println("[VCI Adapter] Could not fetch format: ${e.message}")
-            null
-        }
-    }
 
     /**
      * POST /credential-offer - API endpoint for programmatic access
@@ -301,7 +290,11 @@ class VciWalletConformanceAdapter(
         val nonceEndpoint = resolved["nonceEndpoint"]?.jsonPrimitive?.contentOrNull
 
         // 2. Authorization URL, PKCE verifier and state.
-        val authUrlResponse = client.post("$walletApiUrl/wallet/$walletId/credentials/receive/authorization-url") {
+        val batchSuffix = if (batchHolderKeyIds.isEmpty()) "" else "/batch"
+        // The released scope endpoint authorizes one configuration; the batch receive endpoint
+        // then requests its explicit holder copies under that same authorization.
+        val authorizationSuffix = if (useScope) "" else batchSuffix
+        val authUrlResponse = client.post("$walletApiUrl/wallet/$walletId/credentials/receive/authorization-url$authorizationSuffix") {
             contentType(ContentType.Application.Json)
             setBody(
                 buildJsonObject {
@@ -309,10 +302,6 @@ class VciWalletConformanceAdapter(
                     put("clientId", CLIENT_ID)
                     put("redirectUri", getRedirectUri())
                     put("usePkce", true)
-                    // HAIP fixes authorization_request_type=simple, which authorizes by scope rather
-                    // than by authorization_details; the suite's ExtractRequestedScopes then rejects a
-                    // request that carries none. Not derivable from metadata - nothing an issuer
-                    // publishes says which of the two it expects - so it is selected per plan.
                     if (useScope) put("useScope", true)
                 }.toString()
             )
@@ -326,8 +315,10 @@ class VciWalletConformanceAdapter(
         val state = authorization["state"]?.jsonPrimitive?.content
             ?: return ClaimResult(false, "authorization-url returned no state")
         val codeVerifier = authorization["codeVerifier"]?.jsonPrimitive?.contentOrNull
-        val credentialConfigurationId = authorization["credentialConfigurationId"]?.jsonPrimitive?.content
-            ?: return ClaimResult(false, "authorization-url returned no credentialConfigurationId")
+        val configurationIds = if (batchHolderKeyIds.isEmpty() || useScope) {
+            listOf(authorization["credentialConfigurationId"]?.jsonPrimitive?.content
+                ?: return ClaimResult(false, "authorization-url returned no credentialConfigurationId"))
+        } else authorization.getValue("credentialConfigurationIds").jsonArray.map { it.jsonPrimitive.content }
 
         // 3. The browser leg, followed by hand. Ktor's HttpRedirect refuses to follow an HTTPS ->
         // HTTP downgrade, and the authorization server is HTTPS while this adapter's redirect URI is
@@ -336,7 +327,7 @@ class VciWalletConformanceAdapter(
         val code = followAuthorization(client, authorizationUrl).getOrElse { return ClaimResult(false, it.message ?: "authorization failed") }
 
         // 4. Everything after the redirect is the wallet's job.
-        val url = "$walletApiUrl/wallet/$walletId/credentials/receive/authorized"
+        val url = "$walletApiUrl/wallet/$walletId/credentials/receive/authorized$batchSuffix"
         println("[VCI Adapter] POST $url")
         val response = client.post(url) {
             contentType(ContentType.Application.Json)
@@ -346,7 +337,8 @@ class VciWalletConformanceAdapter(
                     codeVerifier?.let { put("codeVerifier", it) }
                     put("credentialIssuer", credentialIssuer)
                     put("credentialEndpoint", credentialEndpoint)
-                    put("credentialConfigurationId", credentialConfigurationId)
+                    if (batchHolderKeyIds.isEmpty()) put("credentialConfigurationId", configurationIds.single())
+                    else put("credentials", batchSelections(configurationIds))
                     nonceEndpoint?.let { put("nonceEndpoint", it) }
                     put("clientId", CLIENT_ID)
                     put("redirectUri", getRedirectUri())
@@ -422,7 +414,19 @@ class VciWalletConformanceAdapter(
             val url = "$walletApiUrl/wallet/$walletId/credentials/receive"
             println("[VCI Adapter] POST $url")
 
-            val requestBody = buildOfferRequest(offer)
+            val selections = if (batchHolderKeyIds.isEmpty()) null else {
+                val resolved = client.post("$walletApiUrl/wallet/$walletId/credentials/receive/resolve-offer") {
+                    contentType(ContentType.Application.Json)
+                    setBody(buildOfferSource(offer).toString())
+                }
+                check(resolved.status.isSuccess()) { "resolve-offer ${resolved.status}: ${resolved.bodyAsText()}" }
+                batchSelections(Json.parseToJsonElement(resolved.bodyAsText()).jsonObject
+                    .getValue("credentialConfigurationIds").jsonArray.map { it.jsonPrimitive.content })
+            }
+            val requestBody = buildJsonObject {
+                buildOfferRequest(offer).entries.forEach { (key, value) -> put(key, value) }
+                selections?.let { put("credentials", it) }
+            }
             val response = client.post(url) {
                 contentType(ContentType.Application.Json)
                 setBody(requestBody.toString())
@@ -539,6 +543,17 @@ class VciWalletConformanceAdapter(
     private fun buildOfferSource(offer: String): JsonObject = buildJsonObject {
         val offerJsonObject = parseOfferJson(offer)
         if (offerJsonObject != null) put("offerJson", offerJsonObject) else put("offerUrl", offer)
+    }
+
+    private fun batchSelections(configurationIds: List<String>): JsonArray = buildJsonArray {
+        configurationIds.forEach { configurationId ->
+            add(buildJsonObject {
+                put("credentialConfigurationId", configurationId)
+                put("holderBindings", buildJsonArray {
+                    batchHolderKeyIds.forEach { keyId -> add(buildJsonObject { put("keyId", keyId) }) }
+                })
+            })
+        }
     }
 
     private fun buildOfferRequest(offer: String, includeAuthParams: Boolean = false): JsonObject {

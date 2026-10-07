@@ -228,6 +228,25 @@ Run public-backend tests serially on iOS. The tests depend on public network
 services, so a transient simulator networking failure should be retried before
 treating it as a product regression.
 
+For signed DID presentation after a process restart, both iOS demos' `testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2`
+terminate and relaunch the app before previewing a signed `did:key` request and sharing the saved credential.
+Android's `MobileWalletRestartTest` runs in the self-instrumenting `androidE2eTests` module,
+separately from the wallet process. One test receives a credential, force-stops and relaunches the app,
+then presents the saved credential through a signed `did:key` request.
+From the Identity repository root, select an emulator or device:
+
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew -PenableAndroidBuild=true \
+  :waltid-applications:waltid-wallet-demo-compose:androidE2eTests:connectedProductionDebugAndroidTest
+```
+
+The test clears wallet app data before setup and preserves it across the restart. It checks that the
+wallet process ended, the runner survived, credential IDs and signing DID/key ID stayed unchanged,
+and the exact verifier session succeeded. `androidTestFixtures/` shares the demo UI helpers between
+the in-process app tests and external tests. CI runs the test in the Android Compose demo lane and
+publishes its standard JUnit report alongside the app tests. The native and Compose iOS lanes run
+the corresponding receive-and-present tests.
+
 Identity document provider configuration is checked on the built products rather than on the source
 `.entitlements` and `Info.plist` files, because the interesting values contain `$(AppIdentifierPrefix)`
 or come from `INFOPLIST_KEY_` build settings and can silently resolve to nothing. Run the same script
@@ -321,23 +340,39 @@ The Kotlin mobile SDK modules use explicit API mode. Public and protected
 declarations must name their visibility and public return types, which keeps the
 Android/KMP source API intentional before it reaches generated docs or Swift.
 
-Kotlin ABI validation is enabled for:
+The modules that configure Kotlin `abiValidation` own committed ABI baselines in
+`api/`. This includes mdoc proximity, crypto2 and its provider/interop modules,
+JOSE, wallet-mobile, persistence-mobile, recovery and enterprise custody. Gradle's
+unqualified `checkKotlinAbi` task selects every configured module, so new ABI-enabled
+modules join the contract checks without adding another task to the workflow.
 
-- `waltid-openid4vc-wallet-mobile`
-- `waltid-openid4vc-wallet-persistence-mobile`
-
-The Kotlin Gradle plugin writes the tracked KMP/native ABI baselines under each
-module's `api/` directory. Check them with:
-
-```bash
-./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:checkKotlinAbi :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:checkKotlinAbi -PenableAndroidBuild=true -PenableIosBuild=true
-```
-
-When the public KMP surface intentionally changes, regenerate the baselines:
+Check the complete Android and native contracts from the Identity root on macOS
+with the Android SDK and Xcode installed:
 
 ```bash
-./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:updateKotlinAbi :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:updateKotlinAbi -PenableAndroidBuild=true -PenableIosBuild=true
+./gradlew checkKotlinAbi -PenableAndroidBuild=true -PenableIosBuild=true
 ```
+
+Ordinary `check`/`build` tasks also run ABI validation for the modules and targets
+enabled in that build. The macOS SDK contract job enables Android and both iOS
+targets. Its path filters select the job for ABI files and mobile SDK source
+changes; pushes to main also run the job.
+
+Checks generate current dumps in `build/` and compare them with the committed
+references. A difference fails the check. Intentional source API changes and
+compiler or code-generator changes require review and an explicit reference update:
+
+```bash
+./gradlew updateKotlinAbi -PenableAndroidBuild=true -PenableIosBuild=true
+```
+
+Review the generated diff and rerun `checkKotlinAbi` before committing the updated
+references. Enable both platforms when updating: a build with a platform disabled
+cannot regenerate that platform's API. The optional-iOS helper prevents updates
+with iOS disabled and uses a temporary non-iOS projection for checks; it keeps the
+canonical committed baseline intact. CI generates API documentation and performs
+contract comparisons, but does not automatically accept or commit changed ABI
+references.
 
 If those ABI baselines change, reviewers also need evidence that the Swift
 facade was considered. This can be a Swift source/test/docs update, or an entry

@@ -92,6 +92,20 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         }
     }
 
+    func createIssuanceHolderKeys(count: Int, keyType: WalletKeyType, didMethod: String, policy: WalletKeyUseAuthorizationPolicy) async throws -> [IssuanceHolderBinding] {
+        guard let count = Int32(exactly: count), count > 0 else { throw WalletError.invalidInput("Holder key count must be a positive 32-bit integer") }
+        let result = try await bridge.createIssuanceHolderKeys(count: count, keyType: keyType.toKMPKeyType(),
+            didMethod: didMethod, keyUseAuthorizationPolicy: policy.toKMPAuthorizationPolicy())
+        return swiftArray(try Self.successAnyValue(result, operation: "create issuance holder keys"), of: MobileWalletHolderBinding.self)
+            .map { IssuanceHolderBinding(keyID: $0.keyId, did: $0.did) }
+    }
+
+    func listDeferredIssuance() async throws -> [DeferredCredential] {
+        let result = try await bridge.listDeferredIssuance()
+        return swiftArray(try Self.successAnyValue(result, operation: "list deferred issuance"),
+            of: Waltid_openid4vc_walletWalletIssuanceContinuation.self).map { $0.toSwiftDeferredCredential() }
+    }
+
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
         let result = try await bridge.startIssuance(
             request: MobileWalletIssuanceRequest(
@@ -105,14 +119,14 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
         let value = try Self.successValue(
             result,
-            as: Waltid_openid4vc_walletWalletIssuanceSession.self,
+            as: Waltid_openid4vc_walletWalletIssuanceBatchSession.self,
             operation: "start issuance"
         )
         return try value.toSwiftIssuanceSession()
     }
 
-    func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization {
-        let result = try await bridge.beginAuthorizationIssuance(sessionId: sessionID)
+    func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
+        let result = try await bridge.beginAuthorizationIssuance(sessionId: sessionID, credentials: try credentials?.map { try $0.toKMPSelection() })
         let value = try Self.successValue(
             result,
             as: Waltid_openid4vc_walletWalletIssuanceAuthorization.self,
@@ -123,11 +137,13 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
 
     func continuePreAuthorizedIssuance(
         sessionID: String,
-        transactionCode: String?
+        transactionCode: String?,
+        credentials: [IssuanceCredentialSelection]?
     ) async throws -> IssuanceOutcome {
         let result = try await bridge.continuePreAuthorizedIssuance(
             sessionId: sessionID,
-            transactionCode: transactionCode
+            transactionCode: transactionCode,
+            credentials: try credentials?.map { try $0.toKMPSelection() }
         )
         return try Self.issuanceOutcome(result, operation: "continue pre-authorized issuance")
     }
@@ -1030,23 +1046,24 @@ final class KMPProximityPresentationSessionBridge:
     }
 }
 
-private extension Waltid_openid4vc_walletWalletIssuanceSession {
+private extension Waltid_openid4vc_walletWalletIssuanceBatchSession {
     func toSwiftIssuanceSession() throws -> IssuanceSession {
         IssuanceSession(
             id: id,
-            offer: try offer.toSwiftIssuanceOfferPreview()
+            offer: try offer.toSwiftIssuanceOfferPreview(batchSize: batchSize?.intValue)
         )
     }
 }
 
 private extension Waltid_openid4vc_walletWalletIssuanceOfferPreview {
-    func toSwiftIssuanceOfferPreview() throws -> IssuanceOfferPreview {
+    func toSwiftIssuanceOfferPreview(batchSize: Int?) throws -> IssuanceOfferPreview {
         IssuanceOfferPreview(
             grant: grant == .authorizationCode ? .authorizationCode : .preAuthorizedCode,
             issuer: issuer.toSwiftIssuanceIssuerPreview(),
             credentials: swiftArray(credentials, of: Waltid_openid4vc_walletWalletIssuanceCredentialPreview.self)
                 .map { $0.toSwiftIssuanceCredentialPreview() },
-            transactionCode: transactionCode?.toSwiftIssuanceTransactionCode()
+            transactionCode: transactionCode?.toSwiftIssuanceTransactionCode(),
+            batchSize: batchSize
         )
     }
 }
@@ -1133,7 +1150,7 @@ private extension Waltid_openid4vc_walletWalletIssuanceAuthorization {
     }
 }
 
-private extension Waltid_openid4vc_walletWalletIssuanceOutcome {
+extension Waltid_openid4vc_walletWalletIssuanceOutcome {
     func toSwiftIssuanceOutcome() throws -> IssuanceOutcome {
         switch onEnum(of: self) {
         case let .stored(value):
@@ -1148,13 +1165,7 @@ private extension Waltid_openid4vc_walletWalletIssuanceOutcome {
                 credentials: swiftArray(
                     value.credentials,
                     of: Waltid_openid4vc_walletWalletDeferredCredential.self
-                ).map { credential in
-                    DeferredCredential(
-                        id: credential.id,
-                        credentialConfigurationID: credential.credentialConfigurationId,
-                        intervalSeconds: credential.intervalSeconds?.int64Value
-                    )
-                }
+                ).map { $0.toSwiftDeferredCredential() }
             )
         case let .cancelled(value):
             return .cancelled(sessionID: value.sessionId)
@@ -1163,11 +1174,61 @@ private extension Waltid_openid4vc_walletWalletIssuanceOutcome {
                 sessionID: value.sessionId,
                 error: IssuanceFailure(
                     code: value.error.code.toSwiftIssuanceErrorCode(),
-                    message: value.error.message
+                    message: value.error.message,
+                    targetFailure: value.failure?.toSwiftTargetFailure()
                 ),
-                storedCredentialIDs: swiftArray(value.storedCredentialIds, of: String.self)
+                storedCredentialIDs: swiftArray(value.storedCredentialIds, of: String.self),
+                deferredCredentials: swiftArray(value.deferredCredentials, of: Waltid_openid4vc_walletWalletIssuanceContinuation.self)
+                    .map { $0.toSwiftDeferredCredential() }
             )
         }
+    }
+}
+
+extension IssuanceCredentialSelection {
+    func toKMPSelection() throws -> MobileWalletCredentialSelection {
+        let selection: any MobileWalletCredentialHolders
+        switch holders {
+        case .existing(let bindings):
+            selection = MobileWalletCredentialHoldersExisting(bindings: bindings.map { MobileWalletHolderBinding(keyId: $0.keyID, did: $0.did) })
+        case .newKeys(let count):
+            selection = MobileWalletCredentialHoldersNewKeys(count: Int32(count))
+        }
+        return MobileWalletCredentialSelection(credentialConfigurationId: configurationID,
+            holders: selection, credentialIdentifier: credentialIdentifier)
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletDeferredCredential {
+    func toSwiftDeferredCredential() -> DeferredCredential {
+        DeferredCredential(id: id, credentialConfigurationID: credentialConfigurationId,
+            intervalSeconds: intervalSeconds?.int64Value, credentialIdentifier: credentialIdentifier)
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceContinuation {
+    func toSwiftDeferredCredential() -> DeferredCredential {
+        DeferredCredential(id: id, credentialConfigurationID: credentialConfigurationId,
+            intervalSeconds: intervalSeconds?.int64Value, credentialIdentifier: credentialIdentifier)
+    }
+}
+
+private extension Waltid_openid4vc_walletCredentialIssuanceFailure {
+    func toSwiftTargetFailure() -> IssuanceTargetFailure {
+        let stage: IssuanceFailureStage
+        switch self.stage {
+        case .proof: stage = .proof
+        case .request: stage = .request
+        case .response: stage = .response
+        case .storage: stage = .storage
+        case .observer: stage = .observer
+        }
+        return IssuanceTargetFailure(
+            target: IssuanceCredentialTarget(configurationID: target.credentialConfigurationId, credentialIdentifier: target.credentialIdentifier),
+            stage: stage,
+            notAttempted: swiftArray(notAttempted, of: Waltid_openid4vci_walletCredentialIssuanceTarget.self).map {
+                IssuanceCredentialTarget(configurationID: $0.credentialConfigurationId, credentialIdentifier: $0.credentialIdentifier)
+            })
     }
 }
 
@@ -1181,6 +1242,8 @@ private extension Waltid_openid4vc_walletWalletIssuanceErrorCode {
         case .issuerMetadata: return .issuerMetadata
         case .issuerResponse: return .issuerResponse
         case .network: return .network
+        case .remoteOutcomeUncertain: return .remoteOutcomeUncertain
+        case .storageOutcomeUncertain: return .storageOutcomeUncertain
         case .crypto: return .crypto
         case .storage: return .storage
         case .protocol: return .protocol
@@ -2010,6 +2073,15 @@ private extension MobileWalletEvent {
 private extension WalletBridgeError {
     func toSwiftWalletError() -> WalletError {
         switch category {
+        case .presentationValidation:
+            guard let presentationValidationFailure else {
+                return .internalFailure("Presentation validation error did not include a failure reason")
+            }
+            return .presentationValidation(
+                code: presentationValidationFailure.errorCode.toSwiftErrorCode(),
+                message: presentationValidationFailure.message,
+                responseSafetyFailure: presentationValidationFailure.responseSafetyFailure
+            )
         case .invalidInput:
             return .invalidInput(message)
         case .network:

@@ -14,6 +14,7 @@ import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.credentialCardTags
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.relaunchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.scrollDown
@@ -278,22 +279,6 @@ class DigitalCredentialIssuanceE2ETest {
     private fun UiDevice.newCredentialCard(known: Set<String>): UiObject2? =
         findObjects(By.res(CREDENTIAL_CARD_TAG))
             .firstOrNull { runCatching { it.resourceName !in known }.getOrDefault(false) }
-
-    /** Every card tag currently in the tree, sweeping the list so off-screen cards are included. */
-    private fun UiDevice.credentialCardTags(): Set<String> {
-        val tags = mutableSetOf<String>()
-        fun collect() {
-            findObjects(By.res(CREDENTIAL_CARD_TAG))
-                .mapNotNullTo(tags) { runCatching { it.resourceName }.getOrNull() }
-        }
-        collect()
-        repeat(CREDENTIAL_LIST_SCROLL_ATTEMPTS) {
-            scrollDown()
-            collect()
-        }
-        repeat(CREDENTIAL_LIST_SCROLL_ATTEMPTS) { scrollUp() }
-        return tags
-    }
 
     private class Fixture(
         val context: Context,

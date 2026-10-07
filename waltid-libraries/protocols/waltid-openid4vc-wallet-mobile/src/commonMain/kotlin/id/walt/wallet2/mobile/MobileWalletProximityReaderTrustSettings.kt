@@ -5,21 +5,18 @@ package id.walt.wallet2.mobile
 import id.walt.certificate.x509.PemUtil
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
-import id.walt.mdoc.proximity.ImmutableBytes
+import id.walt.certificate.x509.validation.X509SingleCertificateValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsIsCaValidator
+import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
 import id.walt.mdoc.proximity.SignedRical
 import id.walt.mdoc.proximity.X509RicalSignatureValidator
-import id.walt.x509.CertificateDer
-import id.walt.x509.validateCertificateAuthorityUsage
 import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -55,8 +52,10 @@ public data class ProximityStoredRicalProvider(
         require(providerId.isNotBlank()) { "RICAL provider identifier must not be blank" }
         require(acceptedTypes.isNotEmpty() && acceptedTypes.none(String::isBlank))
         require(providerTrustAnchorsDerBase64Url.isNotEmpty())
-        require(acceptedSignerCertificatePolicyOids.isNotEmpty() &&
-            acceptedSignerCertificatePolicyOids.none(String::isBlank))
+        require(
+            acceptedSignerCertificatePolicyOids.isNotEmpty() &&
+                    acceptedSignerCertificatePolicyOids.none(String::isBlank)
+        )
         require(signedRicalBase64Url.isNotBlank())
     }
 }
@@ -126,6 +125,7 @@ public data class ProximityReaderTrustSettings(
 public enum class ProximityReaderTrustImportKind {
     /** One or more public Reader CA certificates. */
     ReaderCa,
+
     /** A versioned walt.id reader-trust bundle. */
     TrustBundle,
 }
@@ -184,6 +184,7 @@ public data class ProximityReaderTrustImportPreview(
         get() = when (resultingSettings.readerPolicy) {
             ProximityReaderPolicy.AllowAnonymousOrUntrusted ->
                 "Untrusted readers may still reach holder consent"
+
             ProximityReaderPolicy.RequireTrusted ->
                 "Only readers trusted by the configured material may reach holder consent"
         }
@@ -226,7 +227,7 @@ public object ProximityReaderTrustSettingsCodec {
         sourceName: String,
         bytes: ByteArray,
         existing: ProximityReaderTrustSettings,
-        now: Instant = Clock.System.now(),
+        clock: Clock = Clock.System
     ): ProximityReaderTrustImportPreview = try {
         require(sourceName.isNotBlank()) { "The imported file must have a name" }
         require(bytes.isNotEmpty()) { "The imported file is empty" }
@@ -240,9 +241,9 @@ public object ProximityReaderTrustSettingsCodec {
             "Private keys are not accepted; import public trust material only"
         }
         if (text.trimStart().startsWith("{")) {
-            prepareBundleImport(sourceName, text, existing, now)
+            prepareBundleImport(sourceName, text, existing, clock)
         } else {
-            prepareCertificateImport(sourceName, bytes, text, existing, now)
+            prepareCertificateImport(sourceName, bytes, text, existing, clock)
         }
     } catch (error: IllegalArgumentException) {
         throw error
@@ -252,26 +253,34 @@ public object ProximityReaderTrustSettingsCodec {
         throw IllegalArgumentException("Reader trust material could not be imported", error)
     }
 
-    private fun prepareCertificateImport(
+    private suspend fun prepareCertificateImport(
         sourceName: String,
         bytes: ByteArray,
         text: String,
         existing: ProximityReaderTrustSettings,
-        now: Instant,
+        clock: Clock
     ): ProximityReaderTrustImportPreview {
-        val certificates = if (text.contains("-----BEGIN")) parseStrictCertificatePem(text) else listOf(
-            parseCertificate(bytes)
-        )
+        val certificates =
+            if (text.contains("-----BEGIN")) parseStrictCertificatePem(text) else listOf(
+                parseCertificate(bytes)
+            )
         val existingFingerprints = existing.trustAnchors.mapTo(mutableSetOf()) {
             parseCertificate(it.certificateDerBase64Url.decodeBase64Url()).fingerprintSha256Hex
         }
         val previews = certificates.mapIndexed { index, certificate ->
-            validateReaderCa(certificate, now)
+            validateReaderCa(certificate, clock)
             val fingerprint = certificate.fingerprintSha256Hex
             require(existingFingerprints.add(fingerprint)) {
                 "Duplicate Reader CA certificate: $fingerprint"
             }
-            certificate.preview(defaultDisplayName(sourceName, certificate, index, certificates.size))
+            certificate.preview(
+                defaultDisplayName(
+                    sourceName,
+                    certificate,
+                    index,
+                    certificates.size
+                )
+            )
         }
         val importedAnchors = certificates.zip(previews).map { (certificate, preview) ->
             ProximityStoredReaderTrustAnchor(
@@ -292,7 +301,7 @@ public object ProximityReaderTrustSettingsCodec {
         sourceName: String,
         text: String,
         existing: ProximityReaderTrustSettings,
-        now: Instant,
+        clock: Clock,
     ): ProximityReaderTrustImportPreview {
         val bundle = json.decodeFromString<TrustBundle>(text)
         require(bundle.version == BundleVersion) { "Unsupported reader trust bundle version" }
@@ -307,7 +316,7 @@ public object ProximityReaderTrustSettingsCodec {
         val readerRecords = bundle.readerAuthorities.map { anchor ->
             require(anchor.name.isNotBlank()) { "Reader authority name must not be blank" }
             val certificate = parseCertificate(anchor.certificateDerBase64Url.decodeBase64Url())
-            validateReaderCa(certificate, now)
+            validateReaderCa(certificate, clock)
             require(existingFingerprints.add(certificate.fingerprintSha256Hex)) {
                 "Duplicate Reader CA certificate: ${certificate.fingerprintSha256Hex}"
             }
@@ -326,12 +335,16 @@ public object ProximityReaderTrustSettingsCodec {
             require(providerIds.add(provider.providerId)) {
                 "Duplicate RICAL provider identifier: ${provider.providerId}"
             }
-            require(provider.providerTrustAnchorsDerBase64Url.distinct().size ==
-                provider.providerTrustAnchorsDerBase64Url.size) {
+            require(
+                provider.providerTrustAnchorsDerBase64Url.distinct().size ==
+                        provider.providerTrustAnchorsDerBase64Url.size
+            ) {
                 "Duplicate RICAL provider trust anchor"
             }
             val roots = provider.providerTrustAnchorsDerBase64Url.map { encoded ->
-                parseCertificate(encoded.decodeBase64Url()).also { validateReaderCa(it, now) }
+                parseCertificate(encoded.decodeBase64Url()).also {
+                    validateReaderCa(it, clock)
+                }
             }
             val signedBytes = provider.signedRicalBase64Url.decodeBase64Url()
             val signed = runCatching { SignedRical.decode(signedBytes) }.getOrElse {
@@ -343,6 +356,7 @@ public object ProximityReaderTrustSettingsCodec {
             require(signed.rical.type in provider.acceptedTypes) {
                 "RICAL type is not accepted by this provider configuration"
             }
+            val now = clock.now()
             require(signed.rical.date <= now) { "RICAL issue date is in the future" }
             require(signed.rical.nextUpdate == null || now < signed.rical.nextUpdate!!) {
                 "RICAL next-update time has passed"
@@ -350,18 +364,19 @@ public object ProximityReaderTrustSettingsCodec {
             require(signed.rical.notAfter == null || now < signed.rical.notAfter!!) {
                 "RICAL has expired"
             }
-            require(signed.rical.extensions.isEmpty() && signed.rical.reserved.isEmpty() &&
-                signed.rical.certificateInfos.all {
-                    it.trustConstraints.isEmpty() && it.extensions.isEmpty() && it.reserved.isEmpty()
-                }) {
+            require(
+                signed.rical.extensions.isEmpty() && signed.rical.reserved.isEmpty() &&
+                        signed.rical.certificateInfos.all {
+                            it.trustConstraints.isEmpty() && it.extensions.isEmpty() && it.reserved.isEmpty()
+                        }) {
                 "RICAL contains unsupported extension or trust-constraint semantics"
             }
             val signatureValid = X509RicalSignatureValidator(
                 provider.acceptedSignerCertificatePolicyOids,
-                now = { now },
+                clock
             ).validate(
                 signed,
-                roots.map { ImmutableBytes.of(it.encodedDer.toByteArray()) },
+                roots.map { ByteString(it.encodedDer.toByteArray()) },
             )
             require(signatureValid) { "RICAL signature, signer profile, or signer path is invalid" }
             ricalPreviews += ProximityRicalPreview(
@@ -381,7 +396,7 @@ public object ProximityReaderTrustSettingsCodec {
                 },
                 acceptedSignerCertificatePolicyOids = provider.acceptedSignerCertificatePolicyOids,
                 establishReaderTrust = provider.establishReaderTrust,
-                signedRicalBase64Url = signed.exactMessage.copy().encodeBase64Url(),
+                signedRicalBase64Url = signed.exactMessage.toByteArray().encodeBase64Url(),
             )
         }
         return ProximityReaderTrustImportPreview(
@@ -426,10 +441,22 @@ public object ProximityReaderTrustSettingsCodec {
         X509CertificateUtil.parseCertificateDerEncoded(ByteString(bytes))
     }.getOrElse { throw IllegalArgumentException("Invalid DER X.509 certificate", it) }
 
-    private fun validateReaderCa(certificate: X509Certificate, now: Instant) {
-        runCatching {
-            CertificateDer(certificate.encodedDer.toByteArray()).validateCertificateAuthorityUsage(now)
-        }.getOrElse { throw IllegalArgumentException("Reader trust anchor is not a valid current CA", it) }
+    private suspend fun validateReaderCa(certificate: X509Certificate, clock: Clock) {
+        val trustedCaValidator = X509SingleCertificateValidator(
+            listOf(
+                X509CertificateValidityValidator(
+                    allowValidityInFuture = false,
+                    clock = clock
+                ),
+                X509CertificateBasicConstraintsIsCaValidator()
+            )
+        )
+        val validationResult = trustedCaValidator.validate(certificate)
+        if (!validationResult.valid) {
+            throw IllegalArgumentException(
+                "Cannot trust certificate with subject '${certificate.data.subjectDn}' error: ${validationResult.errorLog.joinToString { it.message }}",
+            )
+        }
     }
 
     private fun X509Certificate.preview(displayName: String) =
@@ -516,6 +543,7 @@ public object ProximityReaderTrustSettingsCodec {
         readerPolicy = when (readerPolicy) {
             ProximityReaderPolicy.AllowAnonymousOrUntrusted ->
                 PersistedReaderPolicy.AllowAnonymousOrUntrusted
+
             ProximityReaderPolicy.RequireTrusted -> PersistedReaderPolicy.RequireTrusted
         },
         readerAuthorities = trustAnchors.map {
@@ -539,6 +567,7 @@ public object ProximityReaderTrustSettingsCodec {
             readerPolicy = when (readerPolicy) {
                 PersistedReaderPolicy.AllowAnonymousOrUntrusted ->
                     ProximityReaderPolicy.AllowAnonymousOrUntrusted
+
                 PersistedReaderPolicy.RequireTrusted -> ProximityReaderPolicy.RequireTrusted
             },
             trustAnchors = readerAuthorities.map {
@@ -562,11 +591,9 @@ public object ProximityReaderTrustSettingsCodec {
     private const val BundleType = "org.waltid.wallet.reader-trust"
 }
 
-@OptIn(ExperimentalEncodingApi::class)
 private fun ByteArray.encodeBase64Url(): String =
     Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(this)
 
-@OptIn(ExperimentalEncodingApi::class)
 private fun String.decodeBase64Url(): ByteArray = runCatching {
     require(isNotBlank() && !contains('='))
     Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).decode(this)
