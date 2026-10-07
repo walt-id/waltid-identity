@@ -1,6 +1,7 @@
 package id.walt.wallet2.handlers
 
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyStoreEntry
@@ -97,35 +98,48 @@ internal suspend fun executeCredentialTargets(
                 onEvent.emitSafely(WalletSessionEvent.issuance_deferred)
             } else {
                 onEvent.emitSafely(WalletSessionEvent.issuance_credential_received)
-                storeAndNotify(
-                    httpClient = httpClient,
-                    target = IssuerNotificationTarget(
-                        notificationEndpoint = issuerMetadata.notificationEndpoint,
-                        notificationId = response.notificationId,
-                        accessToken = access.accessToken,
-                        tokenType = access.tokenType,
-                        dpopProofFactory = access.dpop?.toProofFactory(access.accessToken),
-                    ),
-                ) {
-                    val prepared = wallet.prepareIssuedCredentials(rawCredentials.map {
+                val notificationTarget = IssuerNotificationTarget(
+                    notificationEndpoint = issuerMetadata.notificationEndpoint,
+                    notificationId = response.notificationId,
+                    accessToken = access.accessToken,
+                    tokenType = access.tokenType,
+                    dpopProofFactory = access.dpop?.toProofFactory(access.accessToken),
+                )
+                val prepared = try {
+                    wallet.prepareIssuedCredentials(rawCredentials.map {
                         val value = it.credential
                         if (value is JsonPrimitive) value.content else value.toString()
                     }, selected.bindings, label, metadata, proofRequired = algorithms != null,
                         expectedConfiguration = configuration)
-                    stage = CredentialIssuanceStage.STORAGE
-                    ensureOwned()
-                    val outcome = sessions.storeReceivedCredentials(
-                        prepared, target.credentialConfigurationId, target.credentialIdentifier,
-                        persistable = access.persistable, sessionId = sessionId,
-                        beforeCredentialsStored = beforeCredentialsStored,
-                        onCredentialStored = { entry ->
-                            stage = CredentialIssuanceStage.OBSERVER
-                            onCredentialStored(entry)
-                            stage = CredentialIssuanceStage.STORAGE
-                        },
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    deliverCredentialNotification(
+                        httpClient = httpClient,
+                        target = notificationTarget,
+                        event = NotificationEvent.CREDENTIAL_FAILURE,
                     )
-                    if (outcome is WalletIssuanceOutcome.Failed) throw CredentialStorageException(outcome)
+                    throw error
                 }
+                stage = CredentialIssuanceStage.STORAGE
+                ensureOwned()
+                val outcome = sessions.storeReceivedCredentials(
+                    prepared, target.credentialConfigurationId, target.credentialIdentifier,
+                    persistable = access.persistable, sessionId = sessionId,
+                    beforeCredentialsStored = beforeCredentialsStored,
+                    onCredentialStored = { entry ->
+                        stage = CredentialIssuanceStage.OBSERVER
+                        onCredentialStored(entry)
+                        stage = CredentialIssuanceStage.STORAGE
+                    },
+                    notificationEndpoint = issuerMetadata.notificationEndpoint,
+                    notificationId = response.notificationId,
+                    accessToken = access.accessToken,
+                    tokenType = access.tokenType,
+                    dpop = access.dpop?.algorithms,
+                    keyMaterial = access.senderKey,
+                )
+                if (outcome is WalletIssuanceOutcome.Failed) throw CredentialStorageException(outcome)
             }
         } catch (error: CancellationException) {
             throw error

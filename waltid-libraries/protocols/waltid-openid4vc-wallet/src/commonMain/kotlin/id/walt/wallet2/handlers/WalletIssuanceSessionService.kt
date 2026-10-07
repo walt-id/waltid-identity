@@ -17,6 +17,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.proofs.ProofType
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.*
 import id.walt.webdatafetching.WebDataFetcher
@@ -1852,6 +1853,8 @@ class WalletIssuanceSessionService(
             return
         }
         try {
+            val remote = record.content as? DeferredContent.Remote
+            val material = record.keyMaterial ?: remote?.request?.keyMaterial
             val payload = PersistedDeferredRecord(
                 content = when (val content = record.content) {
                     is DeferredContent.Received -> PersistedDeferredContent.Received(content.credentials)
@@ -1877,8 +1880,14 @@ class WalletIssuanceSessionService(
                 claimed = record.claimed,
                 public = record.public,
                 sessionId = record.sessionId,
-                notificationEndpoint = record.notificationEndpoint,
+                notificationEndpoint = record.notificationEndpoint ?: remote?.request?.notificationEndpoint,
                 notificationId = record.notificationId,
+                accessToken = record.accessToken ?: remote?.request?.accessToken,
+                tokenType = record.tokenType ?: remote?.request?.tokenType,
+                dpop = record.dpop ?: remote?.request?.dpop,
+                keyId = material?.keyId ?: remote?.request?.keyId,
+                selectedPublicJwk = material?.exportPublicJwkObject()?.toString()
+                    ?: remote?.request?.selectedPublicJwk,
             )
             val replacement = WalletIssuanceSessionRecord(
                 id = deferredRecordId(record.public.id),
@@ -1908,11 +1917,27 @@ class WalletIssuanceSessionService(
         beforeCredentialsStored: suspend (Int) -> Unit,
         onCredentialStored: suspend (StoredCredential) -> Unit,
         sessionId: String? = null,
+        notificationEndpoint: String? = null,
+        notificationId: String? = null,
+        accessToken: String? = null,
+        tokenType: String? = null,
+        dpop: Set<String>? = null,
+        keyMaterial: WalletKeyStoreEntry? = null,
     ): WalletIssuanceOutcome {
         require(credentials.isNotEmpty())
         val public = WalletIssuanceContinuation(Uuid.random().toString(), configurationId, credentialIdentifier = credentialIdentifier)
-        val record = DeferredRecord(content = DeferredContent.Received(credentials), public = public,
-            sessionId = sessionId ?: public.id, persistable = persistable)
+        val record = DeferredRecord(
+            content = DeferredContent.Received(credentials),
+            public = public,
+            sessionId = sessionId ?: public.id,
+            persistable = persistable,
+            notificationEndpoint = notificationEndpoint,
+            notificationId = notificationId,
+            accessToken = accessToken,
+            tokenType = tokenType,
+            dpop = dpop,
+            keyMaterial = keyMaterial,
+        )
         if (!mutex.withLock { !runtime.closed && pollingDeferred.add(public.id) }) return invalidSession(record.sessionId)
         try {
             try {
@@ -1922,6 +1947,11 @@ class WalletIssuanceSessionService(
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
+                deliverCredentialNotification(
+                    httpClient = httpClient,
+                    target = record.notificationTarget(),
+                    event = NotificationEvent.CREDENTIAL_FAILURE,
+                )
                 return failed(record.sessionId, WalletIssuanceErrorCode.STORAGE, deferredCredentials = listOf(public))
             }
             currentCoroutineContext().ensureActive()
@@ -2025,6 +2055,12 @@ class WalletIssuanceSessionService(
                 ))
             }
         }
+        val restoredKey = persisted.keyId?.let { keyId ->
+            resolvePersistedKeyMaterial(
+                keyId,
+                requireNotNull(persisted.selectedPublicJwk) { "Stored deferred credential is missing the holder public key" },
+            )
+        }
         return DeferredRecord(
             content = content,
             claimed = persisted.claimed,
@@ -2034,6 +2070,10 @@ class WalletIssuanceSessionService(
             persistable = true,
             notificationEndpoint = persisted.notificationEndpoint,
             notificationId = persisted.notificationId,
+            accessToken = persisted.accessToken,
+            tokenType = persisted.tokenType,
+            dpop = persisted.dpop,
+            keyMaterial = restoredKey,
         )
     }
 
@@ -2347,6 +2387,11 @@ class WalletIssuanceSessionService(
         val sessionId: String,
         val notificationEndpoint: String? = null,
         val notificationId: String? = null,
+        val accessToken: String? = null,
+        val tokenType: String? = null,
+        val dpop: Set<String>? = null,
+        val keyId: String? = null,
+        val selectedPublicJwk: String? = null,
     ) {
         init {
             require(content !is PersistedDeferredContent.Remote || public.credentialConfigurationId != null) {
