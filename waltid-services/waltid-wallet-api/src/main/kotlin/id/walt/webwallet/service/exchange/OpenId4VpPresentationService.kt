@@ -1,6 +1,7 @@
 package id.walt.webwallet.service.exchange
 
 import id.walt.credentials.CredentialParser
+import id.walt.credentials.jsonld.loadW3cContextDocuments
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.credentials.utils.JwtUtils.isJwt
@@ -122,7 +123,11 @@ class OpenId4VpPresentationService(
             .mapNotNull { it.toDcqlCredentialOrNull() }
 
         return if (dcqlCredentials.isEmpty()) emptyMap()
-        else DcqlMatcher.match(query, dcqlCredentials)
+        else DcqlMatcher.match(
+            query,
+            dcqlCredentials,
+            contextDocuments = jsonLdContexts.httpClient.loadW3cContextDocuments(dcqlCredentials),
+        )
             .onFailure { error -> logger.warn(error) { "OpenID4VP credential matching failed" } }
             .getOrThrow()
     }
@@ -211,6 +216,7 @@ class OpenId4VpPresentationService(
 
     companion object {
         private val webResolveAuthReq = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
+        private val jsonLdContexts = WebDataFetcher("wallet-jsonld-context")
 
         fun isOpenId4VpRequestCandidate(request: String): Boolean = runCatching {
             val parameters = Url(request).parameters
