@@ -53,25 +53,6 @@ internal suspend inline fun <T> storeAndNotify(
     throw error
 }
 
-/** Isolated fetch returns [WalletIssuanceOutcome.Failed] instead of throwing, so notify from the outcome. */
-internal suspend fun notifyCredentialStorageOutcome(
-    httpClient: HttpClient,
-    target: IssuerNotificationTarget,
-    outcome: WalletIssuanceOutcome?,
-    eventDescription: String? = null,
-) {
-    deliverCredentialNotification(
-        httpClient = httpClient,
-        target = target,
-        event = if (outcome is WalletIssuanceOutcome.Failed) {
-            NotificationEvent.CREDENTIAL_FAILURE
-        } else {
-            NotificationEvent.CREDENTIAL_ACCEPTED
-        },
-        eventDescription = eventDescription,
-    )
-}
-
 internal suspend fun deliverCredentialNotification(
     httpClient: HttpClient,
     target: IssuerNotificationTarget,
