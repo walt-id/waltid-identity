@@ -58,6 +58,72 @@ class KeyAttestationProofTest {
     )
 
     @Test
+    fun `non-DID kid selects the matching signed JWK and verifies attestation once`() = runTest {
+        val attester = key()
+        val holders = List(3) { key() }
+        for (kid in listOf("0", "holder-key")) {
+            val jwks = holders.mapIndexed { index, holder ->
+                JsonObject(holder.exportPublicJwkObject() + ("kid" to JsonPrimitive(if (index == 1) kid else "key-$index")))
+            }
+            val inner = attestation(attester, holders, mapOf("attested_keys" to JsonArray(jwks)))
+            var trustCalls = 0
+            var policyCalls = 0
+            val context = context(attester).let { context ->
+                val options = context.keyAttestation!!
+                context.copy(keyAttestation = options.copy(
+                    trustResolver = KeyAttestationTrustResolver { header, validationContext, config ->
+                        trustCalls++
+                        options.trustResolver.resolve(header, validationContext, config)
+                    },
+                    policy = KeyAttestationPolicy { evidence, _, _ ->
+                        policyCalls++
+                        assertEquals(JsonArray(jwks), evidence.payload["attested_keys"])
+                        true
+                    },
+                ))
+            }
+            val result = verifier.verify(request(proof(holders[1], inner, kid)), configuration, context)
+            val evidence = assertIs<VerifiedJwtProof>(result.proofs.single())
+            assertEquals(kid, evidence.holderKid)
+            assertNull(evidence.holderDid)
+            assertEquals(Jwk.sha256Thumbprint(holders[1].exportPublicJwk()), Jwk.sha256Thumbprint(evidence.holderKey.exportPublicJwk()))
+            assertEquals(holders.map { Jwk.sha256Thumbprint(it.exportPublicJwk()) }, result.bindings.map { Jwk.sha256Thumbprint(it.holderKey.exportPublicJwk()) })
+            assertTrue(result.bindings.all { it.holderDid == null && it.proofIndexes == setOf(0) })
+            assertEquals(1, trustCalls)
+            assertEquals(1, policyCalls)
+        }
+    }
+
+    @Test
+    fun `proof signature selects unnamed attested keys without treating kid as an index`() = runTest {
+        val attester = key()
+        val holders = List(3) { key() }
+        for (keys in listOf(listOf(holders[1]), holders, holders + holders[1])) {
+            val jwks = keys.map { JsonObject(it.exportPublicJwkObject() - "kid") }
+            val inner = attestation(attester, keys, mapOf("attested_keys" to JsonArray(jwks)))
+            var policyCalls = 0
+            val context = context(attester).let { context ->
+                context.copy(keyAttestation = context.keyAttestation!!.copy(policy = KeyAttestationPolicy { _, _, _ ->
+                    policyCalls++
+                    true
+                }))
+            }
+            for (kid in listOf("0", "wallet-key")) {
+                val result = verifier.verify(request(proof(holders[1], inner, kid)), configuration, context)
+                val evidence = assertIs<VerifiedJwtProof>(result.proofs.single())
+                assertEquals(Jwk.sha256Thumbprint(holders[1].exportPublicJwk()), Jwk.sha256Thumbprint(evidence.holderKey.exportPublicJwk()))
+                assertEquals(kid, evidence.holderKid)
+                assertNull(evidence.holderDid)
+                assertEquals(keys.map { Jwk.sha256Thumbprint(it.exportPublicJwk()) }.distinct(), result.bindings.map { Jwk.sha256Thumbprint(it.holderKey.exportPublicJwk()) })
+            }
+            assertEquals(2, policyCalls)
+            assertFailsWith<CredentialProofValidationException> {
+                verifier.verify(request(proof(key(), inner, "0")), configuration, context)
+            }
+        }
+    }
+
+    @Test
     fun `nested attested key limit is per attestation and checked before key import`() = runTest {
         val attester = key()
         val holders = List(4) { key() }
@@ -510,12 +576,21 @@ class KeyAttestationProofTest {
         attester, attester.preferredJwsAlgorithm(),
         JsonObject(mapOf("typ" to JsonPrimitive("key-attestation+jwt")) + headers),
     )
-    private suspend fun proof(holder: Key, attestation: String?): String = CompactJws.sign(
-        buildJsonObject { put("aud", issuer); put("iat", now.epochSeconds); put("nonce", "nonce") }.toString().encodeToByteArray(),
-        holder, JwsAlgorithm.ES256,
+    private suspend fun proof(
+        holder: Key,
+        attestation: String?,
+        kid: String? = null,
+        claims: Map<String, JsonElement> = emptyMap(),
+        algorithm: JwsAlgorithm = JwsAlgorithm.ES256,
+    ): String = CompactJws.sign(
+        buildJsonObject {
+            put("aud", issuer); put("iat", now.epochSeconds); put("nonce", "nonce")
+            claims.forEach { (name, value) -> put(name, value) }
+        }.toString().encodeToByteArray(),
+        holder, algorithm,
         buildJsonObject {
             put("typ", JsonPrimitive("openid4vci-proof+jwt"))
-            put("jwk", holder.exportPublicJwkObject())
+            if (kid == null) put("jwk", holder.exportPublicJwkObject()) else put("kid", kid)
             attestation?.let { put("key_attestation", JsonPrimitive(it)) }
         },
     )
