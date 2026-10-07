@@ -14,8 +14,10 @@ data class EventFilter(
     val target: Set<String>? = null,
     val issuanceEventFilter: IssuanceEventFilter? = null,
     val verificationEventFilter: VerificationEventFilter? = null,
+    @Suppress("DEPRECATION")
     @Deprecated("Matches nothing: no service writes KeyEvent. Use usageEventFilter.")
     val keyEventFilter: KeyEventFilter? = null,
+    @Suppress("DEPRECATION")
     @Deprecated("Matches nothing: no service writes DidEvent. Use usageEventFilter.")
     val didEventFilter: DidEventFilter? = null,
     val usageEventFilter: UsageEventFilter? = null,
