@@ -15,7 +15,7 @@ class EventSerialNamesTest {
             listOf(
                 "CredentialWalletEvent", "DidEvent", "IssuanceEvent", "IssuanceWalletEvent", "KeyEvent",
                 "PresentationWalletEvent", "VerificationEvent",
-            ).map { "id.walt.commons.events.$it" }.toSet(),
+            ).map { "id.walt.commons.events.$it" }.toSet() + "id.walt.events.UsageEvent",
             subclassNames,
         )
     }
