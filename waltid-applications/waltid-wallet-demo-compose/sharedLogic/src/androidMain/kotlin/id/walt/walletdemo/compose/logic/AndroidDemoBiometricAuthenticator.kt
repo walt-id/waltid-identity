@@ -7,6 +7,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
@@ -29,9 +30,10 @@ private class AndroidDemoBiometricAuthenticator(
     override suspend fun authenticate(reason: String): DemoBiometricResult =
         withContext(Dispatchers.Main.immediate) {
             val activity = activityProvider() ?: return@withContext DemoBiometricResult.Unavailable
-            if (!activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-                return@withContext DemoBiometricResult.Cancelled
+            val ready = activity.lifecycle.currentStateFlow.first {
+                it.isAtLeast(Lifecycle.State.RESUMED) || it == Lifecycle.State.DESTROYED
             }
+            if (ready == Lifecycle.State.DESTROYED) return@withContext DemoBiometricResult.Unavailable
             if (!isAvailable()) return@withContext DemoBiometricResult.Unavailable
 
             suspendCancellableCoroutine { continuation ->

@@ -35,6 +35,7 @@ import org.jetbrains.compose.resources.stringResource
 
 internal enum class SettingsDestination(val title: StringResource) {
     Main(Res.string.settings_title),
+    WalletAccess(Res.string.settings_wallet_access),
     SigningKey(Res.string.settings_signing_key),
     Technical(Res.string.settings_technical),
     Nearby(Res.string.settings_nearby),
@@ -65,6 +66,8 @@ internal fun SettingsScreen(
     allowWalletReset: Boolean = true,
     serverSettingsContent: (@Composable () -> Unit)? = null,
     initialDestination: SettingsDestination = SettingsDestination.Main,
+    walletAccessContent: (@Composable () -> Unit)? = null,
+    onCancelPinChange: () -> Unit = {},
 ) {
     val currentState by rememberUpdatedState(state)
     val currentReaderPolicy by rememberUpdatedState(readerTrustPolicySummary)
@@ -74,7 +77,10 @@ internal fun SettingsScreen(
         save = { entries: List<SettingsDestination> -> entries.map { it.name } },
         restore = { entries -> entries.map(SettingsDestination::valueOf).takeIf { it.firstOrNull() == initialDestination } ?: listOf(initialDestination) },
     )) { mutableStateOf(listOf(initialDestination)) }
-    val back = { if (path.size > 1) path = path.dropLast(1) else onBack() }
+    val back = {
+        if (currentState.access.pinChange != null) onCancelPinChange()
+        else if (path.size > 1) path = path.dropLast(1) else onBack()
+    }
     fun open(destination: SettingsDestination) { path = path + destination }
     SystemBackHandler(enabled = path.size == 1, onBack = back)
     val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
@@ -89,11 +95,16 @@ internal fun SettingsScreen(
         ) { destination ->
             NavEntry(destination) {
                 Column(Modifier.fillMaxSize().walletNavigationBackground().safeDrawingPadding()) {
+                    if (destination != SettingsDestination.WalletAccess || currentState.access.pinChange == null)
                     WalletScreenHeader(stringResource(destination.title), leading = {
                         IconButton(back, Modifier.testTag(WalletUiTestTags.SettingsBack)) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.settings_back))
                         }
                     })
+                    if (destination == SettingsDestination.WalletAccess) {
+                        walletAccessContent?.invoke()
+                        return@NavEntry
+                    }
                     Column(
                         Modifier.weight(1f).verticalScroll(rememberScrollState()).fillMaxWidth()
                             .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 640.dp)
@@ -116,6 +127,12 @@ internal fun SettingsScreen(
                                 }
                                 WalletSection(stringResource(Res.string.settings_wallet)) {
                                     if (currentState.pinLockEnabled) {
+                                        if (walletAccessContent != null) {
+                                            WalletNavigationRow(stringResource(Res.string.settings_wallet_access),
+                                                { open(SettingsDestination.WalletAccess) }, Modifier.testTag(WalletUiTestTags.SettingsWalletAccess),
+                                                summary = stringResource(Res.string.settings_wallet_access_summary), icon = { Icon(Icons.Default.Lock, null) })
+                                            SettingsDivider()
+                                        }
                                         WalletNavigationRow(stringResource(Res.string.settings_signing_key),
                                             { open(SettingsDestination.SigningKey) }, Modifier.testTag(WalletUiTestTags.SettingsSigningKey), summary = stringResource(Res.string.settings_key_subtitle),
                                             icon = { SettingsSymbol(Res.drawable.settings_key) })
@@ -161,6 +178,7 @@ internal fun SettingsScreen(
                                     }
                                 }
                             }
+                            SettingsDestination.WalletAccess -> walletAccessContent?.invoke()
                             SettingsDestination.SigningKey -> {
                                 when (val details = currentState.identityDetails) {
                                     WalletDemoIdentityDetailsState.Loading -> CircularProgressIndicator()

@@ -1,6 +1,11 @@
 package id.walt.walletdemo.compose.ui
 
 internal object WalletUiTestTags {
+    val SettingsWalletAccess = tag("settingsWalletAccess")
+    val SettingsChangePin = tag("settingsChangePin")
+    val SettingsBiometricUnlock = tag("settingsBiometricUnlock")
+    val PinClearButton = tag("pinClearButton")
+    val PinCancelButton = tag("pinCancelButton")
     val ScanButton = tag("scanButton")
     val ScanScreen = tag("scanScreen")
     val ScanInput = tag("scanInput")
