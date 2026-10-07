@@ -1,22 +1,23 @@
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.handover.NFCHandover
 
 /** Exact handover variant selected before session cryptography is established. */
 sealed interface MdocSessionHandover {
-    fun createTranscript(deviceEngagementBytes: ImmutableBytes, eReaderKeyBytes: ImmutableBytes): SessionTranscript
+    fun createTranscript(deviceEngagementBytes: ByteString, eReaderKeyBytes: ByteString): SessionTranscript
 
     data object Qr : MdocSessionHandover {
         override fun createTranscript(
-            deviceEngagementBytes: ImmutableBytes,
-            eReaderKeyBytes: ImmutableBytes,
-        ): SessionTranscript = SessionTranscript.forQr(deviceEngagementBytes.copy(), eReaderKeyBytes.copy())
+            deviceEngagementBytes: ByteString,
+            eReaderKeyBytes: ByteString,
+        ): SessionTranscript = SessionTranscript.forQr(deviceEngagementBytes.toByteArray(), eReaderKeyBytes.toByteArray())
     }
 
     data class NfcConnection(
-        val handoverSelect: ImmutableBytes,
-        val handoverRequest: ImmutableBytes? = null,
+        val handoverSelect: ByteString,
+        val handoverRequest: ByteString? = null,
     ) : MdocSessionHandover {
         init {
             require(handoverSelect.size > 0)
@@ -24,19 +25,19 @@ sealed interface MdocSessionHandover {
         }
 
         override fun createTranscript(
-            deviceEngagementBytes: ImmutableBytes,
-            eReaderKeyBytes: ImmutableBytes,
+            deviceEngagementBytes: ByteString,
+            eReaderKeyBytes: ByteString,
         ): SessionTranscript = SessionTranscript.forNfc(
-            deviceEngagementBytes.copy(),
-            eReaderKeyBytes.copy(),
-            NFCHandover(handoverSelect.copy(), handoverRequest?.copy()),
+            deviceEngagementBytes.toByteArray(),
+            eReaderKeyBytes.toByteArray(),
+            NFCHandover(handoverSelect.toByteArray(), handoverRequest?.toByteArray()),
         )
     }
 
     /** Provisional NFCv2 exact handover, deliberately distinct from conventional NFC. */
     data class ProvisionalNfcV2(
-        val handoverSelect: ImmutableBytes,
-        val handoverRequest: ImmutableBytes,
+        val handoverSelect: ByteString,
+        val handoverRequest: ByteString,
     ) : MdocSessionHandover {
         init {
             require(handoverSelect.size > 0)
@@ -44,12 +45,12 @@ sealed interface MdocSessionHandover {
         }
 
         override fun createTranscript(
-            deviceEngagementBytes: ImmutableBytes,
-            eReaderKeyBytes: ImmutableBytes,
+            deviceEngagementBytes: ByteString,
+            eReaderKeyBytes: ByteString,
         ): SessionTranscript = SessionTranscript.forNfc(
-            deviceEngagementBytes.copy(),
-            eReaderKeyBytes.copy(),
-            NFCHandover(handoverSelect.copy(), handoverRequest.copy()),
+            deviceEngagementBytes.toByteArray(),
+            eReaderKeyBytes.toByteArray(),
+            NFCHandover(handoverSelect.toByteArray(), handoverRequest.toByteArray()),
         )
     }
 }

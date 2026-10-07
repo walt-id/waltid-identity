@@ -5,13 +5,13 @@
 
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.objects.engagement.BleCentralMode
 import id.walt.mdoc.objects.engagement.BlePeripheralEndpoint
 import id.walt.mdoc.objects.engagement.BlePeripheralMode
 import id.walt.mdoc.objects.engagement.BlePeripheralServerOptions
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ReaderSelectedTransportOffer
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborElement
@@ -25,14 +25,14 @@ internal enum class NfcMdocActor { HOLDER, READER }
 
 /** ISO mdoc NFC and Bluetooth LE carrier-record conversion without platform types. */
 internal object NfcMdocCarrierCodec {
-    private val BLE_MIME_TYPE = ImmutableBytes.of("application/vnd.bluetooth.le.oob".encodeToByteArray())
-    private val WIFI_AWARE_MIME_TYPE = ImmutableBytes.of("application/vnd.wfa.nan".encodeToByteArray())
-    private val NFC_EXTERNAL_TYPE = ImmutableBytes.of("iso.org:18013:nfc".encodeToByteArray())
+    private val BLE_MIME_TYPE = ByteString("application/vnd.bluetooth.le.oob".encodeToByteArray())
+    private val WIFI_AWARE_MIME_TYPE = ByteString("application/vnd.wfa.nan".encodeToByteArray())
+    private val NFC_EXTERNAL_TYPE = ByteString("iso.org:18013:nfc".encodeToByteArray())
 
     /** Converts a supported method into one carrier plus its exact auxiliary references. */
     public fun encode(
         method: DeviceRetrievalMethod,
-        carrierReference: ImmutableBytes,
+        carrierReference: ByteString,
         auxiliaryRecords: List<NdefRecord>,
         actor: NfcMdocActor,
         omitBleUuid: Boolean = false,
@@ -108,7 +108,7 @@ internal object NfcMdocCarrierCodec {
 
     private fun encodeWifiAware(
         method: DeviceRetrievalMethod.WifiAware,
-        reference: ImmutableBytes,
+        reference: ByteString,
     ): NdefRecord {
         val passphrase = requireNotNull(method.passphraseInfo) {
             "An NFC Wi-Fi Aware carrier must explicitly transfer its passphrase"
@@ -137,7 +137,7 @@ internal object NfcMdocCarrierCodec {
             typeNameFormat = NdefTypeNameFormat.MIME_MEDIA,
             type = WIFI_AWARE_MIME_TYPE,
             identifier = reference,
-            payload = ImmutableBytes.of(bytes.toByteArray()),
+            payload = ByteString(bytes.toByteArray()),
         )
     }
 
@@ -153,7 +153,7 @@ internal object NfcMdocCarrierCodec {
     }
 
     private fun parseWifiAware(record: NdefRecord): DecodedWifiAwareCarrier {
-        val cursor = Cursor(record.payload.copy())
+        val cursor = Cursor(record.payload.toByteArray())
         var cipherSuites: Set<Int>? = null
         var passphrase: String? = null
         var bands: ByteArray? = null
@@ -220,7 +220,7 @@ internal object NfcMdocCarrierCodec {
         )
     }
 
-    private fun encodeNfc(method: DeviceRetrievalMethod.Nfc, reference: ImmutableBytes): NdefRecord {
+    private fun encodeNfc(method: DeviceRetrievalMethod.Nfc, reference: ByteString): NdefRecord {
         val bytes = MutableBytes()
         bytes.add(NFC_CARRIER_VERSION)
         bytes.addInteger(NFC_COMMAND_LENGTH_TYPE, method.maximumCommandDataLength.toInt())
@@ -229,12 +229,12 @@ internal object NfcMdocCarrierCodec {
             typeNameFormat = NdefTypeNameFormat.EXTERNAL,
             type = NFC_EXTERNAL_TYPE,
             identifier = reference,
-            payload = ImmutableBytes.of(bytes.toByteArray()),
+            payload = ByteString(bytes.toByteArray()),
         )
     }
 
     private fun decodeNfc(record: NdefRecord): DeviceRetrievalMethod.Nfc {
-        val cursor = Cursor(record.payload.copy())
+        val cursor = Cursor(record.payload.toByteArray())
         require(cursor.readByte() == NFC_CARRIER_VERSION) { "Unsupported mdoc NFC carrier version" }
         val command = cursor.readInteger(NFC_COMMAND_LENGTH_TYPE, "command-data length")
         val response = cursor.readInteger(NFC_RESPONSE_LENGTH_TYPE, "response-data length")
@@ -244,7 +244,7 @@ internal object NfcMdocCarrierCodec {
 
     private fun encodeBle(
         method: DeviceRetrievalMethod.Ble,
-        reference: ImmutableBytes,
+        reference: ByteString,
         actor: NfcMdocActor,
         omitUuid: Boolean,
     ): NdefRecord {
@@ -297,7 +297,7 @@ internal object NfcMdocCarrierCodec {
             typeNameFormat = NdefTypeNameFormat.MIME_MEDIA,
             type = BLE_MIME_TYPE,
             identifier = reference,
-            payload = ImmutableBytes.of(bytes.toByteArray()),
+            payload = ByteString(bytes.toByteArray()),
         )
     }
 
@@ -326,7 +326,7 @@ internal object NfcMdocCarrierCodec {
     }
 
     private fun parseBle(record: NdefRecord): DecodedBleCarrier {
-        val cursor = Cursor(record.payload.copy())
+        val cursor = Cursor(record.payload.toByteArray())
         var role: Int? = null
         var uuid: ByteArray? = null
         var address: ByteArray? = null

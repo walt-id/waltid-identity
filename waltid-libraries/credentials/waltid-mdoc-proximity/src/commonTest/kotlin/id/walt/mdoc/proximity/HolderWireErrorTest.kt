@@ -2,6 +2,7 @@
 
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
@@ -212,7 +213,7 @@ class HolderWireErrorTest {
                     override suspend fun preview(context: MdocHolderRequestContext): MdocRequestPreview {
                         previewCalls++
                         return MdocRequestPreview(listOf(PreviewDocument(DOC_TYPE, listOf("credential"),
-                            listOf(PreviewElement(NAMESPACE, "given_name", false)))), submissionBindingDigest = ImmutableBytes.of(ByteArray(32)))
+                            listOf(PreviewElement(NAMESPACE, "given_name", false)))), submissionBindingDigest = ByteString(ByteArray(32)))
                     }
                     override suspend fun resolve(context: MdocHolderRequestContext, preview: MdocRequestPreview): MdocResponseResolution {
                         resolveCalls++
@@ -224,12 +225,12 @@ class HolderWireErrorTest {
                     if (terminateWithoutResponse) MdocConsentDecision.Approve(it.bindingToken)
                     else MdocConsentDecision.Deny(it.bindingToken)
                 }, context, capabilities)
-            loopback.reader.send(ImmutableBytes.of(bytes))
+            loopback.reader.send(ByteString(bytes))
             val result = engine.run()
             val messages = mutableListOf<SessionData>()
             while (true) {
                 val message = loopback.reader.receive() ?: break
-                messages += coseCompliantCbor.decodeFromByteArray<SessionData>(message.copy())
+                messages += coseCompliantCbor.decodeFromByteArray<SessionData>(message.toByteArray())
             }
             return Exchange(result, messages, previewCalls, resolveCalls)
         }

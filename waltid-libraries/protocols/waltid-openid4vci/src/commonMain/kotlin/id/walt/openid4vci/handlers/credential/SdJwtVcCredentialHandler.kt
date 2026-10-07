@@ -16,10 +16,10 @@ import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.requests.credential.CredentialRequest
+import id.walt.openid4vci.proofs.CredentialProofValidationException
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.coroutines.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -53,7 +53,6 @@ class SdJwtVcCredentialHandler(
         expectedUpdate: Instant?,
     ): CredentialResponseResult = sign(configuration, issuanceBatch, dataMapping) { vct, instance, effectiveMapping ->
         SdJwtVcCredentialSigner.generateSdJwtVC(
-            credentialRequest = request,
             credentialData = instance.input.credentialData,
             issuerId = issuerId,
             issuerKey = issuerKey,
@@ -63,7 +62,7 @@ class SdJwtVcCredentialHandler(
             x5Chain = x5Chain,
             display = display,
             sdJwtTypeHeader = configuration.format.value,
-            verifiedProof = instance.verifiedProof,
+            verifiedBinding = instance.verifiedBinding,
         )
     }
 
@@ -85,7 +84,6 @@ class SdJwtVcCredentialHandler(
         expectedUpdate: Instant?,
     ): CredentialResponseResult = sign(configuration, issuanceBatch, dataMapping) { vct, instance, effectiveMapping ->
         SdJwtVcCredentialSigner.generateSdJwtVC(
-            credentialRequest = request,
             credentialData = instance.input.credentialData,
             issuerId = issuerId,
             issuerKey = issuerKey.key,
@@ -96,7 +94,7 @@ class SdJwtVcCredentialHandler(
             x5Chain = x5Chain,
             display = display,
             sdJwtTypeHeader = configuration.format.value,
-            verifiedProof = instance.verifiedProof,
+            verifiedBinding = instance.verifiedBinding,
         )
     }
 
@@ -135,10 +133,8 @@ class SdJwtVcCredentialHandler(
                 roundedTimeClaimMapping(dataMapping, now())
             } else dataMapping
             issuanceBatch.signEach { instance -> issue(vct, instance, effectiveMapping) }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            CredentialResponseResult.Failure(e.toCredentialHandlerError())
+        } catch (e: CredentialProofValidationException) {
+            CredentialResponseResult.Failure(CredentialError(e.errorCode, e.message))
         }
     }
 

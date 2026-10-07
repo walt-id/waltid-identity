@@ -2,6 +2,7 @@
 
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.edition2.deviceretrieval.AlternativeDataElementsSet
 import id.walt.mdoc.objects.edition2.deviceretrieval.DeviceRequest
@@ -66,7 +67,7 @@ class RequestMatchingTest {
             ),
         )
         val candidate = MdocCredentialCandidate(
-            "id-1", "id", listOf(ImmutableBytes.of(byteArrayOf(2))), listOf(element)
+            "id-1", "id", listOf(ByteString(byteArrayOf(2))), listOf(element)
         )
 
         assertIs<MdocRequestMatchResult.Unsatisfied>(MdocRequestMatcher().match(request, listOf(candidate)))
