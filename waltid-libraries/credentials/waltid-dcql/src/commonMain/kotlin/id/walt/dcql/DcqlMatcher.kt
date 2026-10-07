@@ -401,12 +401,15 @@ object DcqlMatcher {
                 val credTypes = credTypesElement.mapNotNull { it.jsonPrimitive.contentOrNull }
                 // OpenID4VP 1.0 Appendix B.1.1 compares expanded IRIs only. Compact strings are also
                 // accepted so existing walt.id queries that send the compact name keep matching.
-                // That is a deliberate superset of the spec.
-                val expandedTypes = W3cTypeExpander.expandedTypes(credential.data, contextDocuments)
+                // That is a deliberate superset of the spec. Expansion runs only once a required
+                // value is missing from the compact type array.
+                var cachedExpandedTypes: Set<String>? = null
+                fun expandedTypes(): Set<String> = cachedExpandedTypes
+                    ?: W3cTypeExpander.expandedTypes(credential.data, contextDocuments).also { cachedExpandedTypes = it }
 
                 metaQuery.typeValues.any { requiredTypeSet ->
                     requiredTypeSet.all { requiredType ->
-                        requiredType in credTypes || requiredType in expandedTypes
+                        requiredType in credTypes || requiredType in expandedTypes()
                     }
                 }
             }

@@ -1,6 +1,9 @@
+@file:OptIn(kotlin.concurrent.atomics.ExperimentalAtomicApi::class)
+
 package id.walt.dcql.jsonld
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlin.concurrent.atomics.AtomicReference
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -19,6 +22,7 @@ import kotlinx.serialization.json.contentOrNull
  */
 object W3cTypeExpander {
     private val log = KotlinLogging.logger {}
+    private val processedContexts = AtomicReference(emptyMap<ContextCacheKey, JsonLdActiveContext>())
 
     fun expandedTypes(
         data: JsonObject,
@@ -27,8 +31,30 @@ object W3cTypeExpander {
         val node = w3cCredentialNode(data)
         val types = stringArray(node["type"])
         if (types.isEmpty()) return emptySet()
-        val active = processContext(JsonLdActiveContext(), node["@context"], documents, mutableSetOf())
+        val active = activeContext(node["@context"], documents)
         return types.map { expandIri(it, active, vocabRelative = true) }.toSet()
+    }
+
+    private fun activeContext(
+        context: JsonElement?,
+        documents: JsonLdContextDocumentSource,
+    ): JsonLdActiveContext {
+        if (context == null) return JsonLdActiveContext()
+        val key = ContextCacheKey(documents, context)
+        processedContexts.load()[key]?.let { return it }
+        val processed = processContext(JsonLdActiveContext(), context, documents, mutableSetOf())
+        val frozen = JsonLdActiveContext(processed.terms.toMap(), processed.vocab)
+        return remember(key, frozen)
+    }
+
+    private fun remember(key: ContextCacheKey, value: JsonLdActiveContext): JsonLdActiveContext {
+        while (true) {
+            val current = processedContexts.load()
+            current[key]?.let { return it }
+            val retained = if (current.size < CONTEXT_CACHE_LIMIT) current
+            else current.entries.drop(current.size - CONTEXT_CACHE_LIMIT + 1).associate { it.key to it.value }
+            if (processedContexts.compareAndSet(current, retained + (key to value))) return value
+        }
     }
 
     internal fun w3cCredentialNode(data: JsonObject): JsonObject {
@@ -89,11 +115,9 @@ object W3cTypeExpander {
         )
         when (val vocab = context["@vocab"]) {
             null -> Unit
-            is JsonNull -> session.active = session.active.copy(vocab = null)
+            is JsonNull -> session.active.vocab = null
             is JsonPrimitive -> if (vocab.isString) {
-                session.active = session.active.copy(
-                    vocab = expandIri(vocab.content, session.active, vocabRelative = true, session),
-                )
+                session.active.vocab = expandIri(vocab.content, session.active, vocabRelative = true, session)
             }
             else -> Unit
         }
@@ -117,7 +141,7 @@ object W3cTypeExpander {
             session.defined[term] = true
             val existing = session.active.terms[term]
             if (existing?.protected != true) {
-                session.active = session.active.copy(terms = session.active.terms - term)
+                session.active.terms.remove(term)
             }
             return
         }
@@ -131,8 +155,7 @@ object W3cTypeExpander {
         if (existing?.protected == true && (existing.iri != defined.iri || existing.prefix != defined.prefix)) {
             return
         }
-        val stored = defined.copy(protected = existing?.protected == true || defined.protected)
-        session.active = session.active.copy(terms = session.active.terms + (term to stored))
+        session.active.terms[term] = defined.copy(protected = existing?.protected == true || defined.protected)
     }
 
     private fun createTerm(session: TermDefinitionSession, term: String, value: JsonElement): JsonLdTerm? = when (value) {
@@ -191,6 +214,9 @@ object W3cTypeExpander {
             }
             return value
         }
+        if (session != null && value in session.local && session.defined[value] != true) {
+            defineTerm(session, value)
+        }
         val current = session?.active ?: active
         val term = current.terms[value]
         if (term?.iri != null && (vocabRelative || !term.prefix)) return term.iri
@@ -209,7 +235,13 @@ object W3cTypeExpander {
     private val JsonPrimitive.booleanOrNull: Boolean?
         get() = if (isString) null else content.toBooleanStrictOrNull()
 
+    private const val CONTEXT_CACHE_LIMIT = 32
 }
+
+private data class ContextCacheKey(
+    val documents: JsonLdContextDocumentSource,
+    val context: JsonElement,
+)
 
 private class TermDefinitionSession(
     var active: JsonLdActiveContext,
@@ -218,10 +250,11 @@ private class TermDefinitionSession(
     val defined: MutableMap<String, Boolean> = mutableMapOf(),
 )
 
-internal data class JsonLdActiveContext(
-    val terms: Map<String, JsonLdTerm> = emptyMap(),
-    val vocab: String? = null,
+internal class JsonLdActiveContext(
+    terms: Map<String, JsonLdTerm> = emptyMap(),
+    var vocab: String? = null,
 ) {
+    val terms: MutableMap<String, JsonLdTerm> = terms.toMutableMap()
     val hasProtectedTerms: Boolean get() = terms.values.any { it.protected }
 }
 
