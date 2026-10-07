@@ -33,8 +33,6 @@ kotlin {
             api(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
             api(project(":waltid-libraries:credentials:waltid-dcql"))
             implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
-            implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
-            implementation(identityLibs.ktor.client.core)
 
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.datetime)

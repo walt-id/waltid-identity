@@ -1,11 +1,8 @@
 package id.walt.cli.util
 
-import id.walt.credentials.jsonld.loadW3cContextDocuments
 import id.walt.credentials.trustedauthorities.DcqlTrustedAuthoritiesChecker
 import id.walt.dcql.DcqlCredential
 import id.walt.dcql.DcqlMatcher
-import id.walt.webdatafetching.WebDataFetcher
-import kotlinx.coroutines.runBlocking
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.TrustedAuthoritiesQuery
@@ -14,23 +11,18 @@ import id.walt.dcql.models.TrustedAuthorityType
 object CliDcql {
     private val trustedAuthoritiesChecker: (DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean =
         DcqlTrustedAuthoritiesChecker.checker
-    private val jsonLdContexts by lazy { WebDataFetcher("cli-jsonld-context") }
 
     fun match(
         query: DcqlQuery,
         credentials: List<DcqlCredential>,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
         validate(query)
-        val contextDocuments = runBlocking {
-            jsonLdContexts.httpClient.loadW3cContextDocuments(credentials)
-        }
         val matches = query.credentials.mapNotNull { credentialQuery ->
             val queryMatches = credentials.flatMap { credential ->
                 DcqlMatcher.findMatches(
                     query = DcqlQuery(credentials = listOf(credentialQuery)),
                     availableCredentials = listOf(credential),
                     trustedAuthoritiesChecker = trustedAuthoritiesChecker,
-                    contextDocuments = contextDocuments,
                 ).getOrThrow()[credentialQuery.id].orEmpty()
             }
             require(credentialQuery.multiple || queryMatches.size <= 1) {

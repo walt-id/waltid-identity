@@ -30,11 +30,21 @@ object DcqlMatcher {
      * Discovers credentials that match individual DCQL queries without requiring the full request
      * to be satisfiable. Missing queries and unsatisfied credential sets are omitted from the
      * result instead of failing the match.
+     *
+     * W3C types are expanded with the bundled context documents. Pass [contextDocuments] on the
+     * overload that takes a [JsonLdContextDocumentSource] to add more.
      */
     fun findMatches(
         query: DcqlQuery,
         availableCredentials: List<DcqlCredential>,
-        contextDocuments: JsonLdContextDocumentSource = JsonLdContextDocumentSource.bundled,
+        trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
+    ): Result<Map<String, List<DcqlMatchResult>>> =
+        findMatches(query, availableCredentials, JsonLdContextDocumentSource.bundled, trustedAuthoritiesChecker)
+
+    fun findMatches(
+        query: DcqlQuery,
+        availableCredentials: List<DcqlCredential>,
+        contextDocuments: JsonLdContextDocumentSource,
         trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ): Result<Map<String, List<DcqlMatchResult>>> {
         log.debug { "Starting DCQL discovery. Query: $query, Available Credentials Count: ${availableCredentials.size}" }
@@ -115,7 +125,14 @@ object DcqlMatcher {
     fun match(
         query: DcqlQuery,
         availableCredentials: List<DcqlCredential>,
-        contextDocuments: JsonLdContextDocumentSource = JsonLdContextDocumentSource.bundled,
+        trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
+    ): Result<Map<String, List<DcqlMatchResult>>> =
+        match(query, availableCredentials, JsonLdContextDocumentSource.bundled, trustedAuthoritiesChecker)
+
+    fun match(
+        query: DcqlQuery,
+        availableCredentials: List<DcqlCredential>,
+        contextDocuments: JsonLdContextDocumentSource,
         trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ): Result<Map<String, List<DcqlMatchResult>>> {
         val discovered = findMatches(query, availableCredentials, contextDocuments, trustedAuthoritiesChecker)
@@ -138,7 +155,14 @@ object DcqlMatcher {
     fun matchWithoutClaims(
         query: DcqlQuery,
         availableCredentials: List<DcqlCredential>,
-        contextDocuments: JsonLdContextDocumentSource = JsonLdContextDocumentSource.bundled,
+        trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
+    ): Result<Map<String, List<DcqlCredential>>> =
+        matchWithoutClaims(query, availableCredentials, JsonLdContextDocumentSource.bundled, trustedAuthoritiesChecker)
+
+    fun matchWithoutClaims(
+        query: DcqlQuery,
+        availableCredentials: List<DcqlCredential>,
+        contextDocuments: JsonLdContextDocumentSource,
         trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ): Result<Map<String, List<DcqlCredential>>> {
         val discovered = findMatches(query, availableCredentials, contextDocuments, trustedAuthoritiesChecker)
@@ -375,9 +399,9 @@ object DcqlMatcher {
                     return false
                 }
                 val credTypes = credTypesElement.mapNotNull { it.jsonPrimitive.contentOrNull }
-                // OpenID4VP 1.0 Appendix B.1.1 compares type_values to types expanded with @context.
-                // Compact type strings are also accepted so existing queries that send the compact
-                // name continue to match.
+                // OpenID4VP 1.0 Appendix B.1.1 compares expanded IRIs only. Compact strings are also
+                // accepted so existing walt.id queries that send the compact name keep matching.
+                // That is a deliberate superset of the spec.
                 val expandedTypes = W3cTypeExpander.expandedTypes(credential.data, contextDocuments)
 
                 metaQuery.typeValues.any { requiredTypeSet ->
