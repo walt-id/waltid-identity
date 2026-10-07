@@ -10,6 +10,10 @@ struct SettingsView: View {
     var body: some View {
         List {
             Section("Wallet") {
+                NavigationLink { WalletAccessSettingsView(viewModel: viewModel) } label: {
+                    SettingsDestinationLabel("Wallet access", systemImage: "lock", summary: String(localized: "PIN and biometric unlock"))
+                }
+                .accessibilityIdentifier("wallet.settingsWalletAccess")
                 NavigationLink {
                     if let model = viewModel.identityScreen { WalletIdentityView(model: model) }
                     else { List { signingProtectionSection }.navigationTitle("Signing key").navigationBarTitleDisplayMode(.inline) }

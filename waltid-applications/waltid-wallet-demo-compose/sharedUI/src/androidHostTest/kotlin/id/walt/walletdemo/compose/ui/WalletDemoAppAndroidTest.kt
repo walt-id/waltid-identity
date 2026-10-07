@@ -18,6 +18,8 @@ class WalletDemoAppAndroidTest {
 
     private val scenarios = WalletDemoAppTestScenarios()
 
+    @Test fun walletAccessChangesPinUsingTheSharedEntryFlow() = scenarios.walletAccessChangesPinUsingTheSharedEntryFlow()
+
     @Test fun biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline() = scenarios.biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline()
 
     @Test fun pinSetupRequiresFourDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresFourDigitsAndMatchingConfirmation()
@@ -49,8 +51,8 @@ class WalletDemoAppAndroidTest {
         scenarios.pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable()
 
     @Test
-    fun pinSetupKeepsSubmitReachableWhenScrolled() =
-        scenarios.pinSetupKeepsSubmitReachableWhenScrolled()
+    fun pinSetupKeepsClearReachable() =
+        scenarios.pinSetupKeepsClearReachable()
 
     @Test
     fun pinSetupDoesNotAskForSigningApproval() =

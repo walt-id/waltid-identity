@@ -173,9 +173,9 @@ class WalletDemoAppTestScenarios(
         onAllNodesWithTag("wallet.pinBiometricToggle").assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.PinInput).performTextInput("１２12a3")
         assertEquals("123", (controller.state.value.auth as WalletAuthState.Setup).pin)
-        onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsNotEnabled()
+        onAllNodesWithTag(WalletUiTestTags.PinSubmitButton).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.PinInput).performTextInput("45")
-        onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsEnabled().performClick()
+        onAllNodesWithTag(WalletUiTestTags.PinSubmitButton).assertCountEquals(0)
         onNodeWithText("Step 2 of 2").assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.PinInput).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.PinConfirmationInput).assertIsDisplayed().assertIsFocused()
@@ -183,7 +183,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.PinConfirmationInput).performTextInput("123")
         onNodeWithTag(WalletUiTestTags.PinBackButton).performClick()
         onNodeWithText("Step 1 of 2").assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.PinSubmitButton).performClick()
+        onNodeWithTag(WalletUiTestTags.PinInput).performTextInput("1234")
         assertEquals("", (controller.state.value.auth as WalletAuthState.Setup).confirmation)
         onNodeWithTag(WalletUiTestTags.PinConfirmationInput).performTextInput("4321")
         onNodeWithText("PIN confirmation does not match").assertIsDisplayed()
@@ -343,12 +343,41 @@ class WalletDemoAppTestScenarios(
         onAllNodesWithText("Next, your device will offer biometric unlock. Decline to keep using your PIN.").assertCountEquals(0)
     }
 
-    fun pinSetupKeepsSubmitReachableWhenScrolled() = runComposeUiTest {
+    fun walletAccessChangesPinUsingTheSharedEntryFlow() = runComposeUiTest {
+        val store = InMemoryDemoPinStore()
+        val controller = WalletDemoController(WalletUiTestWallet(), store)
+        setWalletContent { WalletDemoApp(controller) }
+        confirmNewPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+        onNodeWithTag(WalletUiTestTags.SettingsButton).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsWalletAccess).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsChangePin).performClick()
+        onNodeWithTag(WalletUiTestTags.PinInput).performTextInput("0000")
+        waitUntil { (controller.state.value.access.pinChange as? id.walt.walletdemo.compose.logic.WalletPinChange.Current)?.error != null }
+        onNodeWithText("Wrong PIN").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PinInput).performTextInput("1234")
+        waitUntil { controller.state.value.access.pinChange is id.walt.walletdemo.compose.logic.WalletPinChange.NewPin }
+        onNodeWithText("Choose a new PIN").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PinCancelButton).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsChangePin).assertIsDisplayed().performClick()
+        assertTrue(store.verifyPin("1234"))
+        onNodeWithTag(WalletUiTestTags.PinInput).performTextInput("1234")
+        waitUntil { controller.state.value.access.pinChange is id.walt.walletdemo.compose.logic.WalletPinChange.NewPin }
+        onNodeWithTag(WalletUiTestTags.PinInput).performTextInput("5678")
+        onNodeWithTag(WalletUiTestTags.PinConfirmationInput).performTextInput("5678")
+        waitUntil { controller.state.value.access.pinChange == null }
+        onNodeWithText("PIN changed").assertIsDisplayed()
+        assertTrue(store.verifyPin("5678"))
+        assertFalse(store.verifyPin("1234"))
+        onNodeWithTag(WalletUiTestTags.SettingsChangePin).assertIsDisplayed()
+    }
+
+    fun pinSetupKeepsClearReachable() = runComposeUiTest {
         val controller = WalletDemoController(WalletUiTestWallet(), InMemoryDemoPinStore())
 
         setWalletContent { WalletDemoApp(controller) }
 
-        onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PinClearButton).assertIsDisplayed()
     }
 
     fun keySetupDefaultNeedsOneConfirmation() = runComposeUiTest {
@@ -415,7 +444,7 @@ class WalletDemoAppTestScenarios(
 
         onAllNodesWithTag(WalletUiTestTags.SigningProtectionBiometric).assertCountEquals(0)
         onAllNodesWithTag(WalletUiTestTags.SigningProtectionNone).assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsNotEnabled()
+        onAllNodesWithTag(WalletUiTestTags.PinSubmitButton).assertCountEquals(0)
     }
 
     fun pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt() = runComposeUiTest {
@@ -2088,7 +2117,6 @@ class WalletDemoAppTestScenarios(
 
     private fun ComposeUiTest.beginPinConfirmation() {
         onNodeWithTag("wallet.pinInput").performScrollTo().performTextInput("1234")
-        onNodeWithTag("wallet.pinSubmitButton").performClick()
         waitForIdle()
     }
 
@@ -2102,7 +2130,6 @@ class WalletDemoAppTestScenarios(
 
     private fun ComposeUiTest.loginWithPin() {
         onNodeWithTag("wallet.pinInput").performClick().performTextInput("1234")
-        onNodeWithTag("wallet.pinSubmitButton").performClick()
         waitForIdle()
     }
 

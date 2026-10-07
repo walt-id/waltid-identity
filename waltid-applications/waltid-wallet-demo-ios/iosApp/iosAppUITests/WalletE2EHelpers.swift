@@ -361,21 +361,14 @@ final class WalletE2EUI {
 
     func unlockWallet() {
         let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
-        guard pinInput.waitForExistence(timeout: 10) else {
-            return
-        }
-
+        guard pinInput.waitForExistence(timeout: 10) else { return }
+        let creating = app.staticTexts["Step 1 of 2"].exists
         replaceText(in: pinInput, value: pin)
-
-        let submit = app.buttons["wallet.pinSubmitButton"]
-        XCTAssertTrue(submit.waitForExistence(timeout: 10), "PIN submit button not found")
-        if app.staticTexts["Step 1 of 2"].exists {
-            submit.tap()
+        if creating {
             let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
-            XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+            XCTAssertTrue(confirmation.waitForExistence(timeout: 10), app.debugDescription)
+            XCTAssertFalse(pinInput.exists, "Choose and Confirm must be separate screens")
             replaceText(in: confirmation, value: pin)
-        } else {
-            submit.tap()
         }
     }
 }

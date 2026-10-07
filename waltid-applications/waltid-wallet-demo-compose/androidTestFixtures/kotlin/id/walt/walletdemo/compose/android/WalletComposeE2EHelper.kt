@@ -114,8 +114,6 @@ internal object WalletComposeE2EHelper {
             ?: throw AssertionError("PIN input not found. ${foregroundWindowSnapshot(device)}")
         val setup = device.hasObject(By.text("Step 1 of 2"))
         pinInput.setText(PIN)
-        dismissKeyboard(device)
-        clickByTag(device, "wallet.pinSubmitButton")
         if (setup) {
             assertTrue(device.wait(Until.hasObject(By.text("Step 2 of 2")), UI_ELEMENT_TIMEOUT))
             val confirmation = requireNotNull(waitForResource(device, "wallet.pinConfirmationInput", UI_ELEMENT_TIMEOUT))

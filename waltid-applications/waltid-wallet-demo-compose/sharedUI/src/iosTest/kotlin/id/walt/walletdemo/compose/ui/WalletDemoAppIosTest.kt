@@ -17,6 +17,8 @@ class WalletDemoAppIosTest {
 
     @Test fun pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt() = scenarios.pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt()
 
+    @Test fun walletAccessChangesPinUsingTheSharedEntryFlow() = scenarios.walletAccessChangesPinUsingTheSharedEntryFlow()
+
     @Test fun biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline() = scenarios.biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline()
 
     @Test fun pinSetupRequiresFourDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresFourDigitsAndMatchingConfirmation()
@@ -59,8 +61,8 @@ class WalletDemoAppIosTest {
         scenarios.pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable()
 
     @Test
-    fun pinSetupKeepsSubmitReachableWhenScrolled() =
-        scenarios.pinSetupKeepsSubmitReachableWhenScrolled()
+    fun pinSetupKeepsClearReachable() =
+        scenarios.pinSetupKeepsClearReachable()
 
     @Test
     fun pinSetupDoesNotAskForSigningApproval() =

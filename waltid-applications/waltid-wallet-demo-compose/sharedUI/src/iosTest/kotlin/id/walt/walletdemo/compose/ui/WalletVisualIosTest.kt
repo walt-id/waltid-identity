@@ -80,11 +80,22 @@ class WalletVisualIosTest {
     @Test fun keyStorage() = scenario { keySetup("storage") }
     @Test fun keyApproval() = scenario { keySetup("approval") }
 
+    @Test fun accessRejected() = scenario { walletAccess("rejected") }
+    @Test fun accessBiometricFallback() = scenario { walletAccess("biometric_fallback") }
+    @Test fun accessBiometricLockout() = scenario { walletAccess("biometric_lockout") }
+    @Test fun accessSettings() = scenario { walletAccess("default") }
+    @Test fun accessCurrentPin() = scenario { walletAccess("current_pin") }
+    @Test fun accessNewPin() = scenario { walletAccess("new_pin") }
+    @Test fun accessConfirmation() = scenario { walletAccess("confirmation") }
+    @Test fun accessSaveFailure() = scenario { walletAccess("save_failure") }
+    @Test fun accessPinChanged() = scenario { walletAccess("pin_changed") }
+
     @Test fun pinSetup() = scenario { pin("setup") }
     @Test fun pinMismatch() = scenario { pin("mismatch") }
     @Test fun pinConfirmation() = scenario { pin("confirmation") }
     @Test fun pinBiometricPrompt() = scenario { pin("biometric_prompt") }
     @Test fun pinUnlock() = scenario { pin("unlock") }
+    @Test fun pinRtl() = scenario { pin("rtl") }
     @Test fun biometricCancelled() = scenario { biometricSetup() }
     @Test fun biometricUnavailable() = scenario { biometricSetup(unavailable = true) }
     @Test fun pinCompact() = scenario(size = Size(320f, 568f), fontScale = 1.5f, dark = true) { pin("compact_dark_large_text") }

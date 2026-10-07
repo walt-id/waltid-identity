@@ -21,8 +21,8 @@ final class DemoPinStoreTests: XCTestCase {
         try await store.setPin(Self.parityPin)
 
         XCTAssertEqual(defaults.string(forKey: "id.walt.walletdemo.pin.parity"), Self.parityRecord)
-        let parityMatches = await store.verifyPin(Self.parityPin)
-        let wrongPinMatches = await store.verifyPin("0000")
+        let parityMatches = try await store.verifyPin(Self.parityPin)
+        let wrongPinMatches = try await store.verifyPin("0000")
         XCTAssertTrue(parityMatches)
         XCTAssertFalse(wrongPinMatches)
     }
@@ -45,27 +45,17 @@ final class DemoPinStoreTests: XCTestCase {
         }
     }
 
-    func testRejectsTruncatedAndWrongVersionRecords() async {
+    func testCorruptAndMissingRecordsReportStorageFailure() async {
         let defaults = UserDefaults(suiteName: "pin-reject-\(UUID().uuidString)")!
         let store = UserDefaultsDemoPinStore(walletID: "reject", defaults: defaults)
-
-        defaults.set(
-            "2:210000:\(Self.paritySaltB64):\(Self.parityVerifierB64)",
-            forKey: "id.walt.walletdemo.pin.reject"
-        )
-        let wrongVersionMatches = await store.verifyPin(Self.parityPin)
-        XCTAssertFalse(wrongVersionMatches)
-
-        defaults.set("1:210000:\(Self.paritySaltB64)", forKey: "id.walt.walletdemo.pin.reject")
-        let truncatedMatches = await store.verifyPin(Self.parityPin)
-        XCTAssertFalse(truncatedMatches)
-
-        defaults.set(
-            "1:210000:not-base64:\(Self.parityVerifierB64)",
-            forKey: "id.walt.walletdemo.pin.reject"
-        )
-        let invalidSaltMatches = await store.verifyPin(Self.parityPin)
-        XCTAssertFalse(invalidSaltMatches)
+        for record in [nil, "2:210000:\(Self.paritySaltB64):\(Self.parityVerifierB64)",
+                       "1:210000:\(Self.paritySaltB64)", "1:210000:not-base64:\(Self.parityVerifierB64)"] as [String?] {
+            defaults.set(record, forKey: "id.walt.walletdemo.pin.reject")
+            do { _ = try await store.verifyPin(Self.parityPin); XCTFail("Expected PIN storage failure") }
+            catch DemoPinRecordError.invalidRecord { }
+            catch DemoPinRecordError.missingRecord { }
+            catch { XCTFail("Unexpected error: \(error)") }
+        }
     }
 
     private static let parityPin = "1234"

@@ -12,6 +12,8 @@ import kotlinx.coroutines.withContext
 import platform.Foundation.NSError
 import platform.Foundation.NSThread
 import platform.LocalAuthentication.LAContext
+import platform.LocalAuthentication.LABiometryTypeFaceID
+import platform.LocalAuthentication.LABiometryTypeTouchID
 import platform.LocalAuthentication.LAErrorAppCancel
 import platform.LocalAuthentication.LAErrorSystemCancel
 import platform.LocalAuthentication.LAErrorUserCancel
@@ -28,6 +30,19 @@ import kotlin.coroutines.resume
 fun createIosDemoBiometricAuthenticator(): DemoBiometricAuthenticator = IosDemoBiometricAuthenticator()
 
 private class IosDemoBiometricAuthenticator : DemoBiometricAuthenticator {
+    @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
+    override val kind: DemoBiometricKind get() = onMainThread {
+        memScoped {
+            val context = LAContext()
+            val error = alloc<ObjCObjectVar<NSError?>>()
+            context.canEvaluatePolicy(LAPolicyDeviceOwnerAuthenticationWithBiometrics, error.ptr)
+            when (context.biometryType) {
+                LABiometryTypeFaceID -> DemoBiometricKind.FaceId
+                LABiometryTypeTouchID -> DemoBiometricKind.TouchId
+                else -> DemoBiometricKind.Generic
+            }
+        }
+    }
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
     override fun isAvailable(): Boolean = onMainThread { evaluateAvailability() }
 

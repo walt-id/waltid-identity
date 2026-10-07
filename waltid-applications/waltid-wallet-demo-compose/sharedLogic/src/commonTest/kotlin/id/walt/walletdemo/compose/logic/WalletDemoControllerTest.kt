@@ -314,8 +314,6 @@ class WalletDemoControllerTest {
         val store = InMemoryDemoPinStore()
         val controller = controllerWith(wallet, this, store)
         controller.updatePin("1234")
-        controller.updatePinConfirmation("1234") // Choosing cannot bypass confirmation.
-        controller.submitPin()
         assertEquals(PinSetupStep.Confirm, (controller.state.value.auth as WalletAuthState.Setup).step)
         assertFalse(store.hasPin())
         assertEquals(0, wallet.bootstrapCalls)
@@ -341,6 +339,7 @@ class WalletDemoControllerTest {
         controller.updatePinConfirmation("123")
         controller.editSetupPin()
         assertEquals(PinSetupStep.Choose, (controller.state.value.auth as WalletAuthState.Setup).step)
+        assertEquals("", (controller.state.value.auth as WalletAuthState.Setup).pin)
         assertEquals("", (controller.state.value.auth as WalletAuthState.Setup).confirmation)
         controller.updatePin("4321")
         controller.submitPin()
@@ -494,7 +493,7 @@ class WalletDemoControllerTest {
         controller.submitPin()
         controller.updatePinConfirmation("1234")
         runCurrent()
-        assertEquals("PIN could not be saved. Try again.", (controller.state.value.auth as WalletAuthState.Setup).error)
+        assertEquals(WalletAccessOperation.RetryPin("PIN could not be saved. Try again."), controller.state.value.access.operation)
         assertFalse(controller.state.value.isAuthenticating)
         assertEquals(0, biometrics.authenticateCalls)
         fail = false
@@ -594,6 +593,8 @@ class WalletDemoControllerTest {
         assertFalse(login.biometricPromptConsumed)
 
         controller.unlockWithBiometrics()
+        // Disposal of the outgoing access settings must not cancel this new prompt.
+        controller.cancelPinChange()
         controller.handleApplicationForegrounded()
         runCurrent()
         assertEquals(2, biometrics.authenticateCalls)
@@ -1347,12 +1348,36 @@ class WalletDemoControllerTest {
 
         controller.lock()
         controller.updatePin("9999")
-        controller.submitPin()
         runCurrent()
 
         val auth = controller.state.value.auth as WalletAuthState.Login
         assertEquals("Wrong PIN", auth.error)
+        assertEquals("", auth.pin)
         assertTrue(controller.state.value.session is WalletSessionState.Ready)
+        controller.updatePin("1234")
+        runCurrent()
+        assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
+    }
+
+    @Test
+    fun clearPinKeepsTheCreationStageAndOriginalDraft() = runTest {
+        val controller = controllerWith(FakeDemoWallet(), this)
+        controller.updatePin("12")
+        controller.clearPin()
+        assertEquals("", (controller.state.value.auth as WalletAuthState.Setup).pin)
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("12")
+        controller.clearPin()
+        val confirm = controller.state.value.auth as WalletAuthState.Setup
+        assertEquals(PinSetupStep.Confirm, confirm.step)
+        assertEquals("1234", confirm.pin)
+        assertEquals("", confirm.confirmation)
+        controller.updatePinConfirmation("1234")
+        runCurrent()
+        controller.lock()
+        controller.updatePin("12")
+        controller.clearPin()
+        assertEquals("", (controller.state.value.auth as WalletAuthState.Login).pin)
     }
 
     @Test
@@ -1363,7 +1388,6 @@ class WalletDemoControllerTest {
 
         controller.lock()
         controller.updatePin("1234")
-        controller.submitPin()
         runCurrent()
 
         assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
@@ -3129,6 +3153,183 @@ class WalletDemoControllerTest {
             ),
             controller.state.value.operation,
         )
+    }
+
+    @Test
+    fun changingPinCommitsOnlyAfterConfirmationAndPreservesWallet() = runTest {
+        val store = InMemoryDemoPinStore().also { it.setPin("1234"); it.setBiometricUnlockEnabled(true) }
+        val wallet = FakeDemoWallet()
+        val controller = controllerWith(wallet, this, store)
+        controller.updatePin("1234")
+        runCurrent()
+        val ready = controller.state.value.session
+        val bootstraps = wallet.bootstrapCalls
+        controller.startPinChange()
+        controller.updatePin("0000")
+        runCurrent()
+        assertEquals("", (controller.state.value.access.pinChange as WalletPinChange.Current).pin)
+        controller.updatePin("1234")
+        runCurrent()
+        assertIs<WalletPinChange.NewPin>(controller.state.value.access.pinChange)
+        controller.updatePin("5678")
+        assertEquals(PinSetupStep.Confirm, (controller.state.value.access.pinChange as WalletPinChange.NewPin).setup.step)
+        assertTrue(store.verifyPin("1234"))
+        controller.updatePinConfirmation("9999")
+        assertEquals("", (controller.state.value.access.pinChange as WalletPinChange.NewPin).setup.confirmation)
+        assertTrue(store.verifyPin("1234"))
+        controller.updatePinConfirmation("5678")
+        controller.submitPin()
+        runCurrent()
+        assertNull(controller.state.value.access.pinChange)
+        assertFalse(store.verifyPin("1234"))
+        assertTrue(store.verifyPin("5678"))
+        assertTrue(store.isBiometricUnlockEnabled())
+        assertEquals(ready, controller.state.value.session)
+        assertEquals(bootstraps, wallet.bootstrapCalls)
+        controller.lock()
+        controller.updatePin("5678")
+        runCurrent()
+        assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
+    }
+
+    @Test
+    fun cancellingAndFailedPinReplacementLeaveTheOldPinUsable() = runTest {
+        val stored = InMemoryDemoPinStore().also { it.setPin("1234") }
+        var fail = true
+        var saves = 0
+        val store = object : DemoPinStore by stored {
+            override suspend fun setPin(pin: String) { check(!fail); saves += 1; stored.setPin(pin) }
+        }
+        val controller = controllerWith(FakeDemoWallet(), this, store)
+        controller.updatePin("1234"); runCurrent()
+        controller.startPinChange()
+        controller.updatePin("1234"); runCurrent()
+        controller.updatePin("5678")
+        controller.cancelPinChange()
+        assertNull(controller.state.value.access.pinChange)
+        assertTrue(stored.verifyPin("1234"))
+        controller.startPinChange()
+        controller.updatePin("1234"); runCurrent()
+        controller.updatePin("5678"); controller.updatePinConfirmation("5678"); runCurrent()
+        assertIs<WalletAccessOperation.RetryPin>(controller.state.value.access.operation)
+        assertTrue(stored.verifyPin("1234"))
+        assertFalse(stored.verifyPin("5678"))
+        fail = false
+        controller.submitPin(); controller.submitPin(); runCurrent()
+        assertEquals(1, saves)
+        assertTrue(stored.verifyPin("5678"))
+    }
+
+    @Test
+    fun lateCurrentPinVerificationCannotAuthorizeANewChangeFlow() = runTest {
+        val stored = InMemoryDemoPinStore().also { it.setPin("1234") }
+        val gate = CompletableDeferred<Boolean>()
+        var wait = false
+        val store = object : DemoPinStore by stored {
+            override suspend fun verifyPin(pin: String): Boolean = if (wait) withContext(NonCancellable) { gate.await() } else stored.verifyPin(pin)
+        }
+        val controller = controllerWith(FakeDemoWallet(), this, store)
+        controller.updatePin("1234"); runCurrent()
+        controller.startPinChange(); wait = true
+        controller.updatePin("1234"); runCurrent()
+        controller.cancelPinChange(); controller.startPinChange()
+        gate.complete(true); runCurrent()
+        assertEquals(WalletPinChange.Current(), controller.state.value.access.pinChange)
+        assertEquals(WalletAccessOperation.Idle, controller.state.value.access.operation)
+    }
+
+    @Test
+    fun biometricSettingsRequireSuccessfulOsAuthAndPersistAcrossRestart() = runTest {
+        val store = InMemoryDemoPinStore().also { it.setPin("1234") }
+        val biometrics = FakeDemoBiometricAuthenticator(result = DemoBiometricResult.Cancelled)
+        val controller = controllerWith(FakeDemoWallet(), this, store, biometrics)
+        controller.updatePin("1234"); runCurrent()
+        controller.setBiometricUnlockEnabled(true); runCurrent()
+        assertFalse(store.isBiometricUnlockEnabled())
+        assertFalse(controller.state.value.access.biometricEnabled)
+        biometrics.result = DemoBiometricResult.Succeeded
+        controller.setBiometricUnlockEnabled(true); controller.setBiometricUnlockEnabled(true); runCurrent()
+        assertEquals(2, biometrics.authenticateCalls)
+        assertTrue(store.isBiometricUnlockEnabled())
+        assertTrue(controllerWith(FakeDemoWallet(), this, store, biometrics).state.value.access.biometricEnabled)
+        controller.setBiometricUnlockEnabled(false)
+        assertFalse(controllerWith(FakeDemoWallet(), this, store, biometrics).state.value.access.biometricEnabled)
+        assertTrue(store.verifyPin("1234"))
+    }
+
+    @Test
+    fun biometricPreferenceFailureIsVisibleWithoutChangingThePreference() = runTest {
+        val stored = InMemoryDemoPinStore().also { it.setPin("1234") }
+        val store = object : DemoPinStore by stored {
+            override fun setBiometricUnlockEnabled(enabled: Boolean) { error("Write failed") }
+        }
+        val controller = controllerWith(FakeDemoWallet(), this, store, FakeDemoBiometricAuthenticator())
+        controller.updatePin("1234"); runCurrent()
+        controller.setBiometricUnlockEnabled(true); runCurrent()
+        assertFalse(controller.state.value.access.biometricEnabled)
+        assertEquals(WalletAccessNotice.Kind.Error, controller.state.value.access.settingsNotice?.kind)
+        assertFalse(controller.state.value.access.isBusy)
+    }
+
+    @Test
+    fun leavingAccessSettingsIgnoresLateBiometricOptIn() = runTest {
+        val store = InMemoryDemoPinStore().also { it.setPin("1234") }
+        val gate = CompletableDeferred<DemoBiometricResult>()
+        val biometrics = object : DemoBiometricAuthenticator {
+            override fun isAvailable() = true
+            override suspend fun authenticate(reason: String) = withContext(NonCancellable) { gate.await() }
+        }
+        val controller = controllerWith(FakeDemoWallet(), this, store, biometrics)
+        controller.updatePin("1234"); runCurrent()
+        controller.setBiometricUnlockEnabled(true); runCurrent()
+        controller.cancelPinChange()
+        gate.complete(DemoBiometricResult.Succeeded); runCurrent()
+        assertFalse(store.isBiometricUnlockEnabled())
+        assertFalse(controller.state.value.access.isBusy)
+    }
+
+    @Test
+    fun temporaryBiometricUnavailabilityKeepsPreferenceAndAllowsPin() = runTest {
+        val store = InMemoryDemoPinStore().also { it.setPin("1234"); it.setBiometricUnlockEnabled(true) }
+        val biometrics = FakeDemoBiometricAuthenticator(available = false)
+        val controller = controllerWith(FakeDemoWallet(), this, store, biometrics)
+        controller.unlockWithBiometrics(); runCurrent()
+        assertTrue(controller.state.value.access.biometricEnabled)
+        assertTrue(store.isBiometricUnlockEnabled())
+        assertEquals(0, biometrics.authenticateCalls)
+        controller.updatePin("1234"); runCurrent()
+        assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
+    }
+
+    @Test
+    fun biometricCancelThenExplicitRetryUnlocksWithoutAutomaticLoop() = runTest {
+        val store = InMemoryDemoPinStore().also { it.setPin("1234"); it.setBiometricUnlockEnabled(true) }
+        val biometrics = FakeDemoBiometricAuthenticator(result = DemoBiometricResult.Cancelled)
+        val controller = controllerWith(FakeDemoWallet(), this, store, biometrics)
+        controller.unlockWithBiometrics(); runCurrent()
+        repeat(3) { controller.handleApplicationForegrounded(); controller.unlockWithBiometrics() }
+        runCurrent()
+        assertEquals(1, biometrics.authenticateCalls)
+        assertEquals(DemoBiometricResult.Cancelled, (controller.state.value.auth as WalletAuthState.Login).biometricOutcome)
+        biometrics.result = DemoBiometricResult.Succeeded
+        controller.unlockWithBiometrics(force = true); runCurrent()
+        assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
+        assertEquals(2, biometrics.authenticateCalls)
+    }
+
+    @Test
+    fun operationalPinVerificationFailureIsRetryableWithoutClaimingWrongPin() = runTest {
+        val stored = InMemoryDemoPinStore().also { it.setPin("1234") }
+        var fail = true
+        val store = object : DemoPinStore by stored {
+            override suspend fun verifyPin(pin: String): Boolean { check(!fail); return stored.verifyPin(pin) }
+        }
+        val controller = controllerWith(FakeDemoWallet(), this, store)
+        controller.updatePin("1234"); runCurrent()
+        assertIs<WalletAccessOperation.RetryPin>(controller.state.value.access.operation)
+        assertEquals("1234", (controller.state.value.auth as WalletAuthState.Login).pin)
+        fail = false; controller.submitPin(); runCurrent()
+        assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
     }
 
     private fun controllerWith(

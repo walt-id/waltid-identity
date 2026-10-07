@@ -14,6 +14,7 @@ sealed interface WalletAuthState {
         val pin: String = "",
         val error: String? = null,
         val biometricPromptConsumed: Boolean = false,
+        val biometricOutcome: DemoBiometricResult? = null,
     ) : PinEntry
 
     /** The PIN has been saved or verified; only the optional biometric choice remains. */

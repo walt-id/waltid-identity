@@ -81,6 +81,7 @@ final class WalletVisualTests: XCTestCase {
     func testPinConfirmation() async throws { try await pin("confirmation") }
     func testPinBiometricPrompt() async throws { try await pin("biometric_prompt") }
     func testPinUnlock() async throws { try await pin("unlock") }
+    func testPinRtl() async throws { try await pin("rtl") }
     func testPinCompact() async throws { try await pin("compact_dark_large_text") }
     func testBiometricCancelled() async throws { try await biometricSetup(unavailable: false) }
     func testBiometricUnavailable() async throws { try await biometricSetup(unavailable: true) }
@@ -98,7 +99,7 @@ final class WalletVisualTests: XCTestCase {
         let biometric = FakeDemoBiometricAuthenticator(isAvailable: state != "setup", gate: gate)
         let model = makeModel(biometricAuthenticator: biometric)
         await model.readerTrustSettings.awaitPendingOperations()
-        if state == "unlock" { model.auth = .login; model.pin = "1234" }
+        if state == "unlock" { model.auth = .login; model.pin = "12" }
         else if state != "setup" {
             model.updatePin("1234")
             model.submitPin()
@@ -120,11 +121,63 @@ final class WalletVisualTests: XCTestCase {
             XCTAssertEqual(model.auth, .biometricSetup(nil))
             try capture(BiometricSetupView(viewModel: model), id: "onboarding.pin.\(state)")
         } else {
-            try capture(PinView(viewModel: model), id: "onboarding.pin.\(state)",
+            try capture(PinView(viewModel: model)
+                .environment(\.layoutDirection, state == "rtl" ? .rightToLeft : .leftToRight), id: "onboarding.pin.\(state)",
                 config: compact ? .iPhoneSe : .iPhone13,
                 colorScheme: compact ? .dark : .light, sizeCategory: compact ? .accessibilityMedium : .large)
         }
         await gate.complete(.failed)
+    }
+
+    func testAccessRejected() async throws { try await walletAccess("rejected") }
+    func testAccessBiometricFallback() async throws { try await walletAccess("biometric_fallback") }
+    func testAccessBiometricLockout() async throws { try await walletAccess("biometric_lockout") }
+    func testAccessSettings() async throws { try await walletAccess("default") }
+    func testAccessCurrentPin() async throws { try await walletAccess("current_pin") }
+    func testAccessNewPin() async throws { try await walletAccess("new_pin") }
+    func testAccessConfirmation() async throws { try await walletAccess("confirmation") }
+    func testAccessSaveFailure() async throws { try await walletAccess("save_failure") }
+    func testAccessPinChanged() async throws { try await walletAccess("pin_changed") }
+
+    private func walletAccess(_ state: String) async throws {
+        let store = VisualAccessPinStore()
+        store.isBiometricUnlockEnabled = state.hasPrefix("biometric")
+        let biometrics = FakeDemoBiometricAuthenticator(isAvailable: state.hasPrefix("biometric"),
+            result: state == "biometric_lockout" ? .lockedOut : .failed)
+        let model = makeModel(biometricAuthenticator: biometrics, pinStore: store)
+        await model.readerTrustSettings.awaitPendingOperations()
+        let unlocking = ["rejected", "biometric_fallback", "biometric_lockout"].contains(state)
+        if unlocking {
+            if state == "rejected" { model.updatePin("0000") }
+            else { model.unlockWithBiometrics() }
+            await settleAccess(model)
+            try capture(PinView(viewModel: model), id: "access.unlock.\(state)")
+        } else {
+            model.auth = .unlocked
+            if state != "default" {
+                model.startPinChange()
+                if state != "current_pin" {
+                    model.updatePin("1234")
+                    await settleAccess(model)
+                    if state != "new_pin" {
+                        model.updatePin("5678")
+                        if ["save_failure", "pin_changed"].contains(state) {
+                            store.failSaving = state == "save_failure"
+                            model.updatePinConfirmation("5678")
+                            await settleAccess(model)
+                        }
+                    }
+                }
+            }
+            try capture(NavigationView { WalletAccessSettingsView(viewModel: model) }.navigationViewStyle(.stack),
+                id: "settings.access.\(state)")
+        }
+    }
+
+    private func settleAccess(_ model: WalletViewModel) async {
+        let deadline = DispatchTime.now().uptimeNanoseconds + 5_000_000_000
+        while model.isAuthenticating && DispatchTime.now().uptimeNanoseconds < deadline { await Task.yield() }
+        XCTAssertFalse(model.isAuthenticating, "Fixture access operation did not finish")
     }
 
     func testHomeEmpty() async throws { try await home(empty: true) }
@@ -472,14 +525,14 @@ final class WalletVisualTests: XCTestCase {
                     id: noneSelected ? "batch.offer.none_selected" : "batch.offer.two_targets_three_copies")
     }
 
-    private func makeModel(biometricAuthenticator: (any DemoBiometricAuthenticator)? = nil) -> WalletViewModel {
+    private func makeModel(biometricAuthenticator: (any DemoBiometricAuthenticator)? = nil, pinStore: (any DemoPinStore)? = nil) -> WalletViewModel {
         WalletViewModel(
             walletID: "visual-settings",
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(),
             walletClient: MockWalletClient(),
             readerTrustSettingsPersistence: InMemoryDemoReaderTrustSettingsPersistence(),
             identityDocumentRegistrationUpdate: {},
-            pinStore: InMemoryDemoPinStore(),
+            pinStore: pinStore ?? InMemoryDemoPinStore(),
             biometricAuthenticator: biometricAuthenticator ?? FakeDemoBiometricAuthenticator(isAvailable: false)
         )
     }
@@ -652,4 +705,18 @@ private func matchesWithinRasterNoise(_ reference: UIImage, _ actual: UIImage) -
         index += 1
     }
     return true
+}
+
+private final class VisualAccessPinStore: DemoPinStore {
+    private var pin = "1234"
+    var failSaving = false
+    var hasPin: Bool { true }
+    var isBiometricUnlockEnabled = false
+    var isBiometricSetupPending = false
+    func verifyPin(_ value: String) async -> Bool { value == pin }
+    func setPin(_ value: String) async throws {
+        if failSaving { throw DemoPinRecordError.derivationFailed }
+        pin = value
+    }
+    func clear() { pin = "" }
 }

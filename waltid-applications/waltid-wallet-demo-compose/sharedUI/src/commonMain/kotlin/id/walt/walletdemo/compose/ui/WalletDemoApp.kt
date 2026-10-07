@@ -112,9 +112,7 @@ internal fun WalletDemoAppHost(
                         ) {
                             PinScreen(
                                 controller = controller,
-                                auth = auth,
-                                isBusy = state.isBusy,
-                                biometricAvailable = state.biometricUnlockAvailable,
+                                access = state.access,
                             )
                         }
                         is WalletAuthState.StorageUnavailable -> Box(

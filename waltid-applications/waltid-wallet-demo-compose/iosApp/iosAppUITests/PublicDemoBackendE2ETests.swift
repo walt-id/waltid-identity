@@ -211,7 +211,6 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Step 1 of 2"].exists)
         assertPinKeyboardAboveAction(app)
         input.typeText("1234") // No tap: the screen owns focus.
-        app.buttons["wallet.pinSubmitButton"].tap()
         let confirmation = ui.textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
         XCTAssertTrue(confirmation.waitForExistence(timeout: 10))
         assertPinKeyboardAboveAction(app)
@@ -219,7 +218,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         app.buttons["wallet.pinBackButton"].tap()
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         assertPinKeyboardAboveAction(app)
-        app.buttons["wallet.pinSubmitButton"].tap()
+        XCTAssertEqual(input.value as? String, "0 of 4 digits entered")
+        input.typeText("1234")
         XCTAssertTrue(confirmation.waitForExistence(timeout: 10))
         assertPinKeyboardAboveAction(app)
         confirmation.typeText("1234")
@@ -232,14 +232,53 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["Step 1 of 2"].exists)
         assertPinKeyboardAboveAction(app)
+        input.typeText("0000")
+        XCTAssertTrue(app.descendants(matching: .any)["Wrong PIN"].firstMatch.waitForExistence(timeout: 10))
+        assertPinKeyboardAboveAction(app)
         input.typeText("1234")
-        app.buttons["wallet.pinSubmitButton"].tap()
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+    }
+
+    func testWalletAccessChangesPinAndRetainsTheReplacementAcrossRestart() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: isolatedWalletEnvironment())
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+        ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
+        ui.tapButton(identifier: "wallet.settingsWalletAccess", fallbackLabel: "Wallet access")
+        ui.tapButton(identifier: "wallet.settingsChangePin", fallbackLabel: "Change PIN")
+        let input = ui.textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        assertPinKeyboardAboveAction(app)
+        input.typeText("1234")
+        XCTAssertTrue(app.staticTexts["Choose a new PIN"].waitForExistence(timeout: 10))
+        input.typeText("5678")
+        let confirmation = ui.textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 10))
+        assertPinKeyboardAboveAction(app)
+        confirmation.typeText("5678")
+        let notice = app.descendants(matching: .any)["wallet.accessNotice"].firstMatch
+        let changed = notice.waitForExistence(timeout: 10)
+        if !changed {
+            let capture = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            capture.name = "pin-change-failure"; capture.lifetime = .keepAlways; add(capture)
+        }
+        XCTAssertTrue(changed)
+        XCTAssertEqual(notice.label, "PIN changed")
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(input.waitForExistence(timeout: 10))
+        assertPinKeyboardAboveAction(app)
+        input.typeText("1234")
+        XCTAssertTrue(app.descendants(matching: .any)["Wrong PIN"].firstMatch.waitForExistence(timeout: 10))
+        input.typeText("5678")
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
     }
 
     private func assertPinKeyboardAboveAction(_ app: XCUIApplication) {
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "PIN input must open the keyboard automatically")
-        XCTAssertLessThanOrEqual(app.buttons["wallet.pinSubmitButton"].frame.maxY, app.keyboards.firstMatch.frame.minY,
+        XCTAssertLessThanOrEqual(app.buttons["wallet.pinClearButton"].frame.maxY, app.keyboards.firstMatch.frame.minY,
             "The keyboard must not cover the PIN action")
     }
 

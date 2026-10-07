@@ -69,7 +69,7 @@ internal object WalletVisualFixtures {
     val partialResult: WalletDemoUiState get() {
         val outcome = data.getValue("batchOutcome").jsonObject
         return WalletDemoUiState(
-            auth = WalletAuthState.Unlocked,
+            access = WalletAccessState(auth = WalletAuthState.Unlocked),
             session = WalletSessionState.Ready("did:example:visual", "visual-key", "{}",
                 WalletDemoSigningProtection.None, listOf(credentialSummary)),
             selectedTab = WalletDemoTab.Receive,

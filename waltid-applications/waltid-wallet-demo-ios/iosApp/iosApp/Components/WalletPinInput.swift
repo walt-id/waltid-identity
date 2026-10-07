@@ -115,6 +115,17 @@ private struct PinSecureEditor: UIViewRepresentable {
         func textFieldDidBeginEditing(_ textField: UITextField) { updateFocus(textField, focused: true) }
         func textFieldDidEndEditing(_ textField: UITextField) { updateFocus(textField, focused: false) }
 
+        func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+            guard parent.isEnabled, let editRange = Range(range, in: parent.value) else { return false }
+            // Secure UITextField can replace a retained value on the first keystroke
+            // after refocusing. Apply the accepted edit to our draft explicitly.
+            parent.value = parent.value.replacingCharacters(in: editRange, with: string)
+            textField.text = parent.value
+            let end = textField.endOfDocument
+            textField.selectedTextRange = textField.textRange(from: end, to: end)
+            return false
+        }
+
         private func updateFocus(_ field: UITextField, focused: Bool) {
             guard parent.focus != focused else { return }
             // Disabling/replacing an editor can end editing inside a SwiftUI update.
@@ -135,8 +146,9 @@ private struct PinSecureEditor: UIViewRepresentable {
         private var observations: [NSObjectProtocol] = []
 
         func requestInteraction(enabled: Bool, focused: Bool) {
-            wantsEnabled = enabled
-            requestFocus(focused && enabled)
+            // Reject edits through the delegate while retaining this responder/IME session.
+            wantsEnabled = true
+            requestFocus(focused)
         }
 
         func requestFocus(_ requested: Bool) {

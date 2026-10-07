@@ -223,7 +223,7 @@
         "R12",
         "R13"
       ],
-      "note": "WAL-1440: separate four-digit choose/confirm screens, decorative masked circles and OS-controlled biometric opt-in. Wallet-owned synthetic state; real biometric dialogs and persistence are verified separately."
+      "note": "Four masked positions over underlines, separate Choose and Confirm headings, automatic fourth-digit advancement and immediate mismatch clearing. Wallet-owned state; keyboard continuity and OS biometrics have separate app-host tests."
     },
     {
       "id": "onboarding.pin.mismatch",
@@ -235,7 +235,7 @@
         "R12",
         "R13"
       ],
-      "note": "WAL-1440: separate four-digit choose/confirm screens, decorative masked circles and OS-controlled biometric opt-in. Wallet-owned synthetic state; real biometric dialogs and persistence are verified separately."
+      "note": "Four masked positions over underlines, separate Choose and Confirm headings, automatic fourth-digit advancement and immediate mismatch clearing. Wallet-owned state; keyboard continuity and OS biometrics have separate app-host tests."
     },
     {
       "id": "onboarding.pin.confirmation",
@@ -247,7 +247,7 @@
         "R12",
         "R13"
       ],
-      "note": "WAL-1440: separate four-digit choose/confirm screens, decorative masked circles and OS-controlled biometric opt-in. Wallet-owned synthetic state; real biometric dialogs and persistence are verified separately."
+      "note": "Four masked positions over underlines, separate Choose and Confirm headings, automatic fourth-digit advancement and immediate mismatch clearing. Wallet-owned state; keyboard continuity and OS biometrics have separate app-host tests."
     },
     {
       "id": "onboarding.pin.biometric_prompt",
@@ -283,7 +283,19 @@
         "R12",
         "R13"
       ],
-      "note": "Four-digit PIN input stays masked and enables Unlock; the same fixed length applies to creation and confirmation."
+      "note": "Partially entered, masked four-digit PIN with Clear. The fourth digit verifies automatically; keyboard and biometric precedence are checked in app-host tests."
+    },
+    {
+      "id": "onboarding.pin.rtl",
+      "composeTest": "pinRtl",
+      "swiftTest": "testPinRtl",
+      "requirements": [
+        "R01",
+        "R11",
+        "R12",
+        "R13"
+      ],
+      "note": "Confirmation heading and trailing controls under RTL. Compose also uses reduced-motion preferences here; SwiftUI reads the OS preference separately. This still image proves the settled layout; app-host recordings cover transitions."
     },
     {
       "id": "credential.details.localized_metadata",
@@ -942,6 +954,105 @@
         "R18"
       ],
       "note": "F013-F014: one offered configuration uses full art; multi-offer and sharing thumbnails remain flat metadata colors."
+    },
+    {
+      "id": "access.unlock.rejected",
+      "requirements": [
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "accessRejected",
+      "swiftTest": "testAccessRejected",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "access.unlock.biometric_fallback",
+      "requirements": [
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "accessBiometricFallback",
+      "swiftTest": "testAccessBiometricFallback",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "access.unlock.biometric_lockout",
+      "requirements": [
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "accessBiometricLockout",
+      "swiftTest": "testAccessBiometricLockout",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "settings.access.default",
+      "requirements": [
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "accessSettings",
+      "swiftTest": "testAccessSettings",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "settings.access.current_pin",
+      "requirements": [
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "accessCurrentPin",
+      "swiftTest": "testAccessCurrentPin",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "settings.access.new_pin",
+      "requirements": [
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "accessNewPin",
+      "swiftTest": "testAccessNewPin",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "settings.access.confirmation",
+      "requirements": [
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "accessConfirmation",
+      "swiftTest": "testAccessConfirmation",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "settings.access.save_failure",
+      "requirements": [
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "accessSaveFailure",
+      "swiftTest": "testAccessSaveFailure",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "settings.access.pin_changed",
+      "requirements": [
+        "R10",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "accessPinChanged",
+      "swiftTest": "testAccessPinChanged",
+      "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
     }
   ]
 }

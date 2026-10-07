@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import WalletDemoIdentityDocumentSupport
 import WalletDemoSharingUI
 import WalletSDK
@@ -9,16 +10,6 @@ enum WalletTab: Hashable {
     case receive
     case present
 }
-
-enum WalletAuthState: Equatable {
-    case setup
-    case login
-    case biometricSetup(DemoBiometricResult?)
-    case storageUnavailable(String)
-    case unlocked
-}
-
-enum PinSetupStep { case choose, confirm }
 
 enum WalletStatusKind: Hashable {
     case busy
@@ -72,10 +63,6 @@ private enum WalletStatusText {
     static let invalidOfferURL = "invalid offer URL"
     static let invalidRequestURL = "invalid request URL"
     static let selectCredentialForEveryRequest = "select a credential for every requested credential"
-    static let pinMustContain4Digits = "PIN must contain four digits"
-    static let pinConfirmationDoesNotMatch = "PIN confirmation does not match"
-    static let wrongPin = "Wrong PIN"
-    static let enableBiometricUnlock = "Enable biometric unlock"
     static let biometricUnlockNotAuthorized = "Biometric unlock was not authorized. Use the PIN instead."
     static let receivedCredentialsUnavailable = "received credentials are not available locally"
     static let transactionDataProfilesUnavailable = "Transaction data profiles could not be loaded; transaction-data presentation requests will be rejected."
@@ -163,11 +150,13 @@ class WalletViewModel: ObservableObject {
     @Published var inputFocusResetKey = 0
     @Published var transactionDataProfilesWarning: String?
     @Published var statusExpanded = false
-    @Published var auth: WalletAuthState = .setup
-    @Published var pin = ""
-    @Published var pinConfirmation = ""
-    @Published private(set) var pinSetupStep: PinSetupStep = .choose
-    @Published private(set) var isBiometricUnlockAvailable = false
+    let access: WalletAccessController
+    private var accessObservation: AnyCancellable?
+    var auth: WalletAuthState { get { access.auth } set { access.auth = newValue } }
+    var pin: String { get { access.pin } set { access.pin = newValue } }
+    var pinConfirmation: String { get { access.confirmation } set { access.confirmation = newValue } }
+    var pinSetupStep: PinSetupStep { access.step }
+    var isBiometricUnlockAvailable: Bool { access.biometricAvailable }
     @Published var showDcApiPresentationPreview: Bool = DemoSharingSettings.showDcApiPresentationPreview(
         appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
     ) {
@@ -199,8 +188,8 @@ class WalletViewModel: ObservableObject {
             proximityPresentation.refreshPreferences()
         }
     }
-    @Published var pinError: String?
-    @Published var isAuthenticating = false
+    var pinError: String? { access.pinError }
+    var isAuthenticating: Bool { access.isBusy }
     @Published private(set) var pendingPresentationContinuationURL: URL?
     @Published private(set) var pendingPresentationFormPostHTML: String?
     private var statusTab: WalletTab?
@@ -214,7 +203,6 @@ class WalletViewModel: ObservableObject {
     private var paymentConsentTask: Task<Void, Never>?
     @Published var paymentReview: PaymentReviewState = .notRequired
     private var biometricSigningAvailabilityTask: Task<Void, Never>?
-    private var authenticationTask: Task<Void, Never>?
     private var foregroundSequence = 0
     private var lastWarnedForegroundSequence: Int?
 
@@ -350,7 +338,7 @@ class WalletViewModel: ObservableObject {
     }
 
     func resetWallet() {
-        authenticationTask?.cancel()
+        access.cancelAttempt()
         receiveTask?.cancel()
         paymentConsentTask?.cancel()
         presentationTask?.cancel()
@@ -363,15 +351,8 @@ class WalletViewModel: ObservableObject {
                 await proximityPresentation.closeAndAwait()
                 try await walletClient.deleteLocalData()
                 identityScreen = nil
-                pinStore.clear()
+                access.reset()
                 clearWalletState()
-                pin = ""
-                pinConfirmation = ""
-                pinSetupStep = .choose
-                pinError = nil
-                isAuthenticating = false
-                biometricPromptConsumed = false
-                auth = .setup
                 refreshBiometricSigningAvailability()
                 do {
                     try await reconcileIdentityDocumentRegistrations()
@@ -389,7 +370,7 @@ class WalletViewModel: ObservableObject {
     }
 
     func lock() {
-        authenticationTask?.cancel()
+        access.cancelAttempt()
         proximityPresentation.dismiss()
         receiveTask?.cancel()
         paymentConsentTask?.cancel()
@@ -416,95 +397,37 @@ class WalletViewModel: ObservableObject {
         statusMessage = isReady ? WalletStatusText.walletReady : WalletStatusText.startingWallet
         statusExpanded = false
         statusHideTask?.cancel()
-        pin = ""
-        pinConfirmation = ""
-        pinError = nil
-        isAuthenticating = false
-        biometricPromptConsumed = false
-        auth = .login
+        access.lock()
     }
 
-    func updatePin(_ value: String) {
-        guard !isAuthenticating, auth == .login || (auth == .setup && pinSetupStep == .choose) else { return }
-        pin = value
-        pinConfirmation = ""
-        pinError = nil
-    }
-
-    func updatePinConfirmation(_ value: String) {
-        guard !isAuthenticating, auth == .setup, pinSetupStep == .confirm else { return }
-        pinConfirmation = value
-        pinError = nil
-        if value.count == Self.pinLength { submitPin() }
-    }
-
-    func editSetupPin() {
-        guard auth == .setup, !isAuthenticating else { return }
-        pinSetupStep = .choose
-        pinConfirmation = ""
-        pinError = nil
-    }
-
-    func submitPin() {
-        guard !isAuthenticating else { return }
-        switch auth {
-        case .setup:
-            submitSetupPin()
-        case .login:
-            submitLoginPin()
-        case .storageUnavailable, .biometricSetup, .unlocked:
-            break
-        }
-    }
-
-    func unlockWithBiometrics(force: Bool = false) {
-        guard auth == .login else { return }
-        guard force || !biometricPromptConsumed else { return }
-        guard !isAuthenticating else { return }
-        guard !pinStore.isBiometricSetupPending, pinStore.isBiometricUnlockEnabled, biometricAuthenticator.isAvailable else { return }
-        biometricPromptConsumed = true
-        isAuthenticating = true
-        authenticationTask = Task {
-            let result = await biometricAuthenticator.authenticate(reason: "Unlock the wallet")
-            guard !Task.isCancelled, auth == .login else { return }
-            isAuthenticating = false
-            if result == .succeeded {
-                auth = .unlocked
-                showBiometricSigningWarningIfNeeded(
-                    warningSequence: foregroundSequence > 0 ? foregroundSequence : nil
-                )
-                bootstrapIfNeeded()
-            }
-        }
-    }
+    func updatePin(_ value: String) { access.updatePin(value) }
+    func updatePinConfirmation(_ value: String) { access.updatePin(value, confirming: true) }
+    func editSetupPin() { access.back() }
+    func clearPin() { access.clearPin() }
+    func submitPin() { access.submitPin() }
+    func unlockWithBiometrics(force: Bool = false) { access.unlockWithBiometrics(force: force) }
+    func retryBiometricSetup() { access.retryBiometricSetup() }
+    func continueWithoutBiometrics() { access.continueWithoutBiometrics() }
+    func startPinChange() { access.startPinChange() }
+    func cancelPinChange() { access.cancelPinChange() }
+    func setBiometricUnlockEnabled(_ enabled: Bool) { access.setBiometricUnlock(enabled) }
 
     func unlockForTests(pin: String = "1234") {
-        self.pin = pin
-        submitPin()
+        updatePin(pin)
         if auth == .setup && pinSetupStep == .confirm { updatePinConfirmation(pin) }
     }
 
-    func promptBiometricUnlockIfNeeded() {
-        guard auth == .login else { return }
-        unlockWithBiometrics()
-    }
+    func promptBiometricUnlockIfNeeded() { access.unlockWithBiometrics() }
 
     func handleApplicationBecameActive() {
         refreshBiometricAvailability()
         foregroundSequence += 1
         refreshBiometricSigningAvailability(warningSequence: foregroundSequence)
-        promptBiometricUnlockIfNeeded()
     }
 
-    var isBiometricUnlockEnabled: Bool { !pinStore.isBiometricSetupPending && pinStore.isBiometricUnlockEnabled }
-
-    var shouldPromptBiometricUnlock: Bool {
-        auth == .login && !pinStore.isBiometricSetupPending && !biometricPromptConsumed && isBiometricUnlockEnabled && isBiometricUnlockAvailable
-    }
-
-    func refreshBiometricAvailability() {
-        isBiometricUnlockAvailable = biometricAuthenticator.isAvailable
-    }
+    var isBiometricUnlockEnabled: Bool { access.biometricEnabled }
+    var shouldPromptBiometricUnlock: Bool { access.shouldPromptBiometrics }
+    func refreshBiometricAvailability() { access.refreshBiometrics() }
 
     var isBiometricSigningAvailable: Bool {
         biometricSigningAvailability == .available
@@ -628,9 +551,6 @@ class WalletViewModel: ObservableObject {
     private let walletClient: any WalletClient
     private let signingProtectionStore: any WalletDemoSigningProtectionStore
     private let identityDocumentRegistrationUpdate: @Sendable () async throws -> Void
-    private let pinStore: DemoPinStore
-    private let biometricAuthenticator: any DemoBiometricAuthenticator
-    private var biometricPromptConsumed = false
 
     init(
         walletID: String = "default",
@@ -714,18 +634,30 @@ class WalletViewModel: ObservableObject {
         self.identityDocumentRegistrationUpdate = identityDocumentRegistrationUpdate ?? {
             try await Self.defaultIdentityDocumentRegistrationUpdate()
         }
-        self.pinStore = pinStore ?? (
+        let accessStore = pinStore ?? (
             walletClient == nil
                 ? UserDefaultsDemoPinStore(walletID: walletID)
                 : InMemoryDemoPinStore()
         )
-        self.biometricAuthenticator = biometricAuthenticator ?? (
+        let accessBiometrics = biometricAuthenticator ?? (
             walletClient == nil
                 ? LocalAuthenticationBiometricAuthenticator()
                 : UnavailableDemoBiometricAuthenticator()
         )
+        self.access = WalletAccessController(store: accessStore, biometrics: accessBiometrics)
         transactionDataProfilesWarning = transactionDataProfiles.warning
-        auth = self.pinStore.hasPin ? .login : .setup
+        access.beforeSetupSave = { [weak self] in
+            guard let self else { return }
+            let selection = self.signingProtectionMode.resolve(self.selectedSigningProtection)
+            self.signingProtectionStore.save(selection)
+            self.selectedSigningProtection = selection
+        }
+        access.onUnlocked = { [weak self] in
+            guard let self else { return }
+            showBiometricSigningWarningIfNeeded(warningSequence: foregroundSequence > 0 ? foregroundSequence : nil)
+            bootstrapIfNeeded()
+        }
+        accessObservation = access.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
         refreshBiometricAvailability()
         refreshBiometricSigningAvailability()
     }
@@ -1688,116 +1620,7 @@ class WalletViewModel: ObservableObject {
         bootstrap(signingProtection: selectedSigningProtection)
     }
 
-    private func submitSetupPin() {
-        guard Self.isValidPin(pin) else {
-            pinError = WalletStatusText.pinMustContain4Digits
-            return
-        }
-        if pinSetupStep == .choose {
-            pinSetupStep = .confirm
-            pinConfirmation = ""
-            pinError = nil
-            return
-        }
-        guard pin == pinConfirmation else {
-            pinConfirmation = ""
-            pinError = WalletStatusText.pinConfirmationDoesNotMatch
-            return
-        }
-        isAuthenticating = true
-        pinError = nil
-        let confirmedPin = pin
-        authenticationTask = Task {
-            let selection = signingProtectionMode.resolve(selectedSigningProtection)
-            do {
-                signingProtectionStore.save(selection)
-                selectedSigningProtection = selection
-                let offerBiometrics = biometricAuthenticator.isAvailable
-                pinStore.isBiometricSetupPending = offerBiometrics
-                try await pinStore.setPin(confirmedPin)
-                guard !Task.isCancelled, auth == .setup else { return }
-                auth = .biometricSetup(nil)
-                pin = ""
-                pinConfirmation = ""
-                pinStore.isBiometricUnlockEnabled = false
-                if offerBiometrics { await authenticateBiometricSetup(expectedAuth: .biometricSetup(nil)) }
-                else { completeBiometricSetup(enabled: false) }
-            } catch {
-                guard !Task.isCancelled, auth == .setup else { return }
-                isAuthenticating = false
-                pinError = "PIN could not be saved. Try again."
-            }
-        }
-    }
-
-    func retryBiometricSetup() {
-        guard case .biometricSetup = auth, !isAuthenticating else { return }
-        let expectedAuth = auth
-        isAuthenticating = true
-        pinError = nil
-        authenticationTask = Task { await authenticateBiometricSetup(expectedAuth: expectedAuth) }
-    }
-
-    func continueWithoutBiometrics() {
-        guard case .biometricSetup = auth, !isAuthenticating else { return }
-        completeBiometricSetup(enabled: false)
-    }
-
-    private func authenticateBiometricSetup(expectedAuth: WalletAuthState) async {
-        let result = await biometricAuthenticator.authenticate(reason: WalletStatusText.enableBiometricUnlock)
-        guard !Task.isCancelled, auth == expectedAuth else { return }
-        if result == .succeeded { completeBiometricSetup(enabled: true) }
-        else {
-            auth = .biometricSetup(result)
-            isAuthenticating = false
-            refreshBiometricAvailability()
-        }
-    }
-
-    private func completeBiometricSetup(enabled: Bool) {
-        guard case .biometricSetup = auth else { return }
-        pinStore.isBiometricUnlockEnabled = enabled
-        pinStore.isBiometricSetupPending = false
-        isAuthenticating = false
-        pinError = nil
-        auth = .unlocked
-        bootstrapIfNeeded()
-    }
-
-    private func submitLoginPin() {
-        guard Self.isValidPin(pin) else {
-            pinError = WalletStatusText.pinMustContain4Digits
-            return
-        }
-        isAuthenticating = true
-        pinError = nil
-        let enteredPin = pin
-        authenticationTask = Task {
-            let matches = await pinStore.verifyPin(enteredPin)
-            guard !Task.isCancelled, auth == .login else { return }
-            isAuthenticating = false
-            if matches {
-                if pinStore.isBiometricSetupPending {
-                    pin = ""
-                    auth = .biometricSetup(nil)
-                    return
-                }
-                auth = .unlocked
-                showBiometricSigningWarningIfNeeded(
-                    warningSequence: foregroundSequence > 0 ? foregroundSequence : nil
-                )
-                bootstrapIfNeeded()
-            } else {
-                pinError = WalletStatusText.wrongPin
-            }
-        }
-    }
-
-    private static func isValidPin(_ pin: String) -> Bool {
-        pin.utf8.count == pinLength && pin.utf8.allSatisfy { (48...57).contains($0) }
-    }
-
-    static let pinLength = 4
+    static let pinLength = WalletAccessController.pinLength
 
     private func bootstrap(signingProtection: WalletDemoSigningProtection) {
         setLoading(WalletStatusText.bootstrappingWallet)

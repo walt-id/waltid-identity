@@ -173,4 +173,18 @@
     <string name="account_working">Working…</string>
     <string name="account_sign_in">Sign in</string>
     <string name="account_create">Create account</string>
+    <string name="settings_wallet_access">Wallet access</string>
+    <string name="settings_wallet_access_summary">PIN and biometric unlock</string>
+    <string name="settings_change_pin">Change PIN</string>
+    <string name="settings_biometric_unlock">Biometric unlock</string>
+    <string name="settings_face_id_unlock">Unlock with Face ID</string>
+    <string name="settings_touch_id_unlock">Unlock with Touch ID</string>
+    <string name="settings_biometric_unavailable">Biometric unlock is unavailable on this device.</string>
+    <string name="pin_current">Enter your current PIN</string>
+    <string name="pin_create_new">Choose a new PIN</string>
+    <string name="pin_clear">Clear</string>
+    <string name="pin_cancel">Cancel</string>
+    <string name="pin_retry_biometrics">Try biometrics</string>
+    <string name="pin_retry_face_id">Try Face ID</string>
+    <string name="pin_retry_touch_id">Try Touch ID</string>
 </resources>

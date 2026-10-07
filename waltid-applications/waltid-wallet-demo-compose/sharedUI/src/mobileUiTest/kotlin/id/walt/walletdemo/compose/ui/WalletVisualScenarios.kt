@@ -79,7 +79,7 @@ internal class WalletVisualScenarios(
         val controller = id.walt.walletdemo.compose.logic.WalletDemoController(WalletUiTestWallet(), id.walt.walletdemo.compose.logic.InMemoryDemoPinStore())
         val flow = if (unavailable) id.walt.walletdemo.compose.logic.WalletExternalFlow.UnavailableCallback("openid://callback")
             else id.walt.walletdemo.compose.logic.WalletExternalFlow.Active("openid-credential-offer://fixture", id.walt.walletdemo.compose.logic.WalletExternalFlow.Kind.Offer)
-        val state = WalletDemoUiState(auth = id.walt.walletdemo.compose.logic.WalletAuthState.Unlocked,
+        val state = WalletDemoUiState(access = id.walt.walletdemo.compose.logic.WalletAccessState(auth = id.walt.walletdemo.compose.logic.WalletAuthState.Unlocked),
             session = WalletVisualFixtures.partialResult.session, selectedTab = WalletDemoTab.Receive, externalFlow = flow,
             offerPreview = if (unavailable) null else WalletVisualFixtures.offer, issuanceCopyCounts = WalletVisualFixtures.copies)
         content {
@@ -106,7 +106,7 @@ internal class WalletVisualScenarios(
             override fun hasPin() = true
         } else memory
         val controller = id.walt.walletdemo.compose.logic.WalletDemoController(WalletUiTestWallet(), store, biometrics)
-        if (state == "unlock") controller.updatePin("1234")
+        if (state == "unlock") controller.updatePin("12")
         else if (state != "setup") {
             controller.updatePin("1234")
             controller.submitPin()
@@ -114,23 +114,80 @@ internal class WalletVisualScenarios(
             if (state == "compact_dark_large_text") controller.updatePinConfirmation("123")
             if (state == "biometric_prompt") controller.updatePinConfirmation("1234")
         }
-        val auth = controller.state.value.auth as id.walt.walletdemo.compose.logic.WalletAuthState.PinEntry
-        content { id.walt.walletdemo.compose.ui.screens.PinScreen(controller, auth, state == "biometric_prompt", biometrics.isAvailable()) }
+        if (state == "biometric_prompt") {
+            waitUntil { controller.state.value.auth is id.walt.walletdemo.compose.logic.WalletAuthState.BiometricSetup }
+            content { id.walt.walletdemo.compose.ui.screens.BiometricSetupScreen(
+                controller.state.value.auth as id.walt.walletdemo.compose.logic.WalletAuthState.BiometricSetup,
+                busy = true, available = true, onRetry = {}, onContinue = {}) }
+            onNodeWithTag(WalletUiTestTags.BiometricSetupRetry).assertIsNotEnabled()
+            onNodeWithTag(WalletUiTestTags.BiometricSetupContinue).assertIsNotEnabled()
+            capture("onboarding.pin.$state")
+            gate.complete(id.walt.walletdemo.compose.logic.DemoBiometricResult.Failed)
+            return@with
+        }
+        val access = controller.state.value.access
+        content {
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalLayoutDirection provides
+                    if (state == "rtl") androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr,
+                LocalWalletVisualPreferences provides WalletVisualPreferences(reduceMotion = state == "rtl"),
+            ) { id.walt.walletdemo.compose.ui.screens.PinScreen(controller, access) }
+        }
         onAllNodesWithTag("wallet.pinBiometricToggle").assertCountEquals(0)
         val confirming = state !in setOf("setup", "unlock")
         onNodeWithTag(if (confirming) WalletUiTestTags.PinConfirmationInput else WalletUiTestTags.PinInput).assertIsDisplayed()
         onAllNodesWithTag(if (confirming) WalletUiTestTags.PinInput else WalletUiTestTags.PinConfirmationInput).assertCountEquals(0)
         when (state) {
-            "unlock" -> onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsEnabled()
-            "biometric_prompt" -> {
-                onNodeWithTag(WalletUiTestTags.PinBackButton).assertIsNotEnabled()
-                onNodeWithText("Authenticating…").assertIsDisplayed()
-            }
+            "unlock" -> onNodeWithTag(WalletUiTestTags.PinClearButton).assertIsEnabled()
             "mismatch" -> onNodeWithText("PIN confirmation does not match").assertIsDisplayed()
         }
-        if (state != "unlock") onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsDisplayed().assertIsNotEnabled()
+        onAllNodesWithTag(WalletUiTestTags.PinSubmitButton).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.PinClearButton).assertIsDisplayed()
         capture("onboarding.pin.$state")
         gate.complete(id.walt.walletdemo.compose.logic.DemoBiometricResult.Failed)
+    }
+
+    fun walletAccess(state: String) = with(test) {
+        val controller = id.walt.walletdemo.compose.logic.WalletDemoController(WalletUiTestWallet(), id.walt.walletdemo.compose.logic.InMemoryDemoPinStore())
+        val entry = id.walt.walletdemo.compose.logic.WalletAuthState.Login(
+            error = if (state == "rejected") "Wrong PIN" else null,
+            biometricPromptConsumed = true,
+            biometricOutcome = when (state) {
+                "biometric_fallback" -> id.walt.walletdemo.compose.logic.DemoBiometricResult.Failed
+                "biometric_lockout" -> id.walt.walletdemo.compose.logic.DemoBiometricResult.LockedOut
+                else -> null
+            })
+        val unlocking = state in setOf("rejected", "biometric_fallback", "biometric_lockout")
+        val access = id.walt.walletdemo.compose.logic.WalletAccessState(
+            auth = if (unlocking) entry else id.walt.walletdemo.compose.logic.WalletAuthState.Unlocked,
+            biometricAvailable = state == "biometric_fallback", biometricEnabled = state.startsWith("biometric"),
+            pinChange = when (state) {
+                "current_pin" -> id.walt.walletdemo.compose.logic.WalletPinChange.Current()
+                "new_pin" -> id.walt.walletdemo.compose.logic.WalletPinChange.NewPin()
+                "confirmation", "save_failure" -> id.walt.walletdemo.compose.logic.WalletPinChange.NewPin(
+                    id.walt.walletdemo.compose.logic.WalletAuthState.Setup(pin = "5678", confirmation = if (state == "save_failure") "5678" else "",
+                        step = id.walt.walletdemo.compose.logic.PinSetupStep.Confirm))
+                else -> null
+            },
+            operation = if (state == "save_failure") id.walt.walletdemo.compose.logic.WalletAccessOperation.RetryPin("PIN could not be saved. Try again.")
+                else id.walt.walletdemo.compose.logic.WalletAccessOperation.Idle,
+            settingsNotice = if (state == "pin_changed") id.walt.walletdemo.compose.logic.WalletAccessNotice("PIN changed",
+                id.walt.walletdemo.compose.logic.WalletAccessNotice.Kind.Success) else null)
+        content {
+            if (unlocking) id.walt.walletdemo.compose.ui.screens.PinScreen(controller, access)
+            else Column {
+                if (access.pinChange == null) WalletScreenHeader("Wallet access")
+                id.walt.walletdemo.compose.ui.screens.WalletAccessSettingsScreen(controller, access)
+            }
+        }
+        when (state) {
+            "default", "pin_changed" -> onNodeWithTag(WalletUiTestTags.SettingsChangePin).assertIsDisplayed()
+            "confirmation", "save_failure" -> onNodeWithTag(WalletUiTestTags.PinConfirmationInput).assertIsDisplayed()
+            else -> onNodeWithTag(WalletUiTestTags.PinInput).assertIsDisplayed()
+        }
+        if (state == "save_failure") onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsDisplayed().assertIsEnabled()
+        if (state == "biometric_fallback") onNodeWithTag(WalletUiTestTags.PinBiometricButton).assertIsDisplayed()
+        capture(if (unlocking) "access.unlock.$state" else "settings.access.$state")
     }
 
     fun keySetup(page: String) = with(test) {

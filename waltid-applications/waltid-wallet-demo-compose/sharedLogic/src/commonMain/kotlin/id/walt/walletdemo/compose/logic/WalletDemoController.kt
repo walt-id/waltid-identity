@@ -38,7 +38,6 @@ class WalletDemoController(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
-    private var authenticationJob: Job? = null
     private var receiveJob: Job? = null
     private var issuanceSession: WalletDemoIssuanceSession? = null
     private var pendingAuthorizationCallback: String? = null
@@ -52,8 +51,7 @@ class WalletDemoController(
     private var lastWarnedForegroundSequence: Long? = null
 
     private fun initialState(): WalletDemoUiState = WalletDemoUiState(
-        auth = readInitialAuthState(),
-        biometricUnlockAvailable = !skipPin && biometricAuthenticator.isAvailable(),
+        access = WalletAccessController.initialState(pinStore, biometricAuthenticator, skipPin),
         signingProtectionMode = signingProtectionMode,
         selectedSigningProtection = signingProtectionMode.resolve(signingProtectionStore.load()),
         showDcApiPresentationPreview = sharingSettings.showDcApiPresentationPreview(),
@@ -85,58 +83,37 @@ class WalletDemoController(
         }
     }
 
-    fun updatePin(value: String) {
-        _state.update { state ->
-            if (state.isAuthenticating) return@update state
-            when (val auth = state.auth) {
-                is WalletAuthState.Setup -> if (auth.step == PinSetupStep.Choose)
-                    state.copy(auth = auth.copy(pin = value, confirmation = "", error = null)) else state
-                is WalletAuthState.Login -> state.copy(auth = auth.copy(pin = value, error = null))
-                is WalletAuthState.StorageUnavailable,
-                is WalletAuthState.BiometricSetup,
-                WalletAuthState.Unlocked -> state
-            }
-        }
-    }
+    private val accessController = WalletAccessController(
+        store = pinStore, biometrics = biometricAuthenticator, scope = scope, dispatcher = dispatcher,
+        current = { _state.value.access },
+        update = { transform -> getAndUpdateState { it.copy(access = transform(it.access)) }.access },
+        beforeSetupSave = { signingProtectionStore.save(_state.value.selectedSigningProtection) },
+        onUnlocked = {
+            showBiometricSigningWarningIfNeeded(foregroundSequence.takeIf { it > 0 })
+            bootstrapIfNeeded()
+        },
+    )
 
-    fun updatePinConfirmation(value: String) {
-        _state.update { state ->
-            if (state.isAuthenticating) return@update state
-            when (val auth = state.auth) {
-                is WalletAuthState.Setup -> if (auth.step == PinSetupStep.Confirm)
-                    state.copy(auth = auth.copy(confirmation = value, error = null)) else state
-                is WalletAuthState.Login,
-                is WalletAuthState.StorageUnavailable,
-                is WalletAuthState.BiometricSetup,
-                WalletAuthState.Unlocked,
-                -> state
-            }
-        }
-        val setup = _state.value.auth as? WalletAuthState.Setup ?: return
-        if (setup.step == PinSetupStep.Confirm && value.length == PinLength) submitPin()
-    }
-
-    fun editSetupPin() {
-        _state.update { state ->
-            val setup = state.auth as? WalletAuthState.Setup ?: return@update state
-            if (state.isAuthenticating) state else
-                state.copy(auth = setup.copy(step = PinSetupStep.Choose, confirmation = "", error = null))
-        }
-    }
-
-    fun isBiometricUnlockAvailable(): Boolean = biometricAuthenticator.isAvailable()
-
-    fun isBiometricUnlockEnabled(): Boolean = !pinStore.isBiometricSetupPending() && pinStore.isBiometricUnlockEnabled()
-
-    fun refreshBiometricUnlockAvailability() {
-        _state.update { it.copy(biometricUnlockAvailable = biometricAuthenticator.isAvailable()) }
-    }
+    fun updatePin(value: String) = accessController.updatePin(value)
+    fun updatePinConfirmation(value: String) = accessController.updatePin(value, confirmation = true)
+    fun editSetupPin() = accessController.back()
+    fun clearPin() = accessController.clearPin()
+    fun submitPin() = accessController.submitPin()
+    fun retryPinStorage() = accessController.retryStorage()
+    fun unlockWithBiometrics(force: Boolean = false) = accessController.unlockWithBiometrics(force)
+    fun retryBiometricSetup() = accessController.retryBiometricSetup()
+    fun continueWithoutBiometrics() = accessController.continueWithoutBiometrics()
+    fun startPinChange() = accessController.startPinChange()
+    fun cancelPinChange() = accessController.cancelPinChange()
+    fun setBiometricUnlockEnabled(enabled: Boolean) = accessController.setBiometricUnlock(enabled)
+    fun isBiometricUnlockAvailable(): Boolean = _state.value.access.biometricAvailable
+    fun isBiometricUnlockEnabled(): Boolean = _state.value.access.biometricEnabled
+    fun refreshBiometricUnlockAvailability() = accessController.refreshBiometrics()
 
     fun handleApplicationForegrounded() {
         refreshBiometricUnlockAvailability()
         foregroundSequence += 1
         refreshBiometricSigningAvailability(foregroundSequence)
-        unlockWithBiometrics()
         if (_state.value.auth == WalletAuthState.Unlocked && _state.value.session is WalletSessionState.IdentitySetup) {
             refreshIdentityChoices()
         }
@@ -170,42 +147,6 @@ class WalletDemoController(
             _state.update { update(it).copy(sharingSettingsError = null) }
         } catch (cause: CancellationException) { throw cause }
         catch (_: Exception) { _state.update { it.copy(sharingSettingsError = message) } }
-    }
-
-    fun unlockWithBiometrics(force: Boolean = false) {
-        val auth = _state.value.auth as? WalletAuthState.Login ?: return
-        if ((!force && auth.biometricPromptConsumed) || _state.value.isAuthenticating) return
-        if (pinStore.isBiometricSetupPending() || !pinStore.isBiometricUnlockEnabled() || !biometricAuthenticator.isAvailable()) return
-
-        _state.update { state ->
-            val login = state.auth as? WalletAuthState.Login ?: return@update state
-            state.copy(
-                auth = login.copy(biometricPromptConsumed = true),
-                isAuthenticating = true,
-            )
-        }
-        val expectedAuth = _state.value.auth
-        authenticationJob = scope.launch(dispatcher) {
-            val result = try {
-                biometricAuthenticator.authenticate(WalletDisplayText.UnlockWithBiometrics)
-            } catch (cause: CancellationException) { throw cause }
-            catch (_: Exception) { DemoBiometricResult.Failed }
-            currentCoroutineContext().ensureActive()
-            if (_state.value.auth != expectedAuth) return@launch
-            when (result) {
-                DemoBiometricResult.Succeeded -> {
-                    _state.update {
-                        it.copy(
-                            auth = WalletAuthState.Unlocked,
-                            isAuthenticating = false,
-                        )
-                    }
-                    showBiometricSigningWarningIfNeeded(foregroundSequence.takeIf { it > 0 })
-                    bootstrapIfNeeded()
-                }
-                else -> _state.update { it.copy(isAuthenticating = false) }
-            }
-        }
     }
 
     fun selectSigningProtection(protection: WalletDemoSigningProtection) {
@@ -378,37 +319,16 @@ class WalletDemoController(
         }
     }
 
-    fun submitPin() {
-        if (_state.value.isAuthenticating) return
-        when (val auth = _state.value.auth) {
-            is WalletAuthState.Setup -> submitSetupPin(auth)
-            is WalletAuthState.Login -> submitLoginPin(auth)
-            is WalletAuthState.StorageUnavailable,
-            is WalletAuthState.BiometricSetup,
-            WalletAuthState.Unlocked -> Unit
-        }
-    }
-
-    fun retryPinStorage() {
-        _state.update { state ->
-            if (state.auth is WalletAuthState.StorageUnavailable) {
-                state.copy(auth = readInitialAuthState())
-            } else {
-                state
-            }
-        }
-    }
-
     fun lock() {
         if (skipPin) return
-        authenticationJob?.cancel()
+        accessController.cancelAttempt()
         receiveJob?.cancel()
         paymentConsentJob?.cancel()
         presentationJob?.cancel()
         val previous = getAndUpdateState {
             it.copy(
-                auth = WalletAuthState.Login(),
-                isAuthenticating = false,
+                access = it.access.copy(auth = WalletAuthState.Login(), operation = WalletAccessOperation.Idle,
+                    pinChange = null, settingsNotice = null),
                 operation = WalletOperationState.Idle,
                 requestDrafts = it.requestDrafts.copy(txCode = ""),
                 offerPreview = null,
@@ -481,7 +401,7 @@ class WalletDemoController(
     }
 
     fun resetWallet(beforeDelete: suspend () -> Unit = {}) {
-        authenticationJob?.cancel()
+        accessController.cancelAttempt()
         cancelActiveWalletWork()
         scope.launch(dispatcher) {
             runCatching { beforeDelete() }.exceptionOrNull()?.let { error ->
@@ -511,7 +431,7 @@ class WalletDemoController(
                 val message = WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, error)
                 _state.update {
                     it.copy(
-                        auth = if (skipPin) WalletAuthState.Unlocked else WalletAuthState.Setup(error = message),
+                        access = it.access.copy(auth = if (skipPin) WalletAuthState.Unlocked else WalletAuthState.Setup(error = message)),
                         operation = WalletOperationState.Failed(message, WalletDemoTab.Credentials),
                     ).withPublishedStatus()
                 }
@@ -1674,144 +1594,6 @@ class WalletDemoController(
         }
     }
 
-    private fun submitSetupPin(auth: WalletAuthState.Setup) {
-        val pin = auth.pin
-        if (!isValidPin(pin)) {
-            setSetupPinError(WalletDisplayText.PinMustContain4Digits)
-            return
-        }
-
-        if (auth.step == PinSetupStep.Choose) {
-            _state.update { state ->
-                if (state.auth == auth && !state.isAuthenticating)
-                    state.copy(auth = auth.copy(step = PinSetupStep.Confirm, confirmation = "", error = null)) else state
-            }
-            return
-        }
-
-        if (pin != auth.confirmation) {
-            _state.update { state ->
-                if (state.auth == auth) state.copy(auth = auth.copy(confirmation = "",
-                    error = WalletDisplayText.PinConfirmationDoesNotMatch)) else state
-            }
-            return
-        }
-
-        val previous = getAndUpdateState { state ->
-            if (state.auth == auth && !state.isAuthenticating) state.copy(isAuthenticating = true) else state
-        }
-        if (previous.auth != auth || previous.isAuthenticating) return
-        authenticationJob = scope.launch(dispatcher) {
-            val protection = _state.value.selectedSigningProtection
-            try {
-                signingProtectionStore.save(protection)
-                val offerBiometrics = biometricAuthenticator.isAvailable()
-                pinStore.setBiometricSetupPending(offerBiometrics)
-                pinStore.setPin(pin)
-                currentCoroutineContext().ensureActive()
-                if (_state.value.auth != auth) return@launch
-                val biometricSetup = WalletAuthState.BiometricSetup()
-                _state.update { it.copy(auth = biometricSetup) }
-                pinStore.setBiometricUnlockEnabled(false)
-                if (offerBiometrics) authenticateBiometricSetup(biometricSetup)
-                else completeBiometricSetup(enabled = false)
-            } catch (cause: CancellationException) { throw cause }
-            catch (_: Exception) {
-                if (_state.value.auth == auth) setSetupPinError("PIN could not be saved. Try again.")
-                else setBiometricSetupError()
-            } finally {
-                _state.update { if (it.auth == auth) it.copy(isAuthenticating = false) else it }
-            }
-        }
-    }
-
-    fun retryBiometricSetup() {
-        val auth = _state.value.auth as? WalletAuthState.BiometricSetup ?: return
-        val previous = getAndUpdateState {
-            if (it.auth == auth && !it.isAuthenticating) it.copy(isAuthenticating = true) else it
-        }
-        if (previous.auth != auth || previous.isAuthenticating) return
-        authenticationJob = scope.launch(dispatcher) { authenticateBiometricSetup(auth) }
-    }
-
-    fun continueWithoutBiometrics() {
-        if (_state.value.auth !is WalletAuthState.BiometricSetup || _state.value.isAuthenticating) return
-        completeBiometricSetup(enabled = false)
-    }
-
-    private suspend fun authenticateBiometricSetup(auth: WalletAuthState.BiometricSetup) {
-        val result = try {
-            biometricAuthenticator.authenticate(WalletDisplayText.EnableBiometricUnlock)
-        } catch (cause: CancellationException) { throw cause }
-        catch (_: Exception) { DemoBiometricResult.Failed }
-        currentCoroutineContext().ensureActive()
-        if (_state.value.auth != auth) return
-        if (result == DemoBiometricResult.Succeeded) completeBiometricSetup(enabled = true)
-        else {
-            val available = biometricAuthenticator.isAvailable()
-            _state.update { it.copy(auth = auth.copy(outcome = result, error = null), isAuthenticating = false,
-                biometricUnlockAvailable = available) }
-        }
-    }
-
-    private fun completeBiometricSetup(enabled: Boolean) {
-        if (_state.value.auth !is WalletAuthState.BiometricSetup) return
-        try {
-            pinStore.setBiometricUnlockEnabled(enabled)
-            pinStore.setBiometricSetupPending(false)
-            _state.update { it.copy(auth = WalletAuthState.Unlocked, isAuthenticating = false) }
-            showBiometricSigningWarningIfNeeded(foregroundSequence.takeIf { it > 0 })
-            bootstrapIfNeeded()
-        } catch (cause: CancellationException) { throw cause }
-        catch (_: Exception) { setBiometricSetupError() }
-    }
-
-    private fun setBiometricSetupError() {
-        _state.update {
-            val auth = it.auth as? WalletAuthState.BiometricSetup ?: return@update it
-            it.copy(auth = auth.copy(error = "Could not save the biometric choice. Try again."), isAuthenticating = false)
-        }
-    }
-
-    private fun submitLoginPin(auth: WalletAuthState.Login) {
-        val pin = auth.pin
-        if (!isValidPin(pin)) {
-            setLoginPinError(WalletDisplayText.PinMustContain4Digits)
-            return
-        }
-
-        val previous = getAndUpdateState {
-            if (it.auth == auth && !it.isAuthenticating) it.copy(isAuthenticating = true) else it
-        }
-        if (previous.auth != auth || previous.isAuthenticating) return
-        authenticationJob = scope.launch(dispatcher) {
-            try {
-                val matches = pinStore.verifyPin(pin)
-                currentCoroutineContext().ensureActive()
-                if (_state.value.auth != auth) return@launch
-                if (!matches) {
-                    setLoginPinError(WalletDisplayText.WrongPin)
-                    return@launch
-                }
-                if (pinStore.isBiometricSetupPending()) {
-                    _state.update { it.copy(auth = WalletAuthState.BiometricSetup(), isAuthenticating = false) }
-                    return@launch
-                }
-                _state.update {
-                    it.copy(
-                        auth = WalletAuthState.Unlocked,
-                        isAuthenticating = false,
-                    )
-                }
-                showBiometricSigningWarningIfNeeded(foregroundSequence.takeIf { it > 0 })
-                bootstrapIfNeeded()
-            } catch (cause: CancellationException) { throw cause }
-            catch (_: Exception) {
-                if (_state.value.auth == auth) setLoginPinError("PIN could not be verified")
-            }
-        }
-    }
-
     fun refreshIdentityDetails() {
         val session = _state.value.session as? WalletSessionState.Ready ?: return
         if (_state.value.identityBusy) return
@@ -2025,26 +1807,6 @@ class WalletDemoController(
         }
     }
 
-    private fun setSetupPinError(message: String) {
-        _state.update { state ->
-            val auth = state.auth as? WalletAuthState.Setup ?: return@update state
-            state.copy(
-                auth = auth.copy(error = message),
-                isAuthenticating = false,
-            )
-        }
-    }
-
-    private fun setLoginPinError(message: String) {
-        _state.update { state ->
-            val auth = state.auth as? WalletAuthState.Login ?: return@update state
-            state.copy(
-                auth = auth.copy(error = message),
-                isAuthenticating = false,
-            )
-        }
-    }
-
     private fun setSigningProtectionError(
         error: Throwable,
         previousSelection: WalletDemoSigningProtection,
@@ -2108,21 +1870,9 @@ class WalletDemoController(
     private fun WalletDemoUiState.withPublishedStatus(): WalletDemoUiState =
         copy(statusOccurrenceId = statusOccurrenceId + 1)
 
-    private fun readInitialAuthState(): WalletAuthState =
-        if (skipPin) {
-            WalletAuthState.Unlocked
-        } else {
-            runCatching {
-                if (pinStore.hasPin()) WalletAuthState.Login() else WalletAuthState.Setup()
-            }.getOrElse {
-                WalletAuthState.StorageUnavailable()
-            }
-        }
-
     companion object {
-        const val PinLength = 4
+        const val PinLength = WalletAccessController.PinLength
         private val SuccessBannerAutoHide = 4.seconds
 
-        private fun isValidPin(pin: String): Boolean = pin.length == PinLength && pin.all { it in '0'..'9' }
     }
 }

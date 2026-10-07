@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B14400000000000000000006 /* WalletAccessSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14400000000000000000005 /* WalletAccessSettingsView.swift */; };
+		B14400000000000000000004 /* WalletAccessScaffold.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14400000000000000000003 /* WalletAccessScaffold.swift */; };
+		B14400000000000000000002 /* WalletAccessController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B14400000000000000000001 /* WalletAccessController.swift */; };
 		A1000470AAAA000100000070 /* WalletPinInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000470AAAA000000000070 /* WalletPinInput.swift */; };
 		13330004AAAA000100000003 /* PresentationErrorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330004AAAA000000000003 /* PresentationErrorView.swift */; };
 		13330004AAAA000100000002 /* WalletExternalFlowStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330004AAAA000000000002 /* WalletExternalFlowStatus.swift */; };
@@ -167,6 +170,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B14400000000000000000005 /* WalletAccessSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAccessSettingsView.swift; sourceTree = "<group>"; };
+		B14400000000000000000003 /* WalletAccessScaffold.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAccessScaffold.swift; sourceTree = "<group>"; };
+		B14400000000000000000001 /* WalletAccessController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAccessController.swift; sourceTree = "<group>"; };
 		A1000470AAAA000000000070 /* WalletPinInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletPinInput.swift; sourceTree = "<group>"; };
 		13330004AAAA000000000003 /* PresentationErrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresentationErrorView.swift; sourceTree = "<group>"; };
 		13330004AAAA000000000002 /* WalletExternalFlowStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletExternalFlowStatus.swift; sourceTree = "<group>"; };
@@ -319,6 +325,7 @@
 			isa = PBXGroup;
 			children = (
 				13330030AAAA000000000001 /* WalletIdentityScreenModel.swift */,
+				B14400000000000000000001 /* WalletAccessController.swift */,
 				A1000001AAAA000000000001 /* WalletViewModel.swift */,
 				13330004AAAA000000000001 /* WalletExternalFlow.swift */,
 				A1000460AAAA000000000060 /* ProximityPresentationViewModel.swift */,
@@ -360,6 +367,7 @@
 				BB7490000000000000000002 /* ReaderTrustSettingsView.swift */,
 				218A1C4A90404CA396529810 /* DigitalCredentialsSettingsView.swift */,
 				BB7490000000000000000001 /* NearbySettingsView.swift */,
+				B14400000000000000000005 /* WalletAccessSettingsView.swift */,
 				A1000442AAAA000000000042 /* PinView.swift */,
 				13330030AAAA000000000030 /* BiometricSetupView.swift */,
 			);
@@ -370,6 +378,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000006AAAA000000000006 /* StatusBannerView.swift */,
+				B14400000000000000000003 /* WalletAccessScaffold.swift */,
 				A1000470AAAA000000000070 /* WalletPinInput.swift */,
 				A1000441AAAA000000000041 /* WalletTabChrome.swift */,
 				13330036AAAA000000000002 /* WalletSuccessDismissal.swift */,
@@ -759,6 +768,7 @@
 				B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */,
 				B33B17EA2C2C394F001A32F7 /* WalletDemoApp.swift in Sources */,
 				13330030AAAA000100000001 /* WalletIdentityScreenModel.swift in Sources */,
+				B14400000000000000000002 /* WalletAccessController.swift in Sources */,
 				A1000001AAAA000100000001 /* WalletViewModel.swift in Sources */,
 				13330004AAAA000100000001 /* WalletExternalFlow.swift in Sources */,
 				A1000460AAAA000100000060 /* ProximityPresentationViewModel.swift in Sources */,
@@ -795,10 +805,12 @@
 				BB7491000000000000000002 /* ReaderTrustSettingsView.swift in Sources */,
 				800619A4865746A58B033223 /* DigitalCredentialsSettingsView.swift in Sources */,
 				BB7491000000000000000001 /* NearbySettingsView.swift in Sources */,
+				B14400000000000000000004 /* WalletAccessScaffold.swift in Sources */,
 				A1000470AAAA000100000070 /* WalletPinInput.swift in Sources */,
 				A1000441AAAA000100000041 /* WalletTabChrome.swift in Sources */,
 				13330036AAAA000100000002 /* WalletSuccessDismissal.swift in Sources */,
 				13330036AAAA000100000001 /* WalletExternalPresentation.swift in Sources */,
+				B14400000000000000000006 /* WalletAccessSettingsView.swift in Sources */,
 				A1000442AAAA000100000042 /* PinView.swift in Sources */,
 				13330030AAAA000100000030 /* BiometricSetupView.swift in Sources */,
 				A1000443AAAA000100000043 /* DemoPinStore.swift in Sources */,

@@ -357,30 +357,14 @@ final class WalletE2EUI {
 
     private func unlockWallet() {
         let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
-        guard pinInput.waitForExistence(timeout: 10) else {
-            return
-        }
-
-        // Wait for the step action before entering the first PIN.
-        _ = button(identifier: "wallet.pinSubmitButton", fallbackLabel: "Continue")
-            .waitForExistence(timeout: 5)
-
-        let settleDeadline = Date().addingTimeInterval(2)
-        while Date() < settleDeadline && !pinInput.isHittable {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        }
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-
-        replaceText(in: pinInput, value: pin)
-
-        if app.staticTexts["Step 1 of 2"].exists {
-            tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Continue")
+        guard pinInput.waitForExistence(timeout: 10) else { return }
+        let creating = app.staticTexts["Step 1 of 2"].exists
+        replaceText(in: pinInput, value: pin, dismiss: false)
+        if creating {
             let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
-            XCTAssertTrue(confirmation.waitForExistence(timeout: 10))
+            XCTAssertTrue(confirmation.waitForExistence(timeout: 10), app.debugDescription)
             XCTAssertFalse(pinInput.exists, "Choose and Confirm must be separate screens")
             replaceText(in: confirmation, value: pin, dismiss: false)
-        } else {
-            tapButton(identifier: "wallet.pinSubmitButton", fallbackLabel: "Unlock")
         }
     }
 
