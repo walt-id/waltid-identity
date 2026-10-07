@@ -24,10 +24,16 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(AndroidJUnit4::class)
 class PinPersistenceTest {
     @Before
-    fun clearPinBeforeTest() = clearPersistedPin()
+    fun clearPinBeforeTest() {
+        org.junit.Assume.assumeTrue("PIN-reset tests require an isolated emulator",
+            android.os.Build.HARDWARE in setOf("ranchu", "goldfish"))
+        clearPersistedPin()
+    }
 
     @After
-    fun clearPinAfterTest() = clearPersistedPin()
+    fun clearPinAfterTest() {
+        if (android.os.Build.HARDWARE in setOf("ranchu", "goldfish")) clearPersistedPin()
+    }
 
     @Test
     fun pinStepsKeepConfirmationSeparateAndActionsAboveTheKeyboard() {
@@ -39,23 +45,23 @@ class PinPersistenceTest {
         assertTrue(device.hasObject(By.text("Step 1 of 2")))
         assertTrue(!device.hasObject(By.res("wallet.pinConfirmationInput")))
         assertTrue(!device.hasObject(By.res("wallet.pinBiometricToggle")))
-        assertPinSubmitAboveKeyboard(instrumentation, device) // No tap: Choose opens the IME itself.
+        assertPinActionAboveKeyboard(instrumentation, device) // No tap: Choose opens the IME itself.
         input.setText("123")
-        assertPinSubmitAboveKeyboard(instrumentation, device)
-        assertTrue(!requireNotNull(device.findObject(By.res("wallet.pinSubmitButton"))).isEnabled)
+        assertPinActionAboveKeyboard(instrumentation, device)
+        assertTrue(!device.hasObject(By.res("wallet.pinSubmitButton")))
+        val chooseY = input.visibleBounds.centerY()
         input.setText(WalletComposeE2EHelper.PIN)
-        WalletComposeE2EHelper.dismissKeyboard(device)
-        WalletComposeE2EHelper.clickByTag(device, "wallet.pinSubmitButton")
         val confirmation = requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinConfirmationInput", 10_000))
         assertTrue(!device.hasObject(By.res("wallet.pinInput")))
-        assertPinSubmitAboveKeyboard(instrumentation, device) // Confirm also restores a dismissed IME.
+        assertPinActionAboveKeyboard(instrumentation, device)
+        assertTrue("The stable editor moved between Choose and Confirm", kotlin.math.abs(confirmation.visibleBounds.centerY() - chooseY) <= 2)
         confirmation.setText("123")
-        assertPinSubmitAboveKeyboard(instrumentation, device)
-        device.pressBack() // Hide the IME first.
+        assertPinActionAboveKeyboard(instrumentation, device)
+        WalletComposeE2EHelper.dismissKeyboard(device) // Wait until IME dismissal finishes before system Back.
         device.pressBack() // The system Back action returns to Choose, rather than exiting.
         assertTrue(device.wait(Until.hasObject(By.text("Step 1 of 2")), 10_000))
-        assertPinSubmitAboveKeyboard(instrumentation, device)
-        WalletComposeE2EHelper.clickByTag(device, "wallet.pinSubmitButton")
+        assertPinActionAboveKeyboard(instrumentation, device)
+        requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 10_000)).setText(WalletComposeE2EHelper.PIN)
         val retry = requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinConfirmationInput", 10_000))
         retry.setText("4321")
         assertTrue(device.wait(Until.hasObject(By.text("PIN confirmation does not match")), 10_000))
@@ -64,8 +70,42 @@ class PinPersistenceTest {
         WalletComposeE2EHelper.launch(context)
         requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 30_000))
         assertTrue(!device.hasObject(By.text("Step 1 of 2")))
-        assertPinSubmitAboveKeyboard(instrumentation, device) // PIN-only Unlock focuses without a tap.
+        assertPinActionAboveKeyboard(instrumentation, device) // PIN-only Unlock focuses without a tap.
+        requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 10_000)).setText("0000")
+        assertTrue(device.wait(Until.hasObject(By.text("Wrong PIN")), 10_000))
+        assertTrue(device.findObject(By.res("wallet.pinInput")).text.isEmpty())
+        assertPinActionAboveKeyboard(instrumentation, device)
         WalletComposeE2EHelper.unlock(device)
+    }
+
+    @Test
+    fun walletAccessChangesPinAndPersistsOnlyTheConfirmedReplacement() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val device = UiDevice.getInstance(instrumentation)
+        launchExpectingSetupAndUnlock(context, device)
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsButton")
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsWalletAccess")
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsChangePin")
+        requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 10_000)).setText("1234")
+        assertTrue(device.wait(Until.hasObject(By.text("Choose a new PIN")), 10_000))
+        assertPinActionAboveKeyboard(instrumentation, device)
+        device.findObject(By.res("wallet.pinInput")).setText("5678")
+        val confirmation = requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinConfirmationInput", 10_000))
+        confirmation.setText("5678")
+        assertTrue(device.wait(Until.hasObject(By.text("PIN changed")), 10_000))
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsBack")
+        WalletComposeE2EHelper.clickByTag(device, "wallet.settingsLock")
+        val input = requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 10_000))
+        input.setText("1234")
+        assertTrue(device.wait(Until.hasObject(By.text("Wrong PIN")), 10_000))
+        assertTrue(input.text.isEmpty())
+        assertPinActionAboveKeyboard(instrumentation, device)
+        input.setText("5678")
+        WalletComposeE2EHelper.awaitWalletReady(device)
+        WalletComposeE2EHelper.launch(context)
+        requireNotNull(WalletComposeE2EHelper.waitForResource(device, "wallet.pinInput", 10_000)).setText("5678")
+        WalletComposeE2EHelper.awaitWalletReady(device)
     }
 
     @Test
@@ -115,7 +155,7 @@ class PinPersistenceTest {
         }
     }
 
-    private fun assertPinSubmitAboveKeyboard(instrumentation: Instrumentation, device: UiDevice) {
+    private fun assertPinActionAboveKeyboard(instrumentation: Instrumentation, device: UiDevice) {
         val deadline = System.currentTimeMillis() + 10_000
         var observed: String? = null
         while (System.currentTimeMillis() < deadline) {
@@ -131,7 +171,7 @@ class PinPersistenceTest {
                     keyboardTop = location[1] + view.height - insets.getInsets(WindowInsets.Type.ime()).bottom
                 }
             }
-            val bounds = device.findObject(By.res("wallet.pinSubmitButton"))?.visibleBounds
+            val bounds = device.findObject(By.res("wallet.pinClearButton"))?.visibleBounds
             observed = "action=$bounds keyboardTop=$keyboardTop"
             if (keyboardTop != null && bounds != null && bounds.bottom <= keyboardTop) return
             Thread.sleep(100)

@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
 interface DemoBiometricAuthenticator {
+    val kind: DemoBiometricKind get() = DemoBiometricKind.Generic
     fun isAvailable(): Boolean
     suspend fun authenticate(reason: String): DemoBiometricResult
 }

@@ -142,6 +142,8 @@ internal fun WalletScreen(
             onProximityApprovalModeChange = onStartProximityPresentation?.let { controller::setProximityApprovalMode },
             allowWalletReset = allowWalletReset,
             serverSettingsContent = serverSettingsContent,
+            walletAccessContent = { WalletAccessSettingsScreen(controller, state.access) },
+            onCancelPinChange = controller::cancelPinChange,
         )
         return
     }

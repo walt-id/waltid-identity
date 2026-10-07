@@ -5,6 +5,8 @@ import Security
 enum DemoPinRecordError: Error {
     case randomGenerationFailed
     case derivationFailed
+    case missingRecord
+    case invalidRecord
 }
 
 protocol DemoPinStore: AnyObject {
@@ -12,7 +14,7 @@ protocol DemoPinStore: AnyObject {
     var isBiometricUnlockEnabled: Bool { get set }
     var isBiometricSetupPending: Bool { get set }
     func setPin(_ pin: String) async throws
-    func verifyPin(_ pin: String) async -> Bool
+    func verifyPin(_ pin: String) async throws -> Bool
     func clear()
 }
 
@@ -83,11 +85,12 @@ final class UserDefaultsDemoPinStore: DemoPinStore {
             salt.base64EncodedString(),
             verifier.base64EncodedString(),
         ].joined(separator: Self.recordSeparator)
+        try Task.checkCancellation()
         defaults.set(record, forKey: recordKey)
     }
 
-    func verifyPin(_ pin: String) async -> Bool {
-        guard let record = defaults.string(forKey: recordKey) else { return false }
+    func verifyPin(_ pin: String) async throws -> Bool {
+        guard let record = defaults.string(forKey: recordKey) else { throw DemoPinRecordError.missingRecord }
         let parts = record.split(
             separator: Character(Self.recordSeparator),
             maxSplits: 3,
@@ -103,7 +106,7 @@ final class UserDefaultsDemoPinStore: DemoPinStore {
               salt.count == Self.saltSizeBytes,
               expected.count == Self.verifierSizeBytes,
               let actual = Self.derive(pin: pin, salt: salt, iterations: iterations) else {
-            return false
+            throw DemoPinRecordError.invalidRecord
         }
         return Self.constantTimeEquals(actual, expected)
     }

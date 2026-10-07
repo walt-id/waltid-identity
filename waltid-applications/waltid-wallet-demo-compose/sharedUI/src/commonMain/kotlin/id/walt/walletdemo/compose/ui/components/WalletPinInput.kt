@@ -21,8 +21,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -44,19 +47,20 @@ internal fun WalletPinInput(
     var focused by remember { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
     BasicTextField(
-        value = value,
+        value = TextFieldValue(value, selection = TextRange(value.length)),
         onValueChange = { input ->
-            val digits = input.filter { it in '0'..'9' }.take(digitCount)
-            if (digits != value) onValueChange(digits)
+            val digits = input.text.filter { it in '0'..'9' }.take(digitCount)
+            if (enabled && digits != value) onValueChange(digits)
         },
-        enabled = enabled,
+        // Retain the IME session while a brief PIN check/save rejects edits.
+        enabled = true,
         singleLine = true,
         visualTransformation = PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { onSubmit() }),
         cursorBrush = SolidColor(Color.Transparent),
         modifier = modifier.fillMaxWidth().height(64.dp).onFocusChanged { focused = it.isFocused }
-            .semantics { contentDescription = label; stateDescription = progressDescription },
+            .semantics { contentDescription = label; stateDescription = progressDescription; if (!enabled) disabled() },
         decorationBox = { innerTextField ->
             Box {
                 Canvas(Modifier.fillMaxWidth().height(64.dp)) {
