@@ -18,6 +18,7 @@ class WalletImageLoaderInitializationTest {
 
         ActivityScenario.launch(MainActivity::class.java).use { activity ->
             activity.onActivity { assertSame(loader, SingletonImageLoader.get(it)) }
+            // Recreate immediately so resume still cancels a check the first launch left open.
             activity.recreate()
             activity.onActivity { assertSame(loader, SingletonImageLoader.get(it)) }
         }

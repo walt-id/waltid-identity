@@ -2,9 +2,19 @@ package id.walt.walletdemo.compose.logic
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.Runnable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -525,6 +535,158 @@ class WalletDemoControllerTest {
         runCurrent()
 
         assertNull(controller.state.value.biometricSigningAvailability)
+    }
+
+    @Test
+    fun cancelledBiometricSigningRefreshDoesNotPublishALateResult() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        var calls = 0
+        val wallet = object : DemoWallet by FakeDemoWallet() {
+            override suspend fun signingProtectionAvailability(
+                signingProtection: WalletDemoSigningProtection,
+            ): WalletDemoSigningProtectionAvailability {
+                calls += 1
+                if (calls == 1) {
+                    withContext(NonCancellable) { gate.await() }
+                    return WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
+                }
+                return WalletDemoSigningProtectionAvailability.Available
+            }
+        }
+        val controller = controllerWith(wallet, this)
+        val seen = mutableListOf<WalletDemoSigningProtectionAvailability?>()
+        val collector = launch {
+            controller.state.map { it.biometricSigningAvailability }.distinctUntilChanged().collect { seen += it }
+        }
+        runCurrent()
+
+        controller.handleApplicationForegrounded()
+        runCurrent()
+        controller.handleApplicationForegrounded()
+        runCurrent()
+        gate.complete(Unit)
+        runCurrent()
+        collector.cancel()
+
+        assertEquals(listOf(null, WalletDemoSigningProtectionAvailability.Available), seen)
+    }
+
+    @Test
+    fun biometricRefreshCancelsThePreviousCallOnItsDispatcher() {
+        val dispatcher = ManualDispatcher()
+        var calls = 0
+        var cancelledOnDispatcher = false
+        val wallet = object : DemoWallet by FakeDemoWallet() {
+            override suspend fun signingProtectionAvailability(
+                signingProtection: WalletDemoSigningProtection,
+            ): WalletDemoSigningProtectionAvailability {
+                calls += 1
+                if (calls == 1) {
+                    suspendCancellableCoroutine<Unit> { continuation ->
+                        continuation.invokeOnCancellation { cancelledOnDispatcher = dispatcher.executing }
+                    }
+                }
+                return WalletDemoSigningProtectionAvailability.Available
+            }
+        }
+        runManualRefresh(wallet, dispatcher) { controller, running ->
+            controller.handleApplicationForegrounded()
+            running.drain()
+            controller.handleApplicationForegrounded()
+            running.drain()
+            assertTrue(cancelledOnDispatcher)
+            assertEquals(
+                WalletDemoSigningProtectionAvailability.Available,
+                controller.state.value.biometricSigningAvailability,
+            )
+        }
+    }
+
+    @Test
+    fun supersededQueuedBiometricRefreshCancelsTheRunningCheck() {
+        val first = CompletableDeferred<Unit>()
+        var calls = 0
+        val cancelled = mutableListOf<Int>()
+        runManualRefresh(object : DemoWallet by FakeDemoWallet() {
+            override suspend fun signingProtectionAvailability(
+                signingProtection: WalletDemoSigningProtection,
+            ): WalletDemoSigningProtectionAvailability {
+                val call = ++calls
+                if (call == 1) {
+                    try {
+                        first.await()
+                    } catch (cancellation: CancellationException) {
+                        cancelled += call
+                        throw cancellation
+                    }
+                }
+                return if (call == 1) {
+                    WalletDemoSigningProtectionAvailability.BiometricNotEnrolled
+                } else {
+                    WalletDemoSigningProtectionAvailability.Available
+                }
+            }
+        }) { controller, dispatcher ->
+            controller.handleApplicationForegrounded()
+            dispatcher.drain()
+            assertEquals(1, calls)
+
+            controller.handleApplicationForegrounded()
+            controller.handleApplicationForegrounded()
+            dispatcher.runLatest()
+            dispatcher.drain()
+
+            assertEquals(listOf(1), cancelled)
+            assertEquals(2, calls)
+            assertEquals(
+                WalletDemoSigningProtectionAvailability.Available,
+                controller.state.value.biometricSigningAvailability,
+            )
+            first.complete(Unit)
+            dispatcher.drain()
+            assertEquals(
+                WalletDemoSigningProtectionAvailability.Available,
+                controller.state.value.biometricSigningAvailability,
+            )
+        }
+    }
+
+    @Test
+    fun supersededQueuedRefreshCancelsObsoleteLazyWalletInitializer() {
+        val inner = FakeDemoWallet().apply {
+            signingProtectionAvailability = WalletDemoSigningProtectionAvailability.Available
+        }
+        var creates = 0
+        var obsoleteInitializerCancelled = false
+        val wallet = object : LazyDemoWallet<DemoWallet>({
+            val attempt = ++creates
+            if (attempt == 1) {
+                try {
+                    awaitCancellation()
+                } catch (cancellation: CancellationException) {
+                    obsoleteInitializerCancelled = true
+                    throw cancellation
+                }
+            }
+            inner
+        }) {}
+        runManualRefresh(wallet) { controller, dispatcher ->
+            controller.handleApplicationForegrounded()
+            dispatcher.drain()
+            assertEquals(1, creates)
+
+            controller.handleApplicationForegrounded()
+            controller.handleApplicationForegrounded()
+            dispatcher.runLatest()
+            dispatcher.drain()
+
+            assertTrue(obsoleteInitializerCancelled)
+            assertEquals(2, creates)
+            assertEquals(
+                WalletDemoSigningProtectionAvailability.Available,
+                controller.state.value.biometricSigningAvailability,
+            )
+        }
     }
 
     @Test
@@ -2651,6 +2813,26 @@ class WalletDemoControllerTest {
             dispatcher = StandardTestDispatcher(scope.testScheduler),
         )
 
+    private fun runManualRefresh(
+        wallet: DemoWallet,
+        dispatcher: ManualDispatcher = ManualDispatcher(),
+        body: (WalletDemoController, ManualDispatcher) -> Unit,
+    ) {
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        try {
+            val controller = WalletDemoController(
+                wallet = wallet,
+                pinStore = InMemoryDemoPinStore(),
+                scope = scope,
+                dispatcher = dispatcher,
+            )
+            dispatcher.drain()
+            body(controller, dispatcher)
+        } finally {
+            scope.cancel()
+        }
+    }
+
     private fun unlockedControllerWith(wallet: DemoWallet, scope: TestScope): WalletDemoController {
         val controller = controllerWith(wallet, scope)
         controller.updatePin("1234")
@@ -2670,6 +2852,41 @@ class WalletDemoControllerTest {
             addedAt = "2026-06-17",
             credentialDataJson = WalletDemoSampleCredentialData.credentialDataJsonWithPortrait,
         )
+    }
+}
+
+private class ManualDispatcher : CoroutineDispatcher() {
+    private val queue = ArrayDeque<Runnable>()
+    var executing: Boolean = false
+        private set
+
+    override fun isDispatchNeeded(context: kotlin.coroutines.CoroutineContext): Boolean = true
+
+    override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) {
+        queue.addLast(block)
+    }
+
+    fun runLatest() {
+        check(queue.isNotEmpty()) { "expected a queued biometric refresh" }
+        run(queue.removeLast())
+    }
+
+    fun drain() {
+        var steps = 0
+        while (queue.isNotEmpty()) {
+            run(queue.removeFirst())
+            steps += 1
+            check(steps < 100) { "biometric refresh dispatcher did not settle" }
+        }
+    }
+
+    private fun run(block: Runnable) {
+        executing = true
+        try {
+            block.run()
+        } finally {
+            executing = false
+        }
     }
 }
 
