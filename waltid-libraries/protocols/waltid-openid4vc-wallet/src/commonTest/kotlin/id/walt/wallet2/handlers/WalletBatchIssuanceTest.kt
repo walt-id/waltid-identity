@@ -1203,6 +1203,8 @@ class WalletBatchIssuanceTest {
             assertEquals("dataset-a", handle.credentialIdentifier)
             val payload = Json.parseToJsonElement(records.list().single().payload).jsonObject
             assertFalse("request" in payload)
+            // Local-save recovery must not keep a credential-request token. Access tokens belong on
+            // received records only when a later issuer notification still has to be sent.
             assertFalse("accessToken" in payload)
             assertFalse("transactionId" in payload)
             val preparedIds = payload.getValue("content").jsonObject.getValue("credentials").jsonArray.map { it.jsonObject.getValue("id").jsonPrimitive.content }
