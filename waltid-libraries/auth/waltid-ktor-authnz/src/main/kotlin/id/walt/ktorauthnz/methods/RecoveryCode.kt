@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods
 
+import kotlin.time.Duration.Companion.days
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
@@ -46,8 +47,18 @@ object RecoveryCode : AuthenticationMethod("recovery-code") {
         val stored = lookupAccountStoredData<RecoveryCodesStoredData>(accountId)
         val codeDigest = digest(code)
         authCheck(codeDigest in stored.codeDigests, OTPAuthException())
-        KtorAuthnzManager.accountStore.updateAccountStoredData(accountId, id, stored.copy(codeDigests = stored.codeDigests - codeDigest))
+        // The account store has no compare-and-set: two requests with the same code would both read it as unused, and
+        // two different codes removed at once can lose one removal. The marker is what makes a code work once.
+        authCheck(
+            KtorAuthnzManager.expiringStore.putIfAbsent("recovery-code-used:$accountId:$codeDigest", "used", USED_MARKER_LIFETIME),
+            OTPAuthException(),
+        )
+        val current = lookupAccountStoredData<RecoveryCodesStoredData>(accountId)
+        KtorAuthnzManager.accountStore.updateAccountStoredData(accountId, id, current.copy(codeDigests = current.codeDigests - codeDigest))
     }
+
+    /** How long a used code stays refused even if its removal from the account was lost. Codes do not expire. */
+    private val USED_MARKER_LIFETIME = (10 * 365).days
 
     @Serializable
     data class RecoveryCodeRequest(val code: String)
