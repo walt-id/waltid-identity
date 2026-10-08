@@ -60,14 +60,15 @@ internal fun SharingReviewSection(
                 SharingCredentialRow(
                     option = option,
                     selectedCredentialOptions = selectedCredentialOptions,
-                    selectedDisclosureOptions = selectedDisclosureOptions,
                     enabled = enabled,
                     readOnly = readOnly,
                     onToggleCredential = onToggleCredential,
-                    onToggleDisclosure = onToggleDisclosure,
+                    hasAlternatives = review.credentialOptions.count { it.queryId == option.queryId } > 1,
                 )
             }
         }
+        SharingInformationSection(review, selectedCredentialOptions, selectedDisclosureOptions,
+            enabled, readOnly, onToggleDisclosure)
 
         if (!readOnly && showActions) {
             SharingActionsRow(

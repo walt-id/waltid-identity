@@ -135,38 +135,48 @@ fun MobileWalletDemoApp(
                                 onRequestSigningProtectionChange = controller::requestSigningProtectionChange,
                                 onConfirmSigningProtectionChange = controller::confirmSigningProtectionChange,
                                 onCancelSigningProtectionChange = controller::cancelSigningProtectionChange,
-                            ) else Column(Modifier.fillMaxSize()) {
-                                WalletScreenHeader("Share nearby", leading = {
-                                    IconButton(proximityController::requestClose, enabled = proximity.canClose,
-                                        modifier = Modifier.testTag(WalletUiTestTags.ProximityCancel)) {
-                                        WalletIcon(WalletSymbol.Decline, "Close nearby sharing")
+                            ) else WalletReviewNavigationHost(
+                                requestKey = proximity.review?.reviewId?.toString() ?: "nearby",
+                                reviewCredentialDetails = credentialDetailsById,
+                                reviewClaimStatus = { id, item ->
+                                    proximityDisclosureStatus(item, proximity.selections.filter { it.credentialId == id })
+                                },
+                                onClose = proximityController::requestClose.takeIf { proximity.canClose },
+                                modifier = Modifier.fillMaxSize(),
+                            ) {
+                                Column(Modifier.fillMaxSize()) {
+                                    WalletScreenHeader("Share nearby", leading = {
+                                        IconButton(proximityController::requestClose, enabled = proximity.canClose,
+                                            modifier = Modifier.testTag(WalletUiTestTags.ProximityCancel)) {
+                                            WalletIcon(WalletSymbol.Decline, "Close nearby sharing")
+                                        }
+                                    })
+                                    Box(Modifier.weight(1f)) {
+                                        WalletDemoProximityScreen(
+                                            headerOwnsClose = true,
+                                            state = proximity.copy(approvalMode = walletState.proximityApprovalMode),
+                                            credentialDetailsById = credentialDetailsById,
+                                            hostActions = hostActions.executor,
+                                            hostActionForDisplay = hostActions::displayedAction,
+                                            onSelectCredential = proximityController::selectCredential,
+                                            onToggleElement = proximityController::toggleElement,
+                                            onContinueAfterResponseChange = proximityController::setContinueAfterResponse,
+                                            onApprove = { proximityController.approve() },
+                                            onDecline = proximityController::decline,
+                                            onRetry = proximityController::retryPrerequisites,
+                                            onRemediate = proximityController::remediate,
+                                            onCancel = proximityController::requestClose,
+                                            onDismiss = proximityController::requestClose,
+                                            onRestart = proximityController::restart,
+                                            onShowEngagement = proximityController::showEngagement,
+                                            onContinueWithAvailableConnection = proximityController::continueWithAvailableConnection,
+                                            onApprovalModeChange = controller::setProximityApprovalMode,
+                                            onConnectionOptions = ({ showingConnectionOptions = true }).takeIf {
+                                                proximity.canChangeConnectionOptions || proximity.refreshingEngagement
+                                            },
+                                            onReviewRecentRequest = { proximityController.reviewRecentRequest() },
+                                        )
                                     }
-                                })
-                                Box(Modifier.weight(1f)) {
-                                    WalletDemoProximityScreen(
-                                        headerOwnsClose = true,
-                                        state = proximity.copy(approvalMode = walletState.proximityApprovalMode),
-                                        credentialDetailsById = credentialDetailsById,
-                                        hostActions = hostActions.executor,
-                                        hostActionForDisplay = hostActions::displayedAction,
-                                        onSelectCredential = proximityController::selectCredential,
-                                        onToggleElement = proximityController::toggleElement,
-                                        onContinueAfterResponseChange = proximityController::setContinueAfterResponse,
-                                        onApprove = { proximityController.approve() },
-                                        onDecline = proximityController::decline,
-                                        onRetry = proximityController::retryPrerequisites,
-                                        onRemediate = proximityController::remediate,
-                                        onCancel = proximityController::requestClose,
-                                        onDismiss = proximityController::requestClose,
-                                        onRestart = proximityController::restart,
-                                        onShowEngagement = proximityController::showEngagement,
-                                        onContinueWithAvailableConnection = proximityController::continueWithAvailableConnection,
-                                        onApprovalModeChange = controller::setProximityApprovalMode,
-                                        onConnectionOptions = ({ showingConnectionOptions = true }).takeIf {
-                                            proximity.canChangeConnectionOptions || proximity.refreshingEngagement
-                                        },
-                                        onReviewRecentRequest = { proximityController.reviewRecentRequest() },
-                                    )
                                 }
                             }
                         }

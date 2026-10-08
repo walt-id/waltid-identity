@@ -108,7 +108,7 @@
     "revision": "visual-consent-revision-1",
     "locale": "en",
     "title": "Confirm payment",
-    "affirmativeAction": "Pay €11.56",
+    "affirmativeAction": "Pay \u20ac11.56",
     "denialAction": "Decline",
     "fields": [
       {
@@ -222,9 +222,20 @@
           {
             "path": "org.iso.18013.5.1/given_name",
             "label": "Given name",
-            "value": "Ada"
+            "value": "Ada",
+            "required": true,
+            "selective": true,
+            "selectable": false,
+            "requested": true
           }
-        ]
+        ],
+        "data": {
+          "org.iso.18013.5.1": {
+            "given_name": "Ada",
+            "family_name": "Lovelace",
+            "birth_date": "1815-12-10"
+          }
+        }
       },
       {
         "queryId": "payment",
@@ -236,9 +247,17 @@
           {
             "path": "account_reference",
             "label": "Account reference",
-            "value": "Example account"
+            "value": "Example account",
+            "required": true,
+            "selective": true,
+            "selectable": false,
+            "requested": true
           }
-        ]
+        ],
+        "data": {
+          "account_reference": "Example account",
+          "account_holder": "Ada Lovelace"
+        }
       }
     ]
   },
@@ -246,7 +265,7 @@
     "revision": "localized-signed-payment",
     "locale": "de",
     "title": null,
-    "affirmativeAction": "Zahlung verbindlich bestätigen",
+    "affirmativeAction": "Zahlung verbindlich best\u00e4tigen",
     "denialAction": null,
     "fields": [
       {
@@ -255,7 +274,7 @@
         "placement": "Prominent"
       },
       {
-        "name": "Empfänger",
+        "name": "Empf\u00e4nger",
         "value": "Example Bookshop",
         "placement": "Main"
       },
@@ -270,7 +289,7 @@
         "placement": "Omitted"
       }
     ],
-    "securityHint": "Prüfen Sie Betrag und Empfänger.",
+    "securityHint": "Pr\u00fcfen Sie Betrag und Empf\u00e4nger.",
     "requiresUnsignedRequestWarning": false
   },
   "readerTrust": {
@@ -281,5 +300,109 @@
     "fingerprint": "12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78",
     "validFrom": "2026-01-01T00:00:00Z",
     "validUntil": "2031-01-01T00:00:00Z"
+  },
+  "sharingInformation": {
+    "origin": "https://verifier.example",
+    "credentials": [
+      {
+        "queryId": "identity",
+        "credentialId": "national-id",
+        "title": "National ID",
+        "issuer": "Example Government",
+        "format": "dc+sd-jwt",
+        "backgroundColor": "#2157A8",
+        "data": {
+          "given_name": "Ada",
+          "birth_date": "1815-12-10",
+          "family_name": "Lovelace"
+        },
+        "disclosures": [
+          {
+            "path": "given_name",
+            "label": "Given name",
+            "value": "Ada",
+            "required": true,
+            "selective": true,
+            "selectable": false,
+            "requested": true
+          },
+          {
+            "path": "birth_date",
+            "label": "Birth date",
+            "value": "1815-12-10",
+            "required": true,
+            "selective": true,
+            "selectable": false,
+            "requested": true
+          }
+        ]
+      },
+      {
+        "queryId": "identity",
+        "credentialId": "city-id",
+        "title": "City ID",
+        "issuer": "Example City",
+        "format": "dc+sd-jwt",
+        "backgroundColor": "#246B57",
+        "data": {
+          "given_name": "Ada",
+          "birth_date": "1815-12-10",
+          "family_name": "Lovelace",
+          "address": "Vienna"
+        },
+        "disclosures": [
+          {
+            "path": "given_name",
+            "label": "Given name",
+            "value": "Ada",
+            "required": true,
+            "selective": true,
+            "selectable": false,
+            "requested": true
+          },
+          {
+            "path": "birth_date",
+            "label": "Birth date",
+            "value": "1815-12-10",
+            "required": true,
+            "selective": true,
+            "selectable": false,
+            "requested": true
+          },
+          {
+            "path": "family_name",
+            "label": "Family name",
+            "value": "Lovelace",
+            "required": false,
+            "selective": false,
+            "selectable": false,
+            "requested": false
+          }
+        ]
+      },
+      {
+        "queryId": "membership",
+        "credentialId": "membership",
+        "title": "Library membership",
+        "issuer": "Example Library",
+        "format": "dc+sd-jwt",
+        "backgroundColor": "#744D9B",
+        "data": {
+          "member_number": "MEM-1234",
+          "membership_type": "Adult"
+        },
+        "disclosures": [
+          {
+            "path": "member_number",
+            "label": "Member number",
+            "value": "MEM-1234",
+            "required": true,
+            "selective": true,
+            "selectable": false,
+            "requested": true
+          }
+        ]
+      }
+    ]
   }
 }

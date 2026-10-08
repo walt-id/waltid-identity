@@ -253,6 +253,7 @@ private fun WalletDemoProximityReview(
             onToggleElement = onToggleElement,
             onContinueAfterResponseChange = onContinueAfterResponseChange,
             allowContinuation = !state.preparingApproval,
+            enabled = state.pendingReviewId == null,
         )
         (state.sessionState as? ProximityState.PreparationRequired)?.plan?.let { plan ->
             MetadataDisclosure(title = stringResource(Res.string.proximity_reader_certificate), initiallyExpanded = false) {

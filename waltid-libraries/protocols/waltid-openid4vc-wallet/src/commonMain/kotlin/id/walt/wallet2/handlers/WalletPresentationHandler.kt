@@ -58,6 +58,7 @@ import io.ktor.http.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
@@ -286,6 +287,8 @@ data class PresentationDisclosure(
     val selectivelyDisclosable: Boolean,
     val required: Boolean,
     val selectable: Boolean,
+    /** False for unrequested clear-text data that the credential must also transmit. */
+    val requested: Boolean = true,
 )
 
 data class PresentationTransactionDataItem(
@@ -2116,7 +2119,7 @@ object WalletPresentationHandler {
 
     internal fun DcqlMatcher.DcqlMatchResult.toPresentationDisclosures(): List<PresentationDisclosure> {
         val plan = originalQuery.claimSelectionPlan()
-        return availablePresentationDisclosures(plan).orEmpty().map { (path, value) ->
+        val requested = availablePresentationDisclosures(plan).orEmpty().map { (path, value) ->
             val required = plan.isRequired(path)
             val selectable = plan.isSelectable(path, value)
             when (value) {
@@ -2146,6 +2149,40 @@ object WalletPresentationHandler {
                 )
             }
         }
+        // Consent must include clear-text claims carried by the signed credential even when the
+        // verifier did not ask for them. This is preview-only: selection and payload generation
+        // remain owned by the matcher/presenter. An mdoc sends selected elements, not its full data.
+        val included = alwaysIncludedPresentationClaims()
+        return requested + included.filterNot { claim ->
+            requested.any { it.path == claim.path || claim.path.startsWith("${it.path}.") }
+        }
+    }
+
+    private fun DcqlMatcher.DcqlMatchResult.alwaysIncludedPresentationClaims(): List<PresentationDisclosure> {
+        if (credential.format == "mso_mdoc") return emptyList()
+        val original = (credential as? RawDcqlCredential)?.originalCredential as? DigitalCredential
+        val selective = original as? id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+        // Only the original signed payload proves which SD-JWT values are unconditionally visible.
+        val payload = if (!credential.disclosures.isNullOrEmpty()) selective?.originalCredentialData
+            ?: return emptyList() else selective?.originalCredentialData ?: credential.data
+        val root = if (originalQuery.claims.orEmpty().any { it.path.firstOrNull() == JsonPrimitive("$") }) listOf("$") else emptyList()
+        val claims = mutableListOf<PresentationDisclosure>()
+        fun visible(value: JsonElement): JsonElement = when (value) {
+            is JsonObject -> JsonObject(value.filterKeys { it !in setOf("_sd", "_sd_alg", "...") }.mapValues { visible(it.value) })
+            is JsonArray -> JsonArray(value.filterNot { it is JsonObject && "..." in it }.map(::visible))
+            else -> value
+        }
+        fun collect(value: JsonElement, path: List<String>, name: String) {
+            when (value) {
+                is JsonObject -> value.forEach { (key, child) ->
+                    if (key !in setOf("_sd", "_sd_alg", "...")) collect(child, path + key, key)
+                }
+                else -> claims += PresentationDisclosure((root + path).joinToString(".") { JsonPrimitive(it).toString() }, name, visible(value),
+                    selectivelyDisclosable = false, required = false, selectable = false, requested = false)
+            }
+        }
+        collect(payload, emptyList(), "")
+        return claims
     }
 
     private fun DcqlMatcher.DcqlMatchResult.availablePresentationDisclosures(

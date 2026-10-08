@@ -63,7 +63,7 @@ fun WalletDemoSharingReviewScreen(
         WalletReviewNavigationHost(
             requestKey = review.hashCode().toString(), sharingOptions = review.credentialOptions,
             selectedCredentials = selection.credentials, selectedDisclosures = selection.disclosures,
-            enabled = enabled, onToggleDisclosure = owner::toggleDisclosure,
+            enabled = enabled,
             onClose = (onBackAtRoot ?: onCancel).takeIf { enabled },
         ) {
             ReviewScaffold(
