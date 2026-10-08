@@ -6,6 +6,10 @@ class WalletDemoSharingReviewIosTest {
     private val scenarios = WalletDemoSharingReviewTestScenarios()
 
     @Test
+    fun choosingFromTheWholeRowUpdatesInformationAndDetailsPreserveSelection() =
+        scenarios.choosingFromTheWholeRowUpdatesInformationAndDetailsPreserveSelection()
+
+    @Test
     fun resizingAnOfferPreservesSelectionAndKeepsItsTitleReadable() =
         scenarios.resizingAnOfferPreservesSelectionAndKeepsItsTitleReadable()
 

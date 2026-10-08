@@ -36,12 +36,12 @@ internal fun WalletReviewNavigationHost(
     requestKey: String,
     offer: WalletDemoOfferPreview? = null,
     savedCredentials: List<WalletDemoCredential> = emptyList(),
+    reviewCredentialDetails: Map<String, CredentialDetails> = emptyMap(),
+    reviewClaimStatus: (String, ClaimItem) -> String? = { _, _ -> null },
     sharingOptions: List<WalletDemoPresentationCredentialOption> = emptyList(),
     selectedCredentials: Set<WalletDemoPresentationCredentialSelection> = emptySet(),
     selectedDisclosures: Set<WalletDemoPresentationDisclosureSelection> = emptySet(),
     enabled: Boolean = true,
-    readOnly: Boolean = false,
-    onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit = {},
     onClose: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
@@ -52,16 +52,18 @@ internal fun WalletReviewNavigationHost(
     val offered = offer?.offeredCredentials?.find { route == "offer:${it.configurationId}" }
     val sharing = sharingOptions.find { route == "sharing:${it.selection.id}" }
     val storedCredential = savedCredentials.find { route == "stored:${it.id}" }
-    val stored = remember(storedCredential) { storedCredential?.toCredentialDetails() }
+    val stored = reviewCredentialDetails[route?.removePrefix("stored:")] ?: remember(storedCredential) { storedCredential?.toCredentialDetails() }
+    val latestClaimStatus by rememberUpdatedState(reviewClaimStatus)
     val latestStored by rememberUpdatedState(stored)
     val latestOffer by rememberUpdatedState(offer)
     val latestOffered by rememberUpdatedState(offered)
     val latestSharing by rememberUpdatedState(sharing)
-    val latestCredentials by rememberUpdatedState(selectedCredentials)
-    val latestDisclosures by rememberUpdatedState(selectedDisclosures)
+    val information = remember(sharingOptions, selectedCredentials, selectedDisclosures) {
+        WalletDemoSharingReview(WalletDemoSharingRequest(null), sharingOptions)
+            .informationToShare(selectedCredentials, selectedDisclosures)
+    }
+    val latestInformation by rememberUpdatedState(information)
     val latestEnabled by rememberUpdatedState(enabled)
-    val latestReadOnly by rememberUpdatedState(readOnly)
-    val latestToggle by rememberUpdatedState(onToggleDisclosure)
     val latestClose by rememberUpdatedState(onClose)
     val latestContent by rememberUpdatedState(content)
     LaunchedEffect(route, offered, sharing, stored) {
@@ -76,11 +78,11 @@ internal fun WalletReviewNavigationHost(
     }
     val back = {
         if (page == CredentialInformationPage.Requested) route = null
-        else pageName = if (stored != null) CredentialInformationPage.Requested.name
+        else pageName = if (stored != null || sharing != null) CredentialInformationPage.Requested.name
             else CredentialInformationPage.entries[page.ordinal - 1].name
     }
     SystemBackHandler(enabled = route != null, onBack = back)
-    val detailPages = if (stored != null) listOf(CredentialInformationPage.Requested) +
+    val detailPages = if (stored != null || sharing != null) listOf(CredentialInformationPage.Requested) +
         if (page == CredentialInformationPage.Technical) listOf(page) else emptyList()
         else CredentialInformationPage.entries.take(page.ordinal + 1)
     val pages = listOf("review") + if (route == null) emptyList() else detailPages.map { "$route:${it.name}" }
@@ -98,8 +100,6 @@ internal fun WalletReviewNavigationHost(
                 val sharing = latestSharing
                 val offer = latestOffer
                 val stored = latestStored
-                val selectedCredentials = latestCredentials
-                val selectedDisclosures = latestDisclosures
                 val enabled = latestEnabled
                 savedPages.SaveableStateProvider("$requestKey:$key") {
                     if (key == "review") Box(Modifier.fillMaxWidth().walletNavigationBackground()) { latestContent() }
@@ -121,14 +121,16 @@ internal fun WalletReviewNavigationHost(
                                     stored != null -> if (displayedPage == CredentialInformationPage.Technical) CredentialTechnicalInformation(stored)
                                     else {
                                         CredentialSummaryRow(stored.toCardDisplayData().toCardArt())
-                                        CredentialDetailsBody(stored, onTechnicalDetails = { pageName = CredentialInformationPage.Technical.name })
+                                        CredentialDetailsBody(stored, onTechnicalDetails = { pageName = CredentialInformationPage.Technical.name },
+                                            claimStatus = { latestClaimStatus(stored.summary.id, it) })
                                     }
                                     offered != null -> OfferedCredentialDetails(offered,
                                         offer!!.issuer.display?.name?.trim()?.takeIf(String::isNotEmpty) ?: offer.issuer.credentialIssuer,
                                         offer.issuer.credentialIssuer)
-                                    sharing != null -> SharingCredentialInformation(sharing, sharing.toCredentialDetails(),
-                                        sharing.selection in selectedCredentials, selectedDisclosures, enabled, latestReadOnly,
-                                        latestToggle, displayedPage, onPageChange = { pageName = it.name })
+                                    sharing != null -> SharingCredentialInformation(sharing.toCredentialDetails(),
+                                        informationFields = latestInformation.firstOrNull {
+                                            it.option.credentialId == sharing.credentialId
+                                        }?.fields.orEmpty(), page = displayedPage, onPageChange = { pageName = it.name })
                                 }
                             }
                         }

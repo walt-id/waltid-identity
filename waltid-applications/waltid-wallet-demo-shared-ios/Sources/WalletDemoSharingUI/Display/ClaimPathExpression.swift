@@ -1,7 +1,7 @@
 import Foundation
 
 public struct ClaimPathExpression {
-    public enum Segment: Equatable {
+    public enum Segment: Hashable {
         case key(String)
         case index(Int)
         case wildcard

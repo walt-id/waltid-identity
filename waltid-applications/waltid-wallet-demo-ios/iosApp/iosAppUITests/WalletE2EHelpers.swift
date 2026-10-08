@@ -182,7 +182,7 @@ final class WalletE2EUI {
 
     func tapElement(identifierPrefix: String, timeout: TimeInterval = 20) {
         guard let element = waitForHittableElement(identifierPrefix: identifierPrefix, timeout: timeout) else {
-            XCTFail("Element not found or not hittable with identifier prefix: \(identifierPrefix)")
+            XCTFail("Element not found or not hittable with identifier prefix: \(identifierPrefix)\n\(app.debugDescription)")
             return
         }
         element.tap()
@@ -263,10 +263,14 @@ final class WalletE2EUI {
             }
         }
 
-        let scannerInput = element.identifier == "wallet.scanInput"
+        let identifier = element.identifier
+        let scannerInput = identifier == "wallet.scanInput"
         element.typeText(value)
         // Scanner Go starts resolution. Keep the draft editable until the caller chooses Continue.
-        if !scannerInput { submitFocusedInput(element) }
+        // PIN fields submit on the fourth digit and can change their AX identity before typing returns.
+        if !scannerInput && identifier != "wallet.pinInput" && identifier != "wallet.pinConfirmationInput" {
+            submitFocusedInput(element)
+        }
     }
 
     private func makeHittable(_ element: XCUIElement) {
@@ -370,6 +374,10 @@ final class WalletE2EUI {
             XCTAssertFalse(pinInput.exists, "Choose and Confirm must be separate screens")
             replaceText(in: confirmation, value: pin)
         }
+        let keyboardDismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate { [app] _, _ in !app.keyboards.firstMatch.exists }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [keyboardDismissed], timeout: 10), .completed,
+            "PIN verification must dismiss its keyboard before another flow starts")
     }
 }
 

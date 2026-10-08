@@ -88,6 +88,7 @@
 		840A9F1B3D9706FE56A2F3F9 /* ProximityApprovalModeChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = C73BE1161BA532D3A322799E /* ProximityApprovalModeChoice.swift */; };
 		277493BB2FDE6B1E628622AA /* ProximityEngagementContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31D33F9BD6356B163E1118E9 /* ProximityEngagementContent.swift */; };
 		E32C62D962B0665227EEEE3E /* ProximityReviewContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8EDF0D7C39EB50782930334 /* ProximityReviewContent.swift */; };
+		13330038AAAA000000000002 /* ProximityInformationGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13330038AAAA000000000001 /* ProximityInformationGroup.swift */; };
 		523F6150528C5157B0C9AE37 /* ProximitySharingSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FBAB08965095A5D534750E /* ProximitySharingSummary.swift */; };
 		F2CD24C2B36AF60F7B2A6301 /* ProximityReaderDetails.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB6839D9409AAF08CC1AC680 /* ProximityReaderDetails.swift */; };
 		1CACFE637B0E59CF2642A5BF /* ProximityStatusContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A8122C18703A339DAD642D0 /* ProximityStatusContent.swift */; };
@@ -240,6 +241,7 @@
 		C73BE1161BA532D3A322799E /* ProximityApprovalModeChoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityApprovalModeChoice.swift; sourceTree = "<group>"; };
 		31D33F9BD6356B163E1118E9 /* ProximityEngagementContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityEngagementContent.swift; sourceTree = "<group>"; };
 		D8EDF0D7C39EB50782930334 /* ProximityReviewContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityReviewContent.swift; sourceTree = "<group>"; };
+		13330038AAAA000000000001 /* ProximityInformationGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityInformationGroup.swift; sourceTree = "<group>"; };
 		C0FBAB08965095A5D534750E /* ProximitySharingSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximitySharingSummary.swift; sourceTree = "<group>"; };
 		BB6839D9409AAF08CC1AC680 /* ProximityReaderDetails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityReaderDetails.swift; sourceTree = "<group>"; };
 		7A8122C18703A339DAD642D0 /* ProximityStatusContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProximityStatusContent.swift; sourceTree = "<group>"; };
@@ -355,6 +357,7 @@
 				BB6839D9409AAF08CC1AC680 /* ProximityReaderDetails.swift */,
 				C0FBAB08965095A5D534750E /* ProximitySharingSummary.swift */,
 				D8EDF0D7C39EB50782930334 /* ProximityReviewContent.swift */,
+				13330038AAAA000000000001 /* ProximityInformationGroup.swift */,
 				31D33F9BD6356B163E1118E9 /* ProximityEngagementContent.swift */,
 				C73BE1161BA532D3A322799E /* ProximityApprovalModeChoice.swift */,
 				19080F553F8485E5BD797FE1 /* ProximityPrerequisiteContent.swift */,
@@ -795,6 +798,7 @@
 				F2CD24C2B36AF60F7B2A6301 /* ProximityReaderDetails.swift in Sources */,
 				523F6150528C5157B0C9AE37 /* ProximitySharingSummary.swift in Sources */,
 				E32C62D962B0665227EEEE3E /* ProximityReviewContent.swift in Sources */,
+				13330038AAAA000000000002 /* ProximityInformationGroup.swift in Sources */,
 				277493BB2FDE6B1E628622AA /* ProximityEngagementContent.swift in Sources */,
 				840A9F1B3D9706FE56A2F3F9 /* ProximityApprovalModeChoice.swift in Sources */,
 				C25CC53977899FB4A1DFD52E /* ProximityPrerequisiteContent.swift in Sources */,

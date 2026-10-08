@@ -108,18 +108,13 @@ final class MockWalletUITests: XCTestCase {
             capture.name = name; capture.lifetime = .keepAlways; add(capture)
         }
 
-        assertSingleHeaderAndCapture("credential-information-requested")
+        assertSingleHeaderAndCapture("credential-information-all")
         XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "Example Credential"))
             .allElementsBoundByIndex.filter(\.isHittable).count, 1)
-        ui.tapElement(identifier: "review-all-credential-information")
-        XCTAssertTrue(app.navigationBars["All credential information"].waitForExistence(timeout: 5))
-        assertSingleHeaderAndCapture("credential-information-all")
         ui.tapElement(identifier: "credential-technical-details")
         XCTAssertTrue(app.navigationBars["Technical details"].waitForExistence(timeout: 5))
         assertSingleHeaderAndCapture("credential-information-technical")
 
-        ui.tapNavigationBack()
-        XCTAssertTrue(app.navigationBars["All credential information"].waitForExistence(timeout: 5))
         ui.tapNavigationBack()
         XCTAssertTrue(app.navigationBars["Credential information"].waitForExistence(timeout: 5))
         ui.tapNavigationBack()
@@ -752,9 +747,9 @@ final class MockWalletUITests: XCTestCase {
         let presentationURL = "openid4vp://mock"
         ui.openDeepLink(presentationURL)
         ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.")
-        XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Requested"].firstMatch.waitForExistence(timeout: 5))
         ui.openDeepLink(presentationURL)
-        XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Requested"].firstMatch.waitForExistence(timeout: 5))
         XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
     }
 
@@ -785,10 +780,9 @@ final class MockWalletUITests: XCTestCase {
             "Review presentation request"
         )
 
-        XCTAssertFalse(app.staticTexts["Requested disclosures"].exists)
-        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Information to share"].waitForExistence(timeout: 10))
         ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.")
-        XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Requested"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Portrait"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["$.portrait"].exists)
         ui.assertExists(identifierPrefix: "wallet.claimImage.", timeout: 10)
@@ -797,7 +791,7 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.images["Full-screen credential image"].waitForExistence(timeout: 10))
         ui.tapElement(identifierPrefix: "wallet.claimImageViewerClose.")
         XCTAssertFalse(app.images["Full-screen credential image"].waitForExistence(timeout: 1))
-        XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Requested"].firstMatch.waitForExistence(timeout: 10))
         ui.assertExists(identifierPrefix: "wallet.claimImage.", timeout: 10)
         XCTAssertFalse(app.descendants(matching: .any)["wallet.credentialDetailsScreen"].exists)
     }
@@ -1125,7 +1119,7 @@ final class MockWalletUITests: XCTestCase {
         )
 
         ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.")
-        XCTAssertTrue(app.staticTexts["Requested disclosures"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Requested"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertFalse(app.descendants(matching: .any)["wallet.credentialDetailsScreen"].exists)
         ui.tapNavigationBack()
 
@@ -1172,10 +1166,14 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertFalse(app.switches["wallet.presentationDisclosureToggle.8:identity6:cred-112:$.given_name"].exists)
         XCTAssertFalse(app.switches["wallet.presentationDisclosureToggle.3:age6:cred-113:$.age_over_18"].exists)
 
-        ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.3:age6:cred-1")
+        XCTAssertTrue(app.staticTexts["Identity disclosure"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Age disclosure"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Over 18"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.staticTexts["Identity disclosure"].exists)
+        XCTAssertFalse(app.buttons["wallet.presentationClaimsToggle.3:age6:cred-1"].exists)
+        ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.8:identity6:cred-1")
+        XCTAssertTrue(app.staticTexts["Given name"].waitForExistence(timeout: 10))
+        ui.assertExists(identifier: "wallet.claim.age_over_18")
+        XCTAssertTrue(app.staticTexts["Age over 18"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.descendants(matching: .any)["wallet.credentialDetailsScreen"].exists)
     }
 

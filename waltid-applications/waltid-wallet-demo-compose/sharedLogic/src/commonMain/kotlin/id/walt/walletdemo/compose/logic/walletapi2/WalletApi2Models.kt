@@ -366,6 +366,7 @@ internal data class PreviewCredentialDisclosureDto(
     val selectivelyDisclosable: Boolean,
     val required: Boolean,
     val selectable: Boolean,
+    val requested: Boolean = true,
 )
 
 @Serializable

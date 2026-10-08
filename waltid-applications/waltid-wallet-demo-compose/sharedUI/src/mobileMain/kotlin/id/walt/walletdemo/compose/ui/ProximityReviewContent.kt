@@ -4,36 +4,24 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.wallet2.mobile.ProximityCredentialOption
-import id.walt.wallet2.mobile.ProximityDocumentReview
 import id.walt.wallet2.mobile.ProximityElementReference
 import id.walt.wallet2.mobile.ProximityReview
 import id.walt.walletdemo.compose.logic.ClaimItem
 import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.logic.WalletDemoProximityDocumentSelection
 import id.walt.walletdemo.compose.logic.toCardDisplayData
-import id.walt.walletdemo.compose.ui.components.ClaimValueRow
-import id.walt.walletdemo.compose.ui.components.CredentialSummaryRow
-import id.walt.walletdemo.compose.ui.components.MetadataDetailItem
-import id.walt.walletdemo.compose.ui.components.MetadataDetailList
-import id.walt.walletdemo.compose.ui.components.MetadataDisclosure
-import id.walt.walletdemo.compose.ui.components.ReviewMetadataSection
-import id.walt.walletdemo.compose.ui.components.toCardArt
+import id.walt.walletdemo.compose.ui.components.*
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -47,6 +35,7 @@ internal fun ProximityReviewContent(
     onToggleElement: (Int, ProximityElementReference) -> Unit,
     onContinueAfterResponseChange: (Boolean) -> Unit,
     allowContinuation: Boolean = true,
+    enabled: Boolean = true,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.ProximityReview),
@@ -83,14 +72,24 @@ internal fun ProximityReviewContent(
                 )
             }
         }
-        review.documents.forEach { document ->
-            DocumentReviewContent(
-                document = document,
-                selection = selections.singleOrNull { it.requestIndex == document.requestIndex },
-                credentialDetailsById = credentialDetailsById,
-                onSelectCredential = onSelectCredential,
-                onToggleElement = onToggleElement,
-            )
+        WalletSection(title = "Select credentials to share") {
+            review.documents.forEach { document ->
+                document.credentialOptions.forEachIndexed { index, credential ->
+                    if (index > 0) MetadataRowDivider()
+                    CredentialOption(document.requestIndex, credential, credentialDetailsById[credential.credentialId],
+                        selections.singleOrNull { it.requestIndex == document.requestIndex }?.credentialId == credential.credentialId,
+                        onSelectCredential, enabled)
+                }
+            }
+        }
+        WalletSection(title = "Information to share", modifier = Modifier.testTag("review-information-to-share")) {
+            review.documents.forEach { document ->
+                val selection = selections.singleOrNull { it.requestIndex == document.requestIndex }
+                document.credentialOptions.singleOrNull { it.credentialId == selection?.credentialId }?.let { credential ->
+                    ProximityInformationGroup(document, credential, selection!!,
+                        credentialDetailsById[credential.credentialId], onToggleElement, enabled)
+                }
+            }
         }
         if (allowContinuation) Row(
             modifier = Modifier.fillMaxWidth(),
@@ -98,6 +97,7 @@ internal fun ProximityReviewContent(
         ) {
             Checkbox(
                 checked = continueAfterResponse,
+                enabled = enabled,
                 onCheckedChange = onContinueAfterResponseChange,
                 modifier = Modifier.testTag(WalletUiTestTags.ProximityContinueAfterResponse),
             )
@@ -113,160 +113,25 @@ internal fun ProximityReviewContent(
 }
 
 @Composable
-private fun DocumentReviewContent(
-    document: ProximityDocumentReview,
-    selection: WalletDemoProximityDocumentSelection?,
-    credentialDetailsById: Map<String, CredentialDetails>,
-    onSelectCredential: (Int, String) -> Unit,
-    onToggleElement: (Int, ProximityElementReference) -> Unit,
-) {
-    ReviewMetadataSection(stringResource(Res.string.proximity_credential_to_share)) {
-        if (document.credentialOptions.size > 1) {
-            Text(stringResource(Res.string.proximity_choose_credential), style = MaterialTheme.typography.labelLarge)
-        }
-        document.credentialOptions.forEach { credential ->
-            CredentialOption(
-                requestIndex = document.requestIndex,
-                credential = credential,
-                details = credentialDetailsById[credential.credentialId],
-                showSelectionControl = document.credentialOptions.size > 1,
-                selected = selection?.credentialId == credential.credentialId,
-                onSelect = onSelectCredential,
-            )
-        }
-        val selectedCredential = document.credentialOptions.singleOrNull {
-            it.credentialId == selection?.credentialId
-        }
-        selectedCredential?.let { credential ->
-            val details = credentialDetailsById[credential.credentialId]
-            HorizontalDivider()
-            Text(stringResource(Res.string.proximity_data_to_share), style = MaterialTheme.typography.labelLarge)
-            if (!document.requiredElements.all { required -> credential.requestedElements.any {
-                    it.namespace == required.namespace && it.elementIdentifier == required.elementIdentifier
-                } }) {
-                Text(stringResource(Res.string.proximity_required_data_unavailable), color = MaterialTheme.colorScheme.error)
-            }
-            credential.requestedElements.forEach { element ->
-                val reference = ProximityElementReference(
-                    namespace = element.namespace,
-                    elementIdentifier = element.elementIdentifier,
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Checkbox(
-                        checked = reference in (selection?.disclosedElements ?: emptySet()),
-                        onCheckedChange = { onToggleElement(document.requestIndex, reference) },
-                        enabled = reference !in document.requiredElements,
-                        modifier = Modifier.testTag(
-                            WalletUiTestTags.proximityElement(
-                                document.requestIndex,
-                                element.namespace,
-                                element.elementIdentifier,
-                            )
-                        ),
-                    )
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        val claims = details?.mdocClaims(element.namespace, element.elementIdentifier).orEmpty()
-                        if (claims.isNotEmpty()) {
-                            claims.forEach { claim -> ClaimValueRow(claim) }
-                        } else {
-                            Text(
-                                humanizedElementIdentifier(element.elementIdentifier),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            Text(
-                                stringResource(Res.string.proximity_value_preview_unavailable),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                        if (element.intentToRetain) {
-                            Text(
-                                stringResource(Res.string.proximity_reader_retention),
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                        if (reference in document.requiredElements) {
-                            Text(stringResource(Res.string.proximity_required_identity_check), style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            }
-            MetadataDisclosure(
-                title = stringResource(Res.string.proximity_technical_details),
-                initiallyExpanded = false,
-            ) {
-                MetadataDetailList(
-                    buildList {
-                        add(
-                            MetadataDetailItem(
-                                stringResource(Res.string.proximity_document_type),
-                                document.docType,
-                            )
-                        )
-                        add(
-                            MetadataDetailItem(
-                                stringResource(Res.string.proximity_device_authentication),
-                                credential.deviceAuthentication.displayName(),
-                            )
-                        )
-                        credential.requestedElements.forEach { element ->
-                            add(
-                                MetadataDetailItem(
-                                    stringResource(Res.string.proximity_requested_element),
-                                    "${element.namespace} / ${element.elementIdentifier}",
-                                )
-                            )
-                        }
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun CredentialOption(
     requestIndex: Int,
     credential: ProximityCredentialOption,
     details: CredentialDetails?,
-    showSelectionControl: Boolean,
     selected: Boolean,
     onSelect: (Int, String) -> Unit,
+    enabled: Boolean,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(WalletUiTestTags.proximityCredential(requestIndex, credential.credentialId))
-            .then(if (showSelectionControl) Modifier.selectable(selected, role = Role.RadioButton,
-                onClick = { onSelect(requestIndex, credential.credentialId) }) else Modifier),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (showSelectionControl) {
-            RadioButton(
-                selected = selected,
-                onClick = null,
-            )
-        }
+    ReviewCredentialChoice(selected, multiple = false, enabled = enabled,
+        modifier = Modifier.testTag(WalletUiTestTags.proximityCredential(requestIndex, credential.credentialId)),
+        onSelect = { if (!selected) onSelect(requestIndex, credential.credentialId) }) {
         if (details != null) {
             val display = remember(details) { details.toCardDisplayData() }
-            CredentialSummaryRow(display.toCardArt(), display.issuer, Modifier.weight(1f))
+            CredentialSummaryRow(display.toCardArt(), display.issuer)
         } else {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(credential.label ?: stringResource(Res.string.proximity_generic_credential))
-                credential.issuer?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                Text(
-                    stringResource(Res.string.proximity_valid_until, credential.validUntil.toString()),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
+            Text(credential.label ?: stringResource(Res.string.proximity_generic_credential))
+            credential.issuer?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            Text(stringResource(Res.string.proximity_valid_until, credential.validUntil.toString()),
+                style = MaterialTheme.typography.bodySmall)
         }
     }
 }

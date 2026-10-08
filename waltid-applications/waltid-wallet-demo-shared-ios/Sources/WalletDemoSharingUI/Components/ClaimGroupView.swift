@@ -3,10 +3,12 @@ import SwiftUI
 public struct ClaimGroupView: View {
     public let group: ClaimGroup
     public let collapsible: Bool
+    private let claimStatus: (ClaimItem) -> String?
 
-    public init(group: ClaimGroup, collapsible: Bool = true) {
+    public init(group: ClaimGroup, collapsible: Bool = true, claimStatus: @escaping (ClaimItem) -> String? = { _ in nil }) {
         self.group = group
         self.collapsible = collapsible
+        self.claimStatus = claimStatus
     }
 
     public var body: some View {
@@ -39,6 +41,9 @@ public struct ClaimGroupView: View {
                     Divider()
                 }
                 ClaimValueRow(item: item)
+                if let status = claimStatus(item) {
+                    Text(status).font(.footnote).foregroundStyle(.secondary)
+                }
             }
         }
     }

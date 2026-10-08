@@ -215,7 +215,9 @@ does not establish verifier trust and does not expose verifier key material.
 
 Configure `MobileWalletConfig.paymentCredentialIssuers` with independently trusted
 issuer URLs and public JWKs, and set `preferredLocales`. An empty trust list blocks
-authoritative payment review. After preview and selection, prepare the review:
+authoritative payment review. Disclosure previews also expose additional clear-text values that the credential must transmit: `requested=false` distinguishes those immutable values from required or optional requested claims. The flag defaults to true for existing callers. SD-JWT extras come from the original signed payload, and mdoc previews retain only requested document elements. UI consumers must show extra personal information without making it selectable; credential/disclosure selection and payload generation remain SDK-owned.
+
+After preview and selection, prepare the payment review:
 
 ```kotlin
 val consent = wallet.preparePaymentConsent(

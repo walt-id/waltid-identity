@@ -580,14 +580,35 @@ internal class WalletVisualScenarios(
             WalletDemoSharingReviewScreen(review = review, title = "Share documents",
                 onSubmit = {}, onCancel = {}, onBackAtRoot = {}, presentation = WalletReviewPresentation.Sheet)
         }
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performClick()
-        onNodeWithText("Requested disclosures").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
+        onNodeWithText("Requested").performScrollTo().assertIsDisplayed()
         option.disclosures.forEach { disclosure ->
             onNodeWithText(requireNotNull(disclosure.displayValue)).assertIsDisplayed()
         }
         onAllNodesWithText("Credential information").assertCountEquals(1)
         onAllNodesWithTag(WalletUiTestTags.PresentationSubmitButton).assertCountEquals(0)
         capture("sharing.credential_information")
+    }
+
+    fun sharingInformation(alternative: Boolean = false, multiple: Boolean = false) = with(test) {
+        val options = WalletVisualFixtures.informationCredentials.take(if (multiple) 3 else 2)
+        val review = id.walt.walletdemo.compose.logic.WalletDemoSharingReview(
+            id.walt.walletdemo.compose.logic.WalletDemoSharingRequest(
+                id.walt.walletdemo.compose.logic.WalletDemoSharingRequester(
+                    fallbackName = "https://verifier.example", verifiedOrigin = "https://verifier.example")), options,
+            options.map { it.queryId }.distinct().map {
+                id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialRequirement(listOf(listOf(it)))
+            })
+        content {
+            WalletDemoSharingReviewScreen(review = review, title = "Share credentials", compact = false,
+                onSubmit = {}, onCancel = {}, onBackAtRoot = {}, presentation = WalletReviewPresentation.Sheet)
+        }
+        if (alternative) onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(options[1].selection.id))
+            .performScrollTo().performClick()
+        onNodeWithText(if (multiple) "MEM-1234" else if (alternative) "Lovelace" else "Ada").performScrollTo().assertIsDisplayed()
+        if (alternative) onNodeWithText("Always included by this credential").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
+        capture("sharing.information." + if (multiple) "multiple" else if (alternative) "alternative" else "selected")
     }
 
     fun providerOfferReview() = with(test) {
@@ -683,7 +704,8 @@ internal class WalletVisualScenarios(
         onNodeWithTag("payment-details-toggle").performScrollTo().performClick()
         onNodeWithText("example-transaction-001").performScrollTo().assertIsDisplayed()
         capture("${if (sheet) "payment.sheet" else "payment.mixed_credentials"}.details")
-        onNodeWithText("Payment authorisation").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(WalletVisualFixtures.paymentReview.credentialOptions.single { it.queryId == "payment" }.selection.id))
+            .performScrollTo().assertIsDisplayed()
         onNodeWithText("Pay €11.56").assertIsEnabled().assertIsDisplayed()
         capture("${if (sheet) "payment.sheet" else "payment.mixed_credentials"}.requested_data")
         onNodeWithText("Pay €11.56").performClick()

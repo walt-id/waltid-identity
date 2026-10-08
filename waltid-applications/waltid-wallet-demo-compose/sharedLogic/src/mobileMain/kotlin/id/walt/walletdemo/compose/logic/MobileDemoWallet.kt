@@ -451,6 +451,7 @@ private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentat
                         selectivelyDisclosable = disclosure.selectivelyDisclosable,
                         required = disclosure.required,
                         selectable = disclosure.selectable,
+                        requested = disclosure.requested,
                     )
                 },
             )

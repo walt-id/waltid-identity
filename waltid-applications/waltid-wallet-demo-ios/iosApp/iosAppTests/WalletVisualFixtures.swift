@@ -137,18 +137,31 @@ struct WalletVisualFixtures {
     }
 
     func sharingReview(payment: Bool = false) throws -> SharingReviewModel {
-        let value = try object(root, "sharing")
+        try sharingReview(key: "sharing", payment: payment)
+    }
+
+    func informationReview(multiple: Bool = false) throws -> SharingReviewModel {
+        try sharingReview(key: "sharingInformation", payment: false, includeAlternatives: true, multiple: multiple)
+    }
+
+    private func sharingReview(key: String, payment: Bool, includeAlternatives: Bool = false, multiple: Bool = false) throws -> SharingReviewModel {
+        let value = try object(root, key)
         let origin = try text(value, "origin")
         let all = try array(value, "credentials")
-        let options: [PresentationCredentialOption] = try (payment ? all : Array(all.prefix(1))).map { item in
+        let candidates = includeAlternatives ? (multiple ? all : Array(all.prefix(2))) : (payment ? all : Array(all.prefix(1)))
+        let options: [PresentationCredentialOption] = try candidates.map { item in
             PresentationCredentialOption(queryID: try text(item, "queryId"), credentialID: try text(item, "credentialId"),
                 format: try text(item, "format"), issuer: try text(item, "issuer"), subject: nil, label: try text(item, "title"),
-                credentialDataJSON: "{}", disclosures: try array(item, "disclosures").map { claim in
+                credentialDataJSON: try json(object(item, "data")), disclosures: try array(item, "disclosures").map { claim in
                     let value = try text(claim, "value")
                     let encoded = try JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed])
                     return PresentationDisclosure(path: try text(claim, "path"), name: try text(claim, "label"),
                         valueJSON: try XCTUnwrap(String(data: encoded, encoding: .utf8)), displayValue: value,
-                        selectivelyDisclosable: false, required: false, selectable: false)
+                        selectivelyDisclosable: try XCTUnwrap(claim["selective"] as? Bool),
+                        required: try XCTUnwrap(claim["required"] as? Bool), selectable: try XCTUnwrap(claim["selectable"] as? Bool),
+                        requested: try XCTUnwrap(claim["requested"] as? Bool))
+                }, metadataJSON: try (item["backgroundColor"] as? String).map {
+                    try json(["credentialDisplay": [["name": try text(item, "title"), "background_color": $0]]])
                 })
         }
         return SharingReviewModel(request: SharingRequest(
@@ -157,7 +170,7 @@ struct WalletVisualFixtures {
             responseProtection: .encrypted(mechanism: payment ? .dcAPIJWT : .annexCHPKE),
             transactionData: payment ? [ClaimGroup(id: "transaction:0", title: "Payment", items: [], transactionType: "urn:eudi:sca:payment:1")] : []),
             credentialOptions: options,
-            credentialRequirements: options.map { .init(options: [[$0.queryID]]) })
+            credentialRequirements: Array(Set(options.map(\.queryID))).sorted().map { .init(options: [[$0]]) })
     }
 
     func payment(localized: Bool = false) throws -> PaymentConsent {

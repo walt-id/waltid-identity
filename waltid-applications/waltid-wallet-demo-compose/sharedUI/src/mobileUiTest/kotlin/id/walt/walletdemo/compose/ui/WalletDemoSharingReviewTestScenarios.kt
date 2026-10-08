@@ -17,6 +17,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -66,6 +68,31 @@ import kotlinx.coroutines.cancel
  */
 @OptIn(ExperimentalTestApi::class)
 class WalletDemoSharingReviewTestScenarios {
+
+    fun choosingFromTheWholeRowUpdatesInformationAndDetailsPreserveSelection() = runComposeUiTest {
+        val options = WalletVisualFixtures.informationCredentials.take(2)
+        val review = WalletDemoSharingReview(WalletDemoSharingRequest(null), options)
+        val city = options[1]
+        var submitted: WalletDemoSharingSelection? = null
+        setContent {
+            WalletDemoSharingReviewScreen(review = review, title = "Share credentials", compact = false,
+                onSubmit = { submitted = it }, onCancel = {})
+        }
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(options[0].selection.id)).assertIsSelected()
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(city.selection.id)).performScrollTo().performClick()
+        onAllNodesWithTag(WalletUiTestTags.PresentationClaimsDialog).assertCountEquals(0)
+        onNodeWithText("Lovelace").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Always included by this credential").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(city.selection.id)).performScrollTo().performClick()
+        onNodeWithText("Vienna").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Not shared").performScrollTo().assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.PresentationSubmitButton).assertCountEquals(0)
+        onNodeWithTag("wallet-detail-back").performClick()
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(city.selection.id)).performScrollTo().assertIsSelected()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performClick()
+        assertEquals(setOf(city.selection), submitted?.credentials)
+        assertTrue(submitted?.disclosures.orEmpty().isEmpty())
+    }
 
     fun resizingAnOfferPreservesSelectionAndKeepsItsTitleReadable() = runComposeUiTest {
         val credential = WalletVisualFixtures.offer.offeredCredentials.last()
@@ -147,18 +174,14 @@ class WalletDemoSharingReviewTestScenarios {
                 compact = false, presentation = presentation.value, onSubmit = { submitted = it }, onCancel = {},
                 onBackAtRoot = {})
         }
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick()
-        onNodeWithTag("wallet-detail-back").performClick()
         waitForIdle()
         val revision = prepared
         assertEquals(2, revision) // Initial selection and the explicit optional disclosure.
         runOnIdle { visible.value = false }
         waitForIdle()
         runOnIdle { visible.value = true; presentation.value = WalletReviewPresentation.Sheet }
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOn()
-        onNodeWithTag("wallet-detail-back").performClick()
         onNodeWithText("Approve").performClick()
         assertEquals(revision, prepared)
         assertEquals(setOf(optional), submitted?.disclosures)
@@ -176,13 +199,13 @@ class WalletDemoSharingReviewTestScenarios {
             WalletDemoSharingReviewScreen(compact = false, review = digitalCredentialReview(listOf(option)),
                 title = "Share digital credential?", onSubmit = { submitted = it }, onCancel = {})
         }
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         val inInformation = hasAnyAncestor(hasTestTag(WalletUiTestTags.PresentationClaimsDialog))
         onAllNodes(hasTestTag("wallet.screen.header") and inInformation).assertCountEquals(1)
         onAllNodes(hasText("Driving licence") and inInformation).assertCountEquals(1)
-        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick()
-        onNodeWithTag("review-all-credential-information").performScrollTo().performClick()
-        onNode(hasText("Includes information outside this request.") and hasAnyAncestor(hasTestTag("review-all-information-details"))).assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.PresentationSubmitButton).assertCountEquals(0)
+        onNodeWithText("Not shared").performScrollTo().assertIsDisplayed()
         onNodeWithText("For my own reference").performScrollTo().assertIsDisplayed()
         val group = option.toCredentialDetails().groups.first { it.id != "requested" && it.id != "technical" }
         onNodeWithTag(WalletUiTestTags.claimGroup(group.title)).performScrollTo()
@@ -200,7 +223,6 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithTag("wallet-detail-back").performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOn()
         onNodeWithText("For my own reference").assertDoesNotExist()
-        onNodeWithTag("wallet-detail-back").performClick()
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(setOf(option.selection), submitted?.credentials)
         assertEquals(setOf(optional), submitted?.disclosures)
@@ -216,18 +238,17 @@ class WalletDemoSharingReviewTestScenarios {
             WalletDemoSharingReviewScreen(compact = false, review = digitalCredentialReview(listOf(option)),
                 title = "Share digital credential?", onSubmit = { submissions++ }, onCancel = {})
         }
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick()
-        onNodeWithTag("review-all-credential-information").performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag("credential-technical-details").performScrollTo().performClick()
         onAllNodesWithTag(WalletUiTestTags.PresentationSubmitButton).assertCountEquals(0)
-        repeat(3) { onNodeWithTag("wallet-detail-back").performClick() }
+        repeat(2) { onNodeWithTag("wallet-detail-back").performClick() }
         onAllNodesWithTag(WalletUiTestTags.PresentationClaimsDialog).assertCountEquals(0)
         onAllNodesWithTag("wallet.screen.header").assertCountEquals(1)
         assertEquals(0, submissions)
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOn()
-        onNodeWithTag("review-all-credential-information").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
+        onNodeWithText("Private").performScrollTo().assertIsDisplayed()
     }
 
     fun paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements() = runComposeUiTest {
@@ -530,12 +551,11 @@ class WalletDemoSharingReviewTestScenarios {
 
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(first.selection.id))
             .performScrollTo()
-            .assertIsOn()
+            .assertIsSelected()
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(second.selection.id))
             .performScrollTo()
-            .assertIsOff()
+            .assertIsNotSelected()
 
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(first.selection.id)).performScrollTo().performClick()
         // Approving the first credential's optional disclosure gives the switch something to leak;
         // without it, an implementation that never dropped disclosures would still pass.
         val firstOptionalDisclosure = disclosureSelection(first, OPTIONAL_DISCLOSURE_PATH)
@@ -545,14 +565,13 @@ class WalletDemoSharingReviewTestScenarios {
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(firstOptionalDisclosure.id))
             .performScrollTo()
             .assertIsOn()
-        onNodeWithTag("wallet-detail-back").performClick()
 
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(second.selection.id))
             .performScrollTo()
             .performClick()
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(first.selection.id))
             .performScrollTo()
-            .assertIsOff()
+            .assertIsNotSelected()
 
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(setOf(second.selection), submitted?.credentials)
@@ -579,32 +598,28 @@ class WalletDemoSharingReviewTestScenarios {
 
         val required = disclosureSelection(option, REQUIRED_DISCLOSURE_PATH)
         val optional = disclosureSelection(option, OPTIONAL_DISCLOSURE_PATH)
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosure(required.id)).performScrollTo().assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.presentationDisclosureToggle(required.id)).assertCountEquals(0)
-        onNodeWithText("Required by request").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOff()
-        onNodeWithText("Optional disclosure").performScrollTo().assertIsDisplayed()
-        onNodeWithTag("wallet-detail-back").performClick()
+        onNodeWithText("Not shared").performScrollTo().assertIsDisplayed()
 
         // A required disclosure is not carried as a selection, so an empty disclosure set is what
         // "the user approved nothing optional" looks like.
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(emptySet<WalletDemoPresentationDisclosureSelection>(), submitted?.disclosures)
 
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick()
-        onNodeWithTag("wallet-detail-back").performClick()
         onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).performClick()
         assertEquals(setOf(optional), submitted?.disclosures)
 
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(option.selection.id))
             .performScrollTo()
             .performClick()
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
-        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id))
-            .performScrollTo()
-            .assertIsNotEnabled()
+        onAllNodesWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).assertCountEquals(0)
+        onNodeWithTag(WalletDemoSharingReviewTestTags.ShareButton).assertIsNotEnabled()
+        onNodeWithText("Select a credential to see what will be shared.").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(option.selection.id)).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOff()
     }
 
 }

@@ -58,6 +58,9 @@ class WalletVisualIosTest {
     @Test fun externalReceiving() = scenario() { externalReceiving() }
     @Test fun externalUnavailableCallback() = scenario() { externalReceiving(unavailable = true) }
     @Test fun providerSharingReview() = scenario { providerSharingReview() }
+    @Test fun sharingInformationSelected() = scenario { sharingInformation() }
+    @Test fun sharingInformationAlternative() = scenario { sharingInformation(alternative = true) }
+    @Test fun sharingInformationMultiple() = scenario { sharingInformation(multiple = true) }
     @Test fun sharingCredentialInformation() = scenario { sharingCredentialInformation() }
     @Test
     fun compactProviderSharingReview() = scenario(size = Size(320f, 568f), dark = true, fontScale = 1.5f) { providerSharingReview(compact = true) }

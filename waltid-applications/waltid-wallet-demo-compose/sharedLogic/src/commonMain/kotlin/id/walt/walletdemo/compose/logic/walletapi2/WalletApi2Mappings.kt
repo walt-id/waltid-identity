@@ -184,6 +184,7 @@ internal fun PresentationPreviewResponseDto.toDemoPreview(
                             selectivelyDisclosable = disclosure.selectivelyDisclosable,
                             required = disclosure.required,
                             selectable = disclosure.selectable,
+                            requested = disclosure.requested,
                         )
                     },
                 )

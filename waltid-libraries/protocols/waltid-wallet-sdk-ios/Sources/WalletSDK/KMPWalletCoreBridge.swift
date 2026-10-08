@@ -1937,7 +1937,8 @@ private extension MobileWalletPresentationDisclosure {
             displayValue: displayValue,
             selectivelyDisclosable: selectivelyDisclosable,
             required: required,
-            selectable: selectable
+            selectable: selectable,
+            requested: requested
         )
     }
 }

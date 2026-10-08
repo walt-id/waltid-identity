@@ -136,7 +136,7 @@ struct ProximityPresentationView: View {
                     onToggleElement: viewModel.toggleElement,
                     continueAfterResponse: viewModel.continueAfterResponse,
                     onContinueAfterResponseChange: viewModel.setContinueAfterResponse,
-                    allowContinuation: true
+                    allowContinuation: true, enabled: viewModel.pendingReviewID == nil
                 )
             case .preparationRequired(let plan, let reason):
                 preparationContent(plan: plan, reason: reason)
@@ -196,7 +196,7 @@ struct ProximityPresentationView: View {
             onToggleElement: viewModel.toggleElement,
             continueAfterResponse: false,
             onContinueAfterResponseChange: viewModel.setContinueAfterResponse,
-            allowContinuation: false
+            allowContinuation: false, enabled: viewModel.pendingReviewID == nil
         )
         MetadataDisclosure(title: "Reader certificate identity", initiallyExpanded: false) {
             Text(plan.readerCertificateSHA256).font(.caption).textSelection(.enabled)

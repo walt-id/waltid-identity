@@ -33,7 +33,7 @@ internal fun WalletExternalFlowScreen(
         savedCredentials = state.receivedCredentials(),
         selectedCredentials = state.selectedPresentationCredentialOptions,
         selectedDisclosures = state.selectedPresentationDisclosureOptions,
-        enabled = !state.isBusy, onToggleDisclosure = controller::togglePresentationDisclosure,
+        enabled = !state.isBusy,
         onClose = onClose.takeIf { state.canDismissExternalFlow },
     ) {
     Column(Modifier.fillMaxWidth().then(if (fillViewport) Modifier.fillMaxHeight() else Modifier).testTag("wallet.external.flow")) {

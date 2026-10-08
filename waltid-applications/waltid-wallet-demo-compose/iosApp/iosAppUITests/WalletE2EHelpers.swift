@@ -258,11 +258,14 @@ final class WalletE2EUI {
             }
         }
 
-        let scannerInput = element.identifier == "wallet.scanInput"
+        let identifier = element.identifier
+        let scannerInput = identifier == "wallet.scanInput"
         element.typeText(value)
         // Scanner Go now starts resolution. Keep explicit Continue tests in
         // charge of submission, including assertions while the IME is visible.
-        if dismiss && !scannerInput { dismissKeyboard(focusedElement: element) }
+        if dismiss && !scannerInput && identifier != "wallet.pinInput" && identifier != "wallet.pinConfirmationInput" {
+            dismissKeyboard(focusedElement: element)
+        }
     }
 
     private func focusTextInput(_ element: XCUIElement, timeout: TimeInterval = 15) -> Bool {

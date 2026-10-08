@@ -57,6 +57,9 @@ class WalletVisualAndroidTest {
     @Test fun externalReceiving() = scenario(sheetHost = true) { externalReceiving() }
     @Test fun externalUnavailableCallback() = scenario(sheetHost = true) { externalReceiving(unavailable = true) }
     @Test fun providerSharingReview() = scenario(sheetHost = true) { providerSharingReview() }
+    @Test fun sharingInformationSelected() = scenario(sheetHost = true) { sharingInformation() }
+    @Test fun sharingInformationAlternative() = scenario(sheetHost = true) { sharingInformation(alternative = true) }
+    @Test fun sharingInformationMultiple() = scenario(sheetHost = true) { sharingInformation(multiple = true) }
     @Test fun sharingCredentialInformation() = scenario(sheetHost = true) { sharingCredentialInformation() }
     @Test
     @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")

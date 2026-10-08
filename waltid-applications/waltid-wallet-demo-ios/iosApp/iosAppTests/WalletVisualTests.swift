@@ -348,11 +348,30 @@ final class WalletVisualTests: XCTestCase {
         let review = try WalletVisualFixtures().sharingReview()
         let option = try XCTUnwrap(review.credentialOptions.first)
         let details = CredentialDisplayNormalizer.details(for: option)
-        let screen = SharingClaimsSheet(option: option, details: details, credentialSelected: true,
-            selectedDisclosureOptions: [], requestedDisclosureItems: details.groups.first { $0.id == "requested" }?.items ?? [],
-            isLoading: false, isReadOnly: false, onToggleDisclosure: { _ in }, onDismiss: {})
+        let fields = informationFields(option: option, details: details, disclosures: [])
+        let screen = ReviewCredentialInformation(details: details, claimStatus: { fields.disclosureStatus($0) }, onDismiss: {})
         try capture(screen, id: "sharing.credential_information")
     }
+    func testSharingInformationSelected() async throws { try await sharingInformation() }
+    func testSharingInformationAlternative() async throws { try await sharingInformation(alternative: true) }
+    func testSharingInformationMultiple() async throws { try await sharingInformation(multiple: true) }
+
+    private func sharingInformation(alternative: Bool = false, multiple: Bool = false) async throws {
+        let review = try WalletVisualFixtures().informationReview(multiple: multiple)
+        var credentials = review.defaultCredentialSelection()
+        if alternative { credentials = [review.credentialOptions[1].selection] }
+        let selection = SharingSelection(credentials: credentials)
+        XCTAssertTrue(review.hasCompleteCredentialSelection(credentials))
+        let details = review.credentialOptions.map { CredentialDisplayNormalizer.details(for: $0) }
+        let groups = review.informationToShare(selection: selection, details: details)
+        XCTAssertEqual(groups.count, multiple ? 2 : 1)
+        if alternative { XCTAssertTrue(groups[0].fields.contains { $0.alwaysIncluded }) }
+        let screen = SharingReviewScreen(title: "Share credentials", review: review, selection: selection,
+            selectionComplete: true, onToggleCredential: { _ in }, onToggleDisclosure: { _ in }, onSubmit: {}, onCancel: {})
+        try await captureReview(screen, id: "sharing.information." + (multiple ? "multiple" : alternative ? "alternative" : "selected"),
+            expected: Set(review.credentialOptions.map { $0.selection.id }), scrollToBottom: multiple)
+    }
+
     func testCompactProviderSharingReview() async throws { try await providerSharingReview(compact: true) }
     func testCompactProviderSharingReviewLastRow() async throws {
         try await providerSharingReview(compact: true, scrollToBottom: true)

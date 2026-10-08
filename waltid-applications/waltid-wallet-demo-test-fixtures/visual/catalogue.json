@@ -460,6 +460,42 @@
       "note": "Production requested-disclosure information uses the same label/value hierarchy as stored credentials; one header owns the destination and parent decisions are absent."
     },
     {
+      "id": "sharing.information.selected",
+      "requirements": [
+        "R06",
+        "R07",
+        "R10",
+        "R11"
+      ],
+      "composeTest": "sharingInformationSelected",
+      "swiftTest": "testSharingInformationSelected",
+      "note": "F036: candidate rows select; one expanded information group shows actual values for the selected ID."
+    },
+    {
+      "id": "sharing.information.alternative",
+      "requirements": [
+        "R06",
+        "R07",
+        "R10",
+        "R11"
+      ],
+      "composeTest": "sharingInformationAlternative",
+      "swiftTest": "testSharingInformationAlternative",
+      "note": "F036: selecting an alternative changes the shared-information group and exposes unavoidable additional personal data."
+    },
+    {
+      "id": "sharing.information.multiple",
+      "requirements": [
+        "R06",
+        "R07",
+        "R10",
+        "R11"
+      ],
+      "composeTest": "sharingInformationMultiple",
+      "swiftTest": "testSharingInformationMultiple",
+      "note": "F036: information groups for two selected credentials remain scrollable above pinned actions."
+    },
+    {
       "id": "sharing.provider.compact_dark_large_text",
       "requirements": [
         "R04",

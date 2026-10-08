@@ -83,11 +83,41 @@ public struct SharingReviewView: View {
                             if index > 0 { Divider() }
                             SharingCredentialRow(option: option, details: details, selection: selection,
                                 isLoading: isLoading, isReadOnly: isReadOnly,
-                                onToggleCredential: onToggleCredential, onToggleDisclosure: onToggleDisclosure)
+                                onToggleCredential: onToggleCredential,
+                                hasAlternatives: review.credentialOptions.filter { $0.queryID == option.queryID }.count > 1)
                         }
                     }
                 }
             }
+            let groups = review.informationToShare(selection: selection, details: credentialDetails)
+            WalletSection(String(localized: "Information to share", bundle: .module)) {
+                VStack(spacing: 0) {
+                    if groups.isEmpty {
+                        Text("Select a credential to see what will be shared.", bundle: .module)
+                            .font(.body).padding(16)
+                    }
+                    ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+                        if index > 0 { Divider() }
+                        ReviewInformationGroup(title: group.details.cardSummary.title, issuer: group.details.cardSummary.issuer,
+                            details: group.details, detailsIdentifier: WalletAccessibilityID.presentationClaimsToggle(group.options[0].selection.id),
+                            claimStatus: { group.fields.disclosureStatus($0) }) {
+                            ForEach(Array(group.fields.enumerated()), id: \.element.item.id) { index, field in
+                                if index > 0 { Divider() }
+                                if !field.optionalSelections.isEmpty && !isReadOnly {
+                                    Toggle(isOn: Binding(get: { field.included }, set: { include in
+                                        field.optionalSelections.filter { selection.disclosures.contains($0) != include }
+                                            .forEach(onToggleDisclosure)
+                                    })) { fieldContent(field) }
+                                    .toggleStyle(ReviewCheckboxToggleStyle()).disabled(isLoading)
+                                    .accessibilityIdentifier(WalletAccessibilityID.presentationDisclosureToggle(field.optionalSelections.sorted { $0.id < $1.id }[0].id))
+                                } else { fieldContent(field) }
+                            }
+                            if group.fields.isEmpty { Text("No additional information to share.", bundle: .module).font(.footnote) }
+                        }
+                    }
+                }
+            }.accessibilityElement(children: .contain)
+                .accessibilityIdentifier("review-information-to-share")
 
             if !isReadOnly && showActions {
                 ReviewActions(
@@ -106,6 +136,16 @@ public struct SharingReviewView: View {
             let snapshot = await CredentialDisplayNormalizer.details(for: review.credentialOptions)
             guard !Task.isCancelled else { return }
             credentialDetails = snapshot
+        }
+    }
+
+    private func fieldContent(_ field: SharingInformationField) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ClaimValueRow(item: field.item)
+            if field.alwaysIncluded || !field.optionalSelections.isEmpty {
+                Text(!field.included ? "Not shared" : field.alwaysIncluded ? "Always included by this credential" : "Optional")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
         }
     }
 }
