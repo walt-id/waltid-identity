@@ -55,9 +55,52 @@ class CredentialFetcherTest {
     }
 
     @Test
+    fun `token ttl does not cache when Cache-Control is missing`() = runTest {
+        var requests = 0
+        val fetcher = CredentialFetcher(
+            countingClient(
+                cacheControl = emptyList(),
+                body = { unsignedJwt(ttl = 43_200, n = it) },
+            ) { ++requests },
+        )
+        fetcher.fetch("https://example.com/status").getOrThrow()
+        fetcher.fetch("https://example.com/status").getOrThrow()
+        assertEquals(2, requests)
+    }
+
+    @Test
     fun `no-store does not cache`() = runTest {
         var requests = 0
         val fetcher = CredentialFetcher(countingClient(cacheControl = listOf("no-store")) { ++requests })
+        fetcher.fetch("https://example.com/status").getOrThrow()
+        fetcher.fetch("https://example.com/status").getOrThrow()
+        assertEquals(2, requests)
+    }
+
+    @Test
+    fun `token ttl does not cache under no-store`() = runTest {
+        var requests = 0
+        val fetcher = CredentialFetcher(
+            countingClient(
+                cacheControl = listOf("no-store"),
+                body = { unsignedJwt(ttl = 43_200, n = it) },
+            ) { ++requests },
+        )
+        fetcher.fetch("https://example.com/status").getOrThrow()
+        fetcher.fetch("https://example.com/status").getOrThrow()
+        assertEquals(2, requests)
+    }
+
+    @Test
+    fun `token ttl does not cache when Age exhausts max-age`() = runTest {
+        var requests = 0
+        val fetcher = CredentialFetcher(
+            countingClient(
+                cacheControl = listOf("max-age=60"),
+                age = "60",
+                body = { unsignedJwt(ttl = 43_200, n = it) },
+            ) { ++requests },
+        )
         fetcher.fetch("https://example.com/status").getOrThrow()
         fetcher.fetch("https://example.com/status").getOrThrow()
         assertEquals(2, requests)
@@ -176,6 +219,15 @@ class CredentialFetcherTest {
         assertEquals(
             1.seconds,
             HttpCacheControl.remainingFreshness(listOf("max-age=60"), ageSeconds = 59, responseDelay = Duration.ZERO),
+        )
+        val now = Instant.parse("2026-01-01T00:00:00Z")
+        assertEquals(
+            null,
+            StatusListCacheExpiry.of(now, httpRemaining = null, ttlSeconds = 43_200, expEpochSeconds = now.epochSeconds + 60),
+        )
+        assertEquals(
+            now + 1.seconds,
+            StatusListCacheExpiry.of(now, httpRemaining = 60.seconds, ttlSeconds = 1, expEpochSeconds = null),
         )
     }
 

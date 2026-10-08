@@ -45,9 +45,9 @@ sealed class StatusListContent {
 }
 
 /**
- * Fetches status-list tokens and reuses a body until the earliest of HTTP freshness and the
- * token `ttl`/`exp` claims. Missing bounds, `no-store`, `no-cache`, or a non-positive remaining
- * lifetime keep the previous always-fetch behavior.
+ * Fetches status-list tokens and, when HTTP freshness is reusable, reuses a body until the
+ * earliest of remaining HTTP freshness and the token `ttl`/`exp` claims. Missing, `no-store`,
+ * `no-cache`, or exhausted freshness keep the previous always-fetch behavior.
  */
 class CredentialFetcher(
     private val client: HttpClient,
@@ -182,8 +182,9 @@ internal object StatusListCacheExpiry {
         ttlSeconds: Long?,
         expEpochSeconds: Long?,
     ): Instant? {
+        val httpDeadline = now + (httpRemaining ?: return null)
         val deadlines = buildList {
-            httpRemaining?.let { add(now + it) }
+            add(httpDeadline)
             ttlSeconds?.takeIf { it > 0 }?.let { add(now + it.seconds) }
             expEpochSeconds?.let { add(Instant.fromEpochSeconds(it)) }
         }

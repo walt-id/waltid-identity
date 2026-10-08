@@ -60,6 +60,30 @@ class CredentialFetcherJvmTest {
         assertEquals(2, fetches)
     }
 
+    @Test
+    fun `CWT ttl does not cache when Cache-Control is missing`() = runTest {
+        var fetches = 0
+        val cwt = signedCwt(ttl = 43_200, n = 0)
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler {
+                    fetches++
+                    respond(
+                        content = cwt,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(
+                            HttpHeaders.ContentType to listOf("application/statuslist+cwt"),
+                        ),
+                    )
+                }
+            }
+        }
+        val fetcher = CredentialFetcher(client)
+        fetcher.fetch("https://status.example/list").getOrThrow()
+        fetcher.fetch("https://status.example/list").getOrThrow()
+        assertEquals(2, fetches)
+    }
+
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun signedCwt(ttl: Long, n: Int): ByteArray {
         val key = JWKKey.generate(KeyType.Ed25519)
