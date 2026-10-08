@@ -15,6 +15,7 @@ import id.walt.ktorauthnz.ephemeral.InMemoryExpiringStore
 import id.walt.ktorauthnz.events.AuthnzEvent
 import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.flows.authFlows
+import id.walt.ktorauthnz.methods.RecoveryCode
 import id.walt.ktorauthnz.methods.UserPass
 import id.walt.ktorauthnz.methods.storeddata.UserPassStoredData
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
@@ -139,6 +140,17 @@ class TotpEnrollmentTest {
         assertEquals(HttpStatusCode.OK, secondStep("recovery-code", recoveryCodes.first().uppercase()).status)
         assertEquals(HttpStatusCode.Unauthorized, secondStep("recovery-code", recoveryCodes.first()).status, "used up")
         assertEquals(HttpStatusCode.OK, secondStep("recovery-code", recoveryCodes.last()).status)
+    }
+
+    @Test
+    fun `a recovery code stays used when its removal from the account is lost`() = enrollmentTest {
+        val (_, recoveryCodes) = enroll()
+        val unused = ExampleAccountStore.lookupStoredDataForAccount(accountId, RecoveryCode)
+        assertEquals(HttpStatusCode.OK, secondStep("recovery-code", recoveryCodes.first()).status)
+
+        // A concurrent request that read the codes before this use writes them back, the used one included.
+        ExampleAccountStore.updateAccountStoredData(accountId, RecoveryCode.id, assertNotNull(unused))
+        assertEquals(HttpStatusCode.Unauthorized, secondStep("recovery-code", recoveryCodes.first()).status, "used once already")
     }
 
     @Test
