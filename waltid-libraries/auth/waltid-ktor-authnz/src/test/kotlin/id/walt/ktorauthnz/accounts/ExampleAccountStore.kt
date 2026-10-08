@@ -42,14 +42,10 @@ object ExampleAccountStore : EditableAccountStore {
 
     fun registerAccount(newAccount: Account) {
         wip_accounts[newAccount.id] = newAccount
-        println("Registered account: $newAccount")
-        println("Now accounts are: $wip_accounts")
     }
 
     override suspend fun addAccountIdentifierToAccount(accountId: String, newAccountIdentifier: AccountIdentifier) {
-        println("Added account identifier $newAccountIdentifier to account $accountId")
         wip_account_ids[newAccountIdentifier] = accountId
-        println("Now account ids is: $wip_account_ids")
     }
 
     override suspend fun removeAccountIdentifierFromAccount(accountIdentifier: AccountIdentifier) {
@@ -84,37 +80,28 @@ object ExampleAccountStore : EditableAccountStore {
         wip_accountStoredData.remove(accountId)
     }
 
-    // TODO
     override suspend fun lookupStoredDataForAccount(accountId: String, method: AuthenticationMethod): AuthMethodStoredData? {
-        println("Lookup stored multi data for account $accountId, method $method TODO")
         val storedData: AuthMethodStoredData? = wip_accountStoredData[accountId]?.get(method.id)
 
         return storedData
     }
 
-    // TODO
     override suspend fun lookupStoredDataForAccountIdentifier(
         identifier: AccountIdentifier,
         method: AuthenticationMethod
     ): AuthMethodStoredData? {
         //val uuid = wip_account_ids[identifier] ?: error("No account for identifier: $identifier")
         val storedData = wip_accountIdentifierStoredData[identifier]?.get(method.id)
-        println("Lookup stored data for method $method for identifier $identifier: $storedData")
-        println("Account auth mechanisms is: $wip_accountIdentifierStoredData")
 
         return storedData
     }
 
     override suspend fun hasStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): Boolean {
         //val uuid = wip_account_ids[identifier] ?: error("No account for identifier: $identifier")
-        println("Checking if stored data for $identifier, method $method")
-        println("Account auth mechanisms is: $wip_accountIdentifierStoredData")
         return wip_accountIdentifierStoredData.containsKey(identifier)
     }
 
     override suspend fun lookupAccountUuid(identifier: AccountIdentifier): String? {
-        println("Lookup account uuid by identifier: $identifier")
-        println("Account ids is: $wip_accounts")
         return wip_account_ids[identifier]
     }
 

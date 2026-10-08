@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.tokens.ktorauthnztoken
 
+import id.walt.ktorauthnz.exceptions.InvalidTokenException
 import java.util.concurrent.ConcurrentHashMap
 
 class InMemoryKtorAuthNzTokenStore : KtorAuthnzTokenStore {
@@ -13,7 +14,7 @@ class InMemoryKtorAuthNzTokenStore : KtorAuthnzTokenStore {
     }
 
     override suspend fun getTokenSessionId(token: String): String {
-        return tokens[token] ?: error("Unknown token: $token")
+        return tokens[token] ?: throw InvalidTokenException("Unknown token")
     }
 
     override suspend fun validateToken(token: String): Boolean {

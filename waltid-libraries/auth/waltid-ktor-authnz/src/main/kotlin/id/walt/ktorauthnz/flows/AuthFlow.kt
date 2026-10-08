@@ -1,7 +1,6 @@
 package id.walt.ktorauthnz.flows
 
-import io.klogging.logger
-import kotlinx.coroutines.runBlocking
+import io.klogging.noCoLogger
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -33,9 +32,11 @@ data class AuthFlow(
 ) {
 
     companion object {
-        private val log = logger("AuthFlow")
+        private val log = noCoLogger("AuthFlow")
 
         fun fromConfig(config: String): AuthFlow = Json.decodeFromString<AuthFlow>(config)
+
+        internal const val IDENTIFY = "identify"
     }
 
     @Suppress("DEPRECATION") // check for legacy Deprecated "ok"
@@ -48,12 +49,12 @@ data class AuthFlow(
         @Suppress("DEPRECATION")
         if (ok != null) {
             val msg = "Your AuthFlow configuration contains deprecated end-condition \"ok\" - use \"success\" instead."
-            runBlocking { log.warn { msg } }
-            println(msg)
+            log.warn(msg)
         }
 
-        check(isEndConditionSuccess() || continueWith != null) { "No end condition in auth flow with method $method" }
-        check(isEndConditionSuccess() xor (continueWith != null)) { "Multiple end conditions in auth flow with method $method: OK and ${continueWith!!.methods()}" }
+        // `identify` decides what follows from the account it finds.
+        check(isEndConditionSuccess() || continueWith != null || method == IDENTIFY) { "No end condition in auth flow with method $method" }
+        check(!(isEndConditionSuccess() && continueWith != null)) { "Multiple end conditions in auth flow with method $method: OK and ${continueWith!!.methods()}" }
 
         if (continueWith != null) {
             check(continueWith.isNotEmpty()) { "Next flow list (`continueWith`) is empty at method $method" }
