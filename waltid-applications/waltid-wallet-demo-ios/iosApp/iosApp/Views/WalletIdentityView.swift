@@ -3,6 +3,8 @@ import WalletSDK
 import WalletDemoSharingUI
 
 struct WalletIdentityView: View {
+    var biometricAvailability: DemoBiometricAvailability = .available
+    var biometricKind: DemoBiometricKind = .generic
     @ObservedObject var model: WalletIdentityScreenModel
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -28,15 +30,18 @@ struct WalletIdentityView: View {
                                 model.step != .summary ? String(localized: "Done")
                                     : model.loadFailed || model.canRetrySetupOperation ? String(localized: "Try again")
                                     : selected.restoring ? String(localized: "Restore signing key") : String(localized: "Create signing key"),
-                                enabled: !model.busy && !model.refreshing, identifier: "wallet.keySetupContinue") {
+                                enabled: !model.busy && !model.refreshing && (model.step != .summary || model.canCreate || model.loadFailed), identifier: "wallet.keySetupContinue") {
                                     if model.loadFailed && model.step == .summary { Task { await model.refresh() } }
                                     else { model.continueSetup() }
                                 },
-                            secondary: model.step == .summary ? nil : WalletAction(String(localized: "Back"),
+                            secondary: model.step == .summary
+                                ? (!model.canCreate && biometricAvailability.offersSettings ? WalletAction("Open Settings", identifier: "wallet.biometricOpenSettings", perform: BiometricSettings.open) : nil)
+                                : WalletAction(String(localized: "Back"),
                                 enabled: !model.busy && !model.refreshing) { model.step = .summary }
                         )
                     } else if model.loaded && !model.refreshing && model.choices.isEmpty {
-                        WalletActions(primary: WalletAction("Try again", enabled: !model.busy) { Task { await model.refresh() } })
+                        WalletActions(primary: WalletAction("Try again", enabled: !model.busy) { Task { await model.refresh() } },
+                            secondary: biometricAvailability.offersSettings ? WalletAction("Open Settings", identifier: "wallet.biometricOpenSettings", perform: BiometricSettings.open) : nil)
                     }
                 }
             }
@@ -75,8 +80,18 @@ struct WalletIdentityView: View {
                     }
                 }
             } else if let selected = model.selected {
-                SigningKeySetupContent(options: model.setupOptions, selected: selected, step: model.step,
+                SigningKeySetupContent(options: model.setupOptions, selected: selected, step: model.step, requestedApproval: model.requestedApproval,
                     onSelect: model.select, onEdit: model.edit)
+            }
+            if model.identity == nil && model.step == .summary && model.loaded && !model.refreshing {
+                if !model.canCreate && biometricAvailability != .available {
+                    Section { BiometricRecoverySection(availability: biometricAvailability, kind: biometricKind, showSettingsAction: false) }
+                } else if model.selected != nil && !model.canCreate {
+                    Section { Text("The selected signing approval is unavailable for this configuration. Choose compatible storage or explicitly choose another signing approval.").font(.callout).foregroundStyle(.secondary) }
+                }
+                if model.existingKeyUnavailable {
+                    Section { Text("Your existing signing key has not been changed. Restore its availability and try again.").font(.callout).foregroundStyle(.secondary) }
+                }
             }
             if !model.recoveryUnavailableReasons.isEmpty && (model.identity != nil || model.step == .recovery || model.selected == nil) {
                 Section("Backup availability") {

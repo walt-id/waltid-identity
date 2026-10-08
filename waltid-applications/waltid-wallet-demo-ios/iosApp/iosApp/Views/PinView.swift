@@ -32,13 +32,17 @@ struct PinView: View {
         } feedback: {
             if viewModel.access.operation == .checkingPin || viewModel.access.operation == .savingPin {
                 ProgressView().accessibilityLabel("Checking PIN")
+            } else if let pinError = viewModel.pinError {
+                Text(pinError).font(.callout).foregroundStyle(.red)
+            } else if !changing && viewModel.auth == .login && viewModel.isBiometricUnlockEnabled && !viewModel.isBiometricUnlockAvailable {
+                BiometricRecoverySection(availability: viewModel.access.biometricAvailability, kind: viewModel.access.biometricKind, showSettingsAction: false)
             } else if let error {
                 Text(error).font(.callout).foregroundStyle(.red)
             }
         } actions: {
             WalletActions(primary: retryAction,
-                secondary: biometricAction ?? clearAction,
-                tertiary: biometricAction != nil ? clearAction : backAction)
+                secondary: biometricAction ?? biometricSettingsAction ?? clearAction,
+                tertiary: biometricAction != nil || biometricSettingsAction != nil ? clearAction : backAction)
         }
         .task(id: scenePhase) {
             if scenePhase == .active && !changing {
@@ -109,6 +113,12 @@ struct PinView: View {
             return WalletAction("Back", enabled: !viewModel.isAuthenticating, identifier: "wallet.pinBackButton", perform: viewModel.editSetupPin)
         }
         return nil
+    }
+    private var biometricSettingsAction: WalletAction? {
+        guard !changing, viewModel.auth == .login, viewModel.isBiometricUnlockEnabled,
+              viewModel.access.biometricAvailability.offersSettings else { return nil }
+        return WalletAction("Open Settings", enabled: !viewModel.isAuthenticating,
+            identifier: "wallet.biometricOpenSettings", perform: BiometricSettings.open)
     }
     private var biometricAction: WalletAction? {
         guard !changing, viewModel.auth == .login, viewModel.isBiometricUnlockEnabled, viewModel.isBiometricUnlockAvailable else { return nil }

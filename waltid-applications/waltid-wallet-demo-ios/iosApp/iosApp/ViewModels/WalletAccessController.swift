@@ -42,7 +42,7 @@ final class WalletAccessController: ObservableObject {
     @Published private(set) var step: PinSetupStep = .choose
     @Published private(set) var error: String?
     @Published private(set) var operation: WalletAccessOperation = .idle
-    @Published private(set) var biometricAvailable: Bool
+    @Published private(set) var biometricAvailability: DemoBiometricAvailability
     @Published private(set) var biometricEnabled: Bool
     @Published private(set) var biometricOutcome: DemoBiometricResult?
     @Published private(set) var pinChange: WalletPinChange?
@@ -59,10 +59,11 @@ final class WalletAccessController: ObservableObject {
         self.store = store
         self.biometrics = biometrics
         auth = store.hasPin ? .login : .setup
-        biometricAvailable = biometrics.isAvailable
+        biometricAvailability = biometrics.availability
         biometricEnabled = !store.isBiometricSetupPending && store.isBiometricUnlockEnabled
     }
 
+    var biometricAvailable: Bool { biometricAvailability == .available }
     var biometricKind: DemoBiometricKind { biometrics.kind }
     var isBusy: Bool { operation.isBusy }
     var isCreatingPin: Bool { auth == .setup || pinChange == .newPin }
@@ -134,7 +135,7 @@ final class WalletAccessController: ObservableObject {
     }
 
     func refreshBiometrics() {
-        biometricAvailable = biometrics.isAvailable
+        biometricAvailability = biometrics.availability
         biometricEnabled = !store.isBiometricSetupPending && store.isBiometricUnlockEnabled
     }
 

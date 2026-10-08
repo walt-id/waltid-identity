@@ -11,6 +11,8 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -23,6 +25,8 @@ import id.walt.walletdemo.compose.logic.WalletDemoKeySetupOption
 import id.walt.walletdemo.compose.logic.WalletDemoIdentityDetails
 import id.walt.walletdemo.compose.logic.WalletDemoIdentityDetailsState
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.DemoBiometricAvailability
+import id.walt.walletdemo.compose.logic.DemoBiometricKind
 import id.walt.walletdemo.compose.ui.screens.SettingsScreen
 import id.walt.walletdemo.compose.ui.screens.IdentitySetupScreen
 import kotlin.test.Test
@@ -34,6 +38,59 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class KeySetupNavigationAndroidTest {
+    @Test
+    fun unavailableDefaultCannotCreateUntilApprovalIsExplicitlyChanged() = runAndroidComposeUiTest<ComponentActivity> {
+        fun choice(id: String) = WalletDemoKeyChoice(id, id, "Details for $id")
+        val biometric = choice("Biometric signing")
+        val unprotected = WalletDemoKeySetupOption("none-handle", choice("new"), choice("native"), choice("No biometric signing"))
+        val setup = mutableStateOf(WalletDemoIdentitySetup.Choose(listOf(unprotected), preferredApproval = biometric))
+        var submitted: String? = null
+        val restoration = StateRestorationTester(this)
+        restoration.setContent { IdentitySetupScreen(setup.value, null, { submitted = it }, {}, {}, {},
+            biometricAvailability = DemoBiometricAvailability.Unavailable, biometricKind = DemoBiometricKind.FaceId) }
+        onNodeWithTag("wallet.keySetupEdit.Approval").assertTextContains(biometric.title)
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsNotEnabled()
+        onNodeWithText("Face ID is unavailable. Check this app’s Face ID access in Settings.").performScrollTo().assertIsDisplayed()
+        restoration.emulateSaveAndRestore()
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsNotEnabled()
+        onNodeWithTag("wallet.keySetupEdit.Approval").performClick()
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Approval", 0)).performScrollTo().performClick()
+        onNodeWithText("Done").performClick()
+        restoration.emulateSaveAndRestore()
+        onNodeWithTag("wallet.keySetupEdit.Approval").assertTextContains(unprotected.approval.title)
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsEnabled().performClick()
+        kotlin.test.assertEquals("none-handle", submitted)
+    }
+
+    @Test
+    fun availabilityAndStorageChangesPreserveIntendedApproval() = runAndroidComposeUiTest<ComponentActivity> {
+        fun choice(id: String) = WalletDemoKeyChoice(id, id, "Details for $id")
+        val protected = WalletDemoKeySetupOption("protected", choice("new"), choice("native"), choice("biometric"))
+        val plain = protected.copy(id = "plain", approval = choice("none"))
+        val database = plain.copy(id = "database", storage = choice("database"))
+        val setup = mutableStateOf(WalletDemoIdentitySetup.Choose(listOf(plain, database), preferredApproval = protected.approval))
+        val availability = mutableStateOf(DemoBiometricAvailability.Unavailable)
+        var submitted: String? = null
+        setContent { IdentitySetupScreen(setup.value, null, { submitted = it }, {}, {}, {}, biometricAvailability = availability.value) }
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsNotEnabled()
+        runOnUiThread {
+            setup.value = setup.value.copy(options = listOf(protected, plain, database))
+            availability.value = DemoBiometricAvailability.Available
+        }
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsEnabled()
+        onNodeWithTag("wallet.keySetupEdit.Storage").performClick()
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).performScrollTo().performClick()
+        onNodeWithText("Done").performClick()
+        onNodeWithTag("wallet.keySetupEdit.Approval").assertTextContains("biometric")
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsNotEnabled()
+        kotlin.test.assertNull(submitted)
+        onNodeWithTag("wallet.keySetupEdit.Storage").performClick()
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 0)).performScrollTo().performClick()
+        onNodeWithText("Done").performClick()
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsEnabled().performClick()
+        kotlin.test.assertEquals("protected", submitted)
+    }
+
     @Test
     fun settingsDoNotOfferLegacySigningControlsWhileDetailsLoadOrFail() = runAndroidComposeUiTest<ComponentActivity> {
         val state = mutableStateOf(WalletDemoUiState())

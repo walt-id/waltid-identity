@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -21,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.selection.SelectionContainer
 import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.ui.SystemBackHandler
+import id.walt.walletdemo.compose.ui.rememberBiometricSettingsLauncher
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
@@ -32,27 +34,32 @@ internal fun IdentitySetupScreen(
     onCancel: (String) -> Unit,
     onRefresh: () -> Unit,
     progress: String? = null,
+    biometricAvailability: DemoBiometricAvailability = DemoBiometricAvailability.Available,
+    biometricKind: DemoBiometricKind = DemoBiometricKind.Generic,
 ) {
     val refreshing = progress != null
     val options = (setup as? WalletDemoIdentitySetup.Choose)?.options.orEmpty()
     // Save only semantic choices. Executable handles always come from the latest SDK options.
     var recoveryId by rememberSaveable { mutableStateOf<String?>(null) }
     var storageId by rememberSaveable { mutableStateOf<String?>(null) }
-    var approvalId by rememberSaveable { mutableStateOf<String?>(null) }
+    var requestedApproval by rememberSaveable(stateSaver = keyApprovalSaver) { mutableStateOf<WalletDemoKeyChoice?>(null) }
     var pageName by rememberSaveable { mutableStateOf(IdentitySetupPage.Summary.name) }
     val page = IdentitySetupPage.valueOf(pageName)
-    fun select(option: WalletDemoKeySetupOption) {
+    val preferredApproval = requestedApproval ?: (setup as? WalletDemoIdentitySetup.Choose)?.preferredApproval
+    val selected = resolveKeySetupOption(options, recoveryId, storageId, preferredApproval?.id)
+    val intendedApproval = preferredApproval ?: selected?.approval
+    val canCreate = selected != null && selected.approval.id == intendedApproval?.id
+    val openSettings = rememberBiometricSettingsLauncher(biometricAvailability)
+    fun select(option: WalletDemoKeySetupOption, changeApproval: Boolean = false) {
         recoveryId = option.recovery.id
         storageId = option.storage.id
-        approvalId = option.approval.id
+        if (changeApproval || intendedApproval == null) requestedApproval = option.approval
     }
-    val retainedSelection = options.find {
-        it.recovery.id == recoveryId && it.storage.id == storageId && it.approval.id == approvalId
-    }
-    val selected = retainedSelection ?: options.firstOrNull()
     val latestSetup by rememberUpdatedState(setup)
     val latestOptions by rememberUpdatedState(options)
     val latestSelected by rememberUpdatedState(selected)
+    val latestApproval by rememberUpdatedState(intendedApproval)
+    val latestCanCreate by rememberUpdatedState(canCreate)
     val latestWarning by rememberUpdatedState(warning)
     val latestProgress by rememberUpdatedState(progress)
     fun back() { pageName = IdentitySetupPage.Summary.name }
@@ -60,12 +67,13 @@ internal fun IdentitySetupScreen(
     LaunchedEffect(options) {
         // Empty options during refresh must not discard the saved choice.
         if (options.isNotEmpty()) {
-            if (recoveryId != null && retainedSelection == null) pageName = IdentitySetupPage.Summary.name
+            if (recoveryId != null && options.none { it.recovery.id == recoveryId && it.storage.id == storageId })
+                pageName = IdentitySetupPage.Summary.name
             select(selected!!)
         }
     }
     // A failed operation belongs to the configuration that produced it, not every customization page.
-    val selectedConfiguration = selected?.let { listOf(it.recovery.id, it.storage.id, it.approval.id) } ?: emptyList()
+    val selectedConfiguration = selected?.let { listOf(it.recovery.id, it.storage.id, intendedApproval?.id.orEmpty()) } ?: emptyList()
     val failedConfiguration = rememberSaveable(warning) { selectedConfiguration }
     val latestFailedConfiguration by rememberUpdatedState(failedConfiguration)
     val latestSelectedConfiguration by rememberUpdatedState(selectedConfiguration)
@@ -83,6 +91,8 @@ internal fun IdentitySetupScreen(
                 val setup = latestSetup
                 val options = latestOptions
                 val selected = latestSelected
+                val intendedApproval = latestApproval
+                val canCreate = latestCanCreate
                 val progress = latestProgress
                 val refreshing = progress != null
                 val displayedPage = IdentitySetupPage.valueOf(key)
@@ -116,10 +126,11 @@ internal fun IdentitySetupScreen(
                                             selected.restoring -> stringResource(Res.string.setup_restore)
                                             else -> stringResource(Res.string.setup_create)
                                         },
-                                        onClick = { if (summary) onChoose(selected.id) else back() },
-                                        enabled = !refreshing, testTag = WalletUiTestTags.KeySetupContinue,
+                                        onClick = { if (summary && canCreate) onChoose(selected.id) else if (!summary) back() },
+                                        enabled = !refreshing && (!summary || canCreate), testTag = WalletUiTestTags.KeySetupContinue,
                                     ) else if (!refreshing) WalletAction(stringResource(Res.string.settings_try_again), onRefresh) else null,
-                                    secondary = if (!summary) WalletAction(stringResource(Res.string.settings_back), ::back, !refreshing) else null,
+                                    secondary = if (!summary) WalletAction(stringResource(Res.string.settings_back), ::back, !refreshing)
+                                    else openSettings?.takeIf { !canCreate }?.let { WalletAction(stringResource(Res.string.biometric_open_settings), it, !refreshing, "wallet.biometricOpenSettings") },
                                 )
                             }
                         },
@@ -137,13 +148,19 @@ internal fun IdentitySetupScreen(
                                     if (selected != null) WalletSection(stringResource(Res.string.setup_summary), selected.recovery.detail) {
                                         SigningKeySummary(
                                             if (selected.recovery.id == "new") stringResource(Res.string.setup_no_backup) else selected.recovery.title,
-                                            selected.storage.title, selected.approval.title, enabled = !refreshing,
+                                            selected.storage.title, intendedApproval?.title ?: selected.approval.title, enabled = !refreshing,
                                             onEdit = { selectedStep -> pageName = IdentitySetupPage.entries.first { it.choiceStep == selectedStep }.name },
                                         )
                                     } else if (!refreshing) {
-                                        Text(stringResource(Res.string.setup_no_options))
+                                        Text(intendedApproval?.title ?: stringResource(Res.string.setup_no_options))
                                         setup.recoveryUnavailableReasons.distinct().forEach { SettingsNotice(it) }
                                     }
+                                    if (!refreshing && !canCreate) {
+                                        if (biometricAvailability != DemoBiometricAvailability.Available)
+                                            BiometricRecoveryNotice(biometricAvailability, biometricKind, showSettingsAction = false)
+                                        else SettingsNotice(stringResource(Res.string.setup_approval_unavailable))
+                                    }
+                                    if (setup.existingKeyUnavailable) SettingsNotice(stringResource(Res.string.setup_key_retained))
                                 } else if (selected != null && displayedStep != null) {
                                     Text(stringResource(when (displayedStep) {
                                         WalletDemoKeySetupStep.Recovery -> Res.string.setup_recovery_description
@@ -154,6 +171,12 @@ internal fun IdentitySetupScreen(
                                         setup.recoveryStorageNotice?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                                     }
                                     val choices = displayedStep.options(options, selected).map(displayedStep::choice).distinctBy { it.id }
+                                    if (displayedStep == WalletDemoKeySetupStep.Approval && !canCreate && intendedApproval != null) {
+                                        WalletSection {
+                                            SettingsChoiceRow(intendedApproval.title, stringResource(Res.string.setup_approval_unavailable),
+                                                selected = true, onSelect = {}, enabled = false)
+                                        }
+                                    }
                                     val groups = if (displayedStep == WalletDemoKeySetupStep.Recovery)
                                         choices.groupBy { it.id.startsWith("restore:") }.values.toList() else listOf(choices)
                                     Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -164,10 +187,11 @@ internal fun IdentitySetupScreen(
                                                 footer = if (choices.size == 1) stringResource(Res.string.setup_single_option) else null) {
                                                 group.forEachIndexed { index, choice ->
                                                     if (index > 0) SettingsDivider()
-                                                    SettingsChoiceRow(choice.title, choice.detail, displayedStep.choice(selected).id == choice.id,
-                                                        onSelect = { select(displayedStep.select(options, selected, choice.id)) },
+                                                    SettingsChoiceRow(choice.title, choice.detail,
+                                                        (if (displayedStep == WalletDemoKeySetupStep.Approval) intendedApproval?.id else displayedStep.choice(selected).id) == choice.id,
+                                                        onSelect = { select(displayedStep.select(options, selected, choice.id), changeApproval = displayedStep == WalletDemoKeySetupStep.Approval) },
                                                         modifier = Modifier.testTag(WalletUiTestTags.keySetupChoice(displayedStep.name, choices.indexOf(choice))),
-                                                        enabled = !refreshing, selectable = choices.size > 1,
+                                                        enabled = !refreshing, selectable = choices.size > 1 || (displayedStep == WalletDemoKeySetupStep.Approval && !canCreate),
                                                         extra = choice.identifier?.let { identifier -> { RecoveryIdentifier(identifier) } })
                                                 }
                                             }
@@ -215,3 +239,8 @@ internal fun ProviderAvailability(reasons: List<String>, enabled: Boolean, onRef
         SettingsActionRow(stringResource(Res.string.setup_check_again), onRefresh, enabled = enabled)
     }
 }
+
+private val keyApprovalSaver = Saver<WalletDemoKeyChoice?, List<String>>(
+    save = { it?.let { choice -> listOf(choice.id, choice.title, choice.detail) } ?: emptyList() },
+    restore = { it.takeIf { values -> values.size == 3 }?.let { values -> WalletDemoKeyChoice(values[0], values[1], values[2]) } },
+)
