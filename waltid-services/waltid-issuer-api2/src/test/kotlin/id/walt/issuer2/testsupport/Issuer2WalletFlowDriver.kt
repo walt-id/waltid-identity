@@ -2,10 +2,17 @@ package id.walt.issuer2.testsupport
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
-import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
+import id.walt.did.dids.registrar.local.jwk.Crypto2DidJwkRegistrar
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
@@ -16,7 +23,7 @@ import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.IssuerStateMode
-import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.proofs.Proofs
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
@@ -392,12 +399,14 @@ class Issuer2WalletFlowDriver(
         clientId: String? = null,
     ): Proofs {
         val nonceResponse = client.post(requireNotNull(issuerMetadata.nonceEndpoint)).body<JsonObject>()
-        val proofKey = JWKKey.generate(KeyType.secp256r1)
+        val proofKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(GenerateSoftwareKeyRequest(
+            KeyId("holder-proof"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+        ))
         val useDidInProof = includeDidInProof
             ?: issuerMetadata.useDidJwkProof(credentialConfigurationId)
         val holderDid = if (useDidInProof) {
-            DidJwkRegistrar()
-                .registerByKey(proofKey, DidJwkCreateOptions(KeyType.secp256r1))
+            Crypto2DidJwkRegistrar()
+                .createByKey(proofKey, DidJwkCreateOptions(KeyType.secp256r1))
                 .did
         } else {
             null
@@ -405,6 +414,7 @@ class Issuer2WalletFlowDriver(
 
         return JwtProofBuilder().buildProof(
             key = proofKey,
+            algorithm = JwsAlgorithm.ES256,
             audience = issuerMetadata.credentialIssuer,
             nonce = requireNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull),
             binding = holderDid?.let { ProofKeyBinding.KeyId("$it#0") } ?: ProofKeyBinding.Jwk,

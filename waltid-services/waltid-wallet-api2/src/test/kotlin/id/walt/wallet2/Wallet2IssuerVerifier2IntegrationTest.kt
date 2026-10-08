@@ -31,7 +31,7 @@ import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDefinition
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
-import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
@@ -127,7 +127,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
 
     // Tell the wallet to build a JWT proof for ES256 and Ed25519 keys
     private val jwtProofTypesSupported = mapOf(
-        "jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA"))
+        "jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256", "EdDSA"))
     )
 
     // -----------------------------------------------------------------------
@@ -259,7 +259,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
         val configuration = CredentialConfiguration(
             format = VciCredentialFormat.SD_JWT_VC, vct = vct, scope = configurationId,
             cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
-            proofTypesSupported = mapOf("jwt" to ProofType(proofSigningAlgValuesSupported = setOf("ES256"))),
+            proofTypesSupported = mapOf("jwt" to ProofTypeMetadata(proofSigningAlgValuesSupported = setOf("ES256"))),
         )
         val profile = CredentialProfileConfig(
             name = profileId, credentialConfigurationId = configurationId,

@@ -10,9 +10,7 @@ class X509CertificateChain private constructor(private val certChainList: List<C
 
     companion object {
 
-        fun of(
-            certificateList: Collection<X509Certificate>
-        ): X509CertificateChain {
+        fun of(certificateList: Collection<X509Certificate>): X509CertificateChain {
 
             val subjectToCertMap = certificateList
                 .distinctBy { it.fingerprintSha256 }
@@ -21,11 +19,11 @@ class X509CertificateChain private constructor(private val certChainList: List<C
                         isTrusted = false,
                         entry = it
                     )
-                }
-                .associateBy { it.subjectDn }
+                }.groupBy { it.subjectDn }
 
-            val potentialRoots = subjectToCertMap
-                .values
+            val distinctCertificateList = subjectToCertMap.values.flatten()
+
+            val potentialRoots = distinctCertificateList
                 .filter { it.subjectDn == it.issuerDn || !subjectToCertMap.keys.contains(it.issuerDn) }
                 .toList()
 
@@ -33,10 +31,10 @@ class X509CertificateChain private constructor(private val certChainList: List<C
                 "Identified multiple roots in the certificate chain: ${potentialRoots.map { it.subjectDn }}"
             }
 
-            val issuerDnToCertMap = subjectToCertMap.values
+            val issuerDnToCertMap = distinctCertificateList
                 .filter { it.subjectDn != it.issuerDn }
                 .groupingBy { it.issuerDn }
-                .reduce { key, acc, element -> throw IllegalStateException("Duplicate issuer DN: $key") }
+                .reduce { key, _, _ -> throw IllegalStateException("Duplicate issuer DN: $key") }
 
             val chainList = mutableListOf<CertChainEntry>()
             val rootOfProvidedCertificateList = potentialRoots.first()
@@ -50,6 +48,7 @@ class X509CertificateChain private constructor(private val certChainList: List<C
                     break
                 }
             } while (true)
+            require(chainList.size == distinctCertificateList.size) { "Not all certificates could be added to chain of trust." }
             return X509CertificateChain(chainList.toList())
         }
     }

@@ -1,5 +1,6 @@
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -14,8 +15,8 @@ class FakeProximityLoopback private constructor(
 ) {
     companion object {
         fun create(capacity: Int = Channel.UNLIMITED, kind: ProximityTransportKind = ProximityTransportKind.BLE): FakeProximityLoopback {
-            val holderInbound = Channel<ImmutableBytes>(capacity)
-            val readerInbound = Channel<ImmutableBytes>(capacity)
+            val holderInbound = Channel<ByteString>(capacity)
+            val readerInbound = Channel<ByteString>(capacity)
             val closure = CompletableDeferred<ProximityCloseReason>()
             return FakeProximityLoopback(
                 holder = FakeProximityConnection(holderInbound, readerInbound, kind, closure),
@@ -26,8 +27,8 @@ class FakeProximityLoopback private constructor(
 }
 
 class FakeProximityConnection internal constructor(
-    private val inbound: Channel<ImmutableBytes>,
-    private val outbound: Channel<ImmutableBytes>,
+    private val inbound: Channel<ByteString>,
+    private val outbound: Channel<ByteString>,
     override val kind: ProximityTransportKind,
     private val closure: CompletableDeferred<ProximityCloseReason>,
 ) : ProximityConnection {
@@ -37,11 +38,11 @@ class FakeProximityConnection internal constructor(
 
     override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
 
-    override suspend fun receive(): ImmutableBytes? = inbound.receiveCatching().getOrNull()
+    override suspend fun receive(): ByteString? = inbound.receiveCatching().getOrNull()
 
-    override suspend fun send(message: ImmutableBytes) = sendMutex.withLock {
+    override suspend fun send(message: ByteString) = sendMutex.withLock {
         stateMutex.withLock { check(!terminal) { "Fake connection is closed" } }
-        outbound.send(ImmutableBytes.of(message.copy()))
+        outbound.send(ByteString(message.toByteArray()))
     }
 
     override suspend fun close(reason: ProximityCloseReason): Unit = stateMutex.withLock {

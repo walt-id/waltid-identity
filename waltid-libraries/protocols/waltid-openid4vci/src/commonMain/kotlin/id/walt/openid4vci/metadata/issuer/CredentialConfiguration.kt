@@ -48,7 +48,7 @@ data class CredentialConfiguration(
     @SerialName("cryptographic_binding_methods_supported")
     val cryptographicBindingMethodsSupported: Set<CryptographicBindingMethod>? = null,
     @SerialName("proof_types_supported")
-    val proofTypesSupported: Map<String, ProofType>? = null,
+    val proofTypesSupported: Map<String, ProofTypeMetadata>? = null,
     @SerialName("credential_metadata")
     val credentialMetadata: CredentialMetadata? = null,
     val customParameters: Map<String, JsonElement>? = null,
@@ -149,7 +149,7 @@ internal object CredentialConfigurationSerializer : KSerializer<CredentialConfig
                 put("cryptographic_binding_methods_supported", Json.encodeToJsonElement(serializer, it))
             }
             value.proofTypesSupported?.let {
-                val serializer = MapSerializer(String.serializer(), ProofType.serializer())
+                val serializer = MapSerializer(String.serializer(), ProofTypeMetadata.serializer())
                 put("proof_types_supported", Json.encodeToJsonElement(serializer, it))
             }
             value.credentialMetadata?.let {
@@ -192,7 +192,7 @@ internal object CredentialConfigurationSerializer : KSerializer<CredentialConfig
                 lenientJson.decodeFromJsonElement(serializer, it)
             },
             proofTypesSupported = jsonObject["proof_types_supported"]?.let {
-                val serializer = MapSerializer(String.serializer(), ProofType.serializer())
+                val serializer = MapSerializer(String.serializer(), ProofTypeMetadata.serializer())
                 lenientJson.decodeFromJsonElement(serializer, it)
             },
             credentialMetadata = jsonObject["credential_metadata"]?.let {
@@ -220,7 +220,7 @@ data class CredentialDefinition(
  * Metadata about a supported proof type.
  */
 @Serializable
-data class ProofType(
+data class ProofTypeMetadata(
     @SerialName("proof_signing_alg_values_supported")
     val proofSigningAlgValuesSupported: Set<String>,
     @SerialName("key_attestations_required")
