@@ -1,5 +1,6 @@
 import Foundation
 import WalletDemoIdentityDocumentSupport
+import WalletDemoKeyAttestation
 import WalletDemoSharingUI
 import WalletSDK
 import WalletSDKKeychainRecovery
