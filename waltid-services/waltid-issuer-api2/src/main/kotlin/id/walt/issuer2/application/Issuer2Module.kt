@@ -22,6 +22,7 @@ import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningKeyReferenceResolver
+import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningCertificateReferenceResolver
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyCommitment
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
@@ -36,6 +37,7 @@ class Issuer2Module @JvmOverloads constructor(
     preAuthorizedCodeRepository: PreAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository(),
     keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver? = null,
     metadataSigningKeyResolver: MetadataSigningKeyReferenceResolver? = null,
+    metadataSigningCertificateResolver: MetadataSigningCertificateReferenceResolver? = null,
 ) {
     private val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
     private val parRepository = ConfiguredPARRepository()
@@ -71,6 +73,7 @@ class Issuer2Module @JvmOverloads constructor(
             openId4VciModule.preAuthorizedCodeIssuer.anonymousAccessSupported,
         crypto2TokenSigningKey = openId4VciModule.crypto2TokenSigningKey,
         metadataSigningKeyResolver = metadataSigningKeyResolver,
+        metadataSigningCertificateResolver = metadataSigningCertificateResolver,
     )
 
     val credentialOfferService = CredentialOfferService(
@@ -112,6 +115,7 @@ class Issuer2Module @JvmOverloads constructor(
         fun load(
             credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null,
             metadataSigningKeyResolver: MetadataSigningKeyReferenceResolver? = null,
+            metadataSigningCertificateResolver: MetadataSigningCertificateReferenceResolver? = null,
         ): Issuer2Module =
             Issuer2Module(
                 serviceConfig = ConfigManager.getConfig(),
@@ -119,6 +123,7 @@ class Issuer2Module @JvmOverloads constructor(
                 profilesConfig = ConfigManager.getConfig(),
                 credentialProofKeyAcceptance = credentialProofKeyAcceptance,
                 metadataSigningKeyResolver = metadataSigningKeyResolver,
+                metadataSigningCertificateResolver = metadataSigningCertificateResolver,
             )
     }
 }

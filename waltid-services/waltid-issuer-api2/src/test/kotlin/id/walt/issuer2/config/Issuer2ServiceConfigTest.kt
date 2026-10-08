@@ -70,7 +70,7 @@ class Issuer2ServiceConfigTest {
             """{ type = "x509-chain", privateKeyPem = "synthetic", certificateChainPem = ["leaf", "intermediate"] }""" to
                 MetadataSigningMethod.X509Chain("synthetic", listOf("leaf", "intermediate")),
             """{ type = "key-reference", reference = "metadata-key" }""" to MetadataSigningMethod.KeyReference("metadata-key"),
-            """{ type = "key-reference", reference = "metadata-key", certificateChainPem = ["leaf", "intermediate"] }""" to
+            """{ type = "key-reference", reference = "metadata-key", x5cReferences = ["leaf", "intermediate"] }""" to
                 MetadataSigningMethod.KeyReference("metadata-key", listOf("leaf", "intermediate")),
         )
         for ((method, expected) in cases) {
@@ -131,9 +131,10 @@ class Issuer2ServiceConfigTest {
             """{ type = "x509-chain", privateKeyPem = "secret-inline-key", certificateChainPem = "chain" }""",
             """{ type = "key-reference" }""",
             """{ type = "key-reference", reference = " " }""",
-            """{ type = "key-reference", reference = "key", certificateChainPem = [] }""",
-            """{ type = "key-reference", reference = "key", certificateChainPem = [" "] }""",
-            """{ type = "key-reference", reference = "key", certificateChainPem = "chain" }""",
+            """{ type = "key-reference", reference = "key", x5cReferences = [] }""",
+            """{ type = "key-reference", reference = "key", certificateChainPem = ["leaf"] }""",
+            """{ type = "key-reference", reference = "key", x5cReferences = [" "] }""",
+            """{ type = "key-reference", reference = "key", x5cReferences = "chain" }""",
             """{ type = "key-reference", reference = "key", privateKeyPem = "secret-inline-key" }""",
             """"secret-inline-key"""",
         )

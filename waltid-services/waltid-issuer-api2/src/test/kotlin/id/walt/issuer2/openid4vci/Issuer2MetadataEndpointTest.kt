@@ -15,6 +15,7 @@ import id.walt.openid4vci.metadata.issuer.signing.SignedMetadataConfig
 import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningMethod
 import id.walt.openid4vci.metadata.issuer.signing.ResolvedMetadataSigningKey
 import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningKeyReferenceResolver
+import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningCertificateReferenceResolver
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.config.registerIssuer2ConfigDecoders
@@ -370,12 +371,18 @@ class Issuer2MetadataEndpointTest {
         val fixture = MetadataCertificateFixture()
         val key = fixture.crypto2SigningKey()
         var resolutions = 0
+        val references = fixture.config().certificateChainPem.indices.map { "store.certificate-$it" }
+        val certificateResolutions = mutableListOf<String>()
         installIssuer2WithConfigFiles(
-            signedMetadata = MetadataSigningMethod.KeyReference("metadata-key"),
+            signedMetadata = MetadataSigningMethod.KeyReference("metadata-key", references),
             metadataSigningKeyResolver = MetadataSigningKeyReferenceResolver {
                 assertEquals("metadata-key", it)
                 resolutions++
-                ResolvedMetadataSigningKey(key, fixture.config().certificateChainPem)
+                ResolvedMetadataSigningKey(key)
+            },
+            metadataSigningCertificateResolver = MetadataSigningCertificateReferenceResolver {
+                certificateResolutions.add(it)
+                fixture.config().certificateChainPem[references.indexOf(it)]
             },
         )
         val client = apiClient()
@@ -387,6 +394,7 @@ class Issuer2MetadataEndpointTest {
             assertNotNull(jwt.decodeJws().header["x5c"])
         }
         assertEquals(1, resolutions)
+        assertEquals(references, certificateResolutions)
     }
 
     @Test
@@ -703,6 +711,7 @@ class Issuer2MetadataEndpointTest {
         surfaces: Set<Issuer2RouteSurface>? = null,
         signedMetadata: MetadataSigningMethod? = null,
         metadataSigningKeyResolver: MetadataSigningKeyReferenceResolver? = null,
+        metadataSigningCertificateResolver: MetadataSigningCertificateReferenceResolver? = null,
     ) {
         loadIssuer2ConfigFiles(signedMetadata)
         application {
@@ -712,11 +721,14 @@ class Issuer2MetadataEndpointTest {
             configureStatusPages()
             runBlocking { issuer2AuthenticationPluginAmendment() }
             AuthenticationServiceModule.run { enable() }
-            if (surfaces == null && metadataSigningKeyResolver == null) {
+            if (surfaces == null && metadataSigningKeyResolver == null && metadataSigningCertificateResolver == null) {
                 issuer2Module(withPlugins = true)
             } else {
                 configurePlugins()
-                val module = Issuer2Module.load(metadataSigningKeyResolver = metadataSigningKeyResolver)
+                val module = Issuer2Module.load(
+                    metadataSigningKeyResolver = metadataSigningKeyResolver,
+                    metadataSigningCertificateResolver = metadataSigningCertificateResolver,
+                )
                 routing { module.openId4VciController.register(this, surfaces ?: Issuer2RouteSurface.all) }
             }
         }

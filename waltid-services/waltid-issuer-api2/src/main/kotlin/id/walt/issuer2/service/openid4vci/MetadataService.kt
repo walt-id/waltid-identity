@@ -1,6 +1,7 @@
 package id.walt.issuer2.service.openid4vci
 
 import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningKeyReferenceResolver
+import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningCertificateReferenceResolver
 
 import id.walt.openid4vci.metadata.issuer.signing.MetadataJwtSigner
 
@@ -42,6 +43,7 @@ class MetadataService @JvmOverloads constructor(
     /** Metadata signing key when no dedicated signing strategy is configured. */
     private val crypto2TokenSigningKey: Crypto2JwtSigningKey? = null,
     metadataSigningKeyResolver: MetadataSigningKeyReferenceResolver? = null,
+    metadataSigningCertificateResolver: MetadataSigningCertificateReferenceResolver? = null,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -58,7 +60,7 @@ class MetadataService @JvmOverloads constructor(
     private val supportsClientAttestation = serviceConfig.clientAttestationConfig() != null
     // Eager loading makes invalid dedicated configuration fail initialization, without token-key fallback.
     private val dedicatedMetadataSigner = runBlocking {
-        MetadataJwtSigner.dedicatedSigner(serviceConfig.signedMetadata, metadataSigningKeyResolver)
+        MetadataJwtSigner.dedicatedSigner(serviceConfig.signedMetadata, metadataSigningKeyResolver, metadataSigningCertificateResolver)
     }
 
     private val issuerDisplay: List<IssuerDisplay>? =

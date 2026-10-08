@@ -96,7 +96,7 @@ private class Issuer2KotlinxConfigDecoder<T : Any>(
         } catch (_: Exception) {
             Validated.Invalid(
                 if (supportedClass == SignedMetadataConfig::class) {
-                    ConfigFailure.Generic("Invalid signedMetadata configuration: use signingMethod with static-jwk (inline jwk), x509-chain (inline privateKeyPem and certificateChainPem list), or key-reference (reference)")
+                    ConfigFailure.Generic("Invalid signedMetadata configuration: use signingMethod with static-jwk (inline jwk), x509-chain (inline privateKeyPem and certificateChainPem list), or key-reference (reference and optional x5cReferences list)")
                 } else ConfigFailure.DecodeError(node, type),
             )
         }
