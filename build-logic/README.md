@@ -54,9 +54,9 @@ these baselines; updates with iOS disabled are rejected to preserve the iOS decl
 
 - `waltid.licensereport.gradle.kts` - Generates NOTICE / THIRD-PARTY-NOTICE attribution reports (opt-in for identity via `-PenableLicenseReport=true`; always on for enterprise-api). Does not fail the build on disallowed licenses.
 - `waltid.licensee.gradle.kts` - Licensee policy enforcement (`app.cash.licensee`). Attached to `check`. Run `./gradlew licensee` to execute every module's check. Product policy is selected by project path, or overridden with `-Pwaltid.licensee.policy=apache|binary|saas`:
-  - `apache` — identity libraries and OSS services (Apache-2.0 product). Permissive licenses plus weak copyleft (EPL, CDDL, MPL, GPL+CE).
-  - `binary` — shipped Enterprise binaries. Apache set plus LGPL.
-  - `saas` — license server. Binary set plus GPL. AGPL is never allowed.
+  - `apache` — identity libraries and OSS services (Apache-2.0 product). Permissive licenses plus weak copyleft (EPL, CDDL, MPL, GPL with classpath exception). Plain GPL-2.0 is not allowed. `argon2-jvm` follows the `argon2-jvm` catalog version. `mysql-connector-j` is allowed only on `:waltid-wallet-api`, at the `mysql` catalog version, under the Universal FOSS Exception.
+  - `binary` — shipped Enterprise binaries. Apache set plus LGPL. Does not allow GPL-2.0 or MySQL Connector/J.
+  - `saas` — license server. Binary set plus GPL, because the server is not distributed. AGPL is never allowed.
 
 #### Misc
 
