@@ -79,7 +79,7 @@ suspend fun createAndroidDemoMobileWallet(
                 ),
             ),
             DemoClientIdTrust.configuration,
-        ),
+        ).attachKeyAttestationProviderResolver(DemoKeyAttestationProviders()),
         transactionDataProfilesWarning = transactionDataProfiles.warning,
     )
 }

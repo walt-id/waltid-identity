@@ -96,7 +96,7 @@ internal suspend fun Wallet.resolveProofHolderBindings(
     defaultDid: String?,
 ): List<ResolvedCredentialHolderBinding> {
     CredentialRequestBuilder.validateBatchSize(metadata, holders.size)
-    require(holders.size == 1 || supportedJwtProofAlgorithms(configuration.proofTypesSupported, attachedKeyAttestationProvider() != null) != null) {
+    require(holders.size == 1 || supportedJwtProofAlgorithms(configuration.proofTypesSupported, hasKeyAttestationProvider()) != null) {
         "Multiple instances require an advertised JWT proof type"
     }
     val bindings = holders.map { binding ->
@@ -106,7 +106,7 @@ internal suspend fun Wallet.resolveProofHolderBindings(
         require(configuration.proofTypesSupported?.get("jwt")?.keyAttestationsRequired == null || material.crypto2Key != null) {
             "Key attestation requires a Crypto2 holder key"
         }
-        supportedJwtProofAlgorithms(configuration.proofTypesSupported, attachedKeyAttestationProvider() != null)?.let { algorithms ->
+        supportedJwtProofAlgorithms(configuration.proofTypesSupported, hasKeyAttestationProvider())?.let { algorithms ->
             if (material.crypto2Key != null) material.crypto2Key.selectJwsAlgorithm(algorithms)
             else require(requireNotNull(material.legacyKey).keyType.jwsAlg in algorithms) {
                 "Issuer does not support the selected holder key's proof algorithm"
@@ -237,7 +237,7 @@ internal suspend fun Wallet.prepareIssuedCredentials(
 
 /** Choose a DID only when its verification method belongs to the selected key. */
 private suspend fun Wallet.resolveProofDid(did: String?, material: WalletKeyStoreEntry, configuration: CredentialConfiguration): String? {
-    if (supportedJwtProofAlgorithms(configuration.proofTypesSupported, attachedKeyAttestationProvider() != null) == null) return null
+    if (supportedJwtProofAlgorithms(configuration.proofTypesSupported, hasKeyAttestationProvider()) == null) return null
     val methods = configuration.cryptographicBindingMethodsSupported.orEmpty()
     val permitsJwk = methods.isEmpty() || methods.any { it is CryptographicBindingMethod.Jwk || it is CryptographicBindingMethod.CoseKey }
     val method = did?.removePrefix("did:")?.substringBefore(':')

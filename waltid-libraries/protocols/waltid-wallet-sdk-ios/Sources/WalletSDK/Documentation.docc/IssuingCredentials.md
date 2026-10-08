@@ -18,6 +18,12 @@ Supply this runtime dependency again when recreating a wallet. A missing or inva
 required attestation fails issuance. Issuer trust and evidence supporting the
 provider's assurance claims must be established separately.
 
+For issuer-specific selection, the same property accepts a
+``KeyAttestationProviderResolver``. Its resolver returns a provider with a fixed
+verification key or `nil` for an unsupported issuer. The wallet only resolves when
+attestation is required, then retains that provider throughout the proof collection.
+Existing fixed providers use the default resolver implementation.
+
 ### Start and Continue an Issuance Session
 
 Pass the offer URL from a QR scan, deep link, universal link, or another app

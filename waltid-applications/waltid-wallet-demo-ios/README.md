@@ -136,6 +136,23 @@ On iOS, choose Without a backup under Create a new key to use Secure Enclave. Re
 Settings → Signing key shows the storage policy, observed key protection, key origin, signing approval, and key backup status. The Technical details page shows the wallet DID, key ID, and public key (JWK), with copy controls. Nearby sharing groups sharing approval, connection methods, and reader authentication. Reader-trust imports are reviewed before saving; resets and removals require confirmation. The Digital Credentials API page controls the additional wallet review, while Lock wallet and Reset wallet remain on the Settings root. To replace a key or its signing policy, use Reset wallet and repeat setup; this removes local credentials, which must be issued again.
 
 
+## Automatic test key attestations
+
+The demo automatically selects a local WE BUILD ITB synthetic attester for
+`https://dev-i4mlab.aegean.gr/rfc-issuer` and the EUDI public mock Wallet Provider
+for `https://issuer.eudiw.dev`, only when issuer metadata requires key attestation.
+The resolver is attached again when the wallet is recreated. No manual selector
+or startup request to either service is needed.
+
+Unknown issuers requiring attestation fail. EUDI outages never fall back to ITB.
+The SDK verifies the selected provider's signature, proof key, nonce, lifetime and
+advertised storage/authentication constraints before sending the proof.
+The ITB attester makes explicitly unassessed `example.invalid` claims and cannot
+satisfy profiles requiring certified storage or authentication.
+
+Both integrations are test assurance only. They are separate from `ATTESTATION_*`
+client authentication and Enterprise Wallet Provider WIA/KA loading (WAL-1479).
+
 ## Local wallet data
 
 The demo uses the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in iOS Keychain. During local development, reset wallet state by calling `Wallet.deleteLocalData()` from the SDK facade, deleting the app from the simulator/device, or removing the app's local data.
