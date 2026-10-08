@@ -2,6 +2,7 @@
 
 package id.walt.walletdemo.compose.logic.walletapi2
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
@@ -34,7 +35,8 @@ internal data class PersistedAuthorizationIssuance(
     val nonceEndpoint: String? = null,
     val codeVerifier: String? = null,
     val authorizationState: String? = null,
-    val credentialConfigurationId: String? = null,
+    val credentials: List<IssuanceCredentialSelectionDto>,
+    val walletId: String? = null,
 )
 
 @Serializable
@@ -80,6 +82,7 @@ internal data class WalletKeyInfo(
     val keyId: String,
     val keyType: String? = null,
     val algorithm: String? = null,
+    val publicJwk: JsonObject? = null,
 )
 
 @Serializable
@@ -114,22 +117,98 @@ internal data class ReceiveCredentialRequestDto(
     val offerUrl: String,
     val txCode: String? = null,
     val did: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val clientId: String = WalletApi2DefaultClientId,
     val redirectUri: String? = null,
+    val credentials: List<IssuanceCredentialSelectionDto>,
+    val keyId: String? = null,
 )
+
+@Serializable
+internal data class IssuanceCredentialSelectionDto(
+    val credentialConfigurationId: String,
+    val holderBindings: List<HolderBindingDto>,
+)
+
+@Serializable
+internal data class HolderBindingDto(val keyId: String, val did: String? = null)
 
 @Serializable
 internal data class ReceiveCredentialResultDto(
     val credentialIds: List<String> = emptyList(),
-    val deferredTransactionIds: Map<String, String> = emptyMap(),
+    val deferredCredentials: List<DeferredCredentialDto> = emptyList(),
+    val failure: CredentialIssuanceFailureDto? = null,
+    val storageOutcome: DeferredIssuanceOutcomeDto.Failed? = null,
+)
+
+@Serializable
+internal data class DeferredCredentialDto(
+    val deferredCredentialId: String,
+    val credentialConfigurationId: String,
+    val credentialIdentifier: String? = null,
+    val transactionId: String,
+    val intervalSeconds: Long,
+)
+
+@Serializable
+internal data class DeferredCredentialHandleDto(
+    val id: String,
+    val credentialConfigurationId: String? = null,
+    val intervalSeconds: Long? = null,
+    val credentialIdentifier: String? = null,
+)
+
+@Serializable
+internal sealed interface DeferredIssuanceOutcomeDto {
+    @Serializable
+    @SerialName("stored")
+    data class Stored(val credentialIds: List<String>) : DeferredIssuanceOutcomeDto
+
+    @Serializable
+    @SerialName("deferred")
+    data class Deferred(
+        val storedCredentialIds: List<String>,
+        val credentials: List<DeferredCredentialHandleDto>,
+    ) : DeferredIssuanceOutcomeDto
+
+    @Serializable
+    @SerialName("failed")
+    data class Failed(
+        val error: IssuanceErrorDto,
+        val failure: CredentialIssuanceFailureDto? = null,
+        val storedCredentialIds: List<String> = emptyList(),
+        val deferredCredentials: List<DeferredCredentialHandleDto> = emptyList(),
+    ) : DeferredIssuanceOutcomeDto
+
+    @Serializable
+    @SerialName("cancelled")
+    data object Cancelled : DeferredIssuanceOutcomeDto
+}
+
+@Serializable
+internal data class IssuanceErrorDto(val code: String, val message: String)
+
+@Serializable
+internal data class CredentialIssuanceTargetDto(
+    val credentialConfigurationId: String,
+    val credentialIdentifier: String? = null,
+)
+
+@Serializable
+internal data class CredentialIssuanceFailureDto(
+    val target: CredentialIssuanceTargetDto,
+    val stage: String,
+    val notAttempted: List<CredentialIssuanceTargetDto> = emptyList(),
 )
 
 @Serializable
 internal data class GenerateAuthorizationUrlRequestDto(
     val offerUrl: String,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val clientId: String = WalletApi2DefaultClientId,
     val redirectUri: String,
     val usePkce: Boolean = true,
+    val credentialConfigurationIds: List<String>,
 )
 
 @Serializable
@@ -137,7 +216,7 @@ internal data class GenerateAuthorizationUrlResultDto(
     val authorizationUrl: String,
     val state: String? = null,
     val codeVerifier: String? = null,
-    val credentialConfigurationId: String,
+    val credentialConfigurationIds: List<String>,
     val credentialIssuerBaseUrl: String,
     val nonceEndpoint: String? = null,
 )
@@ -148,11 +227,13 @@ internal data class ReceiveAuthorizedCredentialRequestDto(
     val codeVerifier: String? = null,
     val credentialIssuer: String,
     val credentialEndpoint: String,
-    val credentialConfigurationId: String,
+    val credentials: List<IssuanceCredentialSelectionDto>,
     val nonceEndpoint: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val clientId: String = WalletApi2DefaultClientId,
     val redirectUri: String,
     val did: String? = null,
+    val keyId: String? = null,
 )
 
 @Serializable
@@ -342,6 +423,7 @@ internal data class RejectPresentationRequestDto(
 internal data class PresentCredentialRequestDto(
     val requestUrl: String,
     val did: String? = null,
+    val keyId: String? = null,
 )
 
 @Serializable
@@ -364,4 +446,10 @@ internal data class PollDeferredRequestDto(
     val credentialIssuerBaseUrl: String? = null,
     val credentialConfigurationId: String? = null,
     val keyId: String? = null,
+)
+
+@Serializable
+internal data class ResolveBatchOfferResponseDto(
+    val offer: ResolveOfferDetailedResponseDto,
+    val batchSize: Int? = null,
 )

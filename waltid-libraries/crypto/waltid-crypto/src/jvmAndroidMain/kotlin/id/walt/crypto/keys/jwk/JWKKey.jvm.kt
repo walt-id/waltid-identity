@@ -647,7 +647,7 @@ actual class JWKKey actual constructor(
         // Defaulting to AES-128-GCM for P-256 and AES-256-GCM for larger curves, matching common profiles.
         return when (keyType) {
             KeyType.secp256r1 -> Triple(HPKE.kem_P256_SHA256, HPKE.kdf_HKDF_SHA256, HPKE.aead_AES_GCM128)
-            KeyType.secp384r1 -> Triple(HPKE.kem_P384_SHA348, HPKE.kdf_HKDF_SHA384, HPKE.aead_AES_GCM256)
+            KeyType.secp384r1 -> Triple(HPKE.kem_P384_SHA384, HPKE.kdf_HKDF_SHA384, HPKE.aead_AES_GCM256)
             KeyType.secp521r1 -> Triple(HPKE.kem_P521_SHA512, HPKE.kdf_HKDF_SHA512, HPKE.aead_AES_GCM256)
             else -> throw IllegalArgumentException("HPKE not supported for key type: $keyType")
         }
@@ -656,7 +656,7 @@ actual class JWKKey actual constructor(
     private fun getEncLength(kemId: Short): Int {
         return when (kemId) {
             HPKE.kem_P256_SHA256 -> 65 // Uncompressed point (0x04 + 32 + 32)
-            HPKE.kem_P384_SHA348 -> 97 // Uncompressed point (0x04 + 48 + 48)
+            HPKE.kem_P384_SHA384 -> 97 // Uncompressed point (0x04 + 48 + 48)
             HPKE.kem_P521_SHA512 -> 133 // Uncompressed point (0x04 + 66 + 66)
             else -> throw IllegalArgumentException("Unknown KEM ID enc length")
         }

@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Executes VCI wallet conformance test plans through the local wallet adapter.
@@ -24,8 +25,8 @@ import kotlinx.serialization.json.jsonObject
  * 2. Get list of test modules
  * 3. For each module:
  *    a. Start module (conformance suite calls the adapter credential-offer endpoint)
- *    b. Open the adapter's offer URL in a browser when authorization is needed
- *    c. Start issuance from the adapter page
+ *    b. Follow authorization redirects when needed
+ *    c. Start issuance through the adapter
  *    d. Adapter completes the OAuth callback and credential fetch
  *    e. Poll for result
  * 4. Collect and return results
@@ -49,7 +50,10 @@ class VciWalletTestPlanRunner(
     /**
      * Execute the test plan and return results.
      */
-    suspend fun test(): List<TestPlanResult> {
+    suspend fun test(
+        requiredModules: Set<String> = emptySet(),
+        requiredVariant: Map<String, String> = emptyMap(),
+    ): List<TestPlanResult> {
         printHeader()
 
         val results = mutableListOf<TestPlanResult>()
@@ -61,14 +65,23 @@ class VciWalletTestPlanRunner(
             println("Test plan created: $testPlanId")
 
             // Get modules
-            val modules = createResponse.modules
+            val missing = requiredModules - createResponse.modules.map { it.testModule }.toSet()
+            check(missing.isEmpty()) { "Required wallet modules are absent from the pinned suite: $missing" }
+            val modules = createResponse.modules.filter { module ->
+                (requiredModules.isEmpty() || module.testModule in requiredModules) && requiredVariant.all { (name, value) ->
+                    (module.variant[name]?.jsonPrimitive?.content ?: testPlan.variant[name]) == value
+                }
+            }
+            check((requiredModules - modules.map { it.testModule }.toSet()).isEmpty()) {
+                "Required wallet module variant is absent from the pinned suite: $requiredVariant"
+            }
             println("Test modules: ${modules.size}")
             modules.forEach { println("   - ${it.testModule}") }
             println()
 
             modules.forEachIndexed { index, module ->
                 println("[${index + 1}/${modules.size}] Running: ${module.testModule}")
-                val result = runModule(testPlanId, module)
+                val result = runModule(testPlanId, module).copy(testName = "${testPlan.producerId}/${module.testModule}")
                 results.add(result)
                 println("   Status: ${result.conformanceResult}")
                 if (result.errorMessage != null) {

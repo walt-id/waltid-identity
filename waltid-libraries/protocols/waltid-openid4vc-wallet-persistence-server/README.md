@@ -72,6 +72,22 @@ wallet2-persistence {
 }
 ```
 
+### Lifecycle contract tests
+
+`ExposedIssuanceSessionStoreTest` checks wallet scoping, concurrent claims, stale generations,
+transaction rollback/commit and a credential write racing with deletion. It uses SQLite by default.
+To run the same contract on PostgreSQL, provide `WALLET2_TEST_POSTGRES_URL` for a disposable database
+with the test-only role/password `wallet_test` / `wallet_test` and permission to create schemas:
+
+```sh
+WALLET2_TEST_POSTGRES_URL=jdbc:postgresql://127.0.0.1:5432/wallet_test ./gradlew \
+  :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-server:test \
+  --tests '*ExposedIssuanceSessionStoreTest'
+```
+
+Each test creates a fresh schema. Dispose of the fixture database after the run. The selected
+backend URL is a Gradle test input, so changing profiles cannot reuse the other backend's result.
+
 ## Usage
 
 ### Initialize Database
@@ -135,6 +151,7 @@ val loaded = walletStore.resolveWallet("my-wallet")
 | `WalletKeyStore` | `ExposedKeyStore` | Cryptographic keys (serialized JWK) |
 | `WalletCredentialStore` | `ExposedCredentialStore` | Stored credentials with metadata |
 | `WalletDidStore` | `ExposedDidStore` | DIDs and their documents |
+| `WalletIssuanceSessionStore` | `ExposedIssuanceSessionStore` | Wallet-scoped sensitive issuance continuations |
 
 ## Database Schema
 
@@ -144,8 +161,26 @@ The library automatically creates the following tables:
 - `wallet2_keys` — Stored keys
 - `wallet2_credentials` — Stored credentials
 - `wallet2_dids` — Stored DIDs
+- `wallet2_issuance_sessions` — Wallet-scoped issuance continuations
 
 Schema migrations are handled automatically by Exposed's `SchemaUtils.createMissingTablesAndColumns()`.
+
+### Issuance continuation protection
+
+`ExposedStoreRegistry.issuanceSessionStore(walletId)` creates a store scoped to one
+wallet. When constructing wallets directly, create one
+`WalletIssuanceSessionState(wallet.id, store)` per wallet in the service process and
+attach that same instance with `wallet.attachIssuanceSessionState(state)` to each
+request's wallet. OSS Wallet2 wires this through its resolver. The shared state
+coordinates local polling and retains received responses during database outages;
+new engines still use the current wallet's key and credential stores. It does not
+coordinate independent server processes. Deleting a wallet removes its continuation rows.
+
+Continuation payloads contain access tokens and can contain credentials awaiting
+storage. They are internal records, unavailable through named-store APIs. As with
+this adapter's persisted private keys, confidentiality and integrity depend on the
+configured database, storage encryption, access controls and backup protection;
+this adapter does not add application-level encryption.
 
 ## Configuration Reference
 

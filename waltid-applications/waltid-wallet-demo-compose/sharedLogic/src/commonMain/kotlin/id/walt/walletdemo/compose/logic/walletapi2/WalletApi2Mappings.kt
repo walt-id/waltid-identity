@@ -5,6 +5,8 @@ import id.walt.walletdemo.compose.logic.CredentialDisplayNormalizer
 import id.walt.walletdemo.compose.logic.CredentialDisplayVocabulary
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialClaimMetadata
+import id.walt.walletdemo.compose.logic.WalletDemoDeferredCredential
+import id.walt.walletdemo.compose.logic.WalletDemoIssuanceOutcome
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
 import id.walt.walletdemo.compose.logic.WalletDemoIssuerMetadata
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
@@ -33,6 +35,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 internal val walletApi2Json = Json {
     ignoreUnknownKeys = true
@@ -41,7 +44,7 @@ internal val walletApi2Json = Json {
     explicitNulls = false
 }
 
-internal fun ResolveOfferDetailedResponseDto.toDemoPreview(): WalletDemoOfferPreview =
+internal fun ResolveOfferDetailedResponseDto.toDemoPreview(batchSize: Int? = null): WalletDemoOfferPreview =
     WalletDemoOfferPreview(
         issuer = WalletDemoIssuerMetadata(
             credentialIssuer = issuer.credentialIssuer,
@@ -65,6 +68,7 @@ internal fun ResolveOfferDetailedResponseDto.toDemoPreview(): WalletDemoOfferPre
         },
         transactionCode = transactionCode?.toDemoRequirement(),
         requiresIssuerAuthentication = toDemoGrant() == WalletDemoIssuanceGrant.AuthorizationCode,
+        batchSize = batchSize,
     )
 
 internal fun List<WalletDemoPresentationDisclosureSelection>.toDisclosureSelectionDtos(): List<DisclosureSelectionDto> =
@@ -75,14 +79,6 @@ internal fun List<WalletDemoPresentationDisclosureSelection>.toDisclosureSelecti
             path = selection.path,
         )
     }
-
-internal suspend fun replaceWalletAfterSuccessfulDelete(
-    deleteCurrent: suspend () -> Unit,
-    createReplacement: suspend () -> String,
-): String {
-    deleteCurrent()
-    return createReplacement()
-}
 
 internal fun ResolveOfferDetailedResponseDto.toDemoGrant(): WalletDemoIssuanceGrant {
     val grant = grantType.orEmpty()
@@ -279,8 +275,80 @@ internal fun publicJwkFromDidDocument(document: JsonObject?): String {
     return methods.firstOrNull()?.jsonObject?.get("publicKeyJwk")?.toString() ?: "{}"
 }
 
+internal data class VerifiedHolder(
+    val keyId: String,
+    val did: String,
+    val publicJwk: String,
+)
+
+/** Pair each key with a DID whose verification method publishes that key. */
+internal fun verifiedHolderPairs(keys: List<WalletKeyInfo>, dids: List<WalletDidEntry>): List<VerifiedHolder> {
+    val remaining = dids.toMutableList()
+    return buildList {
+        for (key in keys) {
+            val publicJwk = key.publicJwk ?: continue
+            val index = remaining.indexOfFirst { matchingVerificationKey(it.document, publicJwk) != null }
+            if (index < 0) continue
+            val did = remaining.removeAt(index)
+            val matched = matchingVerificationKey(did.document, publicJwk) ?: continue
+            add(VerifiedHolder(key.keyId, did.did, matched.toString()))
+        }
+    }
+}
+
+internal fun matchingVerificationKey(document: JsonObject?, publicJwk: JsonObject): JsonObject? {
+    val fields = publicKeyFields(publicJwk)
+    if (fields.isEmpty()) return null
+    val methods = document?.get("verificationMethod") as? JsonArray ?: return null
+    return methods.firstNotNullOfOrNull { entry ->
+        val key = (entry as? JsonObject)?.get("publicKeyJwk") as? JsonObject ?: return@firstNotNullOfOrNull null
+        if (fields.all { name -> key[name] != null && key[name] == publicJwk[name] }) key else null
+    }
+}
+
+private fun publicKeyFields(publicJwk: JsonObject): List<String> = when (publicJwk["kty"]?.jsonPrimitive?.contentOrNull) {
+    "EC" -> listOf("kty", "crv", "x", "y")
+    "OKP" -> listOf("kty", "crv", "x")
+    "RSA" -> listOf("kty", "n", "e")
+    else -> emptyList()
+}
+
 private fun jsonElementAsString(value: JsonElement?): String? = when (value) {
     null -> null
     is JsonPrimitive -> value.content
     else -> value.toString()
+}
+
+internal fun DeferredCredentialHandleDto.toDemoDeferred() = WalletDemoDeferredCredential(
+    id = id, credentialConfigurationId = credentialConfigurationId,
+    intervalSeconds = intervalSeconds, credentialIdentifier = credentialIdentifier,
+)
+
+internal fun ReceiveCredentialResultDto.toOutcome(): WalletDemoIssuanceOutcome {
+    val pending = deferredCredentials.map {
+        WalletDemoDeferredCredential(it.deferredCredentialId, it.credentialConfigurationId,
+            it.intervalSeconds, it.credentialIdentifier)
+    } + storageOutcome?.deferredCredentials.orEmpty().map { it.toDemoDeferred() }
+    return when {
+        failure != null -> WalletDemoIssuanceOutcome.Failed(
+            message = "Credential issuance stopped during ${failure.stage.lowercase()}",
+            storedCredentialIds = credentialIds, deferredCredentials = pending, offerConsumed = true,
+            failedTargetCount = 1, notAttemptedTargetCount = failure.notAttempted.size,
+        )
+        pending.isNotEmpty() -> WalletDemoIssuanceOutcome.Deferred(credentialIds, pending)
+        else -> WalletDemoIssuanceOutcome.Stored(credentialIds)
+    }
+}
+
+internal fun DeferredIssuanceOutcomeDto.toOutcome(): WalletDemoIssuanceOutcome = when (this) {
+    is DeferredIssuanceOutcomeDto.Stored -> WalletDemoIssuanceOutcome.Stored(credentialIds)
+    is DeferredIssuanceOutcomeDto.Deferred -> WalletDemoIssuanceOutcome.Deferred(
+        storedCredentialIds, credentials.map { it.toDemoDeferred() })
+    is DeferredIssuanceOutcomeDto.Failed -> WalletDemoIssuanceOutcome.Failed(
+        message = error.message, storedCredentialIds = storedCredentialIds,
+        failedTargetCount = if (failure == null) 0 else 1,
+        notAttemptedTargetCount = failure?.notAttempted?.size ?: 0,
+        deferredCredentials = deferredCredentials.map { it.toDemoDeferred() }, offerConsumed = true,
+    )
+    DeferredIssuanceOutcomeDto.Cancelled -> WalletDemoIssuanceOutcome.Cancelled
 }

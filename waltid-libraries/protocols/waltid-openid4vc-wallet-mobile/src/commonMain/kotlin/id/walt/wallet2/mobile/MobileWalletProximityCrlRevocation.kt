@@ -6,7 +6,6 @@ import id.walt.certificate.x509.extension.CrlDistributionPointsExtension.Compani
 import id.walt.certificate.x509.model.GeneralName
 import id.walt.certificate.x509.revocation.CertificateRevocationListVerifier
 import id.walt.certificate.x509.revocation.CrlCertificateStatus
-import id.walt.x509.CertificateDer
 import io.ktor.http.Url
 import kotlinx.coroutines.CancellationException
 import kotlinx.io.bytestring.ByteString
@@ -94,26 +93,27 @@ public class ProximityCrlRevocationEvaluator internal constructor(
 
     internal suspend fun evaluateValidatedPath(
         evidence: ProximityReaderEvidence,
-        path: List<CertificateDer>,
+        path: List<X509Certificate>,
     ): ProximityCertificateRevocationResult = evaluatePath(evidence, path)
 
     private suspend fun evaluatePath(
         evidence: ProximityReaderEvidence,
-        validatedPath: List<CertificateDer>?,
+        validatedPath: List<X509Certificate>?,
     ): ProximityCertificateRevocationResult = try {
         require(evidence.certificateChainDerBase64Url.size in 1..MAX_CHAIN_LENGTH)
         val supplied = evidence.certificateChainDerBase64Url.toList().map(::parseCrlCertificate)
         val available = (supplied + issuers).distinctBy { it.encodedDer }
         val path = if (validatedPath != null) {
             require(validatedPath.size in 2..MAX_CHAIN_LENGTH)
-            val validated = validatedPath.map { X509CertificateUtil.parseCertificateDerEncoded(it.bytes) }
-            require(validated.first().encodedDer == supplied.first().encodedDer)
-            val pairs = validated.zipWithNext()
+            require(validatedPath.first().encodedDer == supplied.first().encodedDer)
+            val pairs = validatedPath.zipWithNext()
             when (scope) {
                 ProximityCrlScope.ReaderCertificate -> CrlPath(pairs.take(1), true)
                 ProximityCrlScope.ValidatedPath -> CrlPath(pairs, true)
                 ProximityCrlScope.ReaderCertificateAndIssuingAuthorities -> {
-                    val terminal = resolvePath(validated.last(), (available + validated).distinctBy { it.encodedDer })
+                    val terminal = resolvePath(
+                        validatedPath.last(),
+                        (available + validatedPath).distinctBy { it.encodedDer })
                     CrlPath(pairs + terminal.pairs, terminal.complete)
                 }
             }
@@ -128,13 +128,15 @@ public class ProximityCrlRevocationEvaluator internal constructor(
             val (certificate, issuer) = pair
             val good = mutableListOf<CrlCertificateStatus.Good>()
             for (url in certificate.crlUrls()) {
-                val crl = if (url in fetched) fetched[url] else fetchCrl(url).also { fetched[url] = it }
+                val crl =
+                    if (url in fetched) fetched[url] else fetchCrl(url).also { fetched[url] = it }
                 if (crl == null) continue
                 when (val status = verifier.verify(crl, certificate, issuer, now())) {
                     is CrlCertificateStatus.Good -> good += status
                     is CrlCertificateStatus.Revoked -> return ProximityCertificateRevocationResult.Revoked(
                         if (index == 0) "Reader certificate is revoked" else "Reader certificate authority is revoked",
                     )
+
                     is CrlCertificateStatus.Indeterminate -> Unit
                 }
             }
@@ -143,8 +145,11 @@ public class ProximityCrlRevocationEvaluator internal constructor(
         // A previously checked CRL or its issuer may expire while another fetch is suspended.
         val completedAt = now()
         val current = verified.all { (issuer, crls) ->
-            completedAt >= issuer.data.validity.notBefore && completedAt <= issuer.data.validity.notAfter &&
-                crls.any { it.thisUpdate <= completedAt && completedAt < it.nextUpdate }
+            val result = completedAt >= issuer.data.validity.notBefore && completedAt <= issuer.data.validity.notAfter &&
+                    crls.any {
+                        it.thisUpdate <= completedAt && completedAt < it.nextUpdate
+                    }
+            result
         }
         if (path.complete && verified.isNotEmpty() && current) ProximityCertificateRevocationResult.Good
         else indeterminate()
@@ -163,6 +168,7 @@ public class ProximityCrlRevocationEvaluator internal constructor(
                 require(result.crlDerBase64Url.length in 1..MAX_CRL_BASE64_LENGTH)
                 ByteString(crlBase64.decode(result.crlDerBase64Url)).also { require(it.size <= MAX_CRL_BYTES) }
             }
+
             ProximityCrlFetchResult.Unavailable -> null
         }
     } catch (cancelled: CancellationException) {
@@ -171,7 +177,10 @@ public class ProximityCrlRevocationEvaluator internal constructor(
         null
     }
 
-    private suspend fun resolvePath(leaf: X509Certificate, available: List<X509Certificate>): CrlPath {
+    private suspend fun resolvePath(
+        leaf: X509Certificate,
+        available: List<X509Certificate>
+    ): CrlPath {
         val pairs = mutableListOf<Pair<X509Certificate, X509Certificate>>()
         val seen = mutableSetOf<ByteString>()
         var certificate = leaf
@@ -181,7 +190,9 @@ public class ProximityCrlRevocationEvaluator internal constructor(
             for (issuer in available.filter { it.data.subjectDnRaw == certificate.data.issuerDnRaw }) {
                 val valid = try {
                     X509CertificateUtil.services.signatureValidator.validateCertificateSignature(
-                        X509CertificateUtil.services.cryptoRuntime, issuer.data.subjectPublicKeyInfo, certificate,
+                        X509CertificateUtil.services.cryptoRuntime,
+                        issuer.data.subjectPublicKeyInfo,
+                        certificate,
                     )
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -215,7 +226,10 @@ public class ProximityCrlRevocationEvaluator internal constructor(
     private fun indeterminate(): ProximityCertificateRevocationResult.Indeterminate =
         ProximityCertificateRevocationResult.Indeterminate("Reader certificate CRL status could not be established")
 
-    private data class CrlPath(val pairs: List<Pair<X509Certificate, X509Certificate>>, val complete: Boolean)
+    private data class CrlPath(
+        val pairs: List<Pair<X509Certificate, X509Certificate>>,
+        val complete: Boolean
+    )
 
     private companion object {
         const val MAX_CHAIN_LENGTH = 10

@@ -18,6 +18,21 @@ Neither entry point proves native platform delivery, consent UX or full EUDI
 conformance. Use per-run reports and [WAL-1423](https://linear.app/walt-new/issue/WAL-1423/itb-initial-tests)
 for current qualification; [ITB-BASELINE.md](ITB-BASELINE.md) is a dated historical result.
 
+## Batch issuance evidence
+
+The live adapter uses one holder and the released single-selection issuance
+entry points. Its success check requires stored credentials and no pending
+transaction; it does not assert multiple proofs, distinct holder bindings or
+presentation of every returned copy. A green live ITB run is therefore not batch
+issuance evidence.
+
+Use the explicit two-holder wallet module described in [VCI-WALLET.md](VCI-WALLET.md)
+for batch conformance. A future live ITB batch case must expose a documented batch
+profile and assert at least two distinct proofs, the returned holder associations,
+and successful use of every copy, alongside the exact session's terminal ITB
+success. Do not infer that coverage from issuer metadata or a generic issuance
+success alone.
+
 ## Hosted cases
 
 From the Identity repository root, with JDK 21, supply credentials through your

@@ -1,5 +1,6 @@
 package id.walt.issuer2.service.openid4vci
 
+import id.walt.openid4vci.proofs.attestation.validateKeyAttestationConfiguration
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.StoredKey
@@ -66,6 +67,10 @@ class MetadataService(
             }
         }
 
+    init {
+        validateKeyAttestationConfiguration(credentialConfigurations.values, serviceConfig.keyAttestationConfig, nonceValidationConfigured = true)
+    }
+
     private val configuredTypeMetadata: Map<String, SdJwtVcTypeMetadataDraft04> = buildMap {
         metadataConfig.sdJwtVcTypeMetadataConfiguration.forEach { (configurationId, metadata) ->
             val configuration = requireNotNull(credentialConfigurations[configurationId]) {
@@ -123,7 +128,7 @@ class MetadataService(
                 if (supportsClientAttestation) ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS else null,
             preAuthorizedGrantAnonymousAccessSupported = preAuthorizedGrantAnonymousAccessSupported,
             authorizationResponseIssParameterSupported = true,
-        )
+        ).copy(authorizationDetailsTypesSupported = setOf("openid_credential"))
 
     fun getJwtVcIssuerMetadata(): JWTVCIssuerMetadata =
         getAuthorizationServerMetadata().let { metadata ->

@@ -32,6 +32,12 @@ This library provides the core wallet functionality for building identity wallet
 - **Proof of possession** — JWT-based key binding proofs
 - **Multiple credential formats** — W3C VC, SD-JWT, mdoc/mDL
 
+For isolated proof signing, `signProof(SignProofRequest)` retains the single-JWT SDK contract.
+Use `signProofs(SignProofsRequest)` for explicit holder collections; its `SignProofsResult.proofs`
+contains the complete collection. Both entry points share the same proof validation and signing logic.
+On the wire, one JWT keeps the released `{"proofJwt":"..."}` response; multiple JWTs use
+`{"proofs":{"jwt":["...","..."]}}`. The plural result decoder accepts either shape.
+
 ### Credential Presentation (OpenID4VP 1.0)
 
 - **DCQL matching** — Digital Credentials Query Language for credential selection
@@ -107,12 +113,36 @@ val request = ReceiveCredentialRequest(
     txCode = "123456" // PIN if required
 )
 
-val result = WalletIssuanceHandler.receiveCredential(wallet, request) { event ->
+val result = WalletIssuanceHandler.receiveCredentials(wallet, request, onEvent = { event ->
     println("Issuance event: $event")
-}
+})
 
 println("Received ${result.credentialIds.size} credential(s)")
 ```
+
+`receiveCredentials` and `receiveCredentialsAuthCode` return `ReceiveCredentialsResult`, retaining
+all deferred targets and partial progress. The released `receiveCredential` and
+`receiveCredentialAuthCode` APIs retain `ReceiveCredentialResult` and its non-null transaction map.
+When progress cannot fit that map or issuance stops partway, they throw `CredentialReceiveException`
+with the complete detailed result; do not redeem the grant again. REST requests with explicit
+`credentials` selections and `/authorized/batch` use the detailed result. Omitted pre-authorized
+selections and `/authorized` retain the released successful response shape.
+
+For batches, supply `WalletCredentialSelection` with one distinct stored holder key per copy:
+
+```kotlin
+val selections = listOf(WalletCredentialSelection(
+    "identity", holderBindings = listOf(CredentialHolderBinding(keyId = "holder-1"), CredentialHolderBinding(keyId = "holder-2"))))
+val result = WalletIssuanceHandler.receiveCredentials(wallet, request.copy(credentials = selections))
+```
+
+See the [Wallet2 batch guide](https://docs.walt.id/community-stack/wallet2/credential-receiving/batch-issuance)
+for grants, dataset identifiers, partial results and continuation handling.
+Storage-producing flows require wallet-owned keys; isolated proof signing can use inline keys.
+Released result APIs keep their successful wire shapes and throw progress-bearing exceptions when
+that contract cannot represent a result. Use the detailed APIs and `listIssuanceContinuations()`
+for new consumers. Pending 1.1.0 records remain resumable with their saved key, but cannot recheck
+configuration/proof constraints that the old record did not retain.
 
 When issuer metadata requires a key attestation, attach a `KeyAttestationProvider` to the wallet before issuance. The provider receives the actual proof key's public JWK, the credential issuer, the current nonce, and any advertised storage or authentication constraints. It returns a signed `key-attestation+jwt` and exposes its public verification key. The wallet checks the signature, key binding, nonce, lifetime, and advertised constraints before placing the attestation in the JWT proof header. The provider is runtime configuration: reattach it after restoring or copying a wallet. Without a provider, a required-attestation request fails before sending the proof. The issuer must independently trust the attester; attaching a provider does not establish issuer trust or certify the key's security properties.
 
@@ -246,3 +276,37 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
+
+
+### Authorization URL contracts
+
+`generateAuthorizationUrl(GenerateAuthorizationUrlRequest)` preserves the released single-configuration contract: it authorizes the first offered configuration, honors `useScope`, and returns a non-null `credentialConfigurationId`.
+
+`generateBatchAuthorizationUrl(GenerateBatchAuthorizationUrlRequest)` authorizes the selected configurations (all offered configurations by default), negotiates authorization details or scopes from metadata, and returns `credentialConfigurationIds`. Both use the same metadata, PKCE and PAR implementation. The wallet-aware overload supplies signing capability and client attestation when required by PAR. REST adapters expose the batch contract at `credentials/receive/authorization-url/batch`; the original `authorization-url` endpoint retains the single contract.
+
+
+`WalletIssuanceSessionService.start` retains the released `WalletIssuanceSession` and four-field offer preview. `startBatch` returns `WalletIssuanceBatchSession` with the same ID/offer and an additional `batchSize`. Both use one retained-session implementation. Batch acceptance after recreation reads the limit from the persisted issuer-metadata snapshot. The mobile SDK uses the batch result; its Swift facade continues exposing `offer.batchSize`.
+
+`ResolveOfferResult` retains its released shape. Callers needing the batch limit use `resolveOfferDetailed` and read `resolvedIssuerMetadata.metadata.batchCredentialIssuance?.batchSize`; the metadata is already resolved. The REST `/resolve-offer/batch` response wraps the existing offer details with this limit.
+
+`requestToken` and `exchangeCode` retain the released three-field `RequestTokenResult` (`accessToken`, `expiresIn`, `tokenType`). Isolated batch callers use `requestTokenDetailed` and `exchangeCodeDetailed` to retain granted `authorizationDetails` and `scope`. Both delegate to the same token exchange implementation. REST adapters expose the detailed result at `credentials/receive/request-token/batch` and `credentials/receive/exchange-code/batch`; each code is redeemed once through the chosen contract.
+
+`ReceiveAuthorizedCredentialRequest` and `receiveCredentialAuthCode` retain the released required single configuration. Batch continuation uses `ReceiveAuthorizedCredentialsRequest` with a required, non-empty `credentials` list and `receiveCredentialsAuthCode` (or its typed streaming counterpart, `receiveCredentialsAuthCodeFlow`). REST adapters expose this at `credentials/receive/authorized/batch`; the original `authorized` endpoint accepts the released single-target body. Both normalize into the shared target executor, validating caller-supplied credential and nonce endpoints before code redemption.
+
+### Isolated fetch result contracts
+
+`fetchCredential` retains the released `FetchCredentialResult(rawCredentials)` success
+contract. Use `fetchCredentials` for `FetchCredentialsResult`, which also carries
+remote deferral and local-save progress. Both methods use the same implementation.
+If the released result cannot represent pending or failed progress, the old method
+throws `CredentialFetchException` containing the complete detailed result. Do not
+repeat the issuer request; retain the transaction or resume the local-save handle.
+The deferred retry interval is `deferredCredential.intervalSeconds`.
+
+The OSS and Enterprise HTTP adapters keep released success bodies for requests using
+only released fields. Fetch selects the detailed result when `proofs`, non-default
+`holderBindings`, `credentialIdentifier` or DPoP context is supplied. Poll selects it
+when `proofRequired=true`, non-default `holderBindings`, `credentialIdentifier` or
+DPoP context is supplied. A legacy poll success remains `ReceiveCredentialResult`.
+Legacy pending results return HTTP 409 and local-save failures HTTP 500, with full
+progress; detailed requests retain HTTP 200 pending and HTTP 207 partial progress.

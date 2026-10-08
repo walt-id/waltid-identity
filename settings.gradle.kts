@@ -123,6 +123,7 @@ val modules = listOfNotNull(
     // Service commons
     "$services:waltid-service-commons",
     "$services:waltid-service-commons-test",
+    "$services:waltid-service-events",
 
     // Services based on libs
     "$services:waltid-issuer-api",
@@ -160,6 +161,23 @@ val modules = listOfNotNull(
 include(*modules.distinct().toTypedArray())
 
 pluginManagement {
+    // Settings plugins resolve before version catalog accessors are available.
+    fun catalogVersion(alias: String): String {
+        val assignment = Regex("""\s*${Regex.escape(alias)}\s*=\s*"([^"]+)"\s*(?:#.*)?""")
+        val versions = file("gradle/libs.versions.toml").readLines()
+            .dropWhile { it.trim() != "[versions]" }
+            .drop(1)
+            .takeWhile { !it.trimStart().startsWith("[") }
+            .mapNotNull { assignment.matchEntire(it)?.groupValues?.get(1) }
+        return versions.singleOrNull()
+            ?: error("Expected one quoted [versions].$alias entry in gradle/libs.versions.toml")
+    }
+
+    plugins {
+        id("io.github.ben-manes.versions.settings") version catalogVersion("versions")
+        id("org.gradle.toolchains.foojay-resolver-convention") version catalogVersion("foojay-resolver")
+    }
+
     includeBuild("build-logic")
 
     repositories {
@@ -187,7 +205,8 @@ dependencyResolutionManagement {
 }
 
 plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+    id("io.github.ben-manes.versions.settings")
+    id("org.gradle.toolchains.foojay-resolver-convention")
 }
 
 rootProject.name = "waltid-identity"

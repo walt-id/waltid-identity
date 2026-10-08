@@ -1,7 +1,7 @@
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.crypto.MdocKdf
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ProximityError
 import id.walt.mdoc.proximity.ProximityException
 
@@ -49,8 +49,8 @@ internal object BleIdent {
     // implementation rejects an empty key, so pass that equivalent representation explicitly.
     private val NO_SALT = ByteArray(32)
 
-    fun derive(eDeviceKeyBytes: ImmutableBytes): ByteArray = MdocKdf.deriveSha256(
-        inputKeyMaterial = eDeviceKeyBytes.copy(),
+    fun derive(eDeviceKeyBytes: ByteString): ByteArray = MdocKdf.deriveSha256(
+        inputKeyMaterial = eDeviceKeyBytes.toByteArray(),
         salt = NO_SALT,
         info = INFO,
         length = 16,
@@ -101,12 +101,12 @@ internal class BleGattMessageCodec(private val maximumMessageBytes: Int) {
         require(maximumMessageBytes > 0)
     }
 
-    fun encode(message: ImmutableBytes, maximumPacketBytes: Int): List<ByteArray> {
+    fun encode(message: ByteString, maximumPacketBytes: Int): List<ByteArray> {
         require(maximumPacketBytes in 2..BLE_MAX_GATT_PACKET_BYTES) {
             "A GATT packet must leave room for the ISO chunk marker and payload"
         }
         if (message.size > maximumMessageBytes) throw messageTooLarge(message.size.toLong(), maximumMessageBytes)
-        val bytes = message.copy()
+        val bytes = message.toByteArray()
         val payloadBytes = maximumPacketBytes - 1
         if (bytes.isEmpty()) return listOf(byteArrayOf(0x00))
         return buildList {
@@ -123,7 +123,7 @@ internal class BleGattMessageCodec(private val maximumMessageBytes: Int) {
         }
     }
 
-    fun decode(packet: ByteArray): ImmutableBytes? {
+    fun decode(packet: ByteArray): ByteString? {
         if (packet.isEmpty()) throw protocolFailure("invalid_gatt_chunk", "A GATT data chunk must not be empty")
         if (packet[0] != 0x00.toByte() && packet[0] != 0x01.toByte()) {
             throw protocolFailure("invalid_gatt_chunk", "A GATT data chunk has an unknown continuation marker")
@@ -134,7 +134,7 @@ internal class BleGattMessageCodec(private val maximumMessageBytes: Int) {
             return null
         }
         awaitingFinalChunk = false
-        return ImmutableBytes.of(received.takeAndReset())
+        return ByteString(received.takeAndReset())
     }
 
     fun hasIncompleteMessage(): Boolean = awaitingFinalChunk
@@ -143,7 +143,7 @@ internal class BleGattMessageCodec(private val maximumMessageBytes: Int) {
 internal object BleL2capMessageCodec {
     const val HEADER_BYTES = 4
 
-    fun encode(message: ImmutableBytes, maximumMessageBytes: Int): ByteArray {
+    fun encode(message: ByteString, maximumMessageBytes: Int): ByteArray {
         if (message.size > maximumMessageBytes) throw messageTooLarge(message.size.toLong(), maximumMessageBytes)
         val output = ByteArray(HEADER_BYTES + message.size)
         val size = message.size.toUInt()
@@ -151,7 +151,7 @@ internal object BleL2capMessageCodec {
         output[1] = (size shr 16).toByte()
         output[2] = (size shr 8).toByte()
         output[3] = size.toByte()
-        message.copy().copyInto(output, destinationOffset = HEADER_BYTES)
+        message.toByteArray().copyInto(output, destinationOffset = HEADER_BYTES)
         return output
     }
 }
@@ -166,8 +166,8 @@ internal class BleL2capMessageDecoder(private val maximumMessageBytes: Int) {
         require(maximumMessageBytes > 0)
     }
 
-    fun feed(bytes: ByteArray): List<ImmutableBytes> {
-        val messages = mutableListOf<ImmutableBytes>()
+    fun feed(bytes: ByteArray): List<ByteString> {
+        val messages = mutableListOf<ByteString>()
         var offset = 0
         while (offset < bytes.size) {
             val currentPayload = payload
@@ -184,7 +184,7 @@ internal class BleL2capMessageDecoder(private val maximumMessageBytes: Int) {
                         throw messageTooLarge(messageBytes.toLong(), maximumMessageBytes)
                     }
                     headerBytes = 0
-                    if (messageBytes == 0u) messages += ImmutableBytes.of(ByteArray(0))
+                    if (messageBytes == 0u) messages += ByteString(ByteArray(0))
                     else payload = ByteArray(messageBytes.toInt())
                 }
             } else {
@@ -193,7 +193,7 @@ internal class BleL2capMessageDecoder(private val maximumMessageBytes: Int) {
                 payloadBytes += count
                 offset += count
                 if (payloadBytes == currentPayload.size) {
-                    messages += ImmutableBytes.of(currentPayload)
+                    messages += ByteString(currentPayload)
                     payload = null
                     payloadBytes = 0
                 }

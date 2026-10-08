@@ -59,6 +59,25 @@ public actor Wallet {
         )
     }
 
+    /// Explicitly creates holder keys without replacing the active signing identity.
+    ///
+    /// - Parameters:
+    ///   - count: Number of holder keys to create.
+    ///   - keyType: Cryptographic key type supported by the issuer.
+    ///   - didMethod: DID method for the associated holder DIDs.
+    ///   - policy: Key authorization policy; omission uses the wallet configuration.
+    /// - Returns: Bindings suitable for explicit credential selections.
+    /// - Throws: ``WalletError`` if creation fails; the core cleans up a partially created batch.
+    public func createIssuanceHolderKeys(
+        count: Int,
+        keyType: WalletKeyType = .secp256r1,
+        didMethod: String = "key",
+        policy: WalletKeyUseAuthorizationPolicy? = nil
+    ) async throws -> [IssuanceHolderBinding] {
+        try await bridge.createIssuanceHolderKeys(count: count, keyType: keyType, didMethod: didMethod,
+            policy: policy ?? configuration.defaultKeyUseAuthorizationPolicy)
+    }
+
     /// Starts a typed pre-authorized or authorization-code issuance session.
     ///
     /// - Parameter request: Offer, callback, client, and holder-binding configuration.
@@ -74,11 +93,13 @@ public actor Wallet {
     /// method only after the user accepts an authorization-code offer, then open the returned URL
     /// in the browser and deliver the callback to ``continueAuthorizationIssuance(sessionID:callbackURI:)``.
     ///
-    /// - Parameter sessionID: Opaque identifier returned by ``startIssuance(_:)``.
+    /// - Parameters:
+    ///   - sessionID: Opaque identifier returned by ``startIssuance(_:)``.
+    ///   - credentials: Explicit selections and holder keys; omission requests one instance per offered configuration.
     /// - Returns: Browser authorization data, including the callback binding and PKCE state.
     /// - Throws: ``WalletError`` when authorization initiation cannot be completed.
-    public func beginAuthorizationIssuance(sessionID: String) async throws -> IssuanceAuthorization {
-        try await bridge.beginAuthorizationIssuance(sessionID: sessionID)
+    public func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]? = nil) async throws -> IssuanceAuthorization {
+        try await bridge.beginAuthorizationIssuance(sessionID: sessionID, credentials: credentials)
     }
 
     /// Continues a reviewed pre-authorized issuance session.
@@ -86,15 +107,18 @@ public actor Wallet {
     /// - Parameters:
     ///   - sessionID: Opaque identifier returned by ``startIssuance(_:)``.
     ///   - transactionCode: Separately delivered transaction code when required by the offer.
+    ///   - credentials: Explicit selections and holder keys; omission requests one instance per offered configuration.
     /// - Returns: A typed stored, deferred, cancelled, or failed outcome.
     /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
     public func continuePreAuthorizedIssuance(
         sessionID: String,
-        transactionCode: String? = nil
+        transactionCode: String? = nil,
+        credentials: [IssuanceCredentialSelection]? = nil
     ) async throws -> IssuanceOutcome {
         try await bridge.continuePreAuthorizedIssuance(
             sessionID: sessionID,
-            transactionCode: transactionCode
+            transactionCode: transactionCode,
+            credentials: credentials
         )
     }
 
@@ -119,6 +143,14 @@ public actor Wallet {
     /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
     public func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
         try await bridge.cancelIssuance(sessionID: sessionID)
+    }
+
+    /// Lists retained deferred operations after an interrupted flow or wallet recreation.
+    ///
+    /// - Returns: Opaque deferred handles without token or private-key material.
+    /// - Throws: ``WalletError`` if the protected continuation store cannot be read.
+    public func listDeferredIssuance() async throws -> [DeferredCredential] {
+        try await bridge.listDeferredIssuance()
     }
 
     /// Polls a deferred credential operation without exposing its access material.

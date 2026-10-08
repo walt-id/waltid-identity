@@ -1,9 +1,5 @@
 import io.ktor.plugin.features.*
 
-object Versions {
-    const val HOPLITE_VERSION = "2.9.0"
-}
-
 plugins {
     id("waltid.ktorbackend")
     id("waltid.ktordocker")
@@ -56,8 +52,8 @@ dependencies {
     /* -- Misc --*/
 
     // Config
-    implementation("com.sksamuel.hoplite:hoplite-core:${Versions.HOPLITE_VERSION}")
-    implementation("com.sksamuel.hoplite:hoplite-hocon:${Versions.HOPLITE_VERSION}")
+    implementation(identityLibs.hoplite.core)
+    implementation(identityLibs.hoplite.hocon)
 
     // Logging
     implementation(identityLibs.oshai.kotlinlogging)
@@ -66,6 +62,7 @@ dependencies {
     implementation(identityLibs.slf4j.klogging)
 
     // Test
+    testImplementation(project(":waltid-services:waltid-service-events"))
     testImplementation(kotlin("test"))
     testImplementation(identityLibs.kotlinx.coroutines.test)
 
@@ -87,7 +84,7 @@ dependencies {
     api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
     // crypto
-    implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
+    implementation(identityLibs.java.cose)
     implementation(identityLibs.nimbus.jose.jwt)
     // Bouncy Castle
     implementation(identityLibs.bouncycastle.prov)

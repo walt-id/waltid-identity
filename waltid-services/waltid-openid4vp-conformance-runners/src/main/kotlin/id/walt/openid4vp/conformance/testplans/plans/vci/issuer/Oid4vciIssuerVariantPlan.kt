@@ -23,6 +23,7 @@ class Oid4vciIssuerVariantPlan(
     private val staticTxCode: String? = null,
     private val credentialTrustAnchorPem: String? = null,
     private val statusListTrustAnchorPem: String? = null,
+    private val keyAttesterJwks: JsonObject? = null,
 ) {
 
     // Client keys for DPoP and private_key_jwt tests.
@@ -82,6 +83,7 @@ class Oid4vciIssuerVariantPlan(
             putJsonObject("client_attestation") {
                 put("issuer", clientAttestationIssuer)
                 put("attester_jwks", clientAttesterJwks)
+                keyAttesterJwks?.let { put("key_attestation_jwks", it) }
             }
             putJsonObject("client") {
                 put("client_id", "conformance-test-client")

@@ -72,7 +72,7 @@ import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecordKind
-import id.walt.wallet2.handlers.WalletIssuanceSessionStore
+import id.walt.wallet2.handlers.AtomicWalletIssuanceSessionStore
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
@@ -98,7 +98,12 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.http.Url
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.launch
@@ -116,7 +121,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -130,6 +134,180 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 class MobileWalletTest {
+
+    @Test
+    fun deletionRejectsActiveKeyCreationWithoutClosingTheWallet() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val keys = InMemoryMobileWalletKeyStore()
+        var creations = 0
+        val wallet = MobileWallet(
+            walletId = "busy-delete", keyStore = keys, didStore = InMemoryDidStore(),
+            credentialStore = InMemoryCredentialStore(),
+            generateAndPersistHolderKey = { _, _ ->
+                started.complete(Unit)
+                release.await()
+                CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(GenerateSoftwareKeyRequest(
+                    KeyId("holder-${creations++}"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                )).also { keys.addCrypto2Key(it) }
+            },
+        )
+        val creation = async { wallet.createIssuanceHolderKeys(1) }
+        started.await()
+        assertFailsWith<IllegalStateException> { wallet.deleteWallet() }
+        assertTrue(wallet.credentials().isEmpty())
+        release.complete(Unit)
+        assertEquals(1, creation.await().size)
+        wallet.deleteWallet()
+        assertTrue(keys.listKeys().toList().isEmpty())
+        assertFailsWith<IllegalStateException> { wallet.createIssuanceHolderKeys(1) }
+        assertEquals(1, creations)
+    }
+
+    @Test
+    fun admittedDeletionSurvivesCancellationAndRunsCleanupOnce() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var cleanups = 0
+        val wallet = MobileWallet(
+            walletId = "cancel-delete", keyStore = InMemoryMobileWalletKeyStore(),
+            didStore = InMemoryDidStore(), credentialStore = InMemoryCredentialStore(),
+            deleteLocalPersistence = {
+                started.complete(Unit)
+                release.await()
+                cleanups++
+            },
+        )
+        val deletion = launch { wallet.deleteWallet() }
+        started.await()
+        deletion.cancel()
+        assertFailsWith<IllegalStateException> { wallet.credentials() }
+        release.complete(Unit)
+        deletion.join()
+        wallet.deleteWallet()
+        assertEquals(1, cleanups)
+    }
+
+    @Test
+    fun partialStoreDeletionStaysClosedAndRetryRemovesTheRemainingMaterial() = runTest {
+        val keys = InMemoryMobileWalletKeyStore()
+        keys.addCrypto2Key(CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(GenerateSoftwareKeyRequest(
+            KeyId("holder"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+        )))
+        val backingDids = InMemoryDidStore()
+        backingDids.addDid(WalletDidEntry("did:key:holder", JsonObject(emptyMap())))
+        var didRemovalAttempts = 0
+        var persistenceDeletes = 0
+        val dids = object : WalletDidStore by backingDids {
+            override suspend fun removeDid(did: String): Boolean {
+                if (++didRemovalAttempts == 1) error("DID store unavailable")
+                return backingDids.removeDid(did)
+            }
+        }
+        val wallet = MobileWallet(
+            walletId = "partial-delete", keyStore = keys, didStore = dids,
+            credentialStore = InMemoryCredentialStore(), deleteLocalPersistence = { persistenceDeletes++ },
+        )
+        assertFailsWith<IllegalStateException> { wallet.deleteWallet() }
+        assertTrue(keys.listKeys().toList().isEmpty())
+        assertEquals(1, backingDids.listDids().toList().size)
+        assertEquals(0, persistenceDeletes)
+        assertFailsWith<IllegalStateException> { wallet.credentials() }
+        wallet.deleteWallet()
+        assertTrue(backingDids.listDids().toList().isEmpty())
+        assertEquals(1, persistenceDeletes)
+    }
+
+    @Test
+    fun failedPersistenceDeletionClosesTheWalletAndRetriesWithoutReadingClosedStores() = runTest {
+        var persistenceClosed = false
+        var deletionAttempts = 0
+        val backing = InMemoryCredentialStore()
+        val credentials = object : WalletCredentialStore by backing {
+            override suspend fun listCredentials(): Flow<StoredCredential> {
+                check(!persistenceClosed) { "Database driver is closed" }
+                return backing.listCredentials()
+            }
+        }
+        val wallet = MobileWallet(
+            walletId = "delete-retry", keyStore = InMemoryMobileWalletKeyStore(),
+            didStore = InMemoryDidStore(), credentialStore = credentials,
+            deleteLocalPersistence = {
+                persistenceClosed = true
+                if (++deletionAttempts == 1) error("Database file deletion failed")
+            },
+        )
+        assertFailsWith<IllegalStateException> { wallet.deleteWallet() }
+        val closed = assertFailsWith<IllegalStateException> { wallet.credentials() }
+        assertEquals("Mobile wallet is closed", closed.message)
+        wallet.deleteWallet()
+        wallet.deleteWallet()
+        assertEquals(2, deletionAttempts)
+    }
+
+    @Test
+    fun cancelledBatchKeyCreationCleansUpEvenWhenProviderReturnsAfterCancellation() = runTest {
+        val keyStore = InMemoryMobileWalletKeyStore()
+        val didStore = InMemoryDidStore()
+        val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+        val existing = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
+            KeyId("existing"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+        ))
+        keyStore.addCrypto2Key(existing)
+        var generated = 0
+        val wallet = MobileWallet(
+            walletId = "cancel-batch", keyStore = keyStore, didStore = didStore,
+            credentialStore = InMemoryCredentialStore(),
+            generateAndPersistHolderKey = { _, _ ->
+                runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
+                    KeyId("batch-${generated++}"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+                )).also {
+                    keyStore.addCrypto2Key(it)
+                    currentCoroutineContext().cancel()
+                }
+            },
+        )
+        val operation = launch { wallet.createIssuanceHolderKeys(3) }
+        operation.join()
+        assertTrue(operation.isCancelled)
+        assertEquals(1, generated)
+        assertEquals(listOf("existing"), keyStore.listKeys().toList().map { it.keyId })
+        assertTrue(didStore.listDids().toList().isEmpty())
+    }
+
+    @Test
+    fun explicitBatchKeyCreationUsesConfiguredPolicyAndCleansUpPartialFailure() = runTest {
+        for (failThird in listOf(false, true)) {
+            val keyStore = InMemoryMobileWalletKeyStore()
+            val didStore = InMemoryDidStore()
+            val policies = mutableListOf<KeyUseAuthorizationPolicy>()
+            var generated = 0
+            val wallet = MobileWallet(
+                walletId = "batch-keys", keyStore = keyStore, didStore = didStore,
+                credentialStore = InMemoryCredentialStore(),
+                generateAndPersistHolderKey = { _, policy ->
+                    if (failThird && generated == 2) error("Third key generation failed")
+                    policies += policy
+                    CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+                        GenerateSoftwareKeyRequest(KeyId("batch-${generated++}"), KeySpec.Ec(EcCurve.P256),
+                            setOf(KeyUsage.SIGN, KeyUsage.VERIFY)),
+                    ).also { keyStore.addCrypto2Key(it) }
+                },
+            )
+            if (failThird) {
+                assertFailsWith<IllegalStateException> { wallet.createIssuanceHolderKeys(3) }
+                assertTrue(keyStore.listKeys().toList().isEmpty())
+                assertTrue(didStore.listDids().toList().isEmpty())
+            } else {
+                val created = wallet.createIssuanceHolderKeys(5, keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None)
+                assertEquals(5, created.map { it.keyId }.distinct().size)
+                assertEquals(5, didStore.listDids().toList().size)
+                assertTrue(policies.all { it == KeyUseAuthorizationPolicy.None })
+            }
+        }
+    }
+
+
 
     @Test
     fun presentationErrorCodesMatchOAuthAndOpenId4VpValues() {
@@ -361,6 +539,10 @@ class MobileWalletTest {
         assertEquals(listOf("did:key:custom"), didStore.removedDids)
         assertEquals(emptyList(), credentialStore.removedCredentialIds)
         assertTrue(issuanceSessionStore.records.isEmpty())
+        assertFailsWith<IllegalStateException> {
+            wallet.startIssuance(MobileWalletIssuanceRequest(
+                offer = MobileWalletCredentialOffer.InlineJson(preAuthorizedOfferJson())))
+        }
     }
 
     @Test
@@ -1199,7 +1381,6 @@ class MobileWalletTest {
         }
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun annexCReaderAuthenticationUsesVerifierTranscriptBuildsResponseAndRejectsTampering() = runTest {
         val origin = "https://verifier.example"
@@ -1310,7 +1491,6 @@ class MobileWalletTest {
      * a signature that failed to verify. On Apple's deferred path the preview cannot check the signature
      * at all, so a bad one arriving with the raw request has to reject the submission.
      */
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun annexCDistinguishesReaderTrustStatesAndRejectsBadSignaturesAfterConsent() = runTest {
         val origin = "https://verifier.example"
@@ -1417,7 +1597,6 @@ class MobileWalletTest {
      * Every rejected case below is a *valid* request that parses to exactly what the user saw, because
      * the parsed request carries no reader authentication, no `deviceRequestInfo` and no version.
      */
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun annexCAnswersOnlyTheExactRawRequestConsentWasGivenFor() = runTest {
         val origin = "https://verifier.example"
@@ -1673,7 +1852,6 @@ class MobileWalletTest {
      * authenticated the request. The mismatch is checked before signature verification, so the second
      * signature here can be arbitrary bytes.
      */
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun annexCRejectsReaderAuthenticationSignaturesFromDifferentCertificateChains() = runTest {
         val wallet = annexCWalletWithMdl("annex-c-reader-chain-mismatch-wallet")
@@ -1912,7 +2090,7 @@ class MobileWalletTest {
                           "credential_configurations_supported":{
                             "$MOCK_CONFIGURATION_ID":{
                               "format":"dc+sd-jwt",
-                              "vct":"urn:eu.europa.ec.eudi:pid:1"
+                              "vct":"https://credentials.example.com/identity_credential"
                             }
                           }
                         }
@@ -1925,6 +2103,7 @@ class MobileWalletTest {
                           "issuer":"$MOCK_ISSUER",
                           "token_endpoint":"$MOCK_ISSUER/token",
                           "response_types_supported":["code"],
+                          "authorization_details_types_supported":["openid_credential"],
                           "grant_types_supported":["urn:ietf:params:oauth:grant-type:pre-authorized_code"]
                         }
                         """.trimIndent()
@@ -2038,7 +2217,6 @@ class MobileWalletTest {
     private fun Throwable.causeChainMessages(): List<String> =
         generateSequence(this) { it.cause }.mapNotNull { it.message }.toList()
 
-    @OptIn(ExperimentalEncodingApi::class)
     private fun String.decodeBase64Url(): ByteArray =
         Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL).decode(this)
 
@@ -2193,13 +2371,19 @@ class MobileWalletTest {
 
     private class RecordingIssuanceSessionStore(
         vararg records: WalletIssuanceSessionRecord,
-    ) : WalletIssuanceSessionStore {
+    ) : AtomicWalletIssuanceSessionStore {
         val records = records.associateByTo(linkedMapOf()) { it.id }
 
         override suspend fun get(id: String): WalletIssuanceSessionRecord? = records[id]
         override suspend fun list(): List<WalletIssuanceSessionRecord> = records.values.toList()
         override suspend fun put(record: WalletIssuanceSessionRecord) {
             records[record.id] = record
+        }
+        override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean {
+            require(replacement == null || expected.id == replacement.id)
+            if (records[expected.id] != expected) return false
+            if (replacement == null) records.remove(expected.id) else records[expected.id] = replacement
+            return true
         }
         override suspend fun remove(id: String): Boolean = records.remove(id) != null
     }

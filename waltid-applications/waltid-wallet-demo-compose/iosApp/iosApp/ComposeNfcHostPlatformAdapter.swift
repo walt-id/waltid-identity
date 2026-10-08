@@ -72,9 +72,10 @@ private actor ComposeNfcHostRouter {
     }
 
     func process(_ command: Data) async throws -> Data {
-        try await router.process(
+        let response = try await router.process(
             encodedCommand: command.composeKotlinByteArray()
-        ).doCopy().composeData()
+        )
+        return response.toByteArray(startIndex: 0, endIndex: response.size).composeData()
     }
 
     func deactivate(_ reason: IOSNfcHostBridgeCloseReason) async {

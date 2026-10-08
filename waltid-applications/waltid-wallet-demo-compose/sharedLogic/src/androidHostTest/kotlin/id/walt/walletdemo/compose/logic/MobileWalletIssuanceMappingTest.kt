@@ -5,14 +5,56 @@ import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceIssuerPreview
 import id.walt.wallet2.handlers.WalletIssuanceMetadataProvenance
 import id.walt.wallet2.handlers.WalletIssuanceOfferPreview
-import id.walt.wallet2.handlers.WalletIssuanceSession
+import id.walt.wallet2.handlers.WalletIssuanceBatchSession
+import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.handlers.WalletIssuanceError
+import id.walt.wallet2.handlers.WalletIssuanceErrorCode
+import id.walt.wallet2.handlers.WalletIssuanceContinuation
+import id.walt.wallet2.handlers.CredentialIssuanceFailure
+import id.walt.wallet2.handlers.CredentialIssuanceStage
+import id.waltid.openid4vci.wallet.credential.CredentialIssuanceTarget
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class MobileWalletIssuanceMappingTest {
     @Test
+    fun acceptedCopiesReachTheMobileSdkWithTheirOwnKeysAndDids() {
+        val result = listOf(WalletDemoCredentialSelection("pid", WalletDemoCredentialHolders.Existing(listOf(
+            WalletDemoHolderBinding("first", "did:key:first"), WalletDemoHolderBinding("second", "did:key:second"),
+        )))).toMobileSelections().single()
+        assertEquals("pid", result.credentialConfigurationId)
+        assertEquals(listOf("first", "second"), (result.holders as id.walt.wallet2.mobile.MobileWalletCredentialHolders.Existing).bindings.map { it.keyId })
+        assertEquals(listOf("did:key:first", "did:key:second"), (result.holders as id.walt.wallet2.mobile.MobileWalletCredentialHolders.Existing).bindings.map { it.did })
+        val generated = listOf(WalletDemoCredentialSelection("pid", WalletDemoCredentialHolders.NewKeys(2)))
+            .toMobileSelections().single()
+        assertEquals(id.walt.wallet2.mobile.MobileWalletCredentialHolders.NewKeys(2), generated.holders)
+    }
+
+    @Test
+    fun failedTargetPreservesStoredAndDeferredProgressIncludingDatasetIdentity() {
+        val result = WalletIssuanceOutcome.Failed(
+            sessionId = "issuance",
+            error = WalletIssuanceError(WalletIssuanceErrorCode.NETWORK, "Later target failed"),
+            storedCredentialIds = listOf("stored"),
+            deferredCredentials = listOf(WalletIssuanceContinuation(
+                id = "pending", credentialConfigurationId = "pid", credentialIdentifier = "dataset-2", intervalSeconds = 7,
+            )),
+            failure = CredentialIssuanceFailure(CredentialIssuanceTarget("pid", "dataset-3"), CredentialIssuanceStage.REQUEST,
+                notAttempted = listOf(CredentialIssuanceTarget("pid", "dataset-4"), CredentialIssuanceTarget("mdl"))),
+        ).toDemoIssuanceOutcome()
+        val failed = assertIs<WalletDemoIssuanceOutcome.Failed>(result)
+        assertEquals(listOf("stored"), failed.storedCredentialIds)
+        assertEquals(listOf(WalletDemoDeferredCredential("pending", "pid", 7, "dataset-2")), failed.deferredCredentials)
+        assertTrue(failed.offerConsumed)
+        assertEquals(1, failed.failedTargetCount)
+        assertEquals(2, failed.notAttemptedTargetCount)
+    }
+
+    @Test
     fun credentialLogoAccessibilityTextReachesTheOfferReviewModel() {
-        val session = WalletIssuanceSession(
+        val session = WalletIssuanceBatchSession(
             id = "issuance-1",
             offer = WalletIssuanceOfferPreview(
                 grant = WalletIssuanceGrant.PRE_AUTHORIZED_CODE,
@@ -40,9 +82,11 @@ class MobileWalletIssuanceMappingTest {
                 ),
                 transactionCode = null,
             ),
+            batchSize = 4,
         )
 
         val offered = session.toDemoIssuanceSession().preview.offeredCredentials.single()
+        assertEquals(4, session.toDemoIssuanceSession().preview.batchSize)
         assertEquals("Driving licence logo", offered.display?.logoAltText)
         assertEquals("#12107c", offered.display?.backgroundColor)
         assertEquals("https://issuer.example/mdl-bg.png", offered.display?.backgroundImageUri)

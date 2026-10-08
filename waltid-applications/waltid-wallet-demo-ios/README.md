@@ -24,6 +24,18 @@ Native iOS demo app for the mobile wallet SDK. It uses SwiftUI with the `WalletS
 
 For setup, IDE guidance, and mobile integration test commands, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
 
+## Credential issuance
+
+Offer review lets users select credential configurations and explicitly request copies up to the issuer's advertised limit. Every configuration defaults to one copy. Additional holder keys are created only after acceptance, and the same choices are passed to pre-authorized and browser authorization flows. The Wallet SDK retains each credential's holder-key association for presentation.
+
+Saved credentials remain visible when other targets are deferred or fail. Deferred handles are restored when reopening the wallet and can be polled individually from Receive. A failure after target processing consumes the reviewed offer; it does not offer a retry of the already spent grant.
+
+The receive status summarizes saved credentials and pending targets. When a target fails,
+it also shows the failed and not-attempted target counts. A target can yield multiple
+copies, so pending/failed counts are not credential-copy counts. Mixed deferred-resume
+outcomes refresh saved credentials and retain the remaining handles.
+
+
 ## In-person presentation
 
 The Present tab includes a dedicated **Present in person** journey for holder-side ISO mdoc
@@ -157,9 +169,28 @@ open iosApp.xcodeproj
 Mobile integration tests run through XCTest and the self-contained Enterprise
 fixture Gradle tasks documented in the mobile guide.
 
+`iosAppUITests/BatchIssuanceE2ETests` exercises explicit two-copy issuance and a full app
+restart against `enterpriseMobileFixtureServer`. Set the test runner environment
+`ENTERPRISE_MOBILE_FIXTURE_BASE_URL=http://localhost:33335` and use a coordinated fixture
+that advertises batch support. The test handles Apple's first identity-document registration
+prompt and retains review/result screenshots as XCTest attachments. Without the fixture URL,
+it skips; simulator success does not establish physical-device signing behavior.
+
+The Enterprise SDK test `testBatchHolderBindingsPresentEachCopyAfterWalletRecreation`
+creates two distinct holder keys through the public Swift API, reopens the wallet, and
+submits each stored credential separately to the fixture verifier without overriding its key.
+
 ## Related modules
 
 - [WalletSDK](../../waltid-libraries/protocols/waltid-wallet-sdk-ios/README.md)
 - [waltid-openid4vc-wallet-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md)
 - [waltid-openid4vc-wallet-persistence-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md)
 - [waltid-crypto](../../waltid-libraries/crypto/waltid-crypto/README.md)
+
+The Enterprise SDK suite also has an operator-gated physical signing-cancellation
+check, `testBatchSigningCancellationStoresNoCredential`. Set
+`WALLET_BATCH_SIGNING_CANCELLATION=1` and cancel the second holder's system passcode
+prompt. It asserts a cryptographic failure and no stored copies after wallet recreation.
+This check skips without the explicit flag. For a LAN fixture, enable the app's iOS
+Local Network permission; configure the fixture host as described in the Enterprise
+integration README.

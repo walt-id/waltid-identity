@@ -16,7 +16,7 @@ class Wallet2TokenErrorMappingTest {
             cause = IllegalStateException("upstream body must not escape"),
         )
 
-        val mapped = upstream.toWebException()
+        val mapped = upstream.toStatusException()
 
         assertEquals(HttpStatusCode.BadRequest.value, mapped.status)
         assertEquals("invalid_grant", mapped.message)
@@ -25,7 +25,7 @@ class Wallet2TokenErrorMappingTest {
 
     @Test
     fun upstreamServerFailureBecomesBadGateway() {
-        val mapped = TokenRequestException(statusCode = 500).toWebException()
+        val mapped = TokenRequestException(statusCode = 500).toStatusException()
 
         assertEquals(HttpStatusCode.BadGateway.value, mapped.status)
         assertEquals("token_request_failed", mapped.message)
@@ -33,7 +33,7 @@ class Wallet2TokenErrorMappingTest {
 
     @Test
     fun transportFailureBecomesBadGateway() {
-        val mapped = TokenRequestException(statusCode = 0).toWebException()
+        val mapped = TokenRequestException(statusCode = 0).toStatusException()
 
         assertEquals(HttpStatusCode.BadGateway.value, mapped.status)
         assertEquals("token_request_failed", mapped.message)

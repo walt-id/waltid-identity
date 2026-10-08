@@ -81,8 +81,8 @@ private class RecordingDemoWallet : DemoWallet {
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
     override suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?) =
         error("unused")
-    override suspend fun beginAuthorizationIssuance(sessionId: String) = error("unused")
-    override suspend fun continuePreAuthorizedIssuance(sessionId: String, transactionCode: String?) =
+    override suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<WalletDemoCredentialSelection>) = error("unused")
+    override suspend fun continuePreAuthorizedIssuance(sessionId: String, transactionCode: String?, credentials: List<WalletDemoCredentialSelection>) =
         error("unused")
     override suspend fun continueAuthorizationIssuance(sessionId: String, callbackUri: String): WalletDemoIssuanceOutcome {
         authorizationCallback = callbackUri
@@ -98,6 +98,9 @@ private class RecordingDemoWallet : DemoWallet {
         return WalletDemoIssuanceOutcome.Stored(listOf("cred-1"))
     }
     override suspend fun cancelIssuance(sessionId: String) = WalletDemoIssuanceOutcome.Cancelled
+
+    override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> = emptyList()
+
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String) = error("unused")
     override suspend fun present(requestUrl: String, did: String?) = error("unused")
     override suspend fun previewPresentation(requestUrl: String) = error("unused")

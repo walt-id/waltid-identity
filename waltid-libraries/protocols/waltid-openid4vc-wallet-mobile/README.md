@@ -132,6 +132,55 @@ offer, open the returned browser URL, and then continue with
 the app's ordered BCP 47 language preferences; platform demos pass their
 platform locale preferences.
 
+### Explicit batches and multiple configurations
+
+Issuance requests one instance of each selected configuration by default. A batch
+is opt-in: after reviewing `session.offer.batchSize`, choose existing holders or explicitly request new keys
+at acceptance. A missing batch size means single issuance only;
+an oversized batch fails before the token is redeemed.
+
+```kotlin
+// Preparation happens inside acceptance, using the platform key-use policy.
+val accepted = listOf(
+    MobileWalletCredentialSelection(
+        credentialConfigurationId = session.offer.credentials.first().configurationId,
+        holders = MobileWalletCredentialHolders.NewKeys(count = 2),
+    )
+)
+val outcome = wallet.continuePreAuthorizedIssuance(session.id, transactionCode, accepted)
+// For authorization-code issuance instead:
+// val authorization = wallet.beginAuthorizationIssuance(session.id, accepted)
+```
+
+`Existing` selects wallet-owned keys; `NewKeys` prepares keys only during acceptance.
+Use `createIssuanceHolderKeys` when copies need different platform authorization policies,
+then pass the resulting bindings through `Existing`. Validation failures remove unaccepted
+SDK-generated keys; accepted keys remain wallet-owned and retries reuse them after restart.
+Swift exposes the same choices. See the [Wallet2 batch guide](https://docs.walt.id/community-stack/wallet2/credential-receiving/batch-issuance)
+for target selection, issuer limits, partial results and polling. Mobile consumers use
+`listDeferredIssuance()` and `resumeDeferredIssuance(id)` for retained progress.
+
+Wallet deletion rejects an active wallet or signing-identity operation before any
+cleanup starts. Once admitted, deletion permanently closes that instance to wallet
+and identity operations and continues despite caller cancellation. Platform key
+and database deletion cannot roll back: after a failure, retry `deleteWallet()` on
+the same instance to finish cleanup. It skips stores already cleared before the
+database driver closed, and repeated successful deletion is a no-op. Use a newly
+opened wallet only after cleanup succeeds. This coordinates one writable mobile
+instance; it does not add cross-process write coordination.
+
+Retained records distinguish remote requests from received batches awaiting local save.
+`REMOTE_OUTCOME_UNCERTAIN` and `STORAGE_OUTCOME_UNCERTAIN` preserve an active/interrupted
+claim; they do not authorize another runtime to replay or take over. Resume a recoverable
+local-save handle to save the remaining credentials without contacting the issuer again.
+
+After changing the Swift-facing API, regenerate and check its native ABI on macOS:
+
+```shell
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:updateKotlinAbi -PenableIosBuild=true
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:checkKotlinAbi :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:iosSimulatorArm64Test -PenableIosBuild=true
+```
+
 ## Presenting credentials
 
 Preview a presentation request before submission. The request information includes
@@ -473,13 +522,6 @@ between evaluations. The default revocation policy remains `NotChecked`; demo
 trust settings do not configure a CRL client. OCSP needs a separate request and
 signed-response verifier and is not implemented by this evaluator.
 
-For IACA-issued readers, set `requiredIacaIssuerCertificateDerBase64Url` in the trust
-configuration to the application-identified direct issuer. The validated path must contain
-that exact direct issuer, and the reader must carry non-critical issuerAlternativeName with
-an email/URI contact. A self-signed or imported generic CA does not establish the IACA role.
-Without this context, validation covers the unconditional reader fields; do not claim the
-conditional IACA profile has been checked.
-
 Configuration snapshots detach collection data while retaining provider/evaluator service
 references. Providers and revocation sources are queried at evaluation time. Persisted
 settings decoding checks structure; import checks current CA usage and RICAL material;
@@ -666,3 +708,23 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
+
+### Interactive batch acceptance
+
+The Android `EnterpriseMobileWalletIntegrationTest` uses the coordinated Enterprise
+mobile fixture (`enterprise_fixture_base_url` instrumentation argument). Its batch
+case creates two holder keys, recreates the wallet and presents each copy separately.
+For a physical phone, forward fixture ports 33334 and 33335 over ADB and use
+`http://127.0.0.1:33335` as the fixture URL.
+
+Two additional checks require explicit instrumentation flags:
+
+- `wallet.batch.cancel=true`: run `batchSigningCancellationStoresNoCredential` and
+  cancel the second holder's biometric prompt. The result must report a crypto
+  failure with no stored copies, including after wallet recreation.
+- `wallet.batch.browser=true`: run
+  `browserAuthorizationRetainsBatchSelectionAcrossWalletRecreation`. Allow the
+  installed browser to open the test callback app if prompted. The SDK is recreated
+  before browser return; both copies must then issue and present successfully.
+  This uses the fixture’s controlled identity provider; real issuer PAR/PKCE and token routes
+  remain in use. The test-only callback Activity is absent from production artifacts.

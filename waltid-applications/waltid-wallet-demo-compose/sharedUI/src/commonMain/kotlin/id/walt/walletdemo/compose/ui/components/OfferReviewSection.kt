@@ -4,27 +4,39 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
+import id.walt.walletdemo.compose.logic.issuanceCopyLimit
 import id.walt.walletdemo.compose.logic.WalletDemoTransactionCodeInputMode
 import id.walt.walletdemo.compose.logic.resolvedCardTitle
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
@@ -41,6 +53,8 @@ internal fun OfferReviewSection(
     modifier: Modifier = Modifier,
     cardFirst: Boolean = false,
     showActions: Boolean = true,
+    copies: Map<String, Int> = emptyMap(),
+    onCopiesChange: ((String, Int) -> Unit)? = null,
 ) {
     val focusManager = LocalFocusManager.current
     var issuerExpanded by rememberSaveable { mutableStateOf(false) }
@@ -96,6 +110,16 @@ internal fun OfferReviewSection(
                         issuerFallback = preview.issuer.display?.name?.trim()?.takeIf { it.isNotEmpty() }
                             ?: preview.issuer.credentialIssuer,
                     )
+                    onCopiesChange?.let {
+                        CredentialCopySelection(
+                            credential.configurationId,
+                            credential.resolvedCardTitle(),
+                            copies[credential.configurationId] ?: 1,
+                            issuanceCopyLimit(preview, copies, credential.configurationId),
+                            reviewEnabled,
+                            it,
+                        )
+                    }
                 }
             } else {
             ReviewMetadataSection(
@@ -114,6 +138,16 @@ internal fun OfferReviewSection(
                             fallbackName = title,
                         ),
                     )
+                    onCopiesChange?.let {
+                        CredentialCopySelection(
+                            credential.configurationId,
+                            title,
+                            copies[credential.configurationId] ?: 1,
+                            issuanceCopyLimit(preview, copies, credential.configurationId),
+                            reviewEnabled,
+                            it,
+                        )
+                    }
                 }
             }
             }
@@ -184,6 +218,54 @@ internal fun OfferReviewSection(
                 onAccept = onAccept,
                 onDecline = onDecline,
             )
+        }
+    }
+}
+
+@Composable
+private fun CredentialCopySelection(
+    configurationId: String,
+    title: String,
+    count: Int,
+    limit: Int,
+    enabled: Boolean,
+    onChange: (String, Int) -> Unit,
+) {
+    val canSelect = enabled && (count > 0 || limit > 0)
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .testTag("issuance-select-$configurationId")
+            .semantics { contentDescription = "Receive $title" }
+            .toggleable(count > 0, enabled = canSelect, role = Role.Switch) {
+                onChange(configurationId, if (it) 1 else 0)
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("Receive $title", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Switch(
+            checked = count > 0,
+            onCheckedChange = null,
+            enabled = canSelect,
+        )
+    }
+    if (count > 0 && limit > 1) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Copies: $count", style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f).testTag("issuance-copies-$configurationId"))
+            Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { onChange(configurationId, count - 1) }, enabled = enabled && count > 1,
+                        modifier = Modifier.testTag("issuance-fewer-$configurationId").semantics { contentDescription = "Fewer copies of $title" }) {
+                        Text("−", style = MaterialTheme.typography.titleLarge)
+                    }
+                    VerticalDivider(modifier = Modifier.height(24.dp))
+                    IconButton(onClick = { onChange(configurationId, count + 1) }, enabled = enabled && count < limit,
+                        modifier = Modifier.testTag("issuance-more-$configurationId").semantics { contentDescription = "More copies of $title" }) {
+                        Text("+", style = MaterialTheme.typography.titleLarge)
+                    }
+                }
+            }
         }
     }
 }

@@ -17,10 +17,12 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.encodeURLPathPart
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 
 internal class WalletApi2Exception(
@@ -31,61 +33,91 @@ internal class WalletApi2Exception(
 internal class WalletApi2Client(
     private val baseUrl: String,
     private val token: String,
+    private val kind: WalletApiKind = WalletApiKind.OpenSource,
     private val http: HttpClient = authenticatedHttpClient(baseUrl, token),
 ) {
-    suspend fun listWallets(): List<String> =
-        request { get("/wallet") }.body()
-
-    suspend fun createWallet(): String =
-        request(HttpStatusCode.Created) { post("/wallet") { jsonBody(CreateWalletRequestDto()) } }
-            .body<WalletCreatedResponse>()
-            .walletId
-
-    suspend fun walletInfo(walletId: String): WalletInfoResponse =
-        request { get("/wallet/$walletId") }.body()
-
-    suspend fun deleteWallet(walletId: String) {
-        request(HttpStatusCode.NoContent) { delete("/wallet/$walletId") }
+    suspend fun listWallets(): List<String> {
+        require(kind.canManageWallet) { "This API does not list wallets directly" }
+        return request { get("/wallet") }.body()
     }
 
-    suspend fun generateKey(walletId: String): WalletKeyInfo =
-        request(HttpStatusCode.Created) {
-            post("/wallet/$walletId/keys/generate") {
+    suspend fun listAccessibleWallets(): List<String> = when (kind) {
+        WalletApiKind.OpenSource -> listWallets()
+        WalletApiKind.Enterprise -> wallet2TargetsFromResourceTree(
+            request { get(EnterpriseResourceTreePath) }.body(),
+        )
+    }
+
+    suspend fun createWallet(): String {
+        require(kind.canManageWallet) { "This API does not create wallets" }
+        return request(HttpStatusCode.Created) { post("/wallet") { jsonBody(CreateWalletRequestDto()) } }
+            .body<WalletCreatedResponse>()
+            .walletId
+    }
+
+    suspend fun walletInfo(walletId: String): WalletInfoResponse =
+        request { get(walletPath(walletId)) }.body()
+
+    suspend fun deleteWallet(walletId: String) {
+        require(kind.canManageWallet) { "This API does not delete wallets" }
+        request(HttpStatusCode.NoContent) { delete(walletPath(walletId)) }
+    }
+
+    suspend fun generateKey(walletId: String): WalletKeyInfo {
+        require(kind.canGenerateIdentity) { "This API does not generate keys" }
+        return request(HttpStatusCode.Created) {
+            post(walletPath(walletId, "keys/generate")) {
                 jsonBody(GenerateKeyRequest(backend = "jwk", keyType = "secp256r1"))
             }
         }.body()
-
-    suspend fun listKeys(walletId: String): List<WalletKeyInfo> =
-        request { get("/wallet/$walletId/keys") }.body()
-
-    suspend fun setDefaultKey(walletId: String, keyId: String) {
-        request(HttpStatusCode.NoContent) { put("/wallet/$walletId/keys/$keyId/set-default") }
     }
 
-    suspend fun createDid(walletId: String, keyId: String): WalletDidEntry =
-        request(HttpStatusCode.Created) {
-            post("/wallet/$walletId/dids/create") {
+    suspend fun listKeys(walletId: String): List<WalletKeyInfo> =
+        request { get(walletPath(walletId, "keys")) }.body()
+
+    suspend fun deleteKey(walletId: String, keyId: String) {
+        require(kind.canGenerateIdentity) { "This API does not delete keys" }
+        request(HttpStatusCode.NoContent) { delete(walletPath(walletId, "keys/$keyId")) }
+    }
+
+    suspend fun deleteDid(walletId: String, did: String) {
+        require(kind.canGenerateIdentity) { "This API does not delete DIDs" }
+        request(HttpStatusCode.NoContent) { delete(walletPath(walletId, "dids/$did")) }
+    }
+
+    suspend fun setDefaultKey(walletId: String, keyId: String) {
+        require(kind.canGenerateIdentity) { "This API does not set a default key" }
+        request(HttpStatusCode.NoContent) { put(walletPath(walletId, "keys/$keyId/set-default")) }
+    }
+
+    suspend fun createDid(walletId: String, keyId: String): WalletDidEntry {
+        require(kind.canGenerateIdentity) { "This API does not create DIDs" }
+        return request(HttpStatusCode.Created) {
+            post(walletPath(walletId, "dids/create")) {
                 jsonBody(CreateDidRequest(method = "jwk", keyId = keyId))
             }
         }.body()
+    }
 
     suspend fun listDids(walletId: String): List<WalletDidEntry> =
-        request { get("/wallet/$walletId/dids") }.body()
+        request { get(walletPath(walletId, "dids")) }.body()
 
     suspend fun setDefaultDid(walletId: String, did: String) {
-        request(HttpStatusCode.NoContent) { put("/wallet/$walletId/dids/$did/set-default") }
+        require(kind.canGenerateIdentity) { "This API does not set a default DID" }
+        request(HttpStatusCode.NoContent) { put(walletPath(walletId, "dids/$did/set-default")) }
     }
 
     suspend fun listCredentialMetadata(walletId: String): List<StoredCredentialMetadataDto> =
-        request { get("/wallet/$walletId/credentials") }.body()
+        request { get(walletPath(walletId, "credentials")) }.body()
 
     suspend fun getCredential(walletId: String, credentialId: String): JsonObject =
         walletApi2Json.parseToJsonElement(
-            request { get("/wallet/$walletId/credentials/$credentialId") }.bodyAsText(),
+            request { get(walletPath(walletId, "credentials/$credentialId")) }.bodyAsText(),
         ).jsonObject
 
     suspend fun deleteCredential(walletId: String, credentialId: String): Boolean {
-        val response = http.delete("/wallet/$walletId/credentials/$credentialId")
+        require(kind.canDeleteCredential) { "This API does not delete credentials" }
+        val response = http.delete(walletPath(walletId, "credentials/$credentialId"))
         return when (response.status) {
             HttpStatusCode.NoContent -> true
             HttpStatusCode.NotFound -> false
@@ -93,9 +125,9 @@ internal class WalletApi2Client(
         }
     }
 
-    suspend fun resolveOffer(walletId: String, offerUrl: String): ResolveOfferDetailedResponseDto =
+    suspend fun resolveOffer(walletId: String, offerUrl: String): ResolveBatchOfferResponseDto =
         request {
-            post("/wallet/$walletId/credentials/receive/resolve-offer") {
+            post(walletPath(walletId, "credentials/receive/resolve-offer/batch")) {
                 jsonBody(OfferUrlRequest(offerUrl))
             }
         }.body()
@@ -106,31 +138,37 @@ internal class WalletApi2Client(
         txCode: String?,
         did: String?,
         redirectUri: String,
+        credentials: List<IssuanceCredentialSelectionDto>,
+        keyId: String? = null,
     ): ReceiveCredentialResultDto =
-        request {
-            post("/wallet/$walletId/credentials/receive") {
+        receiveResult {
+            post(walletPath(walletId, "credentials/receive")) {
                 jsonBody(
                     ReceiveCredentialRequestDto(
                         offerUrl = offerUrl,
                         txCode = txCode,
                         did = did,
                         redirectUri = redirectUri,
+                        credentials = credentials,
+                        keyId = keyId,
                     ),
                 )
             }
-        }.body()
+        }
 
     suspend fun authorizationUrl(
         walletId: String,
         offerUrl: String,
         redirectUri: String,
+        credentialConfigurationIds: List<String>,
     ): GenerateAuthorizationUrlResultDto =
         request {
-            post("/wallet/$walletId/credentials/receive/authorization-url") {
+            post(walletPath(walletId, "credentials/receive/authorization-url/batch")) {
                 jsonBody(
                     GenerateAuthorizationUrlRequestDto(
                         offerUrl = offerUrl,
                         redirectUri = redirectUri,
+                        credentialConfigurationIds = credentialConfigurationIds,
                     ),
                 )
             }
@@ -140,9 +178,28 @@ internal class WalletApi2Client(
         walletId: String,
         request: ReceiveAuthorizedCredentialRequestDto,
     ): ReceiveCredentialResultDto =
+        receiveResult {
+            post(walletPath(walletId, "credentials/receive/authorized/batch")) { jsonBody(request) }
+        }
+
+    suspend fun listDeferred(walletId: String): List<DeferredCredentialHandleDto> =
+        request { get(walletPath(walletId, "credentials/receive/deferred")) }.body()
+
+    suspend fun resumeDeferred(walletId: String, deferredCredentialId: String): DeferredIssuanceOutcomeDto =
         request {
-            post("/wallet/$walletId/credentials/receive/authorized") { jsonBody(request) }
+            post(walletPath(walletId, "credentials/receive/deferred/${deferredCredentialId.encodeURLPathPart()}"))
         }.body()
+
+    private suspend fun receiveResult(block: suspend HttpClient.() -> HttpResponse): ReceiveCredentialResultDto {
+        val response = http.block()
+        if (response.status.isSuccess()) return response.body()
+        val body = response.bodyAsText()
+        if (response.status.value in setOf(422, 500, 502)) {
+            val result = runCatching { walletApi2Json.decodeFromString<ReceiveCredentialResultDto>(body) }.getOrNull()
+            if (result?.failure != null) return result
+        }
+        throw WalletApi2Exception(response.status, "Wallet API ${response.status.value}: ${body.ifBlank { response.status.description }}")
+    }
 
     suspend fun previewPresentation(
         walletId: String,
@@ -150,14 +207,14 @@ internal class WalletApi2Client(
         keyId: String?,
     ): PresentationPreviewResponseDto =
         request {
-            post("/wallet/$walletId/credentials/present/preview") {
+            post(walletPath(walletId, "credentials/present/preview")) {
                 jsonBody(PreviewPresentationRequestDto(requestUrl = requestUrl, keyId = keyId))
             }
         }.body()
 
     suspend fun buildVpToken(walletId: String, request: BuildVpTokenRequestDto): BuildVpTokenResultDto =
         request {
-            post("/wallet/$walletId/credentials/present/build-vp-token") { jsonBody(request) }
+            post(walletPath(walletId, "credentials/present/build-vp-token")) { jsonBody(request) }
         }.body()
 
     suspend fun sendPresentationResponse(
@@ -165,7 +222,7 @@ internal class WalletApi2Client(
         request: SendAuthorizationResponseRequestDto,
     ): WalletPresentResultDto =
         request {
-            post("/wallet/$walletId/credentials/present/send-response") { jsonBody(request) }
+            post(walletPath(walletId, "credentials/present/send-response")) { jsonBody(request) }
         }.body()
 
     suspend fun rejectPresentation(
@@ -173,17 +230,25 @@ internal class WalletApi2Client(
         requestUrl: String,
     ): WalletPresentResultDto =
         request {
-            post("/wallet/$walletId/credentials/present/reject") {
+            post(walletPath(walletId, "credentials/present/reject")) {
                 jsonBody(RejectPresentationRequestDto(requestUrl = requestUrl))
             }
         }.body()
 
-    suspend fun present(walletId: String, requestUrl: String, did: String?): WalletPresentResultDto =
+    suspend fun present(
+        walletId: String,
+        requestUrl: String,
+        did: String?,
+        keyId: String? = null,
+    ): WalletPresentResultDto =
         request {
-            post("/wallet/$walletId/credentials/present") {
-                jsonBody(PresentCredentialRequestDto(requestUrl = requestUrl, did = did))
+            post(walletPath(walletId, "credentials/present")) {
+                jsonBody(PresentCredentialRequestDto(requestUrl = requestUrl, did = did, keyId = keyId))
             }
         }.body()
+
+    private fun walletPath(walletId: String, operation: String = "") =
+        walletApiOperationPath(kind, walletId, operation)
 
     private suspend fun request(
         expected: HttpStatusCode? = null,
@@ -197,7 +262,8 @@ internal class WalletApi2Client(
 
     private inline fun <reified T> HttpRequestBuilder.jsonBody(body: T) {
         contentType(ContentType.Application.Json)
-        setBody(body)
+        val element = walletApi2Json.encodeToJsonElement(body)
+        setBody(if (element is JsonObject) adaptWalletRequestBody(kind, element) else element)
     }
 
     private suspend fun HttpResponse.toApiException(): WalletApi2Exception {

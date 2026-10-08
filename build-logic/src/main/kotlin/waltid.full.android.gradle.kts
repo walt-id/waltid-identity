@@ -44,6 +44,10 @@ kotlin {
 
         withDeviceTestBuilder {
             sourceSetTreeName = "test"
+        }.configure {
+            packaging {
+                resources.merges.add("META-INF/LICENSE.md")
+            }
         }
         withHostTestBuilder { }
 

@@ -17,7 +17,11 @@ val enableMobileWallet = enableAndroidBuild || enableIosBuild
 kotlin {
     if (enableWalletDemoComposeWeb) {
         wasmJs {
-            browser()
+            browser {
+                testTask {
+                    useKarma { useChromeHeadless() }
+                }
+            }
         }
     }
 
@@ -33,7 +37,7 @@ kotlin {
         }
 
         if (enableMobileWallet) {
-            val mobileMain by creating {
+            val mobileMain = create("mobileMain") {
                 dependsOn(commonMain.get())
                 dependencies {
                     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
@@ -42,6 +46,7 @@ kotlin {
                     implementation(identityLibs.ktor.client.content.negotiation)
                     implementation(identityLibs.ktor.serialization.kotlinx.json)
                     implementation(identityLibs.cryptography.core)
+                    implementation(identityLibs.okio)
                     implementation(identityLibs.whyoleg.cryptography.random)
                 }
             }
@@ -90,7 +95,10 @@ kotlin {
         if (enableWalletDemoComposeWeb) {
             getByName("wasmJsMain").dependencies {
                 implementation(identityLibs.ktor.client.js)
-                implementation("org.jetbrains.kotlinx:kotlinx-browser:0.3")
+                implementation(identityLibs.kotlinx.browser)
+            }
+            getByName("wasmJsTest").dependencies {
+                implementation(identityLibs.ktor.client.mock)
             }
         }
 
