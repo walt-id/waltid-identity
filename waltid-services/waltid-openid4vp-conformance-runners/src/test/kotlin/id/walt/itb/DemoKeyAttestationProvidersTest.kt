@@ -1,4 +1,4 @@
-package id.walt.walletdemo.compose.logic
+package id.walt.itb
 
 import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import id.walt.crypto2.CryptoRuntime
@@ -44,8 +44,15 @@ class DemoKeyAttestationProvidersTest {
         assertEquals("fresh-nonce", payload["nonce"]?.jsonPrimitive?.content)
         assertEquals(Json.parseToJsonElement(jwk.data.toByteArray().decodeToString()), payload["attested_keys"]?.jsonArray?.single())
         assertEquals(300, payload.getValue("exp").jsonPrimitive.long - payload.getValue("iat").jsonPrimitive.long)
-        assertTrue(payload.getValue("key_storage").jsonArray.single().jsonPrimitive.content.endsWith("key-storage-unassessed"))
+        for (name in listOf("key_storage", "user_authentication")) {
+            assertTrue(payload.getValue(name).jsonArray.all { it.jsonPrimitive.content.startsWith("https://example.invalid/") })
+        }
         assertTrue(payload.getValue("certification").jsonPrimitive.content.endsWith("no-certification"))
+        val status = payload.getValue("key_storage_status").jsonObject
+        assertEquals(3600, status.getValue("exp").jsonPrimitive.long - payload.getValue("iat").jsonPrimitive.long)
+        val statusList = status.getValue("status").jsonObject.getValue("status_list").jsonObject
+        assertEquals(0, statusList.getValue("idx").jsonPrimitive.int)
+        assertTrue(statusList.getValue("uri").jsonPrimitive.content.startsWith("https://example.invalid/"))
     }
 
     @Test

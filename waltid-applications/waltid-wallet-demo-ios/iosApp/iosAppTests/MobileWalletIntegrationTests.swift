@@ -3,7 +3,7 @@ import Security
 @testable import iosApp
 import TestHelpers
 @testable import WalletSDK
-import WalletDemoSharingUI
+import WalletDemoKeyAttestation
 import CryptoKit
 
 /// iOS integration tests for the mobile wallet library.
@@ -55,6 +55,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertEqual(payload["key_storage"] as? [String], ["https://example.invalid/walt-id/itb/key-storage-unassessed"])
         XCTAssertEqual(payload["user_authentication"] as? [String], ["https://example.invalid/walt-id/itb/user-authentication-unassessed"])
         XCTAssertEqual(payload["certification"] as? String, "https://example.invalid/walt-id/itb/no-certification")
+        let status = try XCTUnwrap(payload["key_storage_status"] as? [String: Any])
+        XCTAssertEqual(try XCTUnwrap(status["exp"] as? Int64) - issuedAt, 3600)
+        let statusBody = try XCTUnwrap(status["status"] as? [String: Any])
+        let statusList = try XCTUnwrap(statusBody["status_list"] as? [String: Any])
+        XCTAssertEqual(statusList["idx"] as? Int, 0)
+        XCTAssertEqual(statusList["uri"] as? String, "https://example.invalid/walt-id/itb/no-status-list")
         let unsupported = try await resolver.resolve(credentialIssuer: DemoKeyAttestationProviders.itbIssuer + "/other")
         XCTAssertNil(unsupported)
     }

@@ -111,20 +111,16 @@ private struct ItbDemoKeyAttester: KeyAttestationProvider {
             "typ": profile.jwtType,
             "jwk": try JSONSerialization.jsonObject(with: Data(verificationPublicJWK.utf8)),
         ]
-        var payload: [String: Any] = [
-            "iat": now, "exp": now + profile.lifetimeSeconds,
-            "attested_keys": [try JSONSerialization.jsonObject(with: Data(request.proofKeyJWK.utf8))],
-            "key_storage": profile.claims.keyStorage,
-            "user_authentication": profile.claims.userAuthentication,
-            "certification": profile.claims.certification,
-            "key_storage_status": [
-                "status": ["status_list": [
-                    "uri": profile.claims.keyStorageStatus.status.statusList.uri,
-                    "idx": profile.claims.keyStorageStatus.status.statusList.idx,
-                ]],
-                "exp": now + profile.statusLifetimeSeconds,
-            ],
-        ]
+        // Forward the shared claims, including extensions, exactly as the Kotlin adapter does.
+        guard var payload = try JSONSerialization.jsonObject(with: DemoAttestationProfiles.shared.itbClaims) as? [String: Any],
+              var status = payload["key_storage_status"] as? [String: Any] else {
+            preconditionFailure("Demo key attestation claims are invalid")
+        }
+        status["exp"] = now + profile.statusLifetimeSeconds
+        payload["key_storage_status"] = status
+        payload["iat"] = now
+        payload["exp"] = now + profile.lifetimeSeconds
+        payload["attested_keys"] = [try JSONSerialization.jsonObject(with: Data(request.proofKeyJWK.utf8))]
         if let nonce = request.nonce { payload["nonce"] = nonce }
         let input = try JSONSerialization.data(withJSONObject: header, options: [.sortedKeys]).base64URL
             + "." + JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]).base64URL
@@ -141,9 +137,16 @@ private extension Data {
 }
 
 /// The same profile resource is compiled into the Kotlin demo/test adapters by sources.gradle.kts.
-private struct DemoAttestationProfiles: Decodable, Sendable {
+private struct DemoAttestationProfiles: Sendable {
     let itb: Itb
     let eudi: Eudi
+    // Data is Sendable; untyped JSON dictionaries stay local to each signing operation.
+    let itbClaims: Data
+
+    private struct Definition: Decodable {
+        let itb: Itb
+        let eudi: Eudi
+    }
 
     static let shared: Self = {
         do {
@@ -152,13 +155,22 @@ private struct DemoAttestationProfiles: Decodable, Sendable {
             }
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
-            let profiles = try decoder.decode(Self.self, from: Data(contentsOf: url))
+            let data = try Data(contentsOf: url)
+            let profiles = try decoder.decode(Definition.self, from: data)
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  Set(json.keys) == ["itb", "eudi"],
+                  let itb = json["itb"] as? [String: Any],
+                  let claims = itb["claims"] as? [String: Any],
+                  claims["key_storage_status"] is [String: Any] else {
+                preconditionFailure("Demo key attestation claims are invalid")
+            }
             precondition(profiles.itb.algorithm == "ES256" && profiles.eudi.signingAlgorithms == ["ES256"],
                          "Demo key attestation signing adapters require ES256")
             precondition(profiles.itb.jwtType == "key-attestation+jwt"
                          && profiles.itb.lifetimeSeconds > 0 && profiles.itb.statusLifetimeSeconds > 0,
                          "Demo key attestation type and lifetimes are invalid")
-            return profiles
+            return Self(itb: profiles.itb, eudi: profiles.eudi,
+                        itbClaims: try JSONSerialization.data(withJSONObject: claims))
         } catch {
             preconditionFailure("Demo key attestation profiles are invalid")
         }
@@ -170,7 +182,6 @@ private struct DemoAttestationProfiles: Decodable, Sendable {
         let jwtType: String
         let lifetimeSeconds: Int64
         let statusLifetimeSeconds: Int64
-        let claims: Claims
     }
     struct Eudi: Decodable, Sendable {
         let issuer: String
@@ -179,13 +190,4 @@ private struct DemoAttestationProfiles: Decodable, Sendable {
         let attestationPath: String
         let signingAlgorithms: [String]
     }
-    struct Claims: Decodable, Sendable {
-        let keyStorage: [String]
-        let userAuthentication: [String]
-        let certification: String
-        let keyStorageStatus: KeyStorageStatus
-    }
-    struct KeyStorageStatus: Decodable, Sendable { let status: Status }
-    struct Status: Decodable, Sendable { let statusList: StatusList }
-    struct StatusList: Decodable, Sendable { let uri: String; let idx: Int }
 }

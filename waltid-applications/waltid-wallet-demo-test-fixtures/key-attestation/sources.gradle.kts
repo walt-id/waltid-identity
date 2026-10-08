@@ -4,7 +4,7 @@ import org.gradle.api.file.Directory
 // Private source sharing for demos and integration fixtures; nothing is added to SDK main sources.
 val fixtureRoot = extra["demoKeyAttestationFixture"] as Directory
 val profileFile = fixtureRoot.file(
-    "../../waltid-wallet-demo-shared-ios/Sources/WalletDemoSharingUI/Resources/KeyAttestationProfiles.json",
+    "Resources/KeyAttestationProfiles.json",
 )
 val generatedDirectory = layout.buildDirectory.dir("generated/demoKeyAttestation/kotlin")
 val generateProfiles = tasks.register("generateDemoKeyAttestationProfiles") {
