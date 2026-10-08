@@ -23,6 +23,7 @@ import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 /**
  * WAL-1509: two pinned trust anchors share a subject DN but have different keys (key rollover).
@@ -157,5 +158,23 @@ class SameSubjectDnAnchorsTests {
             )
             assertEquals(ClientIdError.InvalidSignature, failure.error, "includeRoot=$includeRoot")
         }
+    }
+
+    @Test
+    fun `x509_san_dns fails closed when two pinned certificates for the same key make the issuer ambiguous`() = runTest {
+        val ca = newCa("san-dup")
+        val duplicate = X509CertificateUtil.createSelfSignedCertificate(ca.key, sigAlg) {
+            subjectDn = "cn=Rollover Root, o=Walt.id"
+            extensionBasicConstraints { cA = true }
+        }
+        val trust = ClientIdTrustConfiguration(x509TrustAnchors = InMemoryTrustStore(listOf(ca.cert, duplicate)))
+        val clientId = X509SanDns(dnsName, "x509_san_dns:$dnsName")
+
+        val failure = assertIs<ClientValidationResult.Failure>(
+            clientId.authenticateX509SanDns(clientId, sanDnsContext(presentedBy(ca, includeRoot = false)), trust)
+        )
+
+        val error = assertIs<ClientIdError.AttestationError>(failure.error)
+        assertTrue(error.toString().contains("Refusing to select one"), error.toString())
     }
 }

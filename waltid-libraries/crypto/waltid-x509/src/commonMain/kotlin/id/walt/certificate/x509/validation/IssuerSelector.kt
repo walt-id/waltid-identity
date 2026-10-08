@@ -5,6 +5,7 @@ import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.crypto2.CryptoRuntime
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * The outcome of choosing the issuer of a certificate among trusted certificates that share the
@@ -112,6 +113,24 @@ class IssuerSelector(
         return if (sameKey.size > 1) IssuerSelection.Ambiguous(sameKey) else selected
     }
 
+    /**
+     * Whether [certificate] is signed with the key of [candidate]. A candidate whose key cannot verify
+     * the signature at all - typically one of another key type, e.g. an RSA CA that rolled over to an EC
+     * CA with the same subject DN - makes the signature validator throw; for the selection that is
+     * simply "not the issuer", and it can only ever remove a candidate, never add one.
+     */
+    private suspend fun verifies(
+        signatureValidator: SignatureValidator,
+        candidate: X509Certificate,
+        certificate: X509Certificate
+    ): Boolean = try {
+        signatureValidator.validateCertificateSignature(cryptoRuntime, candidate.data.subjectPublicKeyInfo, certificate)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        false
+    }
+
     private suspend fun selectBySignature(
         certificate: X509Certificate,
         group: List<X509Certificate>
@@ -119,13 +138,7 @@ class IssuerSelector(
         if (signatureValidator == null) {
             return if (group.size == 1) IssuerSelection.Selected(group.first()) else IssuerSelection.Ambiguous(group)
         }
-        val verifying = group.filter {
-            signatureValidator.validateCertificateSignature(
-                cryptoRuntime,
-                it.data.subjectPublicKeyInfo,
-                certificate
-            )
-        }
+        val verifying = group.filter { verifies(signatureValidator, it, certificate) }
         return when (verifying.size) {
             0 -> IssuerSelection.NoMatch(group)
             1 -> IssuerSelection.Selected(verifying.first(), signatureVerified = true)

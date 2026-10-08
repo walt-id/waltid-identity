@@ -388,6 +388,32 @@ class X509CertificateSameSubjectDnIssuersTest {
     }
 
     @Test
+    fun rolloverBetweenKeyTypesSelectsTheCaByItsKey() = runTest {
+        // An RSA CA rolled over to an EC CA (or the other way round) with the same subject DN: verifying the
+        // signature against the candidate of the other key type must count as "does not verify", not throw.
+        val rsaSigAlg = SignatureAlgorithm.RsaPkcs1(DigestAlgorithm.SHA_256)
+        val rsaKey = TestKeyUtil.genRsaKey("ca-rsa")
+        val rsaCert = tool.createSelfSignedCertificate(rsaKey, rsaSigAlg) {
+            subjectDn = CA_DN
+            extensionBasicConstraints { cA = true }
+        }
+        val rsaCa = IssuingCa(rsaKey, rsaCert)
+        val ecCa = newCa("ca-ec")
+        val trust = InMemoryTrustStore(listOf(rsaCa.cert, ecCa.cert))
+
+        val rsaLeafKey = TestKeyUtil.genEcKey("leaf-of-rsa-ca")
+        val leafOfRsaCa = tool.createCertificate(rsaCa.key, rsaCa.cert, rsaSigAlg) {
+            subjectDn = "CN=Leaf, O=Walt.id"
+            subjectPublicKey(rsaLeafKey)
+        }
+
+        assertTrue(tool.validateCertificateChain(listOf(leafOfRsaCa), trust).valid)
+        assertTrue(tool.validateCertificateChain(listOf(issueLeaf(ecCa)), trust).valid)
+        // ... and without the AKI/SKI preference to rely on
+        assertTrue(tool.validateCertificateChain(listOf(issueLeafWithoutAki(ecCa)), trust).valid)
+    }
+
+    @Test
     fun pathLengthConstraintOfTheSelectedIssuerIsUsed() = runTest {
         // Same DN: caA allows no intermediates (pathLen 0), caB allows one (pathLen 1).
         val caA = newCa("ca-a", pathLen = 0)
