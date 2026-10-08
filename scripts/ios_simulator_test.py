@@ -9,6 +9,15 @@ import uuid
 import xml.etree.ElementTree as ET
 
 PACKAGE = "id.walt.wallet.recovery-tests"
+# The CI entrypoint resolves the installed host's data container once, right after
+# `simctl install`, and exports it here so per-test phases do not repeat the lookup.
+CONTAINER_ENV = "IOS_RECOVERY_APP_CONTAINER"
+# One-off lookup outside any phase budget. On a freshly booted simulator CoreSimulator
+# can take minutes to answer get_app_container (CI saw ~175 s for a single call).
+CONTAINER_DISCOVERY_TIMEOUT = 600
+# A fallback lookup inside a phase may use the shared budget, but never all of it:
+# this much is always left for `simctl launch` and the test itself.
+MIN_LAUNCH_WINDOW = 60
 
 
 def simctl(*arguments, env=None, timeout=30):
@@ -25,14 +34,43 @@ def simctl(*arguments, env=None, timeout=30):
     return result.stdout
 
 
-def run_test(device, arguments, timeout=180):
+def require_exact_device(device):
     if device in ("booted", "all"):
         raise ValueError("Select an exact simulator UDID")
+
+
+def resolve_container(device, timeout=CONTAINER_DISCOVERY_TIMEOUT):
+    """Look up the installed host's data container once, with its own generous timeout."""
+    require_exact_device(device)
+    return Path(simctl("get_app_container", device, PACKAGE, "data", timeout=timeout).strip())
+
+
+def cached_container(device):
+    """Return the pre-resolved container if it belongs to this simulator and still exists."""
+    value = os.environ.get(CONTAINER_ENV, "").strip()
+    if not value:
+        return None
+    container = Path(value)
+    # A container from another simulator, or one replaced by an uninstall, is never
+    # reused; the caller falls back to a fresh lookup.
+    if device not in container.parts or not container.is_dir():
+        return None
+    return container
+
+
+def run_test(device, arguments, timeout=180):
+    require_exact_device(device)
     run = str(uuid.uuid4())
     # Container discovery also waits on CoreSimulator during a cold boot. Give
     # discovery, launch and test execution one budget, without resetting it.
     deadline = time.monotonic() + timeout
-    container = Path(simctl("get_app_container", device, PACKAGE, "data", timeout=timeout).strip())
+    container = cached_container(device)
+    if container is None:
+        # Fallback lookup stays inside the phase budget but cannot starve launch:
+        # previously a 175 s lookup left 4.6 s for `simctl launch`, which then
+        # timed out with a misleading error. Fail on discovery itself instead.
+        discovery_timeout = timeout - min(MIN_LAUNCH_WINDOW, timeout / 2)
+        container = Path(simctl("get_app_container", device, PACKAGE, "data", timeout=discovery_timeout).strip())
     log = container / "Documents" / (run + ".log")
     launch_timeout = deadline - time.monotonic()
     if launch_timeout <= 0:

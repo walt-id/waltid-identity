@@ -24,6 +24,17 @@ xcrun simctl bootstatus "$simulator" -b
 
 app="$output/host/RecoveryTests.app"
 xcrun simctl install "$simulator" "$app"
+# Resolve the host's data container once, with its own generous timeout, while CoreSimulator
+# finishes settling after the cold boot. Each test phase still has a single, non-resetting
+# budget (see run_test in scripts/ios_simulator_test.py); reusing this path keeps a slow
+# lookup from eating that budget and leaving only seconds for `simctl launch`.
+IOS_RECOVERY_APP_CONTAINER=$(python3 -c '
+import sys
+sys.path.insert(0, "scripts")
+from ios_simulator_test import resolve_container
+print(resolve_container(sys.argv[1]))
+' "$simulator")
+export IOS_RECOVERY_APP_CONTAINER
 python3 scripts/check-ios-recovery-runner.py --device "$simulator" --output "$output/runner-controls"
 python3 scripts/ios_simulator_test.py --device "$simulator" --output "$output" -- \
   --ktest_filter=id.walt.wallet2.recovery.keychain.KeychainIdentityRecoveryTest.compatibleAccessibilityClassesPreserveTheRecordContract \
