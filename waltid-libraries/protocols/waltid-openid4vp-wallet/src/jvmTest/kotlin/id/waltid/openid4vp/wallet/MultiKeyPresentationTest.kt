@@ -18,7 +18,11 @@ import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.crypto2.keys.KeyCapabilities
+import id.walt.crypto2.keys.PublicKeyExporter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
+import id.walt.crypto2.keys.Key as Crypto2Key
 import kotlinx.serialization.json.*
 import java.security.MessageDigest
 import java.util.Base64
@@ -109,6 +113,41 @@ class MultiKeyPresentationTest {
         val vpToken = present(shared, shared, resolver = null)
         assertTrue(keyBindingJwt(vpToken, "pid").verify(ECDSAVerifier(shared.ecKey)))
         assertTrue(keyBindingJwt(vpToken, "identity").verify(ECDSAVerifier(shared.ecKey)))
+    }
+
+    /** [delegate] with its public key export replaced: signing stays possible, checking the key does not. */
+    private class ExporterReplaced(private val delegate: Crypto2Key, private val exporter: PublicKeyExporter?) : Crypto2Key by delegate {
+        override val capabilities: KeyCapabilities get() = delegate.capabilities.copy(publicKeyExporter = exporter)
+    }
+
+    private suspend fun presentWith(exporter: PublicKeyExporter?) {
+        val pid = holder()
+        val identity = holder()
+        present(pid, identity) { credentialId, _ ->
+            val key = assertNotNull(WalletCrypto2KeyAdapter.signingKey((if (credentialId == "stored-pid") pid else identity).key))
+            CredentialPresentationKey(ExporterReplaced(key, exporter), did = null)
+        }
+    }
+
+    @Test
+    fun `a key whose public key cannot be exported is not used to present a bound credential`() = runTest {
+        val error = assertFailsWith<IllegalArgumentException> { presentWith(exporter = null) }
+        assertEquals(
+            "The key selected to present the credential for query 'pid' cannot be checked against its holder key " +
+                "(cnf.jwk): its public key cannot be exported",
+            error.message,
+        )
+    }
+
+    @Test
+    fun `a failing public key export fails the presentation`() = runTest {
+        val error = assertFailsWith<IllegalStateException> { presentWith(PublicKeyExporter { error("HSM unavailable") }) }
+        assertEquals("HSM unavailable", error.message)
+    }
+
+    @Test
+    fun `a cancelled public key export cancels the presentation`() = runTest {
+        assertFailsWith<CancellationException> { presentWith(PublicKeyExporter { throw CancellationException("cancelled") }) }
     }
 
     private fun hash(value: String): String =
