@@ -136,7 +136,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
                 ),
                 transactionDataProfiles: Self.demoTransactionDataProfiles,
                 defaultKeyUseAuthorizationPolicy: .none,
-                keyAttestationProvider: try await EudiTestKeyAttestationProvider.create()
+                keyAttestationProvider: DemoKeyAttestationProviders()
             )
         )
     }

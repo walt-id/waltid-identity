@@ -158,7 +158,7 @@ requires key attestation:
 
 | Exact credential issuer | Demo attester |
 | --- | --- |
-| `https://dev-i4mlab.aegean.gr/rfc-issuer` | Local WE BUILD ITB synthetic ES256 attestation |
+| `https://dev-i4mlab.aegean.gr/rfc-issuer` | Local ITB synthetic ES256 attestation |
 | `https://issuer.eudiw.dev` | EUDI public mock Wallet Provider |
 
 No selector or startup network call is needed. Wallet recreation reattaches the
@@ -167,10 +167,18 @@ Unknown issuers requiring attestation fail; EUDI outages never fall back to ITB.
 The SDK verifies the selected provider's signature, proof key, nonce, lifetime and
 advertised storage/authentication constraints before sending the proof.
 
+The [shared demo attestation profiles](../waltid-wallet-demo-test-fixtures/key-attestation/README.md)
+are used by both Kotlin and Swift. Standalone ITB and mobile SDK integration tests
+reuse the demo resolvers; app UI tests use the configured demo wallet factories.
+Attestations are created for each proof collection; ITB generates a fresh signing key.
+
 Both integrations are test assurance only. The ITB attester uses explicitly
 unassessed `example.invalid` claims and cannot satisfy profiles requiring certified
 storage or authentication. This feature is separate from `ATTESTATION_*` client
 authentication and Enterprise Wallet Provider WIA/KA loading (WAL-1479).
+
+The additional WE BUILD pilot attester is deferred until the [Wallet Provider service (WAL-1471)](https://linear.app/walt-new/issue/WAL-1471)
+can be integrated through [WAL-1479](https://linear.app/walt-new/issue/WAL-1479).
 
 ## Local wallet data
 

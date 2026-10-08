@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import android.content.Context
 import android.os.LocaleList
 import id.walt.wallet2.mobile.MobileWallet

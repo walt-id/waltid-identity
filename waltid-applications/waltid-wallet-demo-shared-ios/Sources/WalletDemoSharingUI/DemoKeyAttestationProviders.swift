@@ -5,8 +5,8 @@ import WalletSDK
 /// Demo-only test attesters. Their claims do not establish hardware protection, authentication,
 /// certification or production Wallet Unit Attestation. Unknown issuers have no synthetic fallback.
 public struct DemoKeyAttestationProviders: KeyAttestationProviderResolver {
-    public static let itbIssuer = "https://dev-i4mlab.aegean.gr/rfc-issuer"
-    public static let eudiIssuer = "https://issuer.eudiw.dev"
+    public static let itbIssuer = DemoAttestationProfiles.shared.itb.issuer
+    public static let eudiIssuer = DemoAttestationProfiles.shared.eudi.issuer
 
     public init() {}
 
@@ -16,7 +16,7 @@ public struct DemoKeyAttestationProviders: KeyAttestationProviderResolver {
         case Self.itbIssuer:
             return ItbDemoKeyAttester()
         case Self.eudiIssuer:
-            let response = try await EudiDemoKeyAttester.request(path: "/jwks")
+            let response = try await EudiDemoKeyAttester.request(path: DemoAttestationProfiles.shared.eudi.jwksPath)
             guard let keys = response["keys"] as? [[String: Any]], keys.count == 1 else {
                 throw DemoKeyAttestationError.invalidResponse
             }
@@ -50,10 +50,10 @@ private struct EudiDemoKeyAttester: KeyAttestationProvider {
         let proofKey = try JSONSerialization.jsonObject(with: Data(request.proofKeyJWK.utf8))
         var payload: [String: Any] = [
             "jwkSet": ["keys": [proofKey]],
-            "supportedSigningAlgorithms": ["ES256"],
+            "supportedSigningAlgorithms": DemoAttestationProfiles.shared.eudi.signingAlgorithms,
         ]
         if let nonce = request.nonce { payload["nonce"] = nonce }
-        let response = try await Self.request(path: "/key-attestation/jwk-set", payload: payload)
+        let response = try await Self.request(path: DemoAttestationProfiles.shared.eudi.attestationPath, payload: payload)
         guard let jwt = response["keyAttestation"] as? String, !jwt.isEmpty else {
             throw DemoKeyAttestationError.invalidResponse
         }
@@ -61,7 +61,7 @@ private struct EudiDemoKeyAttester: KeyAttestationProvider {
     }
 
     static func request(path: String, payload: [String: Any]? = nil) async throws -> [String: Any] {
-        let url = URL(string: "https://wallet-provider.eudiw.dev" + path)!
+        let url = URL(string: DemoAttestationProfiles.shared.eudi.baseUrl + path)!
         var request = URLRequest(url: url, timeoutInterval: 30)
         if let payload {
             request.httpMethod = "POST"
@@ -105,20 +105,24 @@ private struct ItbDemoKeyAttester: KeyAttestationProvider {
         }
         try Task.checkCancellation()
         let now = Int64(Date().timeIntervalSince1970)
+        let profile = DemoAttestationProfiles.shared.itb
         let header: [String: Any] = [
-            "alg": "ES256",
-            "typ": "key-attestation+jwt",
+            "alg": profile.algorithm,
+            "typ": profile.jwtType,
             "jwk": try JSONSerialization.jsonObject(with: Data(verificationPublicJWK.utf8)),
         ]
         var payload: [String: Any] = [
-            "iat": now, "exp": now + 300,
+            "iat": now, "exp": now + profile.lifetimeSeconds,
             "attested_keys": [try JSONSerialization.jsonObject(with: Data(request.proofKeyJWK.utf8))],
-            "key_storage": ["https://example.invalid/walt-id/itb/key-storage-unassessed"],
-            "user_authentication": ["https://example.invalid/walt-id/itb/user-authentication-unassessed"],
-            "certification": "https://example.invalid/walt-id/itb/no-certification",
+            "key_storage": profile.claims.keyStorage,
+            "user_authentication": profile.claims.userAuthentication,
+            "certification": profile.claims.certification,
             "key_storage_status": [
-                "status": ["status_list": ["uri": "https://example.invalid/walt-id/itb/no-status-list", "idx": 0]],
-                "exp": now + 3600,
+                "status": ["status_list": [
+                    "uri": profile.claims.keyStorageStatus.status.statusList.uri,
+                    "idx": profile.claims.keyStorageStatus.status.statusList.idx,
+                ]],
+                "exp": now + profile.statusLifetimeSeconds,
             ],
         ]
         if let nonce = request.nonce { payload["nonce"] = nonce }
@@ -134,4 +138,54 @@ private extension Data {
         base64EncodedString().replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
     }
+}
+
+/// The same profile resource is compiled into the Kotlin demo/test adapters by sources.gradle.kts.
+private struct DemoAttestationProfiles: Decodable, Sendable {
+    let itb: Itb
+    let eudi: Eudi
+
+    static let shared: Self = {
+        do {
+            guard let url = Bundle.module.url(forResource: "KeyAttestationProfiles", withExtension: "json") else {
+                preconditionFailure("Demo key attestation profiles are missing")
+            }
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let profiles = try decoder.decode(Self.self, from: Data(contentsOf: url))
+            precondition(profiles.itb.algorithm == "ES256" && profiles.eudi.signingAlgorithms == ["ES256"],
+                         "Demo key attestation signing adapters require ES256")
+            precondition(profiles.itb.jwtType == "key-attestation+jwt"
+                         && profiles.itb.lifetimeSeconds > 0 && profiles.itb.statusLifetimeSeconds > 0,
+                         "Demo key attestation type and lifetimes are invalid")
+            return profiles
+        } catch {
+            preconditionFailure("Demo key attestation profiles are invalid")
+        }
+    }()
+
+    struct Itb: Decodable, Sendable {
+        let issuer: String
+        let algorithm: String
+        let jwtType: String
+        let lifetimeSeconds: Int64
+        let statusLifetimeSeconds: Int64
+        let claims: Claims
+    }
+    struct Eudi: Decodable, Sendable {
+        let issuer: String
+        let baseUrl: String
+        let jwksPath: String
+        let attestationPath: String
+        let signingAlgorithms: [String]
+    }
+    struct Claims: Decodable, Sendable {
+        let keyStorage: [String]
+        let userAuthentication: [String]
+        let certification: String
+        let keyStorageStatus: KeyStorageStatus
+    }
+    struct KeyStorageStatus: Decodable, Sendable { let status: Status }
+    struct Status: Decodable, Sendable { let statusList: StatusList }
+    struct StatusList: Decodable, Sendable { let uri: String; let idx: Int }
 }

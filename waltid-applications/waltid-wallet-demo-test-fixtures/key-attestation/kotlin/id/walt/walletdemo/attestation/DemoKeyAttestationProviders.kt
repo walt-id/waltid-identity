@@ -1,4 +1,4 @@
-package id.walt.walletdemo.compose.logic
+package id.walt.walletdemo.attestation
 
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
@@ -39,7 +39,7 @@ internal class DemoKeyAttestationProviders(
             ),
         )
         EUDI_ISSUER -> {
-            val jwk = httpRequest("/jwks").getValue("keys").jsonArray.single().jsonObject
+            val jwk = httpRequest(eudi.getValue("jwks_path").jsonPrimitive.content).getValue("keys").jsonArray.single().jsonObject
             val key = CryptoRuntime(defaultSoftwareKeyProviders()).restore(
                 EncodedKey.Jwk(BinaryData(jwk.toString().encodeToByteArray()), false)
                     .toStoredSoftwareKey(KeyId("demo-eudi-attester"), setOf(KeyUsage.VERIFY)),
@@ -55,9 +55,9 @@ internal class DemoKeyAttestationProviders(
                             }
                         }
                         request.nonce?.let { put("nonce", it) }
-                        putJsonArray("supportedSigningAlgorithms") { add("ES256") }
+                        put("supportedSigningAlgorithms", eudi.getValue("signing_algorithms"))
                     }
-                    return httpRequest("/key-attestation/jwk-set", payload).getValue("keyAttestation").jsonPrimitive.content
+                    return httpRequest(eudi.getValue("attestation_path").jsonPrimitive.content, payload).getValue("keyAttestation").jsonPrimitive.content
                 }
             }
         }
@@ -78,9 +78,9 @@ internal class DemoKeyAttestationProviders(
         }
 
     companion object {
-        const val ITB_ISSUER = "https://dev-i4mlab.aegean.gr/rfc-issuer"
-        const val EUDI_ISSUER = "https://issuer.eudiw.dev"
-        private const val EUDI_PROVIDER = "https://wallet-provider.eudiw.dev"
+        val ITB_ISSUER = itb.getValue("issuer").jsonPrimitive.content
+        val EUDI_ISSUER = eudi.getValue("issuer").jsonPrimitive.content
+        private val EUDI_PROVIDER = eudi.getValue("base_url").jsonPrimitive.content
     }
 }
 
@@ -90,29 +90,31 @@ private class ItbDemoKeyAttester(override val verificationKey: Key) : KeyAttesta
         val now = Clock.System.now().toEpochMilliseconds() / 1000
         val jwk = verificationKey.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(verificationKey.spec)
         val header = buildJsonObject {
-            put("typ", "key-attestation+jwt")
+            put("typ", itb.getValue("jwt_type"))
             put("jwk", Json.parseToJsonElement(jwk.data.toByteArray().decodeToString()))
         }
         val payload = buildJsonObject {
+            itb.getValue("claims").jsonObject.forEach { (name, value) -> put(name, value) }
             put("iat", now)
-            put("exp", now + 300)
+            put("exp", now + itb.getValue("lifetime_seconds").jsonPrimitive.long)
             request.nonce?.let { put("nonce", it) }
             putJsonArray("attested_keys") {
                 add(Json.parseToJsonElement(request.proofKey.data.toByteArray().decodeToString()))
             }
-            putJsonArray("key_storage") { add("https://example.invalid/walt-id/itb/key-storage-unassessed") }
-            putJsonArray("user_authentication") { add("https://example.invalid/walt-id/itb/user-authentication-unassessed") }
-            put("certification", "https://example.invalid/walt-id/itb/no-certification")
             putJsonObject("key_storage_status") {
-                putJsonObject("status") {
-                    putJsonObject("status_list") {
-                        put("uri", "https://example.invalid/walt-id/itb/no-status-list")
-                        put("idx", 0)
-                    }
-                }
-                put("exp", now + 3600)
+                itb.getValue("claims").jsonObject.getValue("key_storage_status").jsonObject
+                    .forEach { (name, value) -> put(name, value) }
+                put("exp", now + itb.getValue("status_lifetime_seconds").jsonPrimitive.long)
             }
         }
-        return CompactJws.sign(payload.toString().encodeToByteArray(), verificationKey, JwsAlgorithm.ES256, header)
+        return CompactJws.sign(
+            payload.toString().encodeToByteArray(), verificationKey,
+            JwsAlgorithm.valueOf(itb.getValue("algorithm").jsonPrimitive.content), header,
+        )
     }
 }
+
+// Generated from the same resource loaded by the Swift demo adapter.
+private val profiles = Json.parseToJsonElement(DEMO_KEY_ATTESTATION_PROFILES_JSON).jsonObject
+private val itb = profiles.getValue("itb").jsonObject
+private val eudi = profiles.getValue("eudi").jsonObject

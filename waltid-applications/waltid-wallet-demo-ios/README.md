@@ -138,7 +138,7 @@ Settings → Signing key shows the storage policy, observed key protection, key 
 
 ## Automatic test key attestations
 
-The demo automatically selects a local WE BUILD ITB synthetic attester for
+The demo automatically selects a local ITB synthetic attester for
 `https://dev-i4mlab.aegean.gr/rfc-issuer` and the EUDI public mock Wallet Provider
 for `https://issuer.eudiw.dev`, only when issuer metadata requires key attestation.
 The resolver is attached again when the wallet is recreated. No manual selector
@@ -150,8 +150,16 @@ advertised storage/authentication constraints before sending the proof.
 The ITB attester makes explicitly unassessed `example.invalid` claims and cannot
 satisfy profiles requiring certified storage or authentication.
 
+The [shared demo attestation profiles](../waltid-wallet-demo-test-fixtures/key-attestation/README.md)
+are used by both Kotlin and Swift. Standalone ITB and mobile SDK integration tests
+reuse the demo resolvers; app UI tests use the configured demo wallet factories.
+Attestations are created for each proof collection; ITB generates a fresh signing key.
+
 Both integrations are test assurance only. They are separate from `ATTESTATION_*`
 client authentication and Enterprise Wallet Provider WIA/KA loading (WAL-1479).
+
+The additional WE BUILD pilot attester is deferred until the [Wallet Provider service (WAL-1471)](https://linear.app/walt-new/issue/WAL-1471)
+can be integrated through [WAL-1479](https://linear.app/walt-new/issue/WAL-1479).
 
 ## Local wallet data
 
