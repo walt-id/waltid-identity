@@ -409,7 +409,7 @@ class IssuerMetadataResolverTest {
     }
 
     @Test
-    fun `HTTP status failure surfaces status code and body preview`() = runTest {
+    fun `HTTP status failure surfaces status code but not the response body`() = runTest {
         val issuerUrl = "https://issuer.example.org"
         val client = createMockClient {
             respond("issuer temporarily unavailable", HttpStatusCode.ServiceUnavailable)
@@ -421,7 +421,11 @@ class IssuerMetadataResolverTest {
 
         val message = failure.message ?: ""
         assertContains(message, "HTTP 503", message = "Status code must be surfaced")
-        assertContains(message, "issuer temporarily unavailable", message = "Body preview must be surfaced")
+        assertTrue(
+            "issuer temporarily unavailable" !in message,
+            "issuerUrl is caller-controlled input, so its response body must not be echoed into a message " +
+                "that reaches a client-facing exception - see ResolveFailure.HttpStatus.describe()",
+        )
     }
 
     @Test
