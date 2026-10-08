@@ -97,14 +97,14 @@ internal class WalletAccessController(
             if (!isCurrent(attempt)) return@launch
             if (result == DemoBiometricResult.Succeeded) unlock()
             else update { it.copy(auth = (it.auth as WalletAuthState.Login).copy(biometricOutcome = result),
-                operation = WalletAccessOperation.Idle, biometricAvailable = biometrics.isAvailable()) }
+                operation = WalletAccessOperation.Idle, biometricAvailability = biometrics.availability()) }
         }
     }
 
     fun refreshBiometrics() {
         try {
             val enabled = !store.isBiometricSetupPending() && store.isBiometricUnlockEnabled()
-            update { it.copy(biometricAvailable = biometrics.isAvailable(), biometricKind = biometrics.kind, biometricEnabled = enabled) }
+            update { it.copy(biometricAvailability = biometrics.availability(), biometricKind = biometrics.kind, biometricEnabled = enabled) }
         } catch (cause: CancellationException) { throw cause }
         catch (_: Exception) { update { it.copy(settingsNotice = WalletAccessNotice("Could not read wallet access settings. Try again.", WalletAccessNotice.Kind.Error)) } }
     }
@@ -146,7 +146,7 @@ internal class WalletAccessController(
             val result = authenticate(WalletDisplayText.EnableBiometricUnlock)
             if (!isCurrent(attempt)) return@launch
             if (result == DemoBiometricResult.Succeeded) saveBiometricPreference(true)
-            else update { it.copy(operation = WalletAccessOperation.Idle, biometricAvailable = biometrics.isAvailable(),
+            else update { it.copy(operation = WalletAccessOperation.Idle, biometricAvailability = biometrics.availability(),
                 settingsNotice = WalletAccessNotice(result.fallbackMessage() ?: "Biometric unlock was not enabled. You can try again.", WalletAccessNotice.Kind.Error)) }
         }
     }
@@ -206,7 +206,7 @@ internal class WalletAccessController(
         if (!isCurrent(attempt)) return
         if (result == DemoBiometricResult.Succeeded) finishBiometricSetup(true)
         else update { it.copy(auth = WalletAuthState.BiometricSetup(outcome = result), operation = WalletAccessOperation.Idle,
-            biometricAvailable = biometrics.isAvailable()) }
+            biometricAvailability = biometrics.availability()) }
     }
 
     private fun finishBiometricSetup(enabled: Boolean) {
@@ -275,7 +275,7 @@ internal class WalletAccessController(
         fun initialState(store: DemoPinStore, biometrics: DemoBiometricAuthenticator, skipPin: Boolean = false): WalletAccessState {
             if (skipPin) return WalletAccessState(auth = WalletAuthState.Unlocked)
             return try { WalletAccessState(auth = if (store.hasPin()) WalletAuthState.Login() else WalletAuthState.Setup(),
-                biometricAvailable = biometrics.isAvailable(), biometricKind = biometrics.kind,
+                biometricAvailability = biometrics.availability(), biometricKind = biometrics.kind,
                 biometricEnabled = !store.isBiometricSetupPending() && store.isBiometricUnlockEnabled()) }
             catch (cause: CancellationException) { throw cause }
             catch (_: Exception) { WalletAccessState(auth = WalletAuthState.StorageUnavailable()) }

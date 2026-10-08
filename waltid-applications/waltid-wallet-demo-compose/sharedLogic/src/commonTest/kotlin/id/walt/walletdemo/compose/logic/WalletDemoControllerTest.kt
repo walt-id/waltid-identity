@@ -355,7 +355,7 @@ class WalletDemoControllerTest {
             val gate = CompletableDeferred<DemoBiometricResult>()
             var calls = 0
             val biometrics = object : DemoBiometricAuthenticator {
-                override fun isAvailable() = true
+                override fun availability() = DemoBiometricAvailability.Available
                 override suspend fun authenticate(reason: String): DemoBiometricResult {
                     assertTrue(store.hasPin())
                     assertFalse(store.isBiometricUnlockEnabled())
@@ -399,7 +399,7 @@ class WalletDemoControllerTest {
             val store = InMemoryDemoPinStore()
             var calls = 0
             val biometrics = object : DemoBiometricAuthenticator {
-                override fun isAvailable() = available
+                override fun availability() = if (available) DemoBiometricAvailability.Available else DemoBiometricAvailability.Unavailable
                 override suspend fun authenticate(reason: String): DemoBiometricResult {
                     calls++
                     throw IllegalStateException("OS prompt unavailable")
@@ -420,6 +420,55 @@ class WalletDemoControllerTest {
             assertFalse(store.isBiometricSetupPending())
             assertEquals(if (available) 1 else 0, calls)
         }
+    }
+
+    @Test
+    fun permissionRecoveryKeepsUnlockOptOutAndSigningPreferenceSeparate() = runTest {
+        val store = InMemoryDemoPinStore()
+        val biometrics = FakeDemoBiometricAuthenticator(result = DemoBiometricResult.Unavailable)
+        val wallet = FakeDemoWallet()
+        val signing = InMemoryWalletDemoSigningProtectionStore()
+        val controller = controllerWith(wallet, this, store, biometrics, signingProtectionStore = signing)
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        runCurrent()
+        assertIs<WalletAuthState.BiometricSetup>(controller.state.value.auth)
+        biometrics.available = false
+        controller.refreshBiometricUnlockAvailability()
+        assertEquals(DemoBiometricAvailability.Unavailable, controller.state.value.access.biometricAvailability)
+        controller.continueWithoutBiometrics()
+        runCurrent()
+        assertIs<WalletAuthState.Unlocked>(controller.state.value.auth)
+        assertFalse(store.isBiometricUnlockEnabled())
+        assertEquals(WalletDemoSigningProtection.Biometric, signing.load())
+        assertEquals(listOf(WalletDemoSigningProtection.Biometric), wallet.bootstrappedSigningProtections)
+        biometrics.available = true
+        controller.handleApplicationForegrounded()
+        runCurrent()
+        assertTrue(controller.state.value.access.biometricAvailable)
+        assertFalse(controller.state.value.access.biometricEnabled)
+        assertEquals(1, biometrics.authenticateCalls)
+        assertEquals(WalletDemoSigningProtection.Biometric, controller.state.value.selectedSigningProtection)
+    }
+
+    @Test
+    fun refreshedKeySetupUsesThePersistedApprovalInsteadOfThePlatformDefault() = runTest {
+        val store = InMemoryDemoPinStore()
+        store.setPin("1234")
+        val wallet = FakeDemoWallet().apply {
+            identitySetupValue = WalletDemoIdentitySetup.Choose(emptyList(),
+                preferredApproval = WalletDemoSigningProtection.Biometric.approvalChoice())
+        }
+        val controller = controllerWith(wallet, this, store,
+            signingProtectionStore = InMemoryWalletDemoSigningProtectionStore(WalletDemoSigningProtection.None))
+        controller.updatePin("1234")
+        runCurrent()
+        fun preferred() = ((controller.state.value.session as WalletSessionState.IdentitySetup).setup as WalletDemoIdentitySetup.Choose).preferredApproval
+        assertEquals(WalletDemoSigningProtection.None.approvalChoice(), preferred())
+        controller.refreshIdentityChoices()
+        runCurrent()
+        assertEquals(WalletDemoSigningProtection.None.approvalChoice(), preferred())
+        assertEquals(0, wallet.bootstrapCalls)
     }
 
     @Test
@@ -508,7 +557,7 @@ class WalletDemoControllerTest {
         val gate = CompletableDeferred<DemoBiometricResult>()
         val store = InMemoryDemoPinStore()
         val biometrics = object : DemoBiometricAuthenticator {
-            override fun isAvailable() = true
+            override fun availability() = DemoBiometricAvailability.Available
             override suspend fun authenticate(reason: String) = withContext(NonCancellable) { gate.await() }
         }
         val wallet = FakeDemoWallet()
@@ -3276,7 +3325,7 @@ class WalletDemoControllerTest {
         val store = InMemoryDemoPinStore().also { it.setPin("1234") }
         val gate = CompletableDeferred<DemoBiometricResult>()
         val biometrics = object : DemoBiometricAuthenticator {
-            override fun isAvailable() = true
+            override fun availability() = DemoBiometricAvailability.Available
             override suspend fun authenticate(reason: String) = withContext(NonCancellable) { gate.await() }
         }
         val controller = controllerWith(FakeDemoWallet(), this, store, biometrics)
@@ -3485,7 +3534,7 @@ private class FakeDemoBiometricAuthenticator(
 ) : DemoBiometricAuthenticator {
     var authenticateCalls = 0
 
-    override fun isAvailable(): Boolean = available
+    override fun availability() = if (available) DemoBiometricAvailability.Available else DemoBiometricAvailability.Unavailable
 
     override suspend fun authenticate(reason: String): DemoBiometricResult {
         authenticateCalls += 1

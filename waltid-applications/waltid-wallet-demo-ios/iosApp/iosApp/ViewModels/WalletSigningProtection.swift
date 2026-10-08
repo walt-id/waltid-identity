@@ -157,3 +157,15 @@ final class InMemoryWalletDemoSigningProtectionStore: WalletDemoSigningProtectio
     func load() -> WalletDemoSigningProtection? { value }
     func save(_ protection: WalletDemoSigningProtection) { value = protection }
 }
+
+extension WalletDemoSigningProtectionAvailability {
+    func recoveryAvailability(unlock: DemoBiometricAvailability) -> DemoBiometricAvailability {
+        switch self {
+        case .available: .available
+        case .biometricNotEnrolled: .notEnrolled
+        case .deviceCredentialNotSet: .deviceCredentialNotSet
+        case .unsupported: .unsupported
+        case .biometricUnavailable: unlock == .lockedOut ? .lockedOut : .unavailable
+        }
+    }
+}

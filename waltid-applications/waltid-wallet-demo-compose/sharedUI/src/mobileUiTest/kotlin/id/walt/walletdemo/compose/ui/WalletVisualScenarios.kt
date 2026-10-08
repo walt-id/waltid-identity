@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui
 
+import id.walt.walletdemo.compose.logic.DemoBiometricAvailability
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -98,7 +99,7 @@ internal class WalletVisualScenarios(
     fun pin(state: String) = with(test) {
         val gate = kotlinx.coroutines.CompletableDeferred<id.walt.walletdemo.compose.logic.DemoBiometricResult>()
         val biometrics = object : id.walt.walletdemo.compose.logic.DemoBiometricAuthenticator {
-            override fun isAvailable() = state in setOf("confirmation", "biometric_prompt", "compact_dark_large_text")
+            override fun availability() = if (state in setOf("confirmation", "biometric_prompt", "compact_dark_large_text")) DemoBiometricAvailability.Available else DemoBiometricAvailability.Unavailable
             override suspend fun authenticate(reason: String) = gate.await()
         }
         val memory = id.walt.walletdemo.compose.logic.InMemoryDemoPinStore()
@@ -118,7 +119,7 @@ internal class WalletVisualScenarios(
             waitUntil { controller.state.value.auth is id.walt.walletdemo.compose.logic.WalletAuthState.BiometricSetup }
             content { id.walt.walletdemo.compose.ui.screens.BiometricSetupScreen(
                 controller.state.value.auth as id.walt.walletdemo.compose.logic.WalletAuthState.BiometricSetup,
-                busy = true, available = true, onRetry = {}, onContinue = {}) }
+                busy = true, availability = DemoBiometricAvailability.Available, onRetry = {}, onContinue = {}) }
             onNodeWithTag(WalletUiTestTags.BiometricSetupRetry).assertIsNotEnabled()
             onNodeWithTag(WalletUiTestTags.BiometricSetupContinue).assertIsNotEnabled()
             capture("onboarding.pin.$state")
@@ -157,10 +158,15 @@ internal class WalletVisualScenarios(
                 "biometric_lockout" -> id.walt.walletdemo.compose.logic.DemoBiometricResult.LockedOut
                 else -> null
             })
-        val unlocking = state in setOf("rejected", "biometric_fallback", "biometric_lockout")
+        val unlocking = state in setOf("rejected", "biometric_fallback", "biometric_lockout", "biometric_unavailable")
         val access = id.walt.walletdemo.compose.logic.WalletAccessState(
             auth = if (unlocking) entry else id.walt.walletdemo.compose.logic.WalletAuthState.Unlocked,
-            biometricAvailable = state == "biometric_fallback", biometricEnabled = state.startsWith("biometric"),
+            biometricAvailability = when (state) {
+                "biometric_fallback" -> DemoBiometricAvailability.Available
+                "biometric_lockout" -> DemoBiometricAvailability.LockedOut
+                else -> DemoBiometricAvailability.Unavailable
+            }, biometricKind = if (state == "biometric_unavailable") id.walt.walletdemo.compose.logic.DemoBiometricKind.FaceId else id.walt.walletdemo.compose.logic.DemoBiometricKind.Generic,
+            biometricEnabled = state.startsWith("biometric"),
             pinChange = when (state) {
                 "current_pin" -> id.walt.walletdemo.compose.logic.WalletPinChange.Current()
                 "new_pin" -> id.walt.walletdemo.compose.logic.WalletPinChange.NewPin()
@@ -187,15 +193,21 @@ internal class WalletVisualScenarios(
         }
         if (state == "save_failure") onNodeWithTag(WalletUiTestTags.PinSubmitButton).assertIsDisplayed().assertIsEnabled()
         if (state == "biometric_fallback") onNodeWithTag(WalletUiTestTags.PinBiometricButton).assertIsDisplayed()
+        if (state == "biometric_unavailable") onNodeWithTag("wallet.biometricOpenSettings").assertIsDisplayed()
         capture(if (unlocking) "access.unlock.$state" else "settings.access.$state")
     }
 
     fun keySetup(page: String) = with(test) {
+        val unavailable = page == "approval_unavailable"
+        val setup = WalletVisualFixtures.keySetup
+        val approval = setup.options.first().approval
         content {
-            id.walt.walletdemo.compose.ui.screens.IdentitySetupScreen(WalletVisualFixtures.keySetup, null,
-                onChoose = {}, onResume = {}, onCancel = {}, onRefresh = {})
+            id.walt.walletdemo.compose.ui.screens.IdentitySetupScreen(if (unavailable) setup.copy(options = setup.options.filter { it.approval.id != approval.id }, preferredApproval = approval) else setup, null,
+                onChoose = {}, onResume = {}, onCancel = {}, onRefresh = {},
+                biometricAvailability = if (unavailable) DemoBiometricAvailability.Unavailable else DemoBiometricAvailability.Available,
+                biometricKind = id.walt.walletdemo.compose.logic.DemoBiometricKind.FaceId)
         }
-        if (page != "summary") {
+        if (page != "summary" && !unavailable) {
             onNodeWithTag("wallet.keySetupEdit.${page.replaceFirstChar { it.uppercase() }}").performClick()
             onNodeWithText("Done").assertIsDisplayed()
         } else {
@@ -203,6 +215,10 @@ internal class WalletVisualScenarios(
             onNodeWithTag("wallet.keySetupEdit.Recovery").assertIsDisplayed()
             onNodeWithTag("wallet.keySetupEdit.Storage").assertIsDisplayed()
             onNodeWithTag("wallet.keySetupEdit.Approval").assertIsDisplayed()
+        }
+        if (unavailable) {
+            onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsNotEnabled()
+            onNodeWithTag("wallet.biometricOpenSettings").assertIsDisplayed()
         }
         capture("onboarding.key.$page")
     }
@@ -213,7 +229,7 @@ internal class WalletVisualScenarios(
                 id.walt.walletdemo.compose.logic.WalletAuthState.BiometricSetup(
                     if (unavailable) id.walt.walletdemo.compose.logic.DemoBiometricResult.Unavailable
                     else id.walt.walletdemo.compose.logic.DemoBiometricResult.Cancelled),
-                busy = false, available = !unavailable, onRetry = {}, onContinue = {})
+                busy = false, availability = if (unavailable) DemoBiometricAvailability.Unavailable else DemoBiometricAvailability.Available, onRetry = {}, onContinue = {})
         }
         onNodeWithTag(WalletUiTestTags.BiometricSetupContinue).assertIsDisplayed().assertIsEnabled()
         if (unavailable) onAllNodesWithTag(WalletUiTestTags.BiometricSetupRetry).assertCountEquals(0)

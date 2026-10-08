@@ -56,6 +56,7 @@ fun createIosDemoWallet(
             ),
             warning = transactionDataProfiles.warning,
             isIos = true,
+            preferredSigningProtection = config.signingProtectionMode.defaultSelection,
         )
     }
 }

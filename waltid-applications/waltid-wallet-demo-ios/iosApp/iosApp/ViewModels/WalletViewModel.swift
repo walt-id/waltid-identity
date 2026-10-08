@@ -156,6 +156,9 @@ class WalletViewModel: ObservableObject {
     var pin: String { get { access.pin } set { access.pin = newValue } }
     var pinConfirmation: String { get { access.confirmation } set { access.confirmation = newValue } }
     var pinSetupStep: PinSetupStep { access.step }
+    var biometricSigningRecoveryAvailability: DemoBiometricAvailability {
+        biometricSigningAvailability?.recoveryAvailability(unlock: access.biometricAvailability) ?? .unavailable
+    }
     var isBiometricUnlockAvailable: Bool { access.biometricAvailable }
     @Published var showDcApiPresentationPreview: Bool = DemoSharingSettings.showDcApiPresentationPreview(
         appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier
@@ -1643,7 +1646,7 @@ class WalletViewModel: ObservableObject {
         requiredAppliedSigningProtection: WalletDemoSigningProtection? = nil
     ) async throws {
         if let service = try await walletClient.signingIdentityManager() {
-            let model = identityScreen ?? WalletIdentityScreenModel(service: service) { [weak self] in
+            let model = identityScreen ?? WalletIdentityScreenModel(service: service, preferredAuthorization: signingProtection.authorizationPolicy) { [weak self] in
                 guard let self else { return }
                 self.bootstrap(signingProtection: self.selectedSigningProtection)
             }

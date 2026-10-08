@@ -6,6 +6,7 @@ import kotlinx.cinterop.ObjCObjectVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.value
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -21,6 +22,7 @@ import platform.LocalAuthentication.LAErrorUserFallback
 import platform.LocalAuthentication.LAErrorBiometryLockout
 import platform.LocalAuthentication.LAErrorBiometryNotAvailable
 import platform.LocalAuthentication.LAErrorBiometryNotEnrolled
+import platform.LocalAuthentication.LAErrorPasscodeNotSet
 import platform.LocalAuthentication.LAErrorDomain
 import platform.darwin.dispatch_get_main_queue
 import platform.darwin.dispatch_sync
@@ -35,6 +37,7 @@ private class IosDemoBiometricAuthenticator : DemoBiometricAuthenticator {
         memScoped {
             val context = LAContext()
             val error = alloc<ObjCObjectVar<NSError?>>()
+            error.value = null
             context.canEvaluatePolicy(LAPolicyDeviceOwnerAuthenticationWithBiometrics, error.ptr)
             when (context.biometryType) {
                 LABiometryTypeFaceID -> DemoBiometricKind.FaceId
@@ -44,12 +47,13 @@ private class IosDemoBiometricAuthenticator : DemoBiometricAuthenticator {
         }
     }
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
-    override fun isAvailable(): Boolean = onMainThread { evaluateAvailability() }
+    override fun availability(): DemoBiometricAvailability = onMainThread { evaluateAvailability() }
 
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
     override suspend fun authenticate(reason: String): DemoBiometricResult = withContext(Dispatchers.Main) {
-        if (!evaluateAvailability()) return@withContext DemoBiometricResult.Unavailable
         val context = LAContext()
+        val availability = evaluateAvailability(context)
+        if (availability != DemoBiometricAvailability.Available) return@withContext availability.authenticationResult()
         return@withContext suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { context.invalidate() }
             context.evaluatePolicy(
@@ -70,9 +74,19 @@ private class IosDemoBiometricAuthenticator : DemoBiometricAuthenticator {
     }
 
     @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
-    private fun evaluateAvailability(): Boolean = memScoped {
+    private fun evaluateAvailability(context: LAContext = LAContext()): DemoBiometricAvailability = memScoped {
         val error = alloc<ObjCObjectVar<NSError?>>()
-        LAContext().canEvaluatePolicy(LAPolicyDeviceOwnerAuthenticationWithBiometrics, error.ptr)
+        error.value = null
+        if (context.canEvaluatePolicy(LAPolicyDeviceOwnerAuthenticationWithBiometrics, error.ptr)) {
+            DemoBiometricAvailability.Available
+        } else when (error.value?.takeIf { it.domain == LAErrorDomain }?.code) {
+            LAErrorBiometryNotEnrolled -> DemoBiometricAvailability.NotEnrolled
+            LAErrorPasscodeNotSet -> DemoBiometricAvailability.DeviceCredentialNotSet
+            LAErrorBiometryLockout -> DemoBiometricAvailability.LockedOut
+            LAErrorBiometryNotAvailable -> if (context.biometryType == platform.LocalAuthentication.LABiometryTypeNone)
+                DemoBiometricAvailability.Unsupported else DemoBiometricAvailability.Unavailable
+            else -> DemoBiometricAvailability.Unavailable
+        }
     }
 }
 

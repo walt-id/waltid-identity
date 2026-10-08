@@ -75,6 +75,7 @@ class WalletVisualIosTest {
     @Test fun providerPreparing() = scenario() { providerSharingStatus() }
     @Test fun providerFailure() = scenario() { providerSharingStatus(failure = true) }
 
+    @Test fun keyApprovalUnavailable() = scenario { keySetup("approval_unavailable") }
     @Test fun keySummary() = scenario { keySetup("summary") }
     @Test fun keyRecovery() = scenario { keySetup("recovery") }
     @Test fun keyStorage() = scenario { keySetup("storage") }
@@ -82,6 +83,7 @@ class WalletVisualIosTest {
 
     @Test fun accessRejected() = scenario { walletAccess("rejected") }
     @Test fun accessBiometricFallback() = scenario { walletAccess("biometric_fallback") }
+    @Test fun accessBiometricUnavailable() = scenario { walletAccess("biometric_unavailable") }
     @Test fun accessBiometricLockout() = scenario { walletAccess("biometric_lockout") }
     @Test fun accessSettings() = scenario { walletAccess("default") }
     @Test fun accessCurrentPin() = scenario { walletAccess("current_pin") }

@@ -18,7 +18,7 @@ struct WalletAccessSettingsView: View {
                             .disabled(viewModel.isAuthenticating || (!viewModel.isBiometricUnlockAvailable && !viewModel.isBiometricUnlockEnabled))
                     } footer: {
                         if !viewModel.isBiometricUnlockAvailable {
-                            Text("Biometric unlock is unavailable on this device.")
+                            BiometricRecoverySection(availability: viewModel.access.biometricAvailability, kind: viewModel.access.biometricKind)
                         }
                     }
                     if let notice = viewModel.access.settingsNotice {

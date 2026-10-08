@@ -1053,6 +1053,27 @@
       "composeTest": "accessPinChanged",
       "swiftTest": "testAccessPinChanged",
       "note": "Wallet-owned access state. Automatic completion, keyboard, persistence, cancellation and OS biometric interaction have separate behavior/host evidence."
+    },
+    {
+      "id": "onboarding.key.approval_unavailable",
+      "requirements": [
+        "R03",
+        "R11",
+        "R15"
+      ],
+      "composeTest": "keyApprovalUnavailable",
+      "swiftTest": "testKeyApprovalUnavailable",
+      "note": "Unavailable biometric signing retains the intended approval and blocks creation. Native capture uses the shared production configuration content and recovery section; guarded submission is covered separately."
+    },
+    {
+      "id": "access.unlock.biometric_unavailable",
+      "requirements": [
+        "R11",
+        "R15"
+      ],
+      "composeTest": "accessBiometricUnavailable",
+      "swiftTest": "testAccessBiometricUnavailable",
+      "note": "Configured Face ID is unavailable: PIN fallback and a supported Open Settings action. Synthetic wallet UI; no OS permission dialog is imitated."
     }
   ]
 }

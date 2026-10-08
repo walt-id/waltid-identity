@@ -7,9 +7,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalWindowInfo
 import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.ui.SystemBackHandler
+import id.walt.walletdemo.compose.ui.rememberBiometricSettingsLauncher
 
 @Composable
 internal fun PinScreen(controller: WalletDemoController, access: WalletAccessState) {
+    val openSettings = rememberBiometricSettingsLauncher(access.biometricAvailability)
     val login = access.auth as? WalletAuthState.Login
     val focused = LocalWindowInfo.current.isWindowFocused
     LaunchedEffect(login != null, focused, access.biometricAvailable, access.biometricEnabled) {
@@ -22,5 +24,6 @@ internal fun PinScreen(controller: WalletDemoController, access: WalletAccessSta
         onClear = controller::clearPin,
         onBack = controller::editSetupPin.takeIf { confirming },
         onRetry = controller::submitPin,
-        onBiometrics = { controller.unlockWithBiometrics(force = true) }.takeIf { login != null && access.biometricAvailable && access.biometricEnabled })
+        onBiometrics = { controller.unlockWithBiometrics(force = true) }.takeIf { login != null && access.biometricAvailable && access.biometricEnabled },
+        onBiometricSettings = openSettings.takeIf { login != null && !access.biometricAvailable && access.biometricEnabled })
 }

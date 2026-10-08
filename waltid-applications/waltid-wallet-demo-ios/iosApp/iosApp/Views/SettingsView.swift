@@ -15,7 +15,10 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier("wallet.settingsWalletAccess")
                 NavigationLink {
-                    if let model = viewModel.identityScreen { WalletIdentityView(model: model) }
+                    if let model = viewModel.identityScreen {
+                        WalletIdentityView(biometricAvailability: viewModel.biometricSigningRecoveryAvailability,
+                            biometricKind: viewModel.access.biometricKind, model: model)
+                    }
                     else { List { signingProtectionSection }.navigationTitle("Signing key").navigationBarTitleDisplayMode(.inline) }
                 } label: {
                     SettingsDestinationLabel("Signing key", systemImage: "key", summary: String(localized: "Protection and key backup"))
@@ -100,15 +103,14 @@ struct SettingsView: View {
 
             if !viewModel.isBiometricSigningAvailable,
                viewModel.signingProtectionMode != .disabled {
-                Text(
-                    viewModel.biometricSigningAvailability?.message
-                        ?? "Checking strong biometric availability..."
-                )
-                .font(.footnote)
-                .foregroundStyle(
-                    viewModel.biometricSigningAvailability == nil ? Color.secondary : Color.red
-                )
-                .accessibilityIdentifier(WalletAccessibilityID.signingProtectionAvailability)
+                if viewModel.biometricSigningAvailability == nil {
+                    Text("Checking strong biometric availability...").font(.footnote).foregroundStyle(.secondary)
+                        .accessibilityIdentifier(WalletAccessibilityID.signingProtectionAvailability)
+                } else {
+                    BiometricRecoverySection(availability: viewModel.biometricSigningRecoveryAvailability,
+                        kind: viewModel.access.biometricKind)
+                        .accessibilityIdentifier(WalletAccessibilityID.signingProtectionAvailability)
+                }
             }
 
             if !viewModel.isReady {

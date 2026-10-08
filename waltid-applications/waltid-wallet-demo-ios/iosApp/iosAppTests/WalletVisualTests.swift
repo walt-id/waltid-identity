@@ -63,6 +63,24 @@ final class WalletVisualTests: XCTestCase {
     func testKeyStorage() throws { try keySetup(.storage) }
     func testKeyApproval() throws { try keySetup(.approval) }
 
+    func testKeyApprovalUnavailable() throws {
+        let options = try WalletVisualFixtures().keySetupOptions()
+        let requested = try XCTUnwrap(options.first).approval
+        let plain = options.filter { $0.approval.id != requested.id }
+        let selected = try XCTUnwrap(plain.first)
+        try capture(NavigationView {
+            List {
+                SigningKeySetupContent(options: plain, selected: selected, step: .summary,
+                    requestedApproval: requested, onSelect: { _ in }, onEdit: { _ in })
+                BiometricRecoverySection(availability: .unavailable, kind: .faceID, showSettingsAction: false)
+            }.navigationTitle("Set up your wallet").navigationBarTitleDisplayMode(.inline)
+                .safeAreaInset(edge: .bottom) {
+                    WalletActionBar(primary: WalletAction("Create signing key", enabled: false, perform: {}),
+                        secondary: WalletAction("Open Settings", perform: {}))
+                }
+        }.navigationViewStyle(.stack), id: "onboarding.key.approval_unavailable")
+    }
+
     private func keySetup(_ step: WalletIdentityScreenModel.Step) throws {
         let options = try WalletVisualFixtures().keySetupOptions()
         let selected = try XCTUnwrap(options.first)
@@ -131,6 +149,7 @@ final class WalletVisualTests: XCTestCase {
 
     func testAccessRejected() async throws { try await walletAccess("rejected") }
     func testAccessBiometricFallback() async throws { try await walletAccess("biometric_fallback") }
+    func testAccessBiometricUnavailable() async throws { try await walletAccess("biometric_unavailable") }
     func testAccessBiometricLockout() async throws { try await walletAccess("biometric_lockout") }
     func testAccessSettings() async throws { try await walletAccess("default") }
     func testAccessCurrentPin() async throws { try await walletAccess("current_pin") }
@@ -142,11 +161,13 @@ final class WalletVisualTests: XCTestCase {
     private func walletAccess(_ state: String) async throws {
         let store = VisualAccessPinStore()
         store.isBiometricUnlockEnabled = state.hasPrefix("biometric")
-        let biometrics = FakeDemoBiometricAuthenticator(isAvailable: state.hasPrefix("biometric"),
+        let biometrics = FakeDemoBiometricAuthenticator(isAvailable: state.hasPrefix("biometric") && state != "biometric_unavailable",
             result: state == "biometric_lockout" ? .lockedOut : .failed)
+        if state == "biometric_unavailable" { biometrics.kind = .faceID }
+        if state == "biometric_lockout" { biometrics.isAvailable = false; biometrics.unavailableReason = .lockedOut }
         let model = makeModel(biometricAuthenticator: biometrics, pinStore: store)
         await model.readerTrustSettings.awaitPendingOperations()
-        let unlocking = ["rejected", "biometric_fallback", "biometric_lockout"].contains(state)
+        let unlocking = ["rejected", "biometric_fallback", "biometric_lockout", "biometric_unavailable"].contains(state)
         if unlocking {
             if state == "rejected" { model.updatePin("0000") }
             else { model.unlockWithBiometrics() }

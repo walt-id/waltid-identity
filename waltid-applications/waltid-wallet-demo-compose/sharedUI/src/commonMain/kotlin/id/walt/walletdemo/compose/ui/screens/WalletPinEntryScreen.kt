@@ -33,6 +33,7 @@ internal fun WalletPinEntryScreen(
     onBack: (() -> Unit)?,
     onRetry: () -> Unit,
     onBiometrics: (() -> Unit)? = null,
+    onBiometricSettings: (() -> Unit)? = null,
     onCancel: (() -> Unit)? = null,
 ) {
     val entry = access.pinEntry ?: return
@@ -41,7 +42,8 @@ internal fun WalletPinEntryScreen(
     val confirming = setup?.step == PinSetupStep.Confirm
     val changing = access.pinChange != null
     val value = if (confirming) setup.confirmation else setup?.pin ?: login?.pin.orEmpty()
-    val error = (access.operation as? WalletAccessOperation.RetryPin)?.message ?: setup?.error ?: login?.error ?: login?.biometricOutcome?.fallbackMessage()
+    val pinError = (access.operation as? WalletAccessOperation.RetryPin)?.message ?: setup?.error ?: login?.error
+    val error = pinError ?: login?.biometricOutcome?.fallbackMessage()
     val inputFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
@@ -97,6 +99,10 @@ internal fun WalletPinEntryScreen(
         when {
             access.operation == WalletAccessOperation.CheckingPin || access.operation == WalletAccessOperation.SavingPin ->
                 CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            pinError != null -> Text(pinError, Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            !changing && login != null && access.biometricEnabled && !access.biometricAvailable ->
+                BiometricRecoveryNotice(access.biometricAvailability, access.biometricKind, showSettingsAction = false)
             error != null -> Text(error, Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
         }
@@ -105,9 +111,10 @@ internal fun WalletPinEntryScreen(
             primary = if (access.operation is WalletAccessOperation.RetryPin) WalletAction(stringResource(Res.string.settings_try_again), onRetry,
                 testTag = WalletUiTestTags.PinSubmitButton) else null,
             secondary = if (onBiometrics != null) WalletAction(stringResource(access.biometricKind.retryResource), onBiometrics,
-                !access.isBusy, WalletUiTestTags.PinBiometricButton) else WalletAction(stringResource(Res.string.pin_clear),
+                !access.isBusy, WalletUiTestTags.PinBiometricButton) else if (onBiometricSettings != null) WalletAction(stringResource(Res.string.biometric_open_settings), onBiometricSettings,
+                !access.isBusy, "wallet.biometricOpenSettings") else WalletAction(stringResource(Res.string.pin_clear),
                 { onClear(); focusRequest += 1 }, !access.isBusy && (value.isNotEmpty() || error != null), WalletUiTestTags.PinClearButton),
-            tertiary = if (onBiometrics != null) WalletAction(stringResource(Res.string.pin_clear),
+            tertiary = if (onBiometrics != null || onBiometricSettings != null) WalletAction(stringResource(Res.string.pin_clear),
                 { onClear(); focusRequest += 1 }, !access.isBusy && (value.isNotEmpty() || error != null), WalletUiTestTags.PinClearButton)
                 else onBack?.let { WalletAction(stringResource(Res.string.pin_back), it, !access.isBusy, WalletUiTestTags.PinBackButton) },
         )

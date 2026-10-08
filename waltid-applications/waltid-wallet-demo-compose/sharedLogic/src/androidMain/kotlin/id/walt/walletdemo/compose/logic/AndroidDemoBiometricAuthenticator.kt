@@ -21,11 +21,9 @@ fun createAndroidDemoBiometricAuthenticator(
 private class AndroidDemoBiometricAuthenticator(
     private val activityProvider: () -> FragmentActivity?,
 ) : DemoBiometricAuthenticator {
-    override fun isAvailable(): Boolean {
-        val activity = activityProvider() ?: return false
-        return BiometricManager.from(activity).canAuthenticate(BIOMETRIC_AUTHENTICATORS) ==
-            BiometricManager.BIOMETRIC_SUCCESS
-    }
+    override fun availability(): DemoBiometricAvailability = activityProvider()?.let { activity ->
+        androidBiometricAvailability(BiometricManager.from(activity).canAuthenticate(BIOMETRIC_AUTHENTICATORS))
+    } ?: DemoBiometricAvailability.Unavailable
 
     override suspend fun authenticate(reason: String): DemoBiometricResult =
         withContext(Dispatchers.Main.immediate) {
@@ -34,7 +32,8 @@ private class AndroidDemoBiometricAuthenticator(
                 it.isAtLeast(Lifecycle.State.RESUMED) || it == Lifecycle.State.DESTROYED
             }
             if (ready == Lifecycle.State.DESTROYED) return@withContext DemoBiometricResult.Unavailable
-            if (!isAvailable()) return@withContext DemoBiometricResult.Unavailable
+            val availability = availability()
+            if (availability != DemoBiometricAvailability.Available) return@withContext availability.authenticationResult()
 
             suspendCancellableCoroutine { continuation ->
                 val prompt = BiometricPrompt(
@@ -72,4 +71,11 @@ private class AndroidDemoBiometricAuthenticator(
                 )
             }
         }
+}
+
+internal fun androidBiometricAvailability(result: Int): DemoBiometricAvailability = when (result) {
+    BiometricManager.BIOMETRIC_SUCCESS -> DemoBiometricAvailability.Available
+    BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> DemoBiometricAvailability.NotEnrolled
+    BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> DemoBiometricAvailability.Unsupported
+    else -> DemoBiometricAvailability.Unavailable
 }

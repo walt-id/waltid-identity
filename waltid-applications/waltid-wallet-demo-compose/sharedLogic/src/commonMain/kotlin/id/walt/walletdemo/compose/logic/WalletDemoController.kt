@@ -1655,7 +1655,7 @@ class WalletDemoController(
         _state.update { it.copy(identityProgress = "Loading signing key options…") }
         scope.launch(dispatcher) {
             try {
-                val setup = wallet.identitySetup()
+                val setup = wallet.identitySetup()?.withPreferredApproval()
                 if (_state.value.session !== session) return@launch
                 _state.update { it.copy(session = setup?.let(WalletSessionState::IdentitySetup)
                     ?: WalletSessionState.NotBootstrapped, warning = null) }
@@ -1669,6 +1669,11 @@ class WalletDemoController(
         }
     }
 
+    // The platform adapter supplies its default; the app owns the persisted user preference.
+    private fun WalletDemoIdentitySetup.withPreferredApproval(): WalletDemoIdentitySetup =
+        if (this is WalletDemoIdentitySetup.Choose && preferredApproval != null)
+            copy(preferredApproval = _state.value.selectedSigningProtection.approvalChoice()) else this
+
     private fun runIdentityChoice(progress: String, action: suspend () -> Unit) {
         if (_state.value.identityBusy || _state.value.session !is WalletSessionState.IdentitySetup) return
         _state.update { it.copy(identityProgress = progress, warning = null) }
@@ -1677,7 +1682,7 @@ class WalletDemoController(
                 try { action() }
                 catch (cause: CancellationException) { throw cause }
                 catch (cause: Exception) { _state.update { it.copy(warning = keyOperationFailure(cause)) } }
-                val setup = wallet.identitySetup()
+                val setup = wallet.identitySetup()?.withPreferredApproval()
                 _state.update { it.copy(session = setup?.let(WalletSessionState::IdentitySetup) ?: WalletSessionState.NotBootstrapped) }
                 if (setup == null) bootstrapIfNeeded()
             } catch (cause: CancellationException) { throw cause }
@@ -1698,7 +1703,7 @@ class WalletDemoController(
         if (previous.session is WalletSessionState.Ready || previous.session is WalletSessionState.Bootstrapping) return
 
         scope.launch(dispatcher) {
-            val setup = runCatching { wallet.identitySetup() }.getOrElse { error ->
+            val setup = runCatching { wallet.identitySetup()?.withPreferredApproval() }.getOrElse { error ->
                 if (error is CancellationException) throw error
                 _state.update { it.copy(session = WalletSessionState.Failed(keyOperationFailure(error))) }
                 return@launch

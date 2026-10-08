@@ -77,6 +77,7 @@ class WalletVisualAndroidTest {
     @Test fun providerPreparing() = scenario(sheetHost = true) { providerSharingStatus() }
     @Test fun providerFailure() = scenario(sheetHost = true) { providerSharingStatus(failure = true) }
 
+    @Test fun keyApprovalUnavailable() = scenario { keySetup("approval_unavailable") }
     @Test fun keySummary() = scenario { keySetup("summary") }
     @Test fun keyRecovery() = scenario { keySetup("recovery") }
     @Test fun keyStorage() = scenario { keySetup("storage") }
@@ -84,6 +85,7 @@ class WalletVisualAndroidTest {
 
     @Test fun accessRejected() = scenario { walletAccess("rejected") }
     @Test fun accessBiometricFallback() = scenario { walletAccess("biometric_fallback") }
+    @Test fun accessBiometricUnavailable() = scenario { walletAccess("biometric_unavailable") }
     @Test fun accessBiometricLockout() = scenario { walletAccess("biometric_lockout") }
     @Test fun accessSettings() = scenario { walletAccess("default") }
     @Test fun accessCurrentPin() = scenario { walletAccess("current_pin") }

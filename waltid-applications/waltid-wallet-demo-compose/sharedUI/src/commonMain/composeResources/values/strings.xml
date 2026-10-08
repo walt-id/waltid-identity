@@ -187,4 +187,14 @@
     <string name="pin_retry_biometrics">Try biometrics</string>
     <string name="pin_retry_face_id">Try Face ID</string>
     <string name="pin_retry_touch_id">Try Touch ID</string>
+    <string name="biometric_open_settings">Open Settings</string>
+    <string name="biometric_not_enrolled">Set up biometrics in device settings, then try again.</string>
+    <string name="biometric_no_device_passcode">Set up a device passcode in Settings to use biometrics.</string>
+    <string name="biometric_device_locked_out">Biometrics are locked. Unlock your device with its passcode, then try again.</string>
+    <string name="biometric_unsupported">This device does not support biometric authentication.</string>
+    <string name="biometric_face_id_unavailable">Face ID is unavailable. Check this app’s Face ID access in Settings.</string>
+    <string name="biometric_recovery_unavailable">Biometrics are unavailable. Check device settings or try again later.</string>
+    <string name="biometric_signing_separate">Continuing with your PIN changes wallet unlock only. Signing approval is configured separately.</string>
+    <string name="setup_approval_unavailable">The selected signing approval is unavailable for this configuration. Check device settings or explicitly choose another signing approval.</string>
+    <string name="setup_key_retained">Your existing signing key has not been changed. Restore its availability and try again.</string>
 </resources>

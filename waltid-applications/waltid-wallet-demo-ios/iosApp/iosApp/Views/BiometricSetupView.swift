@@ -9,6 +9,8 @@ struct BiometricSetupView: View {
             VStack(alignment: .leading, spacing: 20) {
                 Text("Unlock with biometrics").font(.largeTitle.weight(.bold))
                 Text(explanation).foregroundStyle(.secondary)
+                Text("Continuing with your PIN changes wallet unlock only. Signing approval is configured separately.")
+                    .font(.callout).foregroundStyle(.secondary)
             }
             .frame(maxWidth: 640, alignment: .leading).padding(20)
             .frame(maxWidth: .infinity)
@@ -17,8 +19,9 @@ struct BiometricSetupView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             WalletFooter {
                 if viewModel.isAuthenticating { ProgressView("Authenticating…").frame(maxWidth: .infinity, alignment: .leading) }
-                WalletActions(primary: viewModel.isBiometricUnlockAvailable ? retry : continueWithPIN,
-                    secondary: viewModel.isBiometricUnlockAvailable ? continueWithPIN : nil)
+                WalletActions(primary: viewModel.isBiometricUnlockAvailable ? retry :
+                    viewModel.access.biometricAvailability.offersSettings ? openSettings : continueWithPIN,
+                    secondary: viewModel.isBiometricUnlockAvailable || viewModel.access.biometricAvailability.offersSettings ? continueWithPIN : nil)
             }
         }
         .accessibilityIdentifier("wallet.biometricSetup")
@@ -26,6 +29,7 @@ struct BiometricSetupView: View {
     }
 
     private var explanation: String {
+        if !viewModel.isBiometricUnlockAvailable { return viewModel.access.biometricAvailability.explanation(kind: viewModel.access.biometricKind) }
         guard case .biometricSetup(let outcome) = viewModel.auth else { return "" }
         switch outcome {
         case .cancelled: return "Setup was cancelled. You can try again or continue with your PIN."
@@ -34,6 +38,11 @@ struct BiometricSetupView: View {
         case .failed: return "Biometric setup did not finish. You can try again or continue with your PIN."
         default: return "Your PIN is ready. Use biometrics for quicker unlock, or continue with your PIN."
         }
+    }
+
+    private var openSettings: WalletAction {
+        WalletAction("Open Settings", enabled: !viewModel.isAuthenticating,
+            identifier: "wallet.biometricOpenSettings", perform: BiometricSettings.open)
     }
 
     private var retry: WalletAction {

@@ -1,10 +1,49 @@
 import Foundation
+import LocalAuthentication
 import WalletSDK
 import XCTest
 @testable import iosApp
 
 @MainActor
 final class WalletViewModelPinTests: XCTestCase {
+    func testUnavailableBiometricsPreserveRecoveryReason() {
+        let classify = LocalAuthenticationBiometricAuthenticator.classifyAvailability
+        func error(_ code: LAError.Code) -> NSError { NSError(domain: LAError.errorDomain, code: code.rawValue) }
+        XCTAssertEqual(classify(error(.biometryNotAvailable), .faceID), .unavailable)
+        XCTAssertEqual(classify(error(.biometryNotAvailable), .none), .unsupported)
+        XCTAssertEqual(classify(error(.biometryNotEnrolled), .faceID), .notEnrolled)
+        XCTAssertEqual(classify(error(.passcodeNotSet), .faceID), .deviceCredentialNotSet)
+        XCTAssertEqual(classify(error(.biometryLockout), .faceID), .lockedOut)
+        XCTAssertEqual(DemoBiometricAvailability.lockedOut.authenticationResult, .lockedOut)
+        XCTAssertFalse(DemoBiometricAvailability.lockedOut.offersSettings)
+        XCTAssertFalse(DemoBiometricAvailability.unsupported.offersSettings)
+        XCTAssertTrue(DemoBiometricAvailability.unavailable.offersSettings)
+    }
+
+    func testPermissionRecoveryDoesNotEnableUnlockOrChangeSigningPreference() async throws {
+        let store = InMemoryDemoPinStore()
+        let biometrics = FakeDemoBiometricAuthenticator(result: .unavailable)
+        let model = WalletViewModel(walletID: "permission-recovery-\(UUID().uuidString)", signingProtectionMode: .optional,
+            walletClient: MockWalletClient(), identityDocumentRegistrationUpdate: {}, pinStore: store, biometricAuthenticator: biometrics)
+        model.updatePin("1234")
+        model.updatePinConfirmation("1234")
+        try await waitUntil { model.auth == .biometricSetup(.unavailable) }
+        biometrics.isAvailable = false
+        model.refreshBiometricAvailability()
+        let signing = model.selectedSigningProtection
+        XCTAssertTrue(signing.requiresBiometrics)
+        model.continueWithoutBiometrics()
+        try await waitUntil { model.isReady }
+        XCTAssertFalse(model.isBiometricUnlockEnabled)
+        XCTAssertEqual(model.selectedSigningProtection, signing)
+        biometrics.isAvailable = true
+        model.handleApplicationBecameActive()
+        model.refreshBiometricAvailability()
+        XCTAssertFalse(model.isBiometricUnlockEnabled)
+        XCTAssertEqual(biometrics.authenticateCalls, 1)
+        XCTAssertEqual(model.selectedSigningProtection, signing)
+    }
+
     func testSetupRejectsPinsOutsideFourAsciiDigits() {
         for pin in ["123", "12345", "123456", "12a4", "١٢٣٤", "１２３４", "1234\n"] {
             let store = InMemoryDemoPinStore()
@@ -594,6 +633,9 @@ final class WalletViewModelPinTests: XCTestCase {
 }
 
 final class FakeDemoBiometricAuthenticator: DemoBiometricAuthenticator {
+    var availability: DemoBiometricAvailability { isAvailable ? .available : unavailableReason }
+    var unavailableReason: DemoBiometricAvailability = .unavailable
+    var kind: DemoBiometricKind = .generic
     var isAvailable: Bool
     var result: DemoBiometricResult
     private(set) var authenticateCalls = 0
