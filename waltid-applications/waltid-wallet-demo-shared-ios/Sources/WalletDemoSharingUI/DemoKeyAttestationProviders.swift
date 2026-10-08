@@ -106,6 +106,7 @@ private struct ItbDemoKeyAttester: KeyAttestationProvider {
         try Task.checkCancellation()
         let now = Int64(Date().timeIntervalSince1970)
         let header: [String: Any] = [
+            "alg": "ES256",
             "typ": "key-attestation+jwt",
             "jwk": try JSONSerialization.jsonObject(with: Data(verificationPublicJWK.utf8)),
         ]
