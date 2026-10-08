@@ -4,13 +4,14 @@ package id.walt.walletdemo.compose.logic
 data class WalletAccessState(
     val auth: WalletAuthState = WalletAuthState.Setup(),
     val operation: WalletAccessOperation = WalletAccessOperation.Idle,
-    val biometricAvailable: Boolean = false,
+    val biometricAvailability: DemoBiometricAvailability = DemoBiometricAvailability.Unavailable,
     val biometricEnabled: Boolean = false,
     val biometricKind: DemoBiometricKind = DemoBiometricKind.Generic,
     val pinChange: WalletPinChange? = null,
     val settingsNotice: WalletAccessNotice? = null,
     internal val generation: Long = 0,
 ) {
+    val biometricAvailable: Boolean get() = biometricAvailability == DemoBiometricAvailability.Available
     val isBusy: Boolean get() = operation == WalletAccessOperation.CheckingPin ||
         operation == WalletAccessOperation.SavingPin || operation == WalletAccessOperation.Biometrics
     val pinEntry: WalletAuthState.PinEntry? get() = when (val change = pinChange) {

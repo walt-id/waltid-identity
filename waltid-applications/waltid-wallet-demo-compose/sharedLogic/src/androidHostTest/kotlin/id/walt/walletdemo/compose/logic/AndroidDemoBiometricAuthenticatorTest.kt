@@ -34,6 +34,15 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class AndroidDemoBiometricAuthenticatorTest {
     @Test
+    fun availabilityPreservesEnrollmentAndHardwareReasons() {
+        assertEquals(DemoBiometricAvailability.Available, androidBiometricAvailability(BiometricManager.BIOMETRIC_SUCCESS))
+        assertEquals(DemoBiometricAvailability.NotEnrolled, androidBiometricAvailability(BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED))
+        assertEquals(DemoBiometricAvailability.Unsupported, androidBiometricAvailability(BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE))
+        assertEquals(DemoBiometricAvailability.Unavailable, androidBiometricAvailability(BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE))
+        assertEquals(DemoBiometricAvailability.Unavailable, androidBiometricAvailability(BiometricManager.BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED))
+    }
+
+    @Test
     fun authenticateFromBackgroundDispatcherCompletesWithoutMainThreadCrash() {
         val controller = Robolectric.buildActivity(FragmentActivity::class.java).setup()
         val activity = controller.get()

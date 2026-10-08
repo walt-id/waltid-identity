@@ -42,7 +42,7 @@ internal fun WalletAccessSettingsScreen(controller: WalletDemoController, access
                 }), access.biometricEnabled, controller::setBiometricUnlockEnabled,
                     Modifier.testTag(WalletUiTestTags.SettingsBiometricUnlock), enabled = !access.isBusy && (access.biometricAvailable || access.biometricEnabled))
             }
-            if (!access.biometricAvailable) SettingsNotice(stringResource(Res.string.settings_biometric_unavailable))
+            if (!access.biometricAvailable) BiometricRecoveryNotice(access.biometricAvailability, access.biometricKind)
             access.settingsNotice?.let { SettingsNotice(it.message, error = it.kind == WalletAccessNotice.Kind.Error,
                 modifier = Modifier.testTag("wallet.accessNotice")) }
         }

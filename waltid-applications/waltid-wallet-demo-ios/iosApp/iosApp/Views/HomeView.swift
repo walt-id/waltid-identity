@@ -131,7 +131,8 @@ private struct WalletSetupView: View {
 
     var body: some View {
         if model.identity == nil {
-            WalletIdentityView(model: model)
+            WalletIdentityView(biometricAvailability: viewModel.biometricSigningRecoveryAvailability,
+                biometricKind: viewModel.access.biometricKind, model: model)
         } else {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Your signing key is ready").font(.title2)

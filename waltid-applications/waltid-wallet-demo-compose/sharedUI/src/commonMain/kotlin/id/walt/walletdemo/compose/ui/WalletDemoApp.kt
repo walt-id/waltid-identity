@@ -102,8 +102,8 @@ internal fun WalletDemoAppHost(
                 ) {
                     when (val auth = state.auth) {
                         is WalletAuthState.BiometricSetup -> BiometricSetupScreen(
-                            auth, state.isAuthenticating, state.biometricUnlockAvailable,
-                            controller::retryBiometricSetup, controller::continueWithoutBiometrics,
+                            auth, state.isAuthenticating, state.access.biometricAvailability,
+                            controller::retryBiometricSetup, controller::continueWithoutBiometrics, state.access.biometricKind,
                         )
                         is WalletAuthState.PinEntry -> Box(
                             modifier = Modifier

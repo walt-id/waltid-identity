@@ -6,6 +6,7 @@ struct SigningKeySetupContent: View {
     let options: [WalletIdentityScreenModel.SetupOption]
     let selected: WalletIdentityScreenModel.SetupOption
     let step: WalletIdentityScreenModel.Step
+    var requestedApproval: WalletIdentityScreenModel.Selection? = nil
     let onSelect: (String) -> Void
     let onEdit: (SigningKeySetting) -> Void
 
@@ -32,13 +33,21 @@ struct SigningKeySetupContent: View {
                 Section("Restore an existing key") { selectionRows(restoring: true) }
             }
         } else if step != .summary {
+            if step == .approval, let requestedApproval, !selections.contains(where: { $0.id == requestedApproval.id }) {
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(requestedApproval.title).font(.headline)
+                        Text("The selected signing approval is unavailable for this configuration.").font(.callout).foregroundStyle(.secondary)
+                    }.accessibilityValue("Selected, unavailable")
+                }
+            }
             Section { selectionRows() }
         }
         if step == .summary {
             Section {
                 SigningKeySummary(
                     recovery: selected.recovery.id == "new" ? String(localized: "No key backup") : selected.recovery.title,
-                    storage: selected.storage.title, approval: selected.approval.title,
+                    storage: selected.storage.title, approval: requestedApproval?.title ?? selected.approval.title,
                     onEdit: onEdit)
             } header: { Text("Signing key") } footer: {
                 Text(selected.recovery.detail)
@@ -46,6 +55,10 @@ struct SigningKeySetupContent: View {
         }
     }
 
+
+    private var selectedChoiceID: String? {
+        step == .approval ? (requestedApproval?.id ?? selected.approval.id) : step.choice(selected)?.id
+    }
 
     private var stepDescription: String {
         switch step {
@@ -61,21 +74,21 @@ struct SigningKeySetupContent: View {
             restoring == nil || choice.id.hasPrefix("restore:") == restoring
         }, id: \.element.id) { index, choice in
             VStack(alignment: .leading, spacing: 8) {
-                selectionCard(choice, selected: step.choice(selected)?.id == choice.id)
+                selectionCard(choice, selected: selectedChoiceID == choice.id)
                     .accessibilityIdentifier("wallet.keySetupChoice.\(step).\(index)")
                 if let identifier = choice.identifier {
                     SettingsCopyContent(title: "Wallet DID", value: identifier, copyLabel: "Copy wallet DID", copyAnnouncement: String(localized: "Wallet DID copied"),
                         valueID: "wallet.recoveryDid.\(choice.id)", copyID: "wallet.recoveryDidCopy.\(choice.id)", disclosureLabels: ("Show full DID", "Hide full DID"))
                 }
             }
-            .listRowBackground(selections.count > 1 && step.choice(selected)?.id == choice.id
+            .listRowBackground(selections.count > 1 && selectedChoiceID == choice.id
                 ? Color.accentColor.opacity(0.08) : Color(uiColor: .secondarySystemGroupedBackground))
         }
     }
 
     @ViewBuilder
     private func selectionCard(_ choice: WalletIdentityScreenModel.Selection, selected: Bool) -> some View {
-        if selections.count == 1 {
+        if selections.count == 1 && selected {
             VStack(alignment: .leading, spacing: 6) {
                 selectionText(choice)
                 Text("This is the only supported option for your current configuration.").font(.footnote).foregroundStyle(.secondary)

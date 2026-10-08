@@ -59,10 +59,29 @@ final class WalletIdentityScreenModel: ObservableObject {
     @Published private(set) var setupOptions: [SetupOption] = []
     @Published var step: Step = .summary
     @Published private(set) var selectedID: UUID?
-    var selected: SetupOption? { setupOptions.first { $0.id == selectedID } ?? setupOptions.first }
+    @Published private(set) var requestedApproval: Selection
+    @Published private(set) var existingKeyUnavailable = false
+    var selected: SetupOption? {
+        setupOptions.first { $0.id == selectedID }
+            ?? Self.resolveSetupOption(setupOptions, approvalID: requestedApproval.id)
+    }
+    var canCreate: Bool { selected?.approval.id == requestedApproval.id && !loadFailed }
+
+    /// The fallback is display-only; continueSetup also checks the requested approval.
+    static func resolveSetupOption(_ options: [SetupOption], recoveryID: String? = nil,
+        storageID: String? = nil, approvalID: String) -> SetupOption? {
+        let matchingRecovery = options.filter { $0.recovery.id == recoveryID }
+        let recovery = matchingRecovery.isEmpty ? options : matchingRecovery
+        let matchingStorage = recovery.filter { $0.storage.id == storageID }
+        let storage = matchingStorage.isEmpty ? recovery : matchingStorage
+        return storage.first { $0.approval.id == approvalID } ?? storage.first
+    }
     func select(_ id: String) {
         guard let selected, !busy && !refreshing else { return }
-        selectedID = step.select(setupOptions, selected: selected, choiceID: id).id
+        let choice = step.select(setupOptions, selected: selected, choiceID: id)
+        if step == .approval { requestedApproval = choice.approval }
+        selectedID = Self.resolveSetupOption(setupOptions, recoveryID: choice.recovery.id,
+            storageID: choice.storage.id, approvalID: requestedApproval.id)?.id
     }
 
     func edit(_ setting: SigningKeySetting) {
@@ -76,8 +95,10 @@ final class WalletIdentityScreenModel: ObservableObject {
 
     func continueSetup() {
         guard let selected, !busy && !refreshing else { return }
-        if step == .summary { perform(selected.restoring ? "Restoring key…" : "Creating key…", selected.perform) }
-        else { step = .summary }
+        if step == .summary {
+            guard canCreate else { return }
+            perform(selected.restoring ? "Restoring key…" : "Creating key…", selected.perform)
+        } else { step = .summary }
     }
 
     @Published private(set) var identity: SigningIdentity?
@@ -102,8 +123,9 @@ final class WalletIdentityScreenModel: ObservableObject {
     private let service: SigningIdentityManager
     private let onActivated: @MainActor () -> Void
 
-    init(service: SigningIdentityManager, onActivated: @escaping @MainActor () -> Void) {
+    init(service: SigningIdentityManager, preferredAuthorization: WalletKeyUseAuthorizationPolicy, onActivated: @escaping @MainActor () -> Void) {
         self.service = service
+        self.requestedApproval = Self.approvalChoice(preferredAuthorization)
         self.onActivated = onActivated
     }
 
@@ -117,15 +139,10 @@ final class WalletIdentityScreenModel: ObservableObject {
         refreshing = true
         loadFailed = false
         defer {
-            if let previous, let retained = setupOptions.first(where: {
-                $0.recovery.id == previous.recovery.id && $0.storage.id == previous.storage.id &&
-                    $0.approval.id == previous.approval.id
-            }) {
-                selectedID = retained.id
-            } else {
-                step = .summary
-                selectedID = setupOptions.first?.id
-            }
+            let retained = Self.resolveSetupOption(setupOptions, recoveryID: previous?.recovery.id,
+                storageID: previous?.storage.id, approvalID: requestedApproval.id)
+            if previous?.recovery.id != retained?.recovery.id || previous?.storage.id != retained?.storage.id { step = .summary }
+            selectedID = retained?.id
             refreshing = false
             loaded = true
         }
@@ -135,6 +152,7 @@ final class WalletIdentityScreenModel: ObservableObject {
             selectedID = nil
             message = nil
             failedSetupSelection = nil
+            existingKeyUnavailable = false
             recoveryUnavailableReasons = []
             switch try await service.state() {
             case .active(let identity):
@@ -188,6 +206,7 @@ final class WalletIdentityScreenModel: ObservableObject {
                     message = Array(Set(unavailableReasons)).sorted().joined(separator: "\n")
                 }
             case .unavailable(_, let reason):
+                existingKeyUnavailable = true
                 identity = nil
                 message = reason.explanation
                 try await addRecoveryChoices()
@@ -277,7 +296,14 @@ final class WalletIdentityScreenModel: ObservableObject {
         case .deviceCredential: title = "Device passcode"
         case .biometricOrDeviceCredential: title = "Biometrics or device passcode"
         }
-        return Selection(id: String(describing: policy), title: title, detail: authorization(policy))
+        let id: String
+        switch policy {
+        case .none: id = WalletDemoSigningProtection.none.rawValue
+        case .biometricTimedReuse(let seconds) where seconds == 10: id = WalletDemoSigningProtection.biometric.rawValue
+        case .biometricCurrentSet: id = WalletDemoSigningProtection.biometricPerUse.rawValue
+        default: id = String(describing: policy)
+        }
+        return Selection(id: id, title: title, detail: authorization(policy))
     }
 
     static func authorization(_ policy: WalletKeyUseAuthorizationPolicy) -> String {

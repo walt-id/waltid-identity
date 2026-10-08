@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.ui
 
+import id.walt.walletdemo.compose.logic.DemoBiometricAvailability
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialHolders
 import id.walt.walletdemo.compose.logic.WalletDemoContinuationStatus
@@ -146,7 +147,7 @@ class WalletDemoAppTestScenarios(
         val gate = CompletableDeferred<DemoBiometricResult>()
         var prompts = 0
         val biometrics = object : DemoBiometricAuthenticator {
-            override fun isAvailable() = true
+            override fun availability() = DemoBiometricAvailability.Available
             override suspend fun authenticate(reason: String): DemoBiometricResult { prompts++; return gate.await() }
         }
         val controller = WalletDemoController(WalletUiTestWallet(), store, biometrics)
@@ -198,7 +199,7 @@ class WalletDemoAppTestScenarios(
         val gate = CompletableDeferred<DemoBiometricResult>()
         var prompts = 0
         val biometrics = object : DemoBiometricAuthenticator {
-            override fun isAvailable() = true
+            override fun availability() = DemoBiometricAvailability.Available
             override suspend fun authenticate(reason: String): DemoBiometricResult { prompts++; return gate.await() }
         }
         val controller = WalletDemoController(WalletUiTestWallet(), pinStore, biometrics)
@@ -2318,7 +2319,7 @@ private class RecordingDemoBiometricAuthenticator(
 ) : DemoBiometricAuthenticator {
     var authenticateCalls = 0
 
-    override fun isAvailable(): Boolean = available
+    override fun availability() = if (available) DemoBiometricAvailability.Available else DemoBiometricAvailability.Unavailable
 
     override suspend fun authenticate(reason: String): DemoBiometricResult {
         authenticateCalls += 1

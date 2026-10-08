@@ -23,6 +23,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
+import id.walt.walletdemo.compose.logic.DemoBiometricAvailability
+import id.walt.walletdemo.compose.logic.recoveryAvailability
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
@@ -56,7 +58,9 @@ internal fun WalletScreen(
 ) {
     val setup = state.session as? WalletSessionState.IdentitySetup
     if (setup != null) {
-        IdentitySetupScreen(setup.setup, state.warning, controller::chooseIdentity, controller::resumeSigningIdentity, controller::cancelIdentity, controller::refreshIdentityChoices, progress = state.identityProgress)
+        IdentitySetupScreen(setup.setup, state.warning, controller::chooseIdentity, controller::resumeSigningIdentity, controller::cancelIdentity, controller::refreshIdentityChoices, progress = state.identityProgress,
+            biometricAvailability = state.biometricSigningAvailability?.recoveryAvailability(state.access.biometricAvailability)
+                ?: DemoBiometricAvailability.Unavailable, biometricKind = state.access.biometricKind)
         return
     }
     if (state.session !is WalletSessionState.Ready) {
