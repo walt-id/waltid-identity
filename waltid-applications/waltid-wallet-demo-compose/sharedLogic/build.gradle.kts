@@ -70,6 +70,7 @@ kotlin {
                     implementation(identityLibs.junit)
                     implementation(identityLibs.robolectric)
                     implementation(identityLibs.kotlinx.coroutines.test)
+                    implementation(identityLibs.ktor.client.mock)
                 }
 
                 getByName("androidDeviceTest").dependencies {

@@ -15,6 +15,35 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     private let credentialOperationTimeout: TimeInterval = 90
     private let verifierPollingTimeout: TimeInterval = 30
 
+    func testAutomaticallyAttestsEudiIssuanceBeforeAndAfterRestart() async throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        let environment = publicDemoEnvironment().merging(
+            ["E2E_WALLET_ID": "native-ka-\(UUID().uuidString)"]
+        ) { _, new in new }
+        ui.launch(environment: environment)
+        for index in 0..<2 {
+            if index == 1 {
+                app.terminate()
+                ui.launch(environment: environment, initializeSigningIdentity: false)
+            }
+            XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 60), "Wallet ready")
+            let offer = try await EudiOfferFlow(client: WalletE2EClient()).generate()
+            ui.tapTab(label: "Receive")
+            ui.replaceText(in: ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL"), value: offer.offerUrl)
+            ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+            XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 90), "Review credential offer")
+            let input = ui.textInput(identifier: "wallet.txCodeInput", fallbackLabel: "Transaction code")
+            XCTAssertTrue(input.waitForExistence(timeout: 20))
+            ui.replaceText(in: input, value: offer.txCode)
+            ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+            let status = ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 90)
+            XCTAssertTrue(status?.hasPrefix("Received") == true, "EUDI issuance failed: \(status ?? "nil")")
+            ui.assertExists(identifierPrefix: "wallet.credentialCard.", timeout: 20)
+        }
+    }
+
     /// Run explicitly on enrolled physical hardware with WALLET_SCA_OPERATOR=approve.
     func testScaPaymentWithNativeAuthorization() async throws {
         continueAfterFailure = false

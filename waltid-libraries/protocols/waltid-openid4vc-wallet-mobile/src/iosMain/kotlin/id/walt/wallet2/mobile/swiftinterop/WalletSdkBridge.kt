@@ -69,6 +69,11 @@ public class WalletSdkBridge private constructor(
         provider: WalletBridgeKeyAttestationProvider,
     ): WalletBridgeResult<Unit> = walletBridgeCall { operations.attachKeyAttestationProvider(provider) }
 
+    /** Attaches issuer-specific runtime key attestation support to this wallet instance. */
+    public suspend fun attachKeyAttestationProviderResolver(
+        resolver: WalletBridgeKeyAttestationProviderResolver,
+    ): WalletBridgeResult<Unit> = walletBridgeCall { operations.attachKeyAttestationProviderResolver(resolver) }
+
     /** Reopens the selected identity or creates the configured default through the shared lifecycle. */
     public suspend fun initializeSigningIdentity(): WalletBridgeResult<SigningIdentityOperationResult> =
         walletBridgeCall { operations.signingIdentity.initialize() }
@@ -331,6 +336,9 @@ public class WalletSdkBridge private constructor(
 }
 
 internal interface WalletSdkBridgeOperations {
+    suspend fun attachKeyAttestationProviderResolver(resolver: WalletBridgeKeyAttestationProviderResolver): Unit =
+        error("Key attestation resolution is not implemented by this test bridge")
+
     suspend fun attachKeyAttestationProvider(provider: WalletBridgeKeyAttestationProvider): Unit =
         error("Key attestation is not implemented by this test bridge")
 
@@ -427,6 +435,10 @@ internal interface WalletSdkBridgeOperations {
 internal class MobileWalletSdkBridgeOperations(
     private val wallet: MobileWallet,
 ) : WalletSdkBridgeOperations {
+    override suspend fun attachKeyAttestationProviderResolver(resolver: WalletBridgeKeyAttestationProviderResolver) {
+        wallet.attachKeyAttestationProviderResolver(resolver.toKeyAttestationProviderResolver())
+    }
+
     override suspend fun attachKeyAttestationProvider(provider: WalletBridgeKeyAttestationProvider) {
         wallet.attachKeyAttestationProvider(provider.toKeyAttestationProvider())
     }

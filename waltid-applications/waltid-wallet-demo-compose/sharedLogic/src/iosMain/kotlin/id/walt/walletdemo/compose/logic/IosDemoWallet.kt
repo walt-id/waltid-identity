@@ -53,7 +53,7 @@ fun createIosDemoWallet(
                     ),
                 ),
                 DemoClientIdTrust.configuration,
-            ),
+            ).attachKeyAttestationProviderResolver(DemoKeyAttestationProviders()),
             warning = transactionDataProfiles.warning,
             isIos = true,
         )

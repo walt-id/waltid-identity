@@ -7,6 +7,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.activeWindow
 import androidx.test.uiautomator.waitForStable
 import id.walt.mobile.test.backend.DemoTestBackend
+import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.VERIFIER_POLLING_TIMEOUT
@@ -15,6 +16,7 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.relaunchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.latestStatus
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.setTextByTag
@@ -27,6 +29,28 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class PublicDemoBackendE2ETest {
+
+    @Test
+    fun automaticallyAttestsEudiIssuanceBeforeAndAfterRelaunch() = runBlocking {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val device = UiDevice.getInstance(instrumentation)
+        launchAndUnlock(context, device)
+        repeat(2) { index ->
+            if (index == 1) relaunchAndUnlock(context, device)
+            val offer = EudiTestBackend.generateOffer()
+            sendDeepLink(context, offer.offerUrl)
+            clickByTag(device, "wallet.receiveButton")
+            assertTrue("EUDI offer did not reach review: ${latestStatus(device)}",
+                waitForStatus(device, CREDENTIAL_OPERATION_TIMEOUT,
+                    { it.startsWith("Review credential offer") }, listOf("Receive failed")))
+            setTextByTag(device, "wallet.txCodeInput", offer.txCode)
+            clickByTag(device, "wallet.offerAcceptButton")
+            assertTrue("EUDI issuance failed: ${latestStatus(device)}",
+                waitForStatus(device, CREDENTIAL_OPERATION_TIMEOUT,
+                    { it.startsWith("Received") }, listOf("Receive failed")))
+        }
+    }
 
     @Test
     fun transactionCodePromptRejectsWrongCodeAndRetriesAgainstPublicDemoIssuer2() = runBlocking {

@@ -151,6 +151,27 @@ Settings → Signing key shows the storage policy, observed key protection, key 
 
 The web demo uses account sign-in instead of a local PIN. Its Settings root retains Technical details, Sign out, and Reset wallet; device-only signing and sharing controls are hidden.
 
+## Automatic test key attestations
+
+The Android and iOS demos automatically select test attesters when issuer metadata
+requires key attestation:
+
+| Exact credential issuer | Demo attester |
+| --- | --- |
+| `https://dev-i4mlab.aegean.gr/rfc-issuer` | Local WE BUILD ITB synthetic ES256 attestation |
+| `https://issuer.eudiw.dev` | EUDI public mock Wallet Provider |
+
+No selector or startup network call is needed. Wallet recreation reattaches the
+resolver. Credentials without an attestation requirement follow normal issuance.
+Unknown issuers requiring attestation fail; EUDI outages never fall back to ITB.
+The SDK verifies the selected provider's signature, proof key, nonce, lifetime and
+advertised storage/authentication constraints before sending the proof.
+
+Both integrations are test assurance only. The ITB attester uses explicitly
+unassessed `example.invalid` claims and cannot satisfy profiles requiring certified
+storage or authentication. This feature is separate from `ATTESTATION_*` client
+authentication and Enterprise Wallet Provider WIA/KA loading (WAL-1479).
+
 ## Local wallet data
 
 Android and iOS demo targets use the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in platform-protected storage. During local development, reset wallet state through `MobileWallet.deleteWallet()`, by uninstalling the app, or by deleting the app's local data.

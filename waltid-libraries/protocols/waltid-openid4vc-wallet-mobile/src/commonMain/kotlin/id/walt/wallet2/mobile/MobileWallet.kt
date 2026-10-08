@@ -272,6 +272,13 @@ public class MobileWallet internal constructor(
         wallet.attachKeyAttestationProvider(provider)
     }
 
+    /** Attaches issuer-specific key attestation support. Supply it again after wallet recreation. */
+    public fun attachKeyAttestationProviderResolver(
+        resolver: id.walt.wallet2.handlers.KeyAttestationProviderResolver,
+    ): MobileWallet = apply {
+        wallet.attachKeyAttestationProviderResolver(resolver)
+    }
+
     private val annexCEngine = MobileWalletAnnexCEngine(
         wallet = wallet,
         readerTrustEvaluator = readerTrustEvaluator,

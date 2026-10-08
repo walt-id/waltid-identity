@@ -18,6 +18,7 @@
 		C0DE00000000000000000105 /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000006 /* TestHelpers.swift */; };
 		C0DE00000000000000000106 /* WalletE2EClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000007 /* WalletE2EClient.swift */; };
 		C0DE00000000000000000107 /* DemoBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000008 /* DemoBackend.swift */; };
+		C0DE00000000000000000108 /* EudiOfferFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000009 /* EudiOfferFlow.swift */; };
 		CEB46067C0B18C64C703CB04 /* KotlinMultiplatformLinkedPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 048F7E5AEC614F5A89E08F1D /* KotlinMultiplatformLinkedPackage */; };
 		C0DE00000000000000001021 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001011 /* WalletSDK */; };
 		C0DE00000000000000001022 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001012 /* WalletDemoIdentityDocumentSupport */; };
@@ -84,6 +85,7 @@
 		C0DE00000000000000000006 /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TestHelpers.swift; path = "../../../mobile-e2e-fixtures/ios/TestHelpers/TestHelpers.swift"; sourceTree = "<group>"; };
 		C0DE00000000000000000007 /* WalletE2EClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WalletE2EClient.swift; path = "../../../mobile-e2e-fixtures/ios/TestHelpers/WalletE2EClient.swift"; sourceTree = "<group>"; };
 		C0DE00000000000000000008 /* DemoBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DemoBackend.swift; path = "../../../mobile-e2e-fixtures/ios/TestHelpers/DemoBackend.swift"; sourceTree = "<group>"; };
+		C0DE00000000000000000009 /* EudiOfferFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EudiOfferFlow.swift; path = "../../../mobile-e2e-fixtures/ios/TestHelpers/EudiOfferFlow.swift"; sourceTree = "<group>"; };
 		C0DE00000000000000001031 /* iosApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iosApp.entitlements; sourceTree = "<group>"; };
 		C0DE00000000000000001032 /* IdentityDocumentProvider.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.extensionkit-extension"; includeInIndex = 0; path = IdentityDocumentProvider.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0DE00000000000000001033 /* IdentityDocumentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityDocumentProvider.swift; sourceTree = "<group>"; };
@@ -189,6 +191,7 @@
 				C0DE00000000000000000006 /* TestHelpers.swift */,
 				C0DE00000000000000000007 /* WalletE2EClient.swift */,
 				C0DE00000000000000000008 /* DemoBackend.swift */,
+				C0DE00000000000000000009 /* EudiOfferFlow.swift */,
 			);
 			path = iosAppUITests;
 			sourceTree = "<group>";
@@ -410,6 +413,7 @@
 				C0DE00000000000000000105 /* TestHelpers.swift in Sources */,
 				C0DE00000000000000000106 /* WalletE2EClient.swift in Sources */,
 				C0DE00000000000000000107 /* DemoBackend.swift in Sources */,
+				C0DE00000000000000000108 /* EudiOfferFlow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
