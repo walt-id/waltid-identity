@@ -2,7 +2,7 @@
 
 package id.walt.wallet2.mobile
 
-import id.walt.mdoc.readertrust.UnconfiguredReaderTrustEvaluator
+import id.walt.mdoc.readertrust.MdocReaderAuthenticationTrustEvaluator
 import id.walt.mdoc.readertrust.ReaderTrustState
 import id.walt.mdoc.readertrust.ReaderTrustEvaluator
 import id.walt.mdoc.readertrust.ReaderTrustDecision
@@ -1529,7 +1529,8 @@ class MobileWalletTest {
         )
         val parsedRequest = wallet.parseAnnexCDeviceRequest(signedRequest.encodeToBase64Url())
 
-        // A verified signature with no configured trust policy: untrusted, and truthfully so.
+        // A verified signature with no configured trust policy: untrusted, and truthfully so. The vector's
+        // reader certificate is not ISO/IEC 18013-5 conforming, so the default evaluator reports that.
         val verified = wallet.previewAnnexCPresentation(
             MobileWalletAnnexCRequest(
                 parsedRequest = parsedRequest,
@@ -1542,8 +1543,8 @@ class MobileWalletTest {
         val untrusted = assertNotNull(verified.readerTrust)
         assertEquals(ReaderTrustState.VALID_BUT_UNTRUSTED, untrusted.state)
         assertTrue(
-            untrusted.reason.orEmpty().contains("no reader trust policy is configured"),
-            "The default evaluator must say why the reader is untrusted, not imply a rejected policy: " +
+            untrusted.reason.orEmpty().startsWith("Reader authentication certificate is not valid"),
+            "The default evaluator must say why the reader is untrusted: " +
                 untrusted.reason,
         )
 
@@ -1914,7 +1915,7 @@ class MobileWalletTest {
         // reader, however valid its signature.
         assertEquals(
             ReaderTrustState.VALID_BUT_UNTRUSTED,
-            UnconfiguredReaderTrustEvaluator.evaluate(
+            MdocReaderAuthenticationTrustEvaluator.evaluate(
                 ReaderAuthenticationEvidence(ReaderAuthenticationScope.WholeRequest)
             ).state,
         )

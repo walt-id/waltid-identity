@@ -25,3 +25,11 @@ commonMain.dependencies {
     implementation(project(":waltid-libraries:credentials:waltid-mdoc-reader-trust"))
 }
 ```
+
+## Reader authentication certificate check
+
+`MdocReaderAuthenticationCertificateUtil.mdocReaderAuthentication(clock)` builds an
+`X509CertificateUtil` that validates a chain with the mdoc reader authentication certificate as
+leaf: validity against the supplied `Clock`, the ISO/IEC 18013-5 reader-authentication profile, and
+rejection of a reader end-entity certificate acting as its own trust anchor. Trust is never derived
+from the chain — supply it via `trustOverride` (e.g. RICAL anchors or holder-configured Reader CAs).

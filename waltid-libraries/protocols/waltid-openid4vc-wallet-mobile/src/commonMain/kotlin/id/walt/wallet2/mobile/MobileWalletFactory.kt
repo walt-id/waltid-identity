@@ -2,7 +2,7 @@
 
 package id.walt.wallet2.mobile
 
-import id.walt.mdoc.readertrust.UnconfiguredReaderTrustEvaluator
+import id.walt.mdoc.readertrust.MdocReaderAuthenticationTrustEvaluator
 import id.walt.mdoc.readertrust.ReaderTrustEvaluator
 import id.walt.crypto2.keys.KeyId
 import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
@@ -64,7 +64,7 @@ public data class MobileWalletConfig(
     public val paymentCredentialIssuers: List<id.walt.wallet2.consent.PaymentCredentialIssuer> = emptyList(),
     public val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     public val credentialRegistry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
-    public val readerTrustEvaluator: ReaderTrustEvaluator = UnconfiguredReaderTrustEvaluator,
+    public val readerTrustEvaluator: ReaderTrustEvaluator = MdocReaderAuthenticationTrustEvaluator,
     public val crossProcessAccess: MobileWalletCrossProcessAccess? = null,
     public val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
     public val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,

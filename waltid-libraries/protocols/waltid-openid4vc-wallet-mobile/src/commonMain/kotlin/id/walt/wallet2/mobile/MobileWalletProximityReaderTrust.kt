@@ -12,7 +12,7 @@ import id.walt.certificate.x509.validation.X509SingleCertificateValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateHasIaCaContactInformationValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.cose.coseCompliantCbor
-import id.walt.mdoc.proximity.MdocX509CertificateUtil.modocReaderAuthentication
+import id.walt.mdoc.readertrust.MdocReaderAuthenticationCertificateUtil.mdocReaderAuthentication
 import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
 import id.walt.mdoc.readertrust.ReaderAuthenticationScope
 import id.walt.mdoc.readertrust.ReaderTrustState
@@ -282,7 +282,7 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
     public val configuration: ProximityReaderTrustConfiguration get() = ownedConfiguration.snapshot()
 
     private val mdocReaderAuthenticationX509CertificateUtil: X509CertificateUtil =
-        modocReaderAuthentication(clock)
+        mdocReaderAuthentication(clock)
 
     public constructor(
         configuration: ProximityReaderTrustConfiguration,

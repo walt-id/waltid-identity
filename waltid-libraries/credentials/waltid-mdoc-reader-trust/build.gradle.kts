@@ -9,6 +9,7 @@ group = "id.walt.credentials"
 kotlin {
     sourceSets {
         commonMain.dependencies {
+            api(project(":waltid-libraries:crypto:waltid-x509"))
             api(identityLibs.kotlinx.io.bytestring)
             implementation(identityLibs.kotlinx.coroutines.core)
         }

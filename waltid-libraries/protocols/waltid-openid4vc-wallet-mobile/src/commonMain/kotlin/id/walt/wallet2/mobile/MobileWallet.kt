@@ -2,7 +2,7 @@
 
 package id.walt.wallet2.mobile
 
-import id.walt.mdoc.readertrust.UnconfiguredReaderTrustEvaluator
+import id.walt.mdoc.readertrust.MdocReaderAuthenticationTrustEvaluator
 import id.walt.mdoc.readertrust.ReaderTrustEvaluator
 import id.walt.wallet2.consent.*
 import id.walt.wallet2.handlers.CredentialHolderBinding
@@ -216,7 +216,7 @@ public class MobileWallet internal constructor(
     private val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     private val credentialRegistry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
     private val registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
-    private val readerTrustEvaluator: ReaderTrustEvaluator = UnconfiguredReaderTrustEvaluator,
+    private val readerTrustEvaluator: ReaderTrustEvaluator = MdocReaderAuthenticationTrustEvaluator,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},

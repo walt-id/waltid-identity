@@ -8,10 +8,10 @@ import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.cose.Cose
 import id.walt.cose.verify
 import id.walt.mdoc.proximity.MdocX509CertificateUtil.mdocRicalSignerCertificateUtil
-import id.walt.mdoc.proximity.MdocX509CertificateUtil.modocReaderAuthentication
 import kotlinx.coroutines.CancellationException
 import kotlinx.io.bytestring.ByteString
 import kotlin.time.Clock
+import id.walt.mdoc.readertrust.MdocReaderAuthenticationCertificateUtil.mdocReaderAuthentication
 import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
 
 /**
@@ -68,7 +68,7 @@ class X509RicalSignatureValidator(
  */
 class X509RicalReaderPathValidator(clock: Clock = Clock.System) : RicalReaderPathValidator {
 
-    private val mdocAuthenticationCertificateUtil = modocReaderAuthentication(clock)
+    private val mdocAuthenticationCertificateUtil = mdocReaderAuthentication(clock)
 
     override suspend fun validate(
         reader: ReaderAuthenticationEvidence,
