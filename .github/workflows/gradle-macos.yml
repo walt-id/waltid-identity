@@ -60,14 +60,14 @@ on:
 # them is validated by its own copy; only checkout-repos stays pinned, since nothing is checked out
 # yet when it runs. Scripts use the selected checkout.
 env:
-  XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-  IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=latest
+  DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+  IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=27.0
   JOB_NAME_PREFIX: ${{ inputs.job_name_prefix != '' && format('{0} / ', inputs.job_name_prefix) || '' }}
 
 jobs:
   ios-simulator-tests:
     if: ${{ inputs.run-ios-simulator }}
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 115
     steps:
       - name: Checkout all repos with ref fallback
@@ -85,11 +85,8 @@ jobs:
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
-          xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
           simulator-destination: ${{ env.IOS_SIMULATOR_DESTINATION }}
-          run-compile-smoke: 'true'
           run-ios-simulator-tests: 'true'
-          run-wallet-core-xcframework: 'false'
           run-native-demo-tests: 'false'
           run-compose-demo-tests: 'false'
           test-report-job-name: ${{ env.JOB_NAME_PREFIX }}ios-simulator-tests
@@ -100,8 +97,6 @@ jobs:
         id: wallet_recovery
         if: ${{ !cancelled() }}
         timeout-minutes: 35
-        env:
-          DEVELOPER_DIR: ${{ env.XCODE_DEVELOPER_DIR }}
         run: ./waltid-identity/.github/scripts/mobile-ci/run-ios-wallet-recovery-tests.sh
 
       - name: Publish iOS wallet recovery report
@@ -130,7 +125,7 @@ jobs:
 
   wallet-core-framework:
     if: ${{ inputs.run-native || inputs.run-compose || inputs.run-enterprise || inputs.run-sdk-docs }}
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 70
     outputs:
       checkout-refs: ${{ steps.revisions.outputs.refs }}
@@ -155,10 +150,6 @@ jobs:
           PYTHON
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
-      - name: Select Xcode toolchain
-        run: |
-          test -d "$XCODE_DEVELOPER_DIR"
-          echo "DEVELOPER_DIR=$XCODE_DEVELOPER_DIR" >> "$GITHUB_ENV"
       - name: Cache Kotlin Native dependencies
         uses: actions/cache@v5
         with:
@@ -196,7 +187,7 @@ jobs:
   wallet-core-consumer-tests:
     needs: wallet-core-framework
     if: ${{ inputs.run-native || inputs.run-compose }}
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 130
     steps:
       - name: Checkout all repos with ref fallback
@@ -212,8 +203,6 @@ jobs:
           path: ${{ runner.temp }}/wallet-core-artifact
       - name: Verify the shared release framework
         working-directory: waltid-identity
-        env:
-          DEVELOPER_DIR: ${{ env.XCODE_DEVELOPER_DIR }}
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
 
       - name: Configure gradle
@@ -225,11 +214,8 @@ jobs:
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
-          xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
           simulator-destination: ${{ env.IOS_SIMULATOR_DESTINATION }}
-          run-compile-smoke: 'false'
           run-ios-simulator-tests: 'false'
-          run-wallet-core-xcframework: 'false'
           run-wallet-sdk-tests: 'true'
           wallet-core-artifact: ${{ runner.temp }}/wallet-core-artifact
           run-native-demo-tests: ${{ (inputs.run-native) && 'true' || 'false' }}
@@ -265,7 +251,7 @@ jobs:
     needs: wallet-core-framework
     timeout-minutes: 60
     if: ${{ inputs.run-enterprise }}
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
@@ -280,21 +266,10 @@ jobs:
           path: ${{ runner.temp }}/wallet-core-artifact
       - name: Verify the shared release framework
         working-directory: waltid-identity
-        env:
-          DEVELOPER_DIR: ${{ env.XCODE_DEVELOPER_DIR }}
         run: python3 .github/scripts/mobile-ci/wallet-core-artifact.py restore --artifact-dir "$RUNNER_TEMP/wallet-core-artifact"
 
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
-
-      - name: Select Enterprise Xcode toolchain
-        run: |
-          test -d "$XCODE_DEVELOPER_DIR"
-          sudo xcode-select -s "$XCODE_DEVELOPER_DIR"
-          echo "DEVELOPER_DIR=$XCODE_DEVELOPER_DIR" >> "$GITHUB_ENV"
-          xcodebuild -version
-          destination=$(python3 waltid-identity/.github/scripts/mobile-ci/ensure_ios_simulator.py)
-          echo "IOS_SIMULATOR_DESTINATION=$destination" >> "$GITHUB_ENV"
 
       - name: Execute Enterprise iOS mobile platform tests
         id: enterprise_ios_mobile_tests

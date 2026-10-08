@@ -1,6 +1,7 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
+
 
 /** A validated ISO/IEC 7816-4 command APDU using short or extended length encoding. */
 internal data class NfcCommandApdu(
@@ -8,7 +9,7 @@ internal data class NfcCommandApdu(
     public val instruction: UByte,
     public val parameter1: UByte,
     public val parameter2: UByte,
-    public val data: ImmutableBytes = ImmutableBytes.of(byteArrayOf()),
+    public val data: ByteString = ByteString(byteArrayOf()),
     public val expectedResponseDataLength: Int? = null,
 ) {
     init {
@@ -23,7 +24,7 @@ internal data class NfcCommandApdu(
 
     /** Encodes this command using the shortest length form that represents its values. */
     public fun encode(): ByteArray {
-        val payload = data.copy()
+        val payload = data.toByteArray()
         val responseLength = expectedResponseDataLength
         val useExtended = payload.size > UByte.MAX_VALUE.toInt() || (responseLength ?: 0) > SHORT_MAXIMUM
         val result = ArrayList<Byte>(4 + payload.size + if (useExtended) 5 else 2)
@@ -84,7 +85,7 @@ internal data class NfcCommandApdu(
                 }
                 return NfcCommandApdu(
                     header[0], header[1], header[2], header[3],
-                    ImmutableBytes.of(encoded.copyOfRange(5, dataEnd)), responseLength,
+                    ByteString(encoded.copyOfRange(5, dataEnd)), responseLength,
                 )
             }
 
@@ -106,7 +107,7 @@ internal data class NfcCommandApdu(
             } else null
             return NfcCommandApdu(
                 header[0], header[1], header[2], header[3],
-                ImmutableBytes.of(encoded.copyOfRange(7, dataEnd)), responseLength,
+                ByteString(encoded.copyOfRange(7, dataEnd)), responseLength,
             )
         }
 
@@ -117,20 +118,20 @@ internal data class NfcCommandApdu(
 
 /** An immutable ISO/IEC 7816-4 response APDU. */
 internal data class NfcResponseApdu(
-    public val data: ImmutableBytes = ImmutableBytes.of(byteArrayOf()),
+    public val data: ByteString = ByteString(byteArrayOf()),
     public val statusWord: UShort,
 ) {
     public val statusByte1: UByte get() = (statusWord.toInt() ushr 8).toUByte()
     public val statusByte2: UByte get() = statusWord.toUByte()
 
-    public fun encode(): ByteArray = data.copy() + byteArrayOf(statusByte1.toByte(), statusByte2.toByte())
+    public fun encode(): ByteArray = data.toByteArray() + byteArrayOf(statusByte1.toByte(), statusByte2.toByte())
 
     public companion object {
         public fun decode(encoded: ByteArray): NfcResponseApdu {
             require(encoded.size >= 2) { "Response APDU must contain a status word" }
             val status = (((encoded[encoded.lastIndex - 1].toInt() and 0xff) shl 8) or
                 (encoded.last().toInt() and 0xff)).toUShort()
-            return NfcResponseApdu(ImmutableBytes.of(encoded.copyOf(encoded.size - 2)), status)
+            return NfcResponseApdu(ByteString(encoded.copyOf(encoded.size - 2)), status)
         }
     }
 }

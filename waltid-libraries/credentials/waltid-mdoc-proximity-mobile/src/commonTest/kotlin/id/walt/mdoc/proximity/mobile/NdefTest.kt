@@ -1,6 +1,6 @@
 package id.walt.mdoc.proximity.mobile
 
-import id.walt.mdoc.proximity.ImmutableBytes
+import kotlinx.io.bytestring.ByteString
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -14,14 +14,14 @@ class NdefTest {
             listOf(
                 NdefRecord(
                     NdefTypeNameFormat.WELL_KNOWN,
-                    ImmutableBytes.of("Hs".encodeToByteArray()),
-                    payload = ImmutableBytes.of(byteArrayOf(1, 2, 3)),
+                    ByteString("Hs".encodeToByteArray()),
+                    payload = ByteString(byteArrayOf(1, 2, 3)),
                 ),
                 NdefRecord(
                     NdefTypeNameFormat.EXTERNAL,
-                    ImmutableBytes.of("example:type".encodeToByteArray()),
-                    ImmutableBytes.of("id".encodeToByteArray()),
-                    ImmutableBytes.of(ByteArray(256) { it.toByte() }),
+                    ByteString("example:type".encodeToByteArray()),
+                    ByteString("id".encodeToByteArray()),
+                    ByteString(ByteArray(256) { it.toByte() }),
                 ),
             )
         )
@@ -38,8 +38,8 @@ class NdefTest {
         )
         val record = NdefMessage.decode(encoded).records.single()
         assertEquals(NdefTypeNameFormat.WELL_KNOWN, record.typeNameFormat)
-        assertContentEquals(byteArrayOf('T'.code.toByte()), record.type.copy())
-        assertContentEquals(byteArrayOf(1, 2, 3), record.payload.copy())
+        assertContentEquals(byteArrayOf('T'.code.toByte()), record.type.toByteArray())
+        assertContentEquals(byteArrayOf(1, 2, 3), record.payload.toByteArray())
     }
 
     @Test

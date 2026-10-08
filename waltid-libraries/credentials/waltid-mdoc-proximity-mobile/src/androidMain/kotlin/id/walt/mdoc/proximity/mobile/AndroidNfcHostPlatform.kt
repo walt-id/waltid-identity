@@ -1,5 +1,6 @@
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import android.Manifest
 import android.app.Activity
 import android.content.ComponentName
@@ -10,7 +11,6 @@ import android.nfc.NfcAdapter
 import android.nfc.cardemulation.CardEmulation
 import android.nfc.cardemulation.HostApduService
 import android.os.Bundle
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.ProximityCloseReason
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -30,6 +30,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.xmlpull.v1.XmlPullParser
+import kotlin.time.Duration.Companion.milliseconds
 
 internal val ANDROID_MDOC_REQUIRED_AIDS: Set<String> = setOf(
     "D2760000850101",
@@ -389,13 +390,13 @@ public abstract class AndroidMdocHostApduService : HostApduService() {
                     pending.session.process(pending.command)
                 } catch (cancelled: CancellationException) {
                     if (serviceScope.coroutineContext[Job]?.isActive != true) throw cancelled
-                    ImmutableBytes.of(STATUS_UNKNOWN_ERROR)
+                    ByteString(STATUS_UNKNOWN_ERROR)
                 } catch (_: Throwable) {
-                    ImmutableBytes.of(STATUS_UNKNOWN_ERROR)
+                    ByteString(STATUS_UNKNOWN_ERROR)
                 }
                 if (AndroidNfcSessionRegistry.isCurrent(pending.session.generation)) {
                     try {
-                        sendResponse(response.copy())
+                        sendResponse(response.toByteArray())
                         pending.session.responseSent(response)
                     } catch (_: Exception) {
                         AndroidNfcSessionRegistry.requestDisarm(
@@ -477,12 +478,12 @@ public abstract class AndroidMdocHostApduService : HostApduService() {
 
 internal object AndroidNfcSessionRegistry {
     internal interface Router {
-        suspend fun process(command: ByteArray): ImmutableBytes
+        suspend fun process(command: ByteArray): ByteString
         suspend fun deactivate(reason: ProximityCloseReason)
     }
 
     private class CommonRouter(private val delegate: NfcHostApduRouter) : Router {
-        override suspend fun process(command: ByteArray): ImmutableBytes = delegate.process(command)
+        override suspend fun process(command: ByteArray): ByteString = delegate.process(command)
         override suspend fun deactivate(reason: ProximityCloseReason) = delegate.deactivate(reason)
     }
 
@@ -504,8 +505,8 @@ internal object AndroidNfcSessionRegistry {
             responseDelivery.updateAndGet { if (it.isCompleted) CompletableDeferred() else it }
         }
 
-        fun responseSent(response: ImmutableBytes) {
-            val bytes = response.copy()
+        fun responseSent(response: ByteString) {
+            val bytes = response.toByteArray()
             // 61xx requires another GET RESPONSE; staging or sending the first fragment is not completion.
             if (bytes.size >= 2 && bytes[bytes.size - 2] != 0x61.toByte()) {
                 responseDelivery.get().complete(Unit)
@@ -513,9 +514,9 @@ internal object AndroidNfcSessionRegistry {
         }
 
         suspend fun awaitResponseDelivery(): Boolean =
-            withTimeoutOrNull(RESPONSE_DRAIN_TIMEOUT_MILLIS) { responseDelivery.get().await(); true } ?: false
+            withTimeoutOrNull(RESPONSE_DRAIN_TIMEOUT_MILLIS.milliseconds) { responseDelivery.get().await(); true } ?: false
 
-        suspend fun process(command: ByteArray): ImmutableBytes {
+        suspend fun process(command: ByteArray): ByteString {
             check(isCurrent(generation)) { "The Android NFC session is stale" }
             return router.process(command)
         }

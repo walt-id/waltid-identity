@@ -31,6 +31,9 @@ internal fun WalletScreen(
     onResetWallet: () -> Unit = { controller.resetWallet() },
     onSignOut: (() -> Unit)? = null,
     resetWalletDescription: String? = null,
+    allowWalletReset: Boolean = true,
+    allowCredentialDelete: Boolean = true,
+    serverSettingsContent: (@Composable () -> Unit)? = null,
 ) {
     val setup = state.session as? WalletSessionState.IdentitySetup
     if (setup != null) {
@@ -72,6 +75,8 @@ internal fun WalletScreen(
             readerTrustSettingsContent = readerTrustSettingsContent,
             readerTrustPolicySummary = readerTrustPolicySummary,
             onProximityApprovalModeChange = onStartProximityPresentation?.let { controller::setProximityApprovalMode },
+            allowWalletReset = allowWalletReset,
+            serverSettingsContent = serverSettingsContent,
         )
         return
     }
@@ -107,7 +112,7 @@ internal fun WalletScreen(
         when (state.selectedTab) {
             WalletDemoTab.Credentials -> CredentialsTab(
                 session = state.session,
-                onDeleteCredential = controller::deleteCredential,
+                onDeleteCredential = if (allowCredentialDelete) controller::deleteCredential else null,
                 onDetailsChromeChange = { detailsChrome = it },
                 modifier = modifier,
             )

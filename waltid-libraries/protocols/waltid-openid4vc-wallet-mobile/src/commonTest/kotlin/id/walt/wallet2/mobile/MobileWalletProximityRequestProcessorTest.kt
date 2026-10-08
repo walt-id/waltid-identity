@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.profile.IsoDocumentSignerX509CertificateProfile.profileDocumentSignerCertificate
@@ -50,7 +51,6 @@ import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.objects.session.SessionEstablishment
 import id.walt.mdoc.objects.session.SessionData
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocConsentPrompt
 import id.walt.mdoc.proximity.MdocHolderRequestContext
 import id.walt.mdoc.proximity.MdocResponseResolution
@@ -173,7 +173,7 @@ class ProximityRequestProcessorTest {
                 )
                 val preview = processor.preview(context)
                 val prompt = MdocConsentPrompt(
-                    bindingToken = ImmutableBytes.of(ByteArray(32) { (index + 16).toByte() }),
+                    bindingToken = ByteString(ByteArray(32) { (index + 16).toByte() }),
                     exchange = context.exchange,
                     preview = preview,
                 )
@@ -201,7 +201,7 @@ class ProximityRequestProcessorTest {
                     processor.resolve(context, preview),
                     scenario.id,
                 )
-                val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(resolution.exactResponse.copy())
+                val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(resolution.exactResponse.toByteArray())
                 val returned = response.documents.orEmpty().single().issuerSigned.namespaces.orEmpty()
                     .values
                     .flatMap { it.entries }
@@ -233,7 +233,7 @@ class ProximityRequestProcessorTest {
             )
             val preview = processor.preview(context)
             val prompt = MdocConsentPrompt(
-                bindingToken = ImmutableBytes.of(ByteArray(32) { 22 }),
+                bindingToken = ByteString(ByteArray(32) { 22 }),
                 exchange = context.exchange,
                 preview = preview,
             )
@@ -258,7 +258,7 @@ class ProximityRequestProcessorTest {
 
             assertEquals(null, processor.accept(prompt, review.reviewId, submission), "UC_DOMESTIC_DATA:consent")
             val resolution = assertIs<MdocResponseResolution.Send>(processor.resolve(context, preview))
-            val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(resolution.exactResponse.copy())
+            val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(resolution.exactResponse.toByteArray())
             val namespaces = response.documents.orEmpty().single().issuerSigned.namespaces.orEmpty()
             val returnedIdentifiers = namespaces.getValue(DOMESTIC_NAMESPACE).entries
                 .map { it.value.elementIdentifier }
@@ -294,7 +294,7 @@ class ProximityRequestProcessorTest {
             )
             val preview = processor.preview(context)
             val prompt = MdocConsentPrompt(
-                bindingToken = ImmutableBytes.of(ByteArray(32) { 21 }),
+                bindingToken = ByteString(ByteArray(32) { 21 }),
                 exchange = context.exchange,
                 preview = preview,
             )
@@ -314,7 +314,7 @@ class ProximityRequestProcessorTest {
 
             assertEquals(null, processor.accept(prompt, review.reviewId, submission))
             val resolution = assertIs<MdocResponseResolution.Send>(processor.resolve(context, preview))
-            val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(resolution.exactResponse.copy())
+            val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(resolution.exactResponse.toByteArray())
 
             assertEquals(2, review.documents.size, "UC_MULTIPLE_REQUESTS:review")
             assertEquals(2, response.documents.orEmpty().size, "UC_MULTIPLE_REQUESTS:response")
@@ -368,7 +368,7 @@ class ProximityRequestProcessorTest {
             val preview = processor.preview(context)
             val review = processor.review(
                 MdocConsentPrompt(
-                    bindingToken = ImmutableBytes.of(ByteArray(32) { 11 }),
+                    bindingToken = ByteString(ByteArray(32) { 11 }),
                     exchange = context.exchange,
                     preview = preview,
                 )
@@ -398,7 +398,7 @@ class ProximityRequestProcessorTest {
             val context = requestContext(fixture.readerEphemeralKey)
             val lowerPreview = processor.preview(context)
             val prompt = MdocConsentPrompt(
-                bindingToken = ImmutableBytes.of(ByteArray(32) { 7 }),
+                bindingToken = ByteString(ByteArray(32) { 7 }),
                 exchange = context.exchange,
                 preview = lowerPreview,
             )
@@ -441,7 +441,7 @@ class ProximityRequestProcessorTest {
                 processor.holderAuthorization(review.reviewId),
             )
             val resolution = assertIs<MdocResponseResolution.Send>(processor.resolve(context, lowerPreview))
-            val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(resolution.exactResponse.copy())
+            val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(resolution.exactResponse.toByteArray())
             assertIs<DeviceAuth.Signature>(response.documents?.single()?.deviceSigned?.deviceAuth)
             assertEquals(lowerPreview.submissionBindingDigest, resolution.submissionBindingDigest)
         }
@@ -464,7 +464,7 @@ class ProximityRequestProcessorTest {
             val context = requestContext(fixture.readerEphemeralKey)
             val lowerPreview = processor.preview(context)
             val prompt = MdocConsentPrompt(
-                bindingToken = ImmutableBytes.of(ByteArray(32) { 8 }),
+                bindingToken = ByteString(ByteArray(32) { 8 }),
                 exchange = context.exchange,
                 preview = lowerPreview,
             )
@@ -479,7 +479,7 @@ class ProximityRequestProcessorTest {
                 processor.holderAuthorization(review.reviewId).requests.single().deviceAuthentication,
             )
             val resolution = assertIs<MdocResponseResolution.Send>(processor.resolve(context, lowerPreview))
-            val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(resolution.exactResponse.copy())
+            val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(resolution.exactResponse.toByteArray())
             assertIs<DeviceAuth.Mac>(response.documents?.single()?.deviceSigned?.deviceAuth)
         }
     }
@@ -563,7 +563,7 @@ class ProximityRequestProcessorTest {
             val lowerPreview = processor.preview(context)
             val review = processor.review(
                 MdocConsentPrompt(
-                    bindingToken = ImmutableBytes.of(ByteArray(32) { 10 }),
+                    bindingToken = ByteString(ByteArray(32) { 10 }),
                     exchange = context.exchange,
                     preview = lowerPreview,
                 )
@@ -640,7 +640,7 @@ class ProximityRequestProcessorTest {
             val context = requestContext(fixture.readerEphemeralKey)
             val lowerPreview = processor.preview(context)
             val prompt = MdocConsentPrompt(
-                bindingToken = ImmutableBytes.of(ByteArray(32) { 9 }),
+                bindingToken = ByteString(ByteArray(32) { 9 }),
                 exchange = context.exchange,
                 preview = lowerPreview,
             )
@@ -1502,7 +1502,7 @@ class ProximityRequestProcessorTest {
             val credentialID = selection.documents.single().credentialId
             assertEquals(null, changed.accept(plan.scope.copy(credentials = plan.scope.credentials - credentialID), plan.review))
             assertEquals(null, changed.accept(plan.scope.copy(credentials = plan.scope.credentials +
-                (credentialID to ImmutableBytes.of(ByteArray(32) { 9 }))), plan.review))
+                (credentialID to ByteString(ByteArray(32) { 9 }))), plan.review))
             assertEquals("prepared_sharing_single_use", assertIs<ProximityPreparationResult.Rejected>(
                 plan.approve(selection.copy(continueAfterResponse = true))).error.code)
             processor.cancel()
@@ -1622,12 +1622,12 @@ class ProximityRequestProcessorTest {
                 MdocConsentDecision.Approve(prompt.bindingToken)
             }, context, capabilities)
         try {
-            loopback.reader.send(ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(SessionEstablishment(
+            loopback.reader.send(ByteString(coseCompliantCbor.encodeToByteArray(SessionEstablishment(
                 ByteStringWrapper(readerPublic, readerBytes), cipher.encrypt(coseCompliantCbor.encodeToByteArray(authenticate(request, transcript))),
             ))))
             val result = engine.run()
             val messages = mutableListOf<SessionData>()
-            while (true) messages += coseCompliantCbor.decodeFromByteArray<SessionData>((loopback.reader.receive() ?: break).copy())
+            while (true) messages += coseCompliantCbor.decodeFromByteArray<SessionData>((loopback.reader.receive() ?: break).toByteArray())
             assertEquals(20u, messages.lastOrNull()?.status, "Session result: $result")
             val encrypted = messages.mapNotNull { it.data }.single()
             WireOutcome(result, coseCompliantCbor.decodeFromByteArray<DeviceResponse>(cipher.decrypt(encrypted)), consentCalls)
@@ -1652,10 +1652,10 @@ class ProximityRequestProcessorTest {
         ).also { it.attach(processor) }
 
     private fun prompt(preview: MdocRequestPreview, exchange: Int) =
-        MdocConsentPrompt(ImmutableBytes.of(ByteArray(32) { exchange.toByte() }), exchange, preview)
+        MdocConsentPrompt(ByteString(ByteArray(32) { exchange.toByte() }), exchange, preview)
 
     private fun decodeResponse(response: MdocResponseResolution.Send): DeviceResponse =
-        coseCompliantCbor.decodeFromByteArray(response.exactResponse.copy())
+        coseCompliantCbor.decodeFromByteArray(response.exactResponse.toByteArray())
 
     private fun requestWithNames(vararg names: String) = DeviceRequest(
         version = DeviceRequest.VERSION,

@@ -35,6 +35,7 @@ private enum class SettingsDestination(val title: StringResource) {
     Technical(Res.string.settings_technical),
     Nearby(Res.string.settings_nearby),
     Connection(Res.string.settings_connection),
+    Server(Res.string.settings_server),
     ReaderAuthentication(Res.string.settings_reader_authentication),
     DigitalCredentialsApi(Res.string.settings_dc_api),
 }
@@ -57,6 +58,8 @@ internal fun SettingsScreen(
     readerTrustPolicySummary: String? = null,
     onProximityApprovalModeChange: ((WalletDemoProximityApprovalMode) -> Unit)? = null,
     resetWalletDescription: String? = null,
+    allowWalletReset: Boolean = true,
+    serverSettingsContent: (@Composable () -> Unit)? = null,
 ) {
     val currentState by rememberUpdatedState(state)
     val currentReaderPolicy by rememberUpdatedState(readerTrustPolicySummary)
@@ -90,6 +93,17 @@ internal fun SettingsScreen(
                         currentState.sharingSettingsError?.let { SettingsNotice(it, error = true) }
                         when (destination) {
                             SettingsDestination.Main -> {
+                                serverSettingsContent?.let {
+                                    SettingsSection {
+                                        SettingsNavigationRow(
+                                            stringResource(Res.string.settings_server),
+                                            { open(SettingsDestination.Server) },
+                                            Modifier.testTag(WalletUiTestTags.SettingsServer),
+                                            summary = stringResource(Res.string.settings_server_subtitle),
+                                            icon = { SettingsSymbol(Res.drawable.settings_connection) },
+                                        )
+                                    }
+                                }
                                 SettingsSection(stringResource(Res.string.settings_wallet)) {
                                     if (currentState.pinLockEnabled) {
                                         SettingsNavigationRow(stringResource(Res.string.settings_signing_key),
@@ -128,11 +142,13 @@ internal fun SettingsScreen(
                                         SettingsActionRow(stringResource(Res.string.settings_sign_out), signOut,
                                             Modifier.testTag(WalletUiTestTags.SettingsSignOut),
                                             icon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null) })
-                                        SettingsDivider()
+                                        if (allowWalletReset) SettingsDivider()
                                     }
-                                    SettingsActionRow(stringResource(Res.string.settings_reset), { confirmReset = true },
-                                        Modifier.testTag(WalletUiTestTags.SettingsReset), destructive = true,
-                                        icon = { Icon(Icons.Default.Refresh, null) })
+                                    if (allowWalletReset) {
+                                        SettingsActionRow(stringResource(Res.string.settings_reset), { confirmReset = true },
+                                            Modifier.testTag(WalletUiTestTags.SettingsReset), destructive = true,
+                                            icon = { Icon(Icons.Default.Refresh, null) })
+                                    }
                                 }
                             }
                             SettingsDestination.SigningKey -> {
@@ -217,6 +233,7 @@ internal fun SettingsScreen(
                                 SettingsNotice(stringResource(Res.string.settings_connection_footer))
                             }
                             SettingsDestination.ReaderAuthentication -> readerTrustSettingsContent?.invoke()
+                            SettingsDestination.Server -> serverSettingsContent?.invoke()
                             SettingsDestination.DigitalCredentialsApi -> {
                                 SettingsSection(footer = stringResource(Res.string.settings_review_description)) {
                                 SettingsToggleRow(stringResource(Res.string.settings_show_review), currentState.showDcApiPresentationPreview,
