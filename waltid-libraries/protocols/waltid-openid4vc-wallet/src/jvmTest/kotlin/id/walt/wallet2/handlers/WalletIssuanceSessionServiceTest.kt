@@ -27,6 +27,7 @@ import id.walt.credentials.examples.SdJwtExamples
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
+import id.walt.openid4vci.proofs.ProofType
 import id.walt.wallet2.data.HolderKeyBindingOrigin
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
@@ -614,7 +615,7 @@ class WalletIssuanceSessionServiceTest {
                 CREDENTIAL_ENDPOINT -> {
                     credentialCalls += 1
                     val body = Json.parseToJsonElement(request.bodyText()).jsonObject
-                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proof = body["proofs"]!!.jsonObject[ProofType.JWT.value]!!.jsonArray.single().jsonPrimitive.content
                     val proofHeader = jwtPart(proof, 0)
                     val proofPayload = jwtPart(proof, 1)
                     assertEquals("endpoint-nonce", proofPayload["nonce"]?.jsonPrimitive?.content)
@@ -679,7 +680,7 @@ class WalletIssuanceSessionServiceTest {
                 CREDENTIAL_ENDPOINT -> {
                     credentialCalls += 1
                     val body = Json.parseToJsonElement(request.bodyText()).jsonObject
-                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proof = body["proofs"]!!.jsonObject[ProofType.JWT.value]!!.jsonArray.single().jsonPrimitive.content
                     val proofPayload = jwtPart(proof, 1)
                     assertEquals(null, proofPayload["nonce"])
                     assertEquals(ISSUER, proofPayload["aud"]?.jsonPrimitive?.content)
@@ -711,7 +712,7 @@ class WalletIssuanceSessionServiceTest {
                 CREDENTIAL_ENDPOINT -> {
                     credentialCalls += 1
                     val body = Json.parseToJsonElement(request.bodyText()).jsonObject
-                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proof = body["proofs"]!!.jsonObject[ProofType.JWT.value]!!.jsonArray.single().jsonPrimitive.content
                     val proofPayload = jwtPart(proof, 1)
                     assertEquals(null, proofPayload["iss"])
                     jsonResponse(
@@ -741,7 +742,7 @@ class WalletIssuanceSessionServiceTest {
                 CREDENTIAL_ENDPOINT -> {
                     credentialCalls += 1
                     val body = Json.parseToJsonElement(request.bodyText()).jsonObject
-                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proof = body["proofs"]!!.jsonObject[ProofType.JWT.value]!!.jsonArray.single().jsonPrimitive.content
                     val proofPayload = jwtPart(proof, 1)
                     assertEquals("wallet-client", proofPayload["iss"]?.jsonPrimitive?.content)
                     jsonResponse(
@@ -1326,7 +1327,7 @@ class WalletIssuanceSessionServiceTest {
                 NONCE_ENDPOINT -> jsonResponse("""{"c_nonce":"endpoint-nonce"}""")
                 CREDENTIAL_ENDPOINT -> {
                     val body = Json.parseToJsonElement(request.bodyText()).jsonObject
-                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proof = body["proofs"]!!.jsonObject[ProofType.JWT.value]!!.jsonArray.single().jsonPrimitive.content
                     val proofHeader = jwtPart(proof, 0)
                     assertEquals(holderDidKeyId, proofHeader["kid"]?.jsonPrimitive?.content)
                     assertEquals(null, proofHeader["jwk"])
@@ -1371,7 +1372,7 @@ class WalletIssuanceSessionServiceTest {
                 NONCE_ENDPOINT -> jsonResponse("""{"c_nonce":"endpoint-nonce"}""")
                 CREDENTIAL_ENDPOINT -> {
                     val body = Json.parseToJsonElement(request.bodyText()).jsonObject
-                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proof = body["proofs"]!!.jsonObject[ProofType.JWT.value]!!.jsonArray.single().jsonPrimitive.content
                     val proofHeader = jwtPart(proof, 0)
                     assertEquals(null, proofHeader["kid"])
                     assertEquals(
@@ -1737,7 +1738,7 @@ class WalletIssuanceSessionServiceTest {
                 NONCE_ENDPOINT -> jsonResponse("""{"c_nonce":"endpoint-nonce"}""")
                 CREDENTIAL_ENDPOINT -> {
                     val body = Json.parseToJsonElement(request.bodyText()).jsonObject
-                    val proof = body["proofs"]!!.jsonObject["jwt"]!!.jsonArray.single().jsonPrimitive.content
+                    val proof = body["proofs"]!!.jsonObject[ProofType.JWT.value]!!.jsonArray.single().jsonPrimitive.content
                     assertEquals("EdDSA", jwtPart(proof, 0)["alg"]?.jsonPrimitive?.content)
                     jsonResponse("""{"transaction_id":"transaction-1","interval":7}""", HttpStatusCode.Accepted)
                 }

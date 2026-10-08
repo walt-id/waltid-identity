@@ -41,7 +41,7 @@ class AttestationX509CertificateValidatorTest {
         assertTrue(
             context.log.any {
                 it.severity == ValidationResult.Severity.ERROR &&
-                    it.message.contains("digitalSignature")
+                        it.message.contains("digitalSignature")
             }
         )
     }
@@ -65,7 +65,7 @@ class AttestationX509CertificateValidatorTest {
         assertTrue(
             context.log.any {
                 it.severity == ValidationResult.Severity.ERROR &&
-                    it.message.contains("verifier purpose")
+                        it.message.contains("verifier purpose")
             }
         )
     }
@@ -96,7 +96,11 @@ class AttestationX509CertificateValidatorTest {
             chainLength = 1,
             trustStore = InMemoryTrustStore(),
         )
-        context.setCurrent(AttestationX509CertificateValidator.id, certificateIndex = 0, certificateSubjectDn = "CN=leaf")
+        context.setCurrent(
+            AttestationX509CertificateValidator.id,
+            certificateIndex = 0,
+            certificateSubjectDn = "CN=leaf"
+        )
         return context
     }
 
@@ -126,6 +130,11 @@ class AttestationX509CertificateValidatorTest {
             override val signatureAlgorithmOid = ""
             override val signatureValueRaw = ByteString()
             override val encodedDer = ByteString()
+
+            override fun equals(other: Any?): Boolean =
+                encodedDer.equals((other as? X509Certificate)?.encodedDer)
+
+            override fun hashCode(): Int = encodedDer.hashCode()
         }
 
     private fun certificateWithExtendedKeyUsage(oid: String): X509Certificate =
@@ -154,5 +163,10 @@ class AttestationX509CertificateValidatorTest {
             override val signatureAlgorithmOid = ""
             override val signatureValueRaw = ByteString()
             override val encodedDer = ByteString()
+
+            override fun equals(other: Any?): Boolean =
+                encodedDer.equals((other as? X509Certificate)?.encodedDer)
+
+            override fun hashCode(): Int = encodedDer.hashCode()
         }
 }

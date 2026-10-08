@@ -28,10 +28,12 @@ import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.SigningAlgId
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.CredentialOfferRequest
+import id.walt.openid4vci.proofs.ProofType
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
+import id.walt.openid4vci.proofs.VerifiedJwtProof
+import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
@@ -160,15 +162,16 @@ class ProviderCredentialIssuanceTest {
             Crypto2JwtKeyResolver().resolveFromDid(holderDid, "$holderDid#unknown")
         }
         val proofPayload = buildJsonObject {
-            put("aud", issuerId)
+            put("aud", "https://issuer.example")
+            put("iat", Clock.System.now().epochSeconds)
             put("nonce", "nonce")
         }
         val proofJwt = holderKey.signJws(
             plaintext = proofPayload.toString().toByteArray(),
-            headers = mapOf("kid" to JsonPrimitive(holderKid)),
+            headers = mapOf("kid" to JsonPrimitive(holderKid), "typ" to JsonPrimitive("openid4vci-proof+jwt")),
         )
         val proofParam = buildJsonObject {
-            put("jwt", JsonArray(listOf(JsonPrimitive(proofJwt))))
+            put(ProofType.JWT.value, JsonArray(listOf(JsonPrimitive(proofJwt))))
         }.toString()
 
         // Wallet submits a credential request; issuer parses and validates it.
@@ -214,6 +217,7 @@ class ProviderCredentialIssuanceTest {
             issuerKey = Crypto2CredentialSigningKey.select(issuerKey, configuration),
             issuerId = issuerId,
             issuanceInputData = issuanceInputs(credentialData),
+            proofValidationContext = CredentialProofValidationContext(issuerMetadata.credentialIssuer),
         )
 
         assertTrue(credentialResponse is CredentialResponseResult.Success)
@@ -377,11 +381,13 @@ class ProviderCredentialIssuanceTest {
     }
 
     @Test
-    fun `sd-jwt rounding rejects generated expiry that would already be expired`() = runBlocking {
-        for (lifetime in listOf("10m", "0s", "-1d", "Infinity")) {
+    fun `invalid issuer configured sd-jwt expiry propagates as a configuration failure`() = runBlocking {
+        for (legacy in listOf(false, true)) for (lifetime in listOf("10m", "0s", "-1d", "Infinity")) {
             val mapping = buildJsonObject { put("exp", "<timestamp-in-seconds:$lifetime>") }
-            val result = issueTimeMappedSdJwt(mapping, "2026-09-10T17:43:28Z")
-            assertEquals(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, assertIs<CredentialResponseResult.Failure>(result).error.error)
+            val failure = assertFailsWith<IllegalArgumentException> {
+                issueTimeMappedSdJwt(mapping, "2026-09-10T17:43:28Z", legacy = legacy)
+            }
+            assertFalse(failure is id.walt.openid4vci.proofs.CredentialProofValidationException)
         }
     }
 
@@ -408,8 +414,8 @@ class ProviderCredentialIssuanceTest {
         )
         val batch = CredentialIssuanceBatch(
             inputs = List(count) { CredentialIssuanceInput(buildJsonObject { put("given_name", "Jane") }) },
-            verifiedProofs = List(count) { index ->
-                VerifiedCredentialProof("jwt", "", "ES256", buildJsonObject {}, buildJsonObject {}, key("holder-$index"), null, null, null)
+            bindings = List(count) { index ->
+                VerifiedJwtProof("", "ES256", buildJsonObject {}, buildJsonObject {}, key("holder-$index"), null, null, null).binding(index)
             },
         )
         var clockReads = 0

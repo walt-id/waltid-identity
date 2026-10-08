@@ -74,10 +74,10 @@ jobs:
 
   mobile-sdk-docs:
     if: ${{ github.event_name == 'workflow_dispatch' || inputs.generate-macos-docs }}
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 120
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
@@ -136,7 +136,6 @@ jobs:
         uses: ./waltid-identity/.github/actions/gradle-mobile-sdk-docs
         with:
           waltid-directory: 'waltid-identity'
-          xcode-developer-dir: ${{ env.DEVELOPER_DIR }}
           generate-dokka: true
           check-snippets: ${{ inputs.generate-linux-docs && 'false' || 'true' }}
           skip-wallet-core-assemble: ${{ inputs.wallet-core-artifact != '' && 'true' || 'false' }}

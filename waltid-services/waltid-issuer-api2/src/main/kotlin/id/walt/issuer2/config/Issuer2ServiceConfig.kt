@@ -1,5 +1,6 @@
 package id.walt.issuer2.config
 
+import id.walt.openid4vci.proofs.attestation.KeyAttestationConfig
 import id.walt.commons.config.WaltConfig
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -20,6 +21,7 @@ data class Issuer2ServiceConfig(
     val ciTokenStoredKey: String? = null,
     /** Enables batch credential issuance and defines the maximum accepted batch size. */
     val batchCredentialIssuance: BatchCredentialIssuance? = null,
+    val keyAttestationConfig: KeyAttestationConfig? = null,
 ) : WaltConfig() {
     /** Preserves the JVM constructor descriptor from before the StoredKey field was added. */
     constructor(

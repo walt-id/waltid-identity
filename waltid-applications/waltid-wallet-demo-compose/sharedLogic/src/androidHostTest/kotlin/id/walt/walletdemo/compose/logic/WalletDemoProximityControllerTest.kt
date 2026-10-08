@@ -1,11 +1,11 @@
 package id.walt.walletdemo.compose.logic
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.wallet2.mobile.ProximityApproval
 import id.walt.wallet2.mobile.ProximityBleConfiguration
 import id.walt.wallet2.mobile.ProximityNfcRetrievalConfiguration
 import id.walt.wallet2.mobile.ProximityRetrievalOptions
 import id.walt.wallet2.mobile.ProximitySharingPlan
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.wallet2.mobile.ProximityConnectedRoute
 import id.walt.wallet2.mobile.ProximityEngagementMethod
 import id.walt.wallet2.mobile.ProximityTransport
@@ -1336,7 +1336,7 @@ private fun wifiPermissionCapabilities(
 /** Host-only fixture. Permission invariants are covered by real signed-request tests in the SDK module. */
 private fun fixtureSharingPlan(review: ProximityReview): ProximitySharingPlan {
     val scopeType = Class.forName("id.walt.wallet2.mobile.ProximityApprovalScope")
-    val digest = ImmutableBytes.of(ByteArray(32) { 1 })
+    val digest = ByteString(ByteArray(32) { 1 })
     val credentials = review.documents.flatMap { it.credentialOptions }.associate { it.credentialId to digest }
     val scope = scopeType.declaredConstructors.single().apply { isAccessible = true }.newInstance(
         ProximityProfile.Iso180135Edition2Dis2026, "fixture-reader", digest, credentials, emptyList<Any>(),

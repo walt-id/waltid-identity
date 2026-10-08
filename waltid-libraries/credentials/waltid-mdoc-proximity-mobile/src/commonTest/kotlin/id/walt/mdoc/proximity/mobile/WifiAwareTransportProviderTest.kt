@@ -2,9 +2,9 @@
 
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.proximity.EngagementContext
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocEngagementMode
 import id.walt.mdoc.proximity.MdocProximityProfile
 import id.walt.mdoc.proximity.ProximityCloseReason
@@ -21,7 +21,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class WifiAwareTransportProviderTest {
-    private val eDeviceKeyBytes = ImmutableBytes.of(ByteArray(32) { it.toByte() })
+    private val eDeviceKeyBytes = ByteString(ByteArray(32) { it.toByte() })
     private val qrContext = EngagementContext(
         profile = MdocProximityProfile.ISO_18013_5_ED2_DIS_2026,
         maximumMessageBytes = 1024,
@@ -67,7 +67,7 @@ class WifiAwareTransportProviderTest {
         val provider = provider(platform)
         val qr = provider.prepare(qrContext, this)
         val nfcPlatform = FakeWifiAwarePlatform()
-        val nfcKeyBytes = ImmutableBytes.of(ByteArray(32) { (it + 1).toByte() })
+        val nfcKeyBytes = ByteString(ByteArray(32) { (it + 1).toByte() })
         val nfc = DefaultWifiAwareProximityTransportProvider(
             WifiAwareProximityTransportConfiguration(nfcKeyBytes), nfcPlatform,
         ).prepareReaderSelected(

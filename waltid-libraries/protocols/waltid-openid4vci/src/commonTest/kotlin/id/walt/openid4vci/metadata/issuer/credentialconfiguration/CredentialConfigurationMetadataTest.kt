@@ -9,7 +9,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialDisplayBackgroundImage
 import id.walt.openid4vci.metadata.issuer.CredentialDisplayLogo
 import id.walt.openid4vci.metadata.issuer.CredentialMetadata
 import id.walt.openid4vci.metadata.issuer.KeyAttestationsRequired
-import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
@@ -18,13 +18,13 @@ class CredentialConfigurationMetadataTest {
     @Test
     fun `key attestation requirements must not contain empty values`() {
         assertFailsWith<IllegalArgumentException> {
-            ProofType(
+            ProofTypeMetadata(
                 proofSigningAlgValuesSupported = setOf("ES256"),
                 keyAttestationsRequired = KeyAttestationsRequired(keyStorage = emptySet()),
             )
         }
         assertFailsWith<IllegalArgumentException> {
-            ProofType(
+            ProofTypeMetadata(
                 proofSigningAlgValuesSupported = setOf("ES256"),
                 keyAttestationsRequired = KeyAttestationsRequired(userAuthentication = emptySet()),
             )
@@ -33,7 +33,7 @@ class CredentialConfigurationMetadataTest {
 
     @Test
     fun `key attestation requirements can be empty`() {
-        ProofType(
+        ProofTypeMetadata(
             proofSigningAlgValuesSupported = setOf("ES256"),
             keyAttestationsRequired = KeyAttestationsRequired(),
         )

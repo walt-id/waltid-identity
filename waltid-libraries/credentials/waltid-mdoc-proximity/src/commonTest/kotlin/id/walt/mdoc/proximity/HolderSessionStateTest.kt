@@ -1,5 +1,6 @@
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -15,12 +16,12 @@ class HolderSessionStateTest {
                 ),
             )
         ),
-        submissionBindingDigest = ImmutableBytes.of(ByteArray(32) { it.toByte() }),
+        submissionBindingDigest = ByteString(ByteArray(32) { it.toByte() }),
     )
 
     @Test
     fun `display states expose only their legal user actions`() {
-        val prompt = MdocConsentPrompt(ImmutableBytes.of(ByteArray(32)), 1, preview)
+        val prompt = MdocConsentPrompt(ByteString(ByteArray(32)), 1, preview)
 
         assertEquals(emptySet(), MdocHolderSessionState.Idle.legalActions)
         assertEquals(
@@ -50,7 +51,7 @@ class HolderSessionStateTest {
         assertFailsWith<IllegalArgumentException> { MdocHolderSessionState.Terminating(0) }
         assertFailsWith<IllegalArgumentException> { MdocHolderSessionState.Completed(0) }
         assertFailsWith<IllegalArgumentException> {
-            MdocConsentPrompt(ImmutableBytes.of(ByteArray(31)), 1, preview)
+            MdocConsentPrompt(ByteString(ByteArray(31)), 1, preview)
         }
         assertFailsWith<IllegalArgumentException> {
             PreviewDocument(

@@ -5,8 +5,8 @@
 
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
-import id.walt.mdoc.proximity.ImmutableBytes
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -25,12 +25,12 @@ class NfcRetrievalApduProcessorTest {
         val pending = assertIs<NfcRetrievalApduResult.Request>(
             processor.process(envelope(request.copyOfRange(3, request.size), responseLength = 4)),
         )
-        assertContentEquals(byteArrayOf(1, 2, 3, 4, 5), pending.sessionMessage.copy())
+        assertContentEquals(byteArrayOf(1, 2, 3, 4, 5), pending.sessionMessage.toByteArray())
         assertEquals(NfcRetrievalState.AWAITING_WALLET_RESPONSE, processor.state)
 
-        val first = NfcResponseApdu.decode(processor.completeResponse(pending.identifier, byteArrayOf(9, 8, 7, 6, 5)).copy())
+        val first = NfcResponseApdu.decode(processor.completeResponse(pending.identifier, byteArrayOf(9, 8, 7, 6, 5)).toByteArray())
         assertEquals(0x6103u, first.statusWord)
-        assertContentEquals(NfcDo53.encode(byteArrayOf(9, 8, 7, 6, 5)).copyOfRange(0, 4), first.data.copy())
+        assertContentEquals(NfcDo53.encode(byteArrayOf(9, 8, 7, 6, 5)).copyOfRange(0, 4), first.data.toByteArray())
         val second = response(processor.process(getResponse(4)))
         assertEquals(NfcStatusWord.SUCCESS, second.statusWord)
         assertEquals(NfcRetrievalState.READY, processor.state)
@@ -55,7 +55,7 @@ class NfcRetrievalApduProcessorTest {
             val pending = assertIs<NfcRetrievalApduResult.Request>(
                 processor.process(envelope(NfcDo53.encode(byteArrayOf(value.toByte())), responseLength = 256)),
             )
-            val response = NfcResponseApdu.decode(processor.completeResponse(pending.identifier, byteArrayOf(value.toByte())).copy())
+            val response = NfcResponseApdu.decode(processor.completeResponse(pending.identifier, byteArrayOf(value.toByte())).toByteArray())
             assertEquals(NfcStatusWord.SUCCESS, response.statusWord)
             assertEquals(NfcRetrievalState.READY, processor.state)
         }
@@ -124,7 +124,7 @@ class NfcRetrievalApduProcessorTest {
                     0xc3u,
                     0u,
                     0u,
-                    ImmutableBytes.of(byteArrayOf(0x53)),
+                    ByteString(byteArrayOf(0x53)),
                     expectedResponseDataLength = 256,
                 ),
             )
@@ -136,7 +136,7 @@ class NfcRetrievalApduProcessorTest {
                     0xc3u,
                     0u,
                     0u,
-                    ImmutableBytes.of(byteArrayOf(0x53, 0x02, 0x01)),
+                    ByteString(byteArrayOf(0x53, 0x02, 0x01)),
                     expectedResponseDataLength = 256,
                 ),
             )
@@ -150,7 +150,7 @@ class NfcRetrievalApduProcessorTest {
                     0xc3u,
                     0u,
                     0u,
-                    ImmutableBytes.of(NfcDo53.encode(message)),
+                    ByteString(NfcDo53.encode(message)),
                     expectedResponseDataLength = 256,
                 ),
             ),
@@ -163,7 +163,7 @@ class NfcRetrievalApduProcessorTest {
                     0xc2u,
                     0u,
                     0u,
-                    ImmutableBytes.of(NfcDo53.encode(message)),
+                    ByteString(NfcDo53.encode(message)),
                     expectedResponseDataLength = 256,
                 ),
             )
@@ -189,7 +189,7 @@ class NfcRetrievalApduProcessorTest {
             0xc3u,
             0u,
             0u,
-            ImmutableBytes.of(data),
+            ByteString(data),
             responseLength,
         ).encode()
 
@@ -202,6 +202,6 @@ class NfcRetrievalApduProcessorTest {
     }
 
     private fun response(result: NfcRetrievalApduResult): NfcResponseApdu = NfcResponseApdu.decode(
-        assertIs<NfcRetrievalApduResult.Response>(result).encoded.copy(),
+        assertIs<NfcRetrievalApduResult.Response>(result).encoded.toByteArray(),
     )
 }

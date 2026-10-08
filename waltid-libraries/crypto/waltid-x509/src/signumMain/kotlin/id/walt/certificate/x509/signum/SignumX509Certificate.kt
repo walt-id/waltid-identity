@@ -61,4 +61,8 @@ class SignumX509Certificate(
                 throw IllegalArgumentException("Invalid certificate extension", error)
             }
     }
+
+    override fun hashCode(): Int = encodedDer.hashCode()
+
+    override fun equals(other: Any?): Boolean = encodedDer == (other as? X509Certificate)?.encodedDer
 }

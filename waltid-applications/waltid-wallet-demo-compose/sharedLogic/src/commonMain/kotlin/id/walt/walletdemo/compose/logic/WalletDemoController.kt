@@ -767,7 +767,7 @@ class WalletDemoController(
                 val installed = updateIfCurrent(request, WalletOperationState.ResolvingOffer) {
                     it.copy(
                         offerPreview = session.preview,
-                        issuanceCopyCounts = session.preview.offeredCredentials.associate { it.configurationId to 1 },
+                        issuanceCopyCounts = initialIssuanceCopyCounts(session.preview),
                         operation = WalletOperationState.OfferPreview,
                     )
                 }
@@ -800,7 +800,7 @@ class WalletDemoController(
         val current = _state.value
         val preview = current.offerPreview ?: return
         if (!current.offerReviewEnabled || preview.offeredCredentials.none { it.configurationId == configurationId }) return
-        val count = copies.coerceIn(0, (preview.batchSize ?: 1).coerceAtLeast(1))
+        val count = copies.coerceIn(0, issuanceCopyLimit(preview, current.issuanceCopyCounts, configurationId))
         _state.compareAndSet(current, current.copy(issuanceCopyCounts = current.issuanceCopyCounts + (configurationId to count)))
     }
 

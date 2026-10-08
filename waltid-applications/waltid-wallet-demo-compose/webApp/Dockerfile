@@ -27,7 +27,8 @@ RUN chmod +x ./gradlew \
     && ENTRY="$(sed -n 's/.*<script src="\([^"]*\)".*/\1/p' /out/index.html | head -n1)" \
     && test -n "$ENTRY" \
     && test -f "/out/$ENTRY" \
-    && grep -q "__WALLET_API2_BASE_URL__" /out/index.html
+    && grep -q "__WALLET_API2_BASE_URL__" /out/index.html \
+    && grep -q "__WALLET_API_FLAVOR__" /out/index.html
 
 # RUN
 FROM nginxinc/nginx-unprivileged:1.27-alpine

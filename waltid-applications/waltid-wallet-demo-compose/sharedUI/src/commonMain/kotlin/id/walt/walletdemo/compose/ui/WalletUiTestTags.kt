@@ -20,6 +20,7 @@ internal object WalletUiTestTags {
     val SettingsScreen = tag("settingsScreen")
     val SettingsSigningKey = tag("settingsSigningKey")
     val SettingsTechnicalDetails = tag("settingsTechnicalDetails")
+    val SettingsServer = tag("settingsServer")
     val SettingsConnectionMethod = tag("settingsConnectionMethod")
     val SettingsDigitalCredentialsApi = tag("settingsDigitalCredentialsApi")
     val SettingsBack = tag("settingsBack")

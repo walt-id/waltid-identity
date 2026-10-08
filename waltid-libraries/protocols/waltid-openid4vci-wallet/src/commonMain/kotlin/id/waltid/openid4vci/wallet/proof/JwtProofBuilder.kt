@@ -8,7 +8,8 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.keys.toPublicJwk
-import id.walt.openid4vci.prooftypes.Proofs
+import id.walt.openid4vci.proofs.ProofType
+import id.walt.openid4vci.proofs.Proofs
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.utils.io.core.*
 import kotlinx.serialization.json.Json
@@ -25,7 +26,7 @@ private val log = KotlinLogging.logger {}
  */
 class JwtProofBuilder : ProofOfPossessionBuilder, Crypto2ProofOfPossessionBuilder {
 
-    override val proofType: String = "jwt"
+    override val proofType: ProofType = ProofType.JWT
 
     private val json = Json {
         ignoreUnknownKeys = true
