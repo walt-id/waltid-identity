@@ -65,6 +65,16 @@ class Issuer2OpenApiCompatibilityTest {
             }
             assertEquals(statuses.size, statuses.distinct().size)
         }
+        val webhookExample = examples.getValue(
+            "[pre-authorized][single][by-reference][webhook runtime override]"
+        ).jsonObject.getValue("value")
+        val webhookRequest = Json.decodeFromJsonElement<CredentialOfferCreateRequest>(webhookExample)
+        val webhook = assertNotNull(webhookRequest.runtimeOverrides?.notifications?.webhook)
+        assertEquals("https://example.com/webhook/issuance-status", webhook.url)
+        assertEquals(8, webhook.retryPolicy.maxAttempts)
+        assertEquals(2, webhook.retryPolicy.initialBackoffSeconds)
+        assertEquals(120, webhook.retryPolicy.maxBackoffSeconds)
+        assertEquals(2.0, webhook.retryPolicy.backoffMultiplier)
         val responses = resolve(body(offer.getValue("responses").jsonObject.getValue("201").jsonObject))
             .getValue("anyOf").jsonArray.map(::resolve)
         assertEquals(1, responses.count { "profileId" in it.getValue("properties").jsonObject })

@@ -156,6 +156,25 @@ object Issuer2RequestExamples {
         ),
     )
 
+    val PROFILE_PRE_AUTHORIZED_OFFER_WITH_WEBHOOK_RUNTIME_OVERRIDE = mapOf(
+        "profileId" to W3C_PROFILE_ID,
+        "authMethod" to "PRE_AUTHORIZED",
+        "valueMode" to "BY_REFERENCE",
+        "runtimeOverrides" to mapOf(
+            "notifications" to mapOf(
+                "webhook" to mapOf(
+                    "url" to "https://example.com/webhook/issuance-status",
+                    "retry_policy" to mapOf(
+                        "max_attempts" to 8,
+                        "initial_backoff_seconds" to 2,
+                        "max_backoff_seconds" to 120,
+                        "backoff_multiplier" to 2.0,
+                    ),
+                ),
+            ),
+        ),
+    )
+
     val PROFILE_PRE_AUTHORIZED_OFFER_WITH_ISSUER_KEY_OVERRIDE = PROFILE_PRE_AUTHORIZED_OFFER.copy(
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
         profileId = W3C_PROFILE_ID,

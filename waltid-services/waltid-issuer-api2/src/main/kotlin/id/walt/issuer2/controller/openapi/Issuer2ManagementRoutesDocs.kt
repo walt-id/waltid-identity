@@ -183,6 +183,9 @@ object Issuer2ManagementRoutesDocs {
                 example("[pre-authorized][single][by-reference][credentialData override]") {
                     value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE
                 }
+                example("[pre-authorized][single][by-reference][webhook runtime override]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_WEBHOOK_RUNTIME_OVERRIDE
+                }
                 example("[pre-authorized][single][by-reference][issuerKey override]") {
                     value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_ISSUER_KEY_OVERRIDE
                 }
