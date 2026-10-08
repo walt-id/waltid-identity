@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.sessions
 
+import id.walt.ktorauthnz.utils.ExternalMappingList
 import id.walt.ktorauthnz.exceptions.AuthSessionNotFoundException
 import id.walt.ktorauthnz.valkey.ValkeyConnection
 import io.github.domgew.kedis.arguments.value.SetOptions
@@ -60,6 +61,12 @@ class ValkeySessionStore(
     override suspend fun dropSession(id: String) {
         removeSessionIdFromAccountSessions(id)
         redis.execute(del("session:$id"))
+        dropExternalIdMappings(id)
+    }
+
+    /** The external ids (e.g. the OIDC `sid`) of a session that is gone, so they do not point at it any more. */
+    private suspend fun dropExternalIdMappings(sessionId: String) {
+        for (namespace in ExternalMappingList.ALL_EXTERNAL_MAPPINGS) dropExternalIdMappingByInternal(namespace, sessionId)
     }
 
     /** Unfinished sessions live [pendingSessionLifetime]; finished ones until their expiration, at most [expiration]. */
@@ -100,14 +107,16 @@ class ValkeySessionStore(
         val sessionIds = redis.execute(KedisHashCommands.hashKeys("account-sessions:${accountId}")).orEmpty()
         if (sessionIds.isNotEmpty()) redis.execute(del(*sessionIds.map { "session:$it" }.toTypedArray()))
         redis.execute(del("account-sessions:${accountId}"))
+        sessionIds.forEach { dropExternalIdMappings(it) }
     }
 
     // -- External id --
 
     override suspend fun storeExternalIdMapping(namespace: String, externalId: String, internalSessionId: String) {
         redis.pipelined().apply {
-            enqueue(KedisValueCommands.set("externalid-forward:$namespace:$externalId", internalSessionId))
-            enqueue(KedisValueCommands.set("externalid-backward:$namespace:$internalSessionId", externalId))
+            // Expire like sessions do, so mappings of sessions that simply expired do not stay forever.
+            enqueue(KedisValueCommands.set("externalid-forward:$namespace:$externalId", internalSessionId, option))
+            enqueue(KedisValueCommands.set("externalid-backward:$namespace:$internalSessionId", externalId, option))
         }.execute()
     }
 
@@ -135,7 +144,9 @@ class ValkeySessionStore(
 
     override suspend fun dropExternalIdMappingByInternal(namespace: String, internalSessionId: String) {
         val externalId = resolveExternalIdMappingBackward(namespace, internalSessionId)
-        removeExternalIdMapping(namespace, externalId, internalSessionId)
+        // The external id may have been mapped to a newer session since; that mapping stays.
+        val forwardStillOurs = externalId != null && resolveExternalIdMapping(namespace, externalId) == internalSessionId
+        removeExternalIdMapping(namespace, externalId?.takeIf { forwardStillOurs }, internalSessionId)
     }
 
 
