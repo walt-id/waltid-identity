@@ -326,7 +326,7 @@ actor MockWalletClient: WalletClient {
                 name: "given_name",
                 valueJSON: "\"Ada\"",
                 displayValue: "Ada",
-                selectivelyDisclosable: true
+                selectivelyDisclosable: true, required: true, selectable: false
             )
         ]
         if let samplePortraitDisclosureValueJSON {
@@ -358,7 +358,7 @@ actor MockWalletClient: WalletClient {
                     name: "Identity disclosure",
                     valueJSON: "\"Ada\"",
                     displayValue: "Ada",
-                    selectivelyDisclosable: true
+                    selectivelyDisclosable: true, required: true, selectable: false
                 )
             ]),
             defaultOption.with(queryID: "age", disclosures: [
@@ -367,7 +367,7 @@ actor MockWalletClient: WalletClient {
                     name: "Age disclosure",
                     valueJSON: "\"Over 18\"",
                     displayValue: "Over 18",
-                    selectivelyDisclosable: true
+                    selectivelyDisclosable: true, required: true, selectable: false
                 )
             ])
         ]
@@ -389,6 +389,7 @@ actor MockWalletClient: WalletClient {
     {
       "vct": "https://issuer.example/credential-types/mobile-driving-licence",
       "given_name": "Ada",
+      "age_over_18": true,
       "family_name": "Lovelace",
       "valid_to": 1781654400,
       "resident_address": {

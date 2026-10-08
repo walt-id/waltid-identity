@@ -1770,6 +1770,9 @@ public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
     /// Whether apps may let the user toggle this claim for submission.
     public let selectable: Bool
 
+    /// False for additional clear-text data the credential must transmit even when not requested.
+    public let requested: Bool
+
     /// Creates a presentation disclosure.
     ///
     /// - Parameters:
@@ -1788,7 +1791,8 @@ public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
         displayValue: String?,
         selectivelyDisclosable: Bool,
         required: Bool? = nil,
-        selectable: Bool? = nil
+        selectable: Bool? = nil,
+        requested: Bool = true
     ) {
         self.path = path
         self.name = name
@@ -1797,6 +1801,9 @@ public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
         self.selectivelyDisclosable = selectivelyDisclosable
         let resolvedRequired = required ?? !selectivelyDisclosable
         let resolvedSelectable = selectable ?? (selectivelyDisclosable && !resolvedRequired)
+        precondition(requested || (!selectivelyDisclosable && !resolvedRequired && !resolvedSelectable),
+            "Additional shared data must be immutable and independent of request requirements.")
+        self.requested = requested
         precondition(
             Self.hasValidSelectionState(
                 selectivelyDisclosable: selectivelyDisclosable,

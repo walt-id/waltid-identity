@@ -123,17 +123,30 @@ internal object WalletVisualFixtures {
     }
 
     val sharingCredentials: List<WalletDemoPresentationCredentialOption> get() =
-        data.getValue("sharing").jsonObject.getValue("credentials").jsonArray.map { item ->
+        sharingCredentials("sharing")
+
+    val informationCredentials: List<WalletDemoPresentationCredentialOption> get() = sharingCredentials("sharingInformation")
+
+    private fun sharingCredentials(key: String): List<WalletDemoPresentationCredentialOption> =
+        data.getValue(key).jsonObject.getValue("credentials").jsonArray.map { item ->
             val credential = item.jsonObject
             WalletDemoPresentationCredentialOption(
                 queryId = credential.text("queryId"), credentialId = credential.text("credentialId"),
                 label = credential.text("title"), issuer = credential.text("issuer"), format = credential.text("format"),
-                credentialDataJson = "{}",
+                credentialDataJson = credential.getValue("data").toString(),
+                metadataJson = credential["backgroundColor"]?.let { buildJsonObject {
+                    put("credentialDisplay", buildJsonArray { add(buildJsonObject {
+                        put("name", credential.text("title")); put("background_color", it)
+                    }) })
+                }.toString() },
                 disclosures = credential.getValue("disclosures").jsonArray.map {
                     val claim = it.jsonObject
                     WalletDemoPresentationDisclosure(label = claim.text("label"), path = claim.text("path"),
                         valueJson = JsonPrimitive(claim.text("value")).toString(), displayValue = claim.text("value"),
-                        selectivelyDisclosable = false)
+                        selectivelyDisclosable = claim.getValue("selective").jsonPrimitive.boolean,
+                        required = claim.getValue("required").jsonPrimitive.boolean,
+                        selectable = claim.getValue("selectable").jsonPrimitive.boolean,
+                        requested = claim.getValue("requested").jsonPrimitive.boolean)
                 },
             )
         }

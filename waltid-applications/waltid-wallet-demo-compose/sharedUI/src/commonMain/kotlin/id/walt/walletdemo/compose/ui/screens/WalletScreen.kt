@@ -161,9 +161,9 @@ internal fun WalletScreen(
             selectedCredentials = state.selectedPresentationCredentialOptions,
             selectedDisclosures = state.selectedPresentationDisclosureOptions,
             enabled = !state.isBusy,
-            onToggleDisclosure = controller::togglePresentationDisclosure,
             onClose = returnHome.takeIf { !state.isBusy },
-            modifier = Modifier.fillMaxSize(),
+            // This flow bypasses Scaffold; it owns and consumes the remaining bottom inset.
+            modifier = Modifier.fillMaxSize().navigationBarsPadding(),
         ) {
             Column(Modifier.fillMaxSize()) {
                 WalletHeader(state, onSettings = null, onClose = returnHome.takeIf { !state.isBusy },

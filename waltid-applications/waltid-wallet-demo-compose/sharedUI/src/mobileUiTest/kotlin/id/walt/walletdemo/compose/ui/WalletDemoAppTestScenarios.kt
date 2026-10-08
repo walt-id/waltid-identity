@@ -1075,12 +1075,14 @@ class WalletDemoAppTestScenarios(
         onNodeWithText("Example Verifier").performScrollTo().assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.PresentationResponseProtectionSection).assertCountEquals(0)
         onAllNodesWithTag(WalletUiTestTags.PresentationTechnicalDetailsSection).assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.presentationCredential(samplePresentationCredentialOption.selection.id)).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.presentationCredential(samplePresentationCredentialOption.selection.id), useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(samplePresentationCredentialOption.selection.id)).performScrollTo().assertIsDisplayed()
 
+        onNodeWithText("Disclosure 7").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(samplePresentationCredentialOption.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
-        onNodeWithText("Disclosure 7").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Family name").performScrollTo().assertIsDisplayed()
         onAllNodesWithTag("wallet.credentialDetailsScreen").assertCountEquals(0)
         onNodeWithTag("wallet-detail-back").performClick()
         onAllNodesWithTag(WalletUiTestTags.PresentationClaimsDialog).assertCountEquals(0)
@@ -1176,27 +1178,28 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
         val portraitDisclosurePath = "disclosures[0].portrait"
-        onAllNodesWithTag(WalletUiTestTags.claim(portraitDisclosurePath)).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.claim(portraitDisclosurePath)).performScrollTo().assertIsDisplayed()
+        awaitEnabledImage(portraitDisclosurePath)
 
         onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(pathOnlyPortraitDisclosureCredentialOption.selection.id)).performScrollTo().performClick()
         onAllNodesWithTag(WalletUiTestTags.CredentialDetailsScreen).assertCountEquals(0)
         onAllNodesWithText("$.portrait").assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.claim(portraitDisclosurePath)).performScrollTo().assertIsDisplayed()
-        awaitTaggedNode(WalletUiTestTags.claimImage(portraitDisclosurePath))
-        awaitEnabledImage(portraitDisclosurePath)
-        onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath))
+        onNodeWithTag(WalletUiTestTags.claim("portrait")).performScrollTo().assertIsDisplayed()
+        awaitTaggedNode(WalletUiTestTags.claimImage("portrait"))
+        awaitEnabledImage("portrait")
+        onNodeWithTag(WalletUiTestTags.claimImage("portrait"))
             .performScrollTo()
             .assertIsDisplayed()
             .assertHasClickAction()
             .performClick()
-        onNodeWithTag(WalletUiTestTags.claimImageViewer(portraitDisclosurePath)).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImageViewer("portrait")).assertIsDisplayed()
         onNodeWithContentDescription("Full-screen credential image").assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.claimImageViewerClose(portraitDisclosurePath))
+        onNodeWithTag(WalletUiTestTags.claimImageViewerClose("portrait"))
             .assertIsDisplayed()
             .performClick()
-        onAllNodesWithTag(WalletUiTestTags.claimImageViewer(portraitDisclosurePath)).assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.claimImageViewer("portrait")).assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath)).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImage("portrait")).assertIsDisplayed()
     }
 
     fun presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails() = runComposeUiTest {
@@ -1235,7 +1238,7 @@ class WalletDemoAppTestScenarios(
                     path = identityDisclosure.path,
                     valueJson = "\"Ada\"",
                     displayValue = "Ada",
-                    selectivelyDisclosable = true,
+                    selectivelyDisclosable = true, required = true, selectable = false,
                 )
             ),
         )
@@ -1247,14 +1250,16 @@ class WalletDemoAppTestScenarios(
                     path = ageDisclosure.path,
                     valueJson = "\"Over 18\"",
                     displayValue = "Over 18",
-                    selectivelyDisclosable = true,
+                    selectivelyDisclosable = true, required = true, selectable = false,
                 )
             ),
         )
+        val ageWithStoredValue = ageOption.copy(credentialDataJson = """{"given_name":"Ada","age_over_18":true}""")
+        val identityWithStoredValue = identityOption.copy(credentialDataJson = ageWithStoredValue.credentialDataJson)
         val wallet = WalletUiTestWallet(
             credentials = listOf(sampleCredential),
             presentationPreview = samplePresentationPreview.copy(
-                credentialOptions = listOf(identityOption, ageOption),
+                credentialOptions = listOf(identityWithStoredValue, ageWithStoredValue),
                 credentialRequirements = listOf(
                     WalletDemoPresentationCredentialRequirement(options = listOf(listOf("identity", "age")))
                 ),
@@ -1276,10 +1281,13 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(identityOption.selection.id)).performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsEnabled()
 
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(ageOption.selection.id)).performScrollTo().performClick()
+        onNodeWithText("Identity disclosure").performScrollTo().assertIsDisplayed()
         onNodeWithText("Age disclosure").performScrollTo().assertIsDisplayed()
         onNodeWithText("Over 18").performScrollTo().assertIsDisplayed()
-        onAllNodesWithText("Identity disclosure").assertCountEquals(0)
+        onAllNodesWithTag(WalletUiTestTags.presentationClaimsToggle(ageOption.selection.id)).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(identityOption.selection.id)).performScrollTo().performClick()
+        onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Age over 18").performScrollTo().assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.CredentialDetailsScreen).assertCountEquals(0)
     }
 
@@ -1301,7 +1309,7 @@ class WalletDemoAppTestScenarios(
 
         onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(samplePresentationCredentialOption.selection.id)).performScrollTo().performClick()
         onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
-        onNodeWithText("Requested disclosures").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Requested").performScrollTo().assertIsDisplayed()
         onAllNodesWithTag("wallet.credentialDetailsScreen").assertCountEquals(0)
         onNodeWithTag("wallet-detail-back").performClick()
         onAllNodesWithTag(WalletUiTestTags.PresentationClaimsDialog).assertCountEquals(0)
@@ -2137,7 +2145,7 @@ class WalletDemoAppTestScenarios(
     private fun ComposeUiTest.assertPresentationActionsFollowReviewContent() {
         val expectedCredentialTag = WalletUiTestTags.presentationCredential(samplePresentationCredentialOption.selection.id)
         onNodeWithText("Example Verifier").performScrollTo().assertIsDisplayed()
-        onNodeWithTag(expectedCredentialTag).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(expectedCredentialTag, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         onNodeWithTag("wallet.presentationActions").assertIsDisplayed()
         onAllNodesWithTag(WalletUiTestTags.PresentationResponseProtectionSection).assertCountEquals(0)
         onAllNodesWithTag(WalletUiTestTags.PresentationTechnicalDetailsSection).assertCountEquals(0)
@@ -2261,6 +2269,7 @@ class WalletDemoAppTestScenarios(
                         disclosures = (1..7).map { index ->
                             WalletDemoPresentationDisclosure(
                                 label = "Disclosure $index",
+                                path = "$.disclosure_$index",
                                 valueJson = "\"Value $index\"",
                                 displayValue = "Value $index",
                                 selectivelyDisclosable = true,
@@ -2271,6 +2280,7 @@ class WalletDemoAppTestScenarios(
                             valueJson = samplePortraitDisclosureValueJson,
                             displayValue = null,
                             selectivelyDisclosable = true,
+                            required = true, selectable = false,
                         ),
                     )
                 ),
@@ -2303,6 +2313,7 @@ class WalletDemoAppTestScenarios(
                         valueJson = samplePortraitDisclosureValueJson,
                         displayValue = null,
                         selectivelyDisclosable = true,
+                        required = true, selectable = false,
                     )
                 ),
             )
