@@ -41,14 +41,14 @@ sealed interface MetadataSigningMethod {
     @SerialName("key-reference")
     data class KeyReference @JvmOverloads constructor(
         val reference: String,
-        /** Optional public chain, leaf first. Overrides certificates supplied by the resolver. */
-        val certificateChainPem: List<String>? = null,
+        /** Optional certificate-store references, leaf first. Overrides certificates supplied by the key resolver. */
+        val x5cReferences: List<String>? = null,
     ) : MetadataSigningMethod {
         init {
             require(reference.isNotBlank()) { "Metadata signing key reference must not be blank" }
-            require(certificateChainPem == null ||
-                certificateChainPem.isNotEmpty() && certificateChainPem.all { it.isNotBlank() }) {
-                "signedMetadata.certificateChainPem must contain PEM certificates, leaf first"
+            require(x5cReferences == null ||
+                x5cReferences.isNotEmpty() && x5cReferences.all { it.isNotBlank() }) {
+                "signedMetadata.x5cReferences must contain certificate references, leaf first"
             }
         }
 

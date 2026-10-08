@@ -11,6 +11,12 @@ fun interface MetadataJwtSigner {
         suspend fun dedicatedSigner(
             config: SignedMetadataConfig?,
             resolver: MetadataSigningKeyReferenceResolver? = null,
+        ): MetadataJwtSigner? = dedicatedSigner(config, resolver, null)
+
+        suspend fun dedicatedSigner(
+            config: SignedMetadataConfig?,
+            resolver: MetadataSigningKeyReferenceResolver?,
+            certificateResolver: MetadataSigningCertificateReferenceResolver?,
         ): MetadataJwtSigner? = when (val signing = config?.signingMethod) {
             null -> null
             is MetadataSigningMethod.StaticJwk -> JwkMetadataSigner.load(signing)
@@ -25,7 +31,19 @@ fun interface MetadataJwtSigner {
                     throw IllegalArgumentException("signedMetadata key-reference could not be resolved")
                 }
                 requireNotNull(material) { "signedMetadata key-reference signing key is unavailable" }
-                val certificateChain = signing.certificateChainPem ?: material.certificateChainPem
+                val certificateChain = signing.x5cReferences?.let { references ->
+                    requireNotNull(certificateResolver) { "signedMetadata x5cReferences requires a certificate resolver" }
+                    references.map { reference ->
+                        val certificate = try {
+                            certificateResolver.resolve(reference)
+                        } catch (cause: CancellationException) {
+                            throw cause
+                        } catch (_: Exception) {
+                            throw IllegalArgumentException("signedMetadata certificate reference could not be resolved")
+                        }
+                        requireNotNull(certificate) { "signedMetadata referenced certificate is unavailable" }
+                    }
+                } ?: material.certificateChainPem
                 if (certificateChain != null) {
                     CertificateMetadataSigner.fromKey(material.key, certificateChain)
                 } else {

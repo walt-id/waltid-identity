@@ -77,22 +77,30 @@ class MetadataSigningKeyReferenceTest {
             )
         }
         val chain = fixture.config().certificateChainPem
-        val config = config(MetadataSigningMethod.KeyReference("kms.metadata-key", chain))
+        val references = chain.indices.map { "certificates.cert-$it" }
+        val config = config(MetadataSigningMethod.KeyReference("kms.metadata-key", references))
         val decoded = Json.decodeFromString<SignedMetadataConfig>(Json.encodeToString(SignedMetadataConfig.serializer(), config))
         assertEquals(config, decoded)
         var resolutions = 0
-        val signer = assertNotNull(MetadataJwtSigner.dedicatedSigner(decoded) {
+        val certificateResolutions = mutableListOf<String>()
+        val signer = assertNotNull(MetadataJwtSigner.dedicatedSigner(decoded, MetadataSigningKeyReferenceResolver {
             assertEquals("kms.metadata-key", it)
             resolutions++
             ResolvedMetadataSigningKey(remote)
-        })
+        }, MetadataSigningCertificateReferenceResolver {
+            certificateResolutions.add(it)
+            chain[references.indexOf(it)]
+        }))
         repeat(2) {
             val jwt = signer.sign(metadata)
             assertTrue(MetadataCertificateFixture.verifies(jwt, fixture.leaf))
             assertNull(jwt.decodeJws().header["jwk"])
             assertEquals(chain.size, jwt.decodeJws().header["x5c"]!!.jsonArray.size)
+            assertEquals(fixture.chain.map { java.util.Base64.getEncoder().encodeToString(it.encoded) },
+                jwt.decodeJws().header["x5c"]!!.jsonArray.map { it.jsonPrimitive.content })
         }
         assertEquals(1, resolutions)
+        assertEquals(references, certificateResolutions)
     }
 
     @Test
@@ -100,20 +108,46 @@ class MetadataSigningKeyReferenceTest {
         val fixture = MetadataCertificateFixture()
         val key = fixture.crypto2SigningKey()
         val other = MetadataCertificateFixture()
+        val references = fixture.config().certificateChainPem.indices.map { "certificates.cert-$it" }
         val signer = assertNotNull(MetadataJwtSigner.dedicatedSigner(
-            config(MetadataSigningMethod.KeyReference("key", fixture.config().certificateChainPem)),
-        ) { ResolvedMetadataSigningKey(key, other.config().certificateChainPem) })
+            config(MetadataSigningMethod.KeyReference("key", references)),
+            MetadataSigningKeyReferenceResolver { ResolvedMetadataSigningKey(key, other.config().certificateChainPem) },
+            MetadataSigningCertificateReferenceResolver { fixture.config().certificateChainPem[references.indexOf(it)] },
+        ))
         assertTrue(MetadataCertificateFixture.verifies(signer.sign(metadata), fixture.leaf))
 
         for (chain in listOf(listOf("garbage"), other.config().certificateChainPem)) {
             assertFailsWith<IllegalArgumentException> {
-                MetadataJwtSigner.dedicatedSigner(config(MetadataSigningMethod.KeyReference("key", chain))) {
-                    ResolvedMetadataSigningKey(key, fixture.config().certificateChainPem)
-                }
+                MetadataJwtSigner.dedicatedSigner(config(MetadataSigningMethod.KeyReference("key", references)),
+                    MetadataSigningKeyReferenceResolver { ResolvedMetadataSigningKey(key, fixture.config().certificateChainPem) },
+                    MetadataSigningCertificateReferenceResolver { chain.getOrElse(references.indexOf(it)) { "garbage" } },
+                )
             }
         }
         assertFailsWith<IllegalArgumentException> { MetadataSigningMethod.KeyReference("key", emptyList()) }
         assertFailsWith<IllegalArgumentException> { MetadataSigningMethod.KeyReference("key", listOf(" ")) }
+    }
+
+    @Test
+    fun `missing certificate resolver or unavailable certificates never fall back and errors redact provider details`() = runTest {
+        val key = MetadataCertificateFixture().crypto2SigningKey()
+        val config = config(MetadataSigningMethod.KeyReference("key", listOf("private-certificate-reference")))
+        val resolver = MetadataSigningKeyReferenceResolver { ResolvedMetadataSigningKey(key) }
+        assertFailsWith<IllegalArgumentException> { MetadataJwtSigner.dedicatedSigner(config, resolver) }
+        for (certificateResolver in listOf(
+            MetadataSigningCertificateReferenceResolver { null },
+            MetadataSigningCertificateReferenceResolver { error("certificate-provider-secret") },
+        )) {
+            val error = assertFailsWith<IllegalArgumentException> {
+                MetadataJwtSigner.dedicatedSigner(config, resolver, certificateResolver)
+            }
+            assertFalse(error.stackTraceToString().contains("certificate-provider-secret"))
+            assertFalse(error.stackTraceToString().contains("private-certificate-reference"))
+        }
+        assertFailsWith<CancellationException> {
+            MetadataJwtSigner.dedicatedSigner(config, resolver,
+                MetadataSigningCertificateReferenceResolver { throw CancellationException("cancelled") })
+        }
     }
 
     @Test
