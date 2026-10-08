@@ -1,9 +1,9 @@
 package id.walt.mdoc.readertrust
 
+import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.profile.IsoMdocReaderAuthenticationX509CertificateProfile
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
-import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.validator.X509CertificateAuthorityKeyIdValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.mdoc.readertrust.MdocReaderAuthenticationCertificateUtil.mdocReaderAuthentication
@@ -32,7 +32,6 @@ open class MdocReaderAuthenticationTrustEvaluator(
     override suspend fun evaluate(evidence: ReaderAuthenticationEvidence): ReaderTrustDecision {
         val chainDer = evidence.certificateChainDer
         if (chainDer.isEmpty()) return untrusted(NO_POLICY_REASON)
-        val anchors = trustStore?.takeUnless { it.isEmpty() }
         val chain = try {
             chainDer.map { X509CertificateUtil.parseCertificateDerEncoded(it) }
         } catch (cancelled: CancellationException) {
@@ -40,23 +39,44 @@ open class MdocReaderAuthenticationTrustEvaluator(
         } catch (e: Throwable) {
             return untrusted("$INVALID_CERTIFICATE_REASON: Failed to parse certificate: ${e.message}")
         }
+        return when (val validation = validateReaderCertificateChain(chain)) {
+            is MdocReaderAuthenticationCertificateValidationResult.InvalidCertificate -> untrusted(validation.reason)
+            MdocReaderAuthenticationCertificateValidationResult.NoTrustAnchor -> untrusted(NO_POLICY_REASON)
+            is MdocReaderAuthenticationCertificateValidationResult.UntrustedPath -> untrusted(validation.reason)
+            MdocReaderAuthenticationCertificateValidationResult.Trusted -> ReaderTrustDecision(ReaderTrustState.TRUSTED)
+        }
+    }
+
+    /**
+     * Validates a parsed reader chain (leaf first) against [trustStore], which defaults to the one this
+     * evaluator was created with. A `null` or empty store checks only the reader certificate itself.
+     */
+    suspend fun validateReaderCertificateChain(
+        chain: List<X509Certificate>,
+        trustStore: InMemoryTrustStore? = this.trustStore,
+    ): MdocReaderAuthenticationCertificateValidationResult {
+        require(chain.isNotEmpty()) { "Reader certificate chain is empty" }
+        val anchors = trustStore?.takeUnless { it.isEmpty() }
         val result = try {
             mdocReaderAuthenticationX509CertificateUtil
                 .validateCertificateChain(chain, anchors ?: InMemoryTrustStore())
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Throwable) {
-            return untrusted("Reader authentication certificate chain could not be validated: ${e.message}")
+            return MdocReaderAuthenticationCertificateValidationResult.InvalidCertificate(
+                "Reader authentication certificate chain could not be validated: ${e.message}"
+            )
         }
         val errors = result.errorLog
         val profileErrors = errors.filter { it.validatorId !in ISSUER_DEPENDENT_VALIDATOR_IDS }
         return when {
-            profileErrors.isNotEmpty() ->
-                untrusted("$INVALID_CERTIFICATE_REASON: ${profileErrors.joinToString { it.message }}")
+            profileErrors.isNotEmpty() -> MdocReaderAuthenticationCertificateValidationResult.InvalidCertificate(
+                "$INVALID_CERTIFICATE_REASON: ${profileErrors.joinToString { it.message }}"
+            )
 
-            anchors == null -> untrusted(NO_POLICY_REASON)
-            result.valid -> ReaderTrustDecision(ReaderTrustState.TRUSTED)
-            else -> untrusted(
+            anchors == null -> MdocReaderAuthenticationCertificateValidationResult.NoTrustAnchor
+            result.valid -> MdocReaderAuthenticationCertificateValidationResult.Trusted
+            else -> MdocReaderAuthenticationCertificateValidationResult.UntrustedPath(
                 "Reader authentication certificate chain does not validate against a configured trust anchor: " +
                         errors.joinToString { it.message }
             )
