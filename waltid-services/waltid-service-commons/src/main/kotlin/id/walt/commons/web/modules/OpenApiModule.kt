@@ -19,6 +19,7 @@ import io.github.smiley4.schemakenerator.reflection.analyzer.MinimalTypeData
 import io.github.smiley4.schemakenerator.reflection.analyzer.ReflectionTypeAnalyzerModule
 import io.github.smiley4.schemakenerator.serialization.analyzer.SerializationTypeAnalyzerModule
 import io.github.smiley4.schemakenerator.serialization.data.InitialSerialDescriptorTypeData
+import io.github.smiley4.schemakenerator.swagger.SwaggerSteps.RequiredHandling
 import io.github.smiley4.schemakenerator.swagger.generator.SwaggerSchemaGenerationModule
 import io.klogging.noCoLogger
 import io.ktor.server.application.*
@@ -156,8 +157,11 @@ object OpenApiModule {
     }
 
     fun createGenerator(): GenericSchemaGenerator {
+        // Document what requests may actually send: nullable properties accept null, and properties
+        // with a default value may be omitted.
         val kotlinxGenerator = SchemaGenerator.kotlinx {
-            explicitNullTypes = false
+            explicitNullTypes = true
+            optionals = RequiredHandling.NON_REQUIRED
             customAnalyzer(StripNotAllowedCharactersAnalyzerModule)
             customAnalyzer(ContextualSerializationTypeAnalyzerModule)
             customAnalyzer(FixSealedClassInheritanceModule)
@@ -174,7 +178,8 @@ object OpenApiModule {
             overwrite(CustomTypeOverrides.QuickFixPolymorphic())
         }
         val reflectionGenerator = SchemaGenerator.reflection {
-            explicitNullTypes = false
+            explicitNullTypes = true
+            optionals = RequiredHandling.NON_REQUIRED
             customGenerator(FixJsonCustomParameters)
             overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
             overwrite(SchemaGenerator.TypeOverwrites.File())
