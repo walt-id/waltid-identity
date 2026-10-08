@@ -1,6 +1,7 @@
 plugins {
     id("waltid.jvm.servicelib")
     id("waltid.publish.maven")
+    id("waltid.dependency-constraints")
 }
 
 group = "id.walt"
@@ -101,33 +102,11 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
-// Force-pin vulnerable transitive dependencies.
-//
-// web3j:core → tools.jackson.core:jackson-core / jackson-databind
-//   Pin both to the jackson-core-3 catalog version.
-//
-// web3j:core / ktor-openapi → com.fasterxml.jackson.core:jackson-core / jackson-databind
-//   Pin both to the jackson-core catalog version.
-//
-// web3j:core → org.bouncycastle:bcprov-jdk18on:1.80
-//   CWE-327 (broken crypto, CVSS 8.7), CWE-1240 (timing attack), CWE-90 (LDAP injection)
-//   Snyk said "no supported fix" at 1.80; 1.84 is now available
-//
-// ktor-openapi → io.netty (4.2.x branch), pinned to the netty-4_2 catalog version.
-// web3j → tuweni → vertx-core. swagger-parser → json-schema-core → rhino.
+// web3j:core still requests bcprov-jdk18on 1.80. Keep this local: the 4.2 Netty
+// pins live in waltid.dependency-constraints and must not be mixed with Azure's
+// Netty 4.1 forces.
 configurations.all {
-    resolutionStrategy.force(
-        identityLibs.jackson.core.tools,
-        identityLibs.jackson.databind.tools,
-        identityLibs.jackson.core,
-        identityLibs.jackson.databind,
-        identityLibs.bouncycastle.prov,
-        identityLibs.netty.codec.compression,
-        identityLibs.netty.codec.http.v2,
-        identityLibs.netty.transport.classes.epoll,
-        identityLibs.vertx.core,
-        identityLibs.rhino,
-    )
+    resolutionStrategy.force(identityLibs.bouncycastle.prov)
 }
 
 mavenPublishing {

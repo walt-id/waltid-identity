@@ -422,7 +422,11 @@ netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "netty"
 netty-codec-http2 = { module = "io.netty:netty-codec-http2", version.ref = "netty" }
 netty-codec-compression = { module = "io.netty:netty-codec-compression", version.ref = "netty-4_2" }
 netty-codec-http-v2 = { module = "io.netty:netty-codec-http", version.ref = "netty-4_2" }
+netty-codec-http2-v2 = { module = "io.netty:netty-codec-http2", version.ref = "netty-4_2" }
+netty-handler-v2 = { module = "io.netty:netty-handler", version.ref = "netty-4_2" }
 netty-transport-classes-epoll = { module = "io.netty:netty-transport-classes-epoll", version.ref = "netty-4_2" }
+netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "netty-4_2" }
+netty-transport-native-kqueue = { module = "io.netty:netty-transport-native-kqueue", version.ref = "netty-4_2" }
 jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson-core" }
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson-core" }
 jackson-core-tools = { module = "tools.jackson.core:jackson-core", version.ref = "jackson-core-3" }
