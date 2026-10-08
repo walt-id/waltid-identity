@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm

@@ -6,6 +6,7 @@ import id.walt.crypto2.keys.toPublicJwk
 import id.walt.openid4vci.metadata.issuer.KeyAttestationsRequired
 import id.walt.openid4vp.conformance.wallet.WalletCredentialIssuer
 import id.walt.wallet2.handlers.KeyAttestationRequest
+import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -13,17 +14,19 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ItbSyntheticKeyAttesterTest {
     @Test
     fun `fixture binds the proof key without asserting an ISO assurance level`() = runTest {
         val proofKey = WalletCredentialIssuer().holderCrypto2Key()
-        val attesterKey = WalletCredentialIssuer().holderCrypto2Key()
+        val provider = assertNotNull(DemoKeyAttestationProviders().resolve(DemoKeyAttestationProviders.ITB_ISSUER))
+        val attesterKey = provider.verificationKey
         val proofJwk = requireNotNull(proofKey.capabilities.publicKeyExporter)
             .exportPublicKey().toPublicJwk(proofKey.spec)
-        val jwt = ItbSyntheticKeyAttester(attesterKey).attest(
-            KeyAttestationRequest("https://issuer.example", proofJwk, "fresh-nonce", KeyAttestationsRequired())
+        val jwt = provider.attest(
+            KeyAttestationRequest(DemoKeyAttestationProviders.ITB_ISSUER, proofJwk, "fresh-nonce", KeyAttestationsRequired())
         )
 
         val claims = Json.parseToJsonElement(

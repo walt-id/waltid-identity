@@ -2,6 +2,7 @@ package id.walt.itb
 
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.openid4vp.conformance.wallet.WalletCredentialIssuer
+import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.handlers.WalletScaPresentationAuthorizer
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
@@ -29,6 +30,6 @@ suspend fun ItbWalletDriver.Companion.create(
         id = "itb-${UUID.randomUUID()}",
         keyStores = listOf(InMemoryKeyStore().apply { addCrypto2Key(holder) }),
         credentialStores = listOf(InMemoryCredentialStore()),
-    ).attachKeyAttestationProvider(ItbSyntheticKeyAttester(WalletCredentialIssuer().holderCrypto2Key()))
+    ).attachKeyAttestationProviderResolver(DemoKeyAttestationProviders())
     return ItbWalletDriver(wallet, client, trustedOrigin, clientIdTrust, authorize, itbHeadlessScaAuthorizer)
 }

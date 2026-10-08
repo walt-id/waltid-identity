@@ -1,0 +1,35 @@
+{
+  "itb": {
+    "issuer": "https://dev-i4mlab.aegean.gr/rfc-issuer",
+    "algorithm": "ES256",
+    "jwt_type": "key-attestation+jwt",
+    "lifetime_seconds": 300,
+    "status_lifetime_seconds": 3600,
+    "claims": {
+      "key_storage": [
+        "https://example.invalid/walt-id/itb/key-storage-unassessed"
+      ],
+      "user_authentication": [
+        "https://example.invalid/walt-id/itb/user-authentication-unassessed"
+      ],
+      "certification": "https://example.invalid/walt-id/itb/no-certification",
+      "key_storage_status": {
+        "status": {
+          "status_list": {
+            "uri": "https://example.invalid/walt-id/itb/no-status-list",
+            "idx": 0
+          }
+        }
+      }
+    }
+  },
+  "eudi": {
+    "issuer": "https://issuer.eudiw.dev",
+    "base_url": "https://wallet-provider.eudiw.dev",
+    "jwks_path": "/jwks",
+    "attestation_path": "/key-attestation/jwk-set",
+    "signing_algorithms": [
+      "ES256"
+    ]
+  }
+}

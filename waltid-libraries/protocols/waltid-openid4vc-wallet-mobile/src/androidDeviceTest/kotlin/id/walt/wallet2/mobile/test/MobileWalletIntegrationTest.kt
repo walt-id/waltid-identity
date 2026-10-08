@@ -20,6 +20,7 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.wallet2.handlers.WalletIssuanceMetadataProvenance
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
@@ -519,7 +520,7 @@ class MobileWalletIntegrationTest {
 
     private suspend fun createEudiWallet(config: MobileWalletConfig) =
         MobileWalletFactory(context).create(config, eudiVerifierTrust)
-            .attachKeyAttestationProvider(EudiTestKeyAttestationProvider.create())
+            .attachKeyAttestationProviderResolver(DemoKeyAttestationProviders())
 
     private suspend fun receiveCredentialFromDemoIssuer2(scenarioId: String) {
         val scenario = demoScenario(scenarioId)
