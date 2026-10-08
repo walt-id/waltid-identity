@@ -7,8 +7,10 @@ import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companio
 import id.walt.certificate.x509.truststore.CompositeTrustStore
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.ValidationResult
+import id.walt.certificate.x509.validation.X509CertificateChainValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
+import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
@@ -74,8 +76,8 @@ class X509CertificateSameSubjectDnIssuersTest {
         issueLeaf(intermediate, id)
 
     /** A self signed CA built without going through [X509CertificateUtil], so it has no Subject Key Identifier. */
-    private suspend fun newCaWithoutSki(id: String): IssuingCa {
-        val key = TestKeyUtil.genEcKey(id)
+    private suspend fun newCaWithoutSki(id: String, key: Key? = null): IssuingCa {
+        val key = key ?: TestKeyUtil.genEcKey(id)
         val builder = X509CertificateDataBuilder(
             serialNumberGenerator = tool.services.serialNumberGenerator,
             issuerDnRaw = ByteString(),
@@ -294,6 +296,93 @@ class X509CertificateSameSubjectDnIssuersTest {
         assertFalse(result.valid)
         assertTrue(
             errors(result).any { it.message.contains("Refusing to select one") },
+            "Validation log: ${result.log}"
+        )
+    }
+
+    @Test
+    fun sameKeyDuplicateIsAmbiguousEvenIfOnlyOneOfThemAdvertisesTheSubjectKeyIdentifier() = runTest {
+        // One certificate carries the SKI that matches the leaf's AKI, the other for the same key does not,
+        // so they fall into different candidate groups. The duplicate must still be detected.
+        val key = TestKeyUtil.genEcKey("ca-same-key-mixed")
+        val withSki = tool.createSelfSignedCertificate(key, sigAlg) {
+            subjectDn = CA_DN
+            extensionBasicConstraints { cA = true }
+        }
+        val withoutSki = newCaWithoutSki("unused", key).cert
+        assertEquals(null, withoutSki.data.extensionSubjectKeyIdentifier)
+        val trust = InMemoryTrustStore(listOf(withSki, withoutSki))
+
+        val result = tool.validateCertificateChain(listOf(issueLeaf(IssuingCa(key, withSki))), trust)
+
+        assertFalse(result.valid)
+        assertTrue(
+            errors(result).any { it.message.contains("Refusing to select one") },
+            "Validation log: ${result.log}"
+        )
+    }
+
+    @Test
+    fun theSelectedIssuersSignatureIsVerifiedOnlyOncePerCandidate() = runTest {
+        val caA = newCa("ca-a")
+        val caB = newCa("ca-b")
+        val delegate = tool.services.signatureValidator
+        var verifications = 0
+        val counting = object : SignatureValidator by delegate {
+            override suspend fun validateCertificateSignature(
+                cryptoRuntime: CryptoRuntime,
+                issuerPublicKey: X509Certificate.SubjectPublicKeyInfo,
+                certificate: X509Certificate
+            ): Boolean {
+                verifications++
+                return delegate.validateCertificateSignature(cryptoRuntime, issuerPublicKey, certificate)
+            }
+        }
+        val validator = X509CertificateChainValidator(
+            listOf(X509CertificateSignatureValidator(counting)),
+            InMemoryTrustStore(listOf(caA.cert, caB.cert))
+        )
+
+        val result = validator.validate(TestKeyUtil.runtime, listOf(issueLeaf(caB)))
+
+        assertTrue(result.valid, "Validation log: ${result.log}")
+        // The leaf's AKI selects caB as the preferred candidate, which verifies: one verification in total
+        assertEquals(1, verifications)
+    }
+
+    @Test
+    fun pathLengthWalkFailsClosedOnAmbiguousIssuerWithoutASignatureValidator() = runTest {
+        val caA = newCa("ca-a")
+        val caB = newCa("ca-b")
+        // The intermediate has no Authority Key Identifier, and without a signature validator nothing else
+        // can tell caA and caB apart; nothing else reports the ambiguity either.
+        val intermediateKey = TestKeyUtil.genEcKey("intermediate-no-aki")
+        val builder = X509CertificateDataBuilder(
+            serialNumberGenerator = tool.services.serialNumberGenerator,
+            issuerDnRaw = caB.cert.data.subjectDnRaw,
+            subjectDn = "CN=Intermediate, O=Walt.id",
+        )
+        builder.subjectPublicKey(intermediateKey)
+        builder.extensionBasicConstraints { cA = true }
+        val intermediate = IssuingCa(
+            intermediateKey,
+            tool.services.certificateSigner.signCertificate(caB.key, sigAlg, builder)
+        )
+        assertEquals(null, intermediate.cert.data.extensionAuthorityKeyIdentifier)
+        val leaf = issueLeafUnder(intermediate)
+        val validator = X509CertificateChainValidator(
+            listOf(X509CertificateBasicConstraintsValidator()),
+            InMemoryTrustStore(listOf(caA.cert, caB.cert))
+        )
+
+        val result = validator.validate(TestKeyUtil.runtime, listOf(leaf, intermediate.cert))
+
+        assertFalse(result.valid, "Validation log: ${result.log}")
+        assertTrue(
+            errors(result).any {
+                it.validatorId == X509CertificateBasicConstraintsValidator.ID &&
+                        it.message.contains("Cannot determine path length constraints")
+            },
             "Validation log: ${result.log}"
         )
     }

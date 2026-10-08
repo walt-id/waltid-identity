@@ -105,21 +105,19 @@ class X509CertificateBasicConstraintsValidator(val leafCanBeCa: Boolean = false)
     ): MutableMap<String, Int> {
         var currentCert = x509Certificate
         val trustedChain = mutableListOf<X509Certificate>()
-        var firstHop = true
         while (currentCert.data.subjectDn != currentCert.data.issuerDn) {
             when (val selection = context.selectIssuer(currentCert)) {
                 is IssuerSelection.NotFound, is IssuerSelection.NoMatch -> break
 
                 is IssuerSelection.Ambiguous -> {
-                    // The ambiguity of the direct issuer of the certificate under validation is reported
-                    // by the signature validator. Report the ones further up, which only this walk sees.
-                    if (!firstHop) {
-                        context.addLogEntry(
-                            ValidationResult.Severity.ERROR,
-                            "Multiple trusted certificates with subjectDn '${currentCert.data.issuerDn}' qualify as " +
-                                    "issuer of '${currentCert.data.subjectDn}'. Cannot determine path length constraints"
-                        )
-                    }
+                    // Fail closed: the constraints of the issuers above this hop are unknown. The signature
+                    // validator reports the same ambiguity for the direct issuer, but it may not be configured,
+                    // and the hops further up are only visible here.
+                    context.addLogEntry(
+                        ValidationResult.Severity.ERROR,
+                        "Multiple trusted certificates with subjectDn '${currentCert.data.issuerDn}' qualify as " +
+                                "issuer of '${currentCert.data.subjectDn}'. Cannot determine path length constraints"
+                    )
                     break
                 }
 
@@ -128,7 +126,6 @@ class X509CertificateBasicConstraintsValidator(val leafCanBeCa: Boolean = false)
                     trustedChain.add(currentCert)
                 }
             }
-            firstHop = false
         }
         var pathLengthConstraints = mutableMapOf<String, Int>()
         trustedChain.reversed().forEach {

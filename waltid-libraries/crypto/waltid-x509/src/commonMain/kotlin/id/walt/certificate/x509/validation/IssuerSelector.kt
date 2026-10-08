@@ -15,8 +15,13 @@ sealed interface IssuerSelection {
     /** No trusted certificate has the issuer DN. */
     data object NotFound : IssuerSelection
 
-    /** Exactly one issuer was identified. */
-    data class Selected(val issuer: X509Certificate) : IssuerSelection
+    /**
+     * Exactly one issuer was identified.
+     *
+     * [signatureVerified] is true if the selection already verified the certificate's signature with
+     * the issuer's key (several candidates were told apart that way), so the caller need not repeat it.
+     */
+    data class Selected(val issuer: X509Certificate, val signatureVerified: Boolean = false) : IssuerSelection
 
     /**
      * There are trusted certificates with the issuer DN, but none of them is the issuer: none
@@ -49,8 +54,12 @@ sealed interface IssuerSelection {
  *    the key identifier metadata - is what proves the issuer.
  * 3. A group of candidates is accepted if exactly one of them verifies the certificate's signature.
  *    If more than one verifies, the result is [IssuerSelection.Ambiguous] (fail closed, never
- *    "first wins"). This includes two certificates for the same key; that case is deliberately not
- *    resolved here.
+ *    "first wins").
+ * 4. Whichever way a candidate was selected, any other candidate for the *same public key* (e.g. a CA
+ *    re-issued with a new serial number) makes the result [IssuerSelection.Ambiguous] too: both
+ *    would verify the signature, and they may differ in constraints. This is checked across both
+ *    groups of rule 2, so it does not depend on which candidates carry a Subject Key Identifier.
+ *    That case is deliberately not resolved here.
  *
  * Without a [signatureValidator], several candidates can only be told apart by the first two rules.
  */
@@ -67,7 +76,8 @@ class IssuerSelector(
         if (candidates.size == 1) return IssuerSelection.Selected(candidates.first())
 
         if (certificate.data.subjectDn == certificate.data.issuerDn) {
-            val samePinned = candidates.filter { it.fingerprintSha256 == certificate.fingerprintSha256 }
+            val fingerprint = certificate.fingerprintSha256
+            val samePinned = candidates.filter { it.fingerprintSha256 == fingerprint }
             return when (samePinned.size) {
                 0 -> IssuerSelection.NoMatch(candidates)
                 else -> IssuerSelection.Selected(samePinned.first())
@@ -86,10 +96,20 @@ class IssuerSelector(
             if (group.isEmpty()) continue
             when (val result = selectBySignature(certificate, group)) {
                 is IssuerSelection.NoMatch -> continue
+                is IssuerSelection.Selected -> return rejectSameKeyDuplicates(result, candidates)
                 else -> return result
             }
         }
         return IssuerSelection.NoMatch(candidates)
+    }
+
+    private fun rejectSameKeyDuplicates(
+        selected: IssuerSelection.Selected,
+        candidates: List<X509Certificate>
+    ): IssuerSelection {
+        val keyId = selected.issuer.data.subjectPublicKeyInfo.keyId
+        val sameKey = candidates.filter { it.data.subjectPublicKeyInfo.keyId == keyId }
+        return if (sameKey.size > 1) IssuerSelection.Ambiguous(sameKey) else selected
     }
 
     private suspend fun selectBySignature(
@@ -108,7 +128,7 @@ class IssuerSelector(
         }
         return when (verifying.size) {
             0 -> IssuerSelection.NoMatch(group)
-            1 -> IssuerSelection.Selected(verifying.first())
+            1 -> IssuerSelection.Selected(verifying.first(), signatureVerified = true)
             else -> IssuerSelection.Ambiguous(verifying)
         }
     }

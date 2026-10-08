@@ -44,7 +44,8 @@ class X509CertificateSignatureValidator(
                 }
             }
 
-            is IssuerSelection.Selected -> validateCertificate(context, selection.issuer, x509Certificate)
+            is IssuerSelection.Selected ->
+                validateCertificate(context, selection.issuer, x509Certificate, selection.signatureVerified)
 
             is IssuerSelection.NoMatch ->
                 if (x509Certificate.data.subjectDn == x509Certificate.data.issuerDn) {
@@ -75,7 +76,8 @@ class X509CertificateSignatureValidator(
     private suspend fun validateCertificate(
         context: ValidationContext,
         issuerCertificate: X509Certificate,
-        certificate: X509Certificate
+        certificate: X509Certificate,
+        signatureAlreadyVerified: Boolean
     ) {
 
         if (issuerCertificate.data.subjectDn == certificate.data.subjectDn) {
@@ -89,7 +91,8 @@ class X509CertificateSignatureValidator(
         } else {
             val publicKeyAlgorithm = issuerCertificate.data.subjectPublicKeyInfo.algorithmName
             val signatureAlgorithmName = certificate.signatureAlgorithmName
-            if (signatureValidator.validateCertificateSignature(
+            // Several candidates were told apart by verifying the signature; do not verify it again
+            if (signatureAlreadyVerified || signatureValidator.validateCertificateSignature(
                     context.cryptoRuntime,
                     issuerCertificate.data.subjectPublicKeyInfo,
                     certificate
