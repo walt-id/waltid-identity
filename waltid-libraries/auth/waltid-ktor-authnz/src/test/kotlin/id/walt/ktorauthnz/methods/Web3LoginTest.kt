@@ -89,6 +89,21 @@ class Web3LoginTest {
     }
 
     @Test
+    fun `a signature with a raw recovery id (0 or 1) logs in too`() = web3Test {
+        val challenge = client.get("/web3/nonce").bodyAsText()
+        val signature = Sign.signPrefixedMessage(challenge.toByteArray(), wallet)
+        val raw = Numeric.toHexString(signature.r + signature.s + byteArrayOf((signature.v[0] - 27).toByte()))
+        assertEquals(HttpStatusCode.OK, signed(challenge, raw).status)
+    }
+
+    @Test
+    fun `a signature with an impossible recovery id is refused`() = web3Test {
+        val challenge = client.get("/web3/nonce").bodyAsText()
+        val signature = Sign.signPrefixedMessage(challenge.toByteArray(), wallet)
+        assertEquals(HttpStatusCode.Unauthorized, signed(challenge, Numeric.toHexString(signature.r + signature.s + byteArrayOf(5))).status)
+    }
+
+    @Test
     fun `a short signature is refused, not a server error`() = web3Test {
         val challenge = client.get("/web3/nonce").bodyAsText()
         assertEquals(HttpStatusCode.Unauthorized, signed(challenge, "0x1234").status)
