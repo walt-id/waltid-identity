@@ -1855,6 +1855,12 @@ class WalletIssuanceSessionService(
         try {
             val remote = record.content as? DeferredContent.Remote
             val material = record.keyMaterial ?: remote?.request?.keyMaterial
+            val notificationEndpoint = record.notificationEndpoint ?: remote?.request?.notificationEndpoint
+            // Received local-save records must not keep a credential-request token unless a later
+            // issuer notification still needs it after process restart.
+            val persistNotificationAuth = record.content is DeferredContent.Received &&
+                !record.notificationId.isNullOrBlank() &&
+                !notificationEndpoint.isNullOrBlank()
             val payload = PersistedDeferredRecord(
                 content = when (val content = record.content) {
                     is DeferredContent.Received -> PersistedDeferredContent.Received(content.credentials)
@@ -1880,14 +1886,19 @@ class WalletIssuanceSessionService(
                 claimed = record.claimed,
                 public = record.public,
                 sessionId = record.sessionId,
-                notificationEndpoint = record.notificationEndpoint ?: remote?.request?.notificationEndpoint,
+                notificationEndpoint = notificationEndpoint,
                 notificationId = record.notificationId,
-                accessToken = record.accessToken ?: remote?.request?.accessToken,
-                tokenType = record.tokenType ?: remote?.request?.tokenType,
-                dpop = record.dpop ?: remote?.request?.dpop,
-                keyId = material?.keyId ?: remote?.request?.keyId,
-                selectedPublicJwk = material?.exportPublicJwkObject()?.toString()
-                    ?: remote?.request?.selectedPublicJwk,
+                accessToken = if (persistNotificationAuth) {
+                    record.accessToken ?: remote?.request?.accessToken
+                } else null,
+                tokenType = if (persistNotificationAuth) {
+                    record.tokenType ?: remote?.request?.tokenType
+                } else null,
+                dpop = if (persistNotificationAuth) record.dpop ?: remote?.request?.dpop else null,
+                keyId = if (persistNotificationAuth) material?.keyId ?: remote?.request?.keyId else null,
+                selectedPublicJwk = if (persistNotificationAuth) {
+                    material?.exportPublicJwkObject()?.toString() ?: remote?.request?.selectedPublicJwk
+                } else null,
             )
             val replacement = WalletIssuanceSessionRecord(
                 id = deferredRecordId(record.public.id),
