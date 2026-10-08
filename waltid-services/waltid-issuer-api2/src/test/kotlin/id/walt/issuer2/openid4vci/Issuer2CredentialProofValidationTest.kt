@@ -14,6 +14,7 @@ import id.walt.crypto.utils.JweUtils
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.testsupport.Issuer2CredentialScenario
+import id.walt.issuer2.testsupport.Issuer2CredentialFamily
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
 import id.walt.issuer2.testsupport.Issuer2TxCodeMode
@@ -351,7 +352,7 @@ class Issuer2CredentialProofValidationTest {
     }
 
     @Test
-    fun `EUDI variants require attestation while general configurations accept ordinary JWT proofs`() = testApplication {
+    fun `configured JWT key attestation requirements are advertised and enforced`() = testApplication {
         val attester = JWKKey.generate(KeyType.secp256r1)
         val holder = JWKKey.generate(KeyType.secp256r1)
         val trusted = attester.getPublicKey().exportJWKObject()
@@ -360,25 +361,35 @@ class Issuer2CredentialProofValidationTest {
             clientAuthenticationConfig = ClientAuthenticationConfig(listOf(ClientAuthenticationMethodConfig.PreAuthAnonymous)),
         ) })
         val client = apiClient()
-        for (general in listOf(Issuer2CredentialScenarios.identitySdJwt, Issuer2CredentialScenarios.isoPhotoId)) {
-            val eudi = Issuer2CredentialScenarios.configured.single {
-                it.credentialConfigurationId == "${general.credentialConfigurationId}_eudi"
-            }
+        for (general in Issuer2CredentialScenarios.configured.filter {
+            it.credentialConfigurationId !in Issuer2CredentialScenarios.requiredJwtAttestationConfigurationIds
+        }) {
             val ordinary = prepareFlow(client, general)
             val configurations = ordinary.resolvedOffer.issuerMetadata.credentialConfigurationsSupported
-            assertEquals(null, configurations.getValue(general.credentialConfigurationId).proofTypesSupported!!["jwt"]!!.keyAttestationsRequired)
-            val variant = configurations.getValue(eudi.credentialConfigurationId)
-            assertEquals(setOf("jwt"), variant.proofTypesSupported!!.keys)
-            assertTrue(variant.proofTypesSupported!!["jwt"]!!.keyAttestationsRequired != null)
-            assertEquals(eudi.credentialConfigurationId, variant.scope)
-            assertEquals(HttpStatusCode.OK, ordinary.request(proof(holder, ordinary.nonce())).status)
+            assertEquals(null, configurations.getValue(general.credentialConfigurationId).proofTypesSupported!!["jwt"]!!.keyAttestationsRequired,
+                "JWT key attestation should be optional for ${general.credentialConfigurationId}")
+            val ordinaryProof = if (general.family == Issuer2CredentialFamily.JWT_VC_JSON) {
+                val holderDid = DidJwkRegistrar().registerByKey(holder, DidJwkCreateOptions(KeyType.secp256r1)).did
+                proof(holder, ordinary.nonce(), kid = "$holderDid#0", includeJwk = false)
+            } else {
+                proof(holder, ordinary.nonce())
+            }
+            val response = ordinary.request(ordinaryProof)
+            assertEquals(HttpStatusCode.OK, response.status, "${general.credentialConfigurationId}: ${response.bodyAsText()}")
         }
         for (eudi in Issuer2CredentialScenarios.configured.filter {
-            it.credentialConfigurationId in Issuer2CredentialScenarios.eudiConfigurationIds
+            it.credentialConfigurationId in Issuer2CredentialScenarios.requiredJwtAttestationConfigurationIds
         }) {
             for (kind in listOf("missing", "untrusted", "valid")) {
                 val flow = prepareFlow(client, eudi)
                 assertEquals(listOf(eudi.credentialConfigurationId), flow.resolvedOffer.offer.credentialConfigurationIds)
+                val configuration = flow.resolvedOffer.issuerMetadata.credentialConfigurationsSupported.getValue(eudi.credentialConfigurationId)
+                assertTrue(configuration.proofTypesSupported!!["jwt"]!!.keyAttestationsRequired != null,
+                    "JWT key attestation should be required for ${eudi.credentialConfigurationId}")
+                if (eudi.credentialConfigurationId.endsWith("_eudi")) {
+                    assertEquals(setOf("jwt"), configuration.proofTypesSupported!!.keys)
+                    assertEquals(eudi.credentialConfigurationId, configuration.scope)
+                }
                 val nonce = flow.nonce()
                 val now = Clock.System.now().epochSeconds
                 val signer = if (kind == "untrusted") JWKKey.generate(KeyType.secp256r1) else attester

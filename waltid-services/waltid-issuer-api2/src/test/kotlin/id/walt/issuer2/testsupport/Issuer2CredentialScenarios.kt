@@ -89,11 +89,11 @@ object Issuer2CredentialScenarios {
         family = Issuer2CredentialFamily.MDOC,
     )
 
-    val eudiConfigurationIds = setOf(
+    // Payment credentials remain in the catalog but do not require JWT key attestation.
+    val requiredJwtAttestationConfigurationIds = setOf(
         "identity_credential_eudi", "org.iso.23220.photoid.1_eudi",
         "urn:eudi:pid:1", "eu.europa.ec.eudi.pid.1", "eu.europa.ec.av.1",
         "urn:eu.europa.ec.eudi:cor:1", "urn:eudi:ehic:1",
-        "sca_payment_card_sd_jwt", "sca_payment_card_mso_mdoc", "emvco_dpc_mso_mdoc",
     )
 
     // Keep this list explicit. If a configured credential disappears, the tests should fail
