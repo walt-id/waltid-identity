@@ -41,7 +41,6 @@ import kotlin.test.assertTrue
 class TransactionDataProfilesIntegrationTest {
 
     private val host = "127.0.0.1"
-    private val port = freePort()
 
     private val paymentType = "org.waltid.transaction-data.payment-authorization"
     private val scaType = "urn:eudi:sca:payment:1"
@@ -73,6 +72,7 @@ class TransactionDataProfilesIntegrationTest {
 
     @Test
     fun `discovery and preview accept configured transaction data types`() {
+        val port = freePort()
         try {
             E2ETest(host, port, failEarly = true).testBlock(
                 features = listOf(OSSWallet2FeatureCatalog),
