@@ -44,6 +44,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let signature = try P256.Signing.ECDSASignature(rawRepresentation: decode(parts[2]))
         XCTAssertTrue(publicKey.isValidSignature(signature, for: Data((parts[0] + "." + parts[1]).utf8)))
         let header = try XCTUnwrap(JSONSerialization.jsonObject(with: decode(parts[0])) as? [String: Any])
+        XCTAssertEqual(header["alg"] as? String, "ES256")
         XCTAssertEqual(header["typ"] as? String, "key-attestation+jwt")
         let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: decode(parts[1])) as? [String: Any])
         XCTAssertEqual(payload["nonce"] as? String, "fresh-nonce")
