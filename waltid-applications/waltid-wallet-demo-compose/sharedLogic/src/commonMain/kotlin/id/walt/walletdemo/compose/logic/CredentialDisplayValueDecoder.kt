@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
-
 package id.walt.walletdemo.compose.logic
 
 import kotlin.io.encoding.Base64

@@ -9,11 +9,12 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceBatch
 import id.walt.openid4vci.handlers.endpoints.credential.signEach
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
-import id.walt.openid4vci.proofs.VerifiedCredentialProof
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
+import id.walt.openid4vci.proofs.CredentialProofValidationException
+import id.walt.openid4vci.proofs.invalidCredentialProof
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.sdjwt.SDMap
-import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
 import id.walt.crypto2.keys.Key as Crypto2Key
@@ -71,8 +72,8 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
                     "credentialData must contain at least one namespace for mso_mdoc"
                 }
 
-                val holderKey = extractHolderKey(request, listOfNotNull(instance.verifiedProof))
-                    ?: throw IllegalArgumentException("Could not extract holder key from proof")
+                val holderKey = extractHolderKey(request, listOfNotNull(instance.verifiedBinding))
+                    ?: throw invalidCredentialProof("Could not extract holder key from proof")
 
                 issueMdoc(
                     docType = docType,
@@ -86,10 +87,8 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
                     validityDays = 365,
                 )
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            CredentialResponseResult.Failure(e.toCredentialHandlerError())
+        } catch (e: CredentialProofValidationException) {
+            CredentialResponseResult.Failure(CredentialError(e.errorCode, e.message))
         }
     }
 
@@ -99,8 +98,8 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
      */
     protected open suspend fun extractHolderKey(
         request: CredentialRequest,
-        verifiedProofs: List<VerifiedCredentialProof>,
-    ): Crypto2Key? = verifiedProofs.firstOrNull()?.holderKey
+        bindings: List<VerifiedCredentialBinding>,
+    ): Crypto2Key? = bindings.firstOrNull()?.holderKey
 
     /**
      * Perform the actual mdoc CBOR/COSE signing.

@@ -69,6 +69,8 @@ data class WebDataFetchingConfiguration(
         engine?.followRedirects?.let { http.followRedirects = it }
 
         http.install(ContentNegotiation) {
+            // Protocol requests own their Accept values; keep JSON as the implicit default.
+            acceptHeaderMergeStrategy = ContentTypeMergeStrategy.SkipIfPresent
             json(json = decoding.json)
         }
         timeouts?.run {

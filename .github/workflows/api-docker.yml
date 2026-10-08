@@ -49,11 +49,6 @@ jobs:
           resolved-refs: ${{ inputs.checkout-refs }}
       - name: Configure gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
-      - name: Update version in build.gradle.kts
-        run: |
-          sed -i 's/version = ".*"/version = "${{ inputs.version }}"/' build.gradle.kts
-          sed -i 's/version = ".*"/version = "${{ inputs.version }}"/' waltid-identity/build.gradle.kts
-
       - name: Generate Docker tags
         id: tags
         run: |
@@ -69,8 +64,10 @@ jobs:
           # invoke Task.project at execution time and are not CC-compatible.
           ./gradlew ${{ matrix.commandPath }}:jib \
             --no-configuration-cache \
+            -Pversion="$RELEASE_VERSION" \
             -Djib.to.tags=${{ steps.tags.outputs.tags }}
         env:
+          RELEASE_VERSION: ${{ inputs.version }}
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
@@ -81,8 +78,10 @@ jobs:
         run: |
           ./gradlew ${{ matrix.commandPath }}:jibDockerBuild \
             --no-configuration-cache \
+            -Pversion="$RELEASE_VERSION" \
             -Djib.to.tags=${{ steps.tags.outputs.tags }}
         env:
+          RELEASE_VERSION: ${{ inputs.version }}
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
       - name: Save Docker Image to ${{ matrix.image }}.tar.gz

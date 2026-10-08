@@ -7,7 +7,7 @@ group = "id.walt"
 dependencies {
     // Testing
     implementation(kotlin("test"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.10.2")
+    implementation(identityLibs.kotlinx.coroutines.service.test.jvm)
     implementation(identityLibs.ktor.server.test.host)
     implementation(identityLibs.ktor.client.java)
     implementation(identityLibs.ktor.client.content.negotiation)
@@ -15,7 +15,7 @@ dependencies {
 
 
     // Command line formatting
-    implementation("com.github.ajalt.mordant:mordant:3.0.2")
+    implementation(identityLibs.mordant)
 
     // Libraries to test
     implementation(project(":waltid-services:waltid-service-commons-test"))
@@ -24,7 +24,7 @@ dependencies {
     implementation(project(":waltid-services:waltid-wallet-api"))
 
     implementation(identityLibs.nimbus.jose.jwt)
-    implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
+    implementation(identityLibs.java.cose)
     implementation(identityLibs.bouncycastle.pkix)
 
     implementation(identityLibs.junit.jupiter.params)

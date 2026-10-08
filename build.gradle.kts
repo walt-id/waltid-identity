@@ -1,10 +1,11 @@
+import com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask
+
 plugins {
     alias(identityLibs.plugins.android.application) apply false
     alias(identityLibs.plugins.kotlin.multiplatform) apply false
     alias(identityLibs.plugins.kotlin.compose) apply false
     alias(identityLibs.plugins.compose.multiplatform) apply false
     alias(identityLibs.plugins.kotlin.serialization) apply false
-    alias(identityLibs.plugins.versions) apply false
     alias(identityLibs.plugins.buildconfig) apply false
     alias(identityLibs.plugins.sqldelight) apply false
     id("waltid.licensereport") apply false
@@ -24,13 +25,12 @@ if (providers.gradleProperty("enableLicenseReport").orNull.toBoolean()) {
     }
 }
 
-allprojects {
-    version = "1.0.0-SNAPSHOT"
-
-    repositories {
-        google()
-        mavenCentral()
-        maven("https://maven.waltid.dev/releases")
-        maven("https://maven.waltid.dev/snapshots")
+// Report stable updates while preserving dependencies intentionally on preview tracks.
+tasks.withType<DependencyUpdatesTask>().configureEach {
+    checkConstraints = true
+    // Cinterop commonization resolves derived artifacts, not dependency update candidates.
+    filterConfigurations = Spec {
+        it.attributes.getAttribute(Usage.USAGE_ATTRIBUTE)?.name != "kotlin-commonized-cinterop"
     }
+    rejectPreReleases = true
 }

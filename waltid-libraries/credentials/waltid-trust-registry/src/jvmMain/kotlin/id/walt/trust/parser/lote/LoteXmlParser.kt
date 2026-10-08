@@ -8,7 +8,6 @@ import id.walt.trust.utils.HashUtils.computeCertificateSha256
 import id.walt.trust.utils.HashUtils.normalizeCertificateDerBase64
 import org.w3c.dom.Element
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Instant
 
 data class LoteXmlParseConfig(
@@ -139,7 +138,6 @@ object LoteXmlParser {
         return ParsedLoteSource(source, entities, services, identities)
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     private fun parseIdentities(
         container: Element, sourceId: String, entityId: String, serviceId: String
     ): List<ServiceIdentity> = container.directChildren("DigitalId").mapIndexedNotNull { index, digitalId ->

@@ -2,13 +2,13 @@
 
 package id.walt.mdoc.proximity.mobile
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.mdoc.objects.engagement.BleCentralMode
 import id.walt.mdoc.objects.engagement.BlePeripheralEndpoint
 import id.walt.mdoc.objects.engagement.BlePeripheralMode
 import id.walt.mdoc.objects.engagement.BlePeripheralServerOptions
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.proximity.EngagementContext
-import id.walt.mdoc.proximity.ImmutableBytes
 import id.walt.mdoc.proximity.MdocEngagementMode
 import id.walt.mdoc.proximity.PreparedTransport
 import id.walt.mdoc.proximity.ProximityCapability
@@ -202,10 +202,10 @@ private class PreparedBleTransport(
     override val kind: ProximityTransportKind = ProximityTransportKind.BLE
     override val connectionMethod: DeviceRetrievalMethod = DeviceRetrievalMethod.Ble(
         peripheralMode = roles.singleOrNull { it.role == BlePlatformRole.PERIPHERAL_SERVER }?.let {
-            BlePeripheralMode(it.serviceUuid.encoded().copy())
+            BlePeripheralMode(it.serviceUuid.encoded().toByteArray())
         },
         centralMode = roles.singleOrNull { it.role == BlePlatformRole.CENTRAL_CLIENT }?.let {
-            BleCentralMode(it.serviceUuid.encoded().copy())
+            BleCentralMode(it.serviceUuid.encoded().toByteArray())
         },
         peripheralEndpoint = roles.singleOrNull { it.role == BlePlatformRole.PERIPHERAL_SERVER }
             ?.l2capPsm
@@ -325,7 +325,7 @@ private class BleMessageConnection(
     private val closeMutex = Mutex()
     private val gattCodec = BleGattMessageCodec(maximumMessageBytes)
     private val l2capDecoder = BleL2capMessageDecoder(maximumMessageBytes)
-    private val decodedL2cap = ArrayDeque<ImmutableBytes>()
+    private val decodedL2cap = ArrayDeque<ByteString>()
     private val maximumMessageBytes = maximumMessageBytes
     private var closed = false
     private val closure = CompletableDeferred<ProximityCloseReason>()
@@ -336,7 +336,7 @@ private class BleMessageConnection(
 
     override suspend fun awaitClosed(): ProximityCloseReason = closure.await()
 
-    override suspend fun receive(): ImmutableBytes? {
+    override suspend fun receive(): ByteString? {
         if (!receiveMutex.tryLock()) throw ProximityException(
             ProximityError.Transport("concurrent_receive", "A BLE connection supports one receive consumer")
         )
@@ -399,7 +399,7 @@ private class BleMessageConnection(
         }
     }
 
-    override suspend fun send(message: ImmutableBytes) = sendMutex.withLock {
+    override suspend fun send(message: ByteString) = sendMutex.withLock {
         closeMutex.withLock {
             if (closed) throw ProximityException(ProximityError.Transport("ble_closed", "The BLE connection is closed"))
         }

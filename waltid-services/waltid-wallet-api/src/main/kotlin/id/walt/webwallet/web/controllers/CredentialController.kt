@@ -199,7 +199,7 @@ fun Application.credentials() = walletRoute {
                 }
             }) {
                 val credentialId = call.parameters.getOrFail("credentialId")
-                val requestParameter = call.receiveNullable<NoteRequestParameter>()
+                val requestParameter = call.receive<NoteRequestParameter?>()
                 runCatching {
                     call.getWalletService().rejectCredential(
                         CredentialRequestParameter(

@@ -5,6 +5,7 @@
 
 package id.walt.mdoc.proximity
 
+import kotlinx.io.bytestring.ByteString
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
@@ -97,7 +98,7 @@ class HolderProtocolEngineTest {
             security[1],
         )
 
-        assertContentEquals(exactEDeviceKeyBytes, factory.encodeEDeviceKeyBytes(deviceKey).copy())
+        assertContentEquals(exactEDeviceKeyBytes, factory.encodeEDeviceKeyBytes(deviceKey).toByteArray())
     }
 
     @Test
@@ -183,7 +184,7 @@ class HolderProtocolEngineTest {
             override var kind = ProximityTransportKind.NFC
                 private set
             private var received = 0
-            override suspend fun receive(): ImmutableBytes? = loopback.holder.receive()?.also {
+            override suspend fun receive(): ByteString? = loopback.holder.receive()?.also {
                 // A hybrid may convey successive messages over different bearers.
                 kind = if (received++ == 0) ProximityTransportKind.BLE else ProximityTransportKind.NFC
             }
@@ -200,7 +201,7 @@ class HolderProtocolEngineTest {
             setOf(MdocProtocolFeature.EXTENDED_REQUESTS),
         )
         val readerSession = readerSession(deviceKey, readerKey, method, engagementContext, capabilities)
-        val firstEstablishment = ImmutableBytes.of(
+        val firstEstablishment = ByteString(
             coseCompliantCbor.encodeToByteArray(
                 SessionEstablishment(
                     ByteStringWrapper(readerSession.readerCose, readerSession.readerCoseBytes),
@@ -213,7 +214,7 @@ class HolderProtocolEngineTest {
                 )
             )
         )
-        val secondRequest = ImmutableBytes.of(
+        val secondRequest = ByteString(
             coseCompliantCbor.encodeToByteArray(
                 SessionData(data = readerSession.cipher.encrypt(encodeRequest(macSourceDocument.docType)))
             )
@@ -260,7 +261,7 @@ class HolderProtocolEngineTest {
                         transcript = context.transcript.value,
                     )
                     return MdocResponseResolution.Send(
-                        ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(response)),
+                        ByteString(coseCompliantCbor.encodeToByteArray(response)),
                         continuation = if (firstExchange) {
                             MdocSessionContinuation.CONTINUE
                         } else {
@@ -366,7 +367,7 @@ class HolderProtocolEngineTest {
             )
             val readerSession = readerSession(deviceKey, readerKey, method, engagementContext, capabilities)
             val encodedRequest = encodeApplicationRequest(sourceDocument.docType)
-            val establishment = ImmutableBytes.of(
+            val establishment = ByteString(
                 coseCompliantCbor.encodeToByteArray(
                     SessionEstablishment(
                         ByteStringWrapper(readerSession.readerCose, readerSession.readerCoseBytes),
@@ -438,7 +439,7 @@ class HolderProtocolEngineTest {
                             transcript = context.transcript.value,
                         )
                         return MdocResponseResolution.Send(
-                            exactResponse = ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(response)),
+                            exactResponse = ByteString(coseCompliantCbor.encodeToByteArray(response)),
                             continuation = MdocSessionContinuation.TERMINATE,
                             submissionBindingDigest = preview.submissionBindingDigest,
                         )
@@ -543,13 +544,13 @@ class HolderProtocolEngineTest {
     @Test
     fun `stale consent and changed submission bindings fail closed before response`() = realDispatcherTest {
         val stale = runSingleRequestSession(
-            consent = { MdocConsentDecision.Approve(ImmutableBytes.of(ByteArray(32))) },
+            consent = { MdocConsentDecision.Approve(ByteString(ByteArray(32))) },
         )
         assertEquals("stale_consent", stale.error.code)
         assertEquals(0, stale.resolveCalls)
 
         val changed = runSingleRequestSession(
-            resolutionBinding = ImmutableBytes.of(ByteArray(32) { 0x7f }),
+            resolutionBinding = ByteString(ByteArray(32) { 0x7f }),
         )
         assertEquals("changed_submission", changed.error.code)
         assertEquals(1, changed.resolveCalls)
@@ -615,21 +616,21 @@ class HolderProtocolEngineTest {
             capabilities = capabilities,
             placement = MdocDeviceEngagementPlacement.PROVISIONAL_NFC_V2,
         )
-        val engagementBytes = ImmutableBytes.of(engagement.engagement.encodedCopy())
+        val engagementBytes = ByteString(engagement.engagement.encodedCopy())
         val handover = MdocSessionHandover.ProvisionalNfcV2(
-            handoverSelect = ImmutableBytes.of(byteArrayOf(0x01)),
-            handoverRequest = ImmutableBytes.of(byteArrayOf(0x02)),
+            handoverSelect = ByteString(byteArrayOf(0x01)),
+            handoverRequest = ByteString(byteArrayOf(0x02)),
         )
         val readerCose =
             (readerKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk).toCoseKey()
         val readerCoseBytes = coseCompliantCbor.encodeToByteArray(CoseKey.serializer(), readerCose)
-        val transcript = handover.createTranscript(engagementBytes, ImmutableBytes.of(readerCoseBytes))
+        val transcript = handover.createTranscript(engagementBytes, ByteString(readerCoseBytes))
         val readerCipher = MdocSessionCipher.establishForReader(
             readerKey,
             engagement.engagement.value.security.eDeviceKey.value,
             MdocCryptoHelper.buildSessionTranscriptBytes(transcript),
         )
-        val establishment = ImmutableBytes.of(
+        val establishment = ByteString(
             coseCompliantCbor.encodeToByteArray(
                 SessionEstablishment(
                     eReaderKey = ByteStringWrapper(readerCose, readerCoseBytes),
@@ -664,7 +665,7 @@ class HolderProtocolEngineTest {
                     context: MdocHolderRequestContext,
                     preview: MdocRequestPreview,
                 ): MdocResponseResolution = MdocResponseResolution.Send(
-                    exactResponse = ImmutableBytes.of(
+                    exactResponse = ByteString(
                         coseCompliantCbor.encodeToByteArray(DeviceResponse("1.0", status = 0u))
                     ),
                     continuation = MdocSessionContinuation.TERMINATE,
@@ -680,7 +681,7 @@ class HolderProtocolEngineTest {
             loopback.reader.send(establishment)
 
             val response = coseCompliantCbor.decodeFromByteArray<SessionData>(
-                requireNotNull(withTimeoutOrNull(5.seconds) { loopback.reader.receive() }).copy()
+                requireNotNull(withTimeoutOrNull(5.seconds) { loopback.reader.receive() }).toByteArray()
             )
             assertEquals(0u, response.seq)
             assertEquals(
@@ -867,7 +868,7 @@ class HolderProtocolEngineTest {
     ): DeviceResponse {
         val bytes = withTimeoutOrNull(5.seconds) { connection.receive() }
             ?: error("No response from holder; state=${engine.state.value}")
-        val responseMessage = coseCompliantCbor.decodeFromByteArray<SessionData>(bytes.copy())
+        val responseMessage = coseCompliantCbor.decodeFromByteArray<SessionData>(bytes.toByteArray())
         assertEquals(expectedStatus, responseMessage.statusCode)
         val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(cipher.decrypt(responseMessage.data!!))
         assertEquals(0u, response.status)
@@ -887,7 +888,7 @@ class HolderProtocolEngineTest {
         previewFailure: Exception? = null,
         applicationAuthorization: MdocApplicationAuthorization? = null,
         resolvedApplicationAuthorization: MdocApplicationAuthorization? = null,
-        resolutionBinding: ImmutableBytes? = null,
+        resolutionBinding: ByteString? = null,
         limits: MdocProximityLimits = MdocProximityLimits(),
         timeouts: MdocProximityTimeouts = MdocProximityTimeouts(),
         maximumTransportMessageBytes: Int = 8 * 1024 * 1024,
@@ -914,7 +915,7 @@ class HolderProtocolEngineTest {
             setOf(MdocProtocolFeature.EXTENDED_REQUESTS),
         )
         val readerSession = readerSession(deviceKey, readerKey, method, engagementContext, capabilities)
-        val establishment = ImmutableBytes.of(
+        val establishment = ByteString(
             coseCompliantCbor.encodeToByteArray(
                 SessionEstablishment(
                     ByteStringWrapper(readerSession.readerCose, readerSession.readerCoseBytes),
@@ -925,7 +926,7 @@ class HolderProtocolEngineTest {
         )
         var resolveCalls = 0
         val holder = if (closeAfterFirstReceive) object : ProximityConnection by loopback.holder {
-            override suspend fun receive(): ImmutableBytes? = loopback.holder.receive().also {
+            override suspend fun receive(): ByteString? = loopback.holder.receive().also {
                 loopback.holder.close(ProximityCloseReason.PEER_DISCONNECTED)
             }
         } else loopback.holder
@@ -951,7 +952,7 @@ class HolderProtocolEngineTest {
                     resolveCalls++
                     onResolve()
                     return MdocResponseResolution.Send(
-                        ImmutableBytes.of(coseCompliantCbor.encodeToByteArray(DeviceResponse("1.0", status = 10u))),
+                        ByteString(coseCompliantCbor.encodeToByteArray(DeviceResponse("1.0", status = 10u))),
                         continuation = MdocSessionContinuation.TERMINATE,
                         submissionBindingDigest = resolutionBinding
                             ?: resolvedApplicationAuthorization?.consentBindingDigest()
@@ -1076,7 +1077,7 @@ class HolderProtocolEngineTest {
     private fun preview(
         request: DeviceRequest,
         applicationAuthorizations: List<MdocApplicationAuthorization> = emptyList(),
-        submissionBindingDigest: ImmutableBytes = digest("preview"),
+        submissionBindingDigest: ByteString = digest("preview"),
     ): MdocRequestPreview {
         return MdocRequestPreview(
             request.docRequests.map { docRequest ->
@@ -1129,7 +1130,7 @@ class HolderProtocolEngineTest {
         )
     }
 
-    private fun digest(value: String): ImmutableBytes = ImmutableBytes.of(
+    private fun digest(value: String): ByteString = ByteString(
         SHA256().digest(value.encodeToByteArray())
     )
 

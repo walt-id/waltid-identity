@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalEncodingApi::class)
-
 package id.walt.walletdemo.compose.ui
 
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialSelection
@@ -9,12 +7,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.ClipboardManager
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalClipboard
 import id.walt.walletdemo.compose.ui.components.SettingsCopyRow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -122,7 +120,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -359,7 +356,10 @@ class WalletDemoAppTestScenarios(
         unlockWithPin()
         awaitTaggedNode(WalletUiTestTags.CredentialsLoading)
         gate.completeExceptionally(IllegalStateException("Credential storage unavailable"))
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Failed }
+        waitUntil(timeoutMillis = 5_000) {
+            controller.state.value.session is WalletSessionState.Failed &&
+                onAllNodesWithTag(WalletUiTestTags.CredentialsLoading).fetchSemanticsNodes().isEmpty()
+        }
         onNodeWithTag(WalletUiTestTags.CredentialsLoading).assertDoesNotExist()
         onNodeWithTag(WalletUiTestTags.CredentialsEmpty).assertDoesNotExist()
     }
@@ -1331,13 +1331,19 @@ class WalletDemoAppTestScenarios(
     fun technicalCopyPreservesFullValueWithoutChangingExpansion() = runComposeUiTest {
         val original = """{"kty":"EC","crv":"P-256","x":"complete-public-key-coordinate","y":"another-complete-coordinate"}"""
         // The headless iOS Compose test owner supplies a no-op clipboard.
-        val clipboard = object : ClipboardManager {
-            var copied: AnnotatedString? = null
-            override fun getText(): AnnotatedString? = copied
-            override fun setText(annotatedString: AnnotatedString) { copied = annotatedString }
+        val writeStarted = CompletableDeferred<Unit>()
+        val finishWrite = CompletableDeferred<Unit>()
+        val clipboard = object : Clipboard {
+            var copied: ClipEntry? = null
+            override suspend fun getClipEntry(): ClipEntry? = copied
+            override suspend fun setClipEntry(clipEntry: ClipEntry?) {
+                writeStarted.complete(Unit)
+                finishWrite.await()
+                copied = clipEntry
+            }
         }
         setWalletContent {
-            CompositionLocalProvider(LocalClipboardManager provides clipboard) {
+            CompositionLocalProvider(LocalClipboard provides clipboard) {
                 Column {
                     SettingsCopyRow("Wallet DID", "did:jwk:example", "did-value", "did-copy", "Copy wallet DID", "Wallet DID copied")
                     SettingsCopyRow("Public key (JWK)", original, "jwk-value", "jwk-copy", "Copy public key as JWK", "Public key copied",
@@ -1349,6 +1355,9 @@ class WalletDemoAppTestScenarios(
         val disclosure = onNodeWithContentDescription("Show public key")
         val originalBounds = disclosure.getUnclippedBoundsInRoot()
         onNodeWithTag("did-copy").performClick()
+        waitUntil { writeStarted.isCompleted }
+        assertTrue(!onNodeWithTag("did-copy").fetchSemanticsNode().config.contains(SemanticsProperties.StateDescription))
+        runOnIdle { finishWrite.complete(Unit) }
         mainClock.advanceTimeByFrame()
         waitForIdle()
         assertEquals(originalBounds, disclosure.getUnclippedBoundsInRoot(), "Copy feedback must not move the next control")
@@ -1362,18 +1371,45 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag("jwk-copy").assertHasClickAction().assertIsEnabled()
         assertTrue(!onNodeWithTag("jwk-copy").fetchSemanticsNode().config.contains(SemanticsProperties.HideFromAccessibility))
         onNodeWithTag("jwk-copy").performClick()
-        runOnIdle { assertEquals(original, clipboard.getText()?.text) }
+        runOnIdle { assertEquals(original, clipboard.copied?.plainText()) }
         assertEquals("Public key copied", onNodeWithTag("jwk-copy").fetchSemanticsNode().config[SemanticsProperties.StateDescription])
         onAllNodesWithTag("jwk-value").assertCountEquals(0)
         onNodeWithContentDescription("Show public key").performClick()
         onNodeWithTag("jwk-value").assertTextContains("complete-public-key-coordinate", substring = true)
         onNodeWithTag("jwk-copy").performClick()
-        runOnIdle { assertEquals(original, clipboard.getText()?.text) }
+        runOnIdle { assertEquals(original, clipboard.copied?.plainText()) }
         onNodeWithTag("jwk-value").assertIsDisplayed()
         onNodeWithContentDescription("Hide public key").performClick()
         onAllNodesWithTag("jwk-value").assertCountEquals(0)
         onNodeWithTag("jwk-copy").performSemanticsAction(SemanticsActions.OnLongClick) { it() }
         onNodeWithText("Copy public key as JWK").assertIsDisplayed()
+    }
+
+    fun copyIsCancelledWhenRowLeavesComposition() = runComposeUiTest {
+        var visible by mutableStateOf(true)
+        val writeStarted = CompletableDeferred<Unit>()
+        val writeCancelled = CompletableDeferred<Unit>()
+        val clipboard = object : Clipboard {
+            override suspend fun getClipEntry(): ClipEntry? = null
+            override suspend fun setClipEntry(clipEntry: ClipEntry?) {
+                writeStarted.complete(Unit)
+                try {
+                    CompletableDeferred<Unit>().await()
+                } finally {
+                    writeCancelled.complete(Unit)
+                }
+            }
+        }
+        setWalletContent {
+            CompositionLocalProvider(LocalClipboard provides clipboard) {
+                if (visible) SettingsCopyRow("Wallet DID", "did:jwk:example", "did-value", "did-copy", "Copy wallet DID", "Wallet DID copied")
+            }
+        }
+        onNodeWithTag("did-copy").performClick()
+        waitUntil { writeStarted.isCompleted }
+        runOnIdle { visible = false }
+        onAllNodesWithTag("did-copy").assertCountEquals(0)
+        waitUntil { writeCancelled.isCompleted }
     }
 
     fun readerTrustSettingsReviewAndPersistPublicCa() = runComposeUiTest {
@@ -1436,6 +1472,12 @@ class WalletDemoAppTestScenarios(
         assertEquals("CN=WAL-1349 Local Reader Test CA", preview.readerAuthorities.single().subject)
         assertEquals(TestReaderCaSha256, preview.readerAuthorities.single().sha256Fingerprint)
         assertTrue(store.load().trustAnchors.isEmpty())
+        // The controller preview can be ready before the modal joins the UI tree on iOS.
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag(WalletUiTestTags.SettingsReaderTrustImportReview)
+                .fetchSemanticsNodes().size == 1
+        }
+        waitForIdle()
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportReview).assertIsDisplayed()
         onNodeWithText("Review import").assertIsDisplayed()
         onNodeWithText("wal-1349-local-reader-ca.der").assertIsDisplayed()
@@ -1484,6 +1526,12 @@ class WalletDemoAppTestScenarios(
             )
         }
         waitUntil(timeoutMillis = 5_000) { controller.state.value.pendingImport != null }
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag(WalletUiTestTags.SettingsReaderTrustImportReview)
+                .fetchSemanticsNodes().size == 1
+        }
+        waitForIdle()
+        onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportReview).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportConfirm).performClick()
         waitForIdle()
 
@@ -1591,8 +1639,11 @@ class WalletDemoAppTestScenarios(
     fun credentialDetailsCanCopyAndDelete() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+        val clipboard = RecordingClipboard()
 
-        setWalletContent { WalletDemoApp(controller) }
+        setWalletContent {
+            CompositionLocalProvider(LocalClipboard provides clipboard) { WalletDemoApp(controller) }
+        }
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
@@ -1602,7 +1653,9 @@ class WalletDemoAppTestScenarios(
         waitUntil(timeoutMillis = 5_000) {
             onAllNodesWithTag(WalletUiTestTags.CopyRawCredential).fetchSemanticsNodes().isNotEmpty()
         }
-        onNodeWithTag(WalletUiTestTags.CopyRawCredential).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.CopyRawCredential).assertIsDisplayed().performClick()
+        runOnIdle { assertEquals(sampleCredential.credentialDataJson, clipboard.entry?.plainText()) }
+        onNodeWithTag(WalletUiTestTags.DetailsMenu).performClick()
         onNodeWithTag(WalletUiTestTags.DeleteCredential).performClick()
         onNodeWithTag(WalletUiTestTags.DeleteCredentialConfirm).performClick()
         waitUntil(timeoutMillis = 5_000) {

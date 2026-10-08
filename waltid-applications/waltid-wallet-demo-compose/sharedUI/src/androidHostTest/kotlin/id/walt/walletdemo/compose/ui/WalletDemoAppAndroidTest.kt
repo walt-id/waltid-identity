@@ -152,6 +152,9 @@ class WalletDemoAppAndroidTest {
         scenarios.technicalCopyPreservesFullValueWithoutChangingExpansion()
 
     @Test
+    fun copyIsCancelledWhenRowLeavesComposition() = scenarios.copyIsCancelledWhenRowLeavesComposition()
+
+    @Test
     fun readerTrustSettingsReviewAndPersistPublicCa() =
         scenarios.readerTrustSettingsReviewAndPersistPublicCa()
 

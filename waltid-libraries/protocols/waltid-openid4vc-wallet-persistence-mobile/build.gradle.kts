@@ -30,7 +30,7 @@ kotlin {
             iosMinimumDeploymentTarget.set("15.4")
             swiftPackage(
                 url = url("https://github.com/sqlcipher/SQLCipher.swift.git"),
-                version = exact("4.16.0"),
+                version = exact(identityLibs.versions.sqlcipher.swift.get()),
                 products = listOf(
                     product(
                         "SQLCipher",
@@ -65,7 +65,7 @@ kotlin {
                 implementation(identityLibs.sqlcipher.android)
                 api(identityLibs.androidx.fragment)
                 implementation(identityLibs.androidx.biometric)
-                implementation(identityLibs.androidx.lifecycle.runtime.ktx)
+                implementation(identityLibs.androidx.lifecycle.runtime)
             }
             named("androidHostTest") {
                 dependencies {

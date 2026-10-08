@@ -30,7 +30,6 @@ if (enableAndroidBuild) {
 
 if (project.file("src/commonTest").exists()) {
     powerAssert {
-        includedSourceSets = listOf("commonTest")
         functions = BuildConstants.POWER_ASSERT_FUNCTIONS
     }
 }

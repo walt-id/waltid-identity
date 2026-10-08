@@ -4,27 +4,44 @@ import argparse
 import os
 from pathlib import Path
 import plistlib
+import shlex
 import shutil
 import subprocess
 
-parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--output", type=Path, required=True)
-args = parser.parse_args()
-root = Path(__file__).resolve().parents[1]
-output = args.output.resolve()
-output.mkdir(parents=True, exist_ok=True)
-app = output / "RecoveryTests.app"
-app.mkdir(exist_ok=True)
-bundle = "id.walt.wallet.recovery-tests"
-entitlements = output / "simulator.entitlements"
-entitlements.write_bytes(plistlib.dumps({"application-identifier": bundle, "keychain-access-groups": [bundle]}))
-(app / "Info.plist").write_bytes(plistlib.dumps({
-    "CFBundleIdentifier": bundle, "CFBundleExecutable": "RecoveryTests", "CFBundleName": "RecoveryTests",
-    "CFBundlePackageType": "APPL", "CFBundleVersion": "1", "CFBundleShortVersionString": "1.0",
-    "MinimumOSVersion": "16.0", "UIDeviceFamily": [1, 2],
-}))
-init = output / "ios-host.init.gradle"
-init.write_text("""gradle.projectsEvaluated {
+
+def imported_framework(definition: Path, name: str) -> Path:
+    options = next((value for line in definition.read_text().splitlines()
+                    for key, separator, value in [line.partition("=")]
+                    if separator and key.strip() == "compilerOpts"), "")
+    # Match Clang's search order: SwiftPM can also emit a second, static framework
+    # beside the dynamically linked framework in PackageFrameworks.
+    for option in shlex.split(options):
+        if option.startswith("-F") and len(option) > 2:
+            framework = Path(option[2:]) / f"{name}.framework"
+            if framework.is_dir():
+                return framework.resolve()
+    raise RuntimeError(f"No imported {name} framework found in {definition}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    root = Path(__file__).resolve().parents[1]
+    output = args.output.resolve()
+    output.mkdir(parents=True, exist_ok=True)
+    app = output / "RecoveryTests.app"
+    app.mkdir(exist_ok=True)
+    bundle = "id.walt.wallet.recovery-tests"
+    entitlements = output / "simulator.entitlements"
+    entitlements.write_bytes(plistlib.dumps({"application-identifier": bundle, "keychain-access-groups": [bundle]}))
+    (app / "Info.plist").write_bytes(plistlib.dumps({
+        "CFBundleIdentifier": bundle, "CFBundleExecutable": "RecoveryTests", "CFBundleName": "RecoveryTests",
+        "CFBundlePackageType": "APPL", "CFBundleVersion": "1", "CFBundleShortVersionString": "1.0",
+        "MinimumOSVersion": "16.0", "UIDeviceFamily": [1, 2],
+    }))
+    init = output / "ios-host.init.gradle"
+    init.write_text("""gradle.projectsEvaluated {
     def module = gradle.rootProject.findProject(':waltid-libraries:protocols:waltid-openid4vc-wallet-mobile')
     if (module == null) return
     // Run the adapter's existing contract in the same entitled host, without duplicating its tests.
@@ -43,43 +60,49 @@ init.write_text("""gradle.projectsEvaluated {
     }
 }
 """)
-developer = os.environ.get("DEVELOPER_DIR") or subprocess.check_output(["xcode-select", "-p"], text=True).strip()
-host_object = output / "recovery-simulator-host.o"
-sdk = subprocess.check_output(["xcrun", "--sdk", "iphonesimulator", "--show-sdk-path"], text=True).strip()
-subprocess.run(["xcrun", "--sdk", "iphonesimulator", "clang", "-target", "arm64-apple-ios16.0-simulator",
-                "-isysroot", sdk, "-fobjc-arc", "-c", str(root / "scripts/recovery-simulator-host.m"),
-                "-o", str(host_object)], check=True)
-# Build only test-host static objects from the real Swift sources. Without a WalletCore search
-# path the SDK compiles its portable contracts, avoiding a second Kotlin runtime in this host.
-swift_sdk = output / "libWalletSDK.a"
-swift_adapter = output / "libWalletSDKKeychainRecovery.a"
-swift_exchange = output / "recovery-keychain-interop.o"
-swift = ["xcrun", "--sdk", "iphonesimulator", "swiftc", "-target", "arm64-apple-ios16.0-simulator",
-         "-sdk", sdk, "-I", str(output), "-parse-as-library", "-strict-concurrency=complete"]
-sources = root / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Sources"
-for module, library in (("WalletSDK", swift_sdk), ("WalletSDKKeychainRecovery", swift_adapter)):
-    subprocess.run(swift + ["-module-name", module, "-emit-module", "-emit-module-path", str(output / (module + ".swiftmodule")),
-        "-emit-library", "-static", "-o", str(library)] + [str(p) for p in sorted((sources / module).glob("*.swift"))], check=True)
-subprocess.run(swift + ["-emit-object", "-o", str(swift_exchange), str(root / "scripts/recovery-keychain-interop.swift")], check=True)
-env = dict(os.environ, RECOVERY_TEST_ENTITLEMENTS=str(entitlements),
-           RECOVERY_TEST_HOST_OBJECT=str(host_object),
-           RECOVERY_TEST_SWIFT_EXCHANGE=str(swift_exchange), RECOVERY_TEST_SWIFT_ADAPTER=str(swift_adapter),
-           RECOVERY_TEST_SWIFT_SDK=str(swift_sdk),
-           RECOVERY_TEST_SWIFT_LIBS=developer + "/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator")
-log = output / "build.log"
-with log.open("w") as stream:
-    result = subprocess.run([str(root / "gradlew"),
-        ":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:linkDebugTestIosSimulatorArm64",
-        "-PenableIosBuild=true", "-PenableAndroidBuild=false", "-PenableIosRecoveryTests=true",
-        "-I", str(init), "--console=plain"], cwd=root, env=env, stdout=stream, stderr=subprocess.STDOUT)
-if result.returncode:
-    raise SystemExit(f"Simulator host build failed; see {log}")
-modules = root / "waltid-libraries/protocols"
-shutil.copy2(modules / "waltid-openid4vc-wallet-mobile/build/bin/iosSimulatorArm64/debugTest/test.kexe", app / "RecoveryTests")
-framework = app / "Frameworks/SQLCipher.framework"
-shutil.copytree(modules / "waltid-openid4vc-wallet-persistence-mobile/build/kotlin/swiftImportDd/dd_iphonesimulator/Build/Products/Debug-iphonesimulator/PackageFrameworks/SQLCipher.framework",
-                framework, dirs_exist_ok=True)
-for target in (framework, app):
-    subprocess.run(["codesign", "--force", "--sign", "-", str(target)], check=True)
-print(f"Simulator test app: {app}")
-print(f"Build log: {log}")
+    developer = os.environ.get("DEVELOPER_DIR") or subprocess.check_output(["xcode-select", "-p"], text=True).strip()
+    host_object = output / "recovery-simulator-host.o"
+    sdk = subprocess.check_output(["xcrun", "--sdk", "iphonesimulator", "--show-sdk-path"], text=True).strip()
+    subprocess.run(["xcrun", "--sdk", "iphonesimulator", "clang", "-target", "arm64-apple-ios16.0-simulator",
+                    "-isysroot", sdk, "-fobjc-arc", "-c", str(root / "scripts/recovery-simulator-host.m"),
+                    "-o", str(host_object)], check=True)
+    # Build only test-host static objects from the real Swift sources. Without a WalletCore search
+    # path the SDK compiles its portable contracts, avoiding a second Kotlin runtime in this host.
+    swift_sdk = output / "libWalletSDK.a"
+    swift_adapter = output / "libWalletSDKKeychainRecovery.a"
+    swift_exchange = output / "recovery-keychain-interop.o"
+    swift = ["xcrun", "--sdk", "iphonesimulator", "swiftc", "-target", "arm64-apple-ios16.0-simulator",
+             "-sdk", sdk, "-I", str(output), "-parse-as-library", "-strict-concurrency=complete"]
+    sources = root / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Sources"
+    for module, library in (("WalletSDK", swift_sdk), ("WalletSDKKeychainRecovery", swift_adapter)):
+        subprocess.run(swift + ["-module-name", module, "-emit-module", "-emit-module-path", str(output / (module + ".swiftmodule")),
+            "-emit-library", "-static", "-o", str(library)] + [str(p) for p in sorted((sources / module).glob("*.swift"))], check=True)
+    subprocess.run(swift + ["-emit-object", "-o", str(swift_exchange), str(root / "scripts/recovery-keychain-interop.swift")], check=True)
+    env = dict(os.environ, RECOVERY_TEST_ENTITLEMENTS=str(entitlements),
+               RECOVERY_TEST_HOST_OBJECT=str(host_object),
+               RECOVERY_TEST_SWIFT_EXCHANGE=str(swift_exchange), RECOVERY_TEST_SWIFT_ADAPTER=str(swift_adapter),
+               RECOVERY_TEST_SWIFT_SDK=str(swift_sdk),
+               RECOVERY_TEST_SWIFT_LIBS=developer + "/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator")
+    log = output / "build.log"
+    with log.open("w") as stream:
+        result = subprocess.run([str(root / "gradlew"),
+            ":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:linkDebugTestIosSimulatorArm64",
+            "-PenableIosBuild=true", "-PenableAndroidBuild=false", "-PenableIosRecoveryTests=true",
+            "-I", str(init), "--console=plain"], cwd=root, env=env, stdout=stream, stderr=subprocess.STDOUT)
+    if result.returncode:
+        raise SystemExit(f"Simulator host build failed; see {log}")
+    modules = root / "waltid-libraries/protocols"
+    shutil.copy2(modules / "waltid-openid4vc-wallet-mobile/build/bin/iosSimulatorArm64/debugTest/test.kexe", app / "RecoveryTests")
+    framework = app / "Frameworks/SQLCipher.framework"
+    # Use the search paths of the cinterop actually compiled above, rather than a
+    # version-specific SwiftPM cache directory or an unrelated cached framework.
+    definition = modules / "waltid-openid4vc-wallet-persistence-mobile/build/kotlin/swiftImportDefs/iphonesimulator/arm64.def"
+    shutil.copytree(imported_framework(definition, "SQLCipher"), framework, dirs_exist_ok=True)
+    for target in (framework, app):
+        subprocess.run(["codesign", "--force", "--sign", "-", str(target)], check=True)
+    print(f"Simulator test app: {app}")
+    print(f"Build log: {log}")
+
+
+if __name__ == "__main__":
+    main()

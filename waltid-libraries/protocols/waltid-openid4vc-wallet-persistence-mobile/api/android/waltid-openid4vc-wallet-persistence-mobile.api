@@ -1,0 +1,443 @@
+public final class id/walt/wallet2/persistence/db/Credentials {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()J
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/db/Credentials;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/db/Credentials;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/db/Credentials;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAdded_at ()J
+	public final fun getFormat ()Ljava/lang/String;
+	public final fun getHolder_key_binding ()Ljava/lang/String;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getMetadata ()Ljava/lang/String;
+	public final fun getSerialized_credential ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/wallet2/persistence/db/Dids {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/db/Dids;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/db/Dids;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/db/Dids;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDid ()Ljava/lang/String;
+	public final fun getDocument ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/wallet2/persistence/db/Issuance_session_records {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()J
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)Lid/walt/wallet2/persistence/db/Issuance_session_records;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/db/Issuance_session_records;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JILjava/lang/Object;)Lid/walt/wallet2/persistence/db/Issuance_session_records;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKind ()Ljava/lang/String;
+	public final fun getPayload ()Ljava/lang/String;
+	public final fun getRecord_id ()Ljava/lang/String;
+	public final fun getSession_id ()Ljava/lang/String;
+	public final fun getUpdated_at ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/wallet2/persistence/db/Key_references {
+	public fun <init> (Ljava/lang/String;JLjava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()J
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;JLjava/lang/String;)Lid/walt/wallet2/persistence/db/Key_references;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/db/Key_references;Ljava/lang/String;JLjava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/db/Key_references;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCreated_at ()J
+	public final fun getKey_id ()Ljava/lang/String;
+	public final fun getStored_key ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class id/walt/wallet2/persistence/db/WalletPersistenceDatabase : app/cash/sqldelight/Transacter {
+	public static final field Companion Lid/walt/wallet2/persistence/db/WalletPersistenceDatabase$Companion;
+	public abstract fun getWalletPersistenceQueries ()Lid/walt/wallet2/persistence/db/WalletPersistenceQueries;
+}
+
+public final class id/walt/wallet2/persistence/db/WalletPersistenceDatabase$Companion {
+	public final fun allTableNames ()Ljava/util/List;
+	public final fun getSchema ()Lapp/cash/sqldelight/db/SqlSchema;
+	public final fun invoke (Lapp/cash/sqldelight/db/SqlDriver;)Lid/walt/wallet2/persistence/db/WalletPersistenceDatabase;
+}
+
+public final class id/walt/wallet2/persistence/db/WalletPersistenceQueries : app/cash/sqldelight/TransacterImpl {
+	public fun <init> (Lapp/cash/sqldelight/db/SqlDriver;)V
+	public final fun compareAndRemoveIssuanceSessionRecord (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun compareAndSetIssuanceSessionRecord (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun deleteByKeyId (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun deleteCredentialById (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun deleteDidByDid (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun deleteIdentityRecord (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun deleteIssuanceSessionRecordById (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun insert (Ljava/lang/String;JLjava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun insertCredential (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun insertDid (Ljava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun insertIssuanceSessionRecord (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun issuanceSessionRecordChanges ()Lapp/cash/sqldelight/ExecutableQuery;
+	public final fun putIdentityRecord (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
+	public final fun selectActiveIdentity (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
+	public final fun selectActiveIdentity (Ljava/lang/String;Lkotlin/jvm/functions/Function4;)Lapp/cash/sqldelight/Query;
+	public final fun selectAll ()Lapp/cash/sqldelight/Query;
+	public final fun selectAll (Lkotlin/jvm/functions/Function3;)Lapp/cash/sqldelight/Query;
+	public final fun selectAllCredentials ()Lapp/cash/sqldelight/Query;
+	public final fun selectAllCredentials (Lkotlin/jvm/functions/Function7;)Lapp/cash/sqldelight/Query;
+	public final fun selectAllDids ()Lapp/cash/sqldelight/Query;
+	public final fun selectAllDids (Lkotlin/jvm/functions/Function2;)Lapp/cash/sqldelight/Query;
+	public final fun selectAllIssuanceSessionRecords ()Lapp/cash/sqldelight/Query;
+	public final fun selectAllIssuanceSessionRecords (Lkotlin/jvm/functions/Function5;)Lapp/cash/sqldelight/Query;
+	public final fun selectByKeyId (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
+	public final fun selectByKeyId (Ljava/lang/String;Lkotlin/jvm/functions/Function3;)Lapp/cash/sqldelight/Query;
+	public final fun selectCredentialById (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
+	public final fun selectCredentialById (Ljava/lang/String;Lkotlin/jvm/functions/Function7;)Lapp/cash/sqldelight/Query;
+	public final fun selectDidByDid (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
+	public final fun selectDidByDid (Ljava/lang/String;Lkotlin/jvm/functions/Function2;)Lapp/cash/sqldelight/Query;
+	public final fun selectIdentityRecord (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
+	public final fun selectIdentityRecord (Ljava/lang/String;Lkotlin/jvm/functions/Function3;)Lapp/cash/sqldelight/Query;
+	public final fun selectIdentityRecords ()Lapp/cash/sqldelight/Query;
+	public final fun selectIdentityRecords (Lkotlin/jvm/functions/Function3;)Lapp/cash/sqldelight/Query;
+	public final fun selectIssuanceSessionRecordById (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
+	public final fun selectIssuanceSessionRecordById (Ljava/lang/String;Lkotlin/jvm/functions/Function5;)Lapp/cash/sqldelight/Query;
+	public final fun setActiveIdentity (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
+}
+
+public final class id/walt/wallet2/persistence/db/Wallet_active_identity {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/db/Wallet_active_identity;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/db/Wallet_active_identity;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/db/Wallet_active_identity;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDid ()Ljava/lang/String;
+	public final fun getIdentity_id ()Ljava/lang/String;
+	public final fun getKey_id ()Ljava/lang/String;
+	public final fun getWallet_id ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/wallet2/persistence/db/Wallet_identity_records {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/db/Wallet_identity_records;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/db/Wallet_identity_records;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/db/Wallet_identity_records;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPayload ()Ljava/lang/String;
+	public final fun getPhase ()Ljava/lang/String;
+	public final fun getWallet_id ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/wallet2/persistence/encryption/AndroidDatabaseEncryptionKeyProvider : id/walt/wallet2/persistence/encryption/DatabaseEncryptionKeyProvider {
+	public fun <init> (Landroid/content/Context;)V
+	public fun deleteKey (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getOrCreateKey (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/wallet2/persistence/encryption/DatabaseEncryptionKey {
+	public fun <init> (Ljava/lang/String;[B)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()[B
+	public final fun copy (Ljava/lang/String;[B)Lid/walt/wallet2/persistence/encryption/DatabaseEncryptionKey;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/encryption/DatabaseEncryptionKey;Ljava/lang/String;[BILjava/lang/Object;)Lid/walt/wallet2/persistence/encryption/DatabaseEncryptionKey;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKeyId ()Ljava/lang/String;
+	public final fun getMaterial ()[B
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class id/walt/wallet2/persistence/encryption/DatabaseEncryptionKeyProvider {
+	public abstract fun deleteKey (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun getOrCreateKey (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract class id/walt/wallet2/persistence/encryption/WalletPersistenceException : java/lang/RuntimeException {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class id/walt/wallet2/persistence/encryption/WalletPersistenceException$DatabaseKeyMissing : id/walt/wallet2/persistence/encryption/WalletPersistenceException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
+public final class id/walt/wallet2/persistence/encryption/WalletPersistenceException$DatabaseUnlockFailed : id/walt/wallet2/persistence/encryption/WalletPersistenceException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class id/walt/wallet2/persistence/encryption/WalletPersistenceException$EncryptionConfigurationFailed : id/walt/wallet2/persistence/encryption/WalletPersistenceException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class id/walt/wallet2/persistence/keys/AndroidPlatformKeyProvider : id/walt/wallet2/persistence/keys/PlatformManagedKeyProvider {
+	public fun <init> (Landroid/content/Context;Lkotlin/jvm/functions/Function0;)V
+	public synthetic fun <init> (Landroid/content/Context;Lkotlin/jvm/functions/Function0;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun deleteManagedKey (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun deleteUncommittedKey (Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun generateManagedKey (Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun importManagedKey (Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;Lid/walt/crypto2/keys/EncodedKey$Jwk;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun keyFacts (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun keyUseAuthorizationPolicy (Lid/walt/crypto2/keys/StoredKey$Managed;)Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;
+	public fun preflight (Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun restoreManagedKey (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun supportsPrivateKeyImport (Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;)Z
+}
+
+public final class id/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt {
+	public static final field Companion Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCancelText ()Ljava/lang/String;
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public abstract interface class id/walt/wallet2/persistence/keys/MobileWalletKeyStore : id/walt/wallet2/data/WalletKeyStore {
+	public abstract fun keyUseAuthorizationPolicy (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/wallet2/persistence/keys/MobileWalletKeyStore$DefaultImpls {
+	public static fun addCrypto2Key (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Lid/walt/crypto2/keys/Key;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getCrypto2Key (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Ljava/lang/String;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getDefaultCrypto2Key (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getDefaultKey (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getDefaultKeyMaterial (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getKeyMaterial (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Ljava/lang/String;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getPublicKeyMaterial (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun listKeysAsList (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class id/walt/wallet2/persistence/keys/PlatformManagedKeyProvider {
+	public abstract fun deleteManagedKey (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun deleteUncommittedKey (Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun generateManagedKey (Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun importManagedKey (Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;Lid/walt/crypto2/keys/EncodedKey$Jwk;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun keyFacts (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun keyUseAuthorizationPolicy (Lid/walt/crypto2/keys/StoredKey$Managed;)Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;
+	public abstract fun preflight (Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun restoreManagedKey (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun supportsPrivateKeyImport (Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;)Z
+}
+
+public final class id/walt/wallet2/persistence/keys/PlatformManagedKeyProvider$DefaultImpls {
+	public static fun deleteUncommittedKey (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyProvider;Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun importManagedKey (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyProvider;Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;Lid/walt/crypto2/keys/EncodedKey$Jwk;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun keyFacts (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyProvider;Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun supportsPrivateKeyImport (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyProvider;Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;)Z
+}
+
+public abstract interface class id/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration {
+	public abstract fun getAuthorizationPolicy ()Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;
+}
+
+public final class id/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration$Invalidated : id/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration {
+	public fun <init> (Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;)V
+	public final fun component1 ()Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;
+	public final fun copy (Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;)Lid/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration$Invalidated;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration$Invalidated;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;ILjava/lang/Object;)Lid/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration$Invalidated;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getAuthorizationPolicy ()Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration$Missing : id/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration {
+	public fun <init> (Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;)V
+	public final fun component1 ()Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;
+	public final fun copy (Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;)Lid/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration$Missing;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration$Missing;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;ILjava/lang/Object;)Lid/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration$Missing;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getAuthorizationPolicy ()Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration$Restored : id/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration {
+	public fun <init> (Lid/walt/crypto2/keys/ManagedKey;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;)V
+	public final fun component1 ()Lid/walt/crypto2/keys/ManagedKey;
+	public final fun component2 ()Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;
+	public final fun copy (Lid/walt/crypto2/keys/ManagedKey;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;)Lid/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration$Restored;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration$Restored;Lid/walt/crypto2/keys/ManagedKey;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;ILjava/lang/Object;)Lid/walt/wallet2/persistence/keys/PlatformManagedKeyRestoration$Restored;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getAuthorizationPolicy ()Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;
+	public final fun getKey ()Lid/walt/crypto2/keys/ManagedKey;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/wallet2/persistence/keys/WalletKeyCreationRequest {
+	public synthetic fun <init> (Ljava/lang/String;Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-1AhpoWA ()Ljava/lang/String;
+	public final fun component2 ()Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;
+	public final fun component3 ()Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy-1locDDc (Ljava/lang/String;Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;Ljava/lang/String;)Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;
+	public static synthetic fun copy-1locDDc$default (Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;Ljava/lang/String;Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-1AhpoWA ()Ljava/lang/String;
+	public final fun getNativeAlias ()Ljava/lang/String;
+	public final fun getPrompt ()Lid/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt;
+	public final fun getRequirements ()Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/wallet2/persistence/keys/WalletKeyProtection : java/lang/Enum {
+	public static final field Companion Lid/walt/wallet2/persistence/keys/WalletKeyProtection$Companion;
+	public static final field HardwarePreferred Lid/walt/wallet2/persistence/keys/WalletKeyProtection;
+	public static final field HardwareRequired Lid/walt/wallet2/persistence/keys/WalletKeyProtection;
+	public static final field NativeStorage Lid/walt/wallet2/persistence/keys/WalletKeyProtection;
+	public static final field PlatformDefault Lid/walt/wallet2/persistence/keys/WalletKeyProtection;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/wallet2/persistence/keys/WalletKeyProtection;
+	public static fun values ()[Lid/walt/wallet2/persistence/keys/WalletKeyProtection;
+}
+
+public final class id/walt/wallet2/persistence/keys/WalletKeyProtection$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/wallet2/persistence/keys/WalletKeyRequirements {
+	public static final field Companion Lid/walt/wallet2/persistence/keys/WalletKeyRequirements$Companion;
+	public fun <init> (Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/wallet2/persistence/keys/WalletKeyProtection;Lid/walt/crypto2/keys/PlatformKeyConfiguration;Lid/walt/crypto2/serialization/BinaryData;)V
+	public synthetic fun <init> (Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/wallet2/persistence/keys/WalletKeyProtection;Lid/walt/crypto2/keys/PlatformKeyConfiguration;Lid/walt/crypto2/serialization/BinaryData;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lid/walt/crypto2/keys/KeySpec;
+	public final fun component2 ()Ljava/util/Set;
+	public final fun component3 ()Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;
+	public final fun component4 ()Lid/walt/wallet2/persistence/keys/WalletKeyProtection;
+	public final fun component5 ()Lid/walt/crypto2/keys/PlatformKeyConfiguration;
+	public final fun component6 ()Lid/walt/crypto2/serialization/BinaryData;
+	public final fun copy (Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/wallet2/persistence/keys/WalletKeyProtection;Lid/walt/crypto2/keys/PlatformKeyConfiguration;Lid/walt/crypto2/serialization/BinaryData;)Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;Lid/walt/crypto2/keys/KeySpec;Ljava/util/Set;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lid/walt/wallet2/persistence/keys/WalletKeyProtection;Lid/walt/crypto2/keys/PlatformKeyConfiguration;Lid/walt/crypto2/serialization/BinaryData;ILjava/lang/Object;)Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAttestationChallenge ()Lid/walt/crypto2/serialization/BinaryData;
+	public final fun getAuthorizationPolicy ()Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;
+	public final fun getPlatform ()Lid/walt/crypto2/keys/PlatformKeyConfiguration;
+	public final fun getProtection ()Lid/walt/wallet2/persistence/keys/WalletKeyProtection;
+	public final fun getSpec ()Lid/walt/crypto2/keys/KeySpec;
+	public final fun getUsages ()Ljava/util/Set;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class id/walt/wallet2/persistence/keys/WalletKeyRequirements$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lid/walt/wallet2/persistence/keys/WalletKeyRequirements$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/wallet2/persistence/keys/WalletKeyRequirements$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class id/walt/wallet2/persistence/stores/DriverFactory {
+	public fun <init> (Landroid/content/Context;)V
+	public final fun createEncryptedDriver (Ljava/lang/String;Lid/walt/wallet2/persistence/encryption/DatabaseEncryptionKey;ZLjava/lang/String;)Lapp/cash/sqldelight/db/SqlDriver;
+	public static synthetic fun createEncryptedDriver$default (Lid/walt/wallet2/persistence/stores/DriverFactory;Ljava/lang/String;Lid/walt/wallet2/persistence/encryption/DatabaseEncryptionKey;ZLjava/lang/String;ILjava/lang/Object;)Lapp/cash/sqldelight/db/SqlDriver;
+	public final fun deleteDatabase (Ljava/lang/String;)V
+}
+
+public final class id/walt/wallet2/persistence/stores/SqlDelightCredentialStore : id/walt/wallet2/data/WalletCredentialStore {
+	public fun <init> (Lid/walt/wallet2/persistence/db/WalletPersistenceQueries;)V
+	public fun addCredential (Lid/walt/wallet2/data/StoredCredential;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getCredential (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun listCredentials (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun listCredentialsAsList (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun removeCredential (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/wallet2/persistence/stores/SqlDelightDidStore : id/walt/wallet2/data/WalletDidStore {
+	public fun <init> (Lid/walt/wallet2/persistence/db/WalletPersistenceQueries;Ljava/lang/String;)V
+	public synthetic fun <init> (Lid/walt/wallet2/persistence/db/WalletPersistenceQueries;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun addDid (Lid/walt/wallet2/data/WalletDidEntry;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getDefaultDid (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getDid (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun listDids (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun listDidsAsList (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun removeDid (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/wallet2/persistence/stores/SqlDelightIssuanceSessionStore : id/walt/wallet2/handlers/AtomicWalletIssuanceSessionStore {
+	public fun <init> (Lid/walt/wallet2/persistence/db/WalletPersistenceQueries;)V
+	public fun compareAndSet (Lid/walt/wallet2/handlers/WalletIssuanceSessionRecord;Lid/walt/wallet2/handlers/WalletIssuanceSessionRecord;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun get (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun list (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun put (Lid/walt/wallet2/handlers/WalletIssuanceSessionRecord;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun remove (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/wallet2/persistence/stores/SqlDelightKeyStore : id/walt/wallet2/persistence/keys/MobileWalletKeyStore {
+	public fun <init> (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyProvider;Lid/walt/wallet2/persistence/db/WalletPersistenceQueries;Ljava/lang/String;)V
+	public synthetic fun <init> (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyProvider;Lid/walt/wallet2/persistence/db/WalletPersistenceQueries;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun addCrypto2Key (Lid/walt/crypto2/keys/Key;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun addKey (Lid/walt/crypto/keys/Key;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun generateKey (Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun generateSoftwareKey (Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getCrypto2Key (Ljava/lang/String;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getDefaultCrypto2Key (Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getDefaultKey (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getDefaultKeyMaterial (Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getKey (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getKeyMaterial (Ljava/lang/String;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getPublicKeyMaterial (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun importSoftwareKey (Lid/walt/crypto2/keys/StoredKey$Software;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun keyUseAuthorizationPolicy (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun listKeys (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun listKeysAsList (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun preflight (Lid/walt/wallet2/persistence/keys/WalletKeyRequirements;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun removeKey (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun storedKey (Ljava/lang/String;)Lid/walt/crypto2/keys/StoredKey;
+}
+

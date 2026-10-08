@@ -10,6 +10,7 @@ import dev.whyoleg.cryptography.algorithms.HMAC
 import dev.whyoleg.cryptography.algorithms.SHA256
 import dev.whyoleg.cryptography.algorithms.SHA384
 import dev.whyoleg.cryptography.algorithms.SHA512
+import okio.ByteString.Companion.toByteString
 
 /** A suspendable interface for a COSE-compatible MAC creator. */
 fun interface CoseMacCreator {
@@ -46,7 +47,7 @@ data class CoseHmacKey(val keyBytes: ByteArray) {
             val key = hmacKey(provider, algorithm)
             if (algorithm == Cose.Algorithm.HMAC_256_64) {
                 val expected = key.signatureGenerator().generateSignature(data).copyOf(8)
-                constantTimeEquals(tag, expected)
+                tag.toByteString().equals(expected.toByteString(), constantTime = true)
             } else {
                 key.signatureVerifier().tryVerifySignature(data, tag)
             }
@@ -72,13 +73,4 @@ data class CoseHmacKey(val keyBytes: ByteArray) {
     override fun hashCode(): Int {
         return keyBytes.contentHashCode()
     }
-}
-
-private fun constantTimeEquals(first: ByteArray, second: ByteArray): Boolean {
-    if (first.size != second.size) return false
-    var difference = 0
-    for (index in first.indices) {
-        difference = difference or (first[index].toInt() xor second[index].toInt())
-    }
-    return difference == 0
 }

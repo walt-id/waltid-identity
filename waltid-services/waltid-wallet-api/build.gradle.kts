@@ -62,7 +62,7 @@ dependencies {
     implementation(identityLibs.bouncycastle.pkix)
 
     // Argon2
-    implementation("de.mkammerer:argon2-jvm:2.11")
+    implementation(identityLibs.argon2.jvm)
 
 
     // walt.id
@@ -94,14 +94,14 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-verifier-api"))
 
     implementation(identityLibs.nimbus.jose.jwt)
-    implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
+    implementation(identityLibs.java.cose)
 
     implementation(identityLibs.ktor.client.java)
 
     /* -- Misc --*/
 
     // Cache
-    implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
+    implementation(identityLibs.cache4k)
 
     // Webauthn
     /*implementation("com.webauthn4j:webauthn4j-core:0.28.5.RELEASE") {
@@ -109,28 +109,27 @@ dependencies {
     }*/ // Not implemented right now
 
     // DB
-    val exposedVersion = "1.0.0-rc-1"
-    implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
-    implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
-    implementation("org.jetbrains.exposed:exposed-dao:$exposedVersion")
-    implementation("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
-    implementation("org.jetbrains.exposed:exposed-json:$exposedVersion")
+    implementation(identityLibs.exposed.wallet.core)
+    implementation(identityLibs.exposed.wallet.jdbc)
+    implementation(identityLibs.exposed.wallet.dao)
+    implementation(identityLibs.exposed.wallet.java.time)
+    implementation(identityLibs.exposed.wallet.json)
     // drivers
-    implementation("org.xerial:sqlite-jdbc:3.53.1.0")
-    implementation("org.postgresql:postgresql:42.7.11")
-    implementation("com.mysql:mysql-connector-j:9.7.0")
-    implementation("com.microsoft.sqlserver:mssql-jdbc:13.4.0.jre11")
+    implementation(identityLibs.sqlite.wallet)
+    implementation(identityLibs.postgresql)
+    implementation(identityLibs.mysql.connector)
+    implementation(identityLibs.mssql.jdbc)
 
     // Web push
     // implementation("dev.blanke.webpush:webpush:6.1.1") // alternative
-    implementation("com.interaso:webpush:1.3.0")
+    implementation(identityLibs.webpush)
 
     // Config
-    implementation("com.sksamuel.hoplite:hoplite-core:2.9.0")
-    implementation("com.sksamuel.hoplite:hoplite-hocon:2.9.0")
-    implementation("com.sksamuel.hoplite:hoplite-yaml:2.9.0")
-    implementation("com.sksamuel.hoplite:hoplite-hikaricp:2.9.0")
-    implementation("com.zaxxer:HikariCP:6.2.1")
+    implementation(identityLibs.hoplite.core)
+    implementation(identityLibs.hoplite.hocon)
+    implementation(identityLibs.hoplite.yaml)
+    implementation(identityLibs.hoplite.hikaricp)
+    implementation(identityLibs.hikaricp.wallet)
 
     // Logging
     implementation(identityLibs.oshai.kotlinlogging)
@@ -142,9 +141,9 @@ dependencies {
     testImplementation(identityLibs.junit.jupiter.api)
     testImplementation(identityLibs.junit.jupiter.params)
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation(identityLibs.kotlinx.coroutines.service.test)
     testImplementation(identityLibs.ktor.server.test.host)
-    testImplementation("io.mockk:mockk:1.14.9")
+    testImplementation(identityLibs.mockk.wallet)
     testImplementation(identityLibs.klogging)
 }
 

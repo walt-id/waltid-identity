@@ -60,7 +60,7 @@ kotlin {
             implementation(identityLibs.junit.jupiter.api)
         }
         jsMain.dependencies {
-            implementation(npm("jose", "5.10.0"))
+            implementation(npm("jose", identityLibs.versions.jose.npm.get()))
             implementation(identityLibs.ktor.client.js)
         }
         jsTest.dependencies {

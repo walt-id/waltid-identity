@@ -1,0 +1,20 @@
+public final class id/walt/wallet2/recovery/blockstore/BlockStoreIdentityRecovery : id/walt/wallet2/mobile/identity/IdentityRecoveryProvider {
+	public fun <init> (Landroid/content/Context;Ljava/lang/String;Lid/walt/wallet2/recovery/blockstore/BlockStoreRecoveryMode;)V
+	public synthetic fun <init> (Landroid/content/Context;Ljava/lang/String;Lid/walt/wallet2/recovery/blockstore/BlockStoreRecoveryMode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun availability (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun delete (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun getDisplayName ()Ljava/lang/String;
+	public fun getId ()Ljava/lang/String;
+	public fun list (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun retrieve (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun store (Ljava/lang/String;Lid/walt/wallet2/mobile/identity/IdentityRecoveryData;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/wallet2/recovery/blockstore/BlockStoreRecoveryMode : java/lang/Enum {
+	public static final field DeviceTransfer Lid/walt/wallet2/recovery/blockstore/BlockStoreRecoveryMode;
+	public static final field EncryptedCloud Lid/walt/wallet2/recovery/blockstore/BlockStoreRecoveryMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/wallet2/recovery/blockstore/BlockStoreRecoveryMode;
+	public static fun values ()[Lid/walt/wallet2/recovery/blockstore/BlockStoreRecoveryMode;
+}
+
