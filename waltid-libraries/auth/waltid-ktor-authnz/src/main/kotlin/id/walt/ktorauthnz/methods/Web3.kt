@@ -60,9 +60,10 @@ object Web3 : AuthenticationMethod("web3") {
         val r = BigInteger(1, signatureBytes.copyOfRange(0, 32))
         val s = BigInteger(1, signatureBytes.copyOfRange(32, 64))
 
-        // The v value is the last byte, convert it to the correct format
-        // MetaMask adds 27 to v, so we need to subtract it
-        val v = (signatureBytes[64].toInt() and 0xFF) - 27
+        // The last byte is the recovery id: MetaMask and most wallets send 27/28, others (e.g. hardware wallets,
+        // some libraries) the raw 0/1.
+        val v = (signatureBytes[64].toInt() and 0xFF).let { if (it >= 27) it - 27 else it }
+        authCheck(v == 0 || v == 1, Web3AuthException("Invalid signature recovery id"))
 
 
         val signature = ECDSASignature(r, s)
