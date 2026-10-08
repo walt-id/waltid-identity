@@ -99,6 +99,7 @@ class AttestationX509CertificateValidatorTest {
         context.setCurrent(
             AttestationX509CertificateValidator.id,
             certificateIndex = 0,
+            certificateIndexInProvidedChain = 0,
             certificateSubjectDn = "CN=leaf"
         )
         return context

@@ -5,6 +5,7 @@ import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.profile.IsoMdocReaderAuthenticationX509CertificateProfile
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
+import id.walt.certificate.x509.validation.validator.X509CertificateChainInOrderValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
 import kotlin.time.Clock
@@ -20,6 +21,7 @@ object MdocReaderAuthenticationCertificateUtil {
         X509CertificateUtil {
             addValidators(
                 X509CertificateValidityValidator(allowValidityInFuture = false, clock = clock),
+                X509CertificateChainInOrderValidator(),
                 object : X509CertificateValidator {
                     override val id: String = IsoMdocReaderAuthenticationX509CertificateProfile.ID
 

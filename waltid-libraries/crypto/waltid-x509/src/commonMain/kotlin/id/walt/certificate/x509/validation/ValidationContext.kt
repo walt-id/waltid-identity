@@ -28,7 +28,7 @@ class ValidationContext(
         variableMap["${valid}:${key}"] = value
     }
 
-    fun <T>getVariable(key: String): T? {
+    fun <T> getVariable(key: String): T? {
         return variableMap["${valid}:${key}"] as? T
     }
 
@@ -43,10 +43,18 @@ class ValidationContext(
         get() = current.validatorId
     val certificateIndex: Int
         get() = current.certificateIndex
+
+    /**
+     * Position of the current certificate in the certificate list passed to validation (0 = first
+     * element, the leaf for a leaf-first chain); `null` if the certificate was not part of that list.
+     * [certificateIndex], in contrast, is its position in the root-first [X509CertificateChain].
+     */
+    val certificateIndexInProvidedChain: Int?
+        get() = current.certificateIndexInProvidedChain
     val certificateSubjectDn: String
         get() = current.certificateSubjectDn
 
-    val isLeaf : Boolean
+    val isLeaf: Boolean
         get() = certificateIndex == chainLength - 1
 
     override fun findCertificateBySubjectDn(subjectDn: String): List<X509Certificate> =
@@ -89,14 +97,21 @@ class ValidationContext(
     fun setCurrent(
         validatorId: String,
         certificateIndex: Int,
+        certificateIndexInProvidedChain: Int?,
         certificateSubjectDn: String
     ) {
-        internalCurrent = Current(validatorId, certificateIndex, certificateSubjectDn)
+        internalCurrent = Current(
+            validatorId,
+            certificateIndex,
+            certificateIndexInProvidedChain,
+            certificateSubjectDn
+        )
     }
 
     private data class Current(
         val validatorId: String,
         val certificateIndex: Int,
+        val certificateIndexInProvidedChain: Int?,
         val certificateSubjectDn: String,
     )
 }

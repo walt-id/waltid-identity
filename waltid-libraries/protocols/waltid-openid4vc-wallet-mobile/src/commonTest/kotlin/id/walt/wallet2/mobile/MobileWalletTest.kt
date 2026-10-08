@@ -1857,6 +1857,55 @@ class MobileWalletTest {
     }
 
     /**
+     * A reader `x5chain` whose certificates do not link up (issuer name and signature) is malformed or
+     * tampered. The leaf still verifies the reader signature, but the chain is rejected by the reader
+     * certificate validation, so the reader is shown as untrusted.
+     */
+    @Test
+    fun annexCRejectsReaderCertificateChainWithBrokenLink() = runTest {
+        val wallet = annexCWalletWithMdl("annex-c-reader-chain-broken-link-wallet")
+        val signedRequest = DeviceRequest.decodeFromBase64Url(SIGNED_READER_REQUEST)
+        val docRequest = signedRequest.docRequests.single()
+        val readerAuth = requireNotNull(docRequest.readerAuth)
+        val protectedHeaders = coseCompliantCbor.decodeFromByteArray(CoseHeaders.serializer(), readerAuth.protected)
+        val leaf = requireNotNull(protectedHeaders.x5chain ?: readerAuth.unprotected.x5chain).first()
+        val brokenChain = signedRequest.copy(
+            docRequests = listOf(
+                docRequest.copy(
+                    readerAuth = readerAuth.copy(
+                        unprotected = readerAuth.unprotected.copy(
+                            x5chain = listOf(leaf, CoseCertificate(Base64.decode(OTHER_READER_CERTIFICATE_BASE64))),
+                        ),
+                        protected = coseCompliantCbor.encodeToByteArray(
+                            CoseHeaders.serializer(),
+                            CoseHeaders(algorithm = Cose.Algorithm.ES256),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val parsedRequest = wallet.parseAnnexCDeviceRequest(brokenChain.encodeToBase64Url())
+
+        val preview = wallet.previewAnnexCPresentation(
+            MobileWalletAnnexCRequest(
+                parsedRequest = parsedRequest,
+                verifiedOrigin = "https://verifier.example",
+                deviceRequestBase64Url = brokenChain.encodeToBase64Url(),
+                encryptionInfoBase64Url = READER_ENCRYPTION_INFO,
+            )
+        )
+
+        assertEquals(MobileWalletReaderAuthentication.VERIFIED, preview.readerAuthentication)
+        val readerTrust = assertNotNull(preview.readerTrust)
+        assertEquals(ReaderTrustState.VALID_BUT_UNTRUSTED, readerTrust.state)
+        assertTrue(
+            readerTrust.reason.orEmpty().contains("certificate chain could not be validated"),
+            "Expected the reader to be untrusted because its certificate chain does not link up, got: " +
+                readerTrust.reason,
+        )
+    }
+
+    /**
      * Every reader-authentication signature in one request must come from the same certificate chain.
      *
      * Otherwise whichever chain reached [ReaderTrustEvaluator] would decide the trust state

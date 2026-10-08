@@ -5,25 +5,25 @@ package id.walt.wallet2.mobile
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
-import id.walt.cose.CoseSign1
 import id.walt.cose.CoseKey
+import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toEncodedJwk
 import id.walt.cose.verifyDetached
-import id.walt.crypto2.hpke.Hpke
-import id.walt.crypto2.keys.HpkeCiphertext
-import id.walt.crypto2.keys.KeyUsage
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto2.hpke.Hpke
+import id.walt.crypto2.keys.HpkeCiphertext
+import id.walt.crypto2.keys.KeyUsage
 import id.walt.mdoc.objects.SessionTranscript
-import id.walt.mdoc.objects.sha256
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.handover.AnnexCDcapiHandoverInfo
+import id.walt.mdoc.objects.sha256
 import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
 import id.walt.mdoc.readertrust.ReaderAuthenticationScope
 import id.walt.mdoc.readertrust.ReaderTrustDecision
@@ -36,11 +36,7 @@ import id.walt.wallet2.data.resolveHolderKey
 import id.walt.wallet2.handlers.PreviewSessionStore
 import id.waltid.openid4vp.wallet.DcApiWallet
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
-import id.walt.x509.CertificateDer
-import id.walt.x509.crypto2VerificationKey
-import id.walt.x509.verifyOrderedCertificateChainSignatures
 import kotlinx.coroutines.CancellationException
-import kotlinx.io.bytestring.ByteString as IoByteString
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
@@ -53,6 +49,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.io.bytestring.ByteString as IoByteString
 
 @Serializable
 @CborObjectAsArray
@@ -467,8 +464,7 @@ internal class MobileWalletAnnexCEngine(
             val chain = (protectedHeaders.x5chain ?: signature.unprotected.x5chain)
                 ?.map { it.rawBytes }
                 ?: throw IllegalArgumentException("Reader authentication has no x5chain")
-  //          TODO()
-            verifyOrderedCertificateChainSignatures(chain.map(::CertificateDer))
+            val certificates = chain.map { X509CertificateUtil.parseCertificateDerEncoded(IoByteString(it)) }
             if (certificateChain == null) certificateChain = chain
             else require(
                 certificateChain.size == chain.size &&
@@ -479,7 +475,7 @@ internal class MobileWalletAnnexCEngine(
             }
             require(
                 signature.verifyDetached(
-                    key = CertificateDer(chain.first()).crypto2VerificationKey(),
+                    key = certificates.first().restoreSubjectPublicKey(X509CertificateUtil.services.cryptoRuntime),
                     detachedPayload = detachedPayload,
                     allowedAlgorithms = READER_AUTHENTICATION_COSE_ALGORITHMS,
                 )
@@ -558,7 +554,7 @@ internal class MobileWalletAnnexCEngine(
         } catch (exception: Exception) {
             ReaderTrustDecision(
                 state = ReaderTrustState.VALID_BUT_UNTRUSTED,
-                reason = "Reader trust evaluation failed",
+                reason = "Reader trust evaluation failed: '${exception.message}'",
             )
         }
 
