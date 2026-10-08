@@ -117,6 +117,9 @@ object WalletPresentFunctionality2 {
                     val selectedCrypto2Key = selected?.key ?: holderCrypto2Key
                     val selectedLegacyKey = holderKey.takeIf { selected == null }
                     val selectedDid = if (selected == null) holderDid else selected.did
+                    if (resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.JWT_VC_JSON ||
+                        resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.DC_SD_JWT
+                    ) requireCredentialHolderKey(queryId, digitalCredential, selectedCrypto2Key, selectedLegacyKey)
                     val presentationStringOrObject: JsonElement = when {
                         resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.JWT_VC_JSON ->
                             selectedCrypto2Key?.let {
@@ -190,6 +193,40 @@ object WalletPresentFunctionality2 {
 
         log.trace { "Generated VP Token Map Contents: $vpTokenMapContents" }
         return Json.encodeToString(JsonObject(vpTokenMapContents))
+    }
+
+    /**
+     * Refuses to present a credential with a key other than its holder key (`cnf.jwk`): the verifier would reject the
+     * proof. One request can need a different key per credential (OpenID4VP 1.0 gives each Credential Query its own
+     * holder binding); they come from the credential holder-key resolver.
+     *
+     * Fails closed: signing and exporting the public key are separate capabilities, so a key whose public key cannot be
+     * read could still sign - with possibly the wrong key. A failing export is propagated, not treated as a pass.
+     */
+    private suspend fun requireCredentialHolderKey(
+        queryId: String,
+        credential: DigitalCredential,
+        crypto2Key: Crypto2Key?,
+        legacyKey: Key?,
+    ) {
+        val confirmationKey = (credential.credentialData["cnf"] as? JsonObject)?.get("jwk") as? JsonObject ?: return
+        val actual = requireNotNull(publicJwkThumbprint(crypto2Key, legacyKey)) {
+            "The key selected to present the credential for query '$queryId' cannot be checked against its holder key " +
+                "(cnf.jwk): its public key cannot be exported"
+        }
+        require(jwkThumbprint(confirmationKey) == actual) {
+            "The credential for query '$queryId' is bound to another holder key (cnf.jwk) than the key selected to present it"
+        }
+    }
+
+    private suspend fun jwkThumbprint(jwk: JsonObject): String =
+        Jwk.sha256Thumbprint(EncodedKey.Jwk(BinaryData(jwk.toString().encodeToByteArray()), privateMaterial = false))
+
+    private suspend fun publicJwkThumbprint(crypto2Key: Crypto2Key?, legacyKey: Key?): String? = when {
+        crypto2Key != null -> crypto2Key.capabilities.publicKeyExporter?.exportPublicKey()?.toPublicJwk(crypto2Key.spec)
+            ?.let { Jwk.sha256Thumbprint(it) }
+        legacyKey != null -> jwkThumbprint(Json.parseToJsonElement(legacyKey.getPublicKey().exportJWK()).jsonObject)
+        else -> null
     }
 
     @Serializable
@@ -1520,11 +1557,12 @@ object WalletPresentFunctionality2 {
             currentCoroutineContext().ensureActive()
             val confirmationKey = (issuerClaims["cnf"] as? JsonObject)?.get("jwk") as? JsonObject
             requireNotNull(confirmationKey) { "TS12 requires the credential's cnf.jwk holder key" }
-            val expected = EncodedKey.Jwk(BinaryData(confirmationKey.toString().encodeToByteArray()), privateMaterial = false)
-            val actual = crypto2Key?.let { key ->
-                requireNotNull(key.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(key.spec)
-            } ?: EncodedKey.Jwk(BinaryData(requireNotNull(holderKey).getPublicKey().exportJWK().encodeToByteArray()), privateMaterial = false)
-            require(Jwk.sha256Thumbprint(expected) == Jwk.sha256Thumbprint(actual)) {
+            val actual = if (crypto2Key != null) {
+                Jwk.sha256Thumbprint(requireNotNull(crypto2Key.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(crypto2Key.spec))
+            } else {
+                requireNotNull(publicJwkThumbprint(null, requireNotNull(holderKey)))
+            }
+            require(jwkThumbprint(confirmationKey) == actual) {
                 "TS12 signing key does not match the credential's holder key"
             }
             val presentation = ScaPresentation(

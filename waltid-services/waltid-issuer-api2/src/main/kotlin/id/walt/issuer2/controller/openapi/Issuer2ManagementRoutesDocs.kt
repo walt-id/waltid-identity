@@ -126,83 +126,10 @@ object Issuer2ManagementRoutesDocs {
         """.trimIndent()
         request {
             body(anyOf(type<CredentialOfferCreateRequest>(), type<MultiCredentialOfferCreateRequest>())) {
-                example("[authorized][single][by-reference]") {
-                    value = Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE
-                }
-                example("[authorized][single][by-value]") {
-                    value = Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_VALUE
-                }
-                example("[authorized][single][by-value][issuer_state omitted]") {
-                    value = Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_VALUE_WITHOUT_ISSUER_STATE
-                }
-                example("[authorized][single][by-reference][mDoc credentialData override]") {
-                    value = Issuer2RequestExamples.AUTHORIZED_MDOC_MDL_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE
-                }
-                example("[authorized][multiple][by-reference][same dataset, different formats][EUDI PID]") {
-                    value = Issuer2RequestExamples.PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_REFERENCE
-                }
-                example("[authorized][multiple][by-value][same format, different datasets][SD-JWT VC]") {
-                    value = Issuer2RequestExamples.PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE
-                }
-                example("[authorized][multiple][by-reference][runtime overrides]") {
-                    value = Issuer2RequestExamples.PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_RUNTIME_OVERRIDES
-                }
-                example("[pre-authorized][single][by-reference]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE
-                }
-                example("[pre-authorized][single][shared status][W3C]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS
-                }
-                example("[pre-authorized][single][shared status][SD-JWT]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_SD_JWT_STATUS
-                }
-                example("[pre-authorized][single][shared status][mdoc]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_MDOC_STATUS
-                }
-                example("[pre-authorized][multiple][different statuses per item]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES
-                }
-                example("[authorized][multiple][different statuses per item]") {
-                    value = Issuer2RequestExamples.PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES
-                }
-                example("[pre-authorized][single][by-value]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_VALUE
-                }
-                example("[pre-authorized][single][by-reference][provided tx_code]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PROVIDED_TX_CODE
-                }
-                example("[pre-authorized][single][by-reference][generated tx_code]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_GENERATED_TX_CODE
-                }
-                example("[pre-authorized][single][by-reference][expires in 2 minutes]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_2_MIN_EXPIRY
-                }
-                example("[pre-authorized][single][by-reference][no expiry]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITHOUT_EXPIRY
-                }
-                example("[pre-authorized][single][by-reference][credentialData override]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE
-                }
-                example("[pre-authorized][single][by-reference][issuerKey override]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_ISSUER_KEY_OVERRIDE
-                }
-                example("[pre-authorized][single][by-reference][selective disclosure override]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SELECTIVE_DISCLOSURE_OVERRIDE
-                }
-                example("[pre-authorized][single][by-reference][mDoc credentialData override]") {
-                    value = Issuer2RequestExamples.PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE
-                }
-                example("[pre-authorized][single][by-reference][authorized transaction types override]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_AUTHORIZED_TRANSACTION_DATA_TYPES_OVERRIDE
-                }
-                example("[pre-authorized][multiple][by-reference]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER
-                }
-                example("[pre-authorized][multiple][by-value]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE
-                }
-                example("[pre-authorized][multiple][by-reference][runtime overrides]") {
-                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_RUNTIME_OVERRIDES
+                Issuer2RequestExamples.credentialOfferRequestExamples().forEach { (name, exampleValue) ->
+                    example(name) {
+                        value = exampleValue
+                    }
                 }
             }
         }

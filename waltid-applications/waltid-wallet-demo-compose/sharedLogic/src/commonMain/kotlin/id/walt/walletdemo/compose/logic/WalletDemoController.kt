@@ -3,10 +3,13 @@ package id.walt.walletdemo.compose.logic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -764,7 +767,7 @@ class WalletDemoController(
                 val installed = updateIfCurrent(request, WalletOperationState.ResolvingOffer) {
                     it.copy(
                         offerPreview = session.preview,
-                        issuanceCopyCounts = session.preview.offeredCredentials.associate { it.configurationId to 1 },
+                        issuanceCopyCounts = initialIssuanceCopyCounts(session.preview),
                         operation = WalletOperationState.OfferPreview,
                     )
                 }
@@ -797,7 +800,7 @@ class WalletDemoController(
         val current = _state.value
         val preview = current.offerPreview ?: return
         if (!current.offerReviewEnabled || preview.offeredCredentials.none { it.configurationId == configurationId }) return
-        val count = copies.coerceIn(0, (preview.batchSize ?: 1).coerceAtLeast(1))
+        val count = copies.coerceIn(0, issuanceCopyLimit(preview, current.issuanceCopyCounts, configurationId))
         _state.compareAndSet(current, current.copy(issuanceCopyCounts = current.issuanceCopyCounts + (configurationId to count)))
     }
 
@@ -1802,9 +1805,21 @@ class WalletDemoController(
         }
     }
 
+    @OptIn(DelicateCoroutinesApi::class)
     private fun refreshBiometricSigningAvailability(warningSequence: Long? = null) {
-        biometricSigningAvailabilityJob?.cancel()
-        biometricSigningAvailabilityJob = scope.launch(dispatcher) {
+        val previous = biometricSigningAvailabilityJob
+        // Cancel on the background dispatcher. Closing the previous call from the main
+        // thread makes the Android HTTP engine throw NetworkOnMainThreadException.
+        // ATOMIC still enters when this refresh is cancelled before dispatch.
+        biometricSigningAvailabilityJob = scope.launch(dispatcher, start = CoroutineStart.ATOMIC) {
+            try {
+                previous?.cancelAndJoin()
+            } catch (_: CancellationException) {
+                ensureActive()
+            } catch (_: Throwable) {
+                // A completion handler can fail while the socket closes. This check still runs.
+            }
+            ensureActive()
             val availability = try {
                 wallet.signingProtectionAvailability(
                     (_state.value.session as? WalletSessionState.Ready)?.signingProtection
@@ -1815,6 +1830,7 @@ class WalletDemoController(
             } catch (_: Throwable) {
                 WalletDemoSigningProtectionAvailability.Unsupported
             }
+            ensureActive()
             _state.update {
                 it.copy(
                     biometricSigningAvailability = availability,

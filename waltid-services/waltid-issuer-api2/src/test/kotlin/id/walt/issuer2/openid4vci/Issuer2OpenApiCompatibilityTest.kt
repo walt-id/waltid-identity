@@ -1,14 +1,20 @@
 package id.walt.issuer2.openid4vci
 
 import id.walt.commons.web.modules.OpenApiModule
+import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.models.CredentialOfferCreateRequest
+import id.walt.issuer2.models.CredentialOfferRequestBody
 import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
 import id.walt.issuer2.testsupport.*
 import io.github.smiley4.ktoropenapi.OpenApi
-import io.github.smiley4.ktoropenapi.config.ExampleEncoder
 import io.github.smiley4.ktoropenapi.openApi
 import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.server.application.install
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
@@ -17,6 +23,15 @@ import kotlinx.serialization.json.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.*
+
+/**
+ * Matches the content-negotiation JSON installed by the shipped service
+ * (`explicitNulls = false`, unknown keys rejected).
+ */
+private val shippedIssuer2Json = Json {
+    explicitNulls = false
+    encodeDefaults = true
+}
 
 class Issuer2OpenApiCompatibilityTest {
     @AfterEach
@@ -27,8 +42,7 @@ class Issuer2OpenApiCompatibilityTest {
         application {
             install(OpenApi) {
                 schemas { generator = OpenApiModule.createGenerator() }
-                // Match the typed example serializer used by OpenApiModule in the running service.
-                examples { exampleEncoder = ExampleEncoder.kotlinx() }
+                examples { exampleEncoder = OpenApiModule.createExampleEncoder() }
             }
             routing { route("api.json") { openApi() } }
         }
@@ -76,4 +90,48 @@ class Issuer2OpenApiCompatibilityTest {
         assertTrue(sessionShapes.any { "issuanceRequests" in it.getValue("properties").jsonObject })
         assertFalse(specification.toString().contains("CredentialOfferCredentialResponse"))
     }
+
+    @Test
+    fun `published credential-offer examples are the kotlinx request bodies and the API accepts them`() = testApplication {
+        application {
+            install(OpenApi) {
+                schemas { generator = OpenApiModule.createGenerator() }
+                examples { exampleEncoder = OpenApiModule.createExampleEncoder() }
+            }
+            routing { route("api.json") { openApi() } }
+        }
+        installIssuer2WithConfigFiles(json = shippedIssuer2Json)
+        val client = apiClient()
+        val specification = Json.parseToJsonElement(client.get("/api.json").bodyAsText()).jsonObject
+        val examples = specification.getValue("paths").jsonObject
+            .getValue("/issuer2/credential-offers").jsonObject
+            .getValue("post").jsonObject
+            .getValue("requestBody").jsonObject
+            .getValue("content").jsonObject
+            .getValue("application/json").jsonObject
+            .getValue("examples").jsonObject
+        val expectedExamples = Issuer2RequestExamples.credentialOfferRequestExamples()
+        assertEquals(expectedExamples.map { it.first }.toSet(), examples.keys)
+
+        expectedExamples.forEach { (name, request) ->
+            val published = examples.getValue(name).jsonObject.getValue("value")
+            assertEquals(expectedExampleJson(request), published, name)
+            val response = client.post("/issuer2/credential-offers") {
+                contentType(ContentType.Application.Json)
+                setBody(published.toString())
+            }
+            assertEquals(HttpStatusCode.Created, response.status, "$name\n${response.bodyAsText()}")
+        }
+    }
+}
+
+private fun expectedExampleJson(request: CredentialOfferRequestBody): JsonElement = when (request) {
+    is CredentialOfferCreateRequest -> OpenApiModule.openApiExampleJson.encodeToJsonElement(
+        CredentialOfferCreateRequest.serializer(),
+        request,
+    )
+    is MultiCredentialOfferCreateRequest -> OpenApiModule.openApiExampleJson.encodeToJsonElement(
+        MultiCredentialOfferCreateRequest.serializer(),
+        request,
+    )
 }
