@@ -89,6 +89,7 @@ class IssuanceNotificationService {
             KtorSessionNotifications(
                 webhook = KtorSessionNotifications.VerificationSessionWebhookNotification(
                     url = Url(webhook.url),
+                    retryPolicy = webhook.retryPolicy,
                 ),
             )
         }
