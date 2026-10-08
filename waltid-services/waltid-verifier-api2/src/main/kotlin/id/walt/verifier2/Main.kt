@@ -8,6 +8,7 @@ import id.walt.commons.web.WebService
 import id.walt.credentials.trustedauthorities.DcqlTrustedAuthoritiesChecker
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
+import id.walt.ktornotifications.WebhookNotifier
 import id.walt.verifier2.config.ClientMetadataHopliteDecoder
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler
 import io.ktor.http.*
@@ -37,6 +38,7 @@ suspend fun main(args: Array<String>) {
                 // Wire trusted_authorities checker per OID4VP §6.1.1 (AKI-based trust chain)
                 Verifier2VPDirectPostHandler.trustedAuthoritiesChecker = DcqlTrustedAuthoritiesChecker.checker
                 OSSVerifier2Manager.initialize()
+                WebhookNotifier.start("verifier2")
             },
             run = WebService(Application::verifierModule).run()
         )

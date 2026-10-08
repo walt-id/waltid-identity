@@ -15,6 +15,7 @@ import id.walt.issuer2.web.plugins.configureHTTP
 import id.walt.issuer2.web.plugins.configureMonitoring
 import id.walt.issuer2.web.plugins.configureRouting
 import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
+import id.walt.ktornotifications.WebhookNotifier
 import io.ktor.server.application.Application
 import io.ktor.server.http.content.staticResources
 import io.ktor.server.routing.routing
@@ -33,6 +34,7 @@ suspend fun main(args: Array<String>) {
                 DidService.minimalInit()
                 WaltCryptoAws.init()
                 WaltCryptoAzure.init()
+                WebhookNotifier.start("issuer2")
             },
             run = WebService(Application::issuer2Module).run()
         )
