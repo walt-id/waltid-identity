@@ -3,6 +3,7 @@ package id.walt.issuer2.controller.openapi
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferCredential
+import id.walt.issuer2.models.CredentialOfferRequestBody
 import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
 import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
@@ -208,7 +209,7 @@ object Issuer2RequestExamples {
     val PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE = MultiCredentialOfferCreateRequest(
         credentials = listOf(
             CredentialOfferCredential(IDENTITY_SD_JWT_PROFILE_ID),
-            CredentialOfferCredential(TAX_ID_SD_JWT_PROFILE_ID),
+            CredentialOfferCredential(CERTIFICATE_OF_RESIDENCE_SD_JWT_PROFILE_ID),
         ),
         authMethod = AuthenticationMethod.AUTHORIZED,
         issuerStateMode = IssuerStateMode.INCLUDE,
@@ -526,6 +527,35 @@ object Issuer2RequestExamples {
         }
     }
 
+    fun credentialOfferRequestExamples(): List<Pair<String, CredentialOfferRequestBody>> = listOf(
+        "[authorized][single][by-reference]" to PROFILE_AUTHORIZED_OFFER_BY_REFERENCE,
+        "[authorized][single][by-value]" to PROFILE_AUTHORIZED_OFFER_BY_VALUE,
+        "[authorized][single][by-value][issuer_state omitted]" to PROFILE_AUTHORIZED_OFFER_BY_VALUE_WITHOUT_ISSUER_STATE,
+        "[authorized][single][by-reference][mDoc credentialData override]" to AUTHORIZED_MDOC_MDL_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE,
+        "[authorized][multiple][by-reference][same dataset, different formats][EUDI PID]" to PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_REFERENCE,
+        "[authorized][multiple][by-value][same format, different datasets][SD-JWT VC]" to PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE,
+        "[authorized][multiple][by-reference][runtime overrides]" to PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_RUNTIME_OVERRIDES,
+        "[pre-authorized][single][by-reference]" to PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE,
+        "[pre-authorized][single][shared status][W3C]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS,
+        "[pre-authorized][single][shared status][SD-JWT]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_SD_JWT_STATUS,
+        "[pre-authorized][single][shared status][mdoc]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_MDOC_STATUS,
+        "[pre-authorized][multiple][different statuses per item]" to PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES,
+        "[authorized][multiple][different statuses per item]" to PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES,
+        "[pre-authorized][single][by-value]" to PROFILE_PRE_AUTHORIZED_OFFER_BY_VALUE,
+        "[pre-authorized][single][by-reference][provided tx_code]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_PROVIDED_TX_CODE,
+        "[pre-authorized][single][by-reference][generated tx_code]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_GENERATED_TX_CODE,
+        "[pre-authorized][single][by-reference][expires in 2 minutes]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_2_MIN_EXPIRY,
+        "[pre-authorized][single][by-reference][no expiry]" to PROFILE_PRE_AUTHORIZED_OFFER_WITHOUT_EXPIRY,
+        "[pre-authorized][single][by-reference][credentialData override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE,
+        "[pre-authorized][single][by-reference][issuerKey override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_ISSUER_KEY_OVERRIDE,
+        "[pre-authorized][single][by-reference][selective disclosure override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SELECTIVE_DISCLOSURE_OVERRIDE,
+        "[pre-authorized][single][by-reference][mDoc credentialData override]" to PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE,
+        "[pre-authorized][single][by-reference][authorized transaction types override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_AUTHORIZED_TRANSACTION_DATA_TYPES_OVERRIDE,
+        "[pre-authorized][multiple][by-reference]" to PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER,
+        "[pre-authorized][multiple][by-value]" to PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE,
+        "[pre-authorized][multiple][by-reference][runtime overrides]" to PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_RUNTIME_OVERRIDES,
+    )
+
     private fun byReferenceOfferUrl(): String =
         CredentialOfferRequest(
             credentialOfferUri = "$EXAMPLE_CREDENTIAL_ISSUER/credential-offer?id=$EXAMPLE_OFFER_ID",
@@ -546,7 +576,7 @@ object Issuer2RequestExamples {
                 credentialIssuer = EXAMPLE_CREDENTIAL_ISSUER,
                 credentialConfigurationIds = listOf(
                     IDENTITY_SD_JWT_CONFIGURATION_ID,
-                    TAX_ID_SD_JWT_CONFIGURATION_ID,
+                    CERTIFICATE_OF_RESIDENCE_SD_JWT_CONFIGURATION_ID,
                 ),
                 issuerState = EXAMPLE_OFFER_ID,
             )
@@ -556,7 +586,7 @@ object Issuer2RequestExamples {
     private const val MDOC_PHOTO_ID_PROFILE_ID = "isoPhotoId"
     private const val MDOC_MDL_PROFILE_ID = "isoMdl"
     private const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
-    private const val TAX_ID_SD_JWT_PROFILE_ID = "taxIdCredentialSdJwt"
+    private const val CERTIFICATE_OF_RESIDENCE_SD_JWT_PROFILE_ID = "certificateOfResidenceSdJwt"
     private const val EUDI_PID_SD_JWT_PROFILE_ID = "eudiPidSdJwt"
     private const val EUDI_PID_MDOC_PROFILE_ID = "eudiPidMdoc"
     private const val EU_AGE_VERIFICATION_PROFILE_ID = "euAgeVerificationMdoc"
@@ -565,8 +595,8 @@ object Issuer2RequestExamples {
     private const val EUDI_PID_SD_JWT_CONFIGURATION_ID = "urn:eudi:pid:1"
     private const val EUDI_PID_MDOC_CONFIGURATION_ID = "eu.europa.ec.eudi.pid.1"
     private const val IDENTITY_SD_JWT_CONFIGURATION_ID = "identity_credential"
+    private const val CERTIFICATE_OF_RESIDENCE_SD_JWT_CONFIGURATION_ID = "urn:eu.europa.ec.eudi:cor:1"
     private const val MDOC_CREDENTIAL_CONFIGURATION_ID = "org.iso.23220.photoid.1"
-    private const val TAX_ID_SD_JWT_CONFIGURATION_ID = "asit.tax-id-credential"
     private const val EXAMPLE_CREDENTIAL_ISSUER = "http://localhost:7002/openid4vci"
     private const val EXAMPLE_OFFER_ID = "018f8d6e-8df4-7b73-9f3d-f3df21a4374a"
     private const val EXAMPLE_EXPIRES_AT = 1_739_000_000_000
