@@ -199,6 +199,9 @@ object WalletPresentFunctionality2 {
      * Refuses to present a credential with a key other than its holder key (`cnf.jwk`): the verifier would reject the
      * proof. One request can need a different key per credential (OpenID4VP 1.0 gives each Credential Query its own
      * holder binding); they come from the credential holder-key resolver.
+     *
+     * Fails closed: signing and exporting the public key are separate capabilities, so a key whose public key cannot be
+     * read could still sign - with possibly the wrong key. A failing export is propagated, not treated as a pass.
      */
     private suspend fun requireCredentialHolderKey(
         queryId: String,
@@ -207,7 +210,10 @@ object WalletPresentFunctionality2 {
         legacyKey: Key?,
     ) {
         val confirmationKey = (credential.credentialData["cnf"] as? JsonObject)?.get("jwk") as? JsonObject ?: return
-        val actual = runCatching { publicJwkThumbprint(crypto2Key, legacyKey) }.getOrNull() ?: return
+        val actual = requireNotNull(publicJwkThumbprint(crypto2Key, legacyKey)) {
+            "The key selected to present the credential for query '$queryId' cannot be checked against its holder key " +
+                "(cnf.jwk): its public key cannot be exported"
+        }
         require(jwkThumbprint(confirmationKey) == actual) {
             "The credential for query '$queryId' is bound to another holder key (cnf.jwk) than the key selected to present it"
         }
