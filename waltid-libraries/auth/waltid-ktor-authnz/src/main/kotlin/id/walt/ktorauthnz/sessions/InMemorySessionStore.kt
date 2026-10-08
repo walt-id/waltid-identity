@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.sessions
 
+import id.walt.ktorauthnz.utils.ExternalMappingList
 import id.walt.ktorauthnz.exceptions.AuthSessionNotFoundException
 import io.klogging.logger
 import kotlin.time.Clock
@@ -44,7 +45,17 @@ class InMemorySessionStore(
         if (!session.isExpired()) return session
         session.accountId?.let { removeSessionIdFromAccountSessions(sessionId, it) }
         sessions.remove(sessionId)
+        dropExternalIdMappings(sessionId)
         return null
+    }
+
+    /** The external ids (e.g. the OIDC `sid`) of a session that is gone. Call with [lock] held. */
+    private fun dropExternalIdMappings(sessionId: String) {
+        for (namespace in ExternalMappingList.ALL_EXTERNAL_MAPPINGS) {
+            externalIdMappingBackward.remove("externalid-backward:$namespace:$sessionId")?.let { externalId ->
+                externalIdMappingForward.remove("externalid-forward:$namespace:$externalId")
+            }
+        }
     }
 
     private var storesSinceSweep = 0
@@ -72,6 +83,7 @@ class InMemorySessionStore(
         synchronized(lock) {
             sessions[id]?.accountId?.let { removeSessionIdFromAccountSessions(id, it) }
             sessions.remove(id)
+            dropExternalIdMappings(id)
         }
     }
 
@@ -96,7 +108,7 @@ class InMemorySessionStore(
 
     override suspend fun invalidateAllSessionsForAccount(accountId: String) {
         synchronized(lock) {
-            accountSessions.remove(accountId)?.forEach { sessions.remove(it) }
+            accountSessions.remove(accountId)?.forEach { sessions.remove(it); dropExternalIdMappings(it) }
         }
     }
 
