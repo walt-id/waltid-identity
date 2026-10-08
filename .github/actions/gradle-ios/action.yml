@@ -1,40 +1,20 @@
 name: gradle-ios
-description: gradle-ios
+description: Run selected iOS build and test phases with the workflow's Xcode toolchain
 inputs:
   waltid-directory:
     description: 'Path waltid-identity directory'
     required: false
-    type: string
     default: '.'
-  xcode-developer-dir:
-    description: 'Full path to the Xcode Developer directory to select'
-    required: false
-    type: string
-    default: ''
   simulator-destination:
     description: 'xcodebuild simulator destination for iOS app tests'
-    required: false
-    type: string
-    default: ''
-  run-compile-smoke:
-    description: 'Run the standalone iOS compile smoke check'
-    required: false
-    type: string
-    default: 'true'
+    required: true
   run-ios-simulator-tests:
     description: 'Run Gradle iosSimulatorArm64Test'
     required: false
-    type: string
-    default: 'true'
-  run-wallet-core-xcframework:
-    description: 'Assemble the full WalletCore release XCFramework'
-    required: false
-    type: string
     default: 'true'
   run-wallet-sdk-tests:
     description: 'Run real WalletCore-to-Swift package projections on iOS Simulator'
     required: false
-    type: string
     default: 'false'
   wallet-core-artifact:
     description: 'Restored release artifact directory to verify and reuse for WalletSDK bridge tests'
@@ -43,76 +23,47 @@ inputs:
   run-native-demo-tests:
     description: 'Run native iOS WalletSDK demo tests'
     required: false
-    type: string
     default: 'true'
   run-compose-demo-tests:
     description: 'Run Compose iOS demo tests'
     required: false
-    type: string
     default: 'true'
   # One flag per demo: each check builds that demo's app and extension, so it belongs in the job whose
   # build is already warm for that project.
   run-native-identity-document-provider-checks:
     description: 'Build the native demo document provider extension and verify its built configuration'
     required: false
-    type: string
     default: 'false'
   run-compose-identity-document-provider-checks:
     description: 'Build the Compose demo document provider extension and verify its built configuration'
     required: false
-    type: string
     default: 'false'
   test-report-job-name:
     description: 'Job name to associate with the published iOS JUnit report'
     required: false
-    type: string
     default: 'gradle'
   test-report-check-name:
     description: 'Check name for the published iOS JUnit report'
     required: false
-    type: string
     default: 'iOS Test Report'
   test-report-require-tests:
     description: 'Require reports containing tests for selected test suites'
     required: false
-    type: string
     default: 'true'
   test-result-artifact-name:
     description: 'Artifact name used when uploading failing iOS test results'
     required: false
-    type: string
     default: 'ios-integration-test-results'
 runs:
   using: "composite"
   steps:
-    - name: Select Xcode toolchain
-      shell: bash
-      run: |
-        XCODE_DEVELOPER_DIR="${{ inputs.xcode-developer-dir }}"
-        if [[ -n "$XCODE_DEVELOPER_DIR" ]]; then
-          if [[ ! -d "$XCODE_DEVELOPER_DIR" ]]; then
-            echo "::error::Xcode developer directory not found: $XCODE_DEVELOPER_DIR"
-            echo "Available Xcode installations under /Applications:"
-            ls -1 /Applications | grep '^Xcode' || true
-            exit 1
-          fi
-
-          sudo xcode-select -s "$XCODE_DEVELOPER_DIR"
-          echo "Selected Xcode developer directory: $XCODE_DEVELOPER_DIR"
-          echo "DEVELOPER_DIR=$XCODE_DEVELOPER_DIR" >> $GITHUB_ENV
-        else
-          echo "Using runner default Xcode selection"
-        fi
-
-        xcodebuild -version
-
     - name: Configure iOS build environment
       uses: ./waltid-identity/.github/actions/ios-build-setup
       with:
         gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
 
     - name: Compile iOS targets
-      if: ${{ inputs.run-compile-smoke == 'true' }}
+      if: ${{ inputs.run-ios-simulator-tests == 'true' }}
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: ./gradlew :waltid-libraries:crypto:waltid-crypto:compileKotlinIosSimulatorArm64
@@ -140,44 +91,6 @@ runs:
       shell: bash
       run: python3 .github/scripts/mobile-ci/verify_proximity_suites.py --platform ios-simulator
 
-    - name: Assemble Swift wallet SDK core XCFramework
-      if: ${{ inputs.run-wallet-core-xcframework == 'true' }}
-      working-directory: ${{ inputs.waltid-directory }}
-      shell: bash
-      run: |
-        exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
-          --output-dir "${{ github.workspace }}/ios-ci-logs" wallet-core-framework \
-          ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework
-
-    - name: Resolve iOS simulator destination
-      if: ${{ inputs.run-wallet-sdk-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true' || inputs.run-native-identity-document-provider-checks == 'true' || inputs.run-compose-identity-document-provider-checks == 'true' }}
-      id: resolve-simulator
-      working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
-      shell: bash
-      run: |
-        SIMULATOR_DESTINATION="${{ inputs.simulator-destination }}"
-        if [[ -n "$SIMULATOR_DESTINATION" ]]; then
-          echo "Using configured simulator destination: $SIMULATOR_DESTINATION"
-          echo "destination=$SIMULATOR_DESTINATION" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-
-        echo "Resolving a compatible iPhone simulator destination from xcodebuild..."
-        DESTINATIONS_OUTPUT=$(xcodebuild -showdestinations -project iosApp.xcodeproj -scheme iosApp 2>&1)
-        MATCHING_LINE=$(printf '%s\n' "$DESTINATIONS_OUTPUT" | grep 'platform:iOS Simulator' | grep 'name:iPhone' | head -n 1 || true)
-        SIMULATOR_ID=$(printf '%s\n' "$MATCHING_LINE" | sed -n 's/.*id:\([^,}]*\).*/\1/p' | tr -d ' ')
-
-        if [[ -z "$SIMULATOR_ID" ]]; then
-          echo "::error::Failed to resolve an iPhone simulator destination for iosApp"
-          printf '%s\n' "$DESTINATIONS_OUTPUT"
-          exit 1
-        fi
-
-        RESOLVED_DESTINATION="platform=iOS Simulator,id=$SIMULATOR_ID"
-        echo "Resolved simulator destination: $RESOLVED_DESTINATION"
-        echo "Matched destination line: $MATCHING_LINE"
-        echo "destination=$RESOLVED_DESTINATION" >> $GITHUB_OUTPUT
-
     # A provider extension that is not embedded, or disagrees with its host about App Group, Keychain
     # group or doctypes, is invisible to iOS and fails no build - only an on-device presentation.
     - name: Verify native iOS identity document provider
@@ -190,7 +103,7 @@ runs:
           --output-dir "${{ github.workspace }}/ios-ci-logs" native-provider \
           "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh" \
           --project-dir "${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp" \
-          --destination "${{ steps.resolve-simulator.outputs.destination }}" \
+          --destination "${{ inputs.simulator-destination }}" \
           --derived-data /tmp/xcode-derived \
           --app-group group.id.walt.wallet.native \
           --keychain-group-suffix id.walt.wallet.native.shared \
@@ -209,7 +122,7 @@ runs:
           --output-dir "${{ github.workspace }}/ios-ci-logs" compose-provider \
           "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify-ios-identity-document-provider.sh" \
           --project-dir "${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-compose/iosApp" \
-          --destination "${{ steps.resolve-simulator.outputs.destination }}" \
+          --destination "${{ inputs.simulator-destination }}" \
           --derived-data /tmp/xcode-derived-compose \
           --app-group group.id.walt.wallet.compose \
           --keychain-group-suffix id.walt.wallet.compose.shared \
@@ -226,7 +139,7 @@ runs:
         exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
           --output-dir "${{ github.workspace }}/ios-ci-logs" wallet-sdk-bridge \
           "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-wallet-sdk-tests.sh" \
-          "${{ steps.resolve-simulator.outputs.destination }}" "${{ inputs.wallet-core-artifact }}"
+          "${{ inputs.simulator-destination }}" "${{ inputs.wallet-core-artifact }}"
 
     - name: Upload WalletSDK bridge discovery evidence
       if: ${{ always() && inputs.run-wallet-sdk-tests == 'true' && steps.wallet_sdk_tests.outcome != 'skipped' }}
@@ -252,7 +165,7 @@ runs:
           xcodebuild test \
           -project iosApp.xcodeproj \
           -scheme iosApp \
-          -destination "${{ steps.resolve-simulator.outputs.destination }}" \
+          -destination "${{ inputs.simulator-destination }}" \
           -only-testing:iosAppTests \
           -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2 \
           -resultBundlePath TestResults \
@@ -273,7 +186,7 @@ runs:
           xcodebuild test \
           -project iosApp.xcodeproj \
           -scheme iosApp \
-          -destination "${{ steps.resolve-simulator.outputs.destination }}" \
+          -destination "${{ inputs.simulator-destination }}" \
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived-compose \
           -enableCodeCoverage NO \
