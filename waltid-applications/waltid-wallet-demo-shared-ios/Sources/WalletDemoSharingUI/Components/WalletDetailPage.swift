@@ -29,9 +29,10 @@ public struct WalletDetailPage<Content: View>: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if let dismissal {
                     Button(action: dismissal.perform) {
-                        Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44)
+                        WalletToolbarIcon("xmark")
                     }
                         .buttonStyle(.plain)
+                        .disabled(!dismissal.enabled)
                         .accessibilityLabel(String(localized: "Close", bundle: .module))
                         .accessibilityIdentifier(dismissal.identifier)
                 }

@@ -19,7 +19,6 @@ import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
 import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
-import id.walt.walletdemo.compose.ui.components.WalletReviewNavigationHost
 import id.walt.walletdemo.compose.ui.components.WalletIcon
 import id.walt.walletdemo.compose.ui.components.WalletSymbol
 
@@ -60,50 +59,43 @@ fun WalletDemoSharingReviewScreen(
     val selectionComplete = review.hasCompleteCredentialSelection(selection.credentials)
 
     WalletReviewHost(presentation, dismissEnabled = enabled, onDismiss = onBackAtRoot) { fillViewport ->
-        WalletReviewNavigationHost(
-            requestKey = review.hashCode().toString(), sharingOptions = review.credentialOptions,
-            selectedCredentials = selection.credentials, selectedDisclosures = selection.disclosures,
-            enabled = enabled,
-            onClose = (onBackAtRoot ?: onCancel).takeIf { enabled },
-        ) {
-            ReviewScaffold(
-                fillViewport = fillViewport,
-                header = {
-                    WalletScreenHeader(title) {
-                        IconButton(onClick = onBackAtRoot ?: onCancel, enabled = enabled,
-                            modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
-                            WalletIcon(WalletSymbol.Decline, "Close request")
-                        }
+        ReviewScaffold(
+            fillViewport = fillViewport,
+            header = {
+                WalletScreenHeader(title) {
+                    IconButton(onClick = onBackAtRoot ?: onCancel, enabled = enabled,
+                        modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
+                        WalletIcon(WalletSymbol.Decline, "Close request")
                     }
-                },
-                actions = {
-                    SharingActionsRow(
-                        paymentReview = paymentReview,
-                        enabled = enabled,
-                        selectionComplete = selectionComplete,
-                        onSubmit = submit,
-                        onCancel = onCancel,
-                        onReject = onReject,
-                        showCancelWithReject = false,
-                    )
-                },
-            ) {
-                SharingReviewSection(
+                }
+            },
+            actions = {
+                SharingActionsRow(
                     paymentReview = paymentReview,
-                    review = review,
-                    selectedCredentialOptions = selection.credentials,
-                    selectedDisclosureOptions = selection.disclosures,
-                    selectionComplete = selectionComplete,
                     enabled = enabled,
-                    compact = compact,
-                    showActions = false,
-                    onToggleCredential = owner::toggleCredential,
-                    onToggleDisclosure = owner::toggleDisclosure,
+                    selectionComplete = selectionComplete,
                     onSubmit = submit,
                     onCancel = onCancel,
                     onReject = onReject,
+                    showCancelWithReject = false,
                 )
-            }
+            },
+        ) {
+            SharingReviewSection(
+                paymentReview = paymentReview,
+                review = review,
+                selectedCredentialOptions = selection.credentials,
+                selectedDisclosureOptions = selection.disclosures,
+                selectionComplete = selectionComplete,
+                enabled = enabled,
+                compact = compact,
+                showActions = false,
+                onToggleCredential = owner::toggleCredential,
+                onToggleDisclosure = owner::toggleDisclosure,
+                onSubmit = submit,
+                onCancel = onCancel,
+                onReject = onReject,
+            )
         }
     }
 }
@@ -119,15 +111,9 @@ object WalletDemoSharingReviewTestTags {
     /** Cancel button. */
     val CancelButton: String get() = WalletUiTestTags.PresentationCancelButton
 
-    /** Claims dialog opened from a compact credential card. */
-    val ClaimsDialog: String get() = WalletUiTestTags.PresentationClaimsDialog
-
-    /** Close button in the claims dialog. */
-    val ClaimsCloseButton: String get() = WalletUiTestTags.PresentationClaimsClose
-
-    /** Compact credential card for the given presentation option. */
-    fun credentialCard(queryId: String, credentialId: String): String =
-        WalletUiTestTags.presentationClaimsToggle(
+    /** Selection row for the given presentation option. */
+    fun credentialRow(queryId: String, credentialId: String): String =
+        WalletUiTestTags.presentationCredential(
             WalletDemoPresentationCredentialSelection(queryId = queryId, credentialId = credentialId).id,
         )
 

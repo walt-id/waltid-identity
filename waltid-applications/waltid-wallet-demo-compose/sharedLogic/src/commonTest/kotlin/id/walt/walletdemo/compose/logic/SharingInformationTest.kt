@@ -36,7 +36,7 @@ class SharingInformationTest {
         assertEquals(setOf("name", "optional-name"), name.selections.map { it.queryId }.toSet())
     }
 
-    @Test fun unavoidablePersonalFieldsAreVisibleButProtocolMetadataIsKeptInDetails() {
+    @Test fun unavoidablePersonalFieldsAreVisibleWithoutUnrequestedProtocolMetadata() {
         val option = option(disclosures = listOf(disclosure("given_name", "Ada"),
             disclosure("family_name", "Lovelace", required = false, selective = false, requested = false),
             disclosure("iss", "Issuer", required = false, selective = false, requested = false)))
@@ -45,10 +45,7 @@ class SharingInformationTest {
         assertTrue(fields.last().alwaysIncluded)
         assertTrue(fields.last().included)
         assertEquals(listOf("Family name"), option.additionalInformationLabels())
-        val items = option.toCredentialDetails().groups.filter { it.id != "requested" }.flatMap { it.items }
-        assertEquals("Requested", fields.disclosureStatus(items.first { it.pathComponents == listOf("given_name") }))
-        assertEquals("Always included", fields.disclosureStatus(items.first { it.pathComponents == listOf("family_name") }))
-        assertEquals("Not shared", fields.disclosureStatus(items.first { it.pathComponents == listOf("birth_date") }))
+
     }
 
     @Test fun nestedAndLiteralKeysWithTheSameLeafAreNotMerged() {

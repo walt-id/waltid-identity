@@ -60,7 +60,6 @@ class WalletVisualAndroidTest {
     @Test fun sharingInformationSelected() = scenario(sheetHost = true) { sharingInformation() }
     @Test fun sharingInformationAlternative() = scenario(sheetHost = true) { sharingInformation(alternative = true) }
     @Test fun sharingInformationMultiple() = scenario(sheetHost = true) { sharingInformation(multiple = true) }
-    @Test fun sharingCredentialInformation() = scenario(sheetHost = true) { sharingCredentialInformation() }
     @Test
     @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
     fun compactProviderSharingReview() = scenario(fontScale = 1.5f, sheetHost = true) { providerSharingReview(compact = true) }

@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,6 +30,9 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationContinuation
 import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.canDismissExternalFlow
+import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
+import id.walt.walletdemo.compose.ui.components.WalletIcon
+import id.walt.walletdemo.compose.ui.components.WalletSymbol
 import id.walt.walletdemo.compose.ui.screens.WalletExternalFlowScreen
 import id.walt.walletdemo.compose.ui.screens.PinScreen
 import id.walt.walletdemo.compose.ui.screens.BiometricSetupScreen
@@ -79,6 +84,7 @@ internal fun WalletDemoAppHost(
     var externalExpanded by rememberSaveable(state.externalFlow?.url) { mutableStateOf(false) }
     LaunchedEffect(state.externalFlow, state.auth, state.session, state.isBusy) { controller.prepareExternalFlow() }
     val closeExternalFlow = { if (controller.closeExternalFlow()) onExternalFlowClosed() }
+    val openExternalInApp = { externalExpanded = true; onOpenExternalInApp() }
     PresentationContinuationEffect(
         continuation = state.pendingPresentationContinuation?.continuation,
         onCompleted = controller::completePresentationContinuation,
@@ -152,11 +158,16 @@ internal fun WalletDemoAppHost(
                 state.canDismissExternalFlow, closeExternalFlow) { fillViewport ->
                 if (state.auth == WalletAuthState.Unlocked && state.session is WalletSessionState.Ready) {
                     WalletExternalFlowScreen(controller, state, closeExternalFlow, fillViewport = fillViewport,
-                        onOpenInApp = if (externalExpanded) null else ({
-                            externalExpanded = true
-                            onOpenExternalInApp()
-                        }))
-                } else appContent()
+                        onOpenInApp = openExternalInApp.takeUnless { externalExpanded })
+                } else Column(Modifier.fillMaxSize()) {
+                    WalletScreenHeader(null) {
+                        if (!externalExpanded) TextButton(openExternalInApp, enabled = state.canDismissExternalFlow,
+                            modifier = Modifier.testTag("wallet.external.openInApp")) { Text("Open in app") }
+                        IconButton(closeExternalFlow, enabled = state.canDismissExternalFlow,
+                            modifier = Modifier.testTag("wallet.external.close")) { WalletIcon(WalletSymbol.Decline, "Close request") }
+                    }
+                    Box(Modifier.weight(1f)) { appContent() }
+                }
             }
         } else appContent()
         state.incomingLinkNotice?.let { notice ->

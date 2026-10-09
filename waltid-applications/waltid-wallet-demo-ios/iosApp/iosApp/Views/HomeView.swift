@@ -8,6 +8,9 @@ struct HomeView: View {
     @State private var showingSettings = false
     @State private var showingScanner = false
     @State private var credentialCards: [CredentialCardItem] = []
+    @State private var nearbySheetHeight: CGFloat?
+    @State private var scannerSheetHeight: CGFloat?
+    @State private var nearbySheet: NearbySheetPresentation = .idle
 
     init(viewModel: WalletViewModel) {
         self.viewModel = viewModel
@@ -33,13 +36,38 @@ struct HomeView: View {
                 }
             } else { walletContent }
         }
-        .sheet(isPresented: $showingScanner) {
-            WalletScanView(onBack: { showingScanner = false }, onOpen: openLink)
+        .background {
+            GeometryReader { geometry in
+                // Measure only pure controls, with room for the native sheet's horizontal margins.
+                let width = max(1, min(geometry.size.width, 540) - 24)
+                ProximityEngagementMenu(methods: [.nfc, .qr], approvalMode: .constant(viewModel.proximityApprovalMode),
+                    enabled: false, onShowEngagement: { _ in }, onConnectionOptions: {})
+                    .padding(.horizontal, 16).padding(.vertical, 8)
+                    .frame(width: width).fixedSize(horizontal: false, vertical: true)
+                    .background(GeometryReader { menu in
+                        let available = max(1, geometry.size.height - 44)
+                        let nearby = menu.size.height + WalletEntrySheetHeights.nativeChrome
+                        let scanner = min(360, width - 40) + 48 + WalletEntrySheetHeights.nativeChrome
+                        Color.clear.preference(key: WalletEntrySheetHeightsKey.self,
+                            value: WalletEntrySheetHeights(nearby: nearby < available ? nearby : nil,
+                                scanner: scanner < available ? scanner : nil))
+                    })
+                    .hidden().accessibilityHidden(true).allowsHitTesting(false)
+            }
         }
-        .sheet(isPresented: Binding(get: { proximity.active }, set: { if !$0 { proximity.requestClose() } })) {
-            PresentView(viewModel: viewModel, onOpenSettings: openSettings, onBack: returnHome)
+        .onPreferenceChange(WalletEntrySheetHeightsKey.self) { heights in
+            nearbySheetHeight = heights.nearby
+            scannerSheetHeight = heights.scanner
+        }
+        .sheet(isPresented: $showingScanner) {
+            WalletScanView(preferredSheetHeight: scannerSheetHeight, onBack: { showingScanner = false }, onOpen: openLink)
+        }
+        .sheet(isPresented: Binding(get: { nearbySheet.isPresented }, set: { if !$0 { dismissNearbySheet() } }),
+            onDismiss: nearbySheetDidDismiss) {
+            PresentView(viewModel: viewModel, onOpenSettings: openSettings, onBack: returnHome, nearbySheet: true)
                 .interactiveDismissDisabled(!proximity.canClose)
-                .modifier(NearbySheetSize(expanded: proximity.review != nil || proximity.displayedEngagement == .qr))
+                .walletSheetSizing(preferredHeight: nearbySheet.preferredHeight,
+                    expanded: !proximity.showsEngagement || proximity.review != nil || proximity.displayedEngagement == .qr)
         }
         .fullScreenCover(isPresented: $showingSettings) {
             NavigationView {
@@ -55,12 +83,8 @@ struct HomeView: View {
             }.navigationViewStyle(.stack)
         }
         .onChange(of: viewModel.isReady) { ready in if !ready { showingSettings = false; showingScanner = false } }
-        .onChange(of: proximity.active) { active in
-            if !active && viewModel.externalFlow == nil && viewModel.presentationSharingReview == nil && !viewModel.presentationCompleted {
-                viewModel.startNewPresentationFlow()
-                viewModel.selectedTab = .credentials
-            }
-        }
+        .onChange(of: NearbySheetSessionState(active: proximity.active, entryReady: proximity.hasEntryContent,
+            closing: proximity.closing)) { _ in synchronizeNearbySheet() }
         .onChange(of: viewModel.selectedTab) { tab in if tab != .credentials { showingScanner = false } }
         .task(id: viewModel.credentials) {
             credentialCards = []
@@ -75,7 +99,7 @@ struct HomeView: View {
     }
 
     @ViewBuilder private var walletContent: some View {
-        if proximity.active { credentialsContent }
+        if proximity.active || nearbySheet.keepsHomeVisible { credentialsContent }
         else {
             switch viewModel.selectedTab {
             case .credentials: credentialsContent
@@ -87,11 +111,8 @@ struct HomeView: View {
 
     private var credentialsContent: some View {
         CredentialsTabView(viewModel: viewModel, selectedDetailsID: $selectedCredentialDetailsID, cards: credentialCards,
-            onOpenSettings: openSettings, onScan: { showingScanner = true }, onShareNearby: {
-                viewModel.startNewPresentationFlow()
-                viewModel.selectedTab = .present
-                viewModel.proximityPresentation.start()
-            })
+            onOpenSettings: openSettings, onScan: { showingScanner = true }, onShareNearby: startNearbySharing,
+            nearbyPreparing: nearbySheet.isPreparing, nearbyEnabled: !proximity.closing)
     }
 
     private func returnHome() {
@@ -102,7 +123,67 @@ struct HomeView: View {
         viewModel.selectedTab = .credentials
     }
 
+    private func startNearbySharing() {
+        if nearbySheet.isPreparing {
+            proximity.requestClose()
+            return
+        }
+        guard case .idle = nearbySheet, !proximity.active else { return }
+        viewModel.startNewPresentationFlow()
+        viewModel.selectedTab = .present
+        nearbySheet = .preparing(nearbySheetHeight)
+        proximity.start()
+        synchronizeNearbySheet()
+    }
+
+    private func synchronizeNearbySheet() {
+        if proximity.active {
+            switch nearbySheet {
+            case .idle:
+                nearbySheet = proximity.hasEntryContent ? .presented(nearbySheetHeight) : .preparing(nearbySheetHeight)
+            case .preparing(let height) where proximity.hasEntryContent && !proximity.closing:
+                nearbySheet = .presented(height)
+            case .hidden(let height) where !proximity.closing:
+                // A rejected cancellation must restore the task and its actual SDK error.
+                nearbySheet = .presented(height)
+            default: break
+            }
+        } else {
+            switch nearbySheet {
+            case .presented(let height): nearbySheet = .dismissing(height)
+            case .preparing, .hidden: finishNearbyDismissal()
+            default: break
+            }
+        }
+    }
+
+    private func dismissNearbySheet() {
+        guard case .presented(let height) = nearbySheet else { return }
+        guard !proximity.active || proximity.canClose else { return }
+        // Visibility changes immediately, even while the SDK is still draining cleanup.
+        nearbySheet = .dismissing(height)
+        if proximity.active { proximity.requestClose() }
+    }
+
+    private func nearbySheetDidDismiss() {
+        if case .presented = nearbySheet { dismissNearbySheet() }
+        guard case .dismissing(let height) = nearbySheet else { return }
+        nearbySheet = .hidden(height)
+        synchronizeNearbySheet()
+    }
+
+    private func finishNearbyDismissal() {
+        guard !proximity.active else { return }
+        if viewModel.isReady && viewModel.externalFlow == nil && viewModel.presentationSharingReview == nil && !viewModel.presentationCompleted {
+            viewModel.startNewPresentationFlow()
+            viewModel.selectedTab = .credentials
+        }
+        proximity.finishDismissedPresentation()
+        nearbySheet = .idle
+    }
+
     private func openLink(_ value: String, kind: WalletLinkKind) {
+        guard showingScanner else { return }
         showingScanner = false
         switch kind {
         case .offer:
@@ -121,6 +202,47 @@ struct HomeView: View {
             if let url = URL(string: value) { viewModel.handleDeepLink(url) }
         default: break
         }
+    }
+}
+
+/// Native presentation and SDK cleanup complete independently; neither can reopen the other.
+private enum NearbySheetPresentation {
+    case idle
+    case preparing(CGFloat?)
+    case presented(CGFloat?)
+    case dismissing(CGFloat?)
+    case hidden(CGFloat?)
+
+    var isPresented: Bool { if case .presented = self { return true }; return false }
+    var isPreparing: Bool { if case .preparing = self { return true }; return false }
+    var keepsHomeVisible: Bool { if case .idle = self { return false }; return true }
+    var preferredHeight: CGFloat? {
+        switch self {
+        case .idle: return nil
+        case .preparing(let height), .presented(let height), .dismissing(let height), .hidden(let height): return height
+        }
+    }
+}
+
+private struct NearbySheetSessionState: Equatable {
+    let active: Bool
+    let entryReady: Bool
+    let closing: Bool
+}
+
+private struct WalletEntrySheetHeights: Equatable {
+    // The measured body excludes the inline navigation toolbar and sheet drag-handle clearance.
+    static let nativeChrome: CGFloat = 96
+    var nearby: CGFloat?
+    var scanner: CGFloat?
+}
+
+private struct WalletEntrySheetHeightsKey: PreferenceKey {
+    static let defaultValue = WalletEntrySheetHeights()
+    static func reduce(value: inout WalletEntrySheetHeights, nextValue: () -> WalletEntrySheetHeights) {
+        let next = nextValue()
+        value.nearby = next.nearby ?? value.nearby
+        value.scanner = next.scanner ?? value.scanner
     }
 }
 
@@ -148,13 +270,5 @@ private struct WalletSetupView: View {
             .navigationTitle("Set up your wallet")
             .navigationBarTitleDisplayMode(.inline)
         }
-    }
-}
-
-private struct NearbySheetSize: ViewModifier {
-    let expanded: Bool
-    @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 16, *) { content.presentationDetents(expanded ? [.large] : [.medium, .large]).presentationDragIndicator(.visible) }
-        else { content }
     }
 }

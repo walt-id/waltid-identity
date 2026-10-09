@@ -25,6 +25,7 @@ import id.walt.walletdemo.compose.ui.rememberScannerHostActive
 import id.walt.walletdemo.compose.ui.components.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
@@ -41,6 +42,7 @@ internal fun WalletScanScreen(
     var input by rememberSaveable { mutableStateOf(initialInput) }
     var manual by rememberSaveable { mutableStateOf(initialInput.isNotEmpty()) }
     var dispatched by remember { mutableStateOf(false) }
+    var closed by remember { mutableStateOf(false) }
     var resolving by remember { mutableStateOf(false) }
     var resolutionError by remember { mutableStateOf<String?>(null) }
     var pasting by remember { mutableStateOf(false) }
@@ -50,8 +52,15 @@ internal fun WalletScanScreen(
     val hostActive = rememberScannerHostActive()
     val launchCamera = rememberSystemCameraLauncher()
     val kind = WalletLinkKind.classify(input)
+    fun close() {
+        if (closed) return
+        closed = true
+        scope.cancel()
+        focus.clearFocus()
+        onBack()
+    }
     fun open(value: String) {
-        if (dispatched || resolving) return
+        if (closed || dispatched || resolving) return
         resolving = true
         resolutionError = null
         focus.clearFocus()
@@ -59,6 +68,7 @@ internal fun WalletScanScreen(
             try {
                 val resolved = resolveLink(value)
                 currentCoroutineContext().ensureActive()
+                if (closed) return@launch
                 dispatched = true
                 onOpen(resolved.url, resolved.kind)
             } catch (error: CancellationException) { throw error }
@@ -68,6 +78,7 @@ internal fun WalletScanScreen(
         }
     }
     fun paste() {
+        if (closed) return
         val originalInput = input
         pasting = true
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -88,15 +99,11 @@ internal fun WalletScanScreen(
         if (manual && hostActive) { withFrameNanos { }; inputFocus.requestFocus() }
         else focus.clearFocus()
     }
-    SystemBackHandler(onBack = onBack, enabled = true)
+    SystemBackHandler(onBack = ::close, enabled = true)
     ReviewScaffold(
-        modifier = Modifier.heightIn(max = 700.dp).padding(bottom = 20.dp).testTag(WalletUiTestTags.ScanScreen), fillViewport = false,
+        modifier = Modifier.testTag(WalletUiTestTags.ScanScreen), fillViewport = false,
         header = {
-            WalletScreenHeader(if (manual) "Enter a link" else "Scan QR code", leading = {
-                IconButton(onClick = onBack, modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
-                    WalletIcon(WalletSymbol.Decline, "Close scanner")
-                }
-            }) {
+            WalletScreenHeader(if (manual) "Enter a link" else "Scan QR code") {
                 launchCamera?.let { camera ->
                     IconButton(onClick = {
                         focus.clearFocus()
@@ -110,15 +117,11 @@ internal fun WalletScanScreen(
                     WalletIcon(if (manual) WalletSymbol.Scan else WalletSymbol.Manual,
                         if (manual) "Scan QR code" else "Enter a link")
                 }
+                IconButton(onClick = ::close, modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
+                    WalletIcon(WalletSymbol.Decline, "Close scanner")
+                }
             }
         },
-        feedback = if (resolving || resolutionError != null) ({
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (resolving) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                Text(resolutionError ?: "Opening link…", style = MaterialTheme.typography.bodyMedium,
-                    color = if (resolutionError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }) else null,
         actions = if (manual) ({
             WalletActions(primary = WalletAction(
                 label = if (resolving) "Opening link…" else if (resolutionError != null) "Try again"
@@ -144,12 +147,22 @@ internal fun WalletScanScreen(
                 WalletLinkKind.Unsupported -> Text("This is not a supported credential offer or sharing request.", style = MaterialTheme.typography.bodyMedium)
                 else -> Unit
             }
-        } else if (!resolving && !dispatched) {
+        } else {
             Box(Modifier.fillMaxWidth().aspectRatio(1f).testTag("wallet.scanPreview")) {
                 // System permission prompts temporarily deactivate the app. Preserve the sheet's
                 // geometry while releasing capture; resume scanning when the host becomes active.
-                if (hostActive) {
+                if (resolving || dispatched) {
+                    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceContainer,
+                        shape = MaterialTheme.shapes.large) {
+                        Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp, androidx.compose.ui.Alignment.CenterVertically)) {
+                            CircularProgressIndicator()
+                            Text("Opening request…", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                } else if (hostActive) {
                     PlatformQrScanner(Modifier.fillMaxSize()) { value ->
+                        if (closed || resolving || dispatched || value.isBlank()) return@PlatformQrScanner
                         input = value.trim()
                         when (WalletLinkKind.classify(input)) {
                             WalletLinkKind.Offer, WalletLinkKind.Presentation, WalletLinkKind.Web, WalletLinkKind.AuthorizationCallback -> open(input)
@@ -166,5 +179,6 @@ internal fun WalletScanScreen(
                 }
             }
         }
+        resolutionError?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
     }
 }

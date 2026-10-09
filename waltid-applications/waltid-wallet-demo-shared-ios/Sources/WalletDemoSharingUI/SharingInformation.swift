@@ -69,15 +69,3 @@ func informationFields(option: PresentationCredentialOption, details: Credential
                 : ClaimPathExpression.parse(disclosure.path).segments)
     }
 }
-
-extension Array where Element == SharingInformationField {
-    func disclosureStatus(_ item: ClaimItem) -> String {
-        let matches = filter { field in
-            let prefix = field.item.pathComponents
-            return !prefix.isEmpty && item.pathComponents.starts(with: prefix)
-        }
-        if matches.contains(where: { $0.included && $0.alwaysIncluded }) { return "Always included" }
-        if matches.contains(where: { $0.included }) { return "Requested" }
-        return "Not shared"
-    }
-}

@@ -149,12 +149,12 @@ class WalletDemoAppIosTest {
         scenarios.presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails()
 
     @Test
-    fun presentationDetailsResolveDuplicateCredentialOptionsIndependently() =
-        scenarios.presentationDetailsResolveDuplicateCredentialOptionsIndependently()
+    fun presentationInformationUnionsDuplicateCredentialOptions() =
+        scenarios.presentationInformationUnionsDuplicateCredentialOptions()
 
     @Test
-    fun presentDetailsStayScopedToPresentTabNavigationStack() =
-        scenarios.presentDetailsStayScopedToPresentTabNavigationStack()
+    fun presentationReviewSurvivesReturningFromTheWallet() =
+        scenarios.presentationReviewSurvivesReturningFromTheWallet()
 
     @Test
     fun presentTabDisablesUrlControlsWhilePreviewing() =

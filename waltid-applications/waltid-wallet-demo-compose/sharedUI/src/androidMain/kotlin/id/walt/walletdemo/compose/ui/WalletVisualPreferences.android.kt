@@ -34,7 +34,7 @@ internal actual fun rememberWalletVisualPreferences(): WalletVisualPreferences {
         } else onDispose {}
     }
     // Keep older RenderNode invalidation workarounds out of the scrolling footer.
-    // The Android 12 physical release comparison favors the designed opaque surface.
+    // Older devices use a translucent scrim without a RenderNode blur pipeline.
     return WalletVisualPreferences(reduceMotion = motion?.scaleFactor == 0f,
-        opaqueControls = Build.VERSION.SDK_INT < 33 || contrast >= .5f, screenReaderEnabled = screenReader)
+        opaqueControls = contrast >= .5f, screenReaderEnabled = screenReader, blurSupported = Build.VERSION.SDK_INT >= 33)
 }

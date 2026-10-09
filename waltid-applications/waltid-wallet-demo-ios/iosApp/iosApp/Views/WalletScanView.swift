@@ -7,22 +7,25 @@ import WalletDemoSharingUI
 struct WalletScanView: View {
     let onBack: () -> Void
     let onOpen: (String, WalletLinkKind) -> Void
+    private let preferredSheetHeight: CGFloat?
     @Environment(\.scenePhase) private var scenePhase
     @State private var input: String
     @State private var manual: Bool
     @State private var dispatched = false
+    @State private var closed = false
     @State private var resolving = false
     @State private var resolutionError: String?
     @State private var resolutionTask: Task<Void, Never>?
     @FocusState private var inputFocused: Bool
     private let resolveLink: (String) async throws -> ResolvedWalletLink
 
-    init(input: String = "", onBack: @escaping () -> Void, onOpen: @escaping (String, WalletLinkKind) -> Void,
+    init(input: String = "", preferredSheetHeight: CGFloat? = nil, onBack: @escaping () -> Void, onOpen: @escaping (String, WalletLinkKind) -> Void,
         resolveLink: @escaping (String) async throws -> ResolvedWalletLink = { try await WalletLinkResolver.resolve($0) }
     ) {
         _input = State(initialValue: input)
         _manual = State(initialValue: !input.isEmpty)
         self.onBack = onBack
+        self.preferredSheetHeight = preferredSheetHeight
         self.onOpen = onOpen
         self.resolveLink = resolveLink
     }
@@ -31,29 +34,37 @@ struct WalletScanView: View {
 
     var body: some View {
         WalletNavigationContainer {
-            WalletReviewScaffold(showsActions: manual || resolving || resolutionError != nil,
+            WalletReviewScaffold(showsActions: manual,
                 background: Color(.secondarySystemGroupedBackground)) {
                 if manual { manualInput }
-                else if scenePhase == .active && !resolving && !dispatched {
-                    CodeScannerView(codeTypes: [.qr], scanMode: .once, showViewfinder: true, requiresPhotoOutput: false) { result in
-                        switch result {
-                        case .success(let scan):
-                            input = scan.string.trimmingCharacters(in: .whitespacesAndNewlines)
-                            if [.offer, .presentation, .web, .authorizationCallback].contains(kind) { open(input) }
-                            else { manual = true }
-                        case .failure:
-                            manual = true
-                            resolutionError = "QR scanning is unavailable. Check camera access or enter a link."
-                        }
+                else {
+                    ZStack {
+                        if resolving || dispatched {
+                            ProgressView("Opening request…")
+                        } else if scenePhase == .active {
+                            CodeScannerView(codeTypes: [.qr], scanMode: .once, showViewfinder: true, requiresPhotoOutput: false) { result in
+                                guard !closed && !resolving && !dispatched else { return }
+                                switch result {
+                                case .success(let scan):
+                                    input = scan.string.trimmingCharacters(in: .whitespacesAndNewlines)
+                                    guard !input.isEmpty else { return }
+                                    if [.offer, .presentation, .web, .authorizationCallback].contains(kind) { open(input) }
+                                    else { manual = true }
+                                case .failure:
+                                    manual = true
+                                    resolutionError = "QR scanning is unavailable. Check camera access or enter a link."
+                                }
+                            }
+                        } else { Text("Camera paused").foregroundStyle(.secondary) }
                     }
+                    .frame(maxWidth: .infinity)
                     .aspectRatio(1, contentMode: .fit).frame(maxHeight: 360).clipped()
                     .accessibilityIdentifier("wallet.scanPreview")
                 }
                 if let explanation, manual { Text(explanation).font(.subheadline).foregroundStyle(.secondary) }
+                if let resolutionError { Text(resolutionError).font(.subheadline).foregroundStyle(.red) }
                 Color.clear.frame(height: 16)
             } actions: {
-                if resolving { ProgressView("Opening link…").frame(maxWidth: .infinity, alignment: .leading) }
-                if let resolutionError { Text(resolutionError).font(.subheadline).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading) }
                 if manual {
                     WalletActions(primary: WalletAction(
                         resolving ? "Opening link…" : resolutionError != nil ? "Try again"
@@ -61,29 +72,27 @@ struct WalletScanView: View {
                         enabled: !dispatched && !resolving && [.offer, .presentation, .authorizationCallback, .web].contains(kind),
                         identifier: "wallet.scanContinue"
                     ) { open(input) })
-                    .padding(.bottom, inputFocused ? 48 : 0)
                 }
             }
             .navigationTitle(manual ? "Enter a link" : "Scan QR code")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: onBack) { Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44) }
-                        .accessibilityLabel("Close scanner").accessibilityIdentifier("wallet.flowBack")
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button { inputFocused = false; manual.toggle(); resolutionError = nil } label: {
                         Image(systemName: manual ? "qrcode.viewfinder" : "keyboard").frame(minWidth: 44, minHeight: 44)
                     }.accessibilityLabel(manual ? "Scan QR code" : "Enter a link")
                         .disabled(resolving).accessibilityIdentifier("wallet.scanMode")
+                    Button(action: close) { WalletToolbarIcon("xmark") }
+                        .accessibilityLabel("Close scanner").accessibilityIdentifier("wallet.flowBack")
                 }
             }
         }
         .accessibilityIdentifier("wallet.scanScreen")
-        .modifier(ScannerSheetSurface(expanded: manual))
+        .walletSheetSizing(preferredHeight: preferredSheetHeight, expanded: manual)
+        .modifier(ScannerSheetSurface())
         .onChange(of: input) { _ in resolutionError = nil }
         .onChange(of: manual) { manual in inputFocused = manual }
-        .onDisappear { resolutionTask?.cancel() }
+        .onDisappear { closed = true; resolutionTask?.cancel() }
     }
 
     private var manualInput: some View {
@@ -115,7 +124,7 @@ struct WalletScanView: View {
     }
 
     private func open(_ value: String) {
-        guard !dispatched && !resolving else { return }
+        guard !closed && !dispatched && !resolving else { return }
         resolving = true
         resolutionError = nil
         inputFocused = false
@@ -124,6 +133,7 @@ struct WalletScanView: View {
             do {
                 let result = try await resolveLink(value)
                 try Task.checkCancellation()
+                guard !closed else { return }
                 dispatched = true
                 onOpen(result.url, result.kind)
             } catch {
@@ -134,20 +144,22 @@ struct WalletScanView: View {
             }
         }
     }
+
+    private func close() {
+        guard !closed else { return }
+        closed = true
+        resolutionTask?.cancel()
+        inputFocused = false
+        onBack()
+    }
 }
 
 /// Native sheet chrome provides the shadow/scrim; a separate surface keeps it visible in dark mode.
 private struct ScannerSheetSurface: ViewModifier {
-    let expanded: Bool
     @ViewBuilder func body(content: Content) -> some View {
         if #available(iOS 16.4, *) {
-            content.presentationDetents(expanded ? [.large] : [.fraction(0.65), .large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color(.secondarySystemGroupedBackground))
+            content.presentationBackground(Color(.secondarySystemGroupedBackground))
                 .presentationCornerRadius(28)
-        } else if #available(iOS 16, *) {
-            content.presentationDetents(expanded ? [.large] : [.fraction(0.65), .large])
-                .presentationDragIndicator(.visible)
         } else { content }
     }
 }

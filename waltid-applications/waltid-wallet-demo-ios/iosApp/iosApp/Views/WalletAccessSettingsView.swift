@@ -37,7 +37,7 @@ struct WalletAccessSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(viewModel.access.pinChange != nil)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 if viewModel.access.pinChange != nil {
                     Button(action: viewModel.cancelPinChange) { Image(systemName: "xmark") }
                         .accessibilityLabel("Cancel PIN change")

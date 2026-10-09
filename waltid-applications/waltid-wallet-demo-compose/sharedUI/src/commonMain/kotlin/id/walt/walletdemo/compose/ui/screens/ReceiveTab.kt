@@ -12,19 +12,15 @@ import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletRequestDrafts
 import id.walt.walletdemo.compose.logic.acceptOfferEnabled
 import id.walt.walletdemo.compose.logic.offerReviewEnabled
-import id.walt.walletdemo.compose.logic.receiveActionEnabled
-import id.walt.walletdemo.compose.logic.receiveUrlEntryEnabled
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.OfferReviewActions
 import id.walt.walletdemo.compose.ui.components.OfferReviewSection
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
-import id.walt.walletdemo.compose.ui.components.UrlActionSection
 
 @Composable
 internal fun ReceiveTab(
     state: WalletDemoUiState,
     requestDrafts: WalletRequestDrafts,
-    onOfferUrlChange: (String) -> Unit,
     onTxCodeChange: (String) -> Unit,
     onCopiesChange: (String, Int) -> Unit,
     onPreviewOffer: () -> Unit,
@@ -42,7 +38,6 @@ internal fun ReceiveTab(
         ReviewScaffold(
             fillViewport = fillViewport,
             modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent),
-            feedback = feedback,
             actions = {
                 OfferReviewActions(
                     requiresIssuerAuthentication = preview.requiresIssuerAuthentication,
@@ -53,6 +48,7 @@ internal fun ReceiveTab(
                 )
             },
         ) {
+            feedback?.invoke()
             OfferReviewSection(
                 preview = preview,
                 acceptEnabled = state.acceptOfferEnabled,
@@ -75,7 +71,7 @@ internal fun ReceiveTab(
             enabled = state.receiveCompleted && !state.isBusy && state.issuanceReceipt?.problem == null && pending.isEmpty()
                 && state.operation is id.walt.walletdemo.compose.logic.WalletOperationState.Succeeded
                 && state.receivedCredentials().isNotEmpty(), onDone = onDone)
-        ReviewScaffold(fillViewport = fillViewport, feedback = feedback,
+        ReviewScaffold(fillViewport = fillViewport,
             modifier = modifier.then(dismissal).testTag(WalletUiTestTags.ReceiveTabContent), actions = {
             WalletActions(WalletAction(stringResource(Res.string.issuance_done), onDone,
                 enabled = !state.isBusy, testTag = "issuance-done"),
@@ -84,29 +80,13 @@ internal fun ReceiveTab(
                         enabled = !state.isBusy, testTag = "issuance-refresh")
                 })
         }) {
+            feedback?.invoke()
             IssuanceResultContent(state.issuanceReceipt, state.receivedCredentials(), pending, state.isBusy, onResumeDeferred)
         }
         return
     }
 
-    if (state.externalFlow != null) {
-        ExternalFlowStatus(state, onRetry = onPreviewOffer, modifier = modifier, fillViewport = fillViewport)
-        return
-    }
-
-    ReviewScaffold(modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent),
-        fillViewport = fillViewport, feedback = feedback) {
-        UrlActionSection(
-            value = requestDrafts.offerUrl,
-            onValueChange = onOfferUrlChange,
-            label = "Credential offer URL",
-            buttonText = "Receive",
-            enabled = state.receiveActionEnabled,
-            inputEnabled = state.receiveUrlEntryEnabled,
-            inputTestTag = WalletUiTestTags.OfferInput,
-            buttonTestTag = WalletUiTestTags.ReceiveButton,
-            scanButtonTestTag = WalletUiTestTags.OfferScanButton,
-            onClick = onPreviewOffer,
-        )
-    }
+    WalletRequestStatus(state, onRetry = onPreviewOffer,
+        retryEnabled = !state.isBusy && requestDrafts.offerUrl.isNotBlank(),
+        modifier = modifier.testTag(WalletUiTestTags.ReceiveTabContent), fillViewport = fillViewport)
 }

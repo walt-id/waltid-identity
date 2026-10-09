@@ -68,9 +68,13 @@ internal fun SettingsScreen(
     initialDestination: SettingsDestination = SettingsDestination.Main,
     walletAccessContent: (@Composable () -> Unit)? = null,
     onCancelPinChange: () -> Unit = {},
+    onClose: (() -> Unit)? = null,
+    closeEnabled: Boolean = true,
 ) {
     val currentState by rememberUpdatedState(state)
     val currentReaderPolicy by rememberUpdatedState(readerTrustPolicySummary)
+    val currentClose by rememberUpdatedState(onClose)
+    val currentCloseEnabled by rememberUpdatedState(closeEnabled)
     var deleteRecovery by remember { mutableStateOf<String?>(null) }
     var confirmReset by rememberSaveable { mutableStateOf(false) }
     var path by rememberSaveable(initialDestination, stateSaver = listSaver(
@@ -100,7 +104,13 @@ internal fun SettingsScreen(
                         IconButton(back, Modifier.testTag(WalletUiTestTags.SettingsBack)) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.settings_back))
                         }
-                    })
+                    }) {
+                        currentClose?.let { close ->
+                            IconButton(close, enabled = currentCloseEnabled, modifier = Modifier.testTag("wallet.sheet.close")) {
+                                WalletIcon(WalletSymbol.Decline, "Close request")
+                            }
+                        }
+                    }
                     if (destination == SettingsDestination.WalletAccess) {
                         walletAccessContent?.invoke()
                         return@NavEntry

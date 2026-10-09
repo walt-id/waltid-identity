@@ -9,9 +9,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.ClaimGroup
-import id.walt.walletdemo.compose.logic.ClaimItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
@@ -19,7 +16,6 @@ internal fun ClaimGroupSection(
     group: ClaimGroup,
     modifier: Modifier = Modifier,
     collapsible: Boolean = true,
-    claimStatus: (ClaimItem) -> String? = { null },
 ) {
     if (group.items.isEmpty()) return
 
@@ -36,26 +32,22 @@ internal fun ClaimGroupSection(
                     modifier = Modifier.testTag(WalletUiTestTags.claimGroup(group.title)),
                 ) {
                     Column(Modifier.padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        ClaimGroupItems(group, claimStatus)
+                        ClaimGroupItems(group)
                     }
                 }
             } else {
-                ClaimGroupItems(group, claimStatus)
+                ClaimGroupItems(group)
             }
         }
     }
 }
 
 @Composable
-private fun ClaimGroupItems(group: ClaimGroup, claimStatus: (ClaimItem) -> String?) {
+private fun ClaimGroupItems(group: ClaimGroup) {
     group.items.forEachIndexed { index, item ->
         if (index > 0) MetadataRowDivider()
         key(item.path.id) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                ClaimValueRow(item = item)
-                claimStatus(item)?.let { Text(it, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            }
+            ClaimValueRow(item = item)
         }
     }
 }
