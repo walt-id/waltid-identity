@@ -65,7 +65,6 @@ class WalletVisualIosTest {
     @Test
     fun compactProviderSharingReview() = scenario(size = Size(320f, 568f), dark = true, fontScale = 1.5f) { providerSharingReview(compact = true) }
     @Test fun providerOfferReview() = scenario { providerOfferReview() }
-    @Test fun paymentSheet() = scenario { paymentReview(sheet = true) }
     @Test fun paymentLoading() = scenario { paymentState(blocked = false) }
     @Test fun paymentBlocked() = scenario { paymentState(blocked = true) }
     @Test fun paymentLocalizedCompact() = scenario(size = Size(320f, 568f), fontScale = 1.5f) { localizedPayment() }
@@ -158,7 +157,7 @@ class WalletVisualIosTest {
             captureImage = { id, direction ->
                 val root = if (id.endsWith(".unsigned_confirmation"))
                 onNode(isRoot() and hasAnyDescendant(hasTestTag("payment-unsigned-confirm")))
-            else if (id.startsWith("external.") || id.startsWith("sharing.") || id.startsWith("receiving.provider") || id.startsWith("payment.sheet"))
+            else if (id.startsWith("external.") || id.startsWith("sharing.") || id.startsWith("receiving.provider") || id == "settings.reader.import_review" || id.startsWith("payment."))
                     onNode(isRoot() and hasAnyDescendant(hasTestTag("wallet.review.sheet"))) else onRoot()
                 fun environment(key: String) = platform.posix.getenv(key)?.toKString() ?: ""
                 val metadata: Map<String, Any> = mapOf(

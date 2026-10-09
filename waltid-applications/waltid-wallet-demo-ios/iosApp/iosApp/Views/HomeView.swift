@@ -7,6 +7,8 @@ struct HomeView: View {
     @State private var selectedCredentialDetailsID: String?
     @State private var showingSettings = false
     @State private var showingScanner = false
+    @State private var scannerManual = false
+    @State private var dismissingSettings = false
     @State private var credentialCards: [CredentialCardItem] = []
     @State private var nearbySheetHeight: CGFloat?
     @State private var scannerSheetHeight: CGFloat?
@@ -34,7 +36,7 @@ struct HomeView: View {
                         }
                     }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-            } else { walletContent }
+            } else { credentialsContent }
         }
         .background {
             GeometryReader { geometry in
@@ -59,8 +61,22 @@ struct HomeView: View {
             nearbySheetHeight = heights.nearby
             scannerSheetHeight = heights.scanner
         }
-        .sheet(isPresented: $showingScanner) {
-            WalletScanView(preferredSheetHeight: scannerSheetHeight, onBack: { showingScanner = false }, onOpen: openLink)
+        .sheet(isPresented: Binding(get: { showingTaskSheet }, set: { if !$0 { returnHome() } })) {
+            Group {
+                if showingOnlineFlow {
+                    switch viewModel.selectedTab {
+                    case .receive: ReceiveView(viewModel: viewModel, onBack: returnHome)
+                    case .present: PresentView(viewModel: viewModel, onBack: returnHome)
+                    case .credentials: EmptyView()
+                    }
+                } else {
+                    WalletScanView(onBack: returnHome, onOpen: openLink,
+                        onManualModeChange: { scannerManual = $0 })
+                }
+            }
+            .walletSheetSizing(preferredHeight: showingOnlineFlow ? nil : scannerSheetHeight,
+                expanded: showingOnlineFlow || scannerManual)
+            .interactiveDismissDisabled(showingOnlineFlow && !viewModel.canDismissExternalFlow)
         }
         .sheet(isPresented: Binding(get: { nearbySheet.isPresented }, set: { if !$0 { dismissNearbySheet() } }),
             onDismiss: nearbySheetDidDismiss) {
@@ -69,7 +85,7 @@ struct HomeView: View {
                 .walletSheetSizing(preferredHeight: nearbySheet.preferredHeight,
                     expanded: !proximity.showsEngagement || proximity.review != nil || proximity.displayedEngagement == .qr)
         }
-        .fullScreenCover(isPresented: $showingSettings) {
+        .fullScreenCover(isPresented: $showingSettings, onDismiss: { dismissingSettings = false }) {
             NavigationView {
                 SettingsView(viewModel: viewModel)
                     .toolbar {
@@ -85,7 +101,12 @@ struct HomeView: View {
         .onChange(of: viewModel.isReady) { ready in if !ready { showingSettings = false; showingScanner = false } }
         .onChange(of: NearbySheetSessionState(active: proximity.active, entryReady: proximity.hasEntryContent,
             closing: proximity.closing)) { _ in synchronizeNearbySheet() }
-        .onChange(of: viewModel.selectedTab) { tab in if tab != .credentials { showingScanner = false } }
+        .onChange(of: viewModel.externalFlow) { flow in
+            if flow != nil && showingSettings {
+                dismissingSettings = true
+                showingSettings = false
+            }
+        }
         .task(id: viewModel.credentials) {
             credentialCards = []
             let cards = await CredentialDisplayNormalizer.cards(for: viewModel.credentials)
@@ -98,24 +119,23 @@ struct HomeView: View {
         showingSettings = true
     }
 
-    @ViewBuilder private var walletContent: some View {
-        if proximity.active || nearbySheet.keepsHomeVisible { credentialsContent }
-        else {
-            switch viewModel.selectedTab {
-            case .credentials: credentialsContent
-            case .receive: ReceiveView(viewModel: viewModel, onBack: returnHome)
-            case .present: PresentView(viewModel: viewModel, onBack: returnHome)
-            }
-        }
+    private var showingOnlineFlow: Bool {
+        viewModel.selectedTab != .credentials && !proximity.active && !nearbySheet.keepsHomeVisible
+    }
+
+    private var showingTaskSheet: Bool {
+        viewModel.isReady && !showingSettings && !dismissingSettings && (showingScanner || showingOnlineFlow)
     }
 
     private var credentialsContent: some View {
         CredentialsTabView(viewModel: viewModel, selectedDetailsID: $selectedCredentialDetailsID, cards: credentialCards,
-            onOpenSettings: openSettings, onScan: { showingScanner = true }, onShareNearby: startNearbySharing,
+            onOpenSettings: openSettings, onScan: { scannerManual = false; showingScanner = true }, onShareNearby: startNearbySharing,
             nearbyPreparing: nearbySheet.isPreparing, nearbyEnabled: !proximity.closing)
+            .accessibilityHidden(showingTaskSheet || nearbySheet.keepsHomeVisible)
     }
 
     private func returnHome() {
+        showingScanner = false
         if viewModel.externalFlow != nil { viewModel.closeExternalFlow(); return }
         viewModel.startNewReceiveFlow()
         viewModel.startNewPresentationFlow()
@@ -183,26 +203,11 @@ struct HomeView: View {
     }
 
     private func openLink(_ value: String, kind: WalletLinkKind) {
-        guard showingScanner else { return }
+        guard showingScanner, let url = URL(string: value) else { return }
+        viewModel.openResolvedLink(url, kind: kind)
         showingScanner = false
-        switch kind {
-        case .offer:
-            viewModel.startNewPresentationFlow()
-            viewModel.startNewReceiveFlow()
-            viewModel.selectedTab = .receive
-            viewModel.offerUrl = value
-            viewModel.previewOffer()
-        case .presentation:
-            viewModel.startNewReceiveFlow()
-            viewModel.startNewPresentationFlow()
-            viewModel.selectedTab = .present
-            viewModel.presentationRequestUrl = value
-            viewModel.previewPresentation()
-        case .authorizationCallback:
-            if let url = URL(string: value) { viewModel.handleDeepLink(url) }
-        default: break
-        }
     }
+
 }
 
 /// Native presentation and SDK cleanup complete independently; neither can reopen the other.

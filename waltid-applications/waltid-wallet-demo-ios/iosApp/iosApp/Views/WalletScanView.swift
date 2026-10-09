@@ -7,7 +7,7 @@ import WalletDemoSharingUI
 struct WalletScanView: View {
     let onBack: () -> Void
     let onOpen: (String, WalletLinkKind) -> Void
-    private let preferredSheetHeight: CGFloat?
+    private let onManualModeChange: (Bool) -> Void
     @Environment(\.scenePhase) private var scenePhase
     @State private var input: String
     @State private var manual: Bool
@@ -19,13 +19,14 @@ struct WalletScanView: View {
     @FocusState private var inputFocused: Bool
     private let resolveLink: (String) async throws -> ResolvedWalletLink
 
-    init(input: String = "", preferredSheetHeight: CGFloat? = nil, onBack: @escaping () -> Void, onOpen: @escaping (String, WalletLinkKind) -> Void,
+    init(input: String = "", onBack: @escaping () -> Void, onOpen: @escaping (String, WalletLinkKind) -> Void,
+        onManualModeChange: @escaping (Bool) -> Void = { _ in },
         resolveLink: @escaping (String) async throws -> ResolvedWalletLink = { try await WalletLinkResolver.resolve($0) }
     ) {
         _input = State(initialValue: input)
         _manual = State(initialValue: !input.isEmpty)
         self.onBack = onBack
-        self.preferredSheetHeight = preferredSheetHeight
+        self.onManualModeChange = onManualModeChange
         self.onOpen = onOpen
         self.resolveLink = resolveLink
     }
@@ -65,14 +66,7 @@ struct WalletScanView: View {
                 if let resolutionError { Text(resolutionError).font(.subheadline).foregroundStyle(.red) }
                 Color.clear.frame(height: 16)
             } actions: {
-                if manual {
-                    WalletActions(primary: WalletAction(
-                        resolving ? "Opening link…" : resolutionError != nil ? "Try again"
-                            : kind == .authorizationCallback ? "Continue sign-in" : "Continue",
-                        enabled: !dispatched && !resolving && [.offer, .presentation, .authorizationCallback, .web].contains(kind),
-                        identifier: "wallet.scanContinue"
-                    ) { open(input) })
-                }
+                if manual { WalletActions(primary: continueAction) }
             }
             .navigationTitle(manual ? "Enter a link" : "Scan QR code")
             .navigationBarTitleDisplayMode(.inline)
@@ -87,12 +81,22 @@ struct WalletScanView: View {
                 }
             }
         }
+        // Use the sheet's full container height while retaining keyboard avoidance.
+        .ignoresSafeArea(.container, edges: .bottom)
         .accessibilityIdentifier("wallet.scanScreen")
-        .walletSheetSizing(preferredHeight: preferredSheetHeight, expanded: manual)
         .modifier(ScannerSheetSurface())
         .onChange(of: input) { _ in resolutionError = nil }
-        .onChange(of: manual) { manual in inputFocused = manual }
+        .onChange(of: manual) { manual in inputFocused = manual; onManualModeChange(manual) }
         .onDisappear { closed = true; resolutionTask?.cancel() }
+    }
+
+    private var continueAction: WalletAction {
+        WalletAction(
+            resolving ? "Opening link…" : resolutionError != nil ? "Try again"
+                : kind == .authorizationCallback ? "Continue sign-in" : "Continue",
+            enabled: !dispatched && !resolving && [.offer, .presentation, .authorizationCallback, .web].contains(kind),
+            identifier: "wallet.scanContinue"
+        ) { open(input) }
     }
 
     private var manualInput: some View {

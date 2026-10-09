@@ -17,7 +17,6 @@ import androidx.navigation3.ui.defaultPredictivePopTransitionSpec
 import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletReviewHost
-import id.walt.walletdemo.compose.ui.WalletReviewPresentation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import id.walt.walletdemo.compose.ui.resources.*
@@ -37,7 +36,7 @@ internal fun WalletDetailSheet(
     val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val predictivePop = defaultPredictivePopTransitionSpec<String>()
-    WalletReviewHost(WalletReviewPresentation.Sheet, dismissEnabled = true, onDismiss = onDismiss) {
+    WalletReviewHost(dismissEnabled = true, onDismiss = onDismiss) {
         // Back navigates within the information stack; X/outside dismissal closes the adapter.
         SystemBackHandler(enabled = onBack != null) { onBack?.invoke() }
         Column(modifier.fillMaxSize()) {

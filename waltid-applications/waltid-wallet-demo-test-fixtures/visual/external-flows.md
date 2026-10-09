@@ -1,29 +1,28 @@
-# External wallet reviews
+# Wallet task sheets
 
-A recognized credential offer or presentation request opens a wallet-owned review sheet. Unlock and signing setup, when needed, stay in that sheet; the request is prepared once the wallet is ready. Reviewing never accepts an offer or sends credentials. Links opened with the in-app scanner remain full-screen journeys.
-
-Open in app expands a wallet-owned external review to the full app presentation without preparing another request or changing credential/copy/disclosure choices. Its result and Close remain owned by that request. Android keeps the wallet open after this explicit promotion. An OS-owned Credential Manager/provider handoff cannot be transferred to a second activity or replayed as a new request; it retains its caller-owned result contract.
+Recognized credential offers and presentation requests open the wallet normally and enter one task sheet over Home. Unlock and signing-key setup remain at the app root; the pending request prepares once the wallet is ready. Scanner/manual resolution advances within the same sheet. Reviewing never accepts an offer or sends credentials. Long reviews expand and scroll; short entry menus use heights measured before presentation.
 
 ## Ownership and navigation
 
-- Reopening the same external URL preserves its review, choices and detail presentation.
-- Another request cannot replace a credential exchange that is already committing, a pending presentation continuation or an active nearby session. A notice asks the user to finish the operation.
-- Closing a review cancels its pending preview and returns to the wallet. Android finishes the Activity when it was launched for this external request, returning to its caller. A warm request in the existing wallet returns to the wallet home.
-- A receive receipt remains visible until Done; successful issuance does not silently remove the external review.
-- Credential information has its own Close action. Closing it must leave the enclosing review and choices intact.
-- Dismissal is blocked during authentication, identity changes and consuming operations. Explicit protocol decline remains separate from closing an unsubmitted review.
-- A callback with no recoverable authorization session explains that the session is unavailable. It does not replay issuance or label credentials already in storage as the result of that callback. Existing recoverable-session support is used where the wallet backend supplies it; mobile process-loss recovery is not asserted by this UI change.
+- Reopening the same URL preserves its review, choices and detail navigation, including resolved HTTPS links.
+- Another request cannot replace a committing exchange, a pending presentation continuation or an active nearby session.
+- Close cancels pending preview work and returns to Home. Ordinary Android request closure keeps the opaque wallet Activity open.
+- Clean successful wallet tasks retain the existing eligible idle timeout. Deferred, partial and uncertain outcomes require explicit recovery; provider issuance retains explicit Done and result delivery.
+- Credential information stays within the receiving task. Back preserves its choices; Close ends the local task. Sharing displays all requested values inline.
+- Busy operations prevent dismissal and duplicate submission. Local Close remains distinct from protocol Reject/Decline and provider selector navigation.
+- An orphan authorization callback explains unavailable recovery without replaying issuance or labeling previously stored credentials as newly received.
+- A request arriving in Settings dismisses Settings before showing its task. Authentication never mounts a second app inside a sheet.
 
 ## Platform surfaces
 
-Compose uses the same receive/share content in full-screen and modal hosts. Android's translucent Activity permits a caller to remain visible when that caller is beneath the wallet in the same task. A task-root launch or warm existing wallet uses its own neutral background. The test caller is a separate debug-only, non-exported Activity in the preview package; it proves Activity stacking and recreation, not every browser's task flags or an OS-owned credential picker.
+Compose Android, Compose iOS and browser consumers share the modal request host and content. Android MainActivity is opaque and retains singleTop delivery; no singleTask/CLEAR_TOP policy is introduced that could destroy provider activities. The two Credential Manager fulfillment activities remain translucent and retain caller context, result routing and their dedicated authorization callback.
 
-Native SwiftUI uses an app-owned sheet above a neutral wallet background. Unlock, setup and accessibility text use a large detent; ordinary review supports medium and large detents. The switch after unlock waits for keyboard dismissal. This does not promise transparency through an iOS app window to another app. Apple credential-provider UI remains a separate system integration.
+Native SwiftUI keeps Home mounted beneath one scanner/online task presentation. Its measured entry detent stays stable; review expands that presentation rather than dismissing and opening another host. Nearby sharing retains its own SDK cleanup and dismissal owner. Settings, image viewers and platform-owned prompts retain their existing containers.
 
-Compose iOS uses the shared sheet content over its own neutral app background. External deep-link ownership and platform-provider ownership remain separate.
+Apple identity-document provider UI remains in its system-owned extension and uses the shared review content directly. It is not transferred to the main wallet. The DC API additional-review preference is retained; it is unrelated to sheet sizing.
 
 ## Evidence
 
-`external.receiving.review` and `external.callback.unavailable` in the visual catalogue render production content with synthetic inputs. Compose captures the modal window; native snapshots capture bounded content and chrome. Native XCTest separately exercises real scene URLs, PIN entry, sheet presentation and Safari warm handoff with the mock wallet. Android instrumentation exercises cold entry, PIN, Activity recreation, close-to-caller, expired callbacks and live issuer receipt retention.
+`external.receiving.review` and `external.callback.unavailable` in the visual catalogue render production content with synthetic inputs. Compose captures the modal window; native snapshots capture bounded content and chrome. Native XCTest separately exercises real scene URLs, PIN entry, sheet presentation and Safari warm handoff with the mock wallet. Android instrumentation exercises cold entry, PIN, Activity recreation, close-to-Home, expired callbacks and live issuer receipt retention.
 
 The controller/model tests cover preparation gating, idempotent entry, late-preview cancellation, commit guards and nearby ownership. The optional Android `authorizationCodeRetainsCopiesThroughBrowserReturn` integration case additionally exercises the real Credential Manager create picker, unattended fixture IdP and Chrome authorization callback, asserting the same provider Activity and two stored copies. It requires the coordinated fixture and an emulator build without signing prompts. A dedicated `walt-wallet-create://authorize` callback prevents Chrome’s `CLEAR_TOP` from clearing the provider request. Unmatched callbacks close without opening the wallet; process-loss callbacks are correlated before being queued for wallet-side recovery. These lanes do not establish physical-device biometric, BLE/NFC, Chrome as the DC API caller, live process-loss recovery or formal TS-12 conformance. Record-only screenshot runs are not verification.
