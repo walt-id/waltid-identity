@@ -14,6 +14,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import java.net.SocketException
 import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
@@ -140,12 +141,48 @@ class IssuerTestPlanRunner(
         )
     }
 
+    /**
+     * Runs one module, retrying it once on a fresh test instance when the suite produced no
+     * result at all (stuck WAITING / socket failure while waiting). Genuine results, including
+     * FAILED, are never retried. See [IssuerModuleRetryPolicy].
+     */
     private suspend fun runModuleAttempt(
         testPlanId: String,
         testModule: String,
         moduleVariant: JsonObject,
         proofType: String?,
     ): IssuerVariantModuleRunResult {
+        val first = runModuleOnce(testPlanId, testModule, moduleVariant, proofType)
+        if (!first.retryable) {
+            return first.result
+        }
+
+        println(
+            "RETRY: module $testModule produced no result (${first.result.failureSummary}; " +
+                "test ${first.result.testId}, last status ${first.result.status}). " +
+                "Retrying once with a fresh test instance."
+        )
+        val second = runModuleOnce(testPlanId, testModule, moduleVariant, proofType).result
+        return if (second.accepted) {
+            second
+        } else {
+            second.copy(
+                failureSummary = listOfNotNull(
+                    second.failureSummary,
+                    "retried once after no-result attempt ${first.result.testId}: ${first.result.failureSummary}",
+                ).joinToString("; ")
+            )
+        }
+    }
+
+    private class ModuleAttempt(val result: IssuerVariantModuleRunResult, val retryable: Boolean)
+
+    private suspend fun runModuleOnce(
+        testPlanId: String,
+        testModule: String,
+        moduleVariant: JsonObject,
+        proofType: String?,
+    ): ModuleAttempt {
         var testId: String? = null
         var stage = "Create test"
         val logUrlForTest: (String) -> String = { "https://$conformanceHost:$conformancePort/log-detail.html?log=$it" }
@@ -160,7 +197,7 @@ class IssuerTestPlanRunner(
             println("View test run at: ${logUrlForTest(testId)}")
             println("Waiting for conformance suite to complete issuer test...")
 
-            stage = "Wait for test completion"
+            stage = IssuerModuleRetryPolicy.WAIT_STAGE
             waitForIssuerTestCompletion(testId, credentialOfferProviderFor(testModule))
 
             stage = "Read test result"
@@ -173,28 +210,39 @@ class IssuerTestPlanRunner(
                 stage = "Check proof evidence"
                 requireIssuerProofEvidence(proofType, conformance.getTestLog(testId))
             }
-            IssuerVariantModuleRunResult(
-                testModule = testModule,
-                testId = testId,
-                logUrl = logUrlForTest(testId),
-                status = testRunInfo.status,
-                result = testRunInfo.result,
-                accepted = accepted,
-                variant = moduleVariant,
+            ModuleAttempt(
+                IssuerVariantModuleRunResult(
+                    testModule = testModule,
+                    testId = testId,
+                    logUrl = logUrlForTest(testId),
+                    status = testRunInfo.status,
+                    result = testRunInfo.result,
+                    accepted = accepted,
+                    variant = moduleVariant,
+                ),
+                retryable = false,
             )
         }.getOrElse { throwable ->
             if (throwable is CancellationException) throw throwable
             val latestInfo = testId?.let { id -> runCatching { conformance.getTestRunInfo(id) }.getOrNull() }
-            IssuerVariantModuleRunResult(
-                testModule = testModule,
-                testId = testId,
-                logUrl = testId?.let(logUrlForTest),
-                status = latestInfo?.status,
-                result = latestInfo?.result,
-                accepted = false,
-                error = throwable.compactMessage(),
-                failureSummary = "$stage: ${throwable.safeConformanceFailure()}",
-                variant = moduleVariant,
+            ModuleAttempt(
+                IssuerVariantModuleRunResult(
+                    testModule = testModule,
+                    testId = testId,
+                    logUrl = testId?.let(logUrlForTest),
+                    status = latestInfo?.status,
+                    result = latestInfo?.result,
+                    accepted = false,
+                    error = throwable.compactMessage(),
+                    failureSummary = "$stage: ${throwable.safeConformanceFailure()}",
+                    variant = moduleVariant,
+                ),
+                retryable = IssuerModuleRetryPolicy.isTransientNoResult(
+                    stage = stage,
+                    throwable = throwable,
+                    latestStatus = latestInfo?.status,
+                    latestResult = latestInfo?.result,
+                ),
             )
         }
     }
@@ -366,14 +414,14 @@ class IssuerTestPlanRunner(
 
             if (counter > 60) {
                 if (testRunInfo.status == "WAITING") {
-                    throw IllegalStateException(
+                    throw IssuerTestCompletionTimeoutException(
                         "Test $testId is stuck in WAITING status after ${counter - 1} seconds. " +
                         "The suite may be waiting for a credential offer, transaction code, or OAuth login. " +
                         "Please complete the test manually at https://$conformanceHost:$conformancePort/test-info/$testId " +
                         "or set OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION=true to let Playwright complete the login."
                     )
                 }
-                throw IllegalStateException("Waited for issuer test $testId for ${counter - 1} seconds, but it is still ${testRunInfo.status}")
+                throw IssuerTestCompletionTimeoutException("Waited for issuer test $testId for ${counter - 1} seconds, but it is still ${testRunInfo.status}")
             }
 
             kotlinx.coroutines.delay(1_000)
@@ -627,5 +675,41 @@ internal data class IssuerModuleSelection(
             ?.filter { it.isNotEmpty() }
             ?.toSet()
             ?: emptySet()
+    }
+}
+
+/**
+ * The suite never reached FINISHED/INTERRUPTED for a module within the wait window. Still an
+ * [IllegalStateException] (same message text), so existing handling and the BLOCKED
+ * classification ("waiting"/"timeout" in the message) are unchanged.
+ */
+internal class IssuerTestCompletionTimeoutException(message: String) : IllegalStateException(message)
+
+/**
+ * Decides whether a module attempt is a transient "no result" outcome worth one retry.
+ *
+ * Seen on the shared conformance suite: one module of an otherwise green matrix stays WAITING
+ * ("Wait for test completion: IllegalStateException") or the poll hits a SocketException, so no
+ * verdict exists and the whole variant is reported BLOCKED. Only these cases are retried, and
+ * only once, so a module that hangs consistently still fails. Any result the suite actually
+ * produced (FAILED, WARNING, ...) and every failure outside the wait stage is reported as-is.
+ */
+internal object IssuerModuleRetryPolicy {
+    const val WAIT_STAGE = "Wait for test completion"
+
+    private val terminalStatuses = setOf("FINISHED", "INTERRUPTED")
+
+    fun isTransientNoResult(
+        stage: String,
+        throwable: Throwable,
+        latestStatus: String?,
+        latestResult: String?,
+    ): Boolean {
+        if (stage != WAIT_STAGE) return false
+        if (latestStatus in terminalStatuses) return false
+        if (latestResult != null && latestResult != "UNKNOWN") return false
+        return generateSequence(throwable) { it.cause }.take(8).any {
+            it is IssuerTestCompletionTimeoutException || it is SocketException
+        }
     }
 }
