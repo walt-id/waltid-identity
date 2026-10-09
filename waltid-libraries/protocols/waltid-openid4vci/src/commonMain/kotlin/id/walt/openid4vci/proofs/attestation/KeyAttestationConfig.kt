@@ -31,8 +31,15 @@ sealed class KeyAttestationVerificationMethod {
 
     @Serializable
     @SerialName("x509-chain")
-    data class X509Chain(val trustedRootCertificatesPem: List<String>) : KeyAttestationVerificationMethod() {
-        init { require(trustedRootCertificatesPem.isNotEmpty()) { "Key attestation trust roots must not be empty" } }
+    data class X509Chain(
+        val trustedRootCertificatesPem: List<String>,
+        /** When set, a linked trust registry must resolve the leaf as this entity type. */
+        val expectedEntityType: String? = null,
+    ) : KeyAttestationVerificationMethod() {
+        init {
+            require(trustedRootCertificatesPem.isNotEmpty()) { "Key attestation trust roots must not be empty" }
+            expectedEntityType?.let { require(it.isNotBlank()) { "expectedEntityType must not be blank" } }
+        }
     }
 }
 
