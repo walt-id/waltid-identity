@@ -28,7 +28,7 @@ class ValidationContext(
         variableMap["${valid}:${key}"] = value
     }
 
-    fun <T>getVariable(key: String): T? {
+    fun <T> getVariable(key: String): T? {
         return variableMap["${valid}:${key}"] as? T
     }
 
@@ -46,7 +46,7 @@ class ValidationContext(
     val certificateSubjectDn: String
         get() = current.certificateSubjectDn
 
-    val isLeaf : Boolean
+    val isLeaf: Boolean
         get() = certificateIndex == chainLength - 1
 
     override fun findCertificateBySubjectDn(subjectDn: String): List<X509Certificate> =
