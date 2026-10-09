@@ -187,6 +187,11 @@ object Issuer2RequestExamples {
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
     )
 
+    val EUDI_IDENTITY_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = "identityCredentialSdJwtEudi")
+    val EUDI_PHOTO_ID_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = "isoPhotoIdEudi")
+    val EUDI_PID_SD_JWT_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = EUDI_PID_SD_JWT_PROFILE_ID)
+    val EUDI_PID_MDOC_OFFER = PROFILE_AUTHORIZED_OFFER_BY_REFERENCE.copy(profileId = EUDI_PID_MDOC_PROFILE_ID)
+
     val PROFILE_AUTHORIZED_OFFER_BY_VALUE = PROFILE_AUTHORIZED_OFFER.copy(
         valueMode = CredentialOfferValueMode.BY_VALUE,
     )
@@ -194,16 +199,6 @@ object Issuer2RequestExamples {
     val PROFILE_AUTHORIZED_OFFER_BY_VALUE_WITHOUT_ISSUER_STATE = PROFILE_AUTHORIZED_OFFER.copy(
         issuerStateMode = IssuerStateMode.OMIT,
         valueMode = CredentialOfferValueMode.BY_VALUE,
-    )
-
-    val PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_REFERENCE = MultiCredentialOfferCreateRequest(
-        credentials = listOf(
-            CredentialOfferCredential(EUDI_PID_SD_JWT_PROFILE_ID),
-            CredentialOfferCredential(EUDI_PID_MDOC_PROFILE_ID),
-        ),
-        authMethod = AuthenticationMethod.AUTHORIZED,
-        issuerStateMode = IssuerStateMode.INCLUDE,
-        valueMode = CredentialOfferValueMode.BY_REFERENCE,
     )
 
     val PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE = MultiCredentialOfferCreateRequest(
@@ -532,7 +527,10 @@ object Issuer2RequestExamples {
         "[authorized][single][by-value]" to PROFILE_AUTHORIZED_OFFER_BY_VALUE,
         "[authorized][single][by-value][issuer_state omitted]" to PROFILE_AUTHORIZED_OFFER_BY_VALUE_WITHOUT_ISSUER_STATE,
         "[authorized][single][by-reference][mDoc credentialData override]" to AUTHORIZED_MDOC_MDL_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE,
-        "[authorized][multiple][by-reference][same dataset, different formats][EUDI PID]" to PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_REFERENCE,
+        "[authorized][single][eudi-sd-jwt-vc-identity]" to EUDI_IDENTITY_OFFER,
+        "[authorized][single][eudi-mdoc-photo-id]" to EUDI_PHOTO_ID_OFFER,
+        "[authorized][single][eudi-sd-jwt-vc-pid]" to EUDI_PID_SD_JWT_OFFER,
+        "[authorized][single][eudi-pid-mdoc]" to EUDI_PID_MDOC_OFFER,
         "[authorized][multiple][by-value][same format, different datasets][SD-JWT VC]" to PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE,
         "[authorized][multiple][by-reference][runtime overrides]" to PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_RUNTIME_OVERRIDES,
         "[pre-authorized][single][by-reference]" to PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE,

@@ -43,7 +43,16 @@ fun loadIssuer2ConfigFiles(baseUrlOverride: String? = KTOR_TEST_APPLICATION_BASE
 
     val configDir = issuer2ConfigDir()
     issuer2ConfigFiles.forEach { (id, type) ->
-        System.setProperty("config.file.$id", configDir.resolve("$id.conf").toString())
+        val file = if (id == "issuer-service") {
+            // Tests must not read an operator's inline signing secrets from the live configuration.
+            Files.createTempFile("issuer2-test-service-", ".conf").also { path ->
+                Files.writeString(path, requireNotNull(
+                    Issuer2ServiceConfig::class.java.getResource("/metadata/issuer-service.conf"),
+                ).readText())
+                path.toFile().deleteOnExit()
+            }
+        } else configDir.resolve("$id.conf")
+        System.setProperty("config.file.$id", file.toString())
         ConfigManager.registerConfig(id, type)
     }
     ConfigManager.loadConfigs()

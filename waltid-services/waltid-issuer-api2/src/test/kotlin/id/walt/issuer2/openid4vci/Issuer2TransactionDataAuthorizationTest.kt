@@ -10,6 +10,7 @@ import id.walt.issuer2.testsupport.Issuer2WalletFlowDriver
 import id.walt.issuer2.testsupport.apiClient
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
 import id.walt.issuer2.testsupport.createWalletFlowCredentialOffer
+import id.walt.issuer2.testsupport.Issuer2TestKeyAttester
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.mso.KeyAuthorization
@@ -43,10 +44,11 @@ class Issuer2TransactionDataAuthorizationTest {
 
     @Test
     fun scaPaymentCardProfileAuthorizesOnlyTheTransactionDataHashElements() = testApplication {
-        installIssuer2WithConfigFiles()
+        val attester = Issuer2TestKeyAttester.create()
+        installIssuer2WithConfigFiles(configureServiceConfig = { it.copy(keyAttestationConfig = attester.issuerTrust) })
 
         val keyAuthorizations = assertNotNull(
-            apiClient().issueAndReadKeyAuthorizations(),
+            apiClient().issueAndReadKeyAuthorizations(attester),
             "Expected keyAuthorizations for a profile with authorizedTransactionDataTypes",
         )
 
@@ -64,9 +66,11 @@ class Issuer2TransactionDataAuthorizationTest {
 
     @Test
     fun profilesWithoutAuthorizedTransactionDataTypesCarryNoKeyAuthorizations() = testApplication {
-        installIssuer2WithConfigFiles()
+        val attester = Issuer2TestKeyAttester.create()
+        installIssuer2WithConfigFiles(configureServiceConfig = { it.copy(keyAttestationConfig = attester.issuerTrust) })
 
         val keyAuthorizations = apiClient().issueAndReadKeyAuthorizations(
+            attester = attester,
             scenario = Issuer2CredentialScenarios.isoMdl,
         )
 
@@ -78,10 +82,12 @@ class Issuer2TransactionDataAuthorizationTest {
 
     @Test
     fun runtimeOverrideAuthorizesTransactionDataOnProfileWithoutGrant() = testApplication {
-        installIssuer2WithConfigFiles()
+        val attester = Issuer2TestKeyAttester.create()
+        installIssuer2WithConfigFiles(configureServiceConfig = { it.copy(keyAttestationConfig = attester.issuerTrust) })
 
         val keyAuthorizations = assertNotNull(
             apiClient().issueAndReadKeyAuthorizations(
+                attester = attester,
                 scenario = euAgeVerificationScenario,
                 runtimeOverrides = CredentialOfferRuntimeOverrides(
                     authorizedTransactionDataTypes = listOf(SCA_PAYMENT_TYPE),
@@ -98,10 +104,11 @@ class Issuer2TransactionDataAuthorizationTest {
     }
 
     private suspend fun HttpClient.issueAndReadKeyAuthorizations(
+        attester: Issuer2TestKeyAttester,
         scenario: Issuer2CredentialScenario = scaPaymentCardScenario,
         runtimeOverrides: CredentialOfferRuntimeOverrides? = null,
     ): KeyAuthorization? {
-        val walletFlow = Issuer2WalletFlowDriver(this)
+        val walletFlow = Issuer2WalletFlowDriver(this, keyAttestationProvider = attester)
         val createdOffer = createWalletFlowCredentialOffer(
             scenario = scenario,
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,

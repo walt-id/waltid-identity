@@ -65,7 +65,10 @@ class ScaPaymentWalletIntegrationTest {
     fun missingIssuerLabelBlocksConsentBeforeAuthorizationOrSigning() = paymentFlow(missingLabel = true)
 
     private fun paymentFlow(missingLabel: Boolean) = testApplication {
-        installIssuer2WithConfigFiles(configureServiceConfig = { it.copy(baseUrl = "https://localhost") })
+        val attester = Issuer2TestKeyAttester.create()
+        installIssuer2WithConfigFiles(configureServiceConfig = {
+            it.copy(baseUrl = "https://localhost", keyAttestationConfig = attester.issuerTrust)
+        })
         if (missingLabel) {
             val config = ConfigManager.getConfig<Issuer2MetadataConfig>()
             val metadata = config.sdJwtVcTypeMetadataConfiguration.getValue("sca_payment_card_sd_jwt")
@@ -96,7 +99,7 @@ class ScaPaymentWalletIntegrationTest {
         val issuerKey = KeyManager.resolveSerializedKey(ConfigManager.getConfig<Issuer2ProfilesConfig>()
             .profiles.getValue("scaPaymentCardSdJwt").issuerKey)
         paymentFlow(apiClient(), "https://localhost", "https://verifier.example",
-            issuerKey.getPublicKey().exportJWK(), missingLabel)
+            issuerKey.getPublicKey().exportJWK(), missingLabel, attester)
     }
 
     @Test
@@ -119,6 +122,7 @@ class ScaPaymentWalletIntegrationTest {
     private suspend fun paymentFlow(
         http: HttpClient, issuerBase: String, verifierBase: String,
         issuerPublicJwk: String, missingLabel: Boolean = false,
+        attester: Issuer2TestKeyAttester? = null,
     ) {
         val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
         try {
@@ -137,6 +141,7 @@ class ScaPaymentWalletIntegrationTest {
                 keyStores = listOf(InMemoryKeyStore().also { it.addCrypto2Key(holderKey) }),
                 credentialStores = listOf(InMemoryCredentialStore()),
             )
+            attester?.let { wallet.attachKeyAttestationProvider(it) }
             val scenario = Issuer2CredentialScenarios.configured.single { it.profileId == "scaPaymentCardSdJwt" }
             val metadata = http.get("$issuerBase/.well-known/openid-credential-issuer/openid4vci")
             assertTrue(metadata.status.isSuccess(), "Issuer metadata unavailable at $issuerBase: ${metadata.status}")
