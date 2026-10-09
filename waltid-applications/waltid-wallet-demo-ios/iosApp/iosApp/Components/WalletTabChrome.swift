@@ -54,7 +54,6 @@ struct WalletTabFeedback: View {
 extension View {
     func walletFlowToolbar(onBack: (() -> Void)?, backEnabled: Bool, external: Bool = false, closing: Bool = false) -> some View {
         toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) { WalletOpenInAppButton() }
             ToolbarItem(placement: .navigationBarTrailing) {
                 if let onBack {
                     Button(action: onBack) {

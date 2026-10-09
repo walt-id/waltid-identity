@@ -18,12 +18,11 @@ internal fun ReaderTrustImportReview(
     preview: ProximityReaderTrustImportPreview,
     onImport: () -> Unit,
     onCancel: () -> Unit,
-    presentation: WalletReviewPresentation = WalletReviewPresentation.Sheet,
 ) {
-    WalletReviewHost(presentation, dismissEnabled = true, onDismiss = onCancel) { fillViewport ->
+    WalletReviewHost(dismissEnabled = true, onDismiss = onCancel) {
         ReviewScaffold(
             modifier = Modifier.testTag(WalletUiTestTags.SettingsReaderTrustImportReview),
-            fillViewport = fillViewport,
+            fillViewport = false,
             header = {
                 WalletScreenHeader(stringResource(Res.string.reader_trust_review_reader_trust_import)) {
                     IconButton(onCancel, modifier = Modifier.testTag(WalletUiTestTags.SettingsReaderTrustImportCancel)) {

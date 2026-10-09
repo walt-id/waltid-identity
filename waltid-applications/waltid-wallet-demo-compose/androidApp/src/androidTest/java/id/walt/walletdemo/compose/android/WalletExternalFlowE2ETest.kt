@@ -23,7 +23,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class WalletExternalFlowE2ETest {
     @Test
-    fun coldSheetUnlockRecreationAndCloseReturnToCaller() = runBlocking {
+    fun coldSheetUnlockRecreationAndCloseReturnToWallet() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         launchAndUnlock(context, device)
@@ -37,12 +37,12 @@ class WalletExternalFlowE2ETest {
         unlock(device, initializeSigningIdentity = false)
         assertNotNull("External offer did not prepare after unlock", waitForResource(device, "wallet.offerReview", UI_ELEMENT_TIMEOUT))
         assertFalse(device.hasObject(By.res("wallet.offerInput")))
-        assertFalse(device.hasObject(By.res("wallet.settingsButton")))
         recreateActivity(MainActivity::class.java, device)
         assertNotNull("Review was lost on recreation", waitForResource(device, "wallet.offerReview", UI_ELEMENT_TIMEOUT))
         assertTrue(device.takeScreenshot(File(context.cacheDir, "external-receive-sheet.png")))
         clickByTag(device, "wallet.external.close")
-        assertNotNull("Closing did not return to the caller", device.wait(Until.findObject(By.text("External test caller")), UI_ELEMENT_TIMEOUT))
+        assertNotNull("Closing did not keep the wallet open", waitForResource(device, "wallet.scanButton", UI_ELEMENT_TIMEOUT))
+        assertFalse("The caller must not show through the wallet", device.hasObject(By.text("External test caller")))
         assertFalse(device.hasObject(By.res("wallet.external.flow")))
     }
 

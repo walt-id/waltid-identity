@@ -19,8 +19,8 @@ class WalletDemoSharingReviewAndroidTest {
         scenarios.resizingAnOfferPreservesSelectionAndKeepsItsTitleReadable()
 
     @Test
-    fun changingHostPreservesDisclosureChoicesAndConsentRevision() =
-        scenarios.changingHostPreservesDisclosureChoicesAndConsentRevision()
+    fun recreatingSheetPreservesDisclosureChoicesAndConsentRevision() =
+        scenarios.recreatingSheetPreservesDisclosureChoicesAndConsentRevision()
 
     @Test
     fun reviewShowsRequestedValuesWithoutExposingUnsharedStoredInformation() =

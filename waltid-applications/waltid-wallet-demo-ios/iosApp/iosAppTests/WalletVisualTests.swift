@@ -54,7 +54,7 @@ final class WalletVisualTests: XCTestCase {
             model.issuanceCopyCounts = try fixtures.copies()
         }
         // The real native sheet/window is covered by the URL-launch UI journey; this pins its content.
-        try capture(ReceiveView(viewModel: model, onBack: {}).environment(\.walletOpenInApp, {}),
+        try capture(ReceiveView(viewModel: model, onBack: {}),
             id: unavailable ? "external.callback.unavailable" : "external.receiving.review", config: .iPhoneSe)
     }
 

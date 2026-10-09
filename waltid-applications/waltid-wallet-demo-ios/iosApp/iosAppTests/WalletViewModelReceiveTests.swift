@@ -6,6 +6,30 @@ import XCTest
 
 @MainActor
 final class WalletViewModelReceiveTests: XCTestCase {
+    func testResolvedHTTPSOfferPreparesOnceAndKeepsItsSelectionUntilClosed() async throws {
+        let client = TransactionCodeWalletClient(transactionCode: nil)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+        model.unlockForTests()
+        try await waitUntil { model.isReady && !model.isLoading }
+        let url = URL(string: "https://issuer.example/offer?credential_offer_uri=https%3A%2F%2Fissuer.example%2F1")!
+        model.openResolvedLink(url, kind: .offer)
+        model.prepareExternalFlow()
+        try await waitUntil { model.offerPreview != nil && !model.isLoading }
+        let preview = try XCTUnwrap(model.offerPreview)
+        let configuration = try XCTUnwrap(preview.credentials.first).configurationID
+        model.updateIssuanceCopies(configuration, 0)
+        model.txCode = "1234"
+        model.openResolvedLink(url, kind: .offer)
+        model.prepareExternalFlow()
+        let calls = await client.issuanceStartCalls
+        XCTAssertEqual(calls, 1)
+        XCTAssertEqual(model.issuanceCopyCounts[configuration], 0)
+        XCTAssertEqual(model.txCode, "1234")
+        XCTAssertTrue(model.closeExternalFlow())
+        XCTAssertEqual(model.selectedTab, .credentials)
+        XCTAssertNil(model.externalFlow)
+    }
+
     func testExternalLinkCannotReplaceNearbySession() {
         let model = WalletViewModel(walletClient: TransactionCodeWalletClient(transactionCode: nil), identityDocumentRegistrationUpdate: {})
         model.proximityPresentation.start()

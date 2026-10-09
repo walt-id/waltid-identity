@@ -10,7 +10,7 @@ import id.walt.walletdemo.compose.logic.isStatusVisible
 import id.walt.walletdemo.compose.logic.statusBanner
 import id.walt.walletdemo.compose.ui.components.StatusCard
 
-/** The in-app route and external host bind exactly the same content and current consent. */
+/** Online task content; the request owner retains drafts and consent through sheet navigation. */
 @Composable
 internal fun WalletFlowContent(
     controller: WalletDemoController,
@@ -18,7 +18,6 @@ internal fun WalletFlowContent(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
     fillViewport: Boolean = true,
-    presentationContent: (@Composable () -> Unit)? = null,
 ) {
     val banner = state.statusBanner().takeIf { state.isStatusVisible }
     val feedback: (@Composable () -> Unit)? = if (banner?.kind == WalletStatusKind.Busy || banner?.kind == WalletStatusKind.Error) {
@@ -63,7 +62,6 @@ internal fun WalletFlowContent(
                     else { controller.cancelPresentationReview(); controller.selectTab(WalletDemoTab.Credentials) }
                 },
                 onDone = onDone,
-                presentationContent = presentationContent,
                 modifier = modifier,
                 fillViewport = fillViewport,
                 feedback = feedback,

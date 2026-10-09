@@ -373,6 +373,8 @@ class WalletViewModel: ObservableObject {
     }
 
     func lock() {
+        externalFlow = nil
+        selectedTab = .credentials
         access.cancelAttempt()
         proximityPresentation.dismiss()
         receiveTask?.cancel()
@@ -760,67 +762,55 @@ class WalletViewModel: ObservableObject {
     }
 
     func handleDeepLink(_ url: URL) {
-        let kind = (url.scheme?.lowercased()).flatMap(WalletDeepLinkScheme.init(rawValue:))
-        if kind == .credentialOffer || kind == .presentationRequest {
-            if externalFlow?.url == url { return }
-            guard canAcceptExternalRequest && !proximityPresentation.active else {
-                incomingLinkNotice = "Finish the current operation before opening another link."
-                return
-            }
-        }
-        resetInputFocus()
         logE2E("Deep link received: \(url.scheme ?? "unknown")")
         switch (url.scheme?.lowercased()).flatMap(WalletDeepLinkScheme.init(rawValue:)) {
-        case .credentialOffer:
-            externalFlow = .pending(url, .offer)
-            receiveTask?.cancel()
-            paymentConsentTask?.cancel()
-            presentationTask?.cancel()
-            cancelIssuanceIfPresent()
-            discardPresentationPreviewIfPresent()
-            selectedTab = .receive
-            offerUrl = url.absoluteString
-            offerPreview = nil
-            lastReceivedCredentialIDs = []
-            issuanceReceipt = nil
-            receiveCompleted = false
-            receiveNavigationResetKey += 1
-            presentationReview = nil
-            selectedPresentationCredentialOptions = []
-            selectedPresentationDisclosureOptions = []
-            presentationCompleted = false
-            clearPendingPresentationContinuation()
-            presentationNavigationResetKey += 1
-            resetFlowStatusForIncomingURL()
-        case .presentationRequest:
-            externalFlow = .pending(url, .presentation)
-            receiveTask?.cancel()
-            paymentConsentTask?.cancel()
-            presentationTask?.cancel()
-            cancelIssuanceIfPresent()
-            discardPresentationPreviewIfPresent()
-            selectedTab = .present
-            presentationRequestUrl = url.absoluteString
-            txCode = ""
-            offerPreview = nil
-            lastReceivedCredentialIDs = []
-            issuanceReceipt = nil
-            receiveCompleted = false
-            receiveNavigationResetKey += 1
-            presentationReview = nil
-            selectedPresentationCredentialOptions = []
-            selectedPresentationDisclosureOptions = []
-            presentationCompleted = false
-            clearPendingPresentationContinuation()
-            presentationNavigationResetKey += 1
-            resetFlowStatusForIncomingURL()
-        case .authorizationCallback:
-            continueAuthorization(callbackURI: url)
+        case .credentialOffer: openResolvedLink(url, kind: .offer)
+        case .presentationRequest: openResolvedLink(url, kind: .presentation)
+        case .authorizationCallback: continueAuthorization(callbackURI: url)
         case nil:
             if WalletLinkKind.classify(url.absoluteString) == .authorizationCallback {
                 continueAuthorization(callbackURI: url)
             }
         }
+    }
+
+    /// Resolved scanner and external links enter the same authenticated task sheet.
+    func openResolvedLink(_ url: URL, kind: WalletLinkKind) {
+        if kind == .authorizationCallback { continueAuthorization(callbackURI: url); return }
+        let flowKind: WalletExternalFlow.Kind
+        switch kind {
+        case .offer: flowKind = .offer
+        case .presentation: flowKind = .presentation
+        default: return
+        }
+        if externalFlow?.url == url { return }
+        guard canAcceptExternalRequest && !proximityPresentation.active else {
+            incomingLinkNotice = "Finish the current operation before opening another link."
+            return
+        }
+        resetInputFocus()
+        receiveTask?.cancel()
+        paymentConsentTask?.cancel()
+        presentationTask?.cancel()
+        cancelIssuanceIfPresent()
+        discardPresentationPreviewIfPresent()
+        selectedTab = flowKind == .offer ? .receive : .present
+        offerUrl = flowKind == .offer ? url.absoluteString : ""
+        presentationRequestUrl = flowKind == .presentation ? url.absoluteString : ""
+        txCode = ""
+        offerPreview = nil
+        lastReceivedCredentialIDs = []
+        issuanceReceipt = nil
+        receiveCompleted = false
+        receiveNavigationResetKey += 1
+        presentationReview = nil
+        selectedPresentationCredentialOptions = []
+        selectedPresentationDisclosureOptions = []
+        presentationCompleted = false
+        clearPendingPresentationContinuation()
+        presentationNavigationResetKey += 1
+        resetFlowStatusForIncomingURL()
+        externalFlow = .pending(url, flowKind)
     }
 
     private var canAcceptExternalRequest: Bool {
@@ -1012,8 +1002,9 @@ class WalletViewModel: ObservableObject {
         txCode = ""
         receiveCompleted = false
         receiveNavigationResetKey += 1
-        if externalFlow == nil { selectedTab = .credentials }
-        setSuccess(WalletStatusText.credentialOfferDeclined, tab: externalFlow == nil ? .credentials : .receive)
+        externalFlow = nil
+        selectedTab = .credentials
+        setSuccess(WalletStatusText.credentialOfferDeclined, tab: .credentials)
         if let sessionID {
             Task { try? await walletClient.cancelIssuance(sessionID: sessionID) }
         }
@@ -1757,6 +1748,8 @@ class WalletViewModel: ObservableObject {
     }
 
     private func clearWalletState() {
+        externalFlow = nil
+        selectedTab = .credentials
         did = ""
         keyID = ""
         publicJWK = ""

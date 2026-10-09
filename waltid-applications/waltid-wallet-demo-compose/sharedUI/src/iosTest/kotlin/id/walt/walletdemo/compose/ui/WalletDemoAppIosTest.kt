@@ -9,7 +9,7 @@ import kotlin.test.Test
 
 @OptIn(InternalComposeUiApi::class)
 class WalletDemoAppIosTest {
-    @Test fun openingExternalReviewInAppPreservesSelectionsWithoutReplayingTheRequest() = scenarios.openingExternalReviewInAppPreservesSelectionsWithoutReplayingTheRequest()
+    @Test fun duplicateResolvedLinkPreservesSelectionsInTheSameSheet() = scenarios.duplicateResolvedLinkPreservesSelectionsInTheSameSheet()
 
     @Test fun externalOfferFailureRemainsVisibleAndCanBeCorrected() = scenarios.externalOfferFailureRemainsVisibleAndCanBeCorrected()
 

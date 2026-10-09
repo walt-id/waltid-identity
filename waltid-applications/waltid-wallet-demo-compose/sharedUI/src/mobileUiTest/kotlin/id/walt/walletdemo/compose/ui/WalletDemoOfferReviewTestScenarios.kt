@@ -46,7 +46,7 @@ class WalletDemoOfferReviewTestScenarios {
         assertEquals(1, done)
     }
 
-    fun selectedCopiesAndTransactionCodeSurviveHostChangesAndSubmitOnce() = runComposeUiTest {
+    fun selectedCopiesAndTransactionCodeSurviveSheetRecreationAndSubmitOnce() = runComposeUiTest {
         val preview = WalletDemoOfferPreview(
             WalletDemoIssuerMetadata("https://issuer.example", null),
             listOf("pid", "mdl").map {
@@ -58,7 +58,6 @@ class WalletDemoOfferReviewTestScenarios {
         val state = mutableStateOf(WalletDemoOfferCreateUiState.Review(preview))
         val visible = mutableStateOf(true)
         val draft = WalletDemoOfferDraft()
-        val presentation = mutableStateOf(WalletReviewPresentation.FullScreen)
         val accepted = mutableListOf<Pair<String?, Map<String, Int>>>()
         var dismissed = 0
         setContent {
@@ -66,8 +65,7 @@ class WalletDemoOfferReviewTestScenarios {
                 onAccept = { code, counts ->
                     accepted += code to counts
                     state.value = state.value.copy(submitting = true)
-                }, onDecline = {}, onDismiss = { dismissed++ }, onCancelAuthorization = {},
-                presentation = presentation.value)
+                }, onDecline = {}, onDismiss = { dismissed++ }, onCancelAuthorization = {})
         }
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsNotEnabled()
         onNodeWithTag("issuance-select-mdl").performScrollToContent(this).performClick()
@@ -82,7 +80,6 @@ class WalletDemoOfferReviewTestScenarios {
         runOnIdle { visible.value = true }
         onNodeWithTag(WalletUiTestTags.TxCodeInput).performScrollToContent(this).assertIsDisplayed()
         assertEquals("1234", draft.transactionCode)
-        runOnIdle { presentation.value = WalletReviewPresentation.Sheet }
         onNodeWithTag("issuance-copies-pid").performScrollToContent(this).assertTextEquals("Copies: 3")
         onNodeWithTag("issuance-select-mdl").performScrollToContent(this).assertIsOff()
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performClick()

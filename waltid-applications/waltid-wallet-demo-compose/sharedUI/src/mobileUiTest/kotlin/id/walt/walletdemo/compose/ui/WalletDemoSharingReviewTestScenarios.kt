@@ -146,10 +146,9 @@ class WalletDemoSharingReviewTestScenarios {
         assertEquals(1, submissions)
     }
 
-    fun changingHostPreservesDisclosureChoicesAndConsentRevision() = runComposeUiTest {
+    fun recreatingSheetPreservesDisclosureChoicesAndConsentRevision() = runComposeUiTest {
         val option = credentialOption(disclosures = listOf(requiredDisclosure(), optionalDisclosure()))
         val optional = disclosureSelection(option, OPTIONAL_DISCLOSURE_PATH)
-        val presentation = mutableStateOf(WalletReviewPresentation.FullScreen)
         var prepared = 0
         var submitted: WalletDemoSharingSelection? = null
         val visible = mutableStateOf(true)
@@ -161,7 +160,7 @@ class WalletDemoSharingReviewTestScenarios {
         }
         setContent {
             if (visible.value) WalletDemoSharingReviewScreen(review = review, controller = owner, title = "Review request",
-                compact = false, presentation = presentation.value, onSubmit = { submitted = it }, onCancel = {},
+                compact = false, onSubmit = { submitted = it }, onCancel = {},
                 onBackAtRoot = {})
         }
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollToContent(this).performClick()
@@ -170,7 +169,7 @@ class WalletDemoSharingReviewTestScenarios {
         assertEquals(2, revision) // Initial selection and the explicit optional disclosure.
         runOnIdle { visible.value = false }
         waitForIdle()
-        runOnIdle { visible.value = true; presentation.value = WalletReviewPresentation.Sheet }
+        runOnIdle { visible.value = true }
         onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollToContent(this).assertIsOn()
         onNodeWithText("Approve").performClick()
         assertEquals(revision, prepared)

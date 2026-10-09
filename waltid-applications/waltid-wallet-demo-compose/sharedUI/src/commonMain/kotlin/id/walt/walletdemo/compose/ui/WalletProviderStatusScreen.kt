@@ -27,8 +27,8 @@ fun WalletProviderStatusScreen(
     onClose: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    WalletReviewHost(WalletReviewPresentation.Sheet, dismissEnabled = enabled, onDismiss = onDismiss) { fill ->
-        ReviewScaffold(fillViewport = fill, header = {
+    WalletReviewHost(dismissEnabled = enabled, onDismiss = onDismiss) {
+        ReviewScaffold(fillViewport = false, header = {
             WalletScreenHeader(title) {
                 IconButton(onClose, enabled = enabled) { WalletIcon(WalletSymbol.Decline, "Close request") }
             }

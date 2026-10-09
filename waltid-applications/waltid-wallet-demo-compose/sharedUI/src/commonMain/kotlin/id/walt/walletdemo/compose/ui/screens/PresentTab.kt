@@ -1,7 +1,5 @@
 package id.walt.walletdemo.compose.ui.screens
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,7 +28,6 @@ internal fun PresentTab(
     onReject: () -> Unit,
     onCancel: () -> Unit,
     onDone: () -> Unit,
-    presentationContent: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
     fillViewport: Boolean = true,
     feedback: (@Composable () -> Unit)? = null,
@@ -59,17 +56,6 @@ internal fun PresentTab(
     if (state.pendingPresentationContinuation != null) {
         ReviewScaffold(modifier = modifier, fillViewport = fillViewport) {
             Text("Finishing the response…", style = MaterialTheme.typography.bodyLarge)
-        }
-        return
-    }
-
-    if (presentationContent != null) {
-        Box(
-            modifier = modifier
-                .fillMaxSize()
-                .testTag(WalletUiTestTags.PresentTabContent),
-        ) {
-            presentationContent()
         }
         return
     }

@@ -49,9 +49,6 @@ fun MobileWalletDemoApp(
     proximityController: WalletDemoProximityController,
     readerTrustSettingsController: DemoReaderTrustSettingsController,
     branding: WalletDemoBranding = WalletDemoBranding(),
-    onExternalFlowClosed: () -> Unit = {},
-    onOpenExternalInApp: () -> Unit = {},
-    externalBackground: WalletExternalBackground = WalletExternalBackground.Wallet,
 ) {
     val walletState by controller.state.collectAsState()
     val proximity by proximityController.state.collectAsState()
@@ -121,14 +118,11 @@ fun MobileWalletDemoApp(
     WalletDemoAppHost(
         controller = controller,
         branding = branding,
-        onExternalFlowClosed = onExternalFlowClosed,
-        onOpenExternalInApp = onOpenExternalInApp,
-        externalBackground = externalBackground,
         onStartProximityPresentation = (proximityController::start).takeUnless { trustSettings.loading },
         onResetWallet = { controller.resetWallet { proximityController.closeAndAwait() } },
         presentationContent = if (showingNearbySheet) {
             {
-                WalletReviewHost(WalletReviewPresentation.Sheet, proximity.canClose, proximityController::requestClose,
+                WalletReviewHost(proximity.canClose, proximityController::requestClose,
                     sheetVisible = proximity.active,
                     onSheetHidden = {
                         if (!latestProximity.active) {

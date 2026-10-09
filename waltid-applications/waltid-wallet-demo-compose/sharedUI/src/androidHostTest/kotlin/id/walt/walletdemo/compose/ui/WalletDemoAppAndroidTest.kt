@@ -8,7 +8,7 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class WalletDemoAppAndroidTest {
-    @Test fun openingExternalReviewInAppPreservesSelectionsWithoutReplayingTheRequest() = scenarios.openingExternalReviewInAppPreservesSelectionsWithoutReplayingTheRequest()
+    @Test fun duplicateResolvedLinkPreservesSelectionsInTheSameSheet() = scenarios.duplicateResolvedLinkPreservesSelectionsInTheSameSheet()
 
     @Test fun externalOfferFailureRemainsVisibleAndCanBeCorrected() = scenarios.externalOfferFailureRemainsVisibleAndCanBeCorrected()
 

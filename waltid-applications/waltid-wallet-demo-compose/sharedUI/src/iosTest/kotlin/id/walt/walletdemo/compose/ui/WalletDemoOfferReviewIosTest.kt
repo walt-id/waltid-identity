@@ -6,6 +6,6 @@ class WalletDemoOfferReviewIosTest {
     @Test fun receivedCredentialDetailsStayInTheProviderHost() =
         WalletDemoOfferReviewTestScenarios().receivedCredentialDetailsStayInTheProviderHost()
 
-    @Test fun selectedCopiesAndTransactionCodeSurviveHostChangesAndSubmitOnce() =
-        WalletDemoOfferReviewTestScenarios().selectedCopiesAndTransactionCodeSurviveHostChangesAndSubmitOnce()
+    @Test fun selectedCopiesAndTransactionCodeSurviveSheetRecreationAndSubmitOnce() =
+        WalletDemoOfferReviewTestScenarios().selectedCopiesAndTransactionCodeSurviveSheetRecreationAndSubmitOnce()
 }

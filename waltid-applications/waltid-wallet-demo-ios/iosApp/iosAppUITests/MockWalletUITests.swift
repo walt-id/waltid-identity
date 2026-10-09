@@ -10,25 +10,41 @@ final class MockWalletUITests: XCTestCase {
 
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
-    func testExternalOfferCanOpenInAppWithoutLosingItsSelection() throws {
+    func testExternalOfferFromSettingsOpensOneTaskAndClosesToHome() {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+        ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
+        XCTAssertTrue(app.buttons["wallet.settingsBack"].waitForExistence(timeout: 5))
+        ui.openDeepLink("openid-credential-offer://mock")
+        XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["wallet.settingsBack"].exists)
+        XCTAssertEqual(app.navigationBars.matching(identifier: "Receive credentials").count, 1)
+        ui.tapButton(identifier: "wallet.external.close", fallbackLabel: "Close request")
+        let home = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"),
+            object: app.buttons["wallet.scanButton"])
+        XCTAssertEqual(XCTWaiter.wait(for: [home], timeout: 5), .completed)
+        XCTAssertFalse(app.textFields["wallet.offerInput"].exists)
+    }
+
+    func testDuplicateExternalOfferKeepsItsSheetAndSelection() throws {
         guard #available(iOS 16.4, *) else { throw XCTSkip("Opening a URL through XCTest requires iOS 16.4") }
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
-        app.launchEnvironment = ["E2E_WALLET_ID": "expand-\(UUID().uuidString)", "E2E_MOCK_WALLET": "1",
+        app.launchEnvironment = ["E2E_WALLET_ID": "duplicate-\(UUID().uuidString)", "E2E_MOCK_WALLET": "1",
             "WALLET_SIGNING_PROTECTION_MODE": "disabled"]
         app.open(URL(string: "openid-credential-offer://mock")!)
         ui.unlockWallet()
         XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 15))
         ui.tapElement(identifier: "issuance-select-ExampleCredential")
         XCTAssertFalse(app.buttons["wallet.offerAcceptButton"].isEnabled)
-        ui.tapButton(identifier: "wallet.external.openInApp", fallbackLabel: "Open in app")
-        XCTAssertTrue(app.descendants(matching: .any)["wallet.external.expanded"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["wallet.external.openInApp"].exists)
-        XCTAssertEqual(app.switches["issuance-select-ExampleCredential"].value as? String, "0")
+        ui.openDeepLink("openid-credential-offer://mock")
+        XCTAssertTrue(app.buttons["wallet.external.close"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["wallet.offerAcceptButton"].isEnabled)
-        let expanded = XCTAttachment(screenshot: app.screenshot())
-        expanded.name = "external-offer-expanded-with-selection"; expanded.lifetime = .keepAlways; add(expanded)
+        let retained = XCTAttachment(screenshot: app.screenshot())
+        retained.name = "external-offer-sheet-with-selection"; retained.lifetime = .keepAlways; add(retained)
         ui.tapElement(identifier: "issuance-select-ExampleCredential")
+        XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].isEnabled)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: 15))
         ui.tapButton(identifier: "issuance-done", fallbackLabel: "Done")
@@ -42,12 +58,21 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
         receiveMockCredential(app: app, ui: ui)
         XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["issuance-done"].exists)
+        let receivedSheetClosed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
+            object: app.buttons["issuance-done"])
+        XCTAssertEqual(XCTWaiter.wait(for: [receivedSheetClosed], timeout: 10), .completed)
+        let homeAfterReceive = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"),
+            object: app.buttons["wallet.scanButton"])
+        XCTAssertEqual(XCTWaiter.wait(for: [homeAfterReceive], timeout: 5), .completed)
         ui.openWalletLink("openid4vp://mock")
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
         XCTAssertTrue(app.buttons["wallet.presentationDone"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 10))
+        let sharedSheetClosed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
+            object: app.buttons["wallet.presentationDone"])
+        XCTAssertEqual(XCTWaiter.wait(for: [sharedSheetClosed], timeout: 10), .completed)
+        let homeAfterSharing = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"),
+            object: app.buttons["wallet.scanButton"])
+        XCTAssertEqual(XCTWaiter.wait(for: [homeAfterSharing], timeout: 5), .completed)
         XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
     }
 
@@ -60,10 +85,10 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Credential information"].waitForExistence(timeout: 5))
         ui.tapNavigationBack()
         XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: 5))
-        let unwantedHome = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true"),
-            object: app.buttons["wallet.scanButton"])
-        unwantedHome.isInverted = true
-        XCTAssertEqual(XCTWaiter.wait(for: [unwantedHome], timeout: 6), .completed)
+        let unwantedDismissal = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
+            object: app.buttons["issuance-done"])
+        unwantedDismissal.isInverted = true
+        XCTAssertEqual(XCTWaiter.wait(for: [unwantedDismissal], timeout: 6), .completed)
         ui.tapButton(identifier: "issuance-done", fallbackLabel: "Done")
         XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 5))
     }
@@ -79,7 +104,7 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Ada"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["Lovelace"].exists, "Unshared stored data must not appear in consent")
         XCTAssertFalse(app.buttons["Details"].exists)
-        XCTAssertEqual(app.navigationBars.allElementsBoundByIndex.filter(\.isHittable).count, 1)
+        XCTAssertEqual(app.navigationBars.matching(identifier: "Share credentials").count, 1)
         XCTAssertTrue(app.buttons["wallet.presentationSubmitButton"].isHittable)
         XCTAssertFalse(app.staticTexts["Presentation sent"].exists)
     }
@@ -115,12 +140,11 @@ final class MockWalletUITests: XCTestCase {
         ui.replaceText(in: ui.textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN"), value: "1234")
         XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.textFields["wallet.offerInput"].exists)
-        XCTAssertFalse(app.buttons["wallet.settingsButton"].exists)
         ui.tapButton(identifier: "issuance-details-ExampleCredential", fallbackLabel: "Credential information")
         XCTAssertTrue(app.staticTexts["Values have not been received yet."].waitForExistence(timeout: 5))
         ui.tapNavigationBack()
         XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["wallet.scanButton"].exists)
+        XCTAssertTrue(app.buttons["wallet.external.close"].exists)
         let offer = XCTAttachment(screenshot: app.screenshot())
         offer.name = "external-receive-sheet"; offer.lifetime = .keepAlways; add(offer)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Receive")
@@ -309,15 +333,16 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
         ui.openScanner()
         let input = ui.textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request")
-        input.tap()
+        // Switching modes must make the action safe without tapping the field again.
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         input.typeText("openid-credential-offer://mock")
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         let action = app.buttons["wallet.scanContinue"]
         XCTAssertTrue(action.isEnabled)
         XCTAssertTrue(app.buttons["wallet.scanPaste"].exists && app.buttons["wallet.scanPaste"].isHittable)
-        XCTAssertLessThanOrEqual(action.frame.maxY, app.keyboards.firstMatch.frame.minY)
         let capture = XCTAttachment(screenshot: app.screenshot())
         capture.name = "scanner-keyboard-action-clearance"; capture.lifetime = .keepAlways; add(capture)
+        XCTAssertLessThanOrEqual(action.frame.maxY, app.keyboards.firstMatch.frame.minY)
         action.tap()
         XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(input.exists)
@@ -339,7 +364,7 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(ui.waitForOfferReview(timeout: 10), app.debugDescription)
         ui.assertExists(identifier: "wallet.offerAcceptButton")
         XCTAssertFalse(app.textFields["wallet.offerInput"].exists)
-        ui.tapButton(identifier: "wallet.flowBack", fallbackLabel: "Back to wallet")
+        ui.tapButton(identifier: "wallet.external.close", fallbackLabel: "Close request")
         XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["No credentials yet"].exists)
     }
@@ -851,7 +876,7 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Values have not been received yet."].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["The issuer has not supplied claim definitions."].exists)
         ui.tapNavigationBack()
-        XCTAssertEqual(app.switches["issuance-select-ExampleCredential"].value as? String, "1")
+        XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].isEnabled)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         XCTAssertTrue(app.staticTexts["Saved · 1"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(app.tabBars.firstMatch.exists)
@@ -1105,7 +1130,7 @@ final class WalletIdentitySetupUITests: XCTestCase {
         capture("recoverable-key-storage", app: app)
         next.tap()
         XCTAssertTrue(app.buttons["wallet.keySetupEdit.approval"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["wallet.settingsButton"].exists)
+        XCTAssertFalse(app.buttons["wallet.settingsButton"].isHittable)
         next.tap()
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
         app.buttons["wallet.settingsTechnicalDetails"].tap()
@@ -1197,12 +1222,12 @@ final class WalletIdentitySetupUITests: XCTestCase {
         for setting in ["recovery", "storage", "approval"] {
             ui.tapButton(identifier: "wallet.keySetupEdit.\(setting)", fallbackLabel: setting)
             XCTAssertEqual(create.label, "Done")
-            XCTAssertFalse(app.buttons["wallet.settingsButton"].exists)
+            XCTAssertFalse(app.buttons["wallet.settingsButton"].isHittable)
             create.tap()
             XCTAssertTrue(app.buttons["wallet.keySetupEdit.\(setting)"].waitForExistence(timeout: 10))
             XCTAssertEqual(create.label, "Create signing key")
         }
-        XCTAssertFalse(app.buttons["wallet.settingsButton"].exists)
+        XCTAssertFalse(app.buttons["wallet.settingsButton"].isHittable)
     }
 
     func testNativeIdentitySetupAndProtectionDetails() {

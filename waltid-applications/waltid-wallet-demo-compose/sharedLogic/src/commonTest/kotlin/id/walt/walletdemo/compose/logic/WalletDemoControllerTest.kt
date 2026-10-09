@@ -2794,6 +2794,30 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun resolvedHttpsOfferUsesTheSamePendingRequestAndPreservesItsDraft() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val controller = unlockedControllerWith(wallet, this)
+        val url = "https://issuer.example/offer?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer%2F1"
+        controller.openResolvedLink(url, WalletLinkKind.Offer)
+        repeat(2) { controller.prepareExternalFlow(); runCurrent() }
+        assertEquals(1, wallet.startIssuanceCalls)
+        val preview = controller.state.value.offerPreview!!
+        val configuration = preview.offeredCredentials.first().configurationId
+        controller.updateIssuanceCopies(configuration, 0)
+        controller.updateTxCode("1234")
+        controller.openResolvedLink(url, WalletLinkKind.Offer)
+        controller.prepareExternalFlow()
+        runCurrent()
+        assertEquals(preview, controller.state.value.offerPreview)
+        assertEquals(0, controller.state.value.issuanceCopyCounts[configuration])
+        assertEquals("1234", controller.state.value.requestDrafts.txCode)
+        assertEquals(1, wallet.startIssuanceCalls)
+        assertTrue(controller.closeExternalFlow())
+        assertEquals(WalletDemoTab.Credentials, controller.state.value.selectedTab)
+        assertEquals(null, controller.state.value.externalFlow)
+    }
+
+    @Test
     fun externalEntryCannotReplaceAnotherMobileFlow() = runTest {
         var available = false
         val controller = WalletDemoController(FakeDemoWallet(), InMemoryDemoPinStore(),
@@ -2868,7 +2892,7 @@ class WalletDemoControllerTest {
         runCurrent()
         assertEquals(WalletOperationState.Receiving, controller.state.value.operation)
         assertFalse(controller.closeExternalFlow())
-        controller.handleDeepLink("openid4vp://replacement")
+        controller.openResolvedLink("https://verifier.example/request", WalletLinkKind.Presentation)
         assertEquals(url, controller.state.value.externalFlow?.url)
         assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
         assertTrue(controller.state.value.incomingLinkNotice != null)
@@ -2908,7 +2932,7 @@ class WalletDemoControllerTest {
         assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
         controller.handleDeepLink("https://example.com/ignored")
 
-        assertEquals(offerUrl, controller.state.value.requestDrafts.offerUrl)
+        assertEquals("", controller.state.value.requestDrafts.offerUrl)
         assertEquals(presentationUrl, controller.state.value.requestDrafts.presentationRequestUrl)
     }
 

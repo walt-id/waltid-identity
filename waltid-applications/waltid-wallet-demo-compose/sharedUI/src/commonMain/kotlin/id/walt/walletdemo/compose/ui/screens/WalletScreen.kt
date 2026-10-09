@@ -4,9 +4,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.unit.dp
-import id.walt.walletdemo.compose.ui.components.WalletReviewNavigationHost
 import id.walt.walletdemo.compose.ui.components.WalletSection
 import id.walt.walletdemo.compose.ui.components.WalletNavigationRow
 import id.walt.walletdemo.compose.ui.components.WalletIcon
@@ -23,21 +21,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import id.walt.walletdemo.compose.logic.DemoBiometricAvailability
 import id.walt.walletdemo.compose.logic.recoveryAvailability
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletSessionState
-import id.walt.walletdemo.compose.logic.WalletLinkKind
-import id.walt.walletdemo.compose.logic.isBusy
-import id.walt.walletdemo.compose.logic.receivedCredentials
+import id.walt.walletdemo.compose.logic.canDismissExternalFlow
+import id.walt.walletdemo.compose.ui.WalletReviewHost
 import id.walt.walletdemo.compose.logic.isStatusVisible
-import id.walt.walletdemo.compose.logic.statusBanner
-import id.walt.walletdemo.compose.logic.WalletStatusKind
 import id.walt.walletdemo.compose.ui.components.StatusCard
 import id.walt.walletdemo.compose.ui.components.WalletFooter
-import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.rememberAuthorizationRequestOpener
 
 @Composable
@@ -72,21 +67,18 @@ internal fun WalletScreen(
     var showingScanner by rememberSaveable { mutableStateOf(false) }
     var detailsChrome by remember { mutableStateOf<CredentialDetailsChrome?>(null) }
 
-    val returnHome = {
-        when (state.selectedTab) {
-            WalletDemoTab.Receive -> controller.startNewReceiveFlow()
-            WalletDemoTab.Present -> controller.startNewPresentationFlow()
-            WalletDemoTab.Credentials -> Unit
+    val returnHome: () -> Unit = {
+        showingScanner = false
+        if (state.externalFlow != null) controller.closeExternalFlow()
+        else {
+            controller.startNewReceiveFlow()
+            controller.startNewPresentationFlow()
+            controller.selectTab(WalletDemoTab.Credentials)
         }
-        controller.selectTab(WalletDemoTab.Credentials)
     }
-    // A flow's own detail/review back handler is composed later and takes precedence.
-    SystemBackHandler(enabled = !showingSettings && !showingScanner && detailsChrome == null &&
-        state.selectedTab != WalletDemoTab.Credentials && presentationContent == null && !state.isBusy,
-        onBack = returnHome)
-
-    LaunchedEffect(state.selectedTab) {
-        if (state.selectedTab != WalletDemoTab.Credentials) showingScanner = false
+    val showingFlow = state.selectedTab != WalletDemoTab.Credentials && presentationContent == null
+    LaunchedEffect(state.externalFlow) {
+        if (state.externalFlow != null) showingSettings = false
     }
 
     LaunchedEffect(state.authorizationRequestUrl) {
@@ -94,31 +86,6 @@ internal fun WalletScreen(
             openAuthorizationRequest(authorizationUrl)
             controller.authorizationRequestOpened()
         }
-    }
-
-    val scanner: @Composable () -> Unit = {
-        WalletScanScreen(onBack = { showingScanner = false }, onOpen = { value, kind ->
-            if (!showingScanner) return@WalletScanScreen
-            showingScanner = false
-            when (kind) {
-                WalletLinkKind.Offer -> {
-                    controller.startNewPresentationFlow()
-                    controller.startNewReceiveFlow()
-                    controller.selectTab(WalletDemoTab.Receive)
-                    controller.updateOfferUrl(value)
-                    controller.previewOffer()
-                }
-                WalletLinkKind.Presentation -> {
-                    controller.startNewReceiveFlow()
-                    controller.startNewPresentationFlow()
-                    controller.selectTab(WalletDemoTab.Present)
-                    controller.updatePresentationRequestUrl(value)
-                    controller.previewPresentation()
-                }
-                WalletLinkKind.AuthorizationCallback -> controller.handleDeepLink(value)
-                else -> Unit
-            }
-        })
     }
 
     if (showingSettings) {
@@ -153,29 +120,10 @@ internal fun WalletScreen(
         return
     }
 
-    if (state.selectedTab != WalletDemoTab.Credentials && presentationContent == null) {
-        WalletReviewNavigationHost(
-            requestKey = "${state.selectedTab}:${state.receiveNavigationResetKey}:${state.presentationNavigationResetKey}",
-            offer = state.offerPreview,
-            savedCredentials = state.receivedCredentials(),
-            enabled = !state.isBusy,
-            onClose = returnHome.takeIf { !state.isBusy },
-            // This flow bypasses Scaffold; it owns and consumes the remaining bottom inset.
-            modifier = Modifier.fillMaxSize().navigationBarsPadding(),
-        ) {
-            Column(Modifier.fillMaxSize()) {
-                WalletHeader(state, onSettings = null, onClose = returnHome.takeIf { !state.isBusy },
-                    title = if (state.selectedTab == WalletDemoTab.Receive) "Receive credentials" else if (state.presentationCompleted) "Sharing result" else "Share credentials")
-                WalletFlowContent(controller, state, onDone = returnHome, modifier = Modifier.weight(1f),
-                    presentationContent = presentationContent)
-            }
-        }
-        return
-    }
-
-    // A nearby task is modal over Home; its lifecycle state never exposes the old online entry page.
-    val collectionState = if (presentationContent != null) state.copy(selectedTab = WalletDemoTab.Credentials) else state
+    // Home remains mounted beneath scanner, review, result and nearby sheets.
+    val collectionState = state.copy(selectedTab = WalletDemoTab.Credentials)
     Scaffold(
+        modifier = if (showingScanner || showingFlow || presentationContent != null) Modifier.clearAndSetSemantics {} else Modifier,
         topBar = {
             val chrome = detailsChrome
             if (chrome != null) {
@@ -185,19 +133,13 @@ internal fun WalletScreen(
                     WalletHeader(
                         state = collectionState,
                         onSettings = { onOpenSettings(); showingSettings = true },
-                        onScan = ({ showingScanner = true }).takeIf { collectionState.selectedTab == WalletDemoTab.Credentials },
+                        onScan = { showingScanner = true },
                         onShareNearby = onStartProximityPresentation?.let { start ->
                             {
                                 controller.startNewPresentationFlow()
                                 controller.selectTab(WalletDemoTab.Present)
                                 start()
                             }
-                        }.takeIf { collectionState.selectedTab == WalletDemoTab.Credentials },
-                        onBack = returnHome.takeIf { collectionState.selectedTab != WalletDemoTab.Credentials && !state.isBusy },
-                        title = when (collectionState.selectedTab) {
-                            WalletDemoTab.Credentials -> null
-                            WalletDemoTab.Receive -> "Receive credentials"
-                            WalletDemoTab.Present -> "Share credentials"
                         },
                     )
                     state.sharingSettingsError?.let { SettingsNotice(it, error = true) }
@@ -205,7 +147,7 @@ internal fun WalletScreen(
             }
         },
         bottomBar = {
-            if (collectionState.selectedTab == WalletDemoTab.Credentials && detailsChrome == null && state.isStatusVisible) {
+            if (!showingScanner && !showingFlow && presentationContent == null && detailsChrome == null && state.isStatusVisible) {
                 WalletFooter(feedback = {
                     StatusCard(state, controller::dismissStatus, controller::toggleStatusExpanded)
                 })
@@ -217,30 +159,31 @@ internal fun WalletScreen(
             .padding(contentPadding)
             .consumeWindowInsets(contentPadding)
 
-        when (collectionState.selectedTab) {
-            WalletDemoTab.Credentials -> Column(modifier) {
-                if (state.deferredCredentials.isNotEmpty() && detailsChrome == null) WalletSection(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
-                    WalletNavigationRow(stringResource(Res.string.issuance_pending_count, state.deferredCredentials.size),
-                        onClick = { controller.startNewReceiveFlow(); controller.selectTab(WalletDemoTab.Receive) },
-                        icon = { WalletIcon(WalletSymbol.Receive, null) })
-                }
-                CredentialsTab(
+        Column(modifier) {
+            if (state.deferredCredentials.isNotEmpty() && detailsChrome == null) WalletSection(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                WalletNavigationRow(stringResource(Res.string.issuance_pending_count, state.deferredCredentials.size),
+                    onClick = { controller.startNewReceiveFlow(); controller.selectTab(WalletDemoTab.Receive) },
+                    icon = { WalletIcon(WalletSymbol.Receive, null) })
+            }
+            CredentialsTab(
                 session = state.session,
                 onDeleteCredential = if (allowCredentialDelete) controller::deleteCredential else null,
                 onDetailsChromeChange = { detailsChrome = it },
                 modifier = Modifier.weight(1f),
-                )
-            }
-            WalletDemoTab.Receive, WalletDemoTab.Present -> WalletFlowContent(
-                controller, state, onDone = { controller.selectTab(WalletDemoTab.Credentials) },
-                modifier = modifier,
-                presentationContent = presentationContent,
             )
         }
     }
     presentationContent?.invoke()
-    if (showingScanner) id.walt.walletdemo.compose.ui.WalletReviewHost(
-        id.walt.walletdemo.compose.ui.WalletReviewPresentation.Sheet, true, onDismiss = { showingScanner = false },
-    ) { scanner() }
-
+    if (showingScanner || showingFlow) WalletReviewHost(
+        dismissEnabled = !showingFlow || state.canDismissExternalFlow,
+        onDismiss = returnHome,
+    ) {
+        if (showingFlow) WalletFlowScreen(controller, state, onClose = returnHome)
+        else WalletScanScreen(onBack = returnHome, onOpen = { value, kind ->
+            if (showingScanner) {
+                controller.openResolvedLink(value, kind)
+                showingScanner = false
+            }
+        })
+    }
 }

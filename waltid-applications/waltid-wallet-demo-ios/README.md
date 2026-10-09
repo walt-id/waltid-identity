@@ -28,6 +28,9 @@ For setup, IDE guidance, and mobile integration test commands, see the [Mobile W
 
 Home is the stable collection destination. Scan opens a scanner-first sheet with a reversible manual-input mode and a field-adjacent Paste control; links resolve automatically to the supported issuance or presentation flow. Android can also open an available system camera. Apple uses the embedded scanner because there is no supported standalone Camera-app launch contract.
 
+Receiving, sharing and pending issuance recovery stay in a modal sheet over Home, including externally opened links. Scanner resolution advances within the same sheet. Unlock and signing-key setup remain at the root while an incoming request waits; no full-screen promotion or Open in app action is needed. Short entry sheets fit premeasured content; long review pages expand and scroll. Close returns to Home without answering a verifier. The system-owned identity-document provider extension retains its request context and fulfillment contract.
+
+
 Reviews and details share one navigation host with directional Back/forward transitions and a reduced-motion alternative. Local Close, protocol Decline/Reject and result Done remain separate actions. A sent presentation keeps its accurate result visible until Done returns to Home or the external caller. In-app offer decline returns to Home. Active reviews do not expose a generic Settings detour.
 
 Decisions use text-first controls: a filled primary action, quiet secondary choices, and destructive color for irreversible confirmation. Meaningful Scan, Paste, Close and navigation icons remain. Operation feedback occupies the footer; trust, disclosure requirements and field validation stay with their context. Scroll content ends above the footer and keyboard, with material/blur and accessibility fallbacks. See the [design system](../waltid-wallet-demo-test-fixtures/design-system.md).

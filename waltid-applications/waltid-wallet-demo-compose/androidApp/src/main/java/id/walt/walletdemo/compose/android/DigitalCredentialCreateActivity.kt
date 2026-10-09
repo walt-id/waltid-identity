@@ -8,7 +8,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateScreen
-import id.walt.walletdemo.compose.ui.WalletReviewPresentation
 
 /** Translucent provider host. Its retained model owns the request, drafts, browser return and result. */
 class DigitalCredentialCreateActivity : FragmentActivity() {
@@ -26,7 +25,7 @@ class DigitalCredentialCreateActivity : FragmentActivity() {
                 model.takeResult()?.let { setResult(it.code, it.data); finish() }
             }
             WalletDemoOfferCreateScreen(
-                state = model.state, draft = model.draft, presentation = WalletReviewPresentation.Sheet,
+                state = model.state, draft = model.draft,
                 onAccept = model::accept, onDecline = model::cancel, onDismiss = model::back,
                 onCancelAuthorization = model::cancel, onDone = model::done,
                 onResumeDeferred = model::resume, onRefresh = model::refresh,

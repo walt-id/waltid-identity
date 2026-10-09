@@ -214,7 +214,9 @@ final class WalletE2EUI {
             close.tap()
             return
         }
-        let button = app.navigationBars.buttons.firstMatch
+        // Home stays mounted beneath a task sheet. Use the foreground navigation bar.
+        let navigationBar = app.navigationBars.allElementsBoundByIndex.last(where: \.isHittable)
+        let button = navigationBar?.buttons.firstMatch ?? app.navigationBars.buttons.firstMatch
         XCTAssertTrue(button.waitForExistence(timeout: 20), "Navigation back button not found")
         button.tap()
     }
@@ -223,11 +225,12 @@ final class WalletE2EUI {
         dismissKeyboardIfPresent()
         let home = app.buttons["wallet.scanButton"]
         for _ in 0..<6 {
-            if home.exists && home.isHittable { return }
             let identifiers = ["wallet.presentationDone", "issuance-done", "wallet-detail-close",
-                "wallet.detailsBack", "wallet.flowBack", "wallet.external.close"]
+                "wallet.external.close", "wallet.detailsBack", "wallet.flowBack"]
             if let button = identifiers.map({ app.buttons[$0] }).first(where: { $0.exists && $0.isHittable }) {
                 button.tap()
+            } else if home.exists && home.isHittable {
+                return
             } else {
                 tapNavigationBack()
             }

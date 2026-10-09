@@ -329,6 +329,8 @@ class WalletDemoController(
             it.copy(
                 access = it.access.copy(auth = WalletAuthState.Login(), operation = WalletAccessOperation.Idle,
                     pinChange = null, settingsNotice = null),
+                externalFlow = null,
+                selectedTab = WalletDemoTab.Credentials,
                 operation = WalletOperationState.Idle,
                 requestDrafts = it.requestDrafts.copy(txCode = ""),
                 offerPreview = null,
@@ -547,79 +549,60 @@ class WalletDemoController(
     }
 
     fun handleDeepLink(url: String) {
-        val scheme = WalletDeepLinkScheme.parse(url)
-        if (scheme == WalletDeepLinkScheme.CredentialOffer || scheme == WalletDeepLinkScheme.PresentationRequest) {
-            val current = _state.value
-            if (current.externalFlow?.url == url) return
-            if (!current.canAcceptExternalRequest || !canOpenExternalRequest()) {
-                _state.update { it.copy(incomingLinkNotice = "Finish the current operation before opening another link.") }
-                return
-            }
-        }
-        when (scheme) {
-            WalletDeepLinkScheme.CredentialOffer -> {
-                receiveJob?.cancel()
-                paymentConsentJob?.cancel()
-                presentationJob?.cancel()
-                val previous = getAndUpdateState {
-                    it.copy(
-                        selectedTab = WalletDemoTab.Receive,
-                        externalFlow = WalletExternalFlow.Pending(url, WalletExternalFlow.Kind.Offer),
-                        requestDrafts = it.requestDrafts.copy(
-                            offerUrl = url,
-                            txCode = "",
-                        ),
-                        offerPreview = null,
-                        lastReceivedCredentialIds = emptyList(),
-                        issuanceReceipt = null,
-                        receiveCompleted = false,
-                        receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
-                        presentationReview = null,
-                        paymentReview = WalletDemoPaymentReview.NotRequired,
-                        selectedPresentationCredentialOptions = emptySet(),
-                        selectedPresentationDisclosureOptions = emptySet(),
-                        presentationCompleted = false,
-                        pendingPresentationContinuation = null,
-                        presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
-                        operation = WalletOperationState.Idle,
-                    )
-                }
-                cancelIssuance()
-                discardPresentationPreview(previous.activePresentationPreviewHandle())
-            }
-            WalletDeepLinkScheme.PresentationRequest -> {
-                receiveJob?.cancel()
-                paymentConsentJob?.cancel()
-                presentationJob?.cancel()
-                val previous = getAndUpdateState {
-                    it.copy(
-                        selectedTab = WalletDemoTab.Present,
-                        externalFlow = WalletExternalFlow.Pending(url, WalletExternalFlow.Kind.Presentation),
-                        requestDrafts = it.requestDrafts.copy(
-                            presentationRequestUrl = url,
-                            txCode = "",
-                        ),
-                        offerPreview = null,
-                        lastReceivedCredentialIds = emptyList(),
-                        issuanceReceipt = null,
-                        receiveCompleted = false,
-                        receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
-                        presentationReview = null,
-                        paymentReview = WalletDemoPaymentReview.NotRequired,
-                        selectedPresentationCredentialOptions = emptySet(),
-                        selectedPresentationDisclosureOptions = emptySet(),
-                        presentationCompleted = false,
-                        pendingPresentationContinuation = null,
-                        presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
-                        operation = WalletOperationState.Idle,
-                    )
-                }
-                cancelIssuance()
-                discardPresentationPreview(previous.activePresentationPreviewHandle())
-            }
+        when (WalletDeepLinkScheme.parse(url)) {
+            WalletDeepLinkScheme.CredentialOffer -> openResolvedLink(url, WalletLinkKind.Offer)
+            WalletDeepLinkScheme.PresentationRequest -> openResolvedLink(url, WalletLinkKind.Presentation)
             WalletDeepLinkScheme.AuthorizationCallback -> continueAuthorization(url)
             null -> Unit
         }
+    }
+
+    /** Scanner and external links share one pending request, including resolved HTTPS links. */
+    fun openResolvedLink(url: String, kind: WalletLinkKind) {
+        if (kind == WalletLinkKind.AuthorizationCallback) {
+            continueAuthorization(url)
+            return
+        }
+        val flowKind = when (kind) {
+            WalletLinkKind.Offer -> WalletExternalFlow.Kind.Offer
+            WalletLinkKind.Presentation -> WalletExternalFlow.Kind.Presentation
+            else -> return
+        }
+        val current = _state.value
+        if (current.externalFlow?.url == url) return
+        if (!current.canAcceptExternalRequest || !canOpenExternalRequest()) {
+            _state.update { it.copy(incomingLinkNotice = "Finish the current operation before opening another link.") }
+            return
+        }
+        receiveJob?.cancel()
+        paymentConsentJob?.cancel()
+        presentationJob?.cancel()
+        val previous = getAndUpdateState {
+            it.copy(
+                selectedTab = if (flowKind == WalletExternalFlow.Kind.Offer) WalletDemoTab.Receive else WalletDemoTab.Present,
+                externalFlow = WalletExternalFlow.Pending(url, flowKind),
+                requestDrafts = it.requestDrafts.copy(
+                    offerUrl = if (flowKind == WalletExternalFlow.Kind.Offer) url else "",
+                    presentationRequestUrl = if (flowKind == WalletExternalFlow.Kind.Presentation) url else "",
+                    txCode = "",
+                ),
+                offerPreview = null,
+                lastReceivedCredentialIds = emptyList(),
+                issuanceReceipt = null,
+                receiveCompleted = false,
+                receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
+                presentationReview = null,
+                paymentReview = WalletDemoPaymentReview.NotRequired,
+                selectedPresentationCredentialOptions = emptySet(),
+                selectedPresentationDisclosureOptions = emptySet(),
+                presentationCompleted = false,
+                pendingPresentationContinuation = null,
+                presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
+                operation = WalletOperationState.Idle,
+            )
+        }
+        cancelIssuance()
+        discardPresentationPreview(previous.activePresentationPreviewHandle())
     }
 
     /** Called by the host after unlock/setup. Recomposition or Activity recreation cannot replay it. */
@@ -785,14 +768,15 @@ class WalletDemoController(
     fun declineOffer() {
         val sessionId = issuanceSession?.id ?: return
         issuanceSession = null
-        val declineTab = if (_state.value.externalFlow == null) WalletDemoTab.Credentials else WalletDemoTab.Receive
+        val declineTab = WalletDemoTab.Credentials
         val declined = WalletOperationState.Succeeded(WalletDisplayText.CredentialOfferDeclined, declineTab)
         _state.update {
             it.copy(
                 offerPreview = null, authorizationRequestUrl = null,
                 requestDrafts = it.requestDrafts.copy(offerUrl = "", txCode = ""),
                 receiveCompleted = false,
-                selectedTab = if (it.externalFlow == null) WalletDemoTab.Credentials else it.selectedTab,
+                selectedTab = WalletDemoTab.Credentials,
+                externalFlow = null,
                 operation = declined,
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
             ).withPublishedStatus()

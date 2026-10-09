@@ -64,7 +64,6 @@ class WalletVisualAndroidTest {
     @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
     fun compactProviderSharingReview() = scenario(fontScale = 1.5f, sheetHost = true) { providerSharingReview(compact = true) }
     @Test fun providerOfferReview() = scenario(sheetHost = true) { providerOfferReview() }
-    @Test fun paymentSheet() = scenario(sheetHost = true) { paymentReview(sheet = true) }
     @Test fun paymentLoading() = scenario { paymentState(blocked = false) }
     @Test fun paymentBlocked() = scenario { paymentState(blocked = true) }
     @Test
@@ -163,7 +162,7 @@ class WalletVisualAndroidTest {
             val directory = checkNotNull(System.getProperty("roborazzi.output.dir")) { "Roborazzi output directory is not configured" }
             val root = if (id.endsWith(".unsigned_confirmation"))
                 onNode(isRoot() and hasAnyDescendant(hasTestTag("payment-unsigned-confirm")))
-            else if (id.startsWith("external.") || id.startsWith("sharing.") || id.startsWith("receiving.provider") || id.startsWith("payment.sheet"))
+            else if (id.startsWith("external.") || id.startsWith("sharing.") || id.startsWith("receiving.provider") || id == "settings.reader.import_review" || id.startsWith("payment."))
                 onNode(isRoot() and hasAnyDescendant(hasTestTag("wallet.review.sheet"))) else onRoot()
             root.captureRoboImage("$directory/android-api35-phone-en-light/$id.png")
         }, platformTheme = { content ->

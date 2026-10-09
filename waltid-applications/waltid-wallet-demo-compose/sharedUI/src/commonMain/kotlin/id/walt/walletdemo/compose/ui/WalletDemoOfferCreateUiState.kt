@@ -2,7 +2,7 @@ package id.walt.walletdemo.compose.ui
 
 import id.walt.walletdemo.compose.logic.*
 
-/** Provider issuance states; the host decides full-screen or sheet presentation. */
+/** Provider issuance states shared by wallet tasks and platform fulfillment hosts. */
 sealed interface WalletDemoOfferCreateUiState {
     data object Loading : WalletDemoOfferCreateUiState
 

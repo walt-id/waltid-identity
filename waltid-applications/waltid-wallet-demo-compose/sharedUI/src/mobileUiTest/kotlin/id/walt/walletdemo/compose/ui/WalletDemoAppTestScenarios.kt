@@ -91,6 +91,7 @@ import id.walt.walletdemo.compose.logic.InMemoryDemoReaderTrustSettingsStore
 import id.walt.walletdemo.compose.logic.WalletDemoBootstrapResult
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.logic.WalletLinkKind
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
 import id.walt.walletdemo.compose.logic.WalletDemoTab
@@ -651,6 +652,8 @@ class WalletDemoAppTestScenarios(
         openWalletLink("openid-credential-offer://example")
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.issuanceReceipt != null }
+        onNodeWithTag("issuance-done").performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
@@ -673,6 +676,8 @@ class WalletDemoAppTestScenarios(
         openWalletLink("openid-credential-offer://example")
         waitUntil(timeoutMillis = 5_000) { controller.state.value.offerPreview != null }
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performSemanticsAction(SemanticsActions.OnClick)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.issuanceReceipt != null }
+        onNodeWithTag("issuance-done").performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
@@ -711,6 +716,8 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsNotEnabled()
 
         receiveGate.complete(Unit)
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.issuanceReceipt != null }
+        onNodeWithTag("issuance-done").performClick()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.selectedTab == WalletDemoTab.Credentials }
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
@@ -899,7 +906,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.OfferReview).assertIsDisplayed()
         onAllNodesWithTag("wallet.offerInput").assertCountEquals(0)
         assertEquals(null, wallet.receivedOfferUrl)
-        onNodeWithTag(WalletUiTestTags.FlowBack).performClick()
+        onNodeWithTag("wallet.external.close").performClick()
         onNodeWithTag(WalletUiTestTags.ScanButton).assertIsDisplayed()
         assertEquals(null, controller.state.value.offerPreview)
     }
@@ -937,7 +944,7 @@ class WalletDemoAppTestScenarios(
         setWalletContent {
             WalletDemoAppHost(
                 controller = controller,
-                presentationContent = { Text("Embedded in-person journey") },
+                presentationContent = { WalletReviewHost(true, {}) { Text("Embedded in-person journey") } },
             )
         }
         unlockWithPin()
@@ -945,10 +952,11 @@ class WalletDemoAppTestScenarios(
 
         runOnIdle { controller.selectTab(WalletDemoTab.Present) }
         onNodeWithText("Embedded in-person journey").assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.AppTitle).assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.SettingsButton).assertIsDisplayed()
-        // The modal host supplies task feedback; the collection retains its own readiness.
-        onNodeWithTag(WalletUiTestTags.Status).assertTextContains("Wallet ready")
+        // Home remains mounted visually, but only the task exposes interactive semantics.
+        onNodeWithTag(WalletUiTestTags.AppTitle).assertDoesNotExist()
+        onNodeWithTag(WalletUiTestTags.SettingsButton).assertDoesNotExist()
+        onNodeWithTag(WalletUiTestTags.Status).assertDoesNotExist()
+        onAllNodesWithTag("wallet.review.sheet").assertCountEquals(1)
         onAllNodesWithTag("wallet.presentationInput").assertCountEquals(0)
     }
 
@@ -1091,7 +1099,7 @@ class WalletDemoAppTestScenarios(
         openWalletLink("openid4vp://example")
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
-        onNodeWithTag(WalletUiTestTags.FlowBack).performClick()
+        onNodeWithTag("wallet.external.close").performClick()
         onNodeWithTag(WalletUiTestTags.ScanButton).assertIsDisplayed()
         assertEquals(null, wallet.rejectedRequestUrl)
         openWalletLink("openid4vp://example")
@@ -1335,7 +1343,7 @@ class WalletDemoAppTestScenarios(
         onAllNodesWithTag("wallet.external.flow").assertCountEquals(0)
     }
 
-    fun openingExternalReviewInAppPreservesSelectionsWithoutReplayingTheRequest() = runComposeUiTest {
+    fun duplicateResolvedLinkPreservesSelectionsInTheSameSheet() = runComposeUiTest {
         val wallet = WalletUiTestWallet(credentialsAfterReceive = listOf(sampleCredential))
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
         controller.handleDeepLink("openid-credential-offer://example")
@@ -1346,9 +1354,9 @@ class WalletDemoAppTestScenarios(
         val configuration = original!!.offeredCredentials.first().configurationId
         runOnIdle { controller.updateIssuanceCopies(configuration, 0) }
         val choices = controller.state.value.issuanceCopyCounts
-        onNodeWithTag("wallet.external.openInApp").performClick()
-        onAllNodesWithTag("wallet.review.sheet").assertCountEquals(0)
-        onAllNodesWithTag("wallet.external.openInApp").assertCountEquals(0)
+        runOnIdle { controller.openResolvedLink("openid-credential-offer://example", WalletLinkKind.Offer) }
+        waitForIdle()
+        onAllNodesWithTag("wallet.review.sheet").assertCountEquals(1)
         assertEquals(original, controller.state.value.offerPreview)
         assertEquals(choices, controller.state.value.issuanceCopyCounts)
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsNotEnabled()
@@ -1990,7 +1998,7 @@ class WalletDemoAppTestScenarios(
                 settingsOpened = true
                 proximity.value = WalletDemoProximityUiState()
             }, presentationContent = if (proximity.value.active) ({
-                WalletReviewHost(WalletReviewPresentation.Sheet, true, {
+                WalletReviewHost(true, {
                     cancelled = true
                     proximity.value = WalletDemoProximityUiState()
                     controller.selectTab(WalletDemoTab.Credentials)

@@ -9,7 +9,6 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewScreen
 import id.walt.walletdemo.compose.ui.WalletProviderStatusScreen
-import id.walt.walletdemo.compose.ui.WalletReviewPresentation
 
 /** Credential Manager owns the result; navigation and request work belong to a retained model. */
 class DigitalCredentialProviderActivity : FragmentActivity() {
@@ -30,7 +29,6 @@ class DigitalCredentialProviderActivity : FragmentActivity() {
             if (owner != null && model.failure == null) {
                 WalletDemoSharingReviewScreen(
                     review = owner.review, controller = owner, title = model.title,
-                    presentation = WalletReviewPresentation.Sheet,
                     enabled = !model.submitting,
                     onSubmit = model::submit, onCancel = model::cancel,
                     onBackAtRoot = model::back,

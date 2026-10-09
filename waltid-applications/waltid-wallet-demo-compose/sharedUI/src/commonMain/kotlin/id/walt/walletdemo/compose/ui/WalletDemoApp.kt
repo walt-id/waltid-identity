@@ -1,7 +1,9 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,9 +21,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import id.walt.walletdemo.compose.logic.WalletAuthState
@@ -30,10 +29,8 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationContinuation
 import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.canDismissExternalFlow
-import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
 import id.walt.walletdemo.compose.ui.components.WalletIcon
 import id.walt.walletdemo.compose.ui.components.WalletSymbol
-import id.walt.walletdemo.compose.ui.screens.WalletExternalFlowScreen
 import id.walt.walletdemo.compose.ui.screens.PinScreen
 import id.walt.walletdemo.compose.ui.screens.BiometricSetupScreen
 import id.walt.walletdemo.compose.ui.screens.PinStorageUnavailableScreen
@@ -67,9 +64,6 @@ internal fun WalletDemoAppHost(
     branding: WalletDemoBranding = WalletDemoBranding(),
     onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
-    onExternalFlowClosed: () -> Unit = {},
-    onOpenExternalInApp: () -> Unit = {},
-    externalBackground: WalletExternalBackground = WalletExternalBackground.Wallet,
     readerTrustSettingsContent: (@Composable () -> Unit)? = null,
     readerTrustPolicySummary: String? = null,
     onOpenSettings: () -> Unit = {},
@@ -81,10 +75,7 @@ internal fun WalletDemoAppHost(
     serverSettingsContent: (@Composable () -> Unit)? = null,
 ) {
     val state by controller.state.collectAsState()
-    var externalExpanded by rememberSaveable(state.externalFlow?.url) { mutableStateOf(false) }
     LaunchedEffect(state.externalFlow, state.auth, state.session, state.isBusy) { controller.prepareExternalFlow() }
-    val closeExternalFlow = { if (controller.closeExternalFlow()) onExternalFlowClosed() }
-    val openExternalInApp = { externalExpanded = true; onOpenExternalInApp() }
     PresentationContinuationEffect(
         continuation = state.pendingPresentationContinuation?.continuation,
         onCompleted = controller::completePresentationContinuation,
@@ -92,84 +83,68 @@ internal fun WalletDemoAppHost(
     )
 
     WalletDemoTheme(branding) {
-        val appContent: @Composable () -> Unit = {
-            Surface(
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .exportTestTagsForPlatformAutomation(),
+            color = MaterialTheme.colorScheme.background,
+        ) {
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .exportTestTagsForPlatformAutomation(),
-                color = MaterialTheme.colorScheme.background,
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+                    ),
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .windowInsetsPadding(
-                            WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
-                        ),
-                ) {
-                    when (val auth = state.auth) {
-                        is WalletAuthState.BiometricSetup -> BiometricSetupScreen(
-                            auth, state.isAuthenticating, state.access.biometricAvailability,
-                            controller::retryBiometricSetup, controller::continueWithoutBiometrics, state.access.biometricKind,
-                        )
-                        is WalletAuthState.PinEntry -> Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .safeDrawingPadding(),
-                        ) {
-                            PinScreen(
-                                controller = controller,
-                                access = state.access,
-                            )
-                        }
-                        is WalletAuthState.StorageUnavailable -> Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .safeDrawingPadding(),
-                        ) {
-                            PinStorageUnavailableScreen(
-                                controller = controller,
-                                message = auth.message,
-                            )
-                        }
-                        WalletAuthState.Unlocked -> WalletScreen(
+                when (val auth = state.auth) {
+                    is WalletAuthState.BiometricSetup -> BiometricSetupScreen(
+                        auth, state.isAuthenticating, state.access.biometricAvailability,
+                        controller::retryBiometricSetup, controller::continueWithoutBiometrics, state.access.biometricKind,
+                    )
+                    is WalletAuthState.PinEntry -> Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .safeDrawingPadding(),
+                    ) {
+                        PinScreen(
                             controller = controller,
-                            state = state,
-                            onStartProximityPresentation = onStartProximityPresentation,
-                            presentationContent = presentationContent,
-                            readerTrustSettingsContent = readerTrustSettingsContent,
-                            readerTrustPolicySummary = readerTrustPolicySummary,
-                            onOpenSettings = onOpenSettings,
-                            onResetWallet = onResetWallet,
-                            onSignOut = onSignOut,
-                            resetWalletDescription = resetWalletDescription,
-                            allowWalletReset = allowWalletReset,
-                            allowCredentialDelete = allowCredentialDelete,
-                            serverSettingsContent = serverSettingsContent,
+                            access = state.access,
                         )
+                    }
+                    is WalletAuthState.StorageUnavailable -> Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .safeDrawingPadding(),
+                    ) {
+                        PinStorageUnavailableScreen(
+                            controller = controller,
+                            message = auth.message,
+                        )
+                    }
+                    WalletAuthState.Unlocked -> WalletScreen(
+                        controller = controller,
+                        state = state,
+                        onStartProximityPresentation = onStartProximityPresentation,
+                        presentationContent = presentationContent,
+                        readerTrustSettingsContent = readerTrustSettingsContent,
+                        readerTrustPolicySummary = readerTrustPolicySummary,
+                        onOpenSettings = onOpenSettings,
+                        onResetWallet = onResetWallet,
+                        onSignOut = onSignOut,
+                        resetWalletDescription = resetWalletDescription,
+                        allowWalletReset = allowWalletReset,
+                        allowCredentialDelete = allowCredentialDelete,
+                        serverSettingsContent = serverSettingsContent,
+                    )
+                }
+                if (state.externalFlow != null && (state.auth != WalletAuthState.Unlocked || state.session !is WalletSessionState.Ready)) {
+                    IconButton(onClick = { controller.closeExternalFlow() }, enabled = state.canDismissExternalFlow,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).testTag("wallet.external.close")) {
+                        WalletIcon(WalletSymbol.Decline, "Close pending request")
                     }
                 }
             }
         }
-        if (state.externalFlow != null) {
-            if (externalBackground == WalletExternalBackground.Wallet) {
-                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
-            }
-            WalletReviewHost(if (externalExpanded) WalletReviewPresentation.FullScreen else WalletReviewPresentation.Sheet,
-                state.canDismissExternalFlow, closeExternalFlow) { fillViewport ->
-                if (state.auth == WalletAuthState.Unlocked && state.session is WalletSessionState.Ready) {
-                    WalletExternalFlowScreen(controller, state, closeExternalFlow, fillViewport = fillViewport,
-                        onOpenInApp = openExternalInApp.takeUnless { externalExpanded })
-                } else Column(Modifier.fillMaxSize()) {
-                    WalletScreenHeader(null) {
-                        if (!externalExpanded) TextButton(openExternalInApp, enabled = state.canDismissExternalFlow,
-                            modifier = Modifier.testTag("wallet.external.openInApp")) { Text("Open in app") }
-                        IconButton(closeExternalFlow, enabled = state.canDismissExternalFlow,
-                            modifier = Modifier.testTag("wallet.external.close")) { WalletIcon(WalletSymbol.Decline, "Close request") }
-                    }
-                    Box(Modifier.weight(1f)) { appContent() }
-                }
-            }
-        } else appContent()
         state.incomingLinkNotice?.let { notice ->
             AlertDialog(onDismissRequest = controller::dismissIncomingLinkNotice,
                 title = { Text("Request already in progress") }, text = { Text(notice) },
