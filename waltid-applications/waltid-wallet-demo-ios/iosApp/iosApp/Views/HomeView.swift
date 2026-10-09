@@ -64,7 +64,7 @@ struct HomeView: View {
         }
         .sheet(isPresented: Binding(get: { nearbySheet.isPresented }, set: { if !$0 { dismissNearbySheet() } }),
             onDismiss: nearbySheetDidDismiss) {
-            PresentView(viewModel: viewModel, onOpenSettings: openSettings, onBack: returnHome, nearbySheet: true)
+            PresentView(viewModel: viewModel, onBack: returnHome, nearbySheet: true)
                 .interactiveDismissDisabled(!proximity.canClose)
                 .walletSheetSizing(preferredHeight: nearbySheet.preferredHeight,
                     expanded: !proximity.showsEngagement || proximity.review != nil || proximity.displayedEngagement == .qr)
@@ -103,8 +103,8 @@ struct HomeView: View {
         else {
             switch viewModel.selectedTab {
             case .credentials: credentialsContent
-            case .receive: ReceiveView(viewModel: viewModel, onOpenSettings: openSettings, onBack: returnHome)
-            case .present: PresentView(viewModel: viewModel, onOpenSettings: openSettings, onBack: returnHome)
+            case .receive: ReceiveView(viewModel: viewModel, onBack: returnHome)
+            case .present: PresentView(viewModel: viewModel, onBack: returnHome)
             }
         }
     }

@@ -64,6 +64,14 @@ final class WalletE2EUI {
         }
     }
 
+    func waitForOfferReview(timeout: TimeInterval) -> Bool {
+        app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: timeout)
+    }
+
+    func waitForPresentationReview(timeout: TimeInterval) -> Bool {
+        app.buttons["wallet.presentationSubmitButton"].waitForExistence(timeout: timeout)
+    }
+
     func waitForStatus(prefixes: [String], timeout: TimeInterval) -> String? {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {

@@ -55,7 +55,7 @@ final class WalletVisualTests: XCTestCase {
             model.issuanceCopyCounts = try fixtures.copies()
         }
         // The real native sheet/window is covered by the URL-launch UI journey; this pins its content.
-        try capture(ReceiveView(viewModel: model, onOpenSettings: {}, onBack: {}).environment(\.walletOpenInApp, {}),
+        try capture(ReceiveView(viewModel: model, onBack: {}).environment(\.walletOpenInApp, {}),
             id: unavailable ? "external.callback.unavailable" : "external.receiving.review", config: .iPhoneSe)
     }
 
@@ -313,7 +313,7 @@ final class WalletVisualTests: XCTestCase {
             credentials: [credential], transactionCode: offer.transactionCode, batchSize: offer.batchSize)
         model.issuanceCopyCounts = [credential.configurationID: 1]
         XCTAssertTrue(model.acceptOfferEnabled)
-        try capture(ReceiveView(viewModel: model, onOpenSettings: {}), id: "batch.offer.single_full_art")
+        try capture(ReceiveView(viewModel: model), id: "batch.offer.single_full_art")
     }
 
     func testOfferDefinitions() throws {
@@ -340,7 +340,7 @@ final class WalletVisualTests: XCTestCase {
         model.offerPreview = try fixtures.offer()
         model.issuanceCopyCounts = try fixtures.copies()
         XCTAssertTrue(model.acceptOfferEnabled)
-        try capture(ReceiveView(viewModel: model, onOpenSettings: {}), id: "batch.offer.compact_dark_large_text",
+        try capture(ReceiveView(viewModel: model), id: "batch.offer.compact_dark_large_text",
                     config: .iPhoneSe, colorScheme: .dark, sizeCategory: .accessibilityMedium)
     }
 
@@ -487,7 +487,7 @@ final class WalletVisualTests: XCTestCase {
         if failure { model.statusMessage = problem?.message ?? ""; model.isError = true }
         XCTAssertEqual(model.credentials.count, 1)
         XCTAssertEqual(model.deferredCredentials.count, failure ? 0 : 1)
-        try capture(ReceiveView(viewModel: model, onOpenSettings: {}), id: "batch.result.\(id)")
+        try capture(ReceiveView(viewModel: model), id: "batch.result.\(id)")
     }
 
     func testNearbyPermission() async throws { try await nearbyState("permission") }
@@ -536,7 +536,7 @@ final class WalletVisualTests: XCTestCase {
         XCTAssertNotNil(model.proximityPresentation.qrPayload)
         let detector = try XCTUnwrap(CIDetector(ofType: CIDetectorTypeQRCode, context: nil,
             options: [CIDetectorAccuracy: CIDetectorAccuracyHigh]))
-        let screen = PresentView(viewModel: model, onOpenSettings: {})
+        let screen = PresentView(viewModel: model)
             .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
             .environment(\.locale, Locale(identifier: "en_US")).environment(\.sizeCategory, .large)
         try await captureWhenReady(screen, id: "nearby.ready.qr", isReady: { model.proximityPresentation.qrPayload != nil },
@@ -557,7 +557,7 @@ final class WalletVisualTests: XCTestCase {
         model.offerPreview = try fixtures.offer()
         model.issuanceCopyCounts = try fixtures.copies().mapValues { noneSelected ? 0 : $0 }
         XCTAssertEqual(model.acceptOfferEnabled, !noneSelected)
-        try capture(ReceiveView(viewModel: model, onOpenSettings: {}),
+        try capture(ReceiveView(viewModel: model),
                     id: noneSelected ? "batch.offer.none_selected" : "batch.offer.two_targets_three_copies")
     }
 
