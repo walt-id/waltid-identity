@@ -1,19 +1,16 @@
 package id.walt.certificate.x509.validation
 
-import id.walt.certificate.x509.SignatureValidator
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateTrustStore
 import id.walt.certificate.x509.truststore.CompositeTrustStore
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto2.CryptoRuntime
-import kotlinx.io.bytestring.ByteString
 import kotlin.time.Clock
 
 class ValidationContext(
     val cryptoRuntime: CryptoRuntime,
     val chainLength: Int,
-    trustStore: X509CertificateTrustStore,
-    issuerSignatureValidator: SignatureValidator? = null
+    trustStore: X509CertificateTrustStore
 ) : X509CertificateTrustStore {
 
     private val internalLog = mutableListOf<ValidationResult.ValidationLogEntry>()
@@ -25,16 +22,13 @@ class ValidationContext(
         )
     )
 
-    private val issuerSelector = IssuerSelector(cryptoRuntime, issuerSignatureValidator)
-    private val issuerSelections = mutableMapOf<ByteString, IssuerSelection>()
-
     private val variableMap = mutableMapOf<String, Any>()
 
     fun setVariable(key: String, value: Any) {
         variableMap["${valid}:${key}"] = value
     }
 
-    fun <T>getVariable(key: String): T? {
+    fun <T> getVariable(key: String): T? {
         return variableMap["${valid}:${key}"] as? T
     }
 
@@ -52,24 +46,11 @@ class ValidationContext(
     val certificateSubjectDn: String
         get() = current.certificateSubjectDn
 
-    val isLeaf : Boolean
+    val isLeaf: Boolean
         get() = certificateIndex == chainLength - 1
 
     override fun findCertificateBySubjectDn(subjectDn: String): List<X509Certificate> =
         internalTrustStore.findCertificateBySubjectDn(subjectDn)
-
-    /**
-     * Selects the trusted issuer of [certificate] among the trusted certificates that share its
-     * issuer DN (see [IssuerSelector]).
-     *
-     * The result is remembered per certificate, so every validator working on the same chain - the
-     * signature validator and the path length walk in the basic constraints validator - uses the
-     * same issuer, and the signature is verified once per certificate and candidate.
-     */
-    suspend fun selectIssuer(certificate: X509Certificate): IssuerSelection =
-        issuerSelections.getOrPut(certificate.fingerprintSha256) {
-            issuerSelector.select(certificate, findCertificateBySubjectDn(certificate.data.issuerDn))
-        }
 
     fun addTrustedCertificate(certificate: X509Certificate) {
         internalChainTrust.addCertificate(certificate)
