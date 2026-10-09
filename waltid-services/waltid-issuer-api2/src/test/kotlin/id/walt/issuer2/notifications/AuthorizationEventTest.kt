@@ -12,9 +12,10 @@ import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
+import id.walt.issuer2.service.openid4vci.encodeExternalLoginAuthorizationParameters
+import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
-import id.walt.issuer2.service.openid4vci.encodeExternalLoginAuthorizationParameters
 import id.walt.ktornotifications.SseNotifier
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.openid4vci.core.OAuth2Provider
@@ -195,10 +196,7 @@ class AuthorizationEventTest {
         val requestId = "external-login-state-failure"
         val service = protocolService(session)
         val events = SseNotifier.getSseFlow(IssuanceNotificationService.ISSUER_EVENT_STREAM_TARGET)
-        val envelope = (
-            validAuthorizationParameters(issuerState = session.sessionId) +
-                ("_issuer2_session_id" to listOf(session.sessionId))
-            ).encodeExternalLoginAuthorizationParameters()
+        val envelope = session.loginEnvelope()
 
         assertFailsWith<IllegalArgumentException> {
             service.processExternalLoginInterception(
@@ -276,7 +274,7 @@ class AuthorizationEventTest {
     }
 
     @Test
-    fun `authorization request reconstruction exception publishes a sanitized correlated failure`() = runTest {
+    fun `callback restores stored request without parsing authorization again`() = runTest {
         val sessionId = "authorization-request-reconstruction-failure"
         val service = protocolService(
             session(sessionId, externalState = STATE),
@@ -289,19 +287,15 @@ class AuthorizationEventTest {
             },
         )
 
-        val (response, events) = service.processExternalCallbackAndCaptureEvents(
-            requestId = "authorization-request-reconstruction-failure",
-            authServerState = STATE,
-            idToken = "not-used",
+        val idToken = JWKKey.generate(KeyType.secp256r1).signJws(
+            buildJsonObject { put("sub", "jane@walt.id") }.toString().encodeToByteArray(),
         )
-
-        assertEquals(400, response.status)
-        assertEquals("Could not restore the authorization request", response.body)
-        val update = events.single()
-        assertEquals(IssuanceSessionEvent.AUTHORIZATION_REQUEST_FAILED.value, update.event)
-        assertEquals(sessionId, update.target)
-        assertEquals(OAuthErrorCodes.SERVER_ERROR, update.error)
-        assertEquals("Could not restore the authorization request", update.errorDescription)
+        val (response, events) = service.processExternalCallbackAndCaptureEvents(
+            requestId = "authorization-request-restored", authServerState = STATE, idToken = idToken,
+        )
+        assertEquals(302, response.status)
+        assertNotNull(response.parameters["code"])
+        assertEquals(IssuanceSessionEvent.AUTHORIZATION_REQUEST_SUCCEEDED.value, events.single().event)
     }
 
     @Test
@@ -447,10 +441,12 @@ class AuthorizationEventTest {
         ),
         expiresAt = Clock.System.now() + 1.hours,
         externalAuthorizationState = externalState,
-        authorizationRequest = mapOf(
-            "response_type" to listOf("code"),
-            "client_id" to listOf("demo-client"),
-            "redirect_uri" to listOf("https://wallet.example/callback"),
+        authorizationRequest = id.walt.openid4vci.requests.authorization.DefaultAuthorizationRequest(
+            client = id.walt.openid4vci.DefaultClient("demo-client", listOf("https://wallet.example/callback"), setOf("authorization_code"), setOf("code")),
+            responseTypes = setOf("code"),
+            redirectUri = "https://wallet.example/callback",
+            state = "wallet-state",
+            requestForm = validAuthorizationParameters(sessionId),
         ),
     )
 
@@ -482,12 +478,80 @@ class AuthorizationEventTest {
         return response to events.replayCache.filter { it.requestId == requestId }
     }
 
+    @Test
+    fun `mandatory PAR survives login without parsing again`() = runTest {
+        val original = session("mandatory-par").copy(authorizationRequest = null)
+        lateinit var provider: OAuth2Provider
+        var authorizationParses = 0
+        val service = protocolService(original, requirePar = true, oauth2ProviderDecorator = { delegate ->
+            provider = delegate
+            object : OAuth2Provider by delegate {
+                override suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult {
+                    authorizationParses++
+                    return delegate.createAuthorizationRequest(parameters)
+                }
+            }
+        })
+        val parameters = validAuthorizationParameters(original.sessionId) + mapOf(
+            "redirect_uri" to listOf("https://wallet.example/callback?existing=value"),
+            "code_challenge" to listOf("a".repeat(43)), "code_challenge_method" to listOf("S256"),
+        )
+        val pushed = kotlin.test.assertIs<AuthorizationRequestResult.Success>(provider.createPushedAuthorizationRequest(parameters)).request
+        val par = kotlin.test.assertIs<id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult.Success>(
+            provider.createPushedAuthorizationResponse(pushed)
+        ).response
+        val response = service.processAuthorizeRequest(mapOf(
+            "client_id" to listOf("demo-client"), "request_uri" to listOf(par.requestUri),
+            "redirect_uri" to listOf("https://attacker.example"), "state" to listOf("tampered"),
+        ), "mandatory-authorize")
+        val reference = requireNotNull(response.redirectUri).substringAfter("/external_login/")
+        val stored = requireNotNull(service.resolveExternalLoginSession(reference).authorizationRequest)
+        assertEquals(parameters, stored.requestForm)
+        val envelopeParameters = reference.decodeExternalLoginAuthorizationParameters()
+        for ((name, value) in mapOf(
+            "_issuer2_request_id" to "wrong", "_issuer2_session_id" to "other",
+            "redirect_uri" to "https://attacker.example", "state" to "tampered",
+            "scope" to "other", "code_challenge" to "tampered", "issuer_state" to "other",
+        )) {
+            val tampered = (envelopeParameters + (name to listOf(value))).encodeExternalLoginAuthorizationParameters()
+            assertFailsWith<IllegalArgumentException> { service.resolveExternalLoginSession(tampered) }
+        }
+        service.processExternalLoginInterception("https://idp.example/authorize?state=upstream", reference, "login")
+        assertFailsWith<IllegalArgumentException> {
+            service.processExternalLoginInterception("https://idp.example/authorize?state=replay", reference, "replay")
+        }
+        val idToken = JWKKey.generate(KeyType.secp256r1).signJws(
+            buildJsonObject { put("sub", "jane@walt.id") }.toString().encodeToByteArray(),
+        )
+        val callback = service.processExternalAuthorizationCallback("upstream", idToken, "callback")
+        assertNotNull(callback.parameters["code"])
+        assertEquals(true, requireNotNull(callback.redirectUri).contains("existing=value"))
+        assertEquals("wallet-state", callback.parameters["state"])
+        assertEquals(1, authorizationParses)
+        kotlin.test.assertIs<AuthorizationRequestResult.Failure>(provider.createAuthorizationRequest(mapOf(
+            "client_id" to listOf("demo-client"), "request_uri" to listOf(par.requestUri),
+        )))
+    }
+
+    @Test
+    fun `expired issuance session cannot be used as login reference`() = runTest {
+        val expired = session("expired-login").copy(expiresAt = Clock.System.now() - 1.hours)
+        assertFailsWith<IllegalArgumentException> {
+            protocolService(expired).resolveExternalLoginSession(expired.loginEnvelope())
+        }
+    }
+
+    private fun IssuanceSession.loginEnvelope(): String = (requireNotNull(authorizationRequest).requestForm + mapOf(
+        "_issuer2_session_id" to listOf(sessionId), "_issuer2_request_id" to listOf(authorizationRequest.id),
+    )).encodeExternalLoginAuthorizationParameters()
+
     private fun protocolService(
         vararg sessions: IssuanceSession,
         authorizationCodeRepository: AuthorizationCodeRepository = InMemoryAuthorizationCodeRepository(),
         oauth2ProviderDecorator: (OAuth2Provider) -> OAuth2Provider = { it },
+        requirePar: Boolean = false,
     ): OpenId4VciProtocolService {
-        val serviceConfig = Issuer2ServiceConfig(baseUrl = "http://localhost")
+        val serviceConfig = Issuer2ServiceConfig(baseUrl = "http://localhost", enforcePushedAuthorizationRequests = requirePar)
         val metadataConfig = Issuer2MetadataConfig()
         val profileService = CredentialProfileService(
             profilesConfig = Issuer2ProfilesConfig(),
