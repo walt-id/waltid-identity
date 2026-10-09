@@ -51,11 +51,7 @@ data class W3CVC(
 
     fun isV2(): Boolean {
         val context = get("@context") ?: return false
-        return when (context) {
-            is JsonArray -> context.any { it.jsonPrimitive.contentOrNull == "https://www.w3.org/ns/credentials/v2" }
-            is JsonPrimitive -> context.contentOrNull == "https://www.w3.org/ns/credentials/v2"
-            else -> false
-        }
+        return context.w3cContextUrls()?.contains(W3CV2DataModel.defaultContext.first()) == true
     }
 
     @Deprecated("Use the crypto2 overload accepting a Key and JwsAlgorithm")

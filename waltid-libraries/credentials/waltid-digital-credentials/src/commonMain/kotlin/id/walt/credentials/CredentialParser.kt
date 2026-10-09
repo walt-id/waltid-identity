@@ -9,6 +9,7 @@ import id.walt.credentials.CredentialDetectorTypes.SDJWTVCSubType
 import id.walt.credentials.CredentialDetectorTypes.SignaturePrimaryType
 import id.walt.credentials.CredentialDetectorTypes.W3CSubType
 import id.walt.credentials.formats.*
+import id.walt.w3c.vc.vcs.w3cContextUrls
 import id.walt.credentials.representations.X5CCertificateString
 import id.walt.credentials.representations.X5CList
 import id.walt.credentials.signatures.CoseCredentialSignature
@@ -57,18 +58,17 @@ object CredentialParser {
     )
 
     fun detectW3CDataModelVersion(data: JsonObject): W3CSubType {
-        // @context may be a JSON array (standard) or a single string (non-conformant but seen in practice)
-        val rawContext = data["@context"] ?: error("Missing context from W3C: $data")
-        val contextField = when (rawContext) {
-            is JsonArray -> rawContext.map { it.jsonPrimitive.content }
-            is JsonPrimitive -> listOf(rawContext.content)
-            else -> error("Unexpected @context type in W3C credential: $data")
-        }
+        // @context may be a JSON array (standard) or a single string (non-conformant but seen in practice).
+        // JSON-LD and VC Data Model allow objects in the array (inline context definitions). Version
+        // detection only needs the context URLs, so those objects are skipped.
+        val rawContext = data["@context"] ?: error("Missing @context in W3C credential")
+        val contextField = rawContext.w3cContextUrls()
+            ?: error("@context must be a string or an array, got ${rawContext::class.simpleName}")
 
         return when {
             DM_2_0_CONTEXT_INDICATORS.any { contextField.contains(it) } -> W3CSubType.W3C_2
             DM_1_1_CONTEXT_INDICATORS.any { contextField.contains(it) } -> W3CSubType.W3C_1_1
-            else -> error("Unknown W3C type: $data")
+            else -> error("Unknown W3C data model")
         }
     }
 
