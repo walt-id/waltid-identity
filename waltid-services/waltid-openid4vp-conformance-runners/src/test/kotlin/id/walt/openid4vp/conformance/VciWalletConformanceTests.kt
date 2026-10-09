@@ -219,7 +219,6 @@ class VciWalletConformanceTests {
     }
 
     @Test
-    @EnabledIf("isConformanceAvailable")
     fun vciWalletBatchBothGrantsAndFormats() {
         check(isConformanceAvailable) { "The pinned suite is required for wallet batch acceptance" }
         runBlocking {
