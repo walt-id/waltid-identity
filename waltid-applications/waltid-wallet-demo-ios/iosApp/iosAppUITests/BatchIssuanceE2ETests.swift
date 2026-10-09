@@ -16,7 +16,7 @@ final class BatchIssuanceE2ETests: XCTestCase {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["ATTESTATION_BASE_URL": "", "TRANSACTION_DATA_PROFILES_URL": ""])
-        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 60), "Wallet ready")
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: 60), "Wallet ready")
 
         ui.tapTab(label: "Receive")
         ui.replaceText(in: ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL"), value: offer.offerUrl)
