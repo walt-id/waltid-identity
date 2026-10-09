@@ -88,6 +88,8 @@ Currently, the following databases can be used:
 - postgres 
 - microsoft sql server 
 
+`com.mysql:mysql-connector-j` can be used, but it is not shipped by default because of its GPL-2.0 license with the Universal FOSS Exception.
+
 The configuration file `db.conf` contain the datasource info required to connect to the respective database engine.
 For more details about database and datasource,
 refer to https://github.com/JetBrains/Exposed/wiki/DataBase-and-DataSource.
