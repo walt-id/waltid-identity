@@ -153,6 +153,35 @@ public actor Wallet {
         try await bridge.listDeferredIssuance()
     }
 
+    /// Reports OpenID4VCI `credential_deleted` for a credential the holder rejected instead of storing.
+    ///
+    /// Isolated fetch (`storeInWallet=false`) returns the notification identifier to pass here with
+    /// the same access token. Delivery is Bearer-only and best-effort.
+    ///
+    /// - Parameters:
+    ///   - notificationID: OpenID4VCI `notification_id` from the credential response.
+    ///   - accessToken: Access token used to obtain the credential.
+    ///   - credentialIssuerBaseURL: Issuer identifier used to resolve `notification_endpoint` when
+    ///     `notificationEndpoint` is omitted.
+    ///   - notificationEndpoint: Explicit OpenID4VCI notification endpoint, when already known.
+    ///   - eventDescription: Optional issuer-facing description.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot deliver the notification request.
+    public func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL? = nil,
+        notificationEndpoint: URL? = nil,
+        eventDescription: String? = nil
+    ) async throws {
+        try await bridge.rejectIssuedCredential(
+            notificationID: notificationID,
+            accessToken: accessToken,
+            credentialIssuerBaseURL: credentialIssuerBaseURL,
+            notificationEndpoint: notificationEndpoint,
+            eventDescription: eventDescription
+        )
+    }
+
     /// Polls a deferred credential operation without exposing its access material.
     ///
     /// - Parameter deferredCredentialID: Opaque identifier returned in a deferred outcome.

@@ -99,6 +99,9 @@ internal class WalletApi2DemoWallet(
             credentialIssuer = resolved.credentialIssuer,
             credentialEndpoint = resolved.credentialEndpoint,
             nonceEndpoint = resolved.nonceEndpoint,
+            tokenEndpoint = resolved.tokenEndpoint,
+            preAuthorizedCode = resolved.preAuthorizedCode,
+            credentialConfigurationId = resolved.credentialConfigurationIds.firstOrNull(),
         )
         issuanceSessions[session.id] = session
         WalletDemoIssuanceSession(
@@ -202,6 +205,25 @@ internal class WalletApi2DemoWallet(
         } finally {
             processingIssuanceSessions.remove(sessionId)
         }
+    }
+
+    override suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String?,
+        notificationEndpoint: String?,
+        eventDescription: String?,
+    ) {
+        client.rejectIssuedCredential(
+            walletId,
+            RejectIssuedCredentialRequestDto(
+                notificationId = notificationId,
+                accessToken = accessToken,
+                credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+                notificationEndpoint = notificationEndpoint,
+                eventDescription = eventDescription,
+            ),
+        )
     }
 
     private suspend fun checkIssuanceActive(sessionId: String) {
@@ -487,8 +509,6 @@ internal class WalletApi2DemoWallet(
                 ?.toApi2Session()
                 ?.also { issuanceSessions[it.id] = it }
             ?: error("Issuance session is missing")
-
-
 }
 
 private enum class WalletResetStage { DeleteCurrent, CreateReplacement, PublishReplacement }
@@ -513,6 +533,8 @@ private data class Api2IssuanceSession(
     val credentialIssuer: String,
     val credentialEndpoint: String,
     val nonceEndpoint: String?,
+    val tokenEndpoint: String? = null,
+    val preAuthorizedCode: String? = null,
     val codeVerifier: String? = null,
     val authorizationState: String? = null,
     val credentials: List<IssuanceCredentialSelectionDto>? = null,

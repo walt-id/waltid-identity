@@ -190,6 +190,15 @@ internal class WalletApi2Client(
             post(walletPath(walletId, "credentials/receive/deferred/${deferredCredentialId.encodeURLPathPart()}"))
         }.body()
 
+    suspend fun rejectIssuedCredential(
+        walletId: String,
+        request: RejectIssuedCredentialRequestDto,
+    ) {
+        request(HttpStatusCode.NoContent) {
+            post("/wallet/$walletId/credentials/receive/reject") { jsonBody(request) }
+        }
+    }
+
     private suspend fun receiveResult(block: suspend HttpClient.() -> HttpResponse): ReceiveCredentialResultDto {
         val response = http.block()
         if (response.status.isSuccess()) return response.body()

@@ -40,7 +40,6 @@ import kotlin.test.assertTrue
 class TransactionDataProfilesIntegrationTest {
 
     private val host = "127.0.0.1"
-    private val port = freePort()
 
     private val paymentType = "org.waltid.transaction-data.payment-authorization"
     private val scaType = "urn:eudi:sca:payment:1"
@@ -72,6 +71,7 @@ class TransactionDataProfilesIntegrationTest {
 
     @Test
     fun `discovery and preview accept configured transaction data types`() {
+        val port = freePort()
         try {
             E2ETest(host, port, failEarly = true).testBlock(
                 features = listOf(OSSWallet2FeatureCatalog),
@@ -187,8 +187,9 @@ class TransactionDataProfilesIntegrationTest {
 
     @Test
     fun `disabled feature yields empty registry and no discovery route`() {
+        val port = freePort()
         try {
-            E2ETest(host, port + 1, failEarly = true).testBlock(
+            E2ETest(host, port, failEarly = true).testBlock(
                 features = listOf(OSSWallet2FeatureCatalog),
                 preload = {
                     ConfigManager.preloadConfig(
@@ -197,7 +198,7 @@ class TransactionDataProfilesIntegrationTest {
                     )
                     ConfigManager.preloadConfig(
                         "wallet-service",
-                        OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:${port + 1}")),
+                        OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$port")),
                     )
                     ConfigManager.preloadConfig(
                         "transaction-data-profiles",

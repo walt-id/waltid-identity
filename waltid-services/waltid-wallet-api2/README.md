@@ -41,7 +41,7 @@ deferred resumption, see [Issuer2 offers through Wallet2](examples/issuer2-batch
 | **Key management**               | Generate (Ed25519, secp256r1, secp256k1, RSA), import from JWK, list, get, delete                                    |
 | **DID management**               | Create (`did:key`, `did:jwk`, `did:web`, …), import, list, get, delete                                               |
 | **OID4VCI 1.0 - full flow**      | Single `POST /credentials/receive` call: resolve offer → token → proof-of-possession → credential                    |
-| **OID4VCI 1.0 - isolated steps** | `resolve-offer`, `request-token`, `sign-proof`, `fetch-credential`, `authorization-url`, `exchange-code`, `deferred` |
+| **OID4VCI 1.0 - isolated steps** | `resolve-offer`, `request-token`, `sign-proof`, `fetch-credential`, `reject`, `authorization-url`, `exchange-code`, `deferred` |
 | **OID4VP 1.0 / DCQL**            | `POST /credentials/present` (full flow); isolated `resolve-request`, `match-credentials-from-store`                  |
 | **Credential store**             | Import raw credentials, list (metadata), get, delete; formats: SD-JWT VC, JWT VC JSON, mdoc                          |
 | **Named stores**                 | Create independently-named key/credential/DID stores, reference them when creating wallets                           |
@@ -326,6 +326,15 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/fetc
     \"accessToken\": \"$ACCESS_TOKEN\",
     \"credentialConfigurationId\": \"pid_sd_jwt\",
     \"proofJwt\": \"$PROOF_JWT\"
+  }"
+
+# Optional: reject a credential fetched with storeInWallet=false
+curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/reject \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"notificationId\": \"$NOTIFICATION_ID\",
+    \"accessToken\": \"$ACCESS_TOKEN\",
+    \"credentialIssuerBaseUrl\": \"https://issuer.example.com\"
   }"
 ```
 

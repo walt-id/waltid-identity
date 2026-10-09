@@ -782,9 +782,10 @@ class Wallet2MoreUseCasesTest {
             OSSWallet2Service.configureInMemory()
 
             // Run 2: different port, same service config — store is clean
-            E2ETest(host, port + 1, failEarly = true).testBlock(
+            val secondPort = freePort()
+            E2ETest(host, secondPort, failEarly = true).testBlock(
                 features = listOf(OSSWallet2FeatureCatalog),
-                preload = { ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:${port + 1}"))) },
+                preload = { ConfigManager.preloadConfig("wallet-service", OSSWallet2ServiceConfig(publicBaseUrl = Url("http://$host:$secondPort"))) },
                 init = {},
                 module = { wallet2Module(withPlugins = false) }
             ) {

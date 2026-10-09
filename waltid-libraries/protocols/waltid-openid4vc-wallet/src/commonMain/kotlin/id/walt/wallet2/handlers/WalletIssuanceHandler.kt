@@ -22,6 +22,7 @@ import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.waltid.openid4vci.wallet.credential.CredentialIssuanceTarget
 import id.waltid.openid4vci.wallet.credential.validateCredentialResponse
 import id.waltid.openid4vci.wallet.credential.CredentialRequestBuilder
@@ -56,6 +57,7 @@ import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
 import id.waltid.openid4vci.wallet.proof.ProofKeyBinding
 import id.waltid.openid4vci.wallet.token.ClientAssertionFactory
 import id.waltid.openid4vci.wallet.token.ClientAttestationHeadersFactory
+import id.waltid.openid4vci.wallet.token.DPoPProofFactory
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import id.waltid.openid4vci.wallet.token.TokenResponseHeadersHandler
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -711,8 +713,11 @@ data class FetchCredentialRequest(
 
 /** Released isolated-fetch result. Detailed progress is available from [FetchCredentialsResult]. */
 @Serializable
-data class FetchCredentialResult(val rawCredentials: List<String>) {
-    constructor(result: FetchCredentialsResult) : this(result.releasedRawCredentials())
+data class FetchCredentialResult(
+    val rawCredentials: List<String>,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val notificationId: String? = null,
+) {
+    constructor(result: FetchCredentialsResult) : this(result.releasedRawCredentials(), result.notificationId)
 }
 
 /** Complete isolated-fetch progress, including remote deferral and local-save recovery. */
@@ -722,6 +727,7 @@ data class FetchCredentialsResult(
     val deferredCredential: DeferredCredentialTransaction? = null,
     /** Local save result, including committed IDs and retained handles when storage is incomplete. */
     val storageOutcome: WalletIssuanceOutcome? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val notificationId: String? = null,
 ) {
     init {
         require(rawCredentials.isNotEmpty() xor (deferredCredential != null)) {
@@ -747,6 +753,35 @@ private fun FetchCredentialsResult.releasedRawCredentials(): List<String> {
         throw CredentialFetchException(this)
     }
     return rawCredentials
+}
+
+/**
+ * Isolated rejection of a credential that was fetched with [FetchCredentialRequest.storeInWallet] left false.
+ *
+ * Pass [notificationId] and [accessToken] from [FetchCredentialResult] / the token response. Supply
+ * either [notificationEndpoint] or [credentialIssuerBaseUrl] so the wallet can resolve the issuer's
+ * OpenID4VCI notification endpoint. This isolated step is Bearer-only, matching isolated fetch.
+ */
+@Serializable
+data class RejectIssuedCredentialRequest(
+    val notificationId: String,
+    val accessToken: String,
+    val credentialIssuerBaseUrl: String? = null,
+    val notificationEndpoint: String? = null,
+    val eventDescription: String? = null,
+) {
+    init {
+        require(notificationId.isNotBlank()) { "notificationId must not be blank" }
+        require(accessToken.isNotBlank()) { "accessToken cannot be blank" }
+        require(!notificationEndpoint.isNullOrBlank() || !credentialIssuerBaseUrl.isNullOrBlank()) {
+            "Either notificationEndpoint or credentialIssuerBaseUrl must be provided"
+        }
+    }
+
+    override fun toString(): String =
+        "RejectIssuedCredentialRequest(notificationId=$notificationId, accessToken=<redacted>, " +
+            "credentialIssuerBaseUrl=$credentialIssuerBaseUrl, notificationEndpoint=$notificationEndpoint, " +
+            "eventDescription=$eventDescription)"
 }
 
 /**
@@ -1785,6 +1820,7 @@ object WalletIssuanceHandler {
                 request.holderBindings.map { it.copy(key = null, keyId = it.keyId ?: request.keyId) },
                 intervalSeconds = requireNotNull(credentialResponse.interval),
                 proofRequired = request.effectiveProofs != null),
+            notificationId = credentialResponse.notificationId,
         )
         val rawCredentials = credentialResponse.credentials
             ?.map { it.credential.let { c -> if (c is JsonPrimitive) c.content else c.toString() } }
@@ -1792,7 +1828,10 @@ object WalletIssuanceHandler {
         require(rawCredentials.isNotEmpty() && (request.effectiveProofs == null || rawCredentials.size <= requestedCount)) {
             "Invalid credential response count"
         }
-        return FetchCredentialsResult(rawCredentials = rawCredentials)
+        return FetchCredentialsResult(
+            rawCredentials = rawCredentials,
+            notificationId = credentialResponse.notificationId,
+        )
     }
 
     private suspend fun requestCredential(
@@ -1961,16 +2000,90 @@ object WalletIssuanceHandler {
         )
         val result = fetchCredentials(request, httpClient, dpop)
         if (result.deferredCredential != null) return result
-        val prepared = wallet.prepareIssuedCredentials(result.rawCredentials, bindings, storage.label, storage.metadata,
-            proofRequired = request.effectiveProofs != null,
-            holderBindingKnown = request.keyId != null || request.holderBindings.all { it.keyId != null || it.key != null },
-            expectedConfiguration = storage.configuration)
-        val outcome = wallet.issuanceSessions(httpClient).storeReceivedCredentials(
-            prepared, request.credentialConfigurationId, request.credentialIdentifier,
-            persistable = true,
-            beforeCredentialsStored = beforeCredentialsStored, onCredentialStored = onCredentialStored,
+        val target = IssuerNotificationTarget(
+            notificationEndpoint = storage.notificationEndpoint,
+            notificationId = result.notificationId,
+            accessToken = request.accessToken,
+            tokenType = request.tokenType,
+            dpopProofFactory = dpop?.toProofFactory(request.accessToken),
         )
-        return result.copy(storageOutcome = outcome)
+        return try {
+            val prepared = wallet.prepareIssuedCredentials(result.rawCredentials, bindings, storage.label, storage.metadata,
+                proofRequired = request.effectiveProofs != null,
+                holderBindingKnown = request.keyId != null || request.holderBindings.all { it.keyId != null || it.key != null },
+                expectedConfiguration = storage.configuration)
+            val outcome = wallet.issuanceSessions(httpClient).storeReceivedCredentials(
+                prepared, request.credentialConfigurationId, request.credentialIdentifier,
+                persistable = true,
+                beforeCredentialsStored = beforeCredentialsStored, onCredentialStored = onCredentialStored,
+                notificationEndpoint = storage.notificationEndpoint,
+                notificationId = result.notificationId,
+                accessToken = request.accessToken,
+                tokenType = request.tokenType,
+                dpop = dpop?.algorithms,
+                keyMaterial = dpop?.keyMaterial,
+            )
+            result.copy(storageOutcome = outcome)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            deliverCredentialNotification(
+                httpClient = httpClient,
+                target = target,
+                event = NotificationEvent.CREDENTIAL_FAILURE,
+            )
+            throw error
+        }
+    }
+
+    /**
+     * Posts [NotificationEvent.CREDENTIAL_DELETED] for a credential fetched with
+     * [FetchCredentialRequest.storeInWallet] left false. Resolves [RejectIssuedCredentialRequest.notificationEndpoint]
+     * from issuer metadata when only [RejectIssuedCredentialRequest.credentialIssuerBaseUrl] is supplied.
+     * Bearer-only, like isolated fetch. Missing advertised `notification_endpoint` is a best-effort no-op.
+     */
+    suspend fun rejectIssuedCredential(
+        request: RejectIssuedCredentialRequest,
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+    ) {
+        val notificationEndpoint = request.notificationEndpoint?.takeIf { it.isNotBlank() }
+            ?: request.credentialIssuerBaseUrl?.takeIf { it.isNotBlank() }?.let { issuer ->
+                IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(issuer)
+                    .metadata.notificationEndpoint
+            }
+        reportCredentialDeleted(
+            notificationEndpoint = notificationEndpoint ?: return,
+            notificationId = request.notificationId,
+            accessToken = request.accessToken,
+            tokenType = "Bearer",
+            eventDescription = request.eventDescription,
+            httpClient = httpClient,
+        )
+    }
+
+    /**
+     * Reports [NotificationEvent.CREDENTIAL_DELETED] for credentials the caller rejected instead of storing.
+     * [tokenType] is `Bearer` or `DPoP`. A DPoP token requires [dpopProofFactory].
+     */
+    suspend fun reportCredentialDeleted(
+        notificationEndpoint: String,
+        notificationId: String,
+        accessToken: String,
+        tokenType: String,
+        eventDescription: String? = null,
+        dpopProofFactory: DPoPProofFactory? = null,
+        httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+    ) {
+        deliverCredentialNotification(
+            httpClient = httpClient,
+            notificationEndpoint = notificationEndpoint,
+            notificationId = notificationId,
+            accessToken = accessToken,
+            tokenType = tokenType,
+            event = NotificationEvent.CREDENTIAL_DELETED,
+            eventDescription = eventDescription,
+            dpopProofFactory = dpopProofFactory,
+        )
     }
 
     // ---------------------------------------------------------------------------
@@ -2083,6 +2196,7 @@ object WalletIssuanceHandler {
         val configuration: CredentialConfiguration?,
         val label: String?,
         val metadata: JsonObject?,
+        val notificationEndpoint: String? = null,
     )
 
     /** Resolve configuration and display metadata before an isolated fetch or poll. */
@@ -2104,6 +2218,7 @@ object WalletIssuanceHandler {
             label = labelOverride ?: configuration?.credentialMetadata?.display?.firstOrNull()?.name,
             metadata = issuer?.let { storedCredentialDisplayMetadata(it, credentialConfigurationId, requestMetadata) }
                 ?: requestMetadata,
+            notificationEndpoint = issuer?.notificationEndpoint,
         )
     }
 
@@ -2637,12 +2752,30 @@ object WalletIssuanceHandler {
         val rawCredentials = credentialResponse.credentials
             ?: error("Deferred credential response contained no credentials")
 
-        val prepared = wallet.prepareIssuedCredentials(rawCredentials.map {
-            val value = it.credential
-            if (value is JsonPrimitive) value.content else value.toString()
-        }, bindings, storage.label, storage.metadata, proofRequired = request.proofRequired || request.holderBindings.size > 1,
-            holderBindingKnown = request.keyId != null || request.holderBindings.all { it.keyId != null || it.key != null },
-            expectedConfiguration = storage.configuration)
+        val notificationTarget = IssuerNotificationTarget(
+            notificationEndpoint = storage.notificationEndpoint,
+            notificationId = credentialResponse.notificationId,
+            accessToken = request.accessToken,
+            tokenType = request.tokenType,
+            dpopProofFactory = dpop?.toProofFactory(request.accessToken),
+        )
+        val prepared = try {
+            wallet.prepareIssuedCredentials(rawCredentials.map {
+                val value = it.credential
+                if (value is JsonPrimitive) value.content else value.toString()
+            }, bindings, storage.label, storage.metadata, proofRequired = request.proofRequired || request.holderBindings.size > 1,
+                holderBindingKnown = request.keyId != null || request.holderBindings.all { it.keyId != null || it.key != null },
+                expectedConfiguration = storage.configuration)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            deliverCredentialNotification(
+                httpClient = httpClient,
+                target = notificationTarget,
+                event = NotificationEvent.CREDENTIAL_FAILURE,
+            )
+            throw error
+        }
         val outcome = wallet.issuanceSessions(httpClient).storeReceivedCredentials(
             prepared, request.credentialConfigurationId, credentialIdentifier = request.credentialIdentifier,
             persistable = true,
@@ -2652,6 +2785,12 @@ object WalletIssuanceHandler {
                 onEvent.emitSafely(WalletSessionEvent.issuance_credential_stored)
                 send(entry)
             },
+            notificationEndpoint = storage.notificationEndpoint,
+            notificationId = credentialResponse.notificationId,
+            accessToken = request.accessToken,
+            tokenType = request.tokenType,
+            dpop = dpop?.algorithms,
+            keyMaterial = dpop?.keyMaterial,
         )
         if (outcome is WalletIssuanceOutcome.Failed) throw CredentialStorageException(outcome)
         onEvent.emitSafely(WalletSessionEvent.issuance_completed)

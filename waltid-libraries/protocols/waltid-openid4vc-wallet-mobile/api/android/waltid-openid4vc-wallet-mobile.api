@@ -134,6 +134,8 @@ public final class id/walt/wallet2/mobile/MobileWallet {
 	public final fun proximityPresentationCapabilities (Lid/walt/wallet2/mobile/ProximityConfiguration;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun proximityPresentationCapabilities$default (Lid/walt/wallet2/mobile/MobileWallet;Lid/walt/wallet2/mobile/ProximityConfiguration;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun refreshDigitalCredentialRegistration (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun rejectIssuedCredential (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun rejectIssuedCredential$default (Lid/walt/wallet2/mobile/MobileWallet;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun rejectPresentation (Lid/walt/wallet2/mobile/MobileWalletPresentationPreviewHandle;Lid/walt/wallet2/mobile/MobileWalletPresentationErrorCode;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun rejectPresentation$default (Lid/walt/wallet2/mobile/MobileWallet;Lid/walt/wallet2/mobile/MobileWalletPresentationPreviewHandle;Lid/walt/wallet2/mobile/MobileWalletPresentationErrorCode;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun resumeDeferredIssuance (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;

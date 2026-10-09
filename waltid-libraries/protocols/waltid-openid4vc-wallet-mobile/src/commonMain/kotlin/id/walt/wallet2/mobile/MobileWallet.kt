@@ -39,12 +39,14 @@ import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.SubmitDcApiPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceAuthorizationCallback
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
+import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceContinuation
 import id.walt.wallet2.handlers.WalletIssuanceBatchSession
 import id.walt.wallet2.handlers.WalletIssuanceSessionRequest
 import id.walt.wallet2.handlers.WalletIssuanceSessionService
 import id.walt.wallet2.handlers.WalletPresentationHandler
+import id.walt.wallet2.handlers.RejectIssuedCredentialRequest
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
@@ -225,7 +227,7 @@ public class MobileWallet internal constructor(
      * Issuance transport override. The configured iOS engine disables Foundation response caching.
      * A supplied client must also prevent automatic caching of sensitive issuance responses.
      */
-    issuanceHttpClient: HttpClient? = null,
+    private val issuanceHttpClient: HttpClient? = null,
     private val scaAuthorizer: WalletScaPresentationAuthorizer? = null,
     paymentCredentialIssuers: List<PaymentCredentialIssuer> = emptyList(),
     paymentMetadataHttpClient: HttpClient? = null,
@@ -517,6 +519,43 @@ public class MobileWallet internal constructor(
     /** Recovers retained deferred handles after an interrupted flow or wallet recreation. */
     public suspend fun listDeferredIssuance(): List<WalletIssuanceContinuation> = lifecycle.use {
         issuanceSessions.listIssuanceContinuations()
+    }
+
+    /**
+     * Reports OpenID4VCI `credential_deleted` for a credential the holder rejected instead of storing.
+     *
+     * Isolated fetch (`storeInWallet=false`) returns the `notificationId` to pass here with the same
+     * access token. Delivery is Bearer-only and best-effort: a missing issuer notification endpoint is
+     * a no-op. Session-based receive already posts `credential_accepted` / `credential_failure` through
+     * the issuance engine.
+     *
+     * @param notificationId OpenID4VCI `notification_id` from the credential response.
+     * @param accessToken Access token used to obtain the credential.
+     * @param credentialIssuerBaseUrl Issuer identifier used to resolve `notification_endpoint` when
+     * [notificationEndpoint] is omitted.
+     * @param notificationEndpoint Explicit OpenID4VCI notification endpoint, when already known.
+     * @param eventDescription Optional issuer-facing description.
+     */
+    public suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String? = null,
+        notificationEndpoint: String? = null,
+        eventDescription: String? = null,
+    ) {
+        val request = RejectIssuedCredentialRequest(
+            notificationId = notificationId,
+            accessToken = accessToken,
+            credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+            notificationEndpoint = notificationEndpoint,
+            eventDescription = eventDescription,
+        )
+        val client = issuanceHttpClient
+        if (client != null) {
+            WalletIssuanceHandler.rejectIssuedCredential(request, client)
+        } else {
+            WalletIssuanceHandler.rejectIssuedCredential(request)
+        }
     }
 
     /** Polls a typed deferred credential result returned by a previous issuance continuation. */

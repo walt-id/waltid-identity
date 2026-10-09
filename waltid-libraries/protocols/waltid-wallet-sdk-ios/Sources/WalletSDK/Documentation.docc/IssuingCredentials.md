@@ -81,9 +81,16 @@ let issuedCredentials = credentials.filter { credentialIDs.contains($0.id) }
 > progress updates for issuer communication, credential storage, or completion.
 
 If the user closes the review without accepting it, call
-``Wallet/cancelIssuance(sessionID:)``. Authorization-code issuance creates its
+``Wallet/cancelIssuance(sessionID:)``. Offer-level cancel happens before the
+credential response, so there is no `notification_id` yet. Authorization-code issuance creates its
 browser URL only after ``Wallet/beginAuthorizationIssuance(sessionID:credentials:)`` is
 called following acceptance.
+
+Continuing a session posts OpenID4VCI `credential_accepted` when the issuer
+advertised a notification endpoint. After an isolated fetch that left
+`storeInWallet` false, call
+``Wallet/rejectIssuedCredential(notificationID:accessToken:credentialIssuerBaseURL:notificationEndpoint:eventDescription:)``
+to post `credential_deleted` instead of storing the credential.
 
 
 ### Select Configurations and Copies
