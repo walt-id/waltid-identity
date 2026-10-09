@@ -505,7 +505,7 @@ final class WalletVisualTests: XCTestCase {
                 credentialDetailsByID: [details.id: details])
                 .navigationTitle("Share nearby").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
+                    ToolbarItem(placement: .navigationBarTrailing) {
                         Button(action: model.proximityPresentation.requestClose) {
                             Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44)
                         }.accessibilityLabel("Close nearby sharing")

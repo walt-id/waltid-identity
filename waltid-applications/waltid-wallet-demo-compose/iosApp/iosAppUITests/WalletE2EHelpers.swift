@@ -217,10 +217,19 @@ final class WalletE2EUI {
     }
 
     func tapButton(identifier: String, fallbackLabel: String, useCoordinateTap: Bool = false) {
+        let tagged = app.buttons.matching(identifier: identifier)
+        if tagged.firstMatch.waitForExistence(timeout: 20) {
+            // Navigation 3 retains both pages during motion; wait for the active page.
+            let unique = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in tagged.count == 1 }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [unique], timeout: 5), .completed,
+                "Button remained ambiguous after navigation: \(identifier)")
+        }
         let targetButton = button(identifier: identifier, fallbackLabel: fallbackLabel)
         XCTAssertTrue(targetButton.waitForExistence(timeout: 20), "Button not found: \(identifier)")
-        dismissKeyboard()
-        makeHittable(targetButton)
+        if !targetButton.isHittable {
+            dismissKeyboard()
+            makeHittable(targetButton)
+        }
         XCTAssertTrue(targetButton.isHittable, "Button is not hittable: \(identifier)")
         XCTAssertTrue(targetButton.isEnabled, "Button is not enabled: \(identifier)")
         if useCoordinateTap {
