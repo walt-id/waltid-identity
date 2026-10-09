@@ -453,6 +453,38 @@ class W3cTypeExpanderTest {
         assertTrue(DcqlMatcher.match(query("""[["$revised"]]"""), listOf(credential), contextDocuments = supplied).isSuccess)
     }
 
+    @Test
+    fun vocabularySelfReferenceDoesNotPublishThePreviousIri() {
+        val old = "https://example.org/old#Degree"
+        val revised = "https://example.org/revised#Degree"
+        val explicit = "https://example.org/explicit#Degree"
+        listOf(
+            """{ "Degree": "Degree" }""",
+            """{ "Degree": { "@id": "Degree" } }""",
+        ).forEach { definition ->
+            val credential = vocabGapCredential(definition)
+            val unresolved = W3cTypeExpander.expandedTypes(credential.data)
+            assertFalse(old in unresolved)
+            assertTrue(verifiableCredential in unresolved)
+            assertTrue(DcqlMatcher.match(query("""[["$old"]]"""), listOf(credential)).isFailure)
+            assertTrue(DcqlMatcher.match(query("""[["Degree"]]"""), listOf(credential)).isSuccess)
+
+            val supplied = documentsRedefining(
+                "https://example.org/review/vocab-gap" to """{ "@context": { "@vocab": "https://example.org/revised#" } }""",
+            )
+            val withRevision = W3cTypeExpander.expandedTypes(credential.data, supplied)
+            assertTrue(revised in withRevision)
+            assertFalse(old in withRevision)
+            assertTrue(DcqlMatcher.match(query("""[["$old"]]"""), listOf(credential), contextDocuments = supplied).isFailure)
+            assertTrue(DcqlMatcher.match(query("""[["$revised"]]"""), listOf(credential), contextDocuments = supplied).isSuccess)
+        }
+
+        val redefined = vocabGapCredential("""{ "@vocab": "https://example.org/explicit#", "Degree": "Degree" }""")
+        assertEquals(setOf(verifiableCredential, explicit), W3cTypeExpander.expandedTypes(redefined.data))
+        assertTrue(DcqlMatcher.match(query("""[["$explicit"]]"""), listOf(redefined)).isSuccess)
+        assertTrue(DcqlMatcher.match(query("""[["$old"]]"""), listOf(redefined)).isFailure)
+    }
+
     private fun query(typeValues: String) = DcqlParser.parse(
         """
         {
@@ -499,6 +531,24 @@ class W3cTypeExpanderTest {
             ).jsonObject,
         )
     }
+
+    private fun vocabGapCredential(degreeDefinition: String) = RawDcqlCredential(
+        id = "degree",
+        format = "jwt_vc_json",
+        data = json.parseToJsonElement(
+            """
+            {
+              "@context": [
+                "https://www.w3.org/ns/credentials/v2",
+                { "@vocab": "https://example.org/old#" },
+                "https://example.org/review/vocab-gap",
+                $degreeDefinition
+              ],
+              "type": ["VerifiableCredential", "Degree"]
+            }
+            """.trimIndent()
+        ).jsonObject,
+    )
 
     private fun documentsRedefining(vararg documents: Pair<String, String>): JsonLdContextDocumentSource =
         LayeredJsonLdContextDocuments(

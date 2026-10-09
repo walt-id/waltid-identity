@@ -187,22 +187,41 @@ object W3cTypeExpander {
         if (existing?.protected == true && (existing.iri != defined.iri || existing.prefix != defined.prefix)) {
             return
         }
+        val uncertain = definedValueIsUncertain(term, value, session.active)
         session.active.terms[term] = defined.copy(protected = existing?.protected == true || defined.protected)
-        if (definedValueIsUncertain(value, session.active)) {
+        if (uncertain) {
             session.active.uncertainTerms.add(term)
         } else {
             session.active.uncertainTerms.remove(term)
         }
     }
 
-    private fun definedValueIsUncertain(value: JsonElement, active: JsonLdActiveContext): Boolean = when (value) {
-        is JsonPrimitive -> value.isString && !value.content.startsWith("@") && expansionIsUncertain(value.content, active)
+    /**
+     * A definition whose value names the term being created expands through `@vocab`, not through
+     * the mapping this call is about to install. That vocabulary may itself be uncertain.
+     */
+    private fun definedValueIsUncertain(term: String, value: JsonElement, active: JsonLdActiveContext): Boolean = when (value) {
+        is JsonPrimitive -> value.isString && !value.content.startsWith("@") && iriSourceIsUncertain(term, value.content, active)
         is JsonObject -> when (val id = value["@id"]) {
             null -> active.vocabUncertain
-            is JsonPrimitive -> id.isString && !id.content.startsWith("@") && expansionIsUncertain(id.content, active)
+            is JsonPrimitive -> id.isString && !id.content.startsWith("@") && iriSourceIsUncertain(term, id.content, active)
             else -> false
         }
         else -> false
+    }
+
+    private fun iriSourceIsUncertain(defining: String, value: String, active: JsonLdActiveContext): Boolean {
+        if (value.startsWith("@")) return false
+        val colon = value.indexOf(':')
+        if (colon > 0) {
+            val prefix = value.substring(0, colon)
+            val suffix = value.substring(colon + 1)
+            if (prefix == "_" || suffix.startsWith("//")) return false
+            if (prefix == defining) return active.vocabUncertain
+            return prefix in active.uncertainTerms
+        }
+        if (value == defining || value !in active.terms) return active.vocabUncertain
+        return value in active.uncertainTerms
     }
 
     private fun createTerm(session: TermDefinitionSession, term: String, value: JsonElement): JsonLdTerm? = when (value) {
