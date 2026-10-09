@@ -139,7 +139,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
     ]
   }
         """.trimIndent()
-        )
+        ).copy(vp_policies = preFinalFixtureVpPolicies)
 
     private val verificationSessionSetup: VerificationSessionSetup = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
