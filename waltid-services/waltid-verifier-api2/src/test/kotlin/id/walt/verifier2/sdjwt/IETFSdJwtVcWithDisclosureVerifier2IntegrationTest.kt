@@ -37,6 +37,10 @@ import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.server.application.*
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.routing.post
+import io.ktor.server.routing.routing
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlin.test.Test
@@ -73,7 +77,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
         )
     )
 
-    private fun additionalSdjwtvcPolicies(credential: DigitalCredential) =
+    private fun additionalSdjwtvcPolicies(issuer: String, webhookUrl: String) =
         Json.decodeFromString<Verification2Session.DefinedVerificationPolicies>(
             """
   {
@@ -81,7 +85,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
       {
         "policy": "allowed-issuer",
         "allowed_issuer": [
-          "${credential.issuer}"
+          "$issuer"
         ]
       },
       {
@@ -94,21 +98,36 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
       "not-before",
       {
         "policy": "webhook",
-        "url": "https://httpbin.io/json"
+        "url": "$webhookUrl"
       },
       {
         "policy": "schema",
-        "schema": ${credential.credentialData}
+        "schema": {
+          "type": "object",
+          "properties": {
+            "given_name": { "type": "string" },
+            "family_name": { "type": "string" },
+            "address": {
+              "type": "object",
+              "properties": {
+                "street_address": { "type": "string" }
+              },
+              "required": ["street_address"]
+            },
+            "birthdate": { "type": "string" }
+          },
+          "required": ["given_name", "family_name", "address", "birthdate"]
+        }
       }
     ]
   }
         """.trimIndent()
         )
 
-    private fun verificationSessionSetup(credential: DigitalCredential): VerificationSessionSetup = CrossDeviceFlowSetup(
+    private fun verificationSessionSetup(issuer: String, webhookUrl: String): VerificationSessionSetup = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
             dcqlQuery = sdJwtVcDcqlQuery,
-            policies = additionalSdjwtvcPolicies(credential)
+            policies = additionalSdjwtvcPolicies(issuer, webhookUrl)
         ),
         openid = OpenId4VPConfig(
             transactionData = listOf(
@@ -271,7 +290,16 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                     updateResolversForMethods()
                 }
             },
-            module = Application::verifierModule
+            module = {
+                verifierModule()
+                routing {
+                    post("/policy-webhook") {
+                        val credential = call.receive<DigitalCredential>()
+                        assertEquals("1940-01-01", credential.credentialData["birthdate"]!!.jsonPrimitive.content)
+                        call.respond(JsonObject(emptyMap()))
+                    }
+                }
+            }
         ) {
             val http = testHttpClient()
             val walletCredentials = walletCredentials()
@@ -279,7 +307,12 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
             // Create the verification session
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
-                    setBody(verificationSessionSetup(walletCredentials.first()))
+                    setBody(
+                        verificationSessionSetup(
+                            issuer = requireNotNull(walletCredentials.first().issuer),
+                            webhookUrl = "http://$host:$port/policy-webhook",
+                        )
+                    )
                 }.body<VerificationSessionCreationResponse>()
             }
             println("Verification Session Response: $verificationSessionResponse")
@@ -364,8 +397,8 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                 val policyResults = assertNotNull(info2.policyResults)
                 assertTrue { policyResults.vpPolicies.getValue("my_pid").values.all { it.success } }
                 assertTrue { policyResults.vpPolicies.getValue("my_pid").getValue("dc+sd-jwt/exp-check").success }
+                assertEquals(listOf("signature"), policyResults.vcPolicies.filterNot { it.success }.map { it.policy.id })
                 val signatureResult = policyResults.vcPolicies.single { it.policy.id == "signature" }
-                assertTrue { !signatureResult.success }
                 assertEquals("Invalid JWS signature", signatureResult.error)
                 val presentedCredential = assertNotNull(info2.presentedCredentials).getValue("my_pid").single()
                 assertEquals("1940-01-01", presentedCredential.credentialData["birthdate"]!!.jsonPrimitive.content)

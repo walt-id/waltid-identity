@@ -2,32 +2,40 @@ package id.walt.verifier2.sdjwt
 
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.SdJwtCredential
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.EdwardsCurve
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
-import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
+import id.walt.did.dids.registrar.local.key.Crypto2DidKeyRegistrar
+import id.walt.sdjwt.Crypto2JWTCryptoProvider
+import id.walt.sdjwt.Crypto2SdJwtKey
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
-import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.Instant
 
 internal const val SD_JWT_VC_TEST_VCT = "https://issuer.example/identity_credential"
 
 /** Issues a synthetic credential from one timestamp; only birthdate is selectively disclosable. */
-@Suppress("DEPRECATION")
-internal suspend fun issueSdJwtVcForHolder(
-    holderDid: String,
-    issuedAt: Instant = Clock.System.now(),
-): SdJwtCredential {
-    val issuerKey = JWKKey.generate(KeyType.Ed25519)
-    val issuerDid = DidKeyRegistrar().registerByKey(issuerKey, DidKeyCreateOptions()).did
-    val issuerKeyId = issuerKey.getKeyId()
+internal suspend fun issueSdJwtVcForHolder(holderDid: String): SdJwtCredential {
+    val issuerKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+        GenerateSoftwareKeyRequest(
+            id = KeyId("sd-jwt-test-issuer"),
+            spec = KeySpec.Edwards(EdwardsCurve.ED25519),
+            usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+        )
+    )
+    val issuerDid = Crypto2DidKeyRegistrar().createByKey(issuerKey, DidKeyCreateOptions()).did
+    val issuedAt = Clock.System.now()
     val claims = buildJsonObject {
         put("given_name", "John")
         put("family_name", "Doe")
@@ -38,14 +46,15 @@ internal suspend fun issueSdJwtVcForHolder(
     }
     val sdJwtVc = SDJwtVC.sign(
         sdPayload = SDPayload.createSDPayload(claims, SDMap(mapOf("birthdate" to SDField(true)))),
-        jwtCryptoProvider = WaltIdJWTCryptoProvider(mapOf(issuerKeyId to issuerKey)),
+        jwtCryptoProvider = Crypto2JWTCryptoProvider(
+            mapOf(issuerDid to Crypto2SdJwtKey(issuerKey, JwsAlgorithm.EDDSA, keyId = issuerDid))
+        ),
         issuerDid = issuerDid,
         holderDid = holderDid,
-        issuerKeyId = issuerKeyId,
+        issuerKeyId = issuerDid,
         vct = SD_JWT_VC_TEST_VCT,
         nbf = issuedAt.epochSeconds,
         exp = (issuedAt + 365.days).epochSeconds,
-        additionalJwtHeader = mapOf("kid" to issuerDid),
         subject = holderDid,
     )
     return CredentialParser.parseOnly(sdJwtVc.toString(formatForPresentation = false, withKBJwt = false)) as SdJwtCredential
