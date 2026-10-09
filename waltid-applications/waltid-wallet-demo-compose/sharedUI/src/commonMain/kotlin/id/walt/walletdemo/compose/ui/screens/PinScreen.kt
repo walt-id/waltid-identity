@@ -1,47 +1,18 @@
 package id.walt.walletdemo.compose.ui.screens
 
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentWidth
-import id.walt.walletdemo.compose.ui.components.SettingsSection
-import id.walt.walletdemo.compose.ui.components.SettingsToggleRow
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -50,7 +21,11 @@ import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.ui.LocalWalletDemoBranding
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.components.*
+import id.walt.walletdemo.compose.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 
+/** App unlock uses the existing four-digit PIN policy. */
 @Composable
 internal fun PinScreen(
     controller: WalletDemoController,
@@ -60,184 +35,93 @@ internal fun PinScreen(
 ) {
     val setup = auth as? WalletAuthState.Setup
     val login = auth as? WalletAuthState.Login
-    val pin = when (auth) {
-        is WalletAuthState.Setup -> auth.pin
-        is WalletAuthState.Login -> auth.pin
-    }
-    val error = when (auth) {
-        is WalletAuthState.Setup -> auth.error
-        is WalletAuthState.Login -> auth.error
-    }
+    val focus = LocalFocusManager.current
+    val confirmationFocus = remember { FocusRequester() }
     val biometricUnlockEnabled = controller.isBiometricUnlockEnabled()
-    val scrollState = rememberScrollState()
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    var hasInputFocus by remember { mutableStateOf(false) }
-
-    fun dismissKeyboard() {
-        hasInputFocus = false
-        focusManager.clearFocus()
-        keyboardController?.hide()
-    }
-    val dismissKeyboardOnScroll = remember(focusManager, keyboardController) {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (source == NestedScrollSource.UserInput && available.y != 0f && hasInputFocus) {
-                    dismissKeyboard()
-                }
-                return Offset.Zero
-            }
-        }
-    }
+    val error = setup?.error ?: login?.error
+    val inputError = error != null && (setup == null || setup.pin != setup.confirmation)
     LaunchedEffect(login != null, biometricUnlockEnabled, biometricAvailable) {
-        if (login != null && biometricUnlockEnabled && biometricAvailable) {
-            controller.unlockWithBiometrics()
-        }
+        if (login != null && biometricUnlockEnabled && biometricAvailable) controller.unlockWithBiometrics()
     }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .imePadding()
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = { dismissKeyboard() })
+    val primary = WalletAction(
+        stringResource(if (setup != null) Res.string.pin_create_action else Res.string.pin_unlock),
+        onClick = {
+            focus.clearFocus()
+            controller.submitPin()
+        },
+        enabled = !isBusy && (setup == null || (setup.pin.length == WalletDemoController.PinLength && setup.confirmation.length == WalletDemoController.PinLength)),
+        testTag = WalletUiTestTags.PinSubmitButton,
+        icon = WalletSymbol.Lock,
+    )
+    val secondary = if (login != null && biometricUnlockEnabled && biometricAvailable) {
+        WalletAction(stringResource(Res.string.pin_unlock_biometrics),
+            { focus.clearFocus(); controller.unlockWithBiometrics(force = true) }, !isBusy,
+            WalletUiTestTags.PinBiometricButton, WalletSymbol.Lock)
+    } else null
+    Scaffold(
+        modifier = Modifier.fillMaxSize().safeDrawingPadding().imePadding().testTag(WalletUiTestTags.PinScreen),
+        bottomBar = { WalletActionBar(primary, secondary) },
+    ) { padding ->
+        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())
+            .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 640.dp).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Text(LocalWalletDemoBranding.current.appTitle, style = MaterialTheme.typography.headlineSmall)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(if (setup != null) Res.string.pin_create else Res.string.pin_enter),
+                    style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(if (setup != null) Res.string.pin_create_help else Res.string.pin_enter_help),
+                    style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            .nestedScroll(dismissKeyboardOnScroll)
-            .verticalScroll(scrollState)
-            .testTag(WalletUiTestTags.PinScreen)
-            .wrapContentWidth(Alignment.CenterHorizontally)
-            .widthIn(max = 640.dp)
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Spacer(Modifier.height(12.dp))
-        Text(
-            LocalWalletDemoBranding.current.appTitle,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            if (setup != null) "Create a PIN" else "Enter your PIN",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            if (setup != null) {
-                "Use 4 to 8 digits to unlock this wallet."
-            } else {
-                "Enter your PIN to unlock this wallet."
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        SettingsSection {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(
-                    value = pin,
-                    onValueChange = controller::updatePin,
-                    label = { Text("PIN") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.NumberPassword,
-                        imeAction = if (setup != null) ImeAction.Next else ImeAction.Done,
-                    ),
-                    keyboardActions = KeyboardActions(onDone = { dismissKeyboard() }),
-                    isError = error != null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged { hasInputFocus = it.isFocused }
-                        .testTag(WalletUiTestTags.PinInput),
-                    singleLine = true,
-                )
-
-                if (setup != null) {
+            WalletSection {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
-                        value = setup.confirmation,
-                        onValueChange = controller::updatePinConfirmation,
-                        label = { Text("Confirm PIN") },
+                        value = setup?.pin ?: login?.pin.orEmpty(),
+                        onValueChange = { input ->
+                            controller.updatePin(input.filter { it in '0'..'9' }.take(WalletDemoController.PinLength))
+                        },
+                        label = { Text(stringResource(Res.string.pin_label)) },
                         visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.NumberPassword,
-                            imeAction = ImeAction.Done,
-                        ),
-                        keyboardActions = KeyboardActions(onDone = { dismissKeyboard() }),
-                        isError = error != null,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .onFocusChanged { hasInputFocus = it.isFocused }
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword,
+                            imeAction = if (setup != null) ImeAction.Next else ImeAction.Done),
+                        keyboardActions = KeyboardActions(onNext = { confirmationFocus.requestFocus() },
+                            onDone = { focus.clearFocus() }),
+                        enabled = !isBusy, isError = inputError, singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.PinInput),
+                    )
+                    if (setup != null) OutlinedTextField(
+                        value = setup.confirmation,
+                        onValueChange = { input ->
+                            controller.updatePinConfirmation(input.filter { it in '0'..'9' }.take(WalletDemoController.PinLength))
+                        },
+                        label = { Text(stringResource(Res.string.pin_confirmation_label)) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
+                        enabled = !isBusy, isError = inputError, singleLine = true,
+                        modifier = Modifier.fillMaxWidth().focusRequester(confirmationFocus)
                             .testTag(WalletUiTestTags.PinConfirmationInput),
-                        singleLine = true,
                     )
                 }
             }
-        }
-        if (setup != null) {
-            SettingsSection {
-                SettingsToggleRow("Unlock with biometrics", setup.useBiometrics && biometricAvailable,
-                    controller::updateUseBiometrics, Modifier.testTag(WalletUiTestTags.PinBiometricToggle),
-                    detail = if (biometricAvailable) "Use biometrics to open the app instead of typing the PIN. Signing approval is set up next."
-                        else "Biometrics are not available on this device.", enabled = biometricAvailable && !isBusy)
+            if (setup != null) WalletSection {
+                SettingsToggleRow(
+                    title = stringResource(Res.string.pin_biometric_label),
+                    detail = stringResource(when {
+                        !biometricAvailable -> Res.string.pin_biometric_unavailable
+                        setup.useBiometrics && !isBusy -> Res.string.pin_biometric_enabled
+                        else -> Res.string.pin_biometric_help
+                    }),
+                    checked = setup.useBiometrics,
+                    onCheckedChange = { focus.clearFocus(); controller.updateUseBiometrics(it) },
+                    enabled = biometricAvailable && !isBusy,
+                    modifier = Modifier.testTag(WalletUiTestTags.PinBiometricToggle),
+                )
             }
-        }
-
-        error?.let { error ->
-            Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-        }
-
-        Button(
-            onClick = controller::submitPin,
-            enabled = !isBusy,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag(WalletUiTestTags.PinSubmitButton),
-        ) {
-            Text(if (setup != null) "Set PIN" else "Unlock")
-        }
-
-        if (login != null && biometricUnlockEnabled && biometricAvailable) {
-            OutlinedButton(
-                onClick = { controller.unlockWithBiometrics(force = true) },
-                enabled = !isBusy,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(WalletUiTestTags.PinBiometricButton),
-            ) {
-                Text("Unlock with biometrics")
+            if (isBusy) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                CircularProgressIndicator(Modifier.size(24.dp))
+                Text(stringResource(Res.string.pin_authenticating))
             }
-        }
-    }
-}
-
-@Composable
-internal fun PinStorageUnavailableScreen(
-    controller: WalletDemoController,
-    message: String,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Spacer(Modifier.height(12.dp))
-        Text(
-            LocalWalletDemoBranding.current.appTitle,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        Text("PIN storage unavailable", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "$message. The wallet remains locked.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.error,
-        )
-        Button(
-            onClick = controller::retryPinStorage,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("wallet.pinStorageRetryButton"),
-        ) {
-            Text("Retry")
+            error?.let { SettingsNotice(it, error = true) }
         }
     }
 }

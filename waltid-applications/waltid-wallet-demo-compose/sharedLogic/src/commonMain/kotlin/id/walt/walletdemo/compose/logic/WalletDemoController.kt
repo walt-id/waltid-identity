@@ -1590,7 +1590,7 @@ class WalletDemoController(
     private fun submitSetupPin(auth: WalletAuthState.Setup) {
         val pin = auth.pin
         if (!isValidPin(pin)) {
-            setSetupPinError(WalletDisplayText.PinMustContain4To8Digits)
+            setSetupPinError(WalletDisplayText.PinMustContain4Digits)
             return
         }
 
@@ -1626,7 +1626,7 @@ class WalletDemoController(
     private fun submitLoginPin(auth: WalletAuthState.Login) {
         val pin = auth.pin
         if (!isValidPin(pin)) {
-            setLoginPinError(WalletDisplayText.PinMustContain4To8Digits)
+            setLoginPinError(WalletDisplayText.PinMustContain4Digits)
             return
         }
 
@@ -1745,20 +1745,18 @@ class WalletDemoController(
         }
     }
 
+    fun retryOpeningWallet() {
+        if (_state.value.auth == WalletAuthState.Unlocked && _state.value.session is WalletSessionState.Failed) bootstrapIfNeeded()
+    }
+
     private fun bootstrapIfNeeded() {
-        if (_state.value.session is WalletSessionState.Ready ||
-            _state.value.session is WalletSessionState.Bootstrapping
-        ) {
-            return
+        val previous = getAndUpdateState {
+            if (it.session is WalletSessionState.Ready || it.session is WalletSessionState.Bootstrapping) it
+            else it.copy(session = WalletSessionState.Bootstrapping, operation = WalletOperationState.Idle)
         }
+        if (previous.session is WalletSessionState.Ready || previous.session is WalletSessionState.Bootstrapping) return
 
         scope.launch(dispatcher) {
-            _state.update {
-                it.copy(
-                    session = WalletSessionState.Bootstrapping,
-                    operation = WalletOperationState.Idle,
-                )
-            }
             val setup = runCatching { wallet.identitySetup() }.getOrElse { error ->
                 if (error is CancellationException) throw error
                 _state.update { it.copy(session = WalletSessionState.Failed(keyOperationFailure(error))) }
@@ -1959,10 +1957,10 @@ class WalletDemoController(
             }
         }
 
-    private companion object {
-        val pinPattern = Regex("\\d{4,8}")
-        val SuccessBannerAutoHide = 4.seconds
+    companion object {
+        const val PinLength = 4
+        private val SuccessBannerAutoHide = 4.seconds
 
-        fun isValidPin(pin: String): Boolean = pin.matches(pinPattern)
+        private fun isValidPin(pin: String): Boolean = pin.length == PinLength && pin.all { it in '0'..'9' }
     }
 }

@@ -29,15 +29,14 @@ internal data class ClaimPath(
                 components = ClaimPathRoot.TransactionData.componentsWith(field.id),
             )
 
-        fun disclosure(index: Int, rawPath: String, label: String): ClaimPath {
-            val semanticLeaf = semanticLeaf(rawPath)
-                ?: label.takeIf { it.isNotBlank() }
-                ?: ClaimPathRoot.Disclosures.singularId
+        fun disclosure(index: Int, rawPath: String, format: String? = null): ClaimPath {
+            val components = disclosurePathComponents(rawPath, format)
+            val semanticLeaf = components.lastOrNull() ?: ClaimPathRoot.Disclosures.singularId
             return ClaimPath(
                 itemPath = ClaimItemPath.topLevel(ClaimPathRoot.Disclosures.id)
                     .indexedChild(index)
                     .child(semanticLeaf),
-                components = ClaimPathRoot.Disclosures.componentsWith(semanticLeaf),
+                components = components,
             )
         }
 
@@ -70,3 +69,11 @@ internal enum class TransactionDataField(val id: String) {
     Details("details"),
     Raw("raw"),
 }
+
+internal fun disclosurePathComponents(rawPath: String, format: String?): List<String> =
+    disclosurePathExpression(rawPath, format).segments.mapNotNull { (it as? ClaimPathExpression.Segment.Key)?.value }
+
+internal fun disclosurePathExpression(rawPath: String, format: String?): ClaimPathExpression =
+    if (format == "mso_mdoc" && !rawPath.startsWith("[") && '/' in rawPath && "://" !in rawPath)
+        ClaimPathExpression(rawPath.split('/', limit = 2).map(ClaimPathExpression.Segment::Key))
+    else ClaimPathExpression.parse(rawPath)

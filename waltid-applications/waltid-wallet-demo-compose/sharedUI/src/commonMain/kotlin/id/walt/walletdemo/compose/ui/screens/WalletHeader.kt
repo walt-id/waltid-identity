@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -26,6 +28,10 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsCloseButton
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsOverflowMenu
 import id.walt.walletdemo.compose.ui.components.StatusCard
+import id.walt.walletdemo.compose.ui.resources.Res
+import id.walt.walletdemo.compose.ui.resources.proximity_qr
+import id.walt.walletdemo.compose.ui.resources.settings_nearby
+import org.jetbrains.compose.resources.painterResource
 
 internal val WalletHeaderHorizontalPadding = 20.dp
 internal val WalletHeaderVerticalPadding = 14.dp
@@ -37,6 +43,10 @@ internal fun WalletHeader(
     onSettings: () -> Unit,
     onDismissStatus: () -> Unit,
     onToggleStatusExpanded: () -> Unit,
+    onScan: (() -> Unit)? = null,
+    onShareNearby: (() -> Unit)? = null,
+    onBack: (() -> Unit)? = null,
+    title: String? = null,
 ) {
     Column(
         modifier = Modifier
@@ -47,18 +57,33 @@ internal fun WalletHeader(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(WalletHeaderTitleRowHeight),
+                .heightIn(min = WalletHeaderTitleRowHeight),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            onBack?.let { back ->
+                IconButton(onClick = back, modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to wallet")
+                }
+            }
             Text(
-                LocalWalletDemoBranding.current.appTitle,
+                title ?: LocalWalletDemoBranding.current.appTitle,
                 modifier = Modifier
                     .weight(1f)
                     .testTag(WalletUiTestTags.AppTitle),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
+            onShareNearby?.let { nearby ->
+                IconButton(onClick = nearby, modifier = Modifier.testTag(WalletUiTestTags.ProximityStartButton)) {
+                    Icon(painterResource(Res.drawable.settings_nearby), "Share nearby")
+                }
+            }
+            onScan?.let { scan ->
+                IconButton(onClick = scan, modifier = Modifier.testTag(WalletUiTestTags.ScanButton)) {
+                    Icon(painterResource(Res.drawable.proximity_qr), "Scan or paste a link")
+                }
+            }
             IconButton(
                 onClick = onSettings,
                 modifier = Modifier.testTag(WalletUiTestTags.SettingsButton),

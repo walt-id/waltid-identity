@@ -62,41 +62,18 @@ internal fun WalletDemoOfferedCredentialMetadata.offeredTypePayloadJson(): Strin
     }.toString()
 }
 
-fun WalletDemoOfferedCredentialMetadata.claimDisplayGroups(): List<WalletDemoCredentialClaimDisplayGroup> {
-    val entries = claims.mapIndexed { index, claim ->
-        val semantics = MdocClaimDisplaySemantics.describe(format = format, path = claim.path)
-        OfferClaimDisplayEntry(
-            group = semantics?.group,
-            sortOrder = semantics?.sortOrder ?: Int.MAX_VALUE,
-            sourceOrder = index,
-            display = WalletDemoCredentialClaimDisplay(
+fun WalletDemoOfferedCredentialMetadata.claimDisplayGroups(): List<WalletDemoCredentialClaimDisplayGroup> =
+    if (claims.isEmpty()) emptyList() else listOf(WalletDemoCredentialClaimDisplayGroup(
+        title = "Credential claims",
+        claims = claims.map { claim ->
+            WalletDemoCredentialClaimDisplay(
                 label = claim.displayName?.takeIf { it.isNotBlank() }
-                    ?: semantics?.label
+                    ?: MdocClaimDisplaySemantics.describe(format = format, path = claim.path)?.label
                     ?: CredentialDisplayVocabulary.humanizedClaimLabel(claim.path.lastOrNull().orEmpty()),
                 inclusion = if (claim.mandatory == true) "Always included" else "May be included",
-            ),
-        )
-    }
-    return entries
-        .groupBy { it.group }
-        .entries
-        .sortedBy { it.key?.order ?: 0 }
-        .map { (group, claims) ->
-            WalletDemoCredentialClaimDisplayGroup(
-                title = group?.title ?: "Credential claims",
-                claims = claims
-                    .sortedWith(compareBy(OfferClaimDisplayEntry::sortOrder, OfferClaimDisplayEntry::sourceOrder))
-                    .map(OfferClaimDisplayEntry::display),
             )
-        }
-}
-
-private data class OfferClaimDisplayEntry(
-    val group: MdocClaimGroup?,
-    val sortOrder: Int,
-    val sourceOrder: Int,
-    val display: WalletDemoCredentialClaimDisplay,
-)
+        },
+    ))
 
 enum class WalletDemoTransactionCodeInputMode {
     Numeric,

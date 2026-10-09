@@ -18,9 +18,6 @@ struct OfferReviewView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Credential offer")
-                .font(.headline)
-
             ExpandableMetadataCard(
                 title: "Issuer",
                 titleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerSection,
@@ -46,28 +43,20 @@ struct OfferReviewView: View {
             }
 
             if !preview.credentials.isEmpty {
-                ReviewMetadataSection(
-                    title: "Offered credentials",
-                    titleAccessibilityIdentifier: WalletAccessibilityID.offerCredentialsSection
-                ) {
-                    ForEach(preview.credentials, id: \.configurationID) { credential in
-                        CredentialCardArtView(summary: credential.cardSummary)
-                        Toggle("Receive \(credential.cardSummary.title)", isOn: Binding(
-                            get: { (copies[credential.configurationID] ?? 1) > 0 },
-                            set: { onCopiesChange(credential.configurationID, $0 ? 1 : 0) }
-                        ))
-                        .disabled(!isReviewEnabled)
-                        .accessibilityIdentifier("issuance-select-\(credential.configurationID)")
-                        if (copies[credential.configurationID] ?? 1) > 0, let limit = preview.batchSize, limit > 1 {
-                            Stepper("Copies: \(copies[credential.configurationID] ?? 1)", value: Binding(
-                                get: { copies[credential.configurationID] ?? 1 },
-                                set: { onCopiesChange(credential.configurationID, $0) }
-                            ), in: 1...limit)
-                            .disabled(!isReviewEnabled)
-                            .accessibilityIdentifier("issuance-copies-\(credential.configurationID)")
+                WalletSection("Offered credentials", titleIdentifier: WalletAccessibilityID.offerCredentialsSection) {
+                    VStack(spacing: 0) {
+                        ForEach(preview.credentials, id: \.configurationID) { credential in
+                            OfferedCredentialRow(credential: credential,
+                                issuerName: preview.issuer.name ?? preview.issuer.identifier,
+                                issuerIdentifier: preview.issuer.identifier,
+                                copies: Binding(get: { copies[credential.configurationID] ?? 1 },
+                                                set: { onCopiesChange(credential.configurationID, $0) }),
+                                limit: preview.batchSize ?? 1, enabled: isReviewEnabled)
+                            if credential.configurationID != preview.credentials.last?.configurationID { Divider() }
                         }
                     }
                 }
+                Text(selectionSummary).font(.footnote).foregroundStyle(.secondary).padding(.horizontal, 16)
             }
 
             if preview.grant == .authorizationCode {
@@ -127,6 +116,12 @@ struct OfferReviewView: View {
         }
     }
 
+    private var selectionSummary: String {
+        let selected = preview.credentials.map { copies[$0.configurationID] ?? 1 }.filter { $0 > 0 }
+        return selected.isEmpty ? String(localized: "Select at least one credential to continue.")
+            : String(format: String(localized: "Selected: %d · Copies: %d"), selected.count, selected.reduce(0, +))
+    }
+
     private var issuerDisplay: MetadataDisplay? {
         MetadataDisplay(
             name: preview.issuer.name,
@@ -145,7 +140,6 @@ struct OfferReviewView: View {
 }
 
 struct OfferReviewActions: View {
-    @Environment(\.walletDemoBranding) private var branding
     let requiresIssuerAuthentication: Bool
     let isAcceptEnabled: Bool
     let isReviewEnabled: Bool
@@ -153,23 +147,11 @@ struct OfferReviewActions: View {
     let onDecline: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            Button(requiresIssuerAuthentication ? "Continue to sign in" : "Accept", action: onAccept)
-                .buttonStyle(.borderedProminent)
-                .tint(branding.primary)
-                .disabled(!isAcceptEnabled)
-                .accessibilityIdentifier(WalletAccessibilityID.offerAcceptButton)
-
-            Button("Decline", action: onDecline)
-                .buttonStyle(.bordered)
-                .disabled(!isReviewEnabled)
-                .accessibilityIdentifier(WalletAccessibilityID.offerDeclineButton)
-        }
-    }
-}
-
-private extension IssuanceCredentialPreview {
-    var cardSummary: CredentialCardSummary {
-        .offered(from: self)
+        WalletActions(
+            primary: WalletAction(requiresIssuerAuthentication ? "Continue to sign in" : "Accept",
+                enabled: isAcceptEnabled, identifier: WalletAccessibilityID.offerAcceptButton, perform: onAccept),
+            secondary: WalletAction("Decline", enabled: isReviewEnabled,
+                identifier: WalletAccessibilityID.offerDeclineButton, perform: onDecline)
+        )
     }
 }
