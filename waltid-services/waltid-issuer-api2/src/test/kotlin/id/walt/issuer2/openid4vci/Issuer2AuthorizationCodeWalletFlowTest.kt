@@ -2,6 +2,8 @@ package id.walt.issuer2.openid4vci
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.issuer2.service.openid4vci.encodeExternalLoginAuthorizationParameters
+import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.testsupport.Issuer2BrowserTestServer
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
@@ -21,7 +23,6 @@ import id.walt.issuer2.testsupport.createWalletFlowCredentialOffer
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.issuer2.testsupport.listSessions
 import id.walt.issuer2.testsupport.browser.Issuer2KeycloakAuthorizationDriver
-import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
@@ -66,8 +67,15 @@ class Issuer2AuthorizationCodeWalletFlowTest {
     @Test
     @Tag("browser")
     @Tag("keycloak")
-    fun walletCanCompleteAuthorizationCodeFlowWithDefaultKeycloak() = runBlocking {
-        Issuer2BrowserTestServer().use { server ->
+    fun walletCanCompleteAuthorizationCodeFlowWithDefaultKeycloak() = completeKeycloakFlow(false)
+
+    @Test
+    @Tag("browser")
+    @Tag("keycloak")
+    fun walletCanCompleteMandatoryParFlowWithDefaultKeycloak() = completeKeycloakFlow(true)
+
+    private fun completeKeycloakFlow(requirePar: Boolean) = runBlocking {
+        Issuer2BrowserTestServer(requirePar = requirePar).use { server ->
             server.start()
             val client = server.httpClient()
             try {
@@ -97,8 +105,31 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                     scenario = scenario,
                     issuerState = issuerState,
                 )
+                val loginUrl = if (requirePar) {
+                    val parsedUrl = Url(authorizationUrl)
+                    val issuer = "${server.baseUrl}/openid4vci"
+                    val headers = eudiAttestationAssembler().buildAttestationHeaders(
+                        instanceKey = JWKKey.generate(KeyType.secp256r1),
+                        clientId = EUDI_WALLET_CLIENT_ID, audience = issuer,
+                    )
+                    val pushed = client.post("/openid4vci/par") {
+                        header(ClientAttestationHeaders.CLIENT_ATTESTATION, headers.attestationJwt)
+                        header(ClientAttestationHeaders.CLIENT_ATTESTATION_POP, headers.popJwt)
+                        setBody(FormDataContent(parsedUrl.parameters))
+                    }
+                    assertEquals(HttpStatusCode.Created, pushed.status, pushed.bodyAsText())
+                    val requestUri = Json.parseToJsonElement(pushed.bodyAsText()).jsonObject["request_uri"]!!.jsonPrimitive.content
+                    io.ktor.http.URLBuilder("$issuer/authorize").apply {
+                        parameters.append("client_id", EUDI_WALLET_CLIENT_ID)
+                        parameters.append("request_uri", requestUri)
+                        parameters.append("state", "browser-tampering")
+                        parameters.append("redirect_uri", "https://attacker.example/callback")
+                        parameters.append("scope", "ungranted-scope")
+                        parameters.append("code_challenge", "invalid-browser-challenge")
+                    }.buildString()
+                } else authorizationUrl
                 val authorizationCode = Issuer2KeycloakAuthorizationDriver().loginAndGetAuthorizationCode(
-                    authorizeUrl = authorizationUrl,
+                    authorizeUrl = loginUrl,
                     redirectUri = WALLET_REDIRECT_URI,
                     expectedState = Url(authorizationUrl).parameters["state"],
                 )
@@ -342,7 +373,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
             scenario.credentialConfigurationId,
             authorizationSession.issuanceRequests.single().credentialConfigurationId,
         )
-        assertNotNull(authorizationSession.authorizationRequest?.get("authorization_details"))
+        assertNotNull(authorizationSession.authorizationRequest?.requestForm?.get("authorization_details"))
     }
 
     @Test
@@ -363,8 +394,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
         assertEquals(HttpStatusCode.Found, authorizationResponse.status, authorizationResponse.bodyAsText())
         val externalLoginRedirect = assertNotNull(authorizationResponse.headers[HttpHeaders.Location])
         assertTrue(externalLoginRedirect.contains("/openid4vci/external_login/"))
-        val authorizationRequestParameters = externalLoginRedirect
-            .substringAfter("/external_login/")
+        val authorizationRequestParameters = externalLoginRedirect.substringAfter("/external_login/")
             .decodeExternalLoginAuthorizationParameters()
         assertEquals(listOf(walletRedirectUri), authorizationRequestParameters["redirect_uri"])
 
@@ -379,7 +409,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
         )
         assertEquals(
             listOf(scenario.credentialConfigurationId),
-            authorizationSession.authorizationRequest?.get("scope"),
+            authorizationSession.authorizationRequest?.requestForm?.get("scope"),
         )
     }
 
@@ -433,10 +463,15 @@ class Issuer2AuthorizationCodeWalletFlowTest {
 
         assertEquals(HttpStatusCode.Found, authorizationResponse.status, authorizationResponse.bodyAsText())
         val externalLoginRedirect = assertNotNull(authorizationResponse.headers[HttpHeaders.Location])
-        val authorizationRequestParameters = externalLoginRedirect
-            .substringAfter("/external_login/")
+        val authorizationRequestParameters = externalLoginRedirect.substringAfter("/external_login/")
             .decodeExternalLoginAuthorizationParameters()
         assertEquals(listOf(walletRedirectUri), authorizationRequestParameters["redirect_uri"])
+        val tampered = (authorizationRequestParameters + ("issuer_state" to listOf("tampered")))
+            .encodeExternalLoginAuthorizationParameters()
+        val rejected = client.get(externalLoginRedirect.substringBeforeLast('/') + "/" + tampered)
+        assertEquals(HttpStatusCode.BadRequest, rejected.status, rejected.bodyAsText())
+        val sessionId = authorizationRequestParameters.getValue("_issuer2_session_id").single()
+        assertNull(client.listSessions().single { it.sessionId == sessionId }.externalAuthorizationState)
     }
 
     @Test

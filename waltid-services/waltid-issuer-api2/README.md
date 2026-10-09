@@ -547,3 +547,24 @@ These examples do not assert full EUDI compliance for every credential schema.
 
 Restart OSS issuer2 after editing the metadata/profile configuration files. Existing offers
 should be replaced with offers selecting the intended profile after a policy change.
+
+## Issuer2 pushed authorization requests
+
+In `issuer-service.conf`:
+
+```hocon
+enforcePushedAuthorizationRequests = false
+```
+
+`false` (default) allows direct authorization and PAR. `true` requires PAR.
+Discovery exposes the setting as `require_pushed_authorization_requests`.
+
+When required, POST the authorization parameters to `/par`, then open `/authorize`
+with `client_id` and the returned `request_uri`. References expire after 90 seconds by default.
+Login callbacks use the saved authorization request without redeeming the reference again.
+
+**Upgrade:** no migration is provided. Old PAR entries are rejected unless explicitly
+migrated to valid typed records preserving client binding, authentication information,
+and original expiry. Otherwise, clients must submit a new PAR request. Unmigrated
+raw-map authorization sessions are closed and must restart. Old unbound login links
+must also restart. Unaffected pre-authorized sessions remain usable.

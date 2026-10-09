@@ -16,6 +16,7 @@ import id.walt.issuer2.repository.fixtures.PreBatchIssuanceSession
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.testsupport.*
+import id.waltid.openid4vci.wallet.token.TokenRequestException
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.offers.AuthenticationMethod
@@ -109,6 +110,18 @@ class Issuer2LegacySessionContinuationTest {
             assertEquals(setOf(baseline.credentialConfigurationId), completed.issuanceResults.keys)
             assertEquals(listOf(baseline.credentialConfigurationId), completed.authorizedCredentialIdentifiers)
             assertTrue(Json.parseToJsonElement(assertNotNull(raw[offer.offerId])).jsonObject.containsKey("issuanceRequests"))
+            if (authMethod == AuthenticationMethod.AUTHORIZED && !tokenBeforeUpgrade && !legacySidecar) {
+                val legacyAuthorization = JsonObject(Json.encodeToJsonElement(baseline).jsonObject +
+                    ("authorizationRequest" to Json.encodeToJsonElement(mapOf(
+                        "client_id" to listOf("issuer2-wallet-test"), "scope" to listOf(baseline.credentialConfigurationId),
+                    )))).toString()
+                raw.set(offer.offerId, legacyAuthorization)
+                val failure = assertFailsWith<TokenRequestException> { exchange() }
+                assertEquals(400, failure.statusCode)
+                assertEquals("invalid_request", failure.oauthError)
+                assertTrue(assertNotNull(failure.oauthErrorDescription).contains("restart authorization"))
+                assertEquals(legacyAuthorization, raw[offer.offerId])
+            }
         }
     }
 

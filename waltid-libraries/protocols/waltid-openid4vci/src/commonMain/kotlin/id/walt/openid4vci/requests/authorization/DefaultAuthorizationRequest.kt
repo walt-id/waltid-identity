@@ -4,9 +4,11 @@ import id.walt.openid4vci.Client
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.requests.generateRequestId
+import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.time.Instant
 
+@Serializable
 data class DefaultAuthorizationRequest(
     override val id: String = generateRequestId(),
     override val requestedAt: Instant = Clock.System.now(),
@@ -45,3 +47,26 @@ data class DefaultAuthorizationRequest(
     override fun withAuthenticatedClient(authenticatedClient: AuthenticatedClient?): AuthorizationRequest =
         copy(authenticatedClient = authenticatedClient)
 }
+
+/** Snapshot the declared request fields for persistence across authentication. */
+fun AuthorizationRequest.toDefaultAuthorizationRequest(): DefaultAuthorizationRequest =
+    if (this is DefaultAuthorizationRequest) this else DefaultAuthorizationRequest(
+        id = id,
+        requestedAt = requestedAt,
+        client = client,
+        responseTypes = responseTypes,
+        handledResponseTypes = handledResponseTypes,
+        requestedScopes = requestedScopes,
+        grantedScopes = grantedScopes,
+        requestedAudience = requestedAudience,
+        grantedAudience = grantedAudience,
+        redirectUri = redirectUri,
+        state = state,
+        issuerState = issuerState,
+        responseMode = responseMode,
+        defaultResponseMode = defaultResponseMode,
+        requestForm = requestForm,
+        issClaim = issClaim,
+        authorizationDetails = authorizationDetails,
+        authenticatedClient = authenticatedClient,
+    )

@@ -8,6 +8,7 @@ import id.walt.openid4vci.repository.par.DefaultPARRecord
 import id.walt.openid4vci.repository.par.DuplicatePARRecordException
 import id.walt.openid4vci.repository.par.PARRepository
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
+import id.walt.openid4vci.requests.authorization.toDefaultAuthorizationRequest
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import kotlin.time.Clock
@@ -34,7 +35,9 @@ class PushedAuthorizationRequestEndpointHandler(
         val record = try {
             DefaultPARRecord(
                 requestId = requestId,
-                requestParameters = authorizationRequest.requestForm.withoutEndpointOnlyParameters(),
+                authorizationRequest = authorizationRequest.toDefaultAuthorizationRequest().copy(
+                    requestForm = authorizationRequest.requestForm.withoutEndpointOnlyParameters(),
+                ),
                 createdAt = now,
                 expiresAt = now + requestLifetimeSeconds.seconds,
                 clientMetadata = clientAuthentication,
