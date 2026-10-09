@@ -187,7 +187,13 @@ class E2ETest(
             result.exceptionOrNull()!!.printStackTrace()
         }
 
-        term.println(TextStyles.bold(TextColors.cyan("---===  End  ${id}. test: $name === ---") + " " + truncatedResult(result.toSuccessString())) + "\n")
+        term.println(
+            TextStyles.bold(
+                TextColors.cyan("---===  End  ${id}. test: $name === ---") + " " + truncatedResult(
+                    result.toSuccessString()
+                )
+            ) + "\n"
+        )
 
         val overallSuccess = testResults.count { it.isSuccess }
         val failed = testResults.size - overallSuccess

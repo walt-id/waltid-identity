@@ -121,7 +121,7 @@ class SameSubjectDnAnchorsTests {
                 clientId.authenticateX509SanDns(clientId, sanDnsContext(presented), trust),
                 "includeRoot=$includeRoot"
             )
-            assertEquals(ClientIdError.InvalidSignature, failure.error, "includeRoot=$includeRoot")
+            assertEquals(ClientIdError.X509TrustAnchorMismatch, failure.error, "includeRoot=$includeRoot")
         }
     }
 
@@ -155,7 +155,7 @@ class SameSubjectDnAnchorsTests {
                 clientId.authenticateX509Hash(clientId, hashContext(presented, clientId), trust),
                 "includeRoot=$includeRoot"
             )
-            assertEquals(ClientIdError.InvalidSignature, failure.error, "includeRoot=$includeRoot")
+            assertEquals(ClientIdError.X509TrustAnchorMismatch, failure.error, "includeRoot=$includeRoot")
         }
     }
 

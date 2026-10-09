@@ -2,7 +2,6 @@ package id.walt.certificate.x509.validation
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateTrustStore
-import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
 import id.walt.crypto2.CryptoRuntime
 
@@ -25,12 +24,7 @@ class X509CertificateChainValidator(
     ): ValidationResult {
         val trustStoreToUse = trustOverride ?: trustStore
         val chain = X509CertificateChain.of(certificateChain)
-        // Lets validators select the issuer by key when several trusted CAs share a subject DN.
-        val issuerSignatureValidator = validators
-            .filterIsInstance<X509CertificateSignatureValidator>()
-            .firstOrNull()
-            ?.signatureValidator
-        val context = ValidationContext(cryptoRuntime, chain.size, trustStoreToUse, issuerSignatureValidator)
+        val context = ValidationContext(cryptoRuntime, chain.size, trustStoreToUse)
         for (i in 0..<chain.size) {
             validators.forEach { validator ->
                 val chainEntry = chain.getEntry(i)
