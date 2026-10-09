@@ -4,7 +4,6 @@ import app.cash.licensee.LicenseeExtension
 import app.cash.licensee.UnusedAction
 import app.cash.licensee.ViolationAction
 import org.gradle.api.Project
-import org.gradle.api.artifacts.VersionCatalogsExtension
 
 enum class LicenseePolicy {
     Apache,
@@ -69,13 +68,6 @@ object LicenseePolicies {
         "LGPL-3.0-or-later",
     )
 
-    private val gplSpdxIds = listOf(
-        "GPL-2.0-only",
-        "GPL-2.0-or-later",
-        "GPL-3.0-only",
-        "GPL-3.0-or-later",
-    )
-
     private val allowedUrls = listOf(
         "https://www.bouncycastle.org/licence.html" to "Bouncy Castle Licence",
         "http://www.bouncycastle.org/licence.html" to "Bouncy Castle Licence",
@@ -114,12 +106,6 @@ object LicenseePolicies {
         "http://www.oracle.com/technetwork/licenses/upl-license-2927578.html" to "UPL-1.0",
     )
 
-    /**
-     * GNU's HTML page for LGPL-3.0. Licensee's SPDX map only knows the standalone and .txt URLs,
-     * so LGPL-3.0-only does not match argon2-jvm's POM.
-     */
-    private const val LGPL_3_HTML = "https://www.gnu.org/licenses/lgpl-3.0.en.html"
-
     fun shouldCheck(project: Project): Boolean {
         val name = project.name
         return !name.endsWith("-test") && !name.endsWith("-tests")
@@ -143,9 +129,6 @@ object LicenseePolicies {
         val ids = (permissiveSpdxIds + weakCopyleftSpdxIds).toMutableList()
         if (policy == LicenseePolicy.Binary || policy == LicenseePolicy.Saas) {
             ids += lgplSpdxIds
-        }
-        if (policy == LicenseePolicy.Saas) {
-            ids += gplSpdxIds
         }
         return ids
     }
@@ -183,40 +166,17 @@ object LicenseePolicies {
                 because(reason)
             }
         }
-        allowArgon2(project, licensee, policy)
         ignoreNameOnlyMitCoordinates(licensee)
-        allowWalletMysqlConnector(project, licensee, policy)
         licensee.unusedAction(UnusedAction.IGNORE)
         licensee.violationAction(ViolationAction.FAIL)
         project.logger.info("Configured Licensee policy {} for {}", policy, project.path)
     }
 
     /**
-     * Binary and SaaS already accept LGPL, so the unrecognized HTML URL is enough and does not
-     * track a version. Apache does not accept LGPL in general; argon2 stays a coordinate
-     * exception whose version is the `argon2-jvm` catalog entry.
-     */
-    private fun allowArgon2(project: Project, licensee: LicenseeExtension, policy: LicenseePolicy) {
-        if (policy == LicenseePolicy.Binary || policy == LicenseePolicy.Saas) {
-            licensee.allowUrl(LGPL_3_HTML) {
-                because("LGPL-3.0-only. Licensee does not map GNU's HTML license page to the SPDX id.")
-            }
-            return
-        }
-        val version = project.identityCatalogVersion("argon2-jvm") ?: return
-        val reason = "LGPL-3.0-only already shipped by the identity stack. Version follows the argon2-jvm catalog entry."
-        licensee.allowDependency("de.mkammerer", "argon2-jvm", version) {
-            because(reason)
-        }
-        licensee.allowDependency("de.mkammerer", "argon2-jvm-nolibs", version) {
-            because(reason)
-        }
-    }
-
-    /**
-     * These POMs say "MIT License" and include no URL, in every release checked through msal4j 1.26.0.
-     * [LicenseeExtension.allowDependency] requires a version, so a pin fails on every Azure SDK bump
-     * without a license change. Ignoring the coordinate keeps the version free to move.
+     * These POMs say "MIT License" and include no URL. Licensee 1.14 can only
+     * allow a coordinate at one exact version, so a pin fails on every Azure SDK
+     * bump. The published license is MIT; ignoring the coordinate keeps that
+     * version free to move.
      */
     private fun ignoreNameOnlyMitCoordinates(licensee: LicenseeExtension) {
         listOf("msal4j", "msal4j-persistence-extension").forEach { artifact ->
@@ -224,33 +184,5 @@ object LicenseePolicies {
                 because("MIT License with no URL or SPDX identifier.")
             }
         }
-    }
-
-    /**
-     * MySQL Connector/J is GPL-2.0-only WITH Universal-FOSS-exception-1.0. The POM has that name
-     * and no URL, so allowing GPL-2.0-only would not match it and would also accept plain GPLv2.
-     * The FOSS exception permits combination with an Apache-2.0 work. It does not permit shipping
-     * the connector inside a proprietary binary, so the binary policy never allows this coordinate.
-     */
-    private fun allowWalletMysqlConnector(
-        project: Project,
-        licensee: LicenseeExtension,
-        policy: LicenseePolicy,
-    ) {
-        if (policy == LicenseePolicy.Binary || !project.path.endsWith(":waltid-wallet-api")) return
-        val version = project.identityCatalogVersion("mysql")
-            ?: error("waltid-wallet-api requires catalog version 'mysql' to allow mysql-connector-j")
-        licensee.allowDependency("com.mysql", "mysql-connector-j", version) {
-            because(
-                "GPL-2.0-only WITH Universal-FOSS-exception-1.0 for the Apache-2.0 wallet service. " +
-                    "Version follows the mysql catalog entry. Not allowed on the binary policy.",
-            )
-        }
-    }
-
-    private fun Project.identityCatalogVersion(name: String): String? {
-        val catalogs = extensions.findByType(VersionCatalogsExtension::class.java) ?: return null
-        val catalog = catalogs.find("identityLibs").orElse(null) ?: return null
-        return catalog.findVersion(name).orElse(null)?.requiredVersion
     }
 }

@@ -167,9 +167,7 @@ canonicalize-npm = "2.0.0"
 uuid-npm = "9.0.1"
 hoplite = "2.9.0"
 playwright = "1.60.0"
-argon2-jvm = "2.11"
 jedis = "5.2.0"
-mysql = "9.7.0"
 mssql = "13.4.0.jre11"
 webpush = "1.3.0"
 coroutines-service-tests = "1.10.2"
@@ -470,9 +468,7 @@ multipaz-jvm = { module = "org.multipaz:multipaz-jvm", version.ref = "multipaz" 
 multipaz-android = { module = "org.multipaz:multipaz-android", version.ref = "multipaz" }
 kotlinx-browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version.ref = "kotlinx-browser" }
 playwright = { module = "com.microsoft.playwright:playwright", version.ref = "playwright" }
-argon2-jvm = { module = "de.mkammerer:argon2-jvm", version.ref = "argon2-jvm" }
 jedis = { module = "redis.clients:jedis", version.ref = "jedis" }
-mysql-connector = { module = "com.mysql:mysql-connector-j", version.ref = "mysql" }
 mssql-jdbc = { module = "com.microsoft.sqlserver:mssql-jdbc", version.ref = "mssql" }
 webpush = { module = "com.interaso:webpush", version.ref = "webpush" }
 kotlinx-coroutines-service-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines-service-tests" }
