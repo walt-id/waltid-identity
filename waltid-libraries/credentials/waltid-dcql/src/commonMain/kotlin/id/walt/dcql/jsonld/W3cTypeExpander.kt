@@ -19,7 +19,8 @@ import kotlinx.serialization.json.contentOrNull
  * definition apply to that term's properties, not to the `type` values themselves.
  * `@import` and document-base resolution are not applied. A context document with no `@context`
  * is ignored. An unavailable context document leaves unprotected expansions that it could have
- * changed unpublished, so those inferred IRIs do not match.
+ * changed unpublished, including a later alias of an uncertain prefix or term, so those inferred
+ * IRIs do not match.
  */
 object W3cTypeExpander {
     private val log = KotlinLogging.logger {}
@@ -67,6 +68,7 @@ object W3cTypeExpander {
             vocab = processed.vocab,
             uncertainTerms = processed.uncertainTerms.toSet(),
             sawUnresolvedContext = processed.sawUnresolvedContext,
+            vocabUncertain = processed.vocabUncertain,
         )
         return remember(key, frozen)
     }
@@ -140,9 +142,13 @@ object W3cTypeExpander {
         )
         when (val vocab = context["@vocab"]) {
             null -> Unit
-            is JsonNull -> session.active.vocab = null
+            is JsonNull -> {
+                session.active.vocab = null
+                session.active.vocabUncertain = false
+            }
             is JsonPrimitive -> if (vocab.isString) {
                 session.active.vocab = expandIri(vocab.content, session.active, vocabRelative = true, session)
+                session.active.vocabUncertain = expansionIsUncertain(vocab.content, session.active)
             }
             else -> Unit
         }
@@ -182,7 +188,21 @@ object W3cTypeExpander {
             return
         }
         session.active.terms[term] = defined.copy(protected = existing?.protected == true || defined.protected)
-        session.active.uncertainTerms.remove(term)
+        if (definedValueIsUncertain(value, session.active)) {
+            session.active.uncertainTerms.add(term)
+        } else {
+            session.active.uncertainTerms.remove(term)
+        }
+    }
+
+    private fun definedValueIsUncertain(value: JsonElement, active: JsonLdActiveContext): Boolean = when (value) {
+        is JsonPrimitive -> value.isString && !value.content.startsWith("@") && expansionIsUncertain(value.content, active)
+        is JsonObject -> when (val id = value["@id"]) {
+            null -> active.vocabUncertain
+            is JsonPrimitive -> id.isString && !id.content.startsWith("@") && expansionIsUncertain(id.content, active)
+            else -> false
+        }
+        else -> false
     }
 
     private fun createTerm(session: TermDefinitionSession, term: String, value: JsonElement): JsonLdTerm? = when (value) {
@@ -282,6 +302,7 @@ internal class JsonLdActiveContext(
     var vocab: String? = null,
     uncertainTerms: Set<String> = emptySet(),
     var sawUnresolvedContext: Boolean = false,
+    var vocabUncertain: Boolean = false,
 ) {
     val terms: MutableMap<String, JsonLdTerm> = terms.toMutableMap()
     val uncertainTerms: MutableSet<String> = uncertainTerms.toMutableSet()
@@ -289,6 +310,7 @@ internal class JsonLdActiveContext(
 
     fun noteUnresolvedContext() {
         sawUnresolvedContext = true
+        if (vocab != null) vocabUncertain = true
         for ((name, term) in terms) {
             if (!term.protected) uncertainTerms.add(name)
         }
