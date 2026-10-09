@@ -167,6 +167,8 @@ runs:
           -scheme iosApp \
           -destination "${{ inputs.simulator-destination }}" \
           -only-testing:iosAppTests \
+          -only-testing:iosAppUITests/MockWalletUITests/testWalletReadinessOutlivesTheSuccessBannerAcrossRestart \
+          -only-testing:iosAppUITests/MockWalletUITests/testCredentialsStayLoadingUntilTheInitialReadCompletes \
           -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2 \
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived \
