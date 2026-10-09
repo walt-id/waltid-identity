@@ -41,7 +41,7 @@ fun WalletDemoPresentationCredentialOption.informationFields(
     val items = toRequestedDisclosureGroup()?.items.orEmpty()
     return disclosures.mapIndexedNotNull { index, disclosure ->
         val item = items.getOrNull(index) ?: return@mapIndexedNotNull null
-        // Unrequested protocol metadata belongs in full details, not among personal information.
+        // Protocol metadata is not personal information; keep requested metadata visible.
         if (!disclosure.requested &&
             CredentialDisplayVocabulary.groupKind(ClaimPath.disclosure(index, disclosure.path, format), format) == ClaimGroupKind.Technical)
             return@mapIndexedNotNull null
@@ -57,15 +57,3 @@ fun WalletDemoPresentationCredentialOption.informationFields(
 /** Brief warning only for unavoidable personal information beyond the requested fields. */
 fun WalletDemoPresentationCredentialOption.additionalInformationLabels(): List<String> =
     informationFields(emptySet()).filter { it.alwaysIncluded }.map { it.item.label }.distinct()
-
-fun List<SharingInformationField>.disclosureStatus(item: ClaimItem): String {
-    val matches = filter { field ->
-        val prefix = field.item.pathComponents
-        prefix.isNotEmpty() && item.pathComponents.take(prefix.size) == prefix
-    }
-    return when {
-        matches.any { it.included && it.alwaysIncluded } -> "Always included"
-        matches.any { it.included } -> "Requested"
-        else -> "Not shared"
-    }
-}

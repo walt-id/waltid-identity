@@ -1079,13 +1079,11 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(samplePresentationCredentialOption.selection.id)).performScrollTo().assertIsDisplayed()
 
         onNodeWithText("Disclosure 7").performScrollTo().assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(samplePresentationCredentialOption.selection.id)).performScrollTo().performClick()
-        onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
-        onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Family name").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Value 7").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Given name").assertDoesNotExist()
+        onNodeWithText("Family name").assertDoesNotExist()
         onAllNodesWithTag("wallet.credentialDetailsScreen").assertCountEquals(0)
-        onNodeWithTag("wallet-detail-back").performClick()
-        onAllNodesWithTag(WalletUiTestTags.PresentationClaimsDialog).assertCountEquals(0)
+        onNodeWithText("Details").assertDoesNotExist()
 
         onNodeWithTag("wallet.presentationSubmitButton").performSemanticsAction(SemanticsActions.OnClick)
 
@@ -1181,25 +1179,16 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag(WalletUiTestTags.claim(portraitDisclosurePath)).performScrollTo().assertIsDisplayed()
         awaitEnabledImage(portraitDisclosurePath)
 
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(pathOnlyPortraitDisclosureCredentialOption.selection.id)).performScrollTo().performClick()
         onAllNodesWithTag(WalletUiTestTags.CredentialDetailsScreen).assertCountEquals(0)
         onAllNodesWithText("$.portrait").assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.claim("portrait")).performScrollTo().assertIsDisplayed()
-        awaitTaggedNode(WalletUiTestTags.claimImage("portrait"))
-        awaitEnabledImage("portrait")
-        onNodeWithTag(WalletUiTestTags.claimImage("portrait"))
-            .performScrollTo()
-            .assertIsDisplayed()
-            .assertHasClickAction()
-            .performClick()
-        onNodeWithTag(WalletUiTestTags.claimImageViewer("portrait")).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath))
+            .performScrollTo().assertIsDisplayed().assertHasClickAction().performClick()
+        onNodeWithTag(WalletUiTestTags.claimImageViewer(portraitDisclosurePath)).assertIsDisplayed()
         onNodeWithContentDescription("Full-screen credential image").assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.claimImageViewerClose("portrait"))
-            .assertIsDisplayed()
-            .performClick()
-        onAllNodesWithTag(WalletUiTestTags.claimImageViewer("portrait")).assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.claimImage("portrait")).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImageViewerClose(portraitDisclosurePath)).assertIsDisplayed().performClick()
+        onAllNodesWithTag(WalletUiTestTags.claimImageViewer(portraitDisclosurePath)).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.PresentationReview).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImage(portraitDisclosurePath)).assertIsDisplayed()
     }
 
     fun presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails() = runComposeUiTest {
@@ -1227,7 +1216,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithText(sampleDidClientId).performScrollTo().assertIsDisplayed()
     }
 
-    fun presentationDetailsResolveDuplicateCredentialOptionsIndependently() = runComposeUiTest {
+    fun presentationInformationUnionsDuplicateCredentialOptions() = runComposeUiTest {
         val identityDisclosure = WalletDemoPresentationDisclosureSelection("identity", "cred-1", "$.given_name")
         val ageDisclosure = WalletDemoPresentationDisclosureSelection("age", "cred-1", "$.age_over_18")
         val identityOption = samplePresentationCredentialOption.copy(
@@ -1284,14 +1273,13 @@ class WalletDemoAppTestScenarios(
         onNodeWithText("Identity disclosure").performScrollTo().assertIsDisplayed()
         onNodeWithText("Age disclosure").performScrollTo().assertIsDisplayed()
         onNodeWithText("Over 18").performScrollTo().assertIsDisplayed()
-        onAllNodesWithTag(WalletUiTestTags.presentationClaimsToggle(ageOption.selection.id)).assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(identityOption.selection.id)).performScrollTo().performClick()
-        onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Age over 18").performScrollTo().assertIsDisplayed()
+        onAllNodesWithText("Identity disclosure").assertCountEquals(1)
+        onAllNodesWithText("Age disclosure").assertCountEquals(1)
+        onNodeWithText("Details").assertDoesNotExist()
         onAllNodesWithTag(WalletUiTestTags.CredentialDetailsScreen).assertCountEquals(0)
     }
 
-    fun presentDetailsStayScopedToPresentTabNavigationStack() = runComposeUiTest {
+    fun presentationReviewSurvivesReturningFromTheWallet() = runComposeUiTest {
         val wallet = WalletUiTestWallet(
             credentials = listOf(sampleCredential),
             presentationPreview = samplePresentationPreview,
@@ -1307,12 +1295,8 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag("wallet.presentButton").performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(samplePresentationCredentialOption.selection.id)).performScrollTo().performClick()
-        onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
-        onNodeWithText("Requested").performScrollTo().assertIsDisplayed()
-        onAllNodesWithTag("wallet.credentialDetailsScreen").assertCountEquals(0)
-        onNodeWithTag("wallet-detail-back").performClick()
-        onAllNodesWithTag(WalletUiTestTags.PresentationClaimsDialog).assertCountEquals(0)
+        val optional = WalletDemoPresentationDisclosureSelection("pid", "cred-1", "$.disclosure_1")
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().performClick().assertIsOn()
 
         runOnIdle { controller.selectTab(WalletDemoTab.Credentials) }
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))
@@ -1321,9 +1305,7 @@ class WalletDemoAppTestScenarios(
         runOnIdle { controller.selectTab(WalletDemoTab.Present) }
         onNodeWithTag(WalletUiTestTags.PresentationReview).assertIsDisplayed()
         onAllNodesWithTag("wallet.credentialDetailsScreen").assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(samplePresentationCredentialOption.selection.id))
-            .performScrollTo()
-            .assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.presentationDisclosureToggle(optional.id)).performScrollTo().assertIsOn()
     }
 
     fun presentTabDisablesUrlControlsWhilePreviewing() = runComposeUiTest {
@@ -1986,12 +1968,7 @@ class WalletDemoAppTestScenarios(
         onNodeWithTag("wallet.presentButton").performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
 
-        val selectionId = samplePresentationCredentialOption.selection.id
-        assertTrue(selectionId != "cred-1")
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(selectionId)).performScrollTo().performClick()
-        onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
-        onAllNodesWithTag(WalletUiTestTags.CredentialDetailsScreen).assertCountEquals(0)
-        onNodeWithTag("wallet-detail-back").performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationReview).assertIsDisplayed()
 
         runOnIdle { controller.selectTab(WalletDemoTab.Credentials) }
         awaitTaggedNode(WalletUiTestTags.credentialCard("cred-1"))

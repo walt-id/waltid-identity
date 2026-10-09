@@ -3,7 +3,6 @@ package id.walt.walletdemo.compose.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -23,14 +22,9 @@ internal fun ProximityInformationGroup(
     onToggleElement: (Int, ProximityElementReference) -> Unit,
     enabled: Boolean,
 ) {
-    val navigation = LocalWalletReviewNavigation.current
-    var detailsOpen by rememberSaveable(document.requestIndex, credential.credentialId) { mutableStateOf(false) }
     val summary = details?.toCardDisplayData()
     ReviewInformationGroup(summary?.title ?: credential.label ?: stringResource(Res.string.proximity_generic_credential),
-        summary?.issuer ?: credential.issuer,
-        onDetails = details?.let { {
-            if (navigation != null) navigation.openStored(credential.credentialId) else detailsOpen = true
-        } }, detailsModifier = Modifier.testTag("proximity-details:${document.requestIndex}")) {
+        summary?.issuer ?: credential.issuer) {
         if (!document.requiredElements.all { required -> credential.requestedElements.any {
             it.namespace == required.namespace && it.elementIdentifier == required.elementIdentifier
         } }) Text(stringResource(Res.string.proximity_required_data_unavailable), color = MaterialTheme.colorScheme.error)
@@ -67,11 +61,4 @@ internal fun ProximityInformationGroup(
             })
         }
     }
-    if (detailsOpen && details != null) ReviewCredentialDetailsSheet(details,
-        claimStatus = { proximityDisclosureStatus(it, listOf(selection)) }, onDismiss = { detailsOpen = false })
 }
-
-internal fun proximityDisclosureStatus(item: ClaimItem, selections: List<WalletDemoProximityDocumentSelection>): String =
-    if (selections.any { it.disclosedElements.any { element ->
-        item.pathComponents.take(2) == listOf(element.namespace, element.elementIdentifier)
-    } }) "Requested" else "Not shared"

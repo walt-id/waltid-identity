@@ -10,6 +10,8 @@ struct CredentialsTabView: View {
     let onOpenSettings: () -> Void
     var onScan: (() -> Void)? = nil
     var onShareNearby: (() -> Void)? = nil
+    var nearbyPreparing = false
+    var nearbyEnabled = true
     @Environment(\.walletDemoBranding) private var branding
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var confirmDelete = false
@@ -91,21 +93,6 @@ struct CredentialsTabView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(selectedDetailsID != nil)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Group {
-                        if selectedDetailsID != nil {
-                            Button {
-                                closeDetails()
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 14, weight: .semibold))
-                            }
-                            .accessibilityLabel("Close credential information")
-                            .frame(minWidth: 44, minHeight: 44)
-                            .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
-                        }
-                    }
-                }
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Group {
                         if selectedDetailsID != nil {
@@ -123,10 +110,20 @@ struct CredentialsTabView: View {
                                     .font(.system(size: 16, weight: .semibold))
                             }
                             .accessibilityIdentifier(WalletAccessibilityID.detailsMenu)
+                            Button(action: closeDetails) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .accessibilityLabel("Close credential information")
+                            .frame(minWidth: 44, minHeight: 44)
+                            .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
                         } else {
                             if let onShareNearby {
-                                Button(action: onShareNearby) { Image(systemName: "dot.radiowaves.left.and.right") }
-                                    .accessibilityLabel("Share nearby")
+                                Button(action: onShareNearby) {
+                                    WalletToolbarIcon("dot.radiowaves.left.and.right", isBusy: nearbyPreparing)
+                                }
+                                    .accessibilityLabel(nearbyPreparing ? "Cancel starting nearby sharing" : "Share nearby")
+                                    .disabled(!nearbyEnabled)
                                     .accessibilityIdentifier(WalletAccessibilityID.proximityStartButton)
                             }
                             if let onScan {

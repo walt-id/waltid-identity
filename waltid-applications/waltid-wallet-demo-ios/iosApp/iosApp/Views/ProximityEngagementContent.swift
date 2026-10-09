@@ -16,30 +16,30 @@ struct ProximityEngagementContent: View {
             ScrollView {
                 if viewModel.displayedEngagement == .qr {
                     qrContent(payload: viewModel.qrPayload, viewport: geometry.size)
+                } else if viewModel.displayedEngagement == nil && viewModel.preparedSharing == nil {
+                    ProximityEngagementMenu(methods: viewModel.engagementChoices, approvalMode: $approvalMode,
+                        enabled: !viewModel.refreshingEngagement, canChangeConnectionOptions: viewModel.canChangeConnectionOptions,
+                        onShowEngagement: viewModel.showEngagement,
+                        onConnectionOptions: onConnectionOptions)
                 } else {
                     VStack(alignment: .leading, spacing: 12) {
                         header
                         if viewModel.displayedEngagement == nil { choices }
-                        footer
+                        footer.padding(.top, 12)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
         .onPreferenceChange(ProximityEngagementHeightKey.self) { sectionHeights = $0 }
+        .onChange(of: viewModel.preparedSharing.map { ObjectIdentifier($0) }) { _ in showApprovedData = false }
         .sheet(isPresented: $showApprovedData) {
-            NavigationView {
-                ScrollView {
-                    if let sharing = viewModel.preparedSharing {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Only the approved reader and data can be used. Cancel to withdraw this approval.")
-                            ProximityDisclosureSummary(review: sharing.review, submission: sharing.submission, credentialDetailsByID: credentialDetailsByID, initiallyExpanded: true)
-                        }.padding()
-                    }
+            WalletDetailSheet("Approved data", onDismiss: { showApprovedData = false }, closeIdentifier: "proximity-approved-data-close") {
+                if let sharing = viewModel.preparedSharing {
+                    Text("Only the approved reader and data can be used. Cancel to withdraw this approval.")
+                    ProximityDisclosureSummary(review: sharing.review, submission: sharing.submission, credentialDetailsByID: credentialDetailsByID, initiallyExpanded: true)
                 }
-                .navigationTitle("Approved data").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showApprovedData = false } } }
-            }.navigationViewStyle(.stack)
+            }
         }
     }
 
@@ -123,42 +123,99 @@ struct ProximityEngagementContent: View {
     }
 
     private var footer: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if viewModel.preparedSharing == nil {
-                ProximityApprovalModeChoice(mode: $approvalMode)
-                    .disabled(viewModel.refreshingEngagement)
-            } else {
-                Button("Approved data") { showApprovedData = true }.frame(maxWidth: .infinity, minHeight: 44)
-            }
+        VStack(alignment: .leading, spacing: 12) {
             if let method = viewModel.displayedEngagement, viewModel.engagementChoices.count > 1 {
                 Button(method == .qr ? String(localized: "Hold near the reader instead") : String(localized: "Show QR code instead")) {
                     viewModel.showEngagement(method == .qr ? .nfc : .qr)
                 }.frame(maxWidth: .infinity, minHeight: 44)
                     .disabled(viewModel.refreshingEngagement)
             }
-            if let onConnectionOptions {
-                WalletSection { WalletNavigationRow("Connection options", symbol: "network", action: onConnectionOptions)
-                    .disabled(!viewModel.canChangeConnectionOptions)
-                    .accessibilityIdentifier("proximity-connection-options") }
-            }
+            ProximitySharingOptions(approvalMode: $approvalMode, prepared: viewModel.preparedSharing != nil,
+                enabled: !viewModel.refreshingEngagement, canChangeConnectionOptions: viewModel.canChangeConnectionOptions,
+                onApprovedData: { showApprovedData = true }, onConnectionOptions: onConnectionOptions)
             if let route = viewModel.connectedRoute { ProximityConnectionDetails(route: route) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var choices: some View {
+        ProximityConnectionChoices(methods: viewModel.engagementChoices, enabled: !viewModel.refreshingEngagement,
+            onShowEngagement: viewModel.showEngagement)
+    }
+
+}
+
+/// Pure menu shared by the live sheet and its pre-presentation size measurement.
+struct ProximityEngagementMenu: View {
+    let methods: [ProximityEngagementMethod]
+    @Binding var approvalMode: WalletDemoProximityApprovalMode
+    var enabled = true
+    var canChangeConnectionOptions = true
+    let onShowEngagement: (ProximityEngagementMethod) -> Void
+    var onConnectionOptions: (() -> Void)? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Choose how to connect to the reader.")
+                .font(.subheadline).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ProximityConnectionChoices(methods: methods, enabled: enabled, onShowEngagement: onShowEngagement)
+            ProximitySharingOptions(approvalMode: $approvalMode, enabled: enabled,
+                canChangeConnectionOptions: canChangeConnectionOptions, onConnectionOptions: onConnectionOptions)
+                .padding(.top, 12)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct ProximityConnectionChoices: View {
+    let methods: [ProximityEngagementMethod]
+    let enabled: Bool
+    let onShowEngagement: (ProximityEngagementMethod) -> Void
+
+    var body: some View {
         WalletSection {
-            ForEach(Array(viewModel.engagementChoices.enumerated()), id: \.offset) { index, method in
-                if index > 0 { Divider() }
-                WalletNavigationRow(method == .qr ? String(localized: "Show QR code") : String(localized: "Hold near the reader"),
-                    subtitle: method == .qr ? String(localized: "Let the reader scan your screen.") : String(localized: "Bring your phone close to connect."),
-                    symbol: method == .qr ? "qrcode" : "wave.3.right") { viewModel.showEngagement(method) }
-                    .disabled(viewModel.refreshingEngagement)
-                    .accessibilityIdentifier(method == .qr ? "proximity-show-Qr" : "proximity-show-Nfc")
+            VStack(spacing: 0) {
+                ForEach(Array(methods.enumerated()), id: \.offset) { index, method in
+                    if index > 0 { Divider().padding(.horizontal, 16) }
+                    WalletNavigationRow(method == .qr ? String(localized: "Show QR code") : String(localized: "Hold near the reader"),
+                        subtitle: method == .qr ? String(localized: "Let the reader scan your screen.") : String(localized: "Bring your phone close to connect."),
+                        symbol: method == .qr ? "qrcode" : "wave.3.right") { onShowEngagement(method) }
+                        .disabled(!enabled)
+                        .accessibilityIdentifier(method == .qr ? "proximity-show-Qr" : "proximity-show-Nfc")
+                }
             }
         }
     }
 
+}
+
+private struct ProximitySharingOptions: View {
+    @Binding var approvalMode: WalletDemoProximityApprovalMode
+    var prepared = false
+    var enabled = true
+    var canChangeConnectionOptions = true
+    var onApprovedData: () -> Void = {}
+    var onConnectionOptions: (() -> Void)? = nil
+
+    var body: some View {
+        WalletSection {
+            VStack(spacing: 0) {
+                if prepared {
+                    Button("Approved data", action: onApprovedData).frame(maxWidth: .infinity, minHeight: 44)
+                } else {
+                    ProximityApprovalModeChoice(mode: $approvalMode)
+                        .padding(.horizontal, 16).padding(.vertical, 8).disabled(!enabled)
+                }
+                if let onConnectionOptions {
+                    Divider().padding(.horizontal, 16)
+                    WalletNavigationRow("Connection options", symbol: "network", action: onConnectionOptions)
+                        .disabled(!canChangeConnectionOptions)
+                        .accessibilityIdentifier("proximity-connection-options")
+                }
+            }
+        }
+    }
 }
 
 private enum ProximityEngagementSection { case header, footer }

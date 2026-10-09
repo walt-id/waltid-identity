@@ -98,9 +98,7 @@ public struct SharingReviewView: View {
                     }
                     ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
                         if index > 0 { Divider() }
-                        ReviewInformationGroup(title: group.details.cardSummary.title, issuer: group.details.cardSummary.issuer,
-                            details: group.details, detailsIdentifier: WalletAccessibilityID.presentationClaimsToggle(group.options[0].selection.id),
-                            claimStatus: { group.fields.disclosureStatus($0) }) {
+                        ReviewInformationGroup(title: group.details.cardSummary.title, issuer: group.details.cardSummary.issuer) {
                             ForEach(Array(group.fields.enumerated()), id: \.element.item.id) { index, field in
                                 if index > 0 { Divider() }
                                 if !field.optionalSelections.isEmpty && !isReadOnly {

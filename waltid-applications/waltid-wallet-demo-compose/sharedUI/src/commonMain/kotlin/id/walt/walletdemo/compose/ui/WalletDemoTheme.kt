@@ -12,6 +12,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import id.walt.walletdemo.compose.ui.components.CssColorParser
+import id.walt.walletdemo.compose.ui.components.WalletMotion
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -77,6 +78,7 @@ fun WalletDemoTheme(
     val preferences = rememberWalletVisualPreferences()
     CompositionLocalProvider(LocalWalletDemoBranding provides branding, LocalWalletVisualPreferences provides preferences) {
         MaterialTheme(
+            motionScheme = if (preferences.reduceMotion) WalletMotion.reduced else WalletMotion.standard,
             colorScheme = if (isSystemInDarkTheme()) darkColorScheme(
                 primary = branding.secondary,
                 onPrimary = branding.onSecondary,

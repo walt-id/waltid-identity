@@ -88,15 +88,18 @@ internal data class CredentialDetailsChrome(
 
 @Composable
 internal fun CredentialDetailsTopBar(chrome: CredentialDetailsChrome) {
-    WalletScreenHeader(title = chrome.title, leading = {
-        if (chrome.onBack != null) IconButton(chrome.onBack, Modifier.testTag("wallet-detail-back")) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-        } else CredentialDetailsCloseButton(onClose = chrome.onClose)
+    WalletScreenHeader(title = chrome.title, leading = chrome.onBack?.let { back ->
+        {
+            IconButton(back, Modifier.testTag("wallet-detail-back")) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+            }
+        }
     }) {
         CredentialDetailsOverflowMenu(
             onCopy = chrome.onCopy,
             onDelete = chrome.onDelete,
         )
+        CredentialDetailsCloseButton(onClose = chrome.onClose)
     }
 }
 

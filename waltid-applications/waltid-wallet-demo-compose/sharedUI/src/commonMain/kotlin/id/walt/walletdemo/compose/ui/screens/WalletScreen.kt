@@ -98,6 +98,7 @@ internal fun WalletScreen(
 
     val scanner: @Composable () -> Unit = {
         WalletScanScreen(onBack = { showingScanner = false }, onOpen = { value, kind ->
+            if (!showingScanner) return@WalletScanScreen
             showingScanner = false
             when (kind) {
                 WalletLinkKind.Offer -> {
@@ -157,9 +158,6 @@ internal fun WalletScreen(
             requestKey = "${state.selectedTab}:${state.receiveNavigationResetKey}:${state.presentationNavigationResetKey}",
             offer = state.offerPreview,
             savedCredentials = state.receivedCredentials(),
-            sharingOptions = state.presentationPreview?.credentialOptions.orEmpty(),
-            selectedCredentials = state.selectedPresentationCredentialOptions,
-            selectedDisclosures = state.selectedPresentationDisclosureOptions,
             enabled = !state.isBusy,
             onClose = returnHome.takeIf { !state.isBusy },
             // This flow bypasses Scaffold; it owns and consumes the remaining bottom inset.
@@ -169,7 +167,7 @@ internal fun WalletScreen(
                 WalletHeader(state, onSettings = null, onClose = returnHome.takeIf { !state.isBusy },
                     title = if (state.selectedTab == WalletDemoTab.Receive) "Receive credentials" else if (state.presentationCompleted) "Sharing result" else "Share credentials")
                 WalletFlowContent(controller, state, onDone = returnHome, modifier = Modifier.weight(1f),
-                    onStartProximityPresentation = onStartProximityPresentation, presentationContent = presentationContent)
+                    presentationContent = presentationContent)
             }
         }
         return
@@ -208,7 +206,7 @@ internal fun WalletScreen(
         },
         bottomBar = {
             if (collectionState.selectedTab == WalletDemoTab.Credentials && detailsChrome == null && state.isStatusVisible) {
-                WalletFooter(modifier = Modifier.navigationBarsPadding(), feedback = {
+                WalletFooter(feedback = {
                     StatusCard(state, controller::dismissStatus, controller::toggleStatusExpanded)
                 })
             }
@@ -235,7 +233,7 @@ internal fun WalletScreen(
             }
             WalletDemoTab.Receive, WalletDemoTab.Present -> WalletFlowContent(
                 controller, state, onDone = { controller.selectTab(WalletDemoTab.Credentials) },
-                modifier = modifier, onStartProximityPresentation = onStartProximityPresentation,
+                modifier = modifier,
                 presentationContent = presentationContent,
             )
         }

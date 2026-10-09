@@ -29,10 +29,8 @@ internal fun WalletExternalFlowScreen(
     }
     WalletReviewNavigationHost(
         requestKey = "external:${state.receiveNavigationResetKey}:${state.presentationNavigationResetKey}",
-        offer = state.offerPreview, sharingOptions = state.presentationPreview?.credentialOptions.orEmpty(),
+        offer = state.offerPreview,
         savedCredentials = state.receivedCredentials(),
-        selectedCredentials = state.selectedPresentationCredentialOptions,
-        selectedDisclosures = state.selectedPresentationDisclosureOptions,
         enabled = !state.isBusy,
         onClose = onClose.takeIf { state.canDismissExternalFlow },
     ) {

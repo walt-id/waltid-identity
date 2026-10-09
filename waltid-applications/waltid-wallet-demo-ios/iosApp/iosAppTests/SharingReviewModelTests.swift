@@ -439,7 +439,7 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertEqual(name?.optionalSelections.isEmpty, true)
     }
 
-    func testAdditionalInformationIsVisibleAndFullDetailsDescribeWhatIsNotShared() {
+    func testAdditionalInformationIsVisibleWithoutUnrequestedProtocolMetadata() {
         let extra = PresentationDisclosure(path: "family_name", name: "family_name", valueJSON: #""Lovelace""#,
             displayValue: "Lovelace", selectivelyDisclosable: false, required: false, selectable: false, requested: false)
         let technical = PresentationDisclosure(path: "iss", name: "iss", valueJSON: #""Issuer""#,
@@ -450,10 +450,7 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertEqual(fields.count, 2)
         XCTAssertTrue(fields[1].included)
         XCTAssertTrue(fields[1].alwaysIncluded)
-        let stored = details.groups.filter { $0.id != "requested" }.flatMap(\.items)
-        XCTAssertEqual(fields.disclosureStatus(stored.first { $0.pathComponents == ["given_name"] }!), "Requested")
-        XCTAssertEqual(fields.disclosureStatus(stored.first { $0.pathComponents == ["family_name"] }!), "Always included")
-        XCTAssertEqual(fields.disclosureStatus(stored.first { $0.pathComponents == ["birth_date"] }!), "Not shared")
+
     }
 
     func testNestedAndLiteralKeysWithTheSameLeafAreNotMerged() {

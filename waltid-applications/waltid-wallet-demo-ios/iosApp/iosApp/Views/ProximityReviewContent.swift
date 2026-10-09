@@ -76,7 +76,6 @@ struct ProximityReviewContent: View {
                         if let selection = selections.first(where: { $0.requestIndex == document.requestIndex }),
                            let credential = document.credentialOptions.first(where: { $0.credentialID == selection.credentialID }) {
                             ProximityInformationGroup(document: document, credential: credential, selection: selection,
-                                sharedElements: Set(selections.filter { $0.credentialID == credential.credentialID }.flatMap(\.disclosedElements)),
                                 details: credentialDetailsByID[credential.credentialID], onToggleElement: onToggleElement, enabled: enabled)
                         }
                     }

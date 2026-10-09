@@ -12,13 +12,13 @@ struct ProximityPresentationView: View {
 
     var body: some View {
         Group {
-            if viewModel.closing {
-                WalletReviewScaffold { EmptyView() } actions: { ProgressView("Closing the secure connection…").frame(maxWidth: .infinity, alignment: .leading) }
-            } else if viewModel.showsEngagement {
+            if viewModel.showsEngagement {
                 presentationBody.padding(.horizontal).padding(.vertical, 8)
-                    .safeAreaInset(edge: .bottom, spacing: 0) { WalletFooter { actions } }
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if showsActions { WalletFooter { actions } }
+                    }
             } else {
-                WalletReviewScaffold(showsActions: (!headerOwnsClose && canCancel) || viewModel.review != nil || viewModel.isTerminal || viewModel.actionErrorMessage != nil) {
+                WalletReviewScaffold(showsActions: showsActions) {
                     presentationBody
                 } actions: { actions }
             }
@@ -51,6 +51,10 @@ struct ProximityPresentationView: View {
 
     private var canCancel: Bool {
         !viewModel.closing && !viewModel.isTerminal && (viewModel.sessionState == nil || viewModel.sessionState?.legalActions.contains(.cancel) == true)
+    }
+
+    private var showsActions: Bool {
+        (!headerOwnsClose && canCancel) || viewModel.review != nil || viewModel.isTerminal || viewModel.actionErrorMessage != nil
     }
 
     @ViewBuilder private var actions: some View {

@@ -20,9 +20,10 @@ internal fun ProximityApprovalModeChoice(
     onSelect: (WalletDemoProximityApprovalMode) -> Unit,
     compact: Boolean = false,
     enabled: Boolean = true,
+    modifier: Modifier = Modifier,
 ) {
     val prepared = selected == WalletDemoProximityApprovalMode.PrepareSharing
-    Box(Modifier.testTag("proximity-approval-mode")) {
+    Box(modifier.testTag("proximity-approval-mode")) {
     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("proximity-approval-prepare")
         .toggleable(prepared, enabled = enabled, role = Role.Checkbox,
             onValueChange = { onSelect(if (it) WalletDemoProximityApprovalMode.PrepareSharing else WalletDemoProximityApprovalMode.AskEachTime) })

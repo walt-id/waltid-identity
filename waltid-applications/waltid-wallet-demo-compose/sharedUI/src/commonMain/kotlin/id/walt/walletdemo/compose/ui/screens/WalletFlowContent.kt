@@ -18,12 +18,10 @@ internal fun WalletFlowContent(
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
     fillViewport: Boolean = true,
-    onStartProximityPresentation: (() -> Unit)? = null,
     presentationContent: (@Composable () -> Unit)? = null,
 ) {
     val banner = state.statusBanner().takeIf { state.isStatusVisible }
-    val feedback: (@Composable () -> Unit)? = if (banner != null &&
-        (state.externalFlow == null || banner.kind == WalletStatusKind.Busy || banner.kind == WalletStatusKind.Error)) {
+    val feedback: (@Composable () -> Unit)? = if (banner?.kind == WalletStatusKind.Busy || banner?.kind == WalletStatusKind.Error) {
         { StatusCard(state, controller::dismissStatus, controller::toggleStatusExpanded) }
     } else null
     when (state.selectedTab) {
@@ -31,7 +29,6 @@ internal fun WalletFlowContent(
             ReceiveTab(
                 state = state,
                 requestDrafts = state.requestDrafts,
-                onOfferUrlChange = controller::updateOfferUrl,
                 onTxCodeChange = controller::updateTxCode,
                 onCopiesChange = controller::updateIssuanceCopies,
                 onPreviewOffer = controller::previewOffer,
@@ -48,8 +45,6 @@ internal fun WalletFlowContent(
         WalletDemoTab.Present -> {
             PresentTab(
                 state = state,
-                requestDrafts = state.requestDrafts,
-                onPresentationRequestUrlChange = controller::updatePresentationRequestUrl,
                 onPreview = controller::previewPresentation,
                 onToggleCredential = controller::togglePresentationCredential,
                 onToggleDisclosure = controller::togglePresentationDisclosure,
@@ -68,7 +63,6 @@ internal fun WalletFlowContent(
                     else { controller.cancelPresentationReview(); controller.selectTab(WalletDemoTab.Credentials) }
                 },
                 onDone = onDone,
-                onStartProximityPresentation = onStartProximityPresentation,
                 presentationContent = presentationContent,
                 modifier = modifier,
                 fillViewport = fillViewport,

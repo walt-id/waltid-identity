@@ -6,10 +6,10 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -39,6 +39,10 @@ import id.walt.walletdemo.compose.logic.WalletDemoProximityApprovalMode
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
 import id.walt.walletdemo.compose.ui.components.ProximityApprovalModeChoice
 import id.walt.walletdemo.compose.ui.components.QrCodeCanvas
+import id.walt.walletdemo.compose.ui.components.SettingsDivider
+import id.walt.walletdemo.compose.ui.components.WalletNavigationRow
+import id.walt.walletdemo.compose.ui.components.WalletSection
+import id.walt.walletdemo.compose.ui.components.WalletDetailSheet
 import id.walt.walletdemo.compose.ui.components.encodeProximityQrCode
 import id.walt.walletdemo.compose.ui.resources.*
 import id.walt.walletdemo.compose.ui.resources.proximity_qr_accessibility
@@ -51,23 +55,18 @@ internal fun ProximityEngagementContent(
     onShowEngagement: (ProximityEngagementMethod) -> Unit,
     onApprovalModeChange: (WalletDemoProximityApprovalMode) -> Unit,
     onConnectionOptions: (() -> Unit)? = null,
+    fillViewport: Boolean = true,
 ) {
     val method = state.displayedEngagement
     val choices = state.engagementChoices
     val sharing = state.preparedSharing
     var showApprovedData by remember(sharing) { mutableStateOf(false) }
     if (showApprovedData && sharing != null) {
-        AlertDialog(
-            onDismissRequest = { showApprovedData = false },
-            title = { Text(stringResource(Res.string.proximity_approved_data)) },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(Res.string.proximity_prepared_one_use))
-                    ProximityDisclosureSummary(sharing.review, sharing.submission, credentialDetailsById, initiallyExpanded = true)
-                }
-            },
-            confirmButton = { TextButton(onClick = { showApprovedData = false }) { Text(stringResource(Res.string.proximity_done)) } },
-        )
+        WalletDetailSheet(stringResource(Res.string.proximity_approved_data),
+            onDismiss = { showApprovedData = false }, closeTag = "proximity-approved-data-close") {
+            Text(stringResource(Res.string.proximity_prepared_one_use))
+            ProximityDisclosureSummary(sharing.review, sharing.submission, credentialDetailsById, initiallyExpanded = true)
+        }
     }
     val header: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -91,14 +90,7 @@ internal fun ProximityEngagementContent(
         }
     }
     val footer: @Composable () -> Unit = {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (sharing == null) {
-                ProximityApprovalModeChoice(state.approvalMode, onApprovalModeChange, compact = true, enabled = !state.refreshingEngagement)
-            } else {
-                TextButton(onClick = { showApprovedData = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(Res.string.proximity_approved_data))
-                }
-            }
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (method != null) {
                 choices.filter { it != method }.forEach { other ->
                     TextButton(onClick = { onShowEngagement(other) }, enabled = !state.refreshingEngagement, modifier = Modifier.fillMaxWidth()) {
@@ -107,9 +99,18 @@ internal fun ProximityEngagementContent(
                     }
                 }
             }
-            onConnectionOptions?.let { options ->
-                id.walt.walletdemo.compose.ui.components.WalletSection {
-                    id.walt.walletdemo.compose.ui.components.WalletNavigationRow(
+            WalletSection {
+                if (sharing == null) {
+                    ProximityApprovalModeChoice(state.approvalMode, onApprovalModeChange, compact = true,
+                        enabled = !state.refreshingEngagement, modifier = Modifier.padding(horizontal = 16.dp))
+                } else {
+                    TextButton(onClick = { showApprovedData = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(Res.string.proximity_approved_data))
+                    }
+                }
+                onConnectionOptions?.let { options ->
+                    SettingsDivider()
+                    WalletNavigationRow(
                         "Connection options", options, Modifier.testTag("proximity-connection-options"),
                         enabled = state.canChangeConnectionOptions,
                     )
@@ -143,15 +144,16 @@ internal fun ProximityEngagementContent(
             }
         }
     } else {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column((if (fillViewport) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
+            .verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             header()
-            if (method == null) id.walt.walletdemo.compose.ui.components.WalletSection {
+            if (method == null) WalletSection {
                 choices.forEachIndexed { index, choice ->
-                    if (index > 0) id.walt.walletdemo.compose.ui.components.SettingsDivider()
+                    if (index > 0) SettingsDivider()
                     ProximityEngagementChoice(choice, enabled = !state.refreshingEngagement) { onShowEngagement(choice) }
                 }
             }
-            footer()
+            Box(Modifier.padding(top = 12.dp)) { footer() }
         }
     }
 }
