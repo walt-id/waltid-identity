@@ -183,14 +183,38 @@ runs:
       run: |
         exec python3 "${{ github.workspace }}/${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/run-ios-phase.py" \
           --output-dir "${{ github.workspace }}/ios-ci-logs" compose-demo \
-          xcodebuild test \
+          bash -e -o pipefail <<'TESTS'
+        # Workflow destinations specify the device-type name and an explicit iOS version.
+        IFS=, read -r platform device os extra <<< "${{ inputs.simulator-destination }}"
+        if [[ "$platform" != 'platform=iOS Simulator' || "$device" != name=?* || "$os" != OS=[0-9]* || -n "$extra" ]]; then
+          echo "::error::Compose tests require a device-type name and explicit iOS version"
+          exit 1
+        fi
+        simulator=$(xcrun simctl create 'Compose wallet CI' "${device#name=}" "iOS ${os#OS=}")
+        cleanup() {
+          test_status=$?
+          xcrun simctl delete "$simulator" || {
+            cleanup_status=$?
+            echo "::error::Failed to remove Compose test simulator"
+            (( test_status != 0 )) || test_status=$cleanup_status
+          }
+          exit "$test_status"
+        }
+        trap cleanup EXIT
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+        xcrun simctl bootstatus "$simulator" -b
+
+        xcodebuild test \
           -project iosApp.xcodeproj \
           -scheme iosApp \
-          -destination "${{ inputs.simulator-destination }}" \
+          -configuration Debug \
+          -destination "platform=iOS Simulator,id=$simulator" \
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived-compose \
           -enableCodeCoverage NO \
           -parallel-testing-enabled NO
+        TESTS
 
     - name: Collect iOS test reports
       if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-wallet-sdk-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true') }}
