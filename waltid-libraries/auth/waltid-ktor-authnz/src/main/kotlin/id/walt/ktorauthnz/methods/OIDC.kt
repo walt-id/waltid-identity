@@ -1,5 +1,11 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.accounts.registerAccount
+import id.walt.ktorauthnz.utils.MetadataCache
+import id.walt.ktorauthnz.methods.sessiondata.IdentifiedSessionData
+import id.walt.ktorauthnz.exceptions.AuthSessionNotFoundException
+import id.walt.ktorauthnz.auth.getEffectiveRequestAuthToken
+import kotlin.uuid.Uuid
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
@@ -14,7 +20,7 @@ import id.walt.crypto2.serialization.BinaryData
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.methods.config.OidcAuthConfiguration
 import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData
 import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData.TokenValidationData
@@ -67,14 +73,21 @@ object OIDC : AuthenticationMethod("oidc") {
     internal const val OIDC_TOKEN_VALIDATION_NAMESPACE = "oidc-token-validation-v2"
 
 
-    private val configurationCache = mutableMapOf<Url, OpenIdConfiguration>()
+    /** The IdP calls back (and logs out) without the session in the path. */
+    override val hasSessionlessRoutes = true
 
-    private val jwksCache = mutableMapOf<String, List<JsonObject>>()
+    /** Discovery documents of identity providers, fetched again hourly. */
+    val configurationCache = MetadataCache<Url, OpenIdConfiguration>("OpenID configuration")
+
+    /** Signing keys of identity providers; a key id they lack is looked up again at most once a minute. */
+    val jwksCache = MetadataCache<String, List<JsonObject>>("JWKS")
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     suspend fun resolveConfiguration(configUrl: Url): OpenIdConfiguration {
-        return configurationCache.getOrPut(configUrl) {
-            http.get(configUrl).body<OpenIdConfiguration>()
+        return configurationCache.get(configUrl) {
+            val response = http.get(configUrl)
+            check(response.status.isSuccess()) { "OpenID configuration at $configUrl answered ${response.status}" }
+            response.body<OpenIdConfiguration>()
         }
     }
 
@@ -144,6 +157,8 @@ object OIDC : AuthenticationMethod("oidc") {
                 append("redirect_uri", config.callbackUri)
                 append("state", state)
                 append("nonce", nonce)
+                // After an `identify` step, the IdP can skip asking who is logging in.
+                createdSession.getSessionData<IdentifiedSessionData>(Identify)?.let { append("login_hint", it.value) }
                 if (codeChallenge != null) {
                     append("code_challenge", codeChallenge)
                     append("code_challenge_method", "S256")
@@ -186,6 +201,8 @@ object OIDC : AuthenticationMethod("oidc") {
                 val sessionId = SessionManager.getSessionIdByExternalId(OIDC_STATE_NAMESPACE, returnedState)
                     ?: throw IllegalArgumentException("Unknown OIDC state in callback: $returnedState")
                 val session = SessionManager.getSessionById(sessionId)
+                // A callback arriving at another tenant does not continue the session there.
+                if (session.tenant != null && session.tenant != authContext(call).tenant) throw AuthSessionNotFoundException(sessionId)
                 val config = session.lookupFlowMethodConfiguration<OidcAuthConfiguration>(OIDC)
                 val oidcConfig = config.getOpenIdConfiguration()
 
@@ -212,12 +229,11 @@ object OIDC : AuthenticationMethod("oidc") {
                 val subject = idTokenPayload["sub"]?.jsonPrimitive?.content
                     ?: throw IllegalStateException("ID Token is missing 'sub' claim.")
 
-                val sid = idTokenPayload["sid"]?.jsonPrimitive?.content ?: throw IllegalStateException("ID Token is missing 'sid' claim.")
-
-                // --- Our logout is successful
+                // `sid` is optional (many IdPs omit it); without it, IdP-initiated logout cannot find the session.
+                val sid = idTokenPayload["sid"]?.jsonPrimitive?.contentOrNull
 
                 session.dropExternalIdMapping(OIDC_STATE_NAMESPACE, returnedState) // No longer need this
-                session.storeExternalIdMapping(OIDC_SESSION_NAMESPACE, sid) // sid
+                if (sid != null) session.storeExternalIdMapping(OIDC_SESSION_NAMESPACE, sid)
 
                 val identifier = OIDCIdentifier(oidcConfig.issuer, subject)
 
@@ -238,16 +254,16 @@ object OIDC : AuthenticationMethod("oidc") {
                         idTokenClaims = idTokenPayload,
                         userInfoClaims = userInfo,
                         idTokenRaw = tokenResponse.idToken,
+                        clientId = config.clientId,
+                        postLogoutRedirectUri = config.postLogoutRedirectUri?.toString(),
+                        allowedPostLogoutRedirectUrls = config.allowedPostLogoutRedirectUrls,
                     )
                 )
                 session.setOidcTokenValidationPolicy(tokenValidationPolicy)
 
-                val accountId = identifier.resolveIfExists() ?: run {
-                    // No existing account found - use addAccountIdentifierToAccount to create one
-                    // The AccountStore implementation (e.g., Enterprise) handles JIT provisioning
-                    KtorAuthnzManager.accountStore.addAccountIdentifierToAccount(subject, identifier)
-                    identifier.resolveToAccountId()
-                }
+                // No account for this issuer + subject yet: provision one, with a new id - never the IdP's `sub`, which
+                // another IdP could also use, and which need not have the store's id format.
+                val accountId = accountFor(session, identifier) { registerAccount(details = userInfo ?: idTokenPayload) { identifier(it) } }
 
                 val authContext = authContext(call)
 
@@ -345,9 +361,7 @@ object OIDC : AuthenticationMethod("oidc") {
 
                 val postLogoutRedirect = call.request.queryParameters["post_logout_redirect_uri"]
 
-                // Get token from cookie or header
-                val token = call.request.cookies[SessionTokenCookieHandler.cookieName]
-                    ?: call.request.headers["Authorization"]?.removePrefix("Bearer ")?.trim()
+                val token = call.getEffectiveRequestAuthToken()
 
                 var idTokenRaw: String? = null
                 var endSessionEndpoint: String? = null
@@ -371,19 +385,15 @@ object OIDC : AuthenticationMethod("oidc") {
                             endSessionEndpoint = oidcConfig.endSessionEndpoint
                         }
 
-                        // Get clientId from registered flows (if available in session)
-                        session.flows?.firstOrNull { it.method == id }?.config?.let { flowConfig ->
-                            try {
-                                val config = Json.decodeFromJsonElement<OidcAuthConfiguration>(flowConfig)
-                                clientId = config.clientId
-                                validatedPostLogout = postLogoutRedirect?.let { uri ->
-                                    config.allowedPostLogoutRedirectUrls.takeIf { it.isNotEmpty() }?.let {
-                                        config.validateRedirectUrl(uri)?.toString()
-                                    }
-                                } ?: config.postLogoutRedirectUri?.toString()
-                            } catch (e: Exception) {
-                                log.debug { "Could not parse OIDC config from session flow: ${e.message}" }
-                            }
+                        // The flow's choices are gone once it succeeded; its client settings were kept at login.
+                        oidcSessionData?.let { data ->
+                            clientId = data.clientId
+                            validatedPostLogout = postLogoutRedirect
+                                ?.takeIf { data.allowedPostLogoutRedirectUrls.isNotEmpty() }
+                                ?.let { uri ->
+                                    OidcAuthConfiguration.matchesAnyRedirectPattern(uri, data.allowedPostLogoutRedirectUrls)
+                                }
+                                ?: data.postLogoutRedirectUri
                         }
 
                         // Terminate local session
@@ -563,13 +573,17 @@ object OIDC : AuthenticationMethod("oidc") {
         kid: String,
         forceRefresh: Boolean = false,
     ): Crypto2Key {
-        var keys = jwksCache[jwksUrl]
-        if (forceRefresh || keys == null || keys.none { it["kid"]?.jsonPrimitive?.contentOrNull == kid }) {
-            val jwks = http.get(jwksUrl).body<JsonObject>()
-            keys = jwks["keys"]?.jsonArray?.map { it.jsonObject }
+        suspend fun fetch(): List<JsonObject> {
+            val response = http.get(jwksUrl)
+            check(response.status.isSuccess()) { "JWKS at $jwksUrl answered ${response.status}" }
+            return response.body<JsonObject>()["keys"]?.jsonArray?.map { it.jsonObject }
                 ?: throw IllegalArgumentException("OIDC JWKS response is missing keys")
-            jwksCache[jwksUrl] = keys
         }
+        fun List<JsonObject>.hasKid() = any { it["kid"]?.jsonPrimitive?.contentOrNull == kid }
+
+        var keys = jwksCache.get(jwksUrl, ::fetch)
+        // The provider may have rotated its keys: look again, but not more than once a minute.
+        if (forceRefresh || !keys.hasKid()) keys = jwksCache.refresh(jwksUrl, ::fetch)
         val matches = keys.filter { it["kid"]?.jsonPrimitive?.contentOrNull == kid }
         require(matches.size == 1) { "OIDC JWKS must contain exactly one key for kid: $kid" }
         val jwk = matches.single()

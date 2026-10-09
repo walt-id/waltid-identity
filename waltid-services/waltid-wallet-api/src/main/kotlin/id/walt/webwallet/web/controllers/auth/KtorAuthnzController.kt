@@ -5,8 +5,8 @@ import id.walt.commons.config.ConfigManager
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.Web3Identifier
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments.Registration
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments.Registration
 import id.walt.ktorauthnz.methods.AuthMethodManager
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.Web3
