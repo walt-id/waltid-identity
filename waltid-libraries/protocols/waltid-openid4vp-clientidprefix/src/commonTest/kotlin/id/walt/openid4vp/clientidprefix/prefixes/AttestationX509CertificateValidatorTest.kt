@@ -131,6 +131,7 @@ class AttestationX509CertificateValidatorTest {
             override val signatureAlgorithmOid = ""
             override val signatureValueRaw = ByteString()
             override val encodedDer = ByteString()
+            override val fingerprintSha256: ByteString = ByteString()
 
             override fun equals(other: Any?): Boolean =
                 encodedDer.equals((other as? X509Certificate)?.encodedDer)
@@ -164,6 +165,7 @@ class AttestationX509CertificateValidatorTest {
             override val signatureAlgorithmOid = ""
             override val signatureValueRaw = ByteString()
             override val encodedDer = ByteString()
+            override val fingerprintSha256: ByteString = ByteString()
 
             override fun equals(other: Any?): Boolean =
                 encodedDer.equals((other as? X509Certificate)?.encodedDer)
