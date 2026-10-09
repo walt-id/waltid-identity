@@ -27,10 +27,15 @@ class X509CertificateChainValidator(
         val context = ValidationContext(cryptoRuntime, chain.size, trustStoreToUse)
         for (i in 0..<chain.size) {
             validators.forEach { validator ->
-                val certificate = chain[i]
-                if (validator.accepts(context, certificate)) {
-                    context.setCurrent(validator.id, i, certificate.data.subjectDn)
-                    validator.validate(context, certificate)
+                val chainEntry = chain.getEntry(i)
+                context.setCurrent(
+                    validator.id,
+                    i,
+                    chainEntry.indexInProvidedChain,
+                    chainEntry.entry.data.subjectDn
+                )
+                if (validator.accepts(context, chainEntry.entry)) {
+                    validator.validate(context, chainEntry.entry)
                     context.addLogEntry(ValidationResult.Severity.INFO, "DONE")
                 }
             }

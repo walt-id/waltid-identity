@@ -2,8 +2,11 @@ package id.walt.certificate.x509.validation.validator
 
 import id.walt.certificate.x509.SignatureValidator
 import id.walt.certificate.x509.X509Certificate
+import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
+import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
+import kotlinx.io.bytestring.toHexString
 
 class X509CertificateSignatureValidator(
     private val signatureValidator: SignatureValidator
@@ -16,7 +19,10 @@ class X509CertificateSignatureValidator(
         x509Certificate: X509Certificate
     ) {
         val trustedIssuerCertificates =
-            context.findCertificateBySubjectDn(x509Certificate.data.issuerDn)
+            context.findCertificate(
+                x509Certificate.data.issuerDn,
+                x509Certificate.data.extensionAuthorityKeyIdentifier?.keyIdentifier
+            )
         if (trustedIssuerCertificates.isEmpty()) {
             // issuer is not trusted, check if this certificate is trusted
             val isCertificateTrusted =
@@ -31,12 +37,21 @@ class X509CertificateSignatureValidator(
             } else {
                 context.addLogEntry(
                     ValidationResult.Severity.ERROR,
-                    "Trusted issuer certificate '${x509Certificate.data.issuerDn}' not found"
+                    "Trusted issuer certificate '${x509Certificate.data.issuerDn}' (SKI: '${x509Certificate.data.extensionSubjectKeyIdentifier?.keyIdentifier?.toHexString() ?: "NULL"}') not found"
                 )
             }
         } else {
-            require(trustedIssuerCertificates.size == 1) { "Multiple certificates with subjectDn '${x509Certificate.data.issuerDn}' in truststore. Select CA certificate by pubic key not yet supported" }
-            validateCertificate(context, trustedIssuerCertificates.first(), x509Certificate)
+            if (trustedIssuerCertificates.size > 1) {
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "Multiple trusted certificates with subjectDn '${x509Certificate.data.issuerDn}' " +
+                            "and SKI '${x509Certificate.data.extensionAuthorityKeyIdentifier?.keyIdentifier?.toHexString() ?: "NULL"}' qualify as issuer " +
+                            "(fingerprints ${trustedIssuerCertificates.joinToString { it.fingerprintSha256Hex }}). " +
+                            "Refusing to select one"
+                )
+            } else {
+                validateCertificate(context, trustedIssuerCertificates.first(), x509Certificate)
+            }
         }
     }
 

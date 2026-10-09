@@ -33,6 +33,10 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import id.walt.mdoc.readertrust.ReaderAuthenticationScope
+import id.walt.mdoc.readertrust.ReaderTrustDecision
+import id.walt.mdoc.readertrust.ReaderTrustEvaluator
+import id.walt.mdoc.readertrust.ReaderTrustState
 
 class ReaderAuthenticationTest {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())

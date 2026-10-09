@@ -1,6 +1,7 @@
 package id.walt.certificate.x509.validation.validator
 
 import id.walt.certificate.x509.X509Certificate
+import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.certificate.x509.extension.BasicConstraintsExtension
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.certificate.x509.validation.ValidationContext
@@ -99,8 +100,21 @@ class X509CertificateBasicConstraintsValidator(val leafCanBeCa: Boolean = false)
         var currentCert = x509Certificate
         val trustedChain = mutableListOf<X509Certificate>()
         while (currentCert.data.subjectDn != currentCert.data.issuerDn) {
-            val potentialIssuers = context.findCertificateBySubjectDn(currentCert.data.issuerDn)
+            val potentialIssuers = context.findCertificate(
+                currentCert.data.issuerDn,
+                currentCert.data.extensionAuthorityKeyIdentifier?.keyIdentifier)
             if (potentialIssuers.isEmpty()) {
+                break
+            }
+            if (potentialIssuers.size > 1) {
+                // Fail closed: the constraints of the issuers above this hop are unknown. The signature
+                // validator reports the same ambiguity for the direct issuer, but it may not be configured,
+                // and the hops further up are only visible here.
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "Multiple trusted certificates with subjectDn '${currentCert.data.issuerDn}' qualify as " +
+                            "issuer of '${currentCert.data.subjectDn}'. Cannot determine path length constraints"
+                )
                 break
             }
             require(potentialIssuers.size == 1) { "Selecting issuer Certificate from multiple potential parents is not implemented" }

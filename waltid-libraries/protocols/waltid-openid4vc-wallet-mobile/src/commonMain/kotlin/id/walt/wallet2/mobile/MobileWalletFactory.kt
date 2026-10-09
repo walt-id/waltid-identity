@@ -2,6 +2,8 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.mdoc.readertrust.MdocReaderAuthenticationTrustEvaluator
+import id.walt.mdoc.readertrust.ReaderTrustEvaluator
 import id.walt.crypto2.keys.KeyId
 import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
 import kotlin.uuid.Uuid
@@ -46,7 +48,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * @property credentialIssuerMetadataTrustResolver Optional trust boundary for signed Credential Issuer Metadata.
  * When absent, signed metadata is neither requested nor accepted.
  * @property credentialRegistry Platform metadata registry. Platform factories install their native default when omitted.
- * @property readerTrustEvaluator Application trust policy for verified ISO 18013-7 reader chains.
+ * @property readerTrustEvaluator Application trust policy for verified ISO 18013-7 Annex C reader authentication.
  * @property crossProcessAccess Optional shared-container/keychain configuration for provider extensions.
  * @property onDigitalCredentialRegistryChanged Called after a credential-set mutation republishes
  * platform registration metadata. Failures do not roll back the committed wallet mutation.
@@ -62,7 +64,7 @@ public data class MobileWalletConfig(
     public val paymentCredentialIssuers: List<id.walt.wallet2.consent.PaymentCredentialIssuer> = emptyList(),
     public val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     public val credentialRegistry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
-    public val readerTrustEvaluator: MobileWalletReaderTrustEvaluator = UnconfiguredMobileWalletReaderTrustEvaluator,
+    public val readerTrustEvaluator: ReaderTrustEvaluator = MdocReaderAuthenticationTrustEvaluator,
     public val crossProcessAccess: MobileWalletCrossProcessAccess? = null,
     public val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
     public val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,

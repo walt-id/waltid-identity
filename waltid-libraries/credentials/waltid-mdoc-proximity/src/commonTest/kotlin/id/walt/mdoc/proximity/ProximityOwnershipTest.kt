@@ -17,6 +17,10 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
+import id.walt.mdoc.readertrust.ReaderAuthenticationScope
+import id.walt.mdoc.readertrust.ReaderTrustDecision
+import id.walt.mdoc.readertrust.ReaderTrustState
 
 class ProximityOwnershipTest {
     @Test

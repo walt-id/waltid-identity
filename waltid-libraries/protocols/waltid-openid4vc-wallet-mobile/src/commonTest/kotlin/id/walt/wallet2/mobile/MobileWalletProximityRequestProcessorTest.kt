@@ -47,6 +47,7 @@ import id.walt.mdoc.objects.edition2.document.DeviceAuth
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.edition2.deviceretrieval.DeviceResponse
 import id.walt.mdoc.proximity.*
+import id.walt.mdoc.readertrust.ReaderAuthenticationScope
 import id.walt.mdoc.crypto.MdocCryptoHelper
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
 import id.walt.mdoc.objects.session.SessionEstablishment

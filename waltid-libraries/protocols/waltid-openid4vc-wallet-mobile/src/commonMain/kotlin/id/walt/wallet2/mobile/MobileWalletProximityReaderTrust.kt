@@ -5,17 +5,15 @@ package id.walt.wallet2.mobile
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.dn.DistinguishedName
-import id.walt.certificate.x509.profile.IsoMdocReaderAuthenticationX509CertificateProfile
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
-import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.X509SingleCertificateValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateHasIaCaContactInformationValidator
-import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
 import id.walt.cose.coseCompliantCbor
-import id.walt.mdoc.proximity.MdocX509CertificateUtil.modocReaderAuthentication
-import id.walt.mdoc.proximity.ReaderAuthenticationEvidence
-import id.walt.mdoc.proximity.ReaderAuthenticationScope
-import id.walt.mdoc.proximity.ReaderTrustState
+import id.walt.mdoc.readertrust.MdocReaderAuthenticationTrustEvaluator
+import id.walt.mdoc.readertrust.MdocReaderAuthenticationCertificateValidationResult
+import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
+import id.walt.mdoc.readertrust.ReaderAuthenticationScope
+import id.walt.mdoc.readertrust.ReaderTrustState
 import id.walt.mdoc.proximity.RicalEvaluationState
 import id.walt.mdoc.proximity.RicalPolicy
 import id.walt.mdoc.proximity.RicalProviderResult
@@ -281,8 +279,7 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
     /** Detached view of the application-provisioned trust policy retained by this instance. */
     public val configuration: ProximityReaderTrustConfiguration get() = ownedConfiguration.snapshot()
 
-    private val mdocReaderAuthenticationX509CertificateUtil: X509CertificateUtil =
-        modocReaderAuthentication(clock)
+    private val readerAuthenticationTrustEvaluator = MdocReaderAuthenticationTrustEvaluator(clock)
 
     public constructor(
         configuration: ProximityReaderTrustConfiguration,
@@ -300,40 +297,19 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
             leaf.mdocReaderAuthenticationCommonName
         }.getOrElse { return invalidPathDecision("Failed to evaluate reader name from leaf certificate") }
 
-        val previewValidationResult =
-            mdocReaderAuthenticationX509CertificateUtil.validateCertificateChain(
-                chain,
-                InMemoryTrustStore()
-            )
-        val nonSignatureRelatedErrors = previewValidationResult.log.filter {
-            it.severity == ValidationResult.Severity.ERROR &&
-                    it.validatorId != X509CertificateSignatureValidator.ID &&
-                    it.validatorId != "${IsoMdocReaderAuthenticationX509CertificateProfile.ID}.chain-length" //chain-length can also not be valuated without trust
-        }
-        if (nonSignatureRelatedErrors.isNotEmpty()) {
-            return invalidPathDecision("Certificate chain errors: ${nonSignatureRelatedErrors.joinToString { it.message }}")
+        val preview = readerAuthenticationTrustEvaluator.validateReaderCertificateChain(chain, trustStore = null)
+        if (preview is MdocReaderAuthenticationCertificateValidationResult.InvalidCertificate) {
+            return invalidPathDecision(preview.reason)
         }
 
         for (anchor in ownedConfiguration.trustAnchors) {
             val anchorCert = anchor.certificateDerBase64Url.toX509Certificate()
-            val validatedChain = runCatching {
-                val validationResult =
-                    mdocReaderAuthenticationX509CertificateUtil.validateCertificateChain(
-                        certificateChain = chain,
-                        trustOverride = InMemoryTrustStore(listOf(anchorCert))
-                    )
-                if (validationResult.valid) {
-                    chain
-                } else {
-                    null
-                }
-            }.getOrNull() ?: continue
-            val path =
-                if (validatedChain.map { it.encodedDer }.toSet().contains(anchorCert.encodedDer)) {
-                    validatedChain
-                } else {
-                    validatedChain + anchorCert
-                }
+            val validation = readerAuthenticationTrustEvaluator.validateReaderCertificateChain(
+                chain,
+                trustStore = InMemoryTrustStore(listOf(anchorCert)),
+            )
+            if (validation != MdocReaderAuthenticationCertificateValidationResult.Trusted) continue
+            val path = if (chain.any { it.encodedDer == anchorCert.encodedDer }) chain else chain + anchorCert
             return decisionForValidatedPath(
                 evidence = ownedEvidence,
                 path = path,

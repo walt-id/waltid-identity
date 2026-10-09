@@ -7,6 +7,7 @@ import id.walt.certificate.x509.extension.Extension
 import id.walt.certificate.x509.signum.dn.toDistinguishedName
 import id.walt.certificate.x509.signum.dn.toRaw
 import id.walt.certificate.x509.signum.extension.SignumExtensionFactory
+import id.walt.crypto.utils.ShaUtils
 import kotlinx.io.bytestring.ByteString
 import at.asitplus.signum.indispensable.pki.X509Certificate as SignumCertificate
 
@@ -24,6 +25,8 @@ class SignumX509Certificate(
 
     override val encodedDer: ByteString
         get() = ByteString(certificate.encodeToDer())
+
+    override val fingerprintSha256: ByteString by lazy { ByteString(ShaUtils.sha256(encodedDer.toByteArray())) }
 
     inner class CertData : X509Certificate.CertificateData {
         override val version: Int = certificate.tbsCertificate.version
