@@ -63,6 +63,15 @@ sealed interface IssuerSelection {
  *    That case is deliberately not resolved here.
  *
  * Without a [signatureValidator], several candidates can only be told apart by the first two rules.
+ *
+ * Known limitations (all fail closed with [IssuerSelection.Ambiguous], none selects a wrong issuer):
+ * - Trusted certificates with the same subject DN and the same public key are never told apart, even
+ *   if they also have the same serial number (e.g. a CA re-issued with identical name and serial but
+ *   different validity or extensions). They differ only in their fingerprint, and the selection does
+ *   not judge which of them is the better anchor. Pin only one of them.
+ * - Rollover link certificates (the new CA key certified by the old CA key, with the same subject DN
+ *   and public key as the new self signed CA) are not supported as trust anchors next to the new CA
+ *   for the same reason. Pin the self signed CAs of the rollover instead.
  */
 class IssuerSelector(
     private val cryptoRuntime: CryptoRuntime,
