@@ -385,6 +385,74 @@ class W3cTypeExpanderTest {
         )
     }
 
+    @Test
+    fun aliasOfUncertainPrefixDoesNotPublishThePreviousIri() {
+        val revised = "https://example.org/revised#"
+        val explicit = "https://example.org/explicit#Degree"
+        val credential = typedCredential(
+            "VerifiableCredential",
+            "Degree",
+            contexts = listOf(
+                "https://www.w3.org/ns/credentials/v2",
+                "https://w3id.org/gaia-x/development",
+                "https://example.org/review/unresolved",
+            ),
+            inlineContext = """{ "Degree": "gx:LegalPerson" }""",
+        )
+        val unresolved = W3cTypeExpander.expandedTypes(credential.data)
+        assertEquals(setOf(verifiableCredential, "Degree"), unresolved)
+        assertFalse(legalPerson in unresolved)
+        assertTrue(DcqlMatcher.match(query("""[["$legalPerson"]]"""), listOf(credential)).isFailure)
+        assertTrue(DcqlMatcher.match(query("""[["Degree"]]"""), listOf(credential)).isSuccess)
+
+        val supplied = documentsRedefining(
+            "https://example.org/review/unresolved" to """{ "@context": { "gx": "$revised" } }""",
+        )
+        val withRevision = W3cTypeExpander.expandedTypes(credential.data, supplied)
+        assertEquals(setOf(verifiableCredential, revised + "LegalPerson"), withRevision)
+        assertFalse(legalPerson in withRevision)
+        assertTrue(DcqlMatcher.match(query("""[["$legalPerson"]]"""), listOf(credential), contextDocuments = supplied).isFailure)
+        assertTrue(
+            DcqlMatcher.match(query("""[["${revised}LegalPerson"]]"""), listOf(credential), contextDocuments = supplied).isSuccess,
+        )
+
+        val absolute = typedCredential(
+            "Degree",
+            contexts = listOf(
+                "https://www.w3.org/ns/credentials/v2",
+                "https://w3id.org/gaia-x/development",
+                "https://example.org/review/unresolved",
+            ),
+            inlineContext = """{ "Degree": "$explicit" }""",
+        )
+        assertEquals(setOf(explicit), W3cTypeExpander.expandedTypes(absolute.data))
+        assertTrue(DcqlMatcher.match(query("""[["$explicit"]]"""), listOf(absolute)).isSuccess)
+    }
+
+    @Test
+    fun aliasOfUncertainTermDoesNotPublishThePreviousIri() {
+        val previous = "https://example.org/Degree"
+        val revised = "https://example.org/OtherDegree"
+        val credential = typedCredential(
+            "Degree",
+            leadingContext = """{ "BaseDegree": "$previous" }""",
+            remoteContext = "https://example.org/review/unresolved",
+            inlineContext = """{ "Degree": "BaseDegree" }""",
+        )
+        val unresolved = W3cTypeExpander.expandedTypes(credential.data)
+        assertEquals(setOf("Degree"), unresolved)
+        assertFalse(previous in unresolved)
+        assertTrue(DcqlMatcher.match(query("""[["$previous"]]"""), listOf(credential)).isFailure)
+        assertTrue(DcqlMatcher.match(query("""[["Degree"]]"""), listOf(credential)).isSuccess)
+
+        val supplied = documentsRedefining(
+            "https://example.org/review/unresolved" to """{ "@context": { "BaseDegree": "$revised" } }""",
+        )
+        assertEquals(setOf(revised), W3cTypeExpander.expandedTypes(credential.data, supplied))
+        assertTrue(DcqlMatcher.match(query("""[["$previous"]]"""), listOf(credential), contextDocuments = supplied).isFailure)
+        assertTrue(DcqlMatcher.match(query("""[["$revised"]]"""), listOf(credential), contextDocuments = supplied).isSuccess)
+    }
+
     private fun query(typeValues: String) = DcqlParser.parse(
         """
         {
@@ -404,4 +472,41 @@ class W3cTypeExpanderTest {
         put("type", buildJsonArray { types.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } })
         put("@context", buildJsonArray { contexts.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } })
     }
+
+    private fun typedCredential(
+        vararg types: String,
+        contexts: List<String> = emptyList(),
+        leadingContext: String? = null,
+        remoteContext: String? = null,
+        inlineContext: String,
+    ): RawDcqlCredential {
+        val contextJson = buildList {
+            leadingContext?.let { add(it) }
+            contexts.forEach { add("\"$it\"") }
+            remoteContext?.let { add("\"$it\"") }
+            add(inlineContext)
+        }.joinToString(",")
+        return RawDcqlCredential(
+            id = "credential",
+            format = "jwt_vc_json",
+            data = json.parseToJsonElement(
+                """
+                {
+                  "@context": [$contextJson],
+                  "type": [${types.joinToString(",") { "\"$it\"" }}]
+                }
+                """.trimIndent()
+            ).jsonObject,
+        )
+    }
+
+    private fun documentsRedefining(vararg documents: Pair<String, String>): JsonLdContextDocumentSource =
+        LayeredJsonLdContextDocuments(
+            listOf(
+                JsonLdContextDocumentSource.bundled,
+                MapJsonLdContextDocuments(
+                    documents.associate { (url, body) -> url to json.parseToJsonElement(body).jsonObject },
+                ),
+            ),
+        )
 }
