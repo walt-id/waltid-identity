@@ -170,6 +170,7 @@ runs:
           -only-testing:iosAppUITests/MockWalletUITests/testWalletReadinessOutlivesTheSuccessBannerAcrossRestart \
           -only-testing:iosAppUITests/MockWalletUITests/testCredentialsStayLoadingUntilTheInitialReadCompletes \
           -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2 \
+          -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testAutomaticallyAttestsEudiIssuanceBeforeAndAfterRestart \
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived \
           -enableCodeCoverage NO \
