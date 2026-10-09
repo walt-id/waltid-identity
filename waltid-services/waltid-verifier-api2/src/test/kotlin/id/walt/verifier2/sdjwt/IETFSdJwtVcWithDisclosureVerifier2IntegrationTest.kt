@@ -48,10 +48,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 /**
- * Unhappy-path coverage for the pre-final community SD-JWT VC fixture with disclosures.
- *
- * Same stale `sd_hash` rejection as [IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest].
- * See [IETFSdJwtVcHappyPathVerifier2IntegrationTest] for the successful presentation path.
+ * Selective disclosure and transaction-data binding pass VP checks before the invalid issuer
+ * signature is rejected by the credential policy.
  */
 class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
 
@@ -61,7 +59,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                 id = "my_pid",
                 format = CredentialFormat.DC_SD_JWT,
                 meta = SdJwtVcMeta(
-                    vctValues = listOf("https://issuer.demo.walt.id/draft13/identity_credential")
+                    vctValues = listOf(SD_JWT_VC_TEST_VCT)
                 ),
                 claims = listOf(
                     ClaimsQuery(pathStrings = listOf("given_name")),
@@ -75,7 +73,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
         )
     )
 
-    private val additionalSdjwtvcPolicies =
+    private fun additionalSdjwtvcPolicies(credential: DigitalCredential) =
         Json.decodeFromString<Verification2Session.DefinedVerificationPolicies>(
             """
   {
@@ -83,7 +81,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
       {
         "policy": "allowed-issuer",
         "allowed_issuer": [
-          "https://issuer.demo.walt.id/draft13"
+          "${credential.issuer}"
         ]
       },
       {
@@ -100,42 +98,17 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
       },
       {
         "policy": "schema",
-        "schema": {
-          "given_name": "John",
-          "family_name": "Doe",
-          "email": "johndoe@example.com",
-          "phone_number": "+1-202-555-0101",
-          "address": {
-            "street_address": "123 Main St",
-            "locality": "Anytown",
-            "region": "Anystate",
-            "country": "US"
-          },
-          "is_over_18": true,
-          "is_over_21": true,
-          "is_over_65": true,
-          "id": "urn:uuid:15030989-e39f-4831-88ee-bf53dbe29f68",
-          "iat": 1759978870,
-          "nbf": 1759978870,
-          "exp": 1791514870,
-          "iss": "https://issuer.demo.walt.id/draft13",
-          "cnf": {
-            "kid": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17"
-          },
-          "vct": "https://issuer.demo.walt.id/draft13/identity_credential",
-          "display": [ ],
-          "birthdate": "1940-01-01"
-        }
+        "schema": ${credential.credentialData}
       }
     ]
   }
         """.trimIndent()
         )
 
-    private val verificationSessionSetup: VerificationSessionSetup = CrossDeviceFlowSetup(
+    private fun verificationSessionSetup(credential: DigitalCredential): VerificationSessionSetup = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
             dcqlQuery = sdJwtVcDcqlQuery,
-            policies = additionalSdjwtvcPolicies
+            policies = additionalSdjwtvcPolicies(credential)
         ),
         openid = OpenId4VPConfig(
             transactionData = listOf(
@@ -144,108 +117,8 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
         )
     )
 
-    private val walletCredentials = listOf(
-        Json.decodeFromString<DigitalCredential>(
-            """
-            {
-          "type": "vc-sd_jwt",
-          "dmtype": "sdjwtvcdm",
-          "disclosables": {
-            "$._sd": [
-              "lyZeYWrDdlJ9qTf4P0iPJQHYPRhq_MV4f_YrLuA2PF8"
-            ]
-          },
-          "disclosures": [
-            {
-              "salt": "ugiBtMSFQWdMe6jptE43pA",
-              "name": "birthdate",
-              "value": "1940-01-01",
-              "location": "$.birthdate",
-              "encoded": "WyJ1Z2lCdE1TRlFXZE1lNmpwdEU0M3BBIiwiYmlydGhkYXRlIiwiMTk0MC0wMS0wMSJd"
-            }
-          ],
-          "signedWithDisclosures": "eyJ4NWMiOlsiLS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tXG5NSUlCZVRDQ0FSOENGSHJXZ3JHbDVLZGVmU3ZSUWhSK2FvcWRmNDgrTUFvR0NDcUdTTTQ5QkFNQ01CY3hGVEFUQmdOVkJBTU1ERTFFVDBNZ1VrOVBWQ0JEUVRBZ0Z3MHlOVEExTVRReE5EQTRNRGxhR0E4eU1EYzFNRFV3TWpFME1EZ3dPVm93WlRFTE1Ba0dBMVVFQmhNQ1FWUXhEekFOQmdOVkJBZ01CbFpwWlc1dVlURVBNQTBHQTFVRUJ3d0dWbWxsYm01aE1SQXdEZ1lEVlFRS0RBZDNZV3gwTG1sa01SQXdEZ1lEVlFRTERBZDNZV3gwTG1sa01SQXdEZ1lEVlFRRERBZDNZV3gwTG1sek1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRUcwUklOQmlGK29RVUQzZDVER25lZ1F1WGVuSTI5SkRhTUdvTXZpb0tSQk41M2Q0VWF6YWtTMnVudThCbnNFdHh1dFMya3FSaFlCUFlrOVJBcmlVM2dUQUtCZ2dxaGtqT1BRUURBZ05JQURCRkFpQU9Nd003aEg3cTlEaSttVDZxQ2k0THZCK2tIOE94TWhlSXJaMmVSUHh0RFFJaEFMSHpUeHd2TjhVZHQwWjJDcG84SkJpaHFhY2ZlWGtJeFZBTzhYa3htWGhCXG4tLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tIl0sImtpZCI6Ijl2dWFKeVV4Ung0S21IeW9aOWtqSnhNc19tanBubmYtbVBNOW5QTUc1MUEiLCJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiJ9.eyJnaXZlbl9uYW1lIjoiSm9obiIsImZhbWlseV9uYW1lIjoiRG9lIiwiZW1haWwiOiJqb2huZG9lQGV4YW1wbGUuY29tIiwicGhvbmVfbnVtYmVyIjoiKzEtMjAyLTU1NS0wMTAxIiwiYWRkcmVzcyI6eyJzdHJlZXRfYWRkcmVzcyI6IjEyMyBNYWluIFN0IiwibG9jYWxpdHkiOiJBbnl0b3duIiwicmVnaW9uIjoiQW55c3RhdGUiLCJjb3VudHJ5IjoiVVMifSwiaXNfb3Zlcl8xOCI6dHJ1ZSwiaXNfb3Zlcl8yMSI6dHJ1ZSwiaXNfb3Zlcl82NSI6dHJ1ZSwiaWQiOiJ1cm46dXVpZDoxNTAzMDk4OS1lMzlmLTQ4MzEtODhlZS1iZjUzZGJlMjlmNjgiLCJpYXQiOjE3NTk5Nzg4NzAsIm5iZiI6MTc1OTk3ODg3MCwiZXhwIjoxNzkxNTE0ODcwLCJpc3MiOiJodHRwczovL2lzc3Vlci5kZW1vLndhbHQuaWQvZHJhZnQxMyIsImNuZiI6eyJraWQiOiJkaWQ6a2V5OnpEbmFlWWI3RGFrUVdtWWtyTGttc1ZFUkFhekY1WWExRzVueGJTblFjTEpaOENyMTcifSwidmN0IjoiaHR0cHM6Ly9pc3N1ZXIuZGVtby53YWx0LmlkL2RyYWZ0MTMvaWRlbnRpdHlfY3JlZGVudGlhbCIsImRpc3BsYXkiOltdLCJfc2QiOlsibHlaZVlXckRkbEo5cVRmNFAwaVBKUUhZUFJocV9NVjRmX1lyTHVBMlBGOCJdfQ.FRi4y983m4c9u9VrmJDa7KY6o--7HPpHZW3nLGmv_yT5OTLszFn-nTlON9BeN3CzqDDvwDI9X41vm8h3m1fPSg~WyJ1Z2lCdE1TRlFXZE1lNmpwdEU0M3BBIiwiYmlydGhkYXRlIiwiMTk0MC0wMS0wMSJd",
-          "credentialData": {
-            "given_name": "John",
-            "family_name": "Doe",
-            "email": "johndoe@example.com",
-            "phone_number": "+1-202-555-0101",
-            "address": {
-              "street_address": "123 Main St",
-              "locality": "Anytown",
-              "region": "Anystate",
-              "country": "US"
-            },
-            "is_over_18": true,
-            "is_over_21": true,
-            "is_over_65": true,
-            "id": "urn:uuid:15030989-e39f-4831-88ee-bf53dbe29f68",
-            "iat": 1759978870,
-            "nbf": 1759978870,
-            "exp": 1791514870,
-            "iss": "https://issuer.demo.walt.id/draft13",
-            "cnf": {
-              "kid": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17"
-            },
-            "vct": "https://issuer.demo.walt.id/draft13/identity_credential",
-            "display": [],
-            "birthdate": "1940-01-01"
-          },
-          "originalCredentialData": {
-            "given_name": "John",
-            "family_name": "Doe",
-            "email": "johndoe@example.com",
-            "phone_number": "+1-202-555-0101",
-            "address": {
-              "street_address": "123 Main St",
-              "locality": "Anytown",
-              "region": "Anystate",
-              "country": "US"
-            },
-            "is_over_18": true,
-            "is_over_21": true,
-            "is_over_65": true,
-            "id": "urn:uuid:15030989-e39f-4831-88ee-bf53dbe29f68",
-            "iat": 1759978870,
-            "nbf": 1759978870,
-            "exp": 1791514870,
-            "iss": "https://issuer.demo.walt.id/draft13",
-            "cnf": {
-              "kid": "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17"
-            },
-            "vct": "https://issuer.demo.walt.id/draft13/identity_credential",
-            "display": [],
-            "_sd": [
-              "lyZeYWrDdlJ9qTf4P0iPJQHYPRhq_MV4f_YrLuA2PF8"
-            ]
-          },
-          "issuer": "https://issuer.demo.walt.id/draft13",
-          "signature": {
-            "type": "signature-sd_jwt",
-            "signature": "FRi4y983m4c9u9VrmJDa7KY6o--7HPpHZW3nLGmv_yT5OTLszFn-nTlON9BeN3CzqDDvwDI9X41vm8h3m1fPSg",
-            "jwtHeader": {
-              "x5c": [
-                "-----BEGIN CERTIFICATE-----\nMIICETCCAbegAwIBAgIUMJAkGLbeyDnDaACHF2MwwUs/j1kwCgYIKoZIzj0EAwIwJDEVMBMGA1UEAwwMV2FsdCBJRCBSb290MQswCQYDVQQGEwJBVDAeFw0yNjA4MTAxMjUyNDdaFw0yNzExMTAxMjUyNDdaMCYxFzAVBgNVBAMMDldhbHQgSUQgbURMIERTMQswCQYDVQQGEwJBVDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABBtESDQYhfqEFA93eQxp3oELl3pyNvSQ2jBqDL4qCkQTed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4GjgcQwgcEwHQYDVR0OBBYEFLm7A+B7z8CQmFznE976TVpzBwXaMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCoGA1UdEgQjMCGBDm9mZmljZUB3YWx0Lmlkhg9odHRwczovL3dhbHQuaWQwLAYDVR0fBCUwIzAhoB+gHYYbaHR0cHM6Ly9jcmwud2FsdC5pZC9jcmwuZGVyMB8GA1UdIwQYMBaAFLm7A+B7z8CQmFznE976TVpzBwXaMAoGCCqGSM49BAMCA0gAMEUCIQD44E8Mukk3WwFeHbB6RZZPy85lVEyNqFZs6aNLq2kq4QIgXrURrzy1iLEYmsnna6YYhRrvGaYEjk1GqCn2w+skfmw=\n-----END CERTIFICATE-----"
-              ],
-              "kid": "9vuaJyUxRx4KmHyoZ9kjJxMs_mjpnnf-mPM9nPMG51A",
-              "typ": "vc+sd-jwt",
-              "alg": "ES256"
-            },
-            "providedDisclosures": [
-              {
-                "salt": "ugiBtMSFQWdMe6jptE43pA",
-                "name": "birthdate",
-                "value": "1940-01-01",
-                "location": "$.birthdate",
-                "encoded": "WyJ1Z2lCdE1TRlFXZE1lNmpwdEU0M3BBIiwiYmlydGhkYXRlIiwiMTk0MC0wMS0wMSJd"
-              }
-            ]
-          },
-          "signed": "eyJ4NWMiOlsiLS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tXG5NSUlCZVRDQ0FSOENGSHJXZ3JHbDVLZGVmU3ZSUWhSK2FvcWRmNDgrTUFvR0NDcUdTTTQ5QkFNQ01CY3hGVEFUQmdOVkJBTU1ERTFFVDBNZ1VrOVBWQ0JEUVRBZ0Z3MHlOVEExTVRReE5EQTRNRGxhR0E4eU1EYzFNRFV3TWpFME1EZ3dPVm93WlRFTE1Ba0dBMVVFQmhNQ1FWUXhEekFOQmdOVkJBZ01CbFpwWlc1dVlURVBNQTBHQTFVRUJ3d0dWbWxsYm01aE1SQXdEZ1lEVlFRS0RBZDNZV3gwTG1sa01SQXdEZ1lEVlFRTERBZDNZV3gwTG1sa01SQXdEZ1lEVlFRRERBZDNZV3gwTG1sek1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRUcwUklOQmlGK29RVUQzZDVER25lZ1F1WGVuSTI5SkRhTUdvTXZpb0tSQk41M2Q0VWF6YWtTMnVudThCbnNFdHh1dFMya3FSaFlCUFlrOVJBcmlVM2dUQUtCZ2dxaGtqT1BRUURBZ05JQURCRkFpQU9Nd003aEg3cTlEaSttVDZxQ2k0THZCK2tIOE94TWhlSXJaMmVSUHh0RFFJaEFMSHpUeHd2TjhVZHQwWjJDcG84SkJpaHFhY2ZlWGtJeFZBTzhYa3htWGhCXG4tLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tIl0sImtpZCI6Ijl2dWFKeVV4Ung0S21IeW9aOWtqSnhNc19tanBubmYtbVBNOW5QTUc1MUEiLCJ0eXAiOiJ2YytzZC1qd3QiLCJhbGciOiJFUzI1NiJ9.eyJnaXZlbl9uYW1lIjoiSm9obiIsImZhbWlseV9uYW1lIjoiRG9lIiwiZW1haWwiOiJqb2huZG9lQGV4YW1wbGUuY29tIiwicGhvbmVfbnVtYmVyIjoiKzEtMjAyLTU1NS0wMTAxIiwiYWRkcmVzcyI6eyJzdHJlZXRfYWRkcmVzcyI6IjEyMyBNYWluIFN0IiwibG9jYWxpdHkiOiJBbnl0b3duIiwicmVnaW9uIjoiQW55c3RhdGUiLCJjb3VudHJ5IjoiVVMifSwiaXNfb3Zlcl8xOCI6dHJ1ZSwiaXNfb3Zlcl8yMSI6dHJ1ZSwiaXNfb3Zlcl82NSI6dHJ1ZSwiaWQiOiJ1cm46dXVpZDoxNTAzMDk4OS1lMzlmLTQ4MzEtODhlZS1iZjUzZGJlMjlmNjgiLCJpYXQiOjE3NTk5Nzg4NzAsIm5iZiI6MTc1OTk3ODg3MCwiZXhwIjoxNzkxNTE0ODcwLCJpc3MiOiJodHRwczovL2lzc3Vlci5kZW1vLndhbHQuaWQvZHJhZnQxMyIsImNuZiI6eyJraWQiOiJkaWQ6a2V5OnpEbmFlWWI3RGFrUVdtWWtyTGttc1ZFUkFhekY1WWExRzVueGJTblFjTEpaOENyMTcifSwidmN0IjoiaHR0cHM6Ly9pc3N1ZXIuZGVtby53YWx0LmlkL2RyYWZ0MTMvaWRlbnRpdHlfY3JlZGVudGlhbCIsImRpc3BsYXkiOltdLCJfc2QiOlsibHlaZVlXckRkbEo5cVRmNFAwaVBKUUhZUFJocV9NVjRmX1lyTHVBMlBGOCJdfQ.FRi4y983m4c9u9VrmJDa7KY6o--7HPpHZW3nLGmv_yT5OTLszFn-nTlON9BeN3CzqDDvwDI9X41vm8h3m1fPSg",
-          "format": "dc+sd-jwt"
-        }
-        """.trimIndent()
-        ),
+    private suspend fun walletCredentials() = listOf(
+        issueSdJwtVcForHolder(holderDid).withInvalidIssuerSignature(),
         MdocsCredential(
             credentialData = Json.decodeFromString(
                 """
@@ -349,8 +222,8 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
 
     private fun selectCredentialsForQuery(
         query: DcqlQuery,
+        storedCredentials: List<DigitalCredential>,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
-        val storedCredentials = walletCredentials
 
         val dcqlCredentials = storedCredentials.mapIndexed { idx, credential ->
             RawDcqlCredential(
@@ -401,11 +274,12 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
             module = Application::verifierModule
         ) {
             val http = testHttpClient()
+            val walletCredentials = walletCredentials()
 
             // Create the verification session
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
-                    setBody(verificationSessionSetup)
+                    setBody(verificationSessionSetup(walletCredentials.first()))
                 }.body<VerificationSessionCreationResponse>()
             }
             println("Verification Session Response: $verificationSessionResponse")
@@ -439,7 +313,8 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
 
             val selectCallback: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>> = { query ->
                 selectCredentialsForQuery(
-                    query = query
+                    query = query,
+                    storedCredentials = walletCredentials,
                 )
             }
 
@@ -463,15 +338,10 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
 
                 val resp = presentationResult.getOrThrow()
                 println("Response: $resp")
-                assertTrue("Pre-final SD-JWT fixture must be rejected: $resp") { resp.transmissionSuccess == false }
-                // The fixture is intentionally invalid. Historically it tripped the SD-JWT `sd_hash-check`
-                // policy (missing `_sd_alg` claim). Since `_sd_alg` now defaults to sha-256 per
-                // RFC 9901 §4.1.1, the presentation gets past that gate and is instead rejected by
-                // the credential `signature` policy on the stale x5c chain. Either rejection is
-                // acceptable for this fixture.
+                assertTrue("Invalid issuer signature must be rejected: $resp") { resp.transmissionSuccess == false }
                 assertTrue {
                     val description = resp.verifierResponse!!.jsonObject["error_description"]!!.jsonPrimitive.content
-                    description.contains("sd_hash-check") || description.contains("signature")
+                    description.startsWith("Credential policy verification failed.") && description.contains("signature")
                 }
             }
 
@@ -491,7 +361,14 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
             test("Check Verification Session after presentation") {
                 assertTrue { info2.attempted }
                 assertTrue { info2.status == Verification2Session.VerificationSessionStatus.FAILED }
-
+                val policyResults = assertNotNull(info2.policyResults)
+                assertTrue { policyResults.vpPolicies.getValue("my_pid").values.all { it.success } }
+                assertTrue { policyResults.vpPolicies.getValue("my_pid").getValue("dc+sd-jwt/exp-check").success }
+                val signatureResult = policyResults.vcPolicies.single { it.policy.id == "signature" }
+                assertTrue { !signatureResult.success }
+                assertEquals("Invalid JWS signature", signatureResult.error)
+                val presentedCredential = assertNotNull(info2.presentedCredentials).getValue("my_pid").single()
+                assertEquals("1940-01-01", presentedCredential.credentialData["birthdate"]!!.jsonPrimitive.content)
             }
 
         }
