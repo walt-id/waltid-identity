@@ -23,7 +23,6 @@ import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 /**
  * WAL-1509: two pinned trust anchors share a subject DN but have different keys (key rollover).
@@ -174,7 +173,6 @@ class SameSubjectDnAnchorsTests {
             clientId.authenticateX509SanDns(clientId, sanDnsContext(presentedBy(ca, includeRoot = false)), trust)
         )
 
-        val error = assertIs<ClientIdError.AttestationError>(failure.error)
-        assertTrue(error.toString().contains("Refusing to select one"), error.toString())
+        assertEquals(ClientIdError.X509TrustAnchorMismatch, failure.error)
     }
 }

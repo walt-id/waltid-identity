@@ -60,7 +60,10 @@ class X509CertificateSignatureValidator(
                         ValidationResult.Severity.ERROR,
                         "(${signatureValidator.name}) Certificate Signature not valid: none of the " +
                                 "${selection.candidates.size} trusted certificates with subjectDn " +
-                                "'${x509Certificate.data.issuerDn}' is the issuer"
+                                "'${x509Certificate.data.issuerDn}' is the issuer" +
+                                selection.verificationErrors.takeIf { it.isNotEmpty() }
+                                    ?.joinToString(prefix = ". Signature check failed with an error for: ", separator = "; ")
+                                    .orEmpty()
                     )
                 }
 

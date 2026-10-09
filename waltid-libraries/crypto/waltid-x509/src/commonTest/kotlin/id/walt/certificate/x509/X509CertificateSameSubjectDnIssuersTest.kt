@@ -351,6 +351,36 @@ class X509CertificateSameSubjectDnIssuersTest {
     }
 
     @Test
+    fun signatureCheckErrorsAreReportedWhenNoCandidateVerifies() = runTest {
+        val caA = newCa("ca-a")
+        val caB = newCa("ca-b")
+        val throwing = object : SignatureValidator by tool.services.signatureValidator {
+            override suspend fun validateCertificateSignature(
+                cryptoRuntime: CryptoRuntime,
+                issuerPublicKey: X509Certificate.SubjectPublicKeyInfo,
+                certificate: X509Certificate
+            ): Boolean = throw UnsupportedOperationException("algorithm not supported here")
+        }
+        val validator = X509CertificateChainValidator(
+            listOf(X509CertificateSignatureValidator(throwing)),
+            InMemoryTrustStore(listOf(caA.cert, caB.cert))
+        )
+
+        val result = validator.validate(TestKeyUtil.runtime, listOf(issueLeaf(caB)))
+
+        assertFalse(result.valid)
+        val error = errors(result).single()
+        assertTrue(error.message.contains("Certificate Signature not valid"), error.message)
+        // Both candidates were tried (the AKI preferred one first) and both errors are kept
+        for (ca in listOf(caA, caB)) {
+            assertTrue(
+                error.message.contains("${ca.cert.fingerprintSha256Hex}: UnsupportedOperationException: algorithm not supported here"),
+                error.message
+            )
+        }
+    }
+
+    @Test
     fun pathLengthWalkFailsClosedOnAmbiguousIssuerWithoutASignatureValidator() = runTest {
         val caA = newCa("ca-a")
         val caB = newCa("ca-b")

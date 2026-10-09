@@ -28,8 +28,15 @@ sealed interface IssuerSelection {
      * There are trusted certificates with the issuer DN, but none of them is the issuer: none
      * verifies the signature of the certificate, or (for a self signed certificate) none is the
      * same certificate.
+     *
+     * [verificationErrors] holds, per candidate whose signature check threw instead of returning a
+     * result, the candidate's fingerprint and the error, so the cause is not lost when the real issuer
+     * could not be checked (e.g. an algorithm the platform does not support).
      */
-    data class NoMatch(val candidates: List<X509Certificate>) : IssuerSelection
+    data class NoMatch(
+        val candidates: List<X509Certificate>,
+        val verificationErrors: List<String> = emptyList()
+    ) : IssuerSelection
 
     /**
      * More than one trusted certificate qualifies as the issuer. Callers must fail closed instead
@@ -102,15 +109,16 @@ class IssuerSelector(
             candidates.partition { it.data.extensionSubjectKeyIdentifier?.keyIdentifier == authorityKeyId }
         }
 
+        val verificationErrors = mutableListOf<String>()
         for (group in listOf(preferred, others)) {
             if (group.isEmpty()) continue
             when (val result = selectBySignature(certificate, group)) {
-                is IssuerSelection.NoMatch -> continue
+                is IssuerSelection.NoMatch -> verificationErrors += result.verificationErrors
                 is IssuerSelection.Selected -> return rejectSameKeyDuplicates(result, candidates)
                 else -> return result
             }
         }
-        return IssuerSelection.NoMatch(candidates)
+        return IssuerSelection.NoMatch(candidates, verificationErrors)
     }
 
     private fun rejectSameKeyDuplicates(
@@ -126,17 +134,20 @@ class IssuerSelector(
      * Whether [certificate] is signed with the key of [candidate]. A candidate whose key cannot verify
      * the signature at all - typically one of another key type, e.g. an RSA CA that rolled over to an EC
      * CA with the same subject DN - makes the signature validator throw; for the selection that is
-     * simply "not the issuer", and it can only ever remove a candidate, never add one.
+     * simply "not the issuer", and it can only ever remove a candidate, never add one. The error is
+     * recorded in [verificationErrors] so that it can be reported if no candidate verifies.
      */
     private suspend fun verifies(
         signatureValidator: SignatureValidator,
         candidate: X509Certificate,
-        certificate: X509Certificate
+        certificate: X509Certificate,
+        verificationErrors: MutableList<String>
     ): Boolean = try {
         signatureValidator.validateCertificateSignature(cryptoRuntime, candidate.data.subjectPublicKeyInfo, certificate)
     } catch (e: CancellationException) {
         throw e
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+        verificationErrors += "${candidate.fingerprintSha256Hex}: ${e::class.simpleName}: ${e.message}"
         false
     }
 
@@ -147,9 +158,10 @@ class IssuerSelector(
         if (signatureValidator == null) {
             return if (group.size == 1) IssuerSelection.Selected(group.first()) else IssuerSelection.Ambiguous(group)
         }
-        val verifying = group.filter { verifies(signatureValidator, it, certificate) }
+        val verificationErrors = mutableListOf<String>()
+        val verifying = group.filter { verifies(signatureValidator, it, certificate, verificationErrors) }
         return when (verifying.size) {
-            0 -> IssuerSelection.NoMatch(group)
+            0 -> IssuerSelection.NoMatch(group, verificationErrors)
             1 -> IssuerSelection.Selected(verifying.first(), signatureVerified = true)
             else -> IssuerSelection.Ambiguous(verifying)
         }
