@@ -132,7 +132,7 @@ object OpenId4VciRoutesDocs {
 
     fun authorize(): RouteConfig.() -> Unit = {
         summary = "Authorization endpoint"
-        description = "The authorization endpoint"
+        description = "When enforcePushedAuthorizationRequests is true, use /par first, then /authorize?client_id=wallet&request_uri=urn:ietf:params:oauth:request_uri:example."
         response {
             HttpStatusCode.Found to {
                 description = "Redirect containing authorization response parameters"
