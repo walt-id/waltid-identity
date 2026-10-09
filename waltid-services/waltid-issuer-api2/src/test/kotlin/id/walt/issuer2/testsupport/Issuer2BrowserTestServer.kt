@@ -16,11 +16,15 @@ import io.ktor.server.application.install
 
 class Issuer2BrowserTestServer(
     val baseUrl: String = DEFAULT_REAL_SERVER_BASE_URL,
+    val requirePar: Boolean = false,
 ) : AutoCloseable {
     private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
 
     fun start(): Issuer2BrowserTestServer {
         loadIssuer2ConfigFiles(baseUrlOverride = baseUrl)
+        val config = id.walt.commons.config.ConfigManager.getConfig<id.walt.issuer2.config.Issuer2ServiceConfig>()
+        id.walt.commons.config.ConfigManager.loadedConfigurations["issuer-service" to id.walt.issuer2.config.Issuer2ServiceConfig::class] =
+            config.copy(enforcePushedAuthorizationRequests = requirePar)
         val url = Url(baseUrl)
         server = embeddedServer(
             factory = CIO,
