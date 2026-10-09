@@ -217,9 +217,16 @@ final class WalletE2EUI {
     }
 
     func tapButton(identifier: String, fallbackLabel: String, useCoordinateTap: Bool = false) {
+        let tagged = app.buttons.matching(identifier: identifier)
+        if tagged.firstMatch.waitForExistence(timeout: 20) {
+            // Navigation 3 retains both pages during motion; wait for the active page.
+            let unique = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in tagged.count == 1 }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [unique], timeout: 5), .completed,
+                "Button remained ambiguous after navigation: \(identifier)")
+        }
         XCTAssertTrue(button(identifier: identifier, fallbackLabel: fallbackLabel).waitForExistence(timeout: 20),
                       "Button not found: \(identifier)")
-        dismissKeyboard()
+        if !button(identifier: identifier, fallbackLabel: fallbackLabel).isHittable { dismissKeyboard() }
         // Success banners auto-hide and move the form. Resolve the tap after that layout change.
         // Error banners have an expand control and remain visible for inspection.
         let statusDismiss = app.buttons["wallet.statusDismiss"]
@@ -233,7 +240,7 @@ final class WalletE2EUI {
             }
         }
         let targetButton = button(identifier: identifier, fallbackLabel: fallbackLabel)
-        makeHittable(targetButton)
+        if !targetButton.isHittable { makeHittable(targetButton) }
         XCTAssertTrue(targetButton.isHittable, "Button is not hittable: \(identifier)")
         XCTAssertTrue(targetButton.isEnabled, "Button is not enabled: \(identifier)")
         if useCoordinateTap {
