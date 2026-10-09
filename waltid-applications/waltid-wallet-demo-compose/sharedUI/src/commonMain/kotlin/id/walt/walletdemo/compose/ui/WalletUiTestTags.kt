@@ -125,8 +125,6 @@ internal object WalletUiTestTags {
     val PresentationCancelButton = tag("presentationCancelButton")
     val PresentationVerifier = tag("presentationVerifier")
     val PresentationVerifierSection = tag("presentationVerifierSection")
-    val PresentationClaimsDialog = tag("presentationClaimsDialog")
-    val PresentationClaimsClose = tag("presentationClaimsClose")
     val PresentationRequesterDetailsToggle = tag("presentationRequesterDetailsToggle")
     val PresentationRequesterDetails = tag("presentationRequesterDetails")
     val PresentationReaderTrustSection = tag("presentationReaderTrustSection")
@@ -164,7 +162,6 @@ internal object WalletUiTestTags {
     fun credentialOverview(id: String): String = tag("credentialOverview", id)
     fun presentationCredential(id: String): String = tag("presentationCredential", id)
     fun presentationCredentialToggle(id: String): String = tag("presentationCredentialToggle", id)
-    fun presentationClaimsToggle(id: String): String = tag("presentationClaimsToggle", id)
     fun presentationDisclosure(id: String): String = tag("presentationDisclosure", id)
     fun presentationDisclosureToggle(id: String): String = tag("presentationDisclosureToggle", id)
 

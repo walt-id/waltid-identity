@@ -7,20 +7,13 @@ struct ProximityInformationGroup: View {
     let document: ProximityDocumentReview
     let credential: ProximityCredentialOption
     let selection: ProximityDocumentSelection
-    let sharedElements: Set<ProximityElementReference>
     let details: CredentialDetails?
     let onToggleElement: (Int, ProximityElementReference) -> Void
     var enabled: Bool = true
 
     var body: some View {
         ReviewInformationGroup(title: details?.cardSummary.title ?? credential.label ?? String(localized: "Wallet credential"),
-            issuer: details?.cardSummary.issuer ?? credential.issuer, details: details,
-            detailsIdentifier: "proximity-details:\(document.requestIndex)",
-            claimStatus: { item in
-                sharedElements.contains { element in
-                    Array(item.pathComponents.prefix(2)) == [element.namespace, element.elementIdentifier]
-                } ? "Requested" : "Not shared"
-            }) {
+            issuer: details?.cardSummary.issuer ?? credential.issuer) {
             if !document.requiredElements.allSatisfy({ required in
                 credential.requestedElements.contains { $0.namespace == required.namespace && $0.elementIdentifier == required.elementIdentifier }
             }) {

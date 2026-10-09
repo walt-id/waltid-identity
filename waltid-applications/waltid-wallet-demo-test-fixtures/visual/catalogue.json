@@ -449,17 +449,6 @@
       "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome."
     },
     {
-      "id": "sharing.credential_information",
-      "requirements": [
-        "R04",
-        "R05",
-        "R15"
-      ],
-      "composeTest": "sharingCredentialInformation",
-      "swiftTest": "testSharingCredentialInformation",
-      "note": "Production requested-disclosure information uses the same label/value hierarchy as stored credentials; one header owns the destination and parent decisions are absent."
-    },
-    {
       "id": "sharing.information.selected",
       "requirements": [
         "R06",

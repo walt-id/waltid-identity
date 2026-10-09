@@ -15,6 +15,10 @@ public struct WalletDetailSheet<Content: View>: View {
     }
 
     public var body: some View {
+        navigation.walletSheetSizing()
+    }
+
+    @ViewBuilder private var navigation: some View {
         if #available(iOS 16, *) {
             NavigationStack {
                 WalletDetailPage(title) { content }
@@ -37,6 +41,14 @@ public struct WalletDetailSheet<Content: View>: View {
 struct WalletDetailDismissal {
     let perform: () -> Void
     let identifier: String
+    var enabled = true
+}
+
+public extension View {
+    /// Task pages retain the host's Close action while native navigation supplies Back.
+    func walletDetailDismissal(perform: (() -> Void)?, enabled: Bool = true, identifier: String = "wallet.flowBack") -> some View {
+        environment(\.walletDetailDismissal, perform.map { WalletDetailDismissal(perform: $0, identifier: identifier, enabled: enabled) })
+    }
 }
 
 private struct WalletDetailDismissalKey: EnvironmentKey {

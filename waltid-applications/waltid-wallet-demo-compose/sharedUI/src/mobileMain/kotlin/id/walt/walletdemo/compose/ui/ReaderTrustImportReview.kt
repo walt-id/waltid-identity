@@ -1,6 +1,6 @@
 package id.walt.walletdemo.compose.ui
 
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -24,16 +24,20 @@ internal fun ReaderTrustImportReview(
         ReviewScaffold(
             modifier = Modifier.testTag(WalletUiTestTags.SettingsReaderTrustImportReview),
             fillViewport = fillViewport,
+            header = {
+                WalletScreenHeader(stringResource(Res.string.reader_trust_review_reader_trust_import)) {
+                    IconButton(onCancel, modifier = Modifier.testTag(WalletUiTestTags.SettingsReaderTrustImportCancel)) {
+                        WalletIcon(WalletSymbol.Decline, stringResource(Res.string.reader_trust_cancel))
+                    }
+                }
+            },
             actions = {
                 WalletActions(
                     WalletAction(stringResource(Res.string.reader_trust_import), onImport,
                         testTag = WalletUiTestTags.SettingsReaderTrustImportConfirm),
-                    WalletAction(stringResource(Res.string.reader_trust_cancel), onCancel,
-                        testTag = WalletUiTestTags.SettingsReaderTrustImportCancel),
                 )
             },
         ) {
-            Text(stringResource(Res.string.reader_trust_review_reader_trust_import), style = MaterialTheme.typography.titleLarge)
             WalletSection {
                 SettingsDetailRow(stringResource(Res.string.reader_trust_file), preview.sourceName)
                 SettingsDetailRow(stringResource(Res.string.reader_trust_kind), stringResource(

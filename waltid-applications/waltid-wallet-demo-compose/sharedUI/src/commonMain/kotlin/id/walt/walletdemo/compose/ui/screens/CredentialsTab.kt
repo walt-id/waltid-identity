@@ -1,7 +1,6 @@
 package id.walt.walletdemo.compose.ui.screens
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -51,6 +50,7 @@ import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
 import id.walt.walletdemo.compose.ui.components.CredentialTechnicalInformation
 import id.walt.walletdemo.compose.ui.components.Id1AspectRatio
 import id.walt.walletdemo.compose.ui.components.walletNavigationMotion
+import id.walt.walletdemo.compose.ui.components.WalletMotion
 import id.walt.walletdemo.compose.ui.components.walletNavigationBackground
 import id.walt.walletdemo.compose.ui.plainTextClipEntry
 import kotlinx.coroutines.CoroutineStart
@@ -88,7 +88,6 @@ internal fun CredentialsTab(
     val showingDetails = selectedCredential != null
     val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val motionDuration = if (reduceMotion) 0 else 160
 
     fun requestClose() { technicalOpen = false; expandedId = null }
     fun toggleCard(id: String) { expandedId = id.takeUnless { it == expandedId } }
@@ -166,7 +165,7 @@ internal fun CredentialsTab(
                         }
                         AnimatedContent(
                             targetState = expanded.takeIf { showingDetails },
-                            transitionSpec = { fadeIn(tween(motionDuration)) togetherWith fadeOut(tween(motionDuration)) },
+                            transitionSpec = { fadeIn(WalletMotion.feedback(reduceMotion)) togetherWith fadeOut(WalletMotion.feedback(reduceMotion)) },
                             label = "stored-credential-information",
                         ) { details ->
                             details?.let { selected ->

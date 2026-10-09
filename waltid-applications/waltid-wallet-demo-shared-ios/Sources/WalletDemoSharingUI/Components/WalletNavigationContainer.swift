@@ -32,7 +32,7 @@ private struct WalletReviewDestination<Destination: View>: ViewModifier {
 
     @ViewBuilder func body(content: Content) -> some View {
         if hasNavigation { content.walletDetailDestination(isPresented: isPresented, destination: destination) }
-        else { content.sheet(isPresented: isPresented, content: destination) }
+        else { content.sheet(isPresented: isPresented) { destination().walletSheetSizing() } }
     }
 }
 

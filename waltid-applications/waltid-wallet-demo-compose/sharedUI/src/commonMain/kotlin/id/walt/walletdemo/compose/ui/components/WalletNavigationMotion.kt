@@ -3,7 +3,6 @@ package id.walt.walletdemo.compose.ui.components
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -18,7 +17,7 @@ internal fun <S> AnimatedContentTransitionScope<S>.walletNavigationMotion(
         else AnimatedContentTransitionScope.SlideDirection.Right
     // The new page travels from the edge; its parent moves a quarter-width behind it.
     // Back reverses that relationship instead of fading two barely moving pages together.
-    val timing = tween<IntOffset>(360, easing = CubicBezierEasing(0.2f, 0f, 0f, 1f))
+    val timing = WalletMotion.navigation<IntOffset>()
     return (slideIntoContainer(direction, timing, initialOffset = { if (forward) it else it / 4 }) togetherWith
         slideOutOfContainer(direction, timing, targetOffset = { if (forward) it / 4 else it }))
         .apply { targetContentZIndex = if (forward) 1f else -1f }

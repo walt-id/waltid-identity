@@ -346,14 +346,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertEqual(previewStatus, "Review presentation request", "Presentation preview did not load, status: \(previewStatus ?? "nil")")
         XCTAssertTrue(app.staticTexts["Information to share"].waitForExistence(timeout: 10))
         captureHost("Requested credential information")
-        let information = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.presentationClaimsToggle.")).firstMatch
-        XCTAssertTrue(information.waitForExistence(timeout: 10))
-        ui.tapButton(identifier: information.identifier, fallbackLabel: "Credential information")
-        XCTAssertTrue(app.descendants(matching: .any)["wallet.presentationClaimsDialog"].waitForExistence(timeout: 10))
-        assertCredentialInformationHeader(app)
-        XCTAssertFalse(app.buttons["wallet.presentationSubmitButton"].exists)
-        captureHost("All credential information")
-        ui.tapButton(identifier: "wallet-detail-back", fallbackLabel: "Back")
+        XCTAssertTrue(app.staticTexts["Given name"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Family name"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["wallet.presentationSubmitButton"].waitForExistence(timeout: 10))
 
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share", useCoordinateTap: true)

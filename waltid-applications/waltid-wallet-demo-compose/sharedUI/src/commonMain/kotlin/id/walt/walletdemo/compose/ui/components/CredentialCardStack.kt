@@ -1,8 +1,6 @@
 package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -49,8 +47,8 @@ internal fun CredentialCardStack(
         } else {
             // Cancellation reverses from the current values; no timer can reopen stale details.
             coroutineScope {
-                launch { othersVisibility.animateTo(if (expanded) 0f else 1f, tween(340, easing = FastOutSlowInEasing)) }
-                launch { selectedProgress.animateTo(if (expanded) 1f else 0f, tween(340, easing = FastOutSlowInEasing)) }
+                launch { othersVisibility.animateTo(if (expanded) 0f else 1f, WalletMotion.navigation()) }
+                launch { selectedProgress.animateTo(if (expanded) 1f else 0f, WalletMotion.navigation()) }
             }
         }
         if (!expanded) displayedExpandedId = null
@@ -59,8 +57,8 @@ internal fun CredentialCardStack(
     // Reduced motion renders the destination directly, including its accessible children.
     // It must not wait for a launched animation effect to hide the other credentials.
     val selectedId = if (reduceMotion) expandedId else displayedExpandedId
-    val visibility = if (reduceMotion) if (expandedId == null) 1f else 0f else othersVisibility.value
-    val progress = if (reduceMotion) if (expandedId == null) 0f else 1f else selectedProgress.value
+    val visibility = if (reduceMotion) if (expandedId == null) 1f else 0f else othersVisibility.value.coerceIn(0f, 1f)
+    val progress = if (reduceMotion) if (expandedId == null) 0f else 1f else selectedProgress.value.coerceIn(0f, 1f)
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val cardHeight = maxWidth / Id1AspectRatio

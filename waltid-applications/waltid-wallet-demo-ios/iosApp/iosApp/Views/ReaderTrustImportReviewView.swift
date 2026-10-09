@@ -65,20 +65,23 @@ struct ReaderTrustImportReviewView: View {
             .frame(maxWidth: 640)
             .frame(maxWidth: .infinity)
             .background(Color(uiColor: .systemGroupedBackground))
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                WalletFooter {
+                    WalletActions(primary: WalletAction(String(localized: "Import"), identifier: WalletAccessibilityID.readerTrustImportConfirm, perform: confirm))
+                }
+            }
             .navigationTitle("Review import")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: cancel)
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: cancel) { WalletToolbarIcon("xmark") }
+                        .accessibilityLabel("Cancel import")
                         .accessibilityIdentifier(WalletAccessibilityID.readerTrustImportCancel)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Import", action: confirm)
-                        .accessibilityIdentifier(WalletAccessibilityID.readerTrustImportConfirm)
                 }
             }
             .accessibilityIdentifier(WalletAccessibilityID.readerTrustImportReview)
-        }
+        }.navigationViewStyle(.stack)
+            .walletSheetSizing(expanded: true)
     }
 
     private func reviewDetail(_ label: String, _ value: String) -> some View {

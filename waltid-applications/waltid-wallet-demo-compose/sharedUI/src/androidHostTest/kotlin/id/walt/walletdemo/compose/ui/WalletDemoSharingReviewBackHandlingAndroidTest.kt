@@ -3,15 +3,10 @@ package id.walt.walletdemo.compose.ui
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.AndroidComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runAndroidComposeUiTest
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
-import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewFixtures.credentialOption
 import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewFixtures.digitalCredentialReview
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,46 +21,12 @@ import org.robolectric.annotation.Config
  * Android-only because the gesture is delivered through the host Activity's own dispatcher, so the
  * shared review has to be hosted in a real [ComponentActivity]. Which Credential Manager outcome each
  * case resolves to belongs to `DigitalCredentialProviderActivity`; here the concern is only which of the
- * three the review chooses.
+ * two the review chooses.
  */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class WalletDemoSharingReviewBackHandlingAndroidTest {
-
-    /**
-     * With the claims dialog open the gesture is the dialog's own dismiss: it closes it and the host
-     * is told nothing, rather than ending an OS-invoked surface because the user looked at what they were
-     * about to share.
-     */
-    @Test
-    fun backClosesClaimsDialogWithoutLeavingTheReview() =
-        runAndroidComposeUiTest<ComponentActivity> {
-            var backAtRoot = 0
-            var cancelled = 0
-            val option = credentialOption()
-            setContent {
-                WalletDemoSharingReviewScreen(
-                    review = digitalCredentialReview(credentialOptions = listOf(option)),
-                    title = "Share digital credential?",
-                    onSubmit = {},
-                    onCancel = { cancelled++ },
-                    onBackAtRoot = { backAtRoot++ },
-                )
-            }
-
-            onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id))
-                .performScrollTo()
-                .performClick()
-            onNodeWithTag(WalletUiTestTags.PresentationClaimsDialog).assertIsDisplayed()
-
-            pressBack()
-
-            onNodeWithTag(WalletDemoSharingReviewTestTags.Review).assertIsDisplayed()
-            onAllNodesWithTag(WalletUiTestTags.PresentationClaimsDialog).assertCountEquals(0)
-            assertEquals(0, backAtRoot)
-            assertEquals(0, cancelled)
-        }
 
     /**
      * At the review root the screen has nothing left to undo, so the gesture goes to the host - and to

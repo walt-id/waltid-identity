@@ -3,13 +3,10 @@ import SwiftUI
 public struct CredentialDetailsBody: View {
     public let details: CredentialDetails
     private let onTechnicalDetails: () -> Void
-    private let claimStatus: (ClaimItem) -> String?
 
-    public init(details: CredentialDetails, onTechnicalDetails: @escaping () -> Void,
-                claimStatus: @escaping (ClaimItem) -> String? = { _ in nil }) {
+    public init(details: CredentialDetails, onTechnicalDetails: @escaping () -> Void) {
         self.onTechnicalDetails = onTechnicalDetails
         self.details = details
-        self.claimStatus = claimStatus
     }
 
     public var body: some View {
@@ -25,7 +22,7 @@ public struct CredentialDetailsBody: View {
             }
 
             ForEach(details.groups.filter { $0.id != "technical" && $0.id != "requested" }) { group in
-                ClaimGroupView(group: group, claimStatus: claimStatus)
+                ClaimGroupView(group: group)
             }
 
             if !technicalGroups.isEmpty {

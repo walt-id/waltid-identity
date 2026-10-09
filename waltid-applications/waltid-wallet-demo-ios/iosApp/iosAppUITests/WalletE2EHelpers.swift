@@ -344,14 +344,6 @@ final class WalletE2EUI {
             .allElementsBoundByIndex
             .first { element in
                 guard element.exists, element.isHittable, element.isEnabled else { return false }
-                // XCTest considers a partly visible card hittable even when its center is
-                // covered by the pinned review actions. Scroll before tapping that card.
-                if element.identifier.hasPrefix("wallet.presentationClaimsToggle.") {
-                    let submit = app.buttons["wallet.presentationSubmitButton"]
-                    if submit.exists && submit.isHittable {
-                        return element.frame.midY < submit.frame.minY
-                    }
-                }
                 return true
             }
     }

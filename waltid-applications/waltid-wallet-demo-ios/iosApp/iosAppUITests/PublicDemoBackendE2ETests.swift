@@ -146,10 +146,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertEqual(previewStatus, "Review presentation request", "Preview failed, status: \(previewStatus ?? "nil")")
 
         XCTAssertTrue(app.staticTexts["Information to share"].waitForExistence(timeout: 20))
-        ui.tapElement(identifierPrefix: "wallet.presentationClaimsToggle.")
-        ui.assertExists(identifier: "wallet.presentationClaimsDialog")
-        XCTAssertTrue(app.staticTexts["Requested"].firstMatch.waitForExistence(timeout: 20))
-        ui.tapNavigationBack()
+        XCTAssertTrue(app.staticTexts["Given name"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.staticTexts["Family name"].waitForExistence(timeout: 20))
 
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
 

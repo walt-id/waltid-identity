@@ -7,7 +7,7 @@ struct WalletTabStatusBanner: View {
 
     var isVisible: Bool {
         guard viewModel.isStatusVisible(for: tab), let kind = viewModel.statusKind(for: tab) else { return false }
-        return viewModel.externalFlow == nil || kind == .busy || kind == .error
+        return tab == .credentials || kind == .busy || kind == .error
     }
 
     var body: some View {
@@ -52,13 +52,15 @@ struct WalletTabFeedback: View {
 }
 
 extension View {
-    func walletFlowToolbar(onBack: (() -> Void)?, backEnabled: Bool, onOpenSettings: (() -> Void)?, external: Bool = false) -> some View {
+    func walletFlowToolbar(onBack: (() -> Void)?, backEnabled: Bool, onOpenSettings: (() -> Void)?, external: Bool = false, closing: Bool = false) -> some View {
         walletSettingsToolbar(onOpenSettings: onOpenSettings).toolbar {
             ToolbarItem(placement: .navigationBarTrailing) { WalletOpenInAppButton() }
-            ToolbarItem(placement: .navigationBarLeading) {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 if let onBack {
-                    Button(action: onBack) { Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44) }
-                        .accessibilityLabel("Close request")
+                    Button(action: onBack) {
+                        WalletToolbarIcon("xmark", isBusy: closing)
+                    }
+                        .accessibilityLabel(closing ? "Closing the secure connection…" : "Close request")
                         .disabled(!backEnabled)
                         .accessibilityIdentifier(external ? "wallet.external.close" : "wallet.flowBack")
                 }

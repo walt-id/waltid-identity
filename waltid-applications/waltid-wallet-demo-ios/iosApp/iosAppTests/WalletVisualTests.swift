@@ -344,14 +344,6 @@ final class WalletVisualTests: XCTestCase {
     }
 
     func testProviderSharingReview() async throws { try await providerSharingReview() }
-    func testSharingCredentialInformation() throws {
-        let review = try WalletVisualFixtures().sharingReview()
-        let option = try XCTUnwrap(review.credentialOptions.first)
-        let details = CredentialDisplayNormalizer.details(for: option)
-        let fields = informationFields(option: option, details: details, disclosures: [])
-        let screen = ReviewCredentialInformation(details: details, claimStatus: { fields.disclosureStatus($0) }, onDismiss: {})
-        try capture(screen, id: "sharing.credential_information")
-    }
     func testSharingInformationSelected() async throws { try await sharingInformation() }
     func testSharingInformationAlternative() async throws { try await sharingInformation(alternative: true) }
     func testSharingInformationMultiple() async throws { try await sharingInformation(multiple: true) }
@@ -597,6 +589,11 @@ final class WalletVisualTests: XCTestCase {
                                                  isReady: () -> Bool, isImageReady: ((UIImage) -> Bool)? = nil,
                                                  failure: String, readinessDescription: () -> String = { "" },
                                                  scrollToBottom: Bool = false, scrollFraction: CGFloat = 1) async throws {
+        // A hosted viewport change must not snapshot an intermediate native toolbar position.
+        // Limit the UIKit override to this settled-state capture and restore the caller's setting.
+        let animationsEnabled = UIView.areAnimationsEnabled
+        UIView.setAnimationsEnabled(false)
+        defer { UIView.setAnimationsEnabled(animationsEnabled) }
         let size = try XCTUnwrap(config.size)
         let host = WalletVisualHostingController(rootView: content)
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)

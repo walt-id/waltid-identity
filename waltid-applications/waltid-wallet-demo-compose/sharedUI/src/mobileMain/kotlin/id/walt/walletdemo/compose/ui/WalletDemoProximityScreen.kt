@@ -3,7 +3,13 @@ package id.walt.walletdemo.compose.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,6 +67,7 @@ internal fun WalletDemoProximityScreen(
     onReviewRecentRequest: () -> Unit = {},
     onConnectionOptions: (() -> Unit)? = null,
     headerOwnsClose: Boolean = false,
+    fillViewport: Boolean = true,
 ) {
     val sessionState = state.sessionState
     val terminal = state.isTerminal
@@ -76,7 +83,7 @@ internal fun WalletDemoProximityScreen(
 
     Column(
         modifier = Modifier
-            .fillMaxSize()
+            .then(if (fillViewport) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
             .then(rememberSuccessDismissal(key = sessionState ?: "nearby-preparing",
                 enabled = sessionState is ProximityState.Completed && !sessionState.declined && sessionState.receipt != null
                     && !state.closing && state.actionError == null && state.hostActionInProgress == null,
@@ -86,7 +93,7 @@ internal fun WalletDemoProximityScreen(
     ) {
         val review = state.review
         if (state.closing) {
-            ReviewScaffold(feedback = { ProximityProgressContent(stringResource(Res.string.proximity_terminating)) }) {}
+            ReviewScaffold { ProximityProgressContent(stringResource(Res.string.proximity_terminating)) }
         } else if (review != null) {
             WalletDemoProximityReview(
                 state = state,
@@ -102,10 +109,14 @@ internal fun WalletDemoProximityScreen(
                 headerOwnsClose = headerOwnsClose,
             )
         } else if (state.showsEngagement) {
-            Box(Modifier.weight(1f).padding(horizontal = 20.dp, vertical = 8.dp)) {
-                ProximityEngagementContent(state, credentialDetailsById, onShowEngagement, onApprovalModeChange, onConnectionOptions)
+            val showsFooter = (canCancel && !headerOwnsClose) || state.actionError != null
+            Box(Modifier.weight(1f, fill = fillViewport)
+                .then(if (showsFooter) Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)))
+                .padding(horizontal = 20.dp, vertical = 8.dp)) {
+                ProximityEngagementContent(state, credentialDetailsById, onShowEngagement, onApprovalModeChange, onConnectionOptions,
+                    fillViewport = fillViewport)
             }
-            if ((canCancel && !headerOwnsClose) || state.actionError != null) {
+            if (showsFooter) {
                 WalletFooter(feedback = state.actionError?.let { error -> { ProximityErrorCard(error) } },
                     actions = if (canCancel && !headerOwnsClose) ({ ProximityCancelAction(onCancel) }) else null)
             }

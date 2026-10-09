@@ -6,14 +6,20 @@ struct ProximityApprovalModeChoice: View {
     var compact = true
 
     var body: some View {
-        Toggle(isOn: Binding(get: { mode == .prepareSharing }, set: { mode = $0 ? .prepareSharing : .askEachTime })) {
+        HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Prepare sharing")
                 Text(compact ? "Review once before connecting to the same reader." : WalletDemoProximityApprovalMode.prepareSharing.explanation)
                     .font(.footnote).foregroundStyle(.secondary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            Toggle("Prepare sharing", isOn: Binding(get: { mode == .prepareSharing },
+                set: { mode = $0 ? .prepareSharing : .askEachTime }))
+                .labelsHidden()
+                .fixedSize()
+                .accessibilityIdentifier("proximity-approval-prepare")
         }
         .frame(minHeight: 44).padding(.vertical, 8)
-        .accessibilityIdentifier("proximity-approval-prepare")
     }
 }

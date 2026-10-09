@@ -9,19 +9,21 @@ import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.*
 
-/** Preparation and terminal states retain the external request without exposing an editable URL. */
+/** A scanned or external request stays in its own journey while preparing or recovering. */
 @Composable
-internal fun ExternalFlowStatus(
+internal fun WalletRequestStatus(
     state: WalletDemoUiState,
     onRetry: () -> Unit,
+    retryEnabled: Boolean,
     modifier: Modifier = Modifier,
     fillViewport: Boolean = true,
 ) {
-    ReviewScaffold(modifier, fillViewport, actions = if (state.operation is WalletOperationState.Failed) {
+    val failure = state.operation as? WalletOperationState.Failed
+    ReviewScaffold(modifier, fillViewport, actions = if (failure != null && retryEnabled) {
         { WalletActions(WalletAction("Try again", onRetry, testTag = "wallet.external.retry")) }
     } else null) {
-        if (state.isBusy || state.externalFlow is WalletExternalFlow.Pending) CircularProgressIndicator()
-        Text(state.statusText.ifBlank { "Preparing request…" }, Modifier.testTag(WalletUiTestTags.Status))
-
+        if (failure == null) CircularProgressIndicator()
+        Text(failure?.message ?: if (state.isBusy) state.statusText else "Preparing request…",
+            Modifier.testTag(WalletUiTestTags.Status))
     }
 }

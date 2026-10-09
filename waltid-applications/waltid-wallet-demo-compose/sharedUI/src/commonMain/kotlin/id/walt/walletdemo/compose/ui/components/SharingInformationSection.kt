@@ -3,7 +3,6 @@ package id.walt.walletdemo.compose.ui.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -42,11 +41,7 @@ private fun SharingInformationContent(
     val option = group.option
     val details = remember(option) { option.toCredentialDetails() }
     val summary = details.toCardDisplayData()
-    val navigation = LocalWalletReviewNavigation.current
-    var open by rememberSaveable(option.selection.id) { mutableStateOf(false) }
-    ReviewInformationGroup(summary.title, summary.issuer,
-        onDetails = { if (navigation != null) navigation.openSharing(option.selection.id) else open = true },
-        detailsModifier = Modifier.testTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id))) {
+    ReviewInformationGroup(summary.title, summary.issuer) {
         if (group.fields.isEmpty()) Text("No additional information to share.", style = MaterialTheme.typography.bodySmall)
         group.fields.forEachIndexed { index, field ->
             if (index > 0) MetadataRowDivider()
@@ -66,6 +61,4 @@ private fun SharingInformationContent(
             }
         }
     }
-    if (open) ReviewCredentialDetailsSheet(details, claimStatus = { group.fields.disclosureStatus(it) },
-        onDismiss = { open = false })
 }

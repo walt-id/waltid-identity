@@ -2,7 +2,6 @@ package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -51,9 +50,10 @@ internal fun MetadataDisclosure(
 ) {
     var expanded by rememberSaveable(title) { mutableStateOf(initiallyExpanded) }
     val stateLabel = stringResource(if (expanded) Res.string.metadata_expanded else Res.string.metadata_collapsed)
-    val duration = if (LocalWalletVisualPreferences.current.reduceMotion) 0 else 180
+    val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
     val expandedRotation = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -90f else 90f
-    val rotation by animateFloatAsState(if (expanded) expandedRotation else 0f, tween(duration), label = "disclosure-chevron")
+    val rotation by animateFloatAsState(if (expanded) expandedRotation else 0f,
+        WalletMotion.disclosure(reduceMotion), label = "disclosure-chevron")
 
     Column {
         Row(
@@ -74,8 +74,8 @@ internal fun MetadataDisclosure(
                 modifier = Modifier.rotate(rotation), tint = MaterialTheme.colorScheme.primary)
         }
         AnimatedVisibility(expanded,
-            enter = expandVertically(tween(duration)) + fadeIn(tween(duration)),
-            exit = shrinkVertically(tween(duration)) + fadeOut(tween(duration))) {
+            enter = expandVertically(WalletMotion.disclosure(reduceMotion)) + fadeIn(WalletMotion.disclosure(reduceMotion)),
+            exit = shrinkVertically(WalletMotion.disclosure(reduceMotion)) + fadeOut(WalletMotion.disclosure(reduceMotion))) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
         }
     }

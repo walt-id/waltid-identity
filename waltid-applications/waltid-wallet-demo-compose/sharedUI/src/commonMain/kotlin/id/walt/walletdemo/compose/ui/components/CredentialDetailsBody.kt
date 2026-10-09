@@ -10,7 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.CredentialDetails
-import id.walt.walletdemo.compose.logic.ClaimItem
 import id.walt.walletdemo.compose.logic.toSystemInfoGroup
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.resources.*
@@ -21,7 +20,6 @@ internal fun CredentialDetailsBody(
     details: CredentialDetails,
     onTechnicalDetails: () -> Unit,
     modifier: Modifier = Modifier,
-    claimStatus: (ClaimItem) -> String? = { null },
 ) {
     val technicalGroups = details.groups.filter { it.id == "technical" } + listOfNotNull(details.toSystemInfoGroup())
     Column(
@@ -35,7 +33,7 @@ internal fun CredentialDetailsBody(
             Text("No credential details available")
         }
         details.groups.filter { it.id != "technical" && it.id != "requested" }.forEach { group ->
-            key(group.id) { ClaimGroupSection(group, claimStatus = claimStatus) }
+            key(group.id) { ClaimGroupSection(group) }
         }
         if (technicalGroups.isNotEmpty()) WalletSection {
             WalletNavigationRow(

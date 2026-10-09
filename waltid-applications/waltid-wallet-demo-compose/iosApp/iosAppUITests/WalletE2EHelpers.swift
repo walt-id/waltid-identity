@@ -214,7 +214,7 @@ final class WalletE2EUI {
     }
 
     func openWalletLink(_ value: String) {
-        for identifier in ["wallet.presentationDone", "issuance-done", "wallet-detail-close", "wallet.presentationClaimsClose", "wallet.detailsBack", "wallet.flowBack"] {
+        for identifier in ["wallet.presentationDone", "issuance-done", "wallet-detail-close", "wallet.detailsBack", "wallet.flowBack"] {
             let button = app.buttons[identifier]
             if button.exists && button.isHittable { button.tap() }
         }

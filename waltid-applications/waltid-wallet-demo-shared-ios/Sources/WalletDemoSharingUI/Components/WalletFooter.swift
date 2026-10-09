@@ -13,8 +13,11 @@ public struct WalletFooter<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .trailing)
             .padding(.horizontal, 16).padding(.vertical, 10)
             .background {
-                if reduceTransparency || contrast == .increased { Color(.systemGroupedBackground) }
-                else { Rectangle().fill(.regularMaterial) }
+                if reduceTransparency || contrast == .increased {
+                    Color(.systemGroupedBackground).ignoresSafeArea(.container, edges: .bottom)
+                } else {
+                    Rectangle().fill(.thinMaterial).ignoresSafeArea(.container, edges: .bottom)
+                }
             }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("wallet.footer")

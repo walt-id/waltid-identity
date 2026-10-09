@@ -344,7 +344,7 @@ internal class WalletVisualScenarios(
             offerPreview = WalletVisualFixtures.offer.copy(offeredCredentials = listOf(credential)),
             issuanceCopyCounts = mapOf(credential.configurationId to 1))
         content {
-            ReceiveTab(state, state.requestDrafts, onOfferUrlChange = {}, onTxCodeChange = {},
+            ReceiveTab(state, state.requestDrafts, onTxCodeChange = {},
                 onCopiesChange = { _, _ -> }, onPreviewOffer = {}, onAcceptOffer = {},
                 onDeclineOffer = {}, onResumeDeferred = {}, onDone = {}, onRefresh = {})
         }
@@ -386,7 +386,7 @@ internal class WalletVisualScenarios(
         content {
             ReceiveTab(
                 state = state, requestDrafts = state.requestDrafts,
-                onOfferUrlChange = {}, onTxCodeChange = {}, onCopiesChange = { _, _ -> },
+                onTxCodeChange = {}, onCopiesChange = { _, _ -> },
                 onPreviewOffer = {}, onAcceptOffer = {}, onDeclineOffer = {}, onResumeDeferred = {}, onDone = {}, onRefresh = {},
             )
         }
@@ -475,7 +475,7 @@ internal class WalletVisualScenarios(
         content {
             Column(Modifier.fillMaxSize()) {
                 WalletHeader(state, onSettings = null, onClose = {}, title = "Receiving result")
-                ReceiveTab(state, state.requestDrafts, onOfferUrlChange = {}, onTxCodeChange = {},
+                ReceiveTab(state, state.requestDrafts, onTxCodeChange = {},
                     onCopiesChange = { _, _ -> }, onPreviewOffer = {}, onAcceptOffer = {}, onDeclineOffer = {},
                     onResumeDeferred = {}, onDone = {}, onRefresh = {}, modifier = Modifier.weight(1f),
                     feedback = { StatusCard(state, {}, {}) })
@@ -571,23 +571,6 @@ internal class WalletVisualScenarios(
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationVerifierSection).performScrollTo().assertIsDisplayed()
         capture(if (compact) "sharing.provider.compact_dark_large_text" else "sharing.provider.review")
-    }
-
-    fun sharingCredentialInformation() = with(test) {
-        val review = WalletVisualFixtures.providerReview
-        val option = review.credentialOptions.first()
-        content {
-            WalletDemoSharingReviewScreen(review = review, title = "Share documents",
-                onSubmit = {}, onCancel = {}, onBackAtRoot = {}, presentation = WalletReviewPresentation.Sheet)
-        }
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(option.selection.id)).performScrollTo().performClick()
-        onNodeWithText("Requested").performScrollTo().assertIsDisplayed()
-        option.disclosures.forEach { disclosure ->
-            onNodeWithText(requireNotNull(disclosure.displayValue)).assertIsDisplayed()
-        }
-        onAllNodesWithText("Credential information").assertCountEquals(1)
-        onAllNodesWithTag(WalletUiTestTags.PresentationSubmitButton).assertCountEquals(0)
-        capture("sharing.credential_information")
     }
 
     fun sharingInformation(alternative: Boolean = false, multiple: Boolean = false) = with(test) {
@@ -704,8 +687,7 @@ internal class WalletVisualScenarios(
         onNodeWithTag("payment-details-toggle").performScrollTo().performClick()
         onNodeWithText("example-transaction-001").performScrollTo().assertIsDisplayed()
         capture("${if (sheet) "payment.sheet" else "payment.mixed_credentials"}.details")
-        onNodeWithTag(WalletUiTestTags.presentationClaimsToggle(WalletVisualFixtures.paymentReview.credentialOptions.single { it.queryId == "payment" }.selection.id))
-            .performScrollTo().assertIsDisplayed()
+        onNodeWithTag("review-information-to-share").performScrollTo().assertIsDisplayed()
         onNodeWithText("Pay €11.56").assertIsEnabled().assertIsDisplayed()
         capture("${if (sheet) "payment.sheet" else "payment.mixed_credentials"}.requested_data")
         onNodeWithText("Pay €11.56").performClick()

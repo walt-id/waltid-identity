@@ -11,24 +11,20 @@ class WalletDemoSharingReviewAndroidTest {
     private val scenarios = WalletDemoSharingReviewTestScenarios()
 
     @Test
-    fun choosingFromTheWholeRowUpdatesInformationAndDetailsPreserveSelection() =
-        scenarios.choosingFromTheWholeRowUpdatesInformationAndDetailsPreserveSelection()
+    fun choosingFromTheWholeRowUpdatesInformationAndSubmission() =
+        scenarios.choosingFromTheWholeRowUpdatesInformationAndSubmission()
 
     @Test
     fun resizingAnOfferPreservesSelectionAndKeepsItsTitleReadable() =
         scenarios.resizingAnOfferPreservesSelectionAndKeepsItsTitleReadable()
 
     @Test
-    fun closingTechnicalInformationReturnsToReviewWithoutSubmitting() =
-        scenarios.closingTechnicalInformationReturnsToReviewWithoutSubmitting()
-
-    @Test
     fun changingHostPreservesDisclosureChoicesAndConsentRevision() =
         scenarios.changingHostPreservesDisclosureChoicesAndConsentRevision()
 
     @Test
-    fun inspectingAllCredentialInformationDoesNotChangeDisclosureConsent() =
-        scenarios.inspectingAllCredentialInformationDoesNotChangeDisclosureConsent()
+    fun reviewShowsRequestedValuesWithoutExposingUnsharedStoredInformation() =
+        scenarios.reviewShowsRequestedValuesWithoutExposingUnsharedStoredInformation()
 
     @Test
     fun unsignedConfirmationIsInvalidatedByNewConsentAndDisabledState() =

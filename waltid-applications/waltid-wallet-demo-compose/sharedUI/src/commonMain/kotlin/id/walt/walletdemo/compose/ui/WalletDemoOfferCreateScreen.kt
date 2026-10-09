@@ -14,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.ui.components.IssuanceResultContent
 import id.walt.walletdemo.compose.ui.components.OfferReviewActions
@@ -64,7 +63,11 @@ fun WalletDemoOfferCreateScreen(
     }) { fillViewport ->
         when (state) {
             WalletDemoOfferCreateUiState.Loading -> ReviewScaffold(fillViewport = fillViewport,
-                actions = { WalletActions(secondary = WalletAction("Cancel", onDecline)) }) {
+                header = {
+                    WalletScreenHeader("Receive credentials") {
+                        IconButton(onDecline) { WalletIcon(WalletSymbol.Decline, "Close request") }
+                    }
+                }) {
                 OfferCreateLoadingContent()
             }
             is WalletDemoOfferCreateUiState.Review -> {
@@ -147,9 +150,13 @@ fun WalletDemoOfferCreateScreen(
             }
             is WalletDemoOfferCreateUiState.WaitingForAuthorization -> ReviewScaffold(
                 fillViewport = fillViewport,
-                actions = if (state.completing) null else ({
-                    WalletActions(secondary = WalletAction("Cancel", onCancelAuthorization))
-                }),
+                header = {
+                    WalletScreenHeader("Receive credentials") {
+                        IconButton(onCancelAuthorization, enabled = !state.completing) {
+                            WalletIcon(WalletSymbol.Decline, "Close request")
+                        }
+                    }
+                },
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().testTag(WalletUiTestTags.OfferAuthorizationSection),
@@ -157,8 +164,7 @@ fun WalletDemoOfferCreateScreen(
                 ) {
                     Text(
                         if (state.completing) "Finishing issuance…" else "Complete sign-in in your browser",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodyLarge,
                     )
                     Text(
                         if (state.completing) "Saving your selected credentials…"

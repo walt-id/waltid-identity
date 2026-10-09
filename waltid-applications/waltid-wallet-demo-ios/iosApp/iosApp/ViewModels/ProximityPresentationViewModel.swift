@@ -72,6 +72,17 @@ final class ProximityPresentationViewModel: ObservableObject {
         return refreshingEngagement
     }
 
+    /// Open on the first usable state, rather than replacing transient startup layouts mid-animation.
+    var hasEntryContent: Bool {
+        if startupFailed { return true }
+        switch sessionState {
+        case nil, .preparing: return false
+        case .checkingPrerequisites(let capabilities):
+            return !capabilities.mayStart || capabilities.remediationActions.contains(.requestBluetoothPermission)
+        default: return true
+        }
+    }
+
     var canChangeApprovalMode: Bool {
         if case .engagementReady = sessionState { return preparedSharing == nil }
         return false
@@ -88,6 +99,7 @@ final class ProximityPresentationViewModel: ObservableObject {
     private var pendingConfiguration: ProximityConfiguration?
     private var sessionGeneration: UInt64 = 0
     private var preparedEngagementLaunched = false
+    private var deferredClosingState: ProximityState?
 
     init(
         client: any ProximityWalletClient,
@@ -125,7 +137,15 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     var canChangeConnectionOptions: Bool {
-        guard active, !closing, preparedSharing == nil, hostActionInProgress == nil else { return false }
+        active && !closing && connectionOptionsAvailable
+    }
+
+    var showsConnectionOptions: Bool {
+        connectionOptionsAvailable || refreshingEngagement
+    }
+
+    private var connectionOptionsAvailable: Bool {
+        guard preparedSharing == nil, hostActionInProgress == nil else { return false }
         switch sessionState { case .checkingPrerequisites, .engagementReady: return true; default: return false }
     }
 
@@ -187,14 +207,8 @@ final class ProximityPresentationViewModel: ObservableObject {
 
     func start() {
         guard !active else { return }
+        resetPresentationUI()
         active = true
-        preferredEngagement = nil
-        refreshingEngagementChoices = []
-        sessionState = nil
-        selections = []
-        continueAfterResponse = false
-        actionErrorMessage = nil
-        startupFailed = false
         sessionGeneration &+= 1
         let generation = sessionGeneration
         guard let configuration = readConfiguration() else { return }
@@ -431,8 +445,8 @@ final class ProximityPresentationViewModel: ObservableObject {
         let currentSession = session
         let shouldCancel = currentSession != nil && !isTerminal && !preparingApproval && sessionState != nil
         let generation = sessionGeneration
+        deferredClosingState = nil
         closing = true
-        actionErrorMessage = nil
         Task { [weak self] in
             guard let self else { return }
             if shouldCancel, let currentSession {
@@ -440,14 +454,12 @@ final class ProximityPresentationViewModel: ObservableObject {
                     let result = try await currentSession.dispatch(.cancel)
                     guard active, sessionGeneration == generation else { return }
                     if case .rejected(let error) = result {
-                        closing = false
-                        actionErrorMessage = error.message
+                        restoreRejectedClose(message: error.message)
                         return
                     }
                 } catch {
                     guard active, sessionGeneration == generation else { return }
-                    closing = false
-                    actionErrorMessage = Self.demoSessionFailureMessage
+                    restoreRejectedClose(message: Self.demoSessionFailureMessage)
                     return
                 }
             }
@@ -459,6 +471,21 @@ final class ProximityPresentationViewModel: ObservableObject {
             closing = false
             active = false
         }
+    }
+
+    private func restoreRejectedClose(message: String) {
+        closing = false
+        if let state = deferredClosingState {
+            deferredClosingState = nil
+            publish(state)
+        }
+        actionErrorMessage = message
+    }
+
+    /// Release retained display state only once the native sheet's dismissal has completed.
+    func finishDismissedPresentation() {
+        guard !active else { return }
+        resetPresentationUI()
     }
 
     func cancel() {
@@ -510,13 +537,23 @@ final class ProximityPresentationViewModel: ObservableObject {
         session = nil
         pendingConfiguration = nil
         effectiveConfiguration = nil
+        let revoking = preparedSharing
+        deferredClosingState = nil
+        if resetUI {
+            active = false
+            resetPresentationUI()
+        }
+        scheduleClose(closing, starting: starting, hostAction: hostAction, revoking: revoking)
+    }
+
+    private func resetPresentationUI() {
+        closing = false
+        deferredClosingState = nil
         capabilities = nil
         connectedRoute = nil
         preferredEngagement = nil
-        let revoking = preparedSharing
         preparedSharing = nil
         recentPlan = nil
-        if resetUI { active = false; self.closing = false }
         pendingReviewID = nil
         refreshingEngagementChoices = []
         sessionState = nil
@@ -525,7 +562,6 @@ final class ProximityPresentationViewModel: ObservableObject {
         hostActionInProgress = nil
         actionErrorMessage = nil
         startupFailed = false
-        scheduleClose(closing, starting: starting, hostAction: hostAction, revoking: revoking)
     }
 
     func restart() {
@@ -663,6 +699,10 @@ final class ProximityPresentationViewModel: ObservableObject {
     }
 
     private func publish(_ state: ProximityState) {
+        if closing {
+            deferredClosingState = state
+            return
+        }
         let previousReviewID = review?.reviewID
         sessionState = state
         if review?.reviewID != pendingReviewID { pendingReviewID = nil }

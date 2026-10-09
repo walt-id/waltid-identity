@@ -7,7 +7,6 @@ struct ReceiveView: View {
     let onOpenSettings: () -> Void
     var onBack: (() -> Void)? = nil
     @Environment(\.openURL) private var openURL
-    @Environment(\.walletDemoBranding) private var branding
 
     var body: some View {
         WalletNavigationContainer {
@@ -20,10 +19,9 @@ struct ReceiveView: View {
                     reviewContent(preview: preview)
                 } else if viewModel.issuanceReceipt != nil || !viewModel.deferredCredentials.isEmpty {
                     resultContent
-                } else if viewModel.externalFlow != nil {
-                    WalletExternalFlowStatus(viewModel: viewModel, onRetry: viewModel.previewOffer)
                 } else {
-                    entryContent
+                    WalletRequestStatus(viewModel: viewModel, tab: .receive,
+                        onRetry: viewModel.previewOffer, onClose: finishReceiving)
                 }
             }
             .background(Color(.systemGroupedBackground))
@@ -35,6 +33,9 @@ struct ReceiveView: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
         }
+        .walletDetailDismissal(perform: onBack,
+            enabled: viewModel.externalFlow != nil ? viewModel.canDismissExternalFlow : !viewModel.isLoading,
+            identifier: viewModel.externalFlow != nil ? "wallet.external.close" : "wallet.flowBack")
         .id(viewModel.receiveNavigationResetKey)
         .onChange(of: viewModel.authorizationRequestURL) { authorizationURL in
             guard let authorizationURL else { return }
@@ -43,32 +44,9 @@ struct ReceiveView: View {
         }
     }
 
-    private var entryContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-
-                ScannableUrlEditor(
-                    title: "",
-                    label: "Credential offer URL",
-                    text: $viewModel.offerUrl,
-                    inputIdentifier: WalletAccessibilityID.offerInput,
-                    scanButtonIdentifier: WalletAccessibilityID.offerScanButton,
-                    isEnabled: viewModel.receiveUrlEntryEnabled,
-                    focusResetKey: viewModel.inputFocusResetKey
-                )
-
-                WalletActions(primary: WalletAction("Receive", enabled: viewModel.receiveActionEnabled,
-                    identifier: WalletAccessibilityID.receiveButton, perform: viewModel.previewOffer))
-
-            }
-            .padding()
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) { WalletTabFeedback(viewModel: viewModel, tab: .receive) }
-    }
-
     private func reviewContent(preview: IssuanceOfferPreview) -> some View {
         WalletReviewScaffold {
-
+            WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
             OfferReviewView(
                 preview: preview,
                 isAcceptEnabled: viewModel.acceptOfferEnabled,
@@ -87,7 +65,6 @@ struct ReceiveView: View {
             }
 
         } actions: {
-            WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
             OfferReviewActions(
                 requiresIssuerAuthentication: preview.grant == .authorizationCode,
                 isAcceptEnabled: viewModel.acceptOfferEnabled,
@@ -104,11 +81,11 @@ struct ReceiveView: View {
 
     private var resultContent: some View {
         WalletReviewScaffold {
+            WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
             IssuanceResultContent(receipt: viewModel.issuanceReceipt, saved: viewModel.receivedCredentials,
                 pending: pendingCredentials,
                 busy: viewModel.isLoading, onResume: viewModel.resumeDeferredCredential)
         } actions: {
-            WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
             WalletActions(primary: WalletAction("Done", enabled: !viewModel.isLoading, identifier: "issuance-done") {
                 finishReceiving()
             }, secondary: pendingCredentials.isEmpty ? nil : WalletAction("Refresh status",

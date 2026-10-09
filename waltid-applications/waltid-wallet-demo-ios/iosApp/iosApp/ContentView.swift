@@ -28,8 +28,8 @@ struct ContentView: View {
                 }
                 walletContent
             }
-            .modifier(ExternalSheetSize(isReady: viewModel.isReady && viewModel.auth == .unlocked))
-            .interactiveDismissDisabled(!viewModel.canDismissExternalFlow || !viewModel.isReady)
+            .walletSheetSizing(expanded: !viewModel.isReady || viewModel.auth != .unlocked)
+            .interactiveDismissDisabled(!viewModel.canDismissExternalFlow)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("wallet.external.flow")
             .environment(\.walletOpenInApp, { expandingExternalFlow = true })
@@ -102,42 +102,3 @@ struct ContentView: View {
 
 // Preview the side-effect-free components in WalletDemoSharingUI. App-host
 // previews must not initialize PIN storage, reader stores or registration services.
-
-/// Use native resizing where available; older iOS retains its standard full-height sheet.
-private struct ExternalSheetSize: ViewModifier {
-    let isReady: Bool
-    @Environment(\.dynamicTypeSize) private var typeSize
-
-    @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 16, *) {
-            ResizableExternalSheet(isReady: isReady, needsLargeText: typeSize.isAccessibilitySize, content: content)
-        } else { content }
-    }
-}
-
-@available(iOS 16, *)
-private struct ResizableExternalSheet<Content: View>: View {
-    let isReady: Bool
-    let needsLargeText: Bool
-    let content: Content
-    @State private var detent: PresentationDetent = .medium
-    @State private var keyboardVisible = false
-    @State private var resizeAfterKeyboard = false
-
-    var body: some View {
-        content.presentationDetents([.medium, .large], selection: $detent)
-            .presentationDragIndicator(.visible)
-            .onAppear { resize() }
-            .onChange(of: isReady) { _ in
-                if keyboardVisible { resizeAfterKeyboard = true } else { resize() }
-            }
-            .onChange(of: needsLargeText) { _ in resize() }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardVisible = true }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidHideNotification)) { _ in
-                keyboardVisible = false
-                if resizeAfterKeyboard { resizeAfterKeyboard = false; resize() }
-            }
-    }
-
-    private func resize() { detent = isReady && !needsLargeText ? .medium : .large }
-}
