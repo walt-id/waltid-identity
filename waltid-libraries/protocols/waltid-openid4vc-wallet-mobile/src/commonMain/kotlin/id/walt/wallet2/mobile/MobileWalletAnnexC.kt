@@ -93,11 +93,6 @@ internal class MobileWalletAnnexCEngine(
     private val readerTrustEvaluator: ReaderTrustEvaluator,
     private val registryRecords: suspend () -> List<MobileWalletCredentialRegistryRecord>,
 ) {
-
-    init {
-        println("Trust configuration")
-    }
-
     /** A request that passed validation, with everything later steps need already decoded. */
     private data class ValidatedRequest(
         val parsedRequest: MobileWalletAnnexCParsedRequest,
