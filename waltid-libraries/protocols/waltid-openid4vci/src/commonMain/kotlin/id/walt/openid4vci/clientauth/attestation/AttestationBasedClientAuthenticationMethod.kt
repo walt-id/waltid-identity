@@ -81,6 +81,18 @@ class AttestationBasedClientAuthenticationMethod(
 
     override val name: String = ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH
 
+    /** Wrap the attestation verifier and keep the endpoint algorithm and clock settings. */
+    fun withAttestationVerifier(
+        transform: (ClientAttestationVerifier) -> ClientAttestationVerifier,
+    ): AttestationBasedClientAuthenticationMethod = AttestationBasedClientAuthenticationMethod(
+        attestationVerifier = transform(attestationVerifier),
+        acceptedAttestationSigningAlgorithms = acceptedAttestationSigningAlgorithms,
+        acceptedPopSigningAlgorithms = acceptedPopSigningAlgorithms,
+        clock = clock,
+        clockSkewSeconds = clockSkewSeconds,
+        popMaxAgeSeconds = popMaxAgeSeconds,
+    )
+
     @Suppress("UNUSED_PARAMETER")
     override suspend fun authenticate(
         endpoint: ClientAuthenticationEndpoint,
