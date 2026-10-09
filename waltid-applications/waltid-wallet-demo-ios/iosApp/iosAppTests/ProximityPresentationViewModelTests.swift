@@ -585,7 +585,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let previous = scene.windows.first { $0.isKeyWindow }
         let window = UIWindow(windowScene: scene)
-        window.rootViewController = UIHostingController(rootView: PresentView(viewModel: wallet, onOpenSettings: {}))
+        window.rootViewController = UIHostingController(rootView: PresentView(viewModel: wallet))
         window.makeKeyAndVisible()
         defer { viewModel.dismiss(); window.isHidden = true; previous?.makeKeyAndVisible() }
         func capture(_ name: String) async throws {
@@ -641,7 +641,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let previous = scene.windows.first { $0.isKeyWindow }
         let window = UIWindow(windowScene: scene)
         defer { model.dismiss(); window.isHidden = true; previous?.makeKeyAndVisible() }
-            window.rootViewController = UIHostingController(rootView: HomeView(viewModel: wallet)
+            window.rootViewController = UIHostingController(rootView: PresentView(viewModel: wallet, onBack: {}, nearbySheet: true)
                 .frame(width: size.width, height: size.height)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading))
             window.makeKeyAndVisible()
@@ -1133,7 +1133,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let previousWindow = scene.windows.first { $0.isKeyWindow }
         let window = UIWindow(windowScene: scene)
-        window.rootViewController = UIHostingController(rootView: PresentView(viewModel: wallet, onOpenSettings: {}))
+        window.rootViewController = UIHostingController(rootView: PresentView(viewModel: wallet))
         window.makeKeyAndVisible()
         defer {
             model.dismiss()

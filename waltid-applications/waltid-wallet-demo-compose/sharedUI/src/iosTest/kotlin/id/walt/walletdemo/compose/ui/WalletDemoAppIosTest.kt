@@ -91,8 +91,8 @@ class WalletDemoAppIosTest {
         scenarios.receiveDetailsStayScopedToReceiveTabNavigationStack()
 
     @Test
-    fun receiveTabDisablesUrlControlsWhileReceiving() =
-        scenarios.receiveTabDisablesUrlControlsWhileReceiving()
+    fun receiveReviewPreventsDuplicateAcceptanceWhileReceiving() =
+        scenarios.receiveReviewPreventsDuplicateAcceptanceWhileReceiving()
 
     @Test
     fun transactionCodeOfferCanBeDeclinedWithoutCode() =
@@ -157,8 +157,8 @@ class WalletDemoAppIosTest {
         scenarios.presentationReviewSurvivesReturningFromTheWallet()
 
     @Test
-    fun presentTabDisablesUrlControlsWhilePreviewing() =
-        scenarios.presentTabDisablesUrlControlsWhilePreviewing()
+    fun presentationRequestKeepsProgressVisibleUntilReviewIsReady() =
+        scenarios.presentationRequestKeepsProgressVisibleUntilReviewIsReady()
 
     @Test
     fun deepLinksRouteToReceiveAndPresentTabs() =

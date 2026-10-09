@@ -195,7 +195,7 @@ private fun WebWalletSession(
                     selectedWalletId = session.walletId,
                     onWalletSelected = { target ->
                         if (target == session.walletId) return@WalletTargetPicker
-                        WalletApi2BrowserSessionStore.updateWalletId(target)
+                        WalletApi2BrowserSessionStore.updateWalletIdIfCurrent(session, target)
                         onSessionChange(session.copy(walletId = target, walletTargets = targets))
                     },
                 )
