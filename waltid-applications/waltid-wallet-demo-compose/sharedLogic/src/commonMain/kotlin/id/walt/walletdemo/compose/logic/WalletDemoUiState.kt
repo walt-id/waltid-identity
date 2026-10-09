@@ -1,9 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
 data class WalletDemoUiState(
-    val auth: WalletAuthState = WalletAuthState.Setup(),
-    val isAuthenticating: Boolean = false,
-    val biometricUnlockAvailable: Boolean = false,
+    val access: WalletAccessState = WalletAccessState(),
     val identityDetails: WalletDemoIdentityDetailsState = WalletDemoIdentityDetailsState.Loading,
     val identityProgress: String? = null,
     val identityError: String? = null,
@@ -18,11 +16,14 @@ data class WalletDemoUiState(
     val signingProtectionError: String? = null,
     val operation: WalletOperationState = WalletOperationState.Idle,
     val selectedTab: WalletDemoTab = WalletDemoTab.Credentials,
+    val externalFlow: WalletExternalFlow? = null,
+    val incomingLinkNotice: String? = null,
     val requestDrafts: WalletRequestDrafts = WalletRequestDrafts(),
     val offerPreview: WalletDemoOfferPreview? = null,
     val issuanceCopyCounts: Map<String, Int> = emptyMap(),
     val authorizationRequestUrl: String? = null,
     val deferredCredentials: List<WalletDemoDeferredCredential> = emptyList(),
+    val issuanceReceipt: WalletDemoIssuanceReceipt? = null,
     val lastReceivedCredentialIds: List<String> = emptyList(),
     val receiveCompleted: Boolean = false,
     val receiveNavigationResetKey: Int = 0,
@@ -44,6 +45,9 @@ data class WalletDemoUiState(
     val proximityApprovalMode: WalletDemoProximityApprovalMode = WalletDemoProximityApprovalMode.AskEachTime,
     val pinLockEnabled: Boolean = true,
 ) {
+    val auth: WalletAuthState get() = access.auth
+    val isAuthenticating: Boolean get() = access.isBusy
+    val biometricUnlockAvailable: Boolean get() = access.biometricAvailable
     val identityBusy: Boolean get() = identityProgress != null
 
     val presentationPreview: WalletDemoPresentationPreview?

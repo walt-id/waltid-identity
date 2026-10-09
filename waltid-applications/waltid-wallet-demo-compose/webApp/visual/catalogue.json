@@ -1,0 +1,12 @@
+{
+  "requirements": ["R01", "R11", "R12", "R15"],
+  "environment": "Playwright 1.62.0 / Chromium 151.0.7922.34 / macOS 27 arm64 / en-US / UTC / scale 1 / light",
+  "states": [
+    { "id": "account.empty.compact", "state": "empty", "width": 393, "height": 852 },
+    { "id": "account.empty.wide", "state": "empty", "width": 1280, "height": 800 },
+    { "id": "account.busy.wide", "state": "busy", "width": 1280, "height": 800 },
+    { "id": "account.invalid.compact", "state": "invalid", "width": 393, "height": 852 },
+    { "id": "account.registered.wide", "state": "registered", "width": 1280, "height": 800 },
+    { "id": "account.expired.compact", "state": "expired", "width": 393, "height": 852 }
+  ]
+}

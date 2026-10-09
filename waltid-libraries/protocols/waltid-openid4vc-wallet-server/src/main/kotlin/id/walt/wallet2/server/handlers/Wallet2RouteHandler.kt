@@ -986,11 +986,22 @@ object Wallet2RouteHandler {
 
             get("/deferred", {
                 summary = "List wallet-scoped deferred issuance handles"
-                request { pathParameter<String>("walletId") }
+                description = "Returns retained handles without polling. Opt in to status and issuer display metadata with includeDetails=true."
+                request {
+                    pathParameter<String>("walletId")
+                    queryParameter<Boolean>("includeDetails") {
+                        description = "Include presentation status and issuer display metadata; defaults to false for released-client compatibility."
+                        required = false
+                    }
+                }
                 response { HttpStatusCode.OK to { body<List<WalletIssuanceContinuation>>() } }
             }) {
                 val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@get
-                call.respond(wallet.issuanceSessions().listIssuanceContinuations())
+                val continuations = wallet.issuanceSessions().listIssuanceContinuations()
+                call.respond(if (call.request.queryParameters["includeDetails"] == "true") continuations else continuations.map {
+                    // Preserve the released wire shape, including handles whose configuration is unknown.
+                    it.copy(status = WalletIssuanceContinuationStatus.UNRESOLVED, displayMetadataJson = null)
+                })
             }
             post("/deferred/{deferredCredentialId}", {
                 summary = "Resume retained deferred issuance"

@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity android:name="id.walt.walletdemo.compose.ui.WalletFooterGpuActivity" android:exported="false" />
+    </application>
+</manifest>

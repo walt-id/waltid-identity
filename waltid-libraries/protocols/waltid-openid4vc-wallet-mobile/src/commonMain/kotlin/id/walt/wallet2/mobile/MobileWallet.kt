@@ -1079,6 +1079,7 @@ public class MobileWallet internal constructor(
                     selectivelyDisclosable = disclosure.selectivelyDisclosable,
                     required = disclosure.required,
                     selectable = disclosure.selectable,
+                    requested = disclosure.requested,
                 )
             },
             metadataJson = metadata?.encodeJsonObject(),

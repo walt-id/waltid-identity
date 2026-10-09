@@ -5,7 +5,7 @@ import TestHelpers
 @MainActor
 final class WalletE2EUI {
     let app: XCUIApplication
-    private let pin = "123456"
+    private let pin = "1234"
 
     init(app: XCUIApplication) {
         self.app = app
@@ -14,10 +14,9 @@ final class WalletE2EUI {
     func completeKeySetupIfNeeded() {
         let button = app.buttons["wallet.keySetupContinue"]
         guard button.waitForExistence(timeout: 10) else { return }
-        for heading in ["1 of 4 · Recovery", "2 of 4 · Key storage", "3 of 4 · Signing approval", "4 of 4 · Review"] {
-            XCTAssertTrue(app.staticTexts[heading].waitForExistence(timeout: 10), "Missing setup step: \(heading)")
-            button.tap()
-        }
+        XCTAssertTrue(app.buttons["wallet.keySetupEdit.storage"].waitForExistence(timeout: 10))
+        XCTAssertEqual(button.label, "Create signing key")
+        button.tap()
     }
 
     func launch(attestation: [String: String] = [:], environment: [String: String] = [:], initializeSigningIdentity: Bool = true) {
@@ -65,6 +64,14 @@ final class WalletE2EUI {
         }
     }
 
+    func waitForOfferReview(timeout: TimeInterval) -> Bool {
+        app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: timeout)
+    }
+
+    func waitForPresentationReview(timeout: TimeInterval) -> Bool {
+        app.buttons["wallet.presentationSubmitButton"].waitForExistence(timeout: timeout)
+    }
+
     func waitForStatus(prefixes: [String], timeout: TimeInterval) -> String? {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
@@ -104,14 +111,30 @@ final class WalletE2EUI {
         XCTAssertTrue(address.waitForExistence(timeout: 10), safari.debugDescription)
         address.tap()
         address.typeText(value + XCUIKeyboardKey.return.rawValue)
+        // Safari can put its first-run toolbar tip above the external-app confirmation.
+        // Dismiss that tip before waiting for the real Open action to become enabled.
+        let tip = safari.staticTexts.matching(NSPredicate(format: "label CONTAINS[cd] %@", "View Bookmarks")).firstMatch
+        if tip.waitForExistence(timeout: 2) {
+            let close = safari.buttons["Close"].firstMatch
+            if close.exists { close.tap() }
+        }
         let open = safari.buttons["Open"]
         if open.waitForExistence(timeout: 5) {
+            let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: open)
+            XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 10), .completed, safari.debugDescription)
             // Safari's external-app confirmation reports no XCTest hit point on
             // iOS 26. Tap the visible button's own frame, not a fixed coordinate.
             XCTAssertFalse(open.frame.isEmpty)
             open.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         }
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10), safari.debugDescription)
+    }
+
+    /// First-use simulator registration is an OS-owned step, separate from wallet receipt rendering.
+    func allowIdentityDocumentRegistrationIfRequested() {
+        let alert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts
+            .containing(NSPredicate(format: "label CONTAINS %@", "Identity Verification")).firstMatch
+        if alert.waitForExistence(timeout: 15) { alert.buttons["Allow"].tap() }
     }
 
     func waitForTextInputValue(identifier: String, fallbackLabel: String, value: String, timeout: TimeInterval) -> Bool {
@@ -167,7 +190,7 @@ final class WalletE2EUI {
 
     func tapElement(identifierPrefix: String, timeout: TimeInterval = 20) {
         guard let element = waitForHittableElement(identifierPrefix: identifierPrefix, timeout: timeout) else {
-            XCTFail("Element not found or not hittable with identifier prefix: \(identifierPrefix)")
+            XCTFail("Element not found or not hittable with identifier prefix: \(identifierPrefix)\n\(app.debugDescription)")
             return
         }
         element.tap()
@@ -191,24 +214,38 @@ final class WalletE2EUI {
             close.tap()
             return
         }
-        let button = app.navigationBars.buttons.firstMatch
+        // Home stays mounted beneath a task sheet. Use the foreground navigation bar.
+        let navigationBar = app.navigationBars.allElementsBoundByIndex.last(where: \.isHittable)
+        let button = navigationBar?.buttons.firstMatch ?? app.navigationBars.buttons.firstMatch
         XCTAssertTrue(button.waitForExistence(timeout: 20), "Navigation back button not found")
         button.tap()
     }
 
     func returnToWallet() {
         dismissKeyboardIfPresent()
-        // Close only known wallet destinations, starting with the innermost sheet.
-        for identifier in ["wallet-detail-close", "wallet.presentationClaimsClose", "wallet.detailsBack", "wallet.flowBack"] {
-            let button = app.buttons[identifier]
-            if button.exists && button.isHittable { button.tap() }
+        let home = app.buttons["wallet.scanButton"]
+        for _ in 0..<6 {
+            let identifiers = ["wallet.presentationDone", "issuance-done", "wallet-detail-close",
+                "wallet.external.close", "wallet.detailsBack", "wallet.flowBack"]
+            if let button = identifiers.map({ app.buttons[$0] }).first(where: { $0.exists && $0.isHittable }) {
+                button.tap()
+            } else if home.exists && home.isHittable {
+                return
+            } else {
+                tapNavigationBack()
+            }
         }
-        XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 10), "Wallet home did not appear")
+        XCTAssertTrue(home.exists && home.isHittable, "Wallet home did not appear: \(app.debugDescription)")
     }
 
     func openScanner() {
         returnToWallet()
-        tapButton(identifier: "wallet.scanButton", fallbackLabel: "Scan or paste")
+        tapButton(identifier: "wallet.scanButton", fallbackLabel: "Scan QR code")
+        XCTAssertTrue(app.buttons["wallet.scanMode"].waitForExistence(timeout: 10))
+        // A simulator may report the camera unavailable; manual entry is then already offered.
+        if !textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request").exists {
+            tapButton(identifier: "wallet.scanMode", fallbackLabel: "Enter a link")
+        }
         XCTAssertTrue(textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request").waitForExistence(timeout: 10))
     }
 
@@ -237,8 +274,14 @@ final class WalletE2EUI {
             }
         }
 
+        let identifier = element.identifier
+        let scannerInput = identifier == "wallet.scanInput"
         element.typeText(value)
-        submitFocusedInput(element)
+        // Scanner Go starts resolution. Keep the draft editable until the caller chooses Continue.
+        // PIN fields submit on the fourth digit and can change their AX identity before typing returns.
+        if !scannerInput && identifier != "wallet.pinInput" && identifier != "wallet.pinConfirmationInput" {
+            submitFocusedInput(element)
+        }
     }
 
     private func makeHittable(_ element: XCUIElement) {
@@ -271,6 +314,12 @@ final class WalletE2EUI {
     }
 
     private func submitFocusedInput(_ element: XCUIElement) {
+        guard element.exists && element.isEnabled else { return }
+        let numericDone = app.buttons["wallet.pinKeyboardAction"]
+        if numericDone.exists && numericDone.isEnabled && numericDone.isHittable {
+            numericDone.tap()
+            return
+        }
         let doneButton = app.toolbars.buttons["Done"]
         if doneButton.exists && doneButton.isHittable {
             doneButton.tap()
@@ -306,14 +355,6 @@ final class WalletE2EUI {
             .allElementsBoundByIndex
             .first { element in
                 guard element.exists, element.isHittable, element.isEnabled else { return false }
-                // XCTest considers a partly visible card hittable even when its center is
-                // covered by the pinned review actions. Scroll before tapping that card.
-                if element.identifier.hasPrefix("wallet.presentationClaimsToggle.") {
-                    let submit = app.buttons["wallet.presentationSubmitButton"]
-                    if submit.exists && submit.isHittable {
-                        return element.frame.midY < submit.frame.minY
-                    }
-                }
                 return true
             }
     }
@@ -325,21 +366,21 @@ final class WalletE2EUI {
         return elements[0]
     }
 
-    private func unlockWallet() {
+    func unlockWallet() {
         let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
-        guard pinInput.waitForExistence(timeout: 10) else {
-            return
-        }
-
+        guard pinInput.waitForExistence(timeout: 10) else { return }
+        let creating = app.staticTexts["Step 1 of 2"].exists
         replaceText(in: pinInput, value: pin)
-
-        let submit = app.buttons["wallet.pinSubmitButton"]
-        XCTAssertTrue(submit.waitForExistence(timeout: 10), "PIN submit button not found")
-        let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
-        if confirmation.waitForExistence(timeout: 2) {
+        if creating {
+            let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
+            XCTAssertTrue(confirmation.waitForExistence(timeout: 10), app.debugDescription)
+            XCTAssertFalse(pinInput.exists, "Choose and Confirm must be separate screens")
             replaceText(in: confirmation, value: pin)
         }
-        submit.tap()
+        let keyboardDismissed = XCTNSPredicateExpectation(
+            predicate: NSPredicate { [app] _, _ in !app.keyboards.firstMatch.exists }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [keyboardDismissed], timeout: 10), .completed,
+            "PIN verification must dismiss its keyboard before another flow starts")
     }
 }
 

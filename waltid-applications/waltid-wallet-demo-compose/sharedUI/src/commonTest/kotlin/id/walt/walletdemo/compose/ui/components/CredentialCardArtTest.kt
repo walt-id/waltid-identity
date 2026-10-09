@@ -5,9 +5,28 @@ import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CredentialCardArtTest {
+
+    @Test
+    fun thumbnailUsesMetadataBackgroundAndLogoInsteadOfArtwork() {
+        val art = CredentialCardArtModel("id", "Credential", backgroundColor = "#123456",
+            backgroundImageUri = "https://issuer.example/art.png", logoUri = "https://issuer.example/logo.png")
+        assertNull(credentialCardMetadataArtUri(art, compact = true))
+        assertEquals(art.backgroundImageUri, credentialCardMetadataArtUri(art, compact = false))
+    }
+
+    @Test
+    fun thumbnailUsesArtworkWhenBackgroundIsUnavailableAndRetainsLogoFallback() {
+        val art = CredentialCardArtModel("id", "Credential", backgroundImageUri = "https://issuer.example/art.png",
+            logoUri = "https://issuer.example/logo.png")
+        assertEquals(art.backgroundImageUri, credentialCardMetadataArtUri(art, compact = true))
+        assertEquals(art.backgroundImageUri, credentialCardMetadataArtUri(art.copy(backgroundColor = "invalid"), compact = true))
+        assertNull(credentialCardMetadataArtUri(art.copy(backgroundImageUri = "http://issuer.example/art.png"), compact = true))
+        assertEquals(CredentialCardLogoSource.Metadata(art.logoUri!!), credentialCardLogoSource(art.logoUri))
+    }
 
     @Test
     fun pendingMetadataArtDoesNotShowConstructedFallback() {

@@ -17,6 +17,6 @@ internal fun PinStorageUnavailableScreen(controller: WalletDemoController, messa
         Text("PIN storage unavailable", style = MaterialTheme.typography.headlineMedium)
         SettingsNotice("$message. The wallet remains locked.", error = true)
         WalletActions(primary = WalletAction("Retry", controller::retryPinStorage,
-            testTag = "wallet.pinStorageRetryButton", icon = WalletSymbol.Retry))
+            testTag = "wallet.pinStorageRetryButton"))
     }
 }

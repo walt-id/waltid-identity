@@ -8,10 +8,24 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class WalletDemoAppAndroidTest {
+    @Test fun duplicateResolvedLinkPreservesSelectionsInTheSameSheet() = scenarios.duplicateResolvedLinkPreservesSelectionsInTheSameSheet()
+
+    @Test fun externalOfferFailureRemainsVisibleAndCanBeCorrected() = scenarios.externalOfferFailureRemainsVisibleAndCanBeCorrected()
+
+    @Test fun keySetupDefaultNeedsOneConfirmation() = scenarios.keySetupDefaultNeedsOneConfirmation()
+
+    @Test fun pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt() = scenarios.pendingIssuanceIsReachableAndSavedDetailsDoNotResumeIt()
+
     private val scenarios = WalletDemoAppTestScenarios()
 
+    @Test fun walletAccessChangesPinUsingTheSharedEntryFlow() = scenarios.walletAccessChangesPinUsingTheSharedEntryFlow()
+
+    @Test fun biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline() = scenarios.biometricUnlockTakesPrecedenceThenFocusesPinAfterDecline()
+
     @Test fun pinSetupRequiresFourDigitsAndMatchingConfirmation() = scenarios.pinSetupRequiresFourDigitsAndMatchingConfirmation()
-    @Test fun pinSetupAuthenticatesBiometricChoiceWithoutLeavingForm() = scenarios.pinSetupAuthenticatesBiometricChoiceWithoutLeavingForm()
+    @Test fun pinConfirmationPromptsBiometricsAndDeclineCompletesSetup() = scenarios.pinConfirmationPromptsBiometricsAndDeclineCompletesSetup()
+
+    @Test fun scannerPastePreservesEditsAndNeverStartsAFlow() = scenarios.scannerPastePreservesEditsAndNeverStartsAFlow()
 
     @Test fun scannerResolvesWebLinksAndKeepsFailureRecoverable() = scenarios.scannerResolvesWebLinksAndKeepsFailureRecoverable()
 
@@ -37,8 +51,8 @@ class WalletDemoAppAndroidTest {
         scenarios.pinScreenRefreshesBiometricAvailabilityWhenItBecomesAvailable()
 
     @Test
-    fun pinSetupKeepsSubmitReachableWhenScrolled() =
-        scenarios.pinSetupKeepsSubmitReachableWhenScrolled()
+    fun pinSetupKeepsClearReachable() =
+        scenarios.pinSetupKeepsClearReachable()
 
     @Test
     fun pinSetupDoesNotAskForSigningApproval() =
@@ -67,8 +81,8 @@ class WalletDemoAppAndroidTest {
         scenarios.receiveDetailsStayScopedToReceiveTabNavigationStack()
 
     @Test
-    fun receiveTabDisablesUrlControlsWhileReceiving() =
-        scenarios.receiveTabDisablesUrlControlsWhileReceiving()
+    fun receiveReviewPreventsDuplicateAcceptanceWhileReceiving() =
+        scenarios.receiveReviewPreventsDuplicateAcceptanceWhileReceiving()
 
     @Test
     fun transactionCodeOfferCanBeDeclinedWithoutCode() =
@@ -125,24 +139,24 @@ class WalletDemoAppAndroidTest {
         scenarios.presentationWithoutVerifierDisplayKeepsClientIdInTechnicalDetails()
 
     @Test
-    fun presentationDetailsResolveDuplicateCredentialOptionsIndependently() =
-        scenarios.presentationDetailsResolveDuplicateCredentialOptionsIndependently()
+    fun presentationInformationUnionsDuplicateCredentialOptions() =
+        scenarios.presentationInformationUnionsDuplicateCredentialOptions()
 
     @Test
-    fun presentDetailsStayScopedToPresentTabNavigationStack() =
-        scenarios.presentDetailsStayScopedToPresentTabNavigationStack()
+    fun presentationReviewSurvivesReturningFromTheWallet() =
+        scenarios.presentationReviewSurvivesReturningFromTheWallet()
 
     @Test
-    fun presentTabDisablesUrlControlsWhilePreviewing() =
-        scenarios.presentTabDisablesUrlControlsWhilePreviewing()
+    fun presentationRequestKeepsProgressVisibleUntilReviewIsReady() =
+        scenarios.presentationRequestKeepsProgressVisibleUntilReviewIsReady()
 
     @Test
     fun deepLinksRouteToReceiveAndPresentTabs() =
         scenarios.deepLinksRouteToReceiveAndPresentTabs()
 
     @Test
-    fun deepLinksResetReceiveAndPresentDetailStacksEvenWhenUrlIsUnchanged() =
-        scenarios.deepLinksResetReceiveAndPresentDetailStacksEvenWhenUrlIsUnchanged()
+    fun duplicateExternalLinksPreserveReviewUntilExplicitlyClosed() =
+        scenarios.duplicateExternalLinksPreserveReviewUntilExplicitlyClosed()
 
     @Test
     fun credentialsPersistAcrossControllerRecreation() =
@@ -172,8 +186,8 @@ class WalletDemoAppAndroidTest {
         scenarios.readerTrustSettingsReviewAndPersistPublicCa()
 
     @Test
-    fun lockDoesNotAutoPromptBiometrics() =
-        scenarios.lockDoesNotAutoPromptBiometrics()
+    fun newUnlockAttemptPromptsBiometricsOnceAfterLock() =
+        scenarios.newUnlockAttemptPromptsBiometricsOnceAfterLock()
 
     @Test
     fun settingsConfirmsAndAppliesSigningProtectionChange() =
@@ -188,6 +202,6 @@ class WalletDemoAppAndroidTest {
         scenarios.deleteFromCredentialsWhileAReviewIsActive()
 
     @Test
-    fun successStatusCanBeDismissedFromTheHeader() =
-        scenarios.successStatusCanBeDismissedFromTheHeader()
+    fun successStatusCanBeDismissedFromTheFooter() =
+        scenarios.successStatusCanBeDismissedFromTheFooter()
 }

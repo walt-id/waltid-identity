@@ -13,7 +13,6 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPER
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.VERIFIER_POLLING_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.WALLET_READY_TIMEOUT
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceTextEquals
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.foregroundWindowSnapshot
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
@@ -46,12 +45,10 @@ class MobileWalletRestartTest {
         val offer = DemoTestBackend.createOffer(scenario)
         launchAndUnlock(context, device)
         sendDeepLink(context, offer.offerUrl)
-        assertResourceTextEquals(device, "wallet.offerInput", offer.offerUrl, UI_ELEMENT_TIMEOUT,
-            "Credential offer URL did not appear")
-        clickByTag(device, "wallet.receiveButton")
-        expectStatus("Review credential offer")
+        assertReview("wallet.offerAcceptButton")
         clickByTag(device, "wallet.offerAcceptButton")
-        expectStatus("Received")
+        assertReview("issuance-done")
+        clickByTag(device, "issuance-done")
         val savedCredentialIds = credentialIds()
         val savedIdentity = signingIdentity()
 
@@ -71,15 +68,17 @@ class MobileWalletRestartTest {
             scenario, signedRequest = true, clientId = DemoTestBackend.PUBLIC_DEMO_DID_VERIFIER_CLIENT_ID,
         )
         sendDeepLink(context, session.authorizationRequestUri)
-        assertResourceTextEquals(device, "wallet.presentationInput", session.authorizationRequestUri,
-            UI_ELEMENT_TIMEOUT, "DID presentation request URL did not appear")
-        clickByTag(device, "wallet.presentButton")
-        expectStatus("Review presentation request")
+        assertReview("wallet.presentationSubmitButton")
         clickByTag(device, "wallet.presentationSubmitButton")
         expectStatus("Presentation")
         DemoTestBackend.waitForVerifierSuccess(session.sessionId, timeoutMs = VERIFIER_POLLING_TIMEOUT)
         assertEquals(savedCredentialIds, credentialIds())
         assertEquals(savedIdentity, signingIdentity())
+    }
+
+    private fun assertReview(action: String) {
+        assertTrue("Expected $action in the automatically opened review",
+            waitForResource(device, action, CREDENTIAL_OPERATION_TIMEOUT) != null)
     }
 
     private fun expectStatus(prefix: String, timeoutMs: Long = CREDENTIAL_OPERATION_TIMEOUT) {
@@ -91,7 +90,8 @@ class MobileWalletRestartTest {
     }
 
     private fun credentialIds(): Set<String> {
-        clickByTag(device, "wallet.tab.credentials")
+        if (device.hasObject(By.res("wallet.external.close"))) clickByTag(device, "wallet.external.close")
+        assertReview("wallet.scanButton")
         val cards = By.res(Pattern.compile("wallet\\.credentialCard\\..*"))
         val ids = device.wait(Condition<UiDevice, Set<String>?> { currentDevice ->
             try {
@@ -123,7 +123,9 @@ class MobileWalletRestartTest {
         assertTrue("Wallet DID must be available", did.startsWith("did:"))
         assertTrue("Wallet key ID must be available", keyId.isNotBlank() && keyId != "Unavailable")
         clickByTag(device, "wallet.settingsBack")
+        assertReview("wallet.settingsSigningKey")
         clickByTag(device, "wallet.settingsBack")
+        assertReview("wallet.scanButton")
         return did to keyId
     }
 }

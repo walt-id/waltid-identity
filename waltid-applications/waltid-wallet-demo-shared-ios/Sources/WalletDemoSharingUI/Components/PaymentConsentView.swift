@@ -17,18 +17,17 @@ public enum PaymentReviewState: Equatable {
 
 struct PaymentConsentView: View {
     let state: PaymentReviewState
-    @State private var detailsExpanded = false
 
     var body: some View {
         switch state {
         case .notRequired: EmptyView()
-        case .loading: ProgressView("Loading payment instructions…").accessibilityIdentifier("payment-consent-loading")
+        case .loading: ProgressView { Text("Loading payment instructions…", bundle: .module) }.accessibilityIdentifier("payment-consent-loading")
         case .blocked(let message): Text(message).foregroundStyle(.red).accessibilityIdentifier("payment-consent-blocked")
         case .ready(let consent):
             VStack(alignment: .leading, spacing: 12) {
                 Text(consent.title ?? String(localized: "Review payment", bundle: .module)).font(.title2)
                 if consent.requiresUnsignedRequestWarning {
-                    Text("This payment request is unsigned. Confirm only if you recognize the requester and approve the payment below.")
+                    Text("This payment request is unsigned. Confirm only if you recognize the requester and approve the payment below.", bundle: .module)
                         .foregroundStyle(.red).accessibilityIdentifier("payment-unsigned-warning")
                 }
                 if let hint = consent.securityHint { Text(hint).accessibilityIdentifier("payment-security-hint") }
@@ -39,13 +38,14 @@ struct PaymentConsentView: View {
                 fields(consent.fields.filter { $0.placement == .main }) { fieldView($0, prominent: false) }
                 let details = consent.fields.filter { $0.placement == .details }
                 if !details.isEmpty {
-                    DisclosureGroup("Payment details", isExpanded: $detailsExpanded) {
+                    MetadataDisclosure(title: String(localized: "Payment details", bundle: .module), initiallyExpanded: false,
+                        accessibilityIdentifier: "payment-details-toggle") {
                         fields(details) { fieldView($0, prominent: false) }
-                    }.accessibilityIdentifier("payment-details-toggle")
+                    }.id(consent.revision)
                 }
             }
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("payment-consent")
-            .onChange(of: consent.revision) { _ in detailsExpanded = false }
         }
     }
 

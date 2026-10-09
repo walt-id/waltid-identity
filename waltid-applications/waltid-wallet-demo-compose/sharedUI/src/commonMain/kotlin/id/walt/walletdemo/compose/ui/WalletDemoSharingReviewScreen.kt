@@ -1,53 +1,32 @@
 package id.walt.walletdemo.compose.ui
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.SheetValue
-import androidx.compose.material3.rememberBottomSheetState
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import id.walt.walletdemo.compose.logic.*
-import id.walt.walletdemo.compose.ui.components.rememberPaymentReview
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import id.walt.walletdemo.compose.logic.WalletDemoPaymentConsent
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
-import id.walt.walletdemo.compose.logic.defaultCredentialSelection
+import id.walt.walletdemo.compose.logic.WalletDemoSharingReviewController
 import id.walt.walletdemo.compose.logic.hasCompleteCredentialSelection
-import id.walt.walletdemo.compose.logic.toggleCredential
-import id.walt.walletdemo.compose.logic.toggleDisclosure
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
+import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
+import id.walt.walletdemo.compose.ui.components.WalletIcon
+import id.walt.walletdemo.compose.ui.components.WalletSymbol
 
 /**
- * Standalone presentation-review screen for a platform-invoked sharing flow.
- *
- * The host owns the transport and the operating-system result; this screen owns only what the user
- * chooses. It therefore keeps credential and disclosure selection internally and hands the finished
- * [WalletDemoSharingSelection] to [onSubmit], so a host launched by the OS does not have to reproduce
- * the selection rules the in-app flow already implements.
- *
- * At the review root a platform back gesture is passed to [onBackAtRoot] - the host, not the review,
- * decides what leaving an OS-invoked surface means, and that is deliberately not assumed to equal
- * [onCancel]. Claims review is a dialog on this surface, not a pushed destination.
- *
- * @param title Heading naming the kind of request, since a provider screen has no surrounding app chrome.
- * @param enabled Whether the user can still act; pass false while a submission is in flight.
- * @param onSubmit Invoked with the user's selection when Share is confirmed.
- * @param onCancel Invoked when the user declines without a protocol-level rejection.
- * @param onReject Protocol-level refusal, or null when the transport has no such message.
- * @param onBackAtRoot Platform back gesture at the review root, or null to let the host handle it.
+ * Shared modal review for provider hosts. Choices and payment consent belong to the request owner.
+ * The caller owns transport and OS results: [onCancel] declines, while [onBackAtRoot] can return
+ * to Credential Manager's selector without answering. Busy reviews block dismissal; a null
+ * [onBackAtRoot] makes the sheet non-dismissible. [compact] shortens the selection heading.
  */
 @Composable
 fun WalletDemoSharingReviewScreen(
@@ -60,165 +39,56 @@ fun WalletDemoSharingReviewScreen(
     onBackAtRoot: (() -> Unit)? = null,
     compact: Boolean = true,
     preparePaymentConsent: (suspend (WalletDemoSharingSelection) -> WalletDemoPaymentConsent?)? = null,
+    controller: WalletDemoSharingReviewController? = null,
 ) {
-    var selection by remember(review) {
-        mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
-    }
+    val scope = rememberCoroutineScope()
+    val owner = controller ?: remember(review) { WalletDemoSharingReviewController(review, scope, preparePaymentConsent) }
+    require(owner.review == review) { "The review controller belongs to another request" }
+    DisposableEffect(owner) { onDispose { if (controller == null) owner.close() } }
+    val state by owner.state.collectAsState()
+    val selection = state.selection
+    val paymentReview = state.payment
+    val submit = { owner.selectionForSubmission(state)?.let(onSubmit); Unit }
+    val selectionComplete = review.hasCompleteCredentialSelection(selection.credentials)
 
-    val paymentReview = rememberPaymentReview(review, selection, preparePaymentConsent)
-
-    // Called unconditionally, as the platform handlers require. A submission already in flight
-    // consumes the gesture and does nothing: the response is on its way, so neither closing this
-    // screen nor abandoning it is an outcome the user can still choose.
-    SystemBackHandler(
-        enabled = !enabled || onBackAtRoot != null,
-    ) {
-        when {
-            !enabled -> Unit
-            else -> onBackAtRoot?.invoke()
-        }
-    }
-
-    WalletDemoTheme {
-        Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .exportTestTagsForPlatformAutomation(),
-            color = MaterialTheme.colorScheme.background,
-        ) {
-            ReviewScaffold(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .safeDrawingPadding(),
-                    actions = {
-                        SharingActionsRow(
-                            paymentReview = paymentReview,
-                            enabled = enabled,
-                            selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
-                            onSubmit = { onSubmit(selection.copy(paymentConsentRevision = paymentReview.consent?.revision)) },
-                            onCancel = onCancel,
-                            onReject = onReject,
-                        )
-                    },
-                ) {
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    SharingReviewSection(
-                        paymentReview = paymentReview,
-                        review = review,
-                        selectedCredentialOptions = selection.credentials,
-                        selectedDisclosureOptions = selection.disclosures,
-                        selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
-                        enabled = enabled,
-                        compact = compact,
-                        showActions = false,
-                        onToggleCredential = { credential ->
-                            selection = selection.toggleCredential(
-                                selection = credential,
-                                option = review.credentialOptions.firstOrNull { it.selection == credential },
-                            )
-                        },
-                        onToggleDisclosure = { disclosure -> selection = selection.toggleDisclosure(disclosure) },
-                        onSubmit = { onSubmit(selection.copy(paymentConsentRevision = paymentReview.consent?.revision)) },
-                        onCancel = onCancel,
-                        onReject = onReject,
-                    )
-                }
-        }
-    }
-}
-
-/**
- * Compact in-tray sharing review for Digital Credentials GET fulfillment.
- *
- * Cancel ends the caller's `getCredential`. Dismissing the sheet or backing out at the review root
- * leaves the provider without a Credential Manager result so the system selector can return.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun WalletDemoSharingReviewSheet(
-    review: WalletDemoSharingReview,
-    title: String,
-    onSubmit: (WalletDemoSharingSelection) -> Unit,
-    onCancel: () -> Unit,
-    onBackAtRoot: () -> Unit,
-    enabled: Boolean = true,
-    preparePaymentConsent: (suspend (WalletDemoSharingSelection) -> WalletDemoPaymentConsent?)? = null,
-) {
-    var selection by remember(review) {
-        mutableStateOf(WalletDemoSharingSelection(credentials = review.defaultCredentialSelection()))
-    }
-    val paymentReview = rememberPaymentReview(review, selection, preparePaymentConsent)
-    val sheetState = rememberBottomSheetState(
-        initialValue = SheetValue.Hidden,
-        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-    )
-
-    SystemBackHandler(enabled = true) {
-        when {
-            !enabled -> Unit
-            else -> onBackAtRoot()
-        }
-    }
-
-    WalletDemoTheme {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .exportTestTagsForPlatformAutomation(),
-        ) {
-            ModalBottomSheet(
-                onDismissRequest = {
-                    if (enabled) onBackAtRoot()
-                },
-                sheetState = sheetState,
-            ) {
-                Box(modifier = Modifier.exportTestTagsForPlatformAutomation()) {
-                    ReviewScaffold(
-                        fillViewport = false,
-                        actions = {
-                            SharingActionsRow(
-                            paymentReview = paymentReview,
-                                enabled = enabled,
-                                selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
-                                onSubmit = { onSubmit(selection.copy(paymentConsentRevision = paymentReview.consent?.revision)) },
-                                onCancel = onCancel,
-                                onReject = null,
-                            )
-                        },
-                    ) {
-                        Text(
-                            title,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        SharingReviewSection(
-                        paymentReview = paymentReview,
-                            review = review,
-                            selectedCredentialOptions = selection.credentials,
-                            selectedDisclosureOptions = selection.disclosures,
-                            selectionComplete = review.hasCompleteCredentialSelection(selection.credentials),
-                            enabled = enabled,
-                            compact = true,
-                            showActions = false,
-                            onToggleCredential = { credential ->
-                                selection = selection.toggleCredential(
-                                    selection = credential,
-                                    option = review.credentialOptions.firstOrNull { it.selection == credential },
-                                )
-                            },
-                            onToggleDisclosure = { disclosure ->
-                                selection = selection.toggleDisclosure(disclosure)
-                            },
-                            onSubmit = { onSubmit(selection.copy(paymentConsentRevision = paymentReview.consent?.revision)) },
-                            onCancel = onCancel,
-                        )
+    WalletReviewHost(dismissEnabled = enabled, onDismiss = onBackAtRoot) {
+        ReviewScaffold(
+            fillViewport = false,
+            header = {
+                WalletScreenHeader(title) {
+                    IconButton(onClick = onBackAtRoot ?: onCancel, enabled = enabled,
+                        modifier = Modifier.testTag(WalletUiTestTags.FlowBack)) {
+                        WalletIcon(WalletSymbol.Decline, "Close request")
                     }
                 }
-            }
+            },
+            actions = {
+                SharingActionsRow(
+                    paymentReview = paymentReview,
+                    enabled = enabled,
+                    selectionComplete = selectionComplete,
+                    onSubmit = submit,
+                    onCancel = onCancel,
+                    onReject = onReject,
+                    showCancelWithReject = false,
+                )
+            },
+        ) {
+            SharingReviewSection(
+                paymentReview = paymentReview,
+                review = review,
+                selectedCredentialOptions = selection.credentials,
+                selectedDisclosureOptions = selection.disclosures,
+                selectionComplete = selectionComplete,
+                enabled = enabled,
+                compact = compact,
+                showActions = false,
+                onToggleCredential = owner::toggleCredential,
+                onToggleDisclosure = owner::toggleDisclosure,
+                onSubmit = submit,
+                onCancel = onCancel,
+                onReject = onReject,
+            )
         }
     }
 }
@@ -234,15 +104,9 @@ object WalletDemoSharingReviewTestTags {
     /** Cancel button. */
     val CancelButton: String get() = WalletUiTestTags.PresentationCancelButton
 
-    /** Claims dialog opened from a compact credential card. */
-    val ClaimsDialog: String get() = WalletUiTestTags.PresentationClaimsDialog
-
-    /** Close button in the claims dialog. */
-    val ClaimsCloseButton: String get() = WalletUiTestTags.PresentationClaimsClose
-
-    /** Compact credential card for the given presentation option. */
-    fun credentialCard(queryId: String, credentialId: String): String =
-        WalletUiTestTags.credentialCard(
+    /** Selection row for the given presentation option. */
+    fun credentialRow(queryId: String, credentialId: String): String =
+        WalletUiTestTags.presentationCredential(
             WalletDemoPresentationCredentialSelection(queryId = queryId, credentialId = credentialId).id,
         )
 

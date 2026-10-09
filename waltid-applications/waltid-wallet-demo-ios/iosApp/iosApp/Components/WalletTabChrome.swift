@@ -5,8 +5,13 @@ struct WalletTabStatusBanner: View {
     @ObservedObject var viewModel: WalletViewModel
     let tab: WalletTab
 
+    var isVisible: Bool {
+        guard viewModel.isStatusVisible(for: tab), let kind = viewModel.statusKind(for: tab) else { return false }
+        return tab == .credentials || kind == .busy || kind == .error
+    }
+
     var body: some View {
-        if viewModel.isStatusVisible(for: tab) {
+        if isVisible {
             StatusBannerView(
                 message: viewModel.statusMessage(for: tab),
                 isLoading: viewModel.statusIsLoading(for: tab),
@@ -15,6 +20,8 @@ struct WalletTabStatusBanner: View {
                 onDismiss: dismissAction,
                 onToggleExpanded: expandAction
             )
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("wallet.status.feedback")
         }
     }
 
@@ -33,28 +40,31 @@ struct WalletTabStatusBanner: View {
     }
 }
 
+/// Feedback without actions uses the same measured safe-area footer as review controls.
+struct WalletTabFeedback: View {
+    @ObservedObject var viewModel: WalletViewModel
+    let tab: WalletTab
+
+    var body: some View {
+        let banner = WalletTabStatusBanner(viewModel: viewModel, tab: tab)
+        if banner.isVisible { WalletFooter { banner } }
+    }
+}
+
 extension View {
-    func walletFlowToolbar(onBack: (() -> Void)?, backEnabled: Bool, onOpenSettings: @escaping () -> Void) -> some View {
-        walletSettingsToolbar(onOpenSettings: onOpenSettings).toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
+    func walletFlowToolbar(onBack: (() -> Void)?, backEnabled: Bool, external: Bool = false, closing: Bool = false) -> some View {
+        toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
                 if let onBack {
-                    Button(action: onBack) { Label("Back to wallet", systemImage: "chevron.backward") }
+                    Button(action: onBack) {
+                        WalletToolbarIcon("xmark", isBusy: closing)
+                    }
+                        .accessibilityLabel(closing ? "Closing the secure connection…" : "Close request")
                         .disabled(!backEnabled)
-                        .accessibilityIdentifier("wallet.flowBack")
+                        .accessibilityIdentifier(external ? "wallet.external.close" : "wallet.flowBack")
                 }
             }
         }
     }
 
-    func walletSettingsToolbar(onOpenSettings: @escaping () -> Void) -> some View {
-        toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: onOpenSettings) {
-                    Image(systemName: "gearshape")
-                }
-                .accessibilityLabel("Settings")
-                .accessibilityIdentifier(WalletAccessibilityID.settingsButton)
-            }
-        }
-    }
 }

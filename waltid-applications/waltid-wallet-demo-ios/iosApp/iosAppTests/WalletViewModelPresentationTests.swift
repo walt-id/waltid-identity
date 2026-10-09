@@ -160,7 +160,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertEqual(rejectedAfterNotify, [previewHandle])
         XCTAssertEqual(viewModel.statusMessage(for: .present), "Verifier notified")
         XCTAssertTrue(viewModel.presentationUrlEntryEnabled)
-        XCTAssertFalse(viewModel.presentationCompleted)
+        XCTAssertTrue(viewModel.presentationCompleted)
     }
 
     @MainActor
@@ -195,7 +195,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
         viewModel.completePresentationContinuation()
 
         XCTAssertNil(viewModel.pendingPresentationContinuationURL)
-        XCTAssertFalse(viewModel.presentationCompleted)
+        XCTAssertTrue(viewModel.presentationCompleted)
         XCTAssertEqual(viewModel.presentationRequestUrl, "")
         XCTAssertTrue(viewModel.presentationUrlEntryEnabled)
         XCTAssertEqual(viewModel.statusMessage(for: .present), "Presentation rejected")
@@ -225,7 +225,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
         viewModel.failPresentationContinuation("network unavailable")
 
         XCTAssertNil(viewModel.pendingPresentationFormPostHTML)
-        XCTAssertFalse(viewModel.presentationCompleted)
+        XCTAssertTrue(viewModel.presentationCompleted)
         XCTAssertTrue(viewModel.statusIsError(for: .present))
         XCTAssertEqual(
             viewModel.statusMessage(for: .present),

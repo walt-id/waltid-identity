@@ -1,10 +1,14 @@
 package id.walt.walletdemo.compose.android
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.view.WindowInsets
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
@@ -56,22 +60,21 @@ internal object WalletComposeE2EHelper {
     fun launchAndCreateScaIdentity(context: Context, device: UiDevice) {
         launch(context, signingProtectionMode = "required")
         unlock(device, initializeSigningIdentity = false)
-        requireNotNull(device.wait(Until.findObject(By.text("1 of 3 · Recovery")), UI_ELEMENT_TIMEOUT))
-        clickByTag(device, "wallet.keySetupContinue")
+        clickByTag(device, "wallet.keySetupEdit.Storage")
         requireNotNull(device.wait(Until.findObject(By.text("Hardware required")), UI_ELEMENT_TIMEOUT)).click()
         clickByTag(device, "wallet.keySetupContinue")
+        clickByTag(device, "wallet.keySetupEdit.Approval")
         requireNotNull(device.wait(Until.findObject(By.text("Current biometrics only")), UI_ELEMENT_TIMEOUT)).click()
+        clickByTag(device, "wallet.keySetupContinue")
         println("SCA_OPERATOR: approve native key setup prompts")
         clickByTag(device, "wallet.keySetupContinue")
-        assertTrue("App key setup failed: ${foregroundWindowSnapshot(device)}",
-            waitForStatus(device, 180_000L, { it == "Wallet ready" }, listOf("Bootstrap failed")))
+        assertNotNull("App key setup failed: ${foregroundWindowSnapshot(device)}",
+            waitForResource(device, "wallet.scanButton", 180_000L))
     }
 
     fun receiveThroughApp(device: UiDevice, offerUrl: String) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         sendDeepLink(context, offerUrl, signingProtectionMode = "required")
-        setTextByTag(device, "wallet.offerInput", offerUrl)
-        clickByTag(device, "wallet.receiveButton")
         requireNotNull(waitForResource(device, "wallet.offerAcceptButton", CREDENTIAL_OPERATION_TIMEOUT))
         println("SCA_OPERATOR: approve native issuance prompts")
         clickByTag(device, "wallet.offerAcceptButton")
@@ -83,10 +86,8 @@ internal object WalletComposeE2EHelper {
         launch(context)
 
         assertNotNull("PIN input not found on initial launch", waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT))
-        assertNotNull(
-            "PIN setup was not shown on initial launch",
-            waitForResource(device, "wallet.pinConfirmationInput", UI_ELEMENT_TIMEOUT),
-        )
+        assertTrue("PIN setup was not shown on initial launch",
+            device.wait(Until.hasObject(By.text("Step 1 of 2")), UI_ELEMENT_TIMEOUT))
         unlock(device)
     }
 
@@ -94,14 +95,11 @@ internal object WalletComposeE2EHelper {
         launch(context)
 
         assertNotNull("PIN input not found after relaunch", waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT))
-        assertNull(
-            "PIN setup was shown after relaunch",
-            waitForResource(device, "wallet.pinConfirmationInput", 2_000L),
-        )
+        assertTrue("PIN setup was shown after relaunch", !device.hasObject(By.text("Step 1 of 2")))
         unlock(device)
     }
 
-    private fun launch(context: Context, signingProtectionMode: String = "disabled") {
+    fun launch(context: Context, signingProtectionMode: String = "disabled") {
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             ?.apply {
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
@@ -114,29 +112,54 @@ internal object WalletComposeE2EHelper {
     fun unlock(device: UiDevice, initializeSigningIdentity: Boolean = true) {
         val pinInput = waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT)
             ?: throw AssertionError("PIN input not found. ${foregroundWindowSnapshot(device)}")
+        val setup = device.hasObject(By.text("Step 1 of 2"))
         pinInput.setText(PIN)
-
-        waitForResource(device, "wallet.pinConfirmationInput", 2_000L)?.setText(PIN)
-
-        clickByTag(device, "wallet.pinSubmitButton")
+        if (setup) {
+            assertTrue(device.wait(Until.hasObject(By.text("Step 2 of 2")), UI_ELEMENT_TIMEOUT))
+            val confirmation = requireNotNull(waitForResource(device, "wallet.pinConfirmationInput", UI_ELEMENT_TIMEOUT))
+            confirmation.setText(PIN) // Matching confirmation advances directly to OS opt-in / signing setup.
+        }
         if (initializeSigningIdentity) awaitWalletReady(device)
     }
 
-    private fun awaitWalletReady(device: UiDevice) {
+    /** Settle the IME before locating a footer action; its bounds move when the keyboard closes. */
+    fun dismissKeyboard(device: UiDevice) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        fun keyboardVisible(): Boolean {
+            var visible = false
+            instrumentation.runOnMainSync {
+                visible = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                    .any { it.window.decorView.rootWindowInsets?.isVisible(WindowInsets.Type.ime()) == true }
+            }
+            return visible
+        }
+        if (!keyboardVisible()) return
+        device.pressBack()
+        val deadline = System.currentTimeMillis() + CLICK_VISIBLE_TIMEOUT
+        while (keyboardVisible() && System.currentTimeMillis() < deadline) Thread.sleep(50)
+        assertTrue("Keyboard did not close before the footer action", !keyboardVisible())
+        device.waitForIdle()
+    }
+
+    fun awaitWalletReady(device: UiDevice) {
         val deadline = System.currentTimeMillis() + WALLET_READY_TIMEOUT
-        var setupStep = 0
+        var creationRequested = false
         while (System.currentTimeMillis() < deadline) {
+            // A preceding modal window may leave API 34+ UiAutomation with stale roots.
+            // Refresh accessibility only; never infer readiness from a timer or a status string.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                InstrumentationRegistry.getInstrumentation().uiAutomation.clearCache()
+            }
             val status = latestStatus(device)
-            if (status == "Wallet ready") return
+            if (device.hasObject(By.res("wallet.scanButton"))) return
             if (status.startsWith("Bootstrap failed")) break
-            if (setupStep < 3) {
+            if (!creationRequested) {
                 try {
-                    val heading = listOf("1 of 3 · Recovery", "2 of 3 · Key storage", "3 of 3 · Signing approval")[setupStep]
-                    if (device.hasObject(By.text(heading))) {
+                    if (device.hasObject(By.res("wallet.keySetupEdit.Storage"))) {
                         device.findObject(By.res("wallet.keySetupContinue"))?.let { button ->
                             if (button.isEnabled) {
                                 button.click()
-                                setupStep++
+                                creationRequested = true
                             }
                         }
                     }
@@ -148,6 +171,30 @@ internal object WalletComposeE2EHelper {
         }
         fail("Wallet did not become ready after unlock. Latest status: ${latestStatus(device)}. " +
             foregroundWindowSnapshot(device))
+    }
+
+    /** Recreates the real Activity, without destroying the retained request model or app process. */
+    fun recreateActivity(type: Class<out Activity>, device: UiDevice) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        fun resumed(): Activity? {
+            var activity: Activity? = null
+            instrumentation.runOnMainSync {
+                activity = ActivityLifecycleMonitorRegistry.getInstance()
+                    .getActivitiesInStage(Stage.RESUMED).singleOrNull { type.isInstance(it) }
+            }
+            return activity
+        }
+        val previous = requireNotNull(resumed()) { "${type.simpleName} is not resumed" }
+        instrumentation.runOnMainSync { previous.recreate() }
+        val deadline = System.currentTimeMillis() + UI_ELEMENT_TIMEOUT
+        while (System.currentTimeMillis() < deadline) {
+            if (resumed()?.let { it !== previous } == true) {
+                device.waitForIdle()
+                return
+            }
+            Thread.sleep(100)
+        }
+        fail("${type.simpleName} did not recreate. ${foregroundWindowSnapshot(device)}")
     }
 
     fun sendDeepLink(context: Context, url: String, signingProtectionMode: String = "disabled") {
@@ -344,36 +391,27 @@ internal object WalletComposeE2EHelper {
     }
 
     private fun findVisibleTextContaining(device: UiDevice, substring: String): UiObject2? =
-        device.findObjects(By.pkg(walletPackage))
-            .flatMap { it.flatten() }
-            .firstOrNull { node ->
-                node.isVisibleOn(device) &&
-                    runCatching { node.text?.contains(substring) == true }.getOrDefault(false)
-            }
+        device.findObjects(By.pkg(walletPackage).textContains(substring))
+            .firstOrNull { it.isVisibleOn(device) }
 
     private fun findVisibleText(device: UiDevice, texts: List<String>): UiObject2? =
-        device.findObjects(By.pkg(walletPackage))
-            .flatMap { it.flatten() }
-            .firstOrNull { node ->
-                node.isVisibleOn(device) && runCatching { node.text?.trim() in texts }.getOrDefault(false)
-            }
+        device.findObjects(By.pkg(walletPackage).text(Pattern.compile(texts.joinToString("|") { Pattern.quote(it) })))
+            .firstOrNull { it.isVisibleOn(device) }
 
     private fun findVisibleResource(device: UiDevice, tag: String): UiObject2? =
-        device.findObjects(By.pkg(walletPackage))
-            .flatMap { it.flatten() }
-            .firstOrNull { node ->
-                node.isVisibleOn(device) && runCatching { node.resourceName == tag }.getOrDefault(false)
-            }
+        device.findObjects(By.pkg(walletPackage).res(tag)).firstOrNull { it.isVisibleOn(device) }
 
     fun findResourceAfterScrolling(device: UiDevice, tag: String): UiObject2? {
         findVisibleResource(device, tag)?.let { return it }
-        repeat(6) {
-            device.scrollDown()
+        for (attempt in 0 until 24) {
+            val more = device.scrollDown()
             findVisibleResource(device, tag)?.let { return it }
+            if (!more) break
         }
-        repeat(12) {
-            device.scrollUp()
+        for (attempt in 0 until 24) {
+            val more = device.scrollUp()
             findVisibleResource(device, tag)?.let { return it }
+            if (!more) break
         }
         return null
     }
@@ -434,6 +472,7 @@ internal object WalletComposeE2EHelper {
 
     /** Every card tag currently in the tree, sweeping the list so off-screen cards are included. */
     fun UiDevice.credentialCardTags(): Set<String> {
+        if (hasObject(By.res("wallet.credentials.empty"))) return emptySet()
         val cardTag = Pattern.compile("wallet\\.credentialCard\\..*")
         val tags = mutableSetOf<String>()
         fun collect() {
@@ -441,11 +480,12 @@ internal object WalletComposeE2EHelper {
                 .mapNotNullTo(tags) { runCatching { it.resourceName }.getOrNull() }
         }
         collect()
-        repeat(6) {
-            scrollDown()
+        for (attempt in 0 until 24) {
+            val more = scrollDown()
             collect()
+            if (!more) break
         }
-        repeat(6) { scrollUp() }
+        for (attempt in 0 until 24) { if (!scrollUp()) break }
         return tags
     }
 
@@ -453,18 +493,28 @@ internal object WalletComposeE2EHelper {
 
     internal fun UiDevice.scrollUp() = scrollContent(towardBottom = false)
 
-    private fun UiDevice.scrollContent(towardBottom: Boolean) {
+    private fun UiDevice.scrollContent(towardBottom: Boolean): Boolean {
         // Review actions are fixed below the scroll viewport, especially on compact devices.
-        val bounds = findObjects(By.pkg(walletPackage).scrollable(true)).mapNotNull {
-            try { it.visibleBounds } catch (_: StaleObjectException) { null }
+        val viewport = findObjects(By.pkg(walletPackage).scrollable(true)).mapNotNull { node ->
+            try { node.visibleBounds.let { node to it } } catch (_: StaleObjectException) { null }
+        }.filter { (_, bounds) -> bounds.width() > 0 && bounds.height() > 0 }
+            .maxByOrNull { (_, bounds) -> bounds.width().toLong() * bounds.height() }?.first ?: return false
+        val bounds = viewport.visibleBounds
+        fun visibleContent() = findObjects(By.pkg(walletPackage).text(Pattern.compile(".*"))).mapNotNull { node ->
+            try {
+                node.visibleBounds.takeIf { android.graphics.Rect.intersects(it, bounds) }
+                    ?.let { "${node.text}:$it" }
+            } catch (_: StaleObjectException) { null }
         }
-            .filter { it.width() > 0 && it.height() > 0 }
-            .maxByOrNull { it.width().toLong() * it.height() }
-        val x = bounds?.centerX() ?: displayWidth / 2
-        val top = bounds?.let { it.top + it.height() / 5 } ?: (displayHeight * 0.36).toInt()
-        val bottom = bounds?.let { it.bottom - it.height() / 5 } ?: (displayHeight * 0.72).toInt()
-        swipe(x, if (towardBottom) bottom else top, x, if (towardBottom) top else bottom, 24)
+        val before = visibleContent()
+        val upper = bounds.top + bounds.height() * 15 / 100
+        val lower = bounds.bottom - bounds.height() * 15 / 100
+        swipe(bounds.centerX(), if (towardBottom) lower else upper,
+            bounds.centerX(), if (towardBottom) upper else lower, 40)
         waitForIdle()
+        // UiObject2.scroll reports false on this Compose/API 37 host even before the end.
+        // Compare the actual visible content after a bounded gesture instead of trusting that event.
+        return before != visibleContent()
     }
 
     fun latestStatus(device: UiDevice): String = try {
@@ -530,9 +580,7 @@ internal object WalletComposeE2EHelper {
     }
 
     private fun visibleUiSnapshot(device: UiDevice): String {
-        val roots = device.findObjects(By.pkg(walletPackage))
-        val nodes = roots
-            .flatMap { it.flatten() }
+        val nodes = device.findObjects(By.pkg(walletPackage))
             .distinctBy { node ->
                 node.snapshotIdentity()
             }

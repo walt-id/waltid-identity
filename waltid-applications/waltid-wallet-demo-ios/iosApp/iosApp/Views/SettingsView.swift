@@ -10,8 +10,15 @@ struct SettingsView: View {
     var body: some View {
         List {
             Section("Wallet") {
+                NavigationLink { WalletAccessSettingsView(viewModel: viewModel) } label: {
+                    SettingsDestinationLabel("Wallet access", systemImage: "lock", summary: String(localized: "PIN and biometric unlock"))
+                }
+                .accessibilityIdentifier("wallet.settingsWalletAccess")
                 NavigationLink {
-                    if let model = viewModel.identityScreen { WalletIdentityView(model: model) }
+                    if let model = viewModel.identityScreen {
+                        WalletIdentityView(biometricAvailability: viewModel.biometricSigningRecoveryAvailability,
+                            biometricKind: viewModel.access.biometricKind, model: model)
+                    }
                     else { List { signingProtectionSection }.navigationTitle("Signing key").navigationBarTitleDisplayMode(.inline) }
                 } label: {
                     SettingsDestinationLabel("Signing key", systemImage: "key", summary: String(localized: "Protection and key backup"))
@@ -28,22 +35,7 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier(WalletAccessibilityID.settingsProximityPresentation)
                 NavigationLink {
-                    List {
-                        Section {
-                            Toggle("Show wallet review", isOn: $viewModel.showDcApiPresentationPreview)
-                                .accessibilityIdentifier(WalletAccessibilityID.settingsShowDcApiPreview)
-                        } footer: {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Show the wallet review after you select a credential in the system picker. Turning this off skips only the wallet review. System consent and any required signing approval still apply.")
-                                Text("Requires iOS 26 or later and a compatible app or browser. This setting controls wallet review only.")
-                            }
-                        }
-                    }
-                    .frame(maxWidth: 640)
-                    .frame(maxWidth: .infinity)
-                    .background(Color(uiColor: .systemGroupedBackground))
-                    .navigationTitle("Digital Credentials API")
-                    .navigationBarTitleDisplayMode(.inline)
+                    DigitalCredentialsSettingsView(showWalletReview: $viewModel.showDcApiPresentationPreview)
                 } label: {
                     SettingsDestinationLabel("Digital Credentials API", systemImage: "person.text.rectangle",
                                              summary: viewModel.showDcApiPresentationPreview ? String(localized: "Wallet review on") : String(localized: "Wallet review off"))
@@ -111,15 +103,14 @@ struct SettingsView: View {
 
             if !viewModel.isBiometricSigningAvailable,
                viewModel.signingProtectionMode != .disabled {
-                Text(
-                    viewModel.biometricSigningAvailability?.message
-                        ?? "Checking strong biometric availability..."
-                )
-                .font(.footnote)
-                .foregroundStyle(
-                    viewModel.biometricSigningAvailability == nil ? Color.secondary : Color.red
-                )
-                .accessibilityIdentifier(WalletAccessibilityID.signingProtectionAvailability)
+                if viewModel.biometricSigningAvailability == nil {
+                    Text("Checking strong biometric availability...").font(.footnote).foregroundStyle(.secondary)
+                        .accessibilityIdentifier(WalletAccessibilityID.signingProtectionAvailability)
+                } else {
+                    BiometricRecoverySection(availability: viewModel.biometricSigningRecoveryAvailability,
+                        kind: viewModel.access.biometricKind)
+                        .accessibilityIdentifier(WalletAccessibilityID.signingProtectionAvailability)
+                }
             }
 
             if !viewModel.isReady {

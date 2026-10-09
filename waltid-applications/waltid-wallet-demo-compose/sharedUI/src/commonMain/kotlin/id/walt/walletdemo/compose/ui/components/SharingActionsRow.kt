@@ -19,7 +19,10 @@ internal fun SharingActionsRow(
     onReject: (() -> Unit)?,
     presentation: ReviewActionPresentation = ReviewActionPresentation.Sharing,
     paymentReview: WalletDemoPaymentReview = WalletDemoPaymentReview.NotRequired,
+    showCancelWithReject: Boolean = true,
 ) {
+    val canSubmit = enabled && selectionComplete && paymentReview.canConfirm
+    val submit = rememberPaymentSubmission(paymentReview, canSubmit, onSubmit)
     val submitLabel = paymentReview.consent?.affirmativeAction ?: when (presentation) {
         ReviewActionPresentation.Sharing -> "Share"
         ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_approve)
@@ -33,13 +36,11 @@ internal fun SharingActionsRow(
         ReviewActionPresentation.Proximity -> stringResource(Res.string.proximity_cancel)
     }
     val cancel = WalletAction(cancelLabel, onCancel,
-        enabled = enabled || presentation == ReviewActionPresentation.Proximity, testTag = presentation.cancelTestTag,
-        icon = WalletSymbol.Decline)
+        enabled = enabled || presentation == ReviewActionPresentation.Proximity, testTag = presentation.cancelTestTag)
     WalletActions(
-        primary = WalletAction(submitLabel, onSubmit, enabled && selectionComplete && paymentReview.canConfirm, presentation.submitTestTag,
-            icon = if (paymentReview.consent != null) WalletSymbol.Accept else WalletSymbol.Share),
-        secondary = onReject?.let { WalletAction(rejectLabel, it, enabled, presentation.rejectTestTag, WalletSymbol.Decline) } ?: cancel,
-        tertiary = cancel.takeIf { onReject != null },
+        primary = WalletAction(submitLabel, submit, canSubmit, presentation.submitTestTag),
+        secondary = onReject?.let { WalletAction(rejectLabel, it, enabled, presentation.rejectTestTag) } ?: cancel,
+        tertiary = cancel.takeIf { onReject != null && showCancelWithReject },
         modifier = Modifier.testTag(WalletUiTestTags.PresentationActions),
     )
 }

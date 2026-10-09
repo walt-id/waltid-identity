@@ -1,6 +1,11 @@
 package id.walt.walletdemo.compose.ui
 
 internal object WalletUiTestTags {
+    val SettingsWalletAccess = tag("settingsWalletAccess")
+    val SettingsChangePin = tag("settingsChangePin")
+    val SettingsBiometricUnlock = tag("settingsBiometricUnlock")
+    val PinClearButton = tag("pinClearButton")
+    val PinCancelButton = tag("pinCancelButton")
     val ScanButton = tag("scanButton")
     val ScanScreen = tag("scanScreen")
     val ScanInput = tag("scanInput")
@@ -120,8 +125,6 @@ internal object WalletUiTestTags {
     val PresentationCancelButton = tag("presentationCancelButton")
     val PresentationVerifier = tag("presentationVerifier")
     val PresentationVerifierSection = tag("presentationVerifierSection")
-    val PresentationClaimsDialog = tag("presentationClaimsDialog")
-    val PresentationClaimsClose = tag("presentationClaimsClose")
     val PresentationRequesterDetailsToggle = tag("presentationRequesterDetailsToggle")
     val PresentationRequesterDetails = tag("presentationRequesterDetails")
     val PresentationReaderTrustSection = tag("presentationReaderTrustSection")
@@ -131,9 +134,12 @@ internal object WalletUiTestTags {
     val VerifierTechnicalDetails = tag("verifierTechnicalDetails")
     val PinInput = tag("pinInput")
     val PinScreen = tag("pinScreen")
+    val BiometricSetup = tag("biometricSetup")
+    val BiometricSetupRetry = tag("biometricSetupRetry")
+    val BiometricSetupContinue = tag("biometricSetupContinue")
     val PinConfirmationInput = tag("pinConfirmationInput")
     val PinSubmitButton = tag("pinSubmitButton")
-    val PinBiometricToggle = tag("pinBiometricToggle")
+    val PinBackButton = tag("pinBackButton")
     val PinBiometricButton = tag("pinBiometricButton")
     val AccountAuthScreen = tag("accountAuthScreen")
     val AccountEmailInput = tag("accountEmailInput")
@@ -156,7 +162,6 @@ internal object WalletUiTestTags {
     fun credentialOverview(id: String): String = tag("credentialOverview", id)
     fun presentationCredential(id: String): String = tag("presentationCredential", id)
     fun presentationCredentialToggle(id: String): String = tag("presentationCredentialToggle", id)
-    fun presentationClaimsToggle(id: String): String = tag("presentationClaimsToggle", id)
     fun presentationDisclosure(id: String): String = tag("presentationDisclosure", id)
     fun presentationDisclosureToggle(id: String): String = tag("presentationDisclosureToggle", id)
 

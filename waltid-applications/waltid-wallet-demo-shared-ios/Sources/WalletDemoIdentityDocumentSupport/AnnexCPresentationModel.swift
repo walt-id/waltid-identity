@@ -37,8 +37,8 @@ public final class AnnexCPresentationModel: ObservableObject {
     @Published public private(set) var preview: AnnexCPresentationPreview?
     /// User-facing failure text, if the flow cannot continue.
     @Published public private(set) var failure: String?
-    /// Whether a response is being built and sealed.
-    @Published public private(set) var isSubmitting = false
+    /// Locks interaction once a response is being sealed or the platform request has ended.
+    public var isSubmitting: Bool { phase == .submitting || phase == .finished }
     /// What the user is being asked to share, in the wallet's shared review vocabulary.
     ///
     /// Derived from ``preview`` so the review UI never sees the Annex C preview handle, the retained
@@ -52,6 +52,8 @@ public final class AnnexCPresentationModel: ObservableObject {
     private let makeWallet: @Sendable () async throws -> any AnnexCPresentationWallet
     private let log = Logger(subsystem: "id.walt.wallet.identity-document", category: "presentation")
     private var wallet: (any AnnexCPresentationWallet)?
+    private enum Phase { case idle, preparing, reviewing, submitting, finished }
+    @Published private var phase: Phase = .idle
 
     /// Creates a presentation model.
     ///
@@ -74,25 +76,28 @@ public final class AnnexCPresentationModel: ObservableObject {
 
     /// Applies a credential toggle using the wallet's shared selection rules.
     public func toggleCredential(_ credential: PresentationCredentialSelection) {
-        guard let review else { return }
+        guard phase == .reviewing, let review else { return }
         selection = review.toggling(credential: credential, in: selection)
     }
 
     /// Applies a disclosure toggle using the wallet's shared selection rules.
     public func toggleDisclosure(_ disclosure: PresentationDisclosureSelection) {
-        guard let review else { return }
+        guard phase == .reviewing, let review else { return }
         selection = review.toggling(disclosure: disclosure, in: selection)
     }
 
     /// Runs stage 1: parses the request, opens the shared wallet, and builds the consent preview.
     public func prepare() async {
-        guard preview == nil, failure == nil else { return }
+        guard phase == .idle else { return }
+        phase = .preparing
         do {
             guard let origin = context.verifiedOrigin else {
                 throw IdentityDocumentSupportFailure.missingVerifiedOrigin
             }
             let parsed = try parsedRequest(from: context.requestSnapshot)
             let wallet = try await makeWallet()
+            try Task.checkCancellation()
+            guard phase == .preparing else { return }
             self.wallet = wallet
             let prepared = try await wallet.previewAnnexCPresentation(
                 parsedRequest: parsed,
@@ -102,6 +107,8 @@ public final class AnnexCPresentationModel: ObservableObject {
                 verifiedOrigin: origin.absoluteString,
                 selectedRegistryEntryIDs: []
             )
+            try Task.checkCancellation()
+            guard phase == .preparing else { return }
             preview = prepared
             let review = prepared.sharingReview()
             self.review = review
@@ -109,15 +116,20 @@ public final class AnnexCPresentationModel: ObservableObject {
             // rule: the choice is visible and changeable in the review, and a wallet that pre-selected
             // differently here would answer the same request differently depending on how it was asked.
             selection = SharingSelection(credentials: review.defaultCredentialSelection())
+            phase = .reviewing
+        } catch is CancellationError {
+            cancel()
         } catch {
+            guard phase != .finished else { return }
             log.error("Annex C preview failed: \(error.localizedDescription, privacy: .public)")
             failure = error.localizedDescription
+            phase = .reviewing
         }
     }
 
     /// Runs stage 2: requests the raw request and returns the sealed response to the platform.
     public func submit() async {
-        guard let wallet, let preview, !isSubmitting else { return }
+        guard phase == .reviewing, let wallet, let preview else { return }
         guard hasCompleteSelection else {
             failure = IdentityDocumentSupportFailure.missingCredentialSelection.localizedDescription
             return
@@ -127,7 +139,7 @@ public final class AnnexCPresentationModel: ObservableObject {
         let selections = preview.credentialOptions
             .map(\.selection)
             .filter(selection.credentials.contains)
-        isSubmitting = true
+        phase = .submitting
         do {
             try await context.sendResponse { rawRequest in
                 let response = try await wallet.submitAnnexCPresentation(
@@ -139,15 +151,18 @@ public final class AnnexCPresentationModel: ObservableObject {
                 )
                 return try encryptedResponseData(fromResponseJSON: response.dataJSON)
             }
+            phase = .finished
         } catch {
             log.error("Annex C response failed: \(error.localizedDescription, privacy: .public)")
             failure = error.localizedDescription
-            isSubmitting = false
+            phase = .reviewing
         }
     }
 
     /// Dismisses the request without releasing anything.
     public func cancel() {
+        guard phase != .submitting, phase != .finished else { return }
+        phase = .finished
         context.cancelRequest()
     }
 }

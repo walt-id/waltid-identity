@@ -5,19 +5,23 @@ import Security
 enum DemoPinRecordError: Error {
     case randomGenerationFailed
     case derivationFailed
+    case missingRecord
+    case invalidRecord
 }
 
 protocol DemoPinStore: AnyObject {
     var hasPin: Bool { get }
     var isBiometricUnlockEnabled: Bool { get set }
+    var isBiometricSetupPending: Bool { get set }
     func setPin(_ pin: String) async throws
-    func verifyPin(_ pin: String) async -> Bool
+    func verifyPin(_ pin: String) async throws -> Bool
     func clear()
 }
 
 final class InMemoryDemoPinStore: DemoPinStore {
     private var configuredPin: String?
     var isBiometricUnlockEnabled = false
+    var isBiometricSetupPending = false
 
     var hasPin: Bool { configuredPin != nil }
 
@@ -32,6 +36,7 @@ final class InMemoryDemoPinStore: DemoPinStore {
     func clear() {
         configuredPin = nil
         isBiometricUnlockEnabled = false
+        isBiometricSetupPending = false
     }
 }
 
@@ -39,6 +44,7 @@ final class UserDefaultsDemoPinStore: DemoPinStore {
     private let defaults: UserDefaults
     private let recordKey: String
     private let biometricKey: String
+    private let pendingKey: String
     private let randomSalt: () throws -> Data
 
     init(
@@ -49,6 +55,7 @@ final class UserDefaultsDemoPinStore: DemoPinStore {
         self.defaults = defaults
         self.recordKey = "id.walt.walletdemo.pin.\(walletID)"
         self.biometricKey = "id.walt.walletdemo.pin.biometric.\(walletID)"
+        self.pendingKey = "id.walt.walletdemo.pin.biometric.pending.\(walletID)"
         self.randomSalt = randomSalt
     }
 
@@ -57,6 +64,11 @@ final class UserDefaultsDemoPinStore: DemoPinStore {
     var isBiometricUnlockEnabled: Bool {
         get { defaults.bool(forKey: biometricKey) }
         set { defaults.set(newValue, forKey: biometricKey) }
+    }
+
+    var isBiometricSetupPending: Bool {
+        get { defaults.bool(forKey: pendingKey) }
+        set { defaults.set(newValue, forKey: pendingKey) }
     }
 
     func setPin(_ pin: String) async throws {
@@ -73,11 +85,12 @@ final class UserDefaultsDemoPinStore: DemoPinStore {
             salt.base64EncodedString(),
             verifier.base64EncodedString(),
         ].joined(separator: Self.recordSeparator)
+        try Task.checkCancellation()
         defaults.set(record, forKey: recordKey)
     }
 
-    func verifyPin(_ pin: String) async -> Bool {
-        guard let record = defaults.string(forKey: recordKey) else { return false }
+    func verifyPin(_ pin: String) async throws -> Bool {
+        guard let record = defaults.string(forKey: recordKey) else { throw DemoPinRecordError.missingRecord }
         let parts = record.split(
             separator: Character(Self.recordSeparator),
             maxSplits: 3,
@@ -93,7 +106,7 @@ final class UserDefaultsDemoPinStore: DemoPinStore {
               salt.count == Self.saltSizeBytes,
               expected.count == Self.verifierSizeBytes,
               let actual = Self.derive(pin: pin, salt: salt, iterations: iterations) else {
-            return false
+            throw DemoPinRecordError.invalidRecord
         }
         return Self.constantTimeEquals(actual, expected)
     }
@@ -101,6 +114,7 @@ final class UserDefaultsDemoPinStore: DemoPinStore {
     func clear() {
         defaults.removeObject(forKey: recordKey)
         defaults.removeObject(forKey: biometricKey)
+        defaults.removeObject(forKey: pendingKey)
     }
 
     static func derive(pin: String, salt: Data, iterations: Int) -> Data? {

@@ -56,6 +56,12 @@ class WalletBatchIssuanceTest {
         return resumeDeferred(id, beforeCredentialsStored, onCredentialStored)
     }
 
+    private suspend fun assertListedContinuation(service: WalletIssuanceSessionService,
+        reference: WalletIssuanceContinuation, status: WalletIssuanceContinuationStatus) {
+        val listed = service.listIssuanceContinuations().single()
+        assertEquals(reference.copy(status = status, displayMetadataJson = listed.displayMetadataJson), listed)
+    }
+
     @Test fun batchReviewAndEveryStoredCopyKeepTheSameLocalizedClaimDefinitions() = runTest {
         for (deferred in listOf(false, true)) {
         val fixture = batchTestFixture(true)
@@ -90,6 +96,17 @@ class WalletBatchIssuanceTest {
         if (deferred) {
             val pending = assertIs<WalletIssuanceOutcome.Deferred>(outcome).credentials.single()
             val restored = newSessionService(fixture.wallet, http, records)
+            val listed = restored.listIssuanceContinuations().single()
+            assertEquals(WalletIssuanceContinuationStatus.AWAITING_ISSUER, listed.status)
+            assertEquals(display, Json.parseToJsonElement(assertNotNull(listed.displayMetadataJson)))
+            assertIs<WalletIssuanceOutcome.Failed>(restored.resumeWhenDue(pending.id,
+                beforeCredentialsStored = { error("Storage temporarily unavailable") }))
+            val retry = newSessionService(fixture.wallet, http, records).listIssuanceContinuations().single()
+            assertEquals(WalletIssuanceContinuationStatus.AWAITING_LOCAL_SAVE, retry.status)
+            assertEquals(listed.displayMetadataJson, retry.displayMetadataJson)
+            val persistedPublic = Json.parseToJsonElement(records.list().single().payload).jsonObject.getValue("public").jsonObject
+            assertFalse("status" in persistedPublic)
+            assertFalse("displayMetadataJson" in persistedPublic)
             assertIs<WalletIssuanceOutcome.Stored>(restored.resumeWhenDue(pending.id))
             restored.closeSessions()
         } else assertIs<WalletIssuanceOutcome.Stored>(outcome)
@@ -100,6 +117,32 @@ class WalletBatchIssuanceTest {
         stored.forEach { assertEquals(claims, it.metadata?.get("credentialClaims")) }
         service.closeSessions()
         }
+    }
+
+    @Test fun continuationPresentationFiltersPrivateMetadataAndDoesNotMislabelMixedResponses() = runTest {
+        val fixture = batchTestFixture(true)
+        val records = InMemoryIssuanceSessionStore()
+        var requests = 0
+        val http = batchTestClient(credential = { requests++; batchTestResponse(it.batchProofs()) })
+        val service = newSessionService(fixture.wallet, http, records)
+        val review = service.start(WalletIssuanceSessionRequest(offerJson = batchTestOffer()))
+        assertIs<WalletIssuanceOutcome.Stored>(service.continuePreAuthorized(review.id))
+        val credential = fixture.store.listCredentials().toList().single()
+        for (mixed in listOf(false, true)) {
+            val display = buildJsonObject { putJsonArray("credentialDisplay") { addJsonObject { put("name", "Resident card") } } }
+            val first = credential.copy(id = "first-$mixed", metadata = JsonObject(display + ("privateNote" to JsonPrimitive("private"))))
+            val second = credential.copy(id = "second-$mixed", metadata = if (mixed) buildJsonObject {
+                putJsonArray("credentialDisplay") { addJsonObject { put("name", "Library card") } }
+            } else display)
+            val failed = assertIs<WalletIssuanceOutcome.Failed>(service.storeReceivedCredentials(
+                listOf(first, second), null, null, true, beforeCredentialsStored = { error("Disk unavailable") }, onCredentialStored = {}))
+            val listed = newSessionService(fixture.wallet, http, records).listIssuanceContinuations()
+                .single { it.id == failed.deferredCredentials.single().id }
+            assertEquals(WalletIssuanceContinuationStatus.AWAITING_LOCAL_SAVE, listed.status)
+            if (mixed) assertNull(listed.displayMetadataJson)
+            else assertEquals(display, Json.parseToJsonElement(assertNotNull(listed.displayMetadataJson)))
+        }
+        assertEquals(1, requests)
     }
 
     @Test fun preparedHolderOwnershipTransfersOnlyAfterValidationAndBeforeRemoteWork() = runTest {
@@ -663,7 +706,7 @@ class WalletBatchIssuanceTest {
             assertFalse("request" in payload)
             val restored = newSessionService(fixture.wallet.copy(), sessionStore = records,
                 httpClient = http, onEvent = { events += it })
-            assertEquals(listOf(handle), restored.listIssuanceContinuations())
+            assertListedContinuation(restored, handle, WalletIssuanceContinuationStatus.AWAITING_LOCAL_SAVE)
             val newlyStored = mutableListOf<String>()
             val resumed = assertIs<WalletIssuanceOutcome.Stored>(restored.resumeWhenDue(handle.id,
                 beforeCredentialsStored = { assertEquals(1, it) }, onCredentialStored = { newlyStored += it.id }))
@@ -891,7 +934,7 @@ class WalletBatchIssuanceTest {
         val pending = failed.deferredCredentials.single()
         assertEquals("dataset-a", pending.credentialIdentifier)
         val restored = newSessionService(fixture.wallet, httpClient = http, sessionStore = records)
-        assertEquals(listOf(pending), restored.listIssuanceContinuations())
+        assertListedContinuation(restored, pending, WalletIssuanceContinuationStatus.AWAITING_ISSUER)
         assertEquals(2, assertIs<WalletIssuanceOutcome.Stored>(restored.resumeWhenDue(pending.id)).credentialIds.size)
         assertTrue(restored.listIssuanceContinuations().isEmpty())
         assertTrue(records.list().isEmpty())
@@ -1058,7 +1101,7 @@ class WalletBatchIssuanceTest {
             val failed = assertIs<WalletIssuanceOutcome.Failed>(restored.resumeWhenDue(handle))
             assertEquals(WalletIssuanceErrorCode.STORAGE, failed.error.code)
             assertEquals(1, failed.storedCredentialIds.size)
-            assertEquals(listOf(public.copy(intervalSeconds = null)), failed.deferredCredentials)
+            assertEquals(listOf(public.copy(intervalSeconds = null, status = WalletIssuanceContinuationStatus.UNRESOLVED, displayMetadataJson = null)), failed.deferredCredentials)
             val restarted = wallet.copy().attachIssuanceSessionState(WalletIssuanceSessionState(fixture.wallet.id, records)).issuanceSessions(http)
             val stored = assertIs<WalletIssuanceOutcome.Stored>(restarted.resumeWhenDue(handle))
             assertEquals(2, stored.credentialIds.size)
@@ -1173,7 +1216,7 @@ class WalletBatchIssuanceTest {
         release.complete(Unit)
         val updated = assertIs<WalletIssuanceOutcome.Deferred>(poll.await()).credentials.single()
         assertEquals(7, updated.intervalSeconds)
-        assertEquals(listOf(WalletIssuanceContinuation(updated)), restored.listIssuanceContinuations())
+        assertListedContinuation(restored, WalletIssuanceContinuation(updated), WalletIssuanceContinuationStatus.AWAITING_ISSUER)
         assertIs<WalletIssuanceOutcome.Cancelled>(restored.cancel(preview.id))
         assertTrue(restored.listIssuanceContinuations().isEmpty())
         restored.clearSessions()
@@ -1254,7 +1297,7 @@ class WalletBatchIssuanceTest {
             val preparedIds = payload.getValue("content").jsonObject.getValue("credentials").jsonArray.map { it.jsonObject.getValue("id").jsonPrimitive.content }
             val restored = fixture.wallet.copy().attachIssuanceSessionState(WalletIssuanceSessionState(wallet.id, records))
                 .issuanceSessions(http)
-            assertEquals(listOf(handle), restored.listIssuanceContinuations())
+            assertListedContinuation(restored, handle, WalletIssuanceContinuationStatus.AWAITING_LOCAL_SAVE)
             val completed = assertIs<WalletIssuanceOutcome.Stored>(restored.resumeWhenDue(handle.id,
                 beforeCredentialsStored = { assertEquals(if (rejectQuota) 2 else 1, it) },
                 onCredentialStored = { reported += it.id }))
@@ -1366,11 +1409,11 @@ class WalletBatchIssuanceTest {
             assertEquals("dataset-a".takeIf { knownConfiguration }, handle.credentialIdentifier)
             val restored = fixture.wallet.copy().attachIssuanceSessionState(WalletIssuanceSessionState(wallet.id, records))
                 .issuanceSessions(http)
-            assertEquals(listOf(handle), restored.listIssuanceContinuations())
+            assertListedContinuation(restored, handle, WalletIssuanceContinuationStatus.AWAITING_LOCAL_SAVE)
             if (knownConfiguration) {
                 assertEquals(listOf(WalletDeferredCredential(handle)), restored.listDeferredCredentials())
             } else {
-                assertEquals(listOf(handle), assertFailsWith<WalletIssuanceContinuationException> {
+                assertEquals(restored.listIssuanceContinuations(), assertFailsWith<WalletIssuanceContinuationException> {
                     restored.listDeferredCredentials()
                 }.continuations)
             }
@@ -1467,6 +1510,8 @@ class WalletBatchIssuanceTest {
         val running = async { first.resumeWhenDue(pending.id) }
         entered.await()
         try {
+            assertEquals(WalletIssuanceContinuationStatus.REMOTE_OUTCOME_UNCERTAIN,
+                second.listIssuanceContinuations().single().status)
             assertEquals(WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN,
                 assertIs<WalletIssuanceOutcome.Failed>(second.resumeWhenDue(pending.id)).error.code)
             assertEquals(WalletIssuanceErrorCode.INVALID_SESSION,
@@ -1509,6 +1554,8 @@ class WalletBatchIssuanceTest {
             try {
                 val claim = records.list().single()
                 val observer = newSessionService(fixture.wallet, sessionStore = records, httpClient = http)
+                assertEquals(WalletIssuanceContinuationStatus.STORAGE_OUTCOME_UNCERTAIN,
+                    observer.listIssuanceContinuations().single().status)
                 val observed = assertIs<WalletIssuanceOutcome.Failed>(observer.resumeWhenDue(pending.id,
                     beforeCredentialsStored = { error("Another writer owns the quota reservation") },
                     onCredentialStored = { error("Another writer owns the save callback") }))
@@ -1872,7 +1919,7 @@ class WalletBatchIssuanceTest {
         val denied = fixture.wallet.copy(keyStores = emptyList()).attachIssuanceSessionState(state).issuanceSessions(http)
         assertIs<WalletIssuanceOutcome.Failed>(denied.resumeWhenDue(pending.id))
         assertEquals(0, polls)
-        assertEquals(listOf(WalletIssuanceContinuation(pending)), permitted.listIssuanceContinuations())
+        assertListedContinuation(permitted, WalletIssuanceContinuation(pending), WalletIssuanceContinuationStatus.AWAITING_ISSUER)
         assertIs<WalletIssuanceOutcome.Stored>(permitted.resumeWhenDue(pending.id))
         assertEquals(1, polls)
         assertFailsWith<IllegalArgumentException> {

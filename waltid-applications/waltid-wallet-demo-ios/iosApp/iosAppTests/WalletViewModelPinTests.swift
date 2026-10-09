@@ -1,10 +1,49 @@
 import Foundation
+import LocalAuthentication
 import WalletSDK
 import XCTest
 @testable import iosApp
 
 @MainActor
 final class WalletViewModelPinTests: XCTestCase {
+    func testUnavailableBiometricsPreserveRecoveryReason() {
+        let classify = LocalAuthenticationBiometricAuthenticator.classifyAvailability
+        func error(_ code: LAError.Code) -> NSError { NSError(domain: LAError.errorDomain, code: code.rawValue) }
+        XCTAssertEqual(classify(error(.biometryNotAvailable), .faceID), .unavailable)
+        XCTAssertEqual(classify(error(.biometryNotAvailable), .none), .unsupported)
+        XCTAssertEqual(classify(error(.biometryNotEnrolled), .faceID), .notEnrolled)
+        XCTAssertEqual(classify(error(.passcodeNotSet), .faceID), .deviceCredentialNotSet)
+        XCTAssertEqual(classify(error(.biometryLockout), .faceID), .lockedOut)
+        XCTAssertEqual(DemoBiometricAvailability.lockedOut.authenticationResult, .lockedOut)
+        XCTAssertFalse(DemoBiometricAvailability.lockedOut.offersSettings)
+        XCTAssertFalse(DemoBiometricAvailability.unsupported.offersSettings)
+        XCTAssertTrue(DemoBiometricAvailability.unavailable.offersSettings)
+    }
+
+    func testPermissionRecoveryDoesNotEnableUnlockOrChangeSigningPreference() async throws {
+        let store = InMemoryDemoPinStore()
+        let biometrics = FakeDemoBiometricAuthenticator(result: .unavailable)
+        let model = WalletViewModel(walletID: "permission-recovery-\(UUID().uuidString)", signingProtectionMode: .optional,
+            walletClient: MockWalletClient(), identityDocumentRegistrationUpdate: {}, pinStore: store, biometricAuthenticator: biometrics)
+        model.updatePin("1234")
+        model.updatePinConfirmation("1234")
+        try await waitUntil { model.auth == .biometricSetup(.unavailable) }
+        biometrics.isAvailable = false
+        model.refreshBiometricAvailability()
+        let signing = model.selectedSigningProtection
+        XCTAssertTrue(signing.requiresBiometrics)
+        model.continueWithoutBiometrics()
+        try await waitUntil { model.isReady }
+        XCTAssertFalse(model.isBiometricUnlockEnabled)
+        XCTAssertEqual(model.selectedSigningProtection, signing)
+        biometrics.isAvailable = true
+        model.handleApplicationBecameActive()
+        model.refreshBiometricAvailability()
+        XCTAssertFalse(model.isBiometricUnlockEnabled)
+        XCTAssertEqual(biometrics.authenticateCalls, 1)
+        XCTAssertEqual(model.selectedSigningProtection, signing)
+    }
+
     func testSetupRejectsPinsOutsideFourAsciiDigits() {
         for pin in ["123", "12345", "123456", "12a4", "١٢٣٤", "１２３４", "1234\n"] {
             let store = InMemoryDemoPinStore()
@@ -65,6 +104,48 @@ final class WalletViewModelPinTests: XCTestCase {
         XCTAssertTrue(viewModel.isReady)
     }
 
+    func testBiometricRetrySavesPinOnceAndSuppressesRepeatedActions() async throws {
+        let store = FailingDemoPinStore()
+        store.fail = false
+        let biometrics = FakeDemoBiometricAuthenticator(result: .cancelled)
+        let model = makeModel(store, biometrics)
+        model.unlockForTests()
+        try await waitUntil { model.auth == .biometricSetup(.cancelled) }
+        XCTAssertFalse(model.isReady)
+        biometrics.result = .succeeded
+        model.retryBiometricSetup()
+        model.retryBiometricSetup()
+        model.continueWithoutBiometrics()
+        try await waitUntil { model.isReady }
+        XCTAssertEqual(store.saves, 1)
+        XCTAssertEqual(biometrics.authenticateCalls, 2)
+        XCTAssertTrue(store.isBiometricUnlockEnabled)
+        XCTAssertFalse(store.isBiometricSetupPending)
+    }
+
+    func testInterruptedBiometricChoiceRequiresPinThenExplicitChoice() async throws {
+        let store = InMemoryDemoPinStore()
+        try await store.setPin("1234")
+        store.isBiometricSetupPending = true
+        store.isBiometricUnlockEnabled = true
+        let biometrics = FakeDemoBiometricAuthenticator()
+        let model = makeModel(store, biometrics)
+        model.handleApplicationBecameActive()
+        await Task.yield()
+        XCTAssertEqual(model.auth, .login)
+        XCTAssertFalse(model.shouldPromptBiometricUnlock)
+        XCTAssertEqual(biometrics.authenticateCalls, 0)
+        model.updatePin("1234")
+        model.submitPin()
+        try await waitUntil { model.auth == .biometricSetup(nil) }
+        XCTAssertFalse(model.isReady)
+        model.continueWithoutBiometrics()
+        try await waitUntil { model.isReady }
+        XCTAssertFalse(store.isBiometricUnlockEnabled)
+        XCTAssertFalse(store.isBiometricSetupPending)
+        XCTAssertEqual(biometrics.authenticateCalls, 0)
+    }
+
     func testResetWalletClearsPinAndReturnsToSetup() async throws {
         let pinStore = InMemoryDemoPinStore()
         let viewModel = WalletViewModel(
@@ -83,51 +164,296 @@ final class WalletViewModelPinTests: XCTestCase {
         XCTAssertFalse(pinStore.isBiometricUnlockEnabled)
     }
 
-    func testEnablingBiometricsRequestsPermissionBeforePersisting() async throws {
-        let pinStore = InMemoryDemoPinStore()
+    func testChooseAndConfirmRequireFourDigitsBeforePersisting() async throws {
+        let store = InMemoryDemoPinStore()
         let biometrics = FakeDemoBiometricAuthenticator()
-        let viewModel = WalletViewModel(
-            walletID: "pin-bio-enable-\(UUID().uuidString)",
-            walletClient: MockWalletClient(),
-            identityDocumentRegistrationUpdate: {},
-            pinStore: pinStore,
-            biometricAuthenticator: biometrics
-        )
-
-        XCTAssertEqual(viewModel.auth, .setup)
-        viewModel.refreshBiometricAvailability()
-        viewModel.updateUseBiometrics(true)
-        try await waitUntil { !viewModel.isAuthenticating }
-
-        XCTAssertTrue(viewModel.useBiometrics)
+        let model = makeModel(store, biometrics)
+        for invalid in ["123", "12345", "123456", "12a4", "１２３４", "1️⃣2️⃣3️⃣4️⃣", "1234\n"] {
+            model.updatePin(invalid)
+            model.submitPin()
+            XCTAssertEqual(model.pinSetupStep, .choose)
+            XCTAssertEqual(model.pinError, "PIN must contain four digits")
+            XCTAssertFalse(store.hasPin)
+        }
+        model.updatePin("1234")
+        XCTAssertEqual(model.pinSetupStep, .confirm)
+        XCTAssertFalse(store.hasPin)
+        XCTAssertEqual(biometrics.authenticateCalls, 0)
+        model.updatePinConfirmation("4321")
+        XCTAssertEqual(model.pinError, "PIN confirmation does not match")
+        XCTAssertEqual(model.pinConfirmation, "")
+        XCTAssertFalse(store.hasPin)
+        model.updatePinConfirmation("1234")
+        try await waitUntil { model.isReady }
+        XCTAssertEqual(model.auth, .unlocked)
+        XCTAssertEqual(model.pin, "")
+        XCTAssertEqual(model.pinConfirmation, "")
         XCTAssertEqual(biometrics.authenticateCalls, 1)
-
-        viewModel.unlockForTests()
-        try await waitUntil { viewModel.auth == .unlocked }
-        XCTAssertTrue(pinStore.isBiometricUnlockEnabled)
+        XCTAssertTrue(store.isBiometricUnlockEnabled)
     }
 
-    func testCancelledBiometricEnableLeavesPinOnly() async throws {
-        let pinStore = InMemoryDemoPinStore()
-        let biometrics = FakeDemoBiometricAuthenticator(result: .failed)
-        let viewModel = WalletViewModel(
-            walletID: "pin-bio-enable-cancel-\(UUID().uuidString)",
-            walletClient: MockWalletClient(),
-            identityDocumentRegistrationUpdate: {},
-            pinStore: pinStore,
-            biometricAuthenticator: biometrics
-        )
+    func testUnlockRequiresFourDigits() async throws {
+        let store = InMemoryDemoPinStore()
+        try await store.setPin("1234")
+        let model = makeModel(store, FakeDemoBiometricAuthenticator())
+        for invalid in ["123", "12345", "123456", "１２３４", "12a4"] {
+            model.updatePin(invalid)
+            model.submitPin()
+            XCTAssertEqual(model.auth, .login)
+            XCTAssertEqual(model.pinError, "PIN must contain four digits")
+            XCTAssertFalse(model.isAuthenticating)
+        }
+        model.updatePin("1234")
+        model.submitPin()
+        try await waitUntil { model.isReady }
+        XCTAssertEqual(model.auth, .unlocked)
+    }
 
-        viewModel.refreshBiometricAvailability()
-        viewModel.updateUseBiometrics(true)
-        try await waitUntil { !viewModel.isAuthenticating }
+    func testBackAllowsEditingAndDiscardsTheOldConfirmation() {
+        let model = makeModel(InMemoryDemoPinStore(), FakeDemoBiometricAuthenticator())
+        model.updatePin("1234")
+        model.submitPin()
+        model.updatePinConfirmation("123")
+        model.editSetupPin()
+        XCTAssertEqual(model.pinSetupStep, .choose)
+        XCTAssertEqual(model.pin, "")
+        XCTAssertEqual(model.pinConfirmation, "")
+        model.updatePin("4321")
+        model.submitPin()
+        model.updatePinConfirmation("1234")
+        XCTAssertEqual(model.pinError, "PIN confirmation does not match")
+        XCTAssertFalse(model.isAuthenticating)
+    }
 
-        XCTAssertFalse(viewModel.useBiometrics)
+    func testMatchingConfirmationPromptsOnceAndOsResultControlsOptIn() async throws {
+        for result in [DemoBiometricResult.succeeded, .cancelled, .unavailable, .lockedOut, .failed] {
+            let store = InMemoryDemoPinStore()
+            let gate = DemoBiometricTestGate()
+            let biometrics = FakeDemoBiometricAuthenticator(gate: gate)
+            let model = makeModel(store, biometrics)
+            model.updatePin("1234")
+            model.submitPin()
+            XCTAssertEqual(biometrics.authenticateCalls, 0)
+            model.updatePinConfirmation("1234")
+            model.submitPin()
+            try await waitUntil { biometrics.authenticateCalls == 1 }
+            XCTAssertTrue(model.isAuthenticating)
+            XCTAssertTrue(store.hasPin)
+            XCTAssertFalse(store.isBiometricUnlockEnabled)
+            XCTAssertFalse(model.isReady)
+            model.editSetupPin()
+            model.updatePin("999999")
+            XCTAssertEqual(model.pin, "")
+            XCTAssertEqual(model.auth, .biometricSetup(nil))
+            await gate.complete(result)
+            if result != .succeeded {
+                try await waitUntil { model.auth == .biometricSetup(result) }
+                XCTAssertFalse(model.isReady)
+                XCTAssertTrue(store.isBiometricSetupPending)
+                model.continueWithoutBiometrics()
+            }
+            try await waitUntil { model.isReady }
+            XCTAssertEqual(model.auth, .unlocked)
+            XCTAssertEqual(store.isBiometricUnlockEnabled, result == .succeeded)
+            XCTAssertEqual(biometrics.authenticateCalls, 1)
+        }
+    }
+
+    func testUnavailableBiometricsFinishesPinOnlyWithoutPrompt() async throws {
+        let store = InMemoryDemoPinStore()
+        let biometrics = FakeDemoBiometricAuthenticator(isAvailable: false)
+        let model = makeModel(store, biometrics)
+        model.unlockForTests()
+        try await waitUntil { model.isReady }
+        XCTAssertFalse(store.isBiometricUnlockEnabled)
+        XCTAssertEqual(biometrics.authenticateCalls, 0)
+    }
+
+    func testPersistenceFailureDoesNotPromptAndRemainsRetryable() async throws {
+        let store = FailingDemoPinStore()
+        let biometrics = FakeDemoBiometricAuthenticator()
+        let model = makeModel(store, biometrics)
+        model.unlockForTests()
+        try await waitUntil { !model.isAuthenticating }
+        XCTAssertEqual(model.auth, .setup)
+        XCTAssertEqual(model.pinSetupStep, .confirm)
+        XCTAssertEqual(model.pinError, "PIN could not be saved. Try again.")
+        XCTAssertEqual(biometrics.authenticateCalls, 0)
+        store.fail = false
+        model.submitPin()
+        try await waitUntil { model.isReady }
         XCTAssertEqual(biometrics.authenticateCalls, 1)
+    }
 
-        viewModel.unlockForTests()
-        try await waitUntil { viewModel.auth == .unlocked }
-        XCTAssertFalse(pinStore.isBiometricUnlockEnabled)
+    func testResetIgnoresLateBiometricSuccess() async throws {
+        let store = InMemoryDemoPinStore()
+        let gate = DemoBiometricTestGate()
+        let biometrics = FakeDemoBiometricAuthenticator(gate: gate)
+        let model = makeModel(store, biometrics)
+        model.unlockForTests()
+        try await waitUntil { biometrics.authenticateCalls == 1 }
+        model.resetWallet()
+        try await waitUntil { model.auth == .setup && !model.isAuthenticating }
+        await gate.complete(.succeeded)
+        await Task.yield()
+        XCTAssertEqual(model.auth, .setup)
+        XCTAssertEqual(model.pinSetupStep, .choose)
+        XCTAssertFalse(store.hasPin)
+        XCTAssertFalse(store.isBiometricUnlockEnabled)
+        XCTAssertFalse(model.isReady)
+    }
+
+    func testWrongPinClearsImmediatelyAndAcceptsTheNextAttempt() async throws {
+        let store = InMemoryDemoPinStore()
+        try await store.setPin("1234")
+        let model = makeModel(store, UnavailableDemoBiometricAuthenticator())
+        model.updatePin("9999")
+        try await waitUntil { !model.isAuthenticating }
+        XCTAssertEqual(model.pin, "")
+        XCTAssertEqual(model.pinError, WalletAccessText.wrongPin)
+        model.updatePin("1234")
+        try await waitUntil { model.auth == .unlocked }
+    }
+
+    func testClearKeepsTheStageAndConfirmationDraft() {
+        let model = makeModel(InMemoryDemoPinStore(), UnavailableDemoBiometricAuthenticator())
+        model.updatePin("12"); model.clearPin()
+        XCTAssertEqual(model.pin, "")
+        XCTAssertEqual(model.pinSetupStep, .choose)
+        model.updatePin("1234"); model.updatePinConfirmation("12"); model.clearPin()
+        XCTAssertEqual(model.pinSetupStep, .confirm)
+        XCTAssertEqual(model.pin, "1234")
+        XCTAssertEqual(model.pinConfirmation, "")
+    }
+
+    func testChangePinRequiresCurrentPinAndPreservesWalletAndBiometricPreference() async throws {
+        let store = InMemoryDemoPinStore()
+        try await store.setPin("1234")
+        store.isBiometricUnlockEnabled = true
+        let wallet = MockWalletClient()
+        let model = WalletViewModel(walletClient: wallet, identityDocumentRegistrationUpdate: {}, pinStore: store,
+            biometricAuthenticator: UnavailableDemoBiometricAuthenticator())
+        model.updatePin("1234")
+        try await waitUntil { model.isReady }
+        let did = model.did
+        let key = model.keyID
+        let credentials = model.credentials.map(\.id)
+        model.startPinChange()
+        model.updatePin("0000")
+        try await waitUntil { !model.isAuthenticating }
+        XCTAssertEqual(model.pin, "")
+        XCTAssertEqual(model.access.pinChange, .current)
+        model.updatePin("1234")
+        try await waitUntil { model.access.pinChange == .newPin }
+        model.updatePin("5678")
+        XCTAssertEqual(model.pinSetupStep, .confirm)
+        let oldBefore = await store.verifyPin("1234")
+        XCTAssertTrue(oldBefore)
+        model.updatePinConfirmation("9999")
+        XCTAssertEqual(model.pinConfirmation, "")
+        model.updatePinConfirmation("5678")
+        model.submitPin()
+        try await waitUntil { model.access.pinChange == nil }
+        let oldAfter = await store.verifyPin("1234")
+        let newAfter = await store.verifyPin("5678")
+        XCTAssertFalse(oldAfter)
+        XCTAssertTrue(newAfter)
+        XCTAssertTrue(store.isBiometricUnlockEnabled)
+        XCTAssertEqual(model.did, did)
+        XCTAssertEqual(model.keyID, key)
+        XCTAssertEqual(model.credentials.map(\.id), credentials)
+        let bootstraps = await wallet.bootstrapCalls
+        XCTAssertEqual(bootstraps, 1)
+        model.lock(); model.updatePin("5678")
+        try await waitUntil { model.auth == .unlocked }
+    }
+
+    func testCancelledAndFailedPinChangePreserveOldPin() async throws {
+        let store = FailingDemoPinStore()
+        store.fail = false
+        try await store.setPin("1234")
+        let model = makeModel(store, UnavailableDemoBiometricAuthenticator())
+        model.updatePin("1234")
+        try await waitUntil { model.auth == .unlocked }
+        model.startPinChange(); model.updatePin("1234")
+        try await waitUntil { model.access.pinChange == .newPin }
+        model.updatePin("5678"); model.cancelPinChange()
+        XCTAssertNil(model.access.pinChange)
+        let oldCancelled = try await store.verifyPin("1234")
+        XCTAssertTrue(oldCancelled)
+        model.startPinChange(); model.updatePin("1234")
+        try await waitUntil { model.access.pinChange == .newPin }
+        model.updatePin("5678"); store.fail = true; model.updatePinConfirmation("5678")
+        try await waitUntil { !model.isAuthenticating }
+        let oldFailed = try await store.verifyPin("1234")
+        XCTAssertTrue(oldFailed)
+        XCTAssertEqual(model.access.operation, .retryPin("PIN could not be saved. Try again."))
+        store.fail = false; model.submitPin(); model.submitPin()
+        try await waitUntil { model.access.pinChange == nil }
+        XCTAssertEqual(store.saves, 2)
+        let newSaved = try await store.verifyPin("5678")
+        XCTAssertTrue(newSaved)
+    }
+
+    func testVerificationFailureRequiresExplicitRetryAndDoesNotRejectThePin() async throws {
+        let store = FailingDemoPinStore()
+        store.fail = false
+        try await store.setPin("1234")
+        store.failVerification = true
+        let model = makeModel(store, UnavailableDemoBiometricAuthenticator())
+        model.updatePin("1234")
+        try await waitUntil { !model.isAuthenticating }
+        XCTAssertEqual(model.auth, .login)
+        XCTAssertEqual(model.pin, "1234")
+        XCTAssertEqual(model.access.operation, .retryPin("PIN could not be verified. Try again."))
+        store.failVerification = false
+        model.submitPin(); model.submitPin()
+        try await waitUntil { model.auth == .unlocked }
+    }
+
+    func testBiometricSettingsRequireSuccessAndKeepPreferenceWhenUnavailable() async throws {
+        let store = InMemoryDemoPinStore()
+        try await store.setPin("1234")
+        let biometrics = FakeDemoBiometricAuthenticator(result: .cancelled)
+        let model = makeModel(store, biometrics)
+        model.updatePin("1234")
+        try await waitUntil { model.auth == .unlocked }
+        model.setBiometricUnlockEnabled(true)
+        try await waitUntil { !model.isAuthenticating }
+        XCTAssertFalse(store.isBiometricUnlockEnabled)
+        biometrics.result = .succeeded
+        model.setBiometricUnlockEnabled(true); model.setBiometricUnlockEnabled(true)
+        try await waitUntil { !model.isAuthenticating }
+        XCTAssertTrue(store.isBiometricUnlockEnabled)
+        XCTAssertEqual(biometrics.authenticateCalls, 2)
+        biometrics.isAvailable = false
+        model.refreshBiometricAvailability()
+        XCTAssertTrue(model.isBiometricUnlockEnabled)
+        XCTAssertFalse(model.isBiometricUnlockAvailable)
+        model.setBiometricUnlockEnabled(false)
+        XCTAssertFalse(makeModel(store, biometrics).isBiometricUnlockEnabled)
+    }
+
+    func testCancelledSettingsIgnoreLateBiometricSuccess() async throws {
+        let store = InMemoryDemoPinStore()
+        try await store.setPin("1234")
+        let gate = DemoBiometricTestGate()
+        let biometrics = FakeDemoBiometricAuthenticator(gate: gate)
+        let model = makeModel(store, biometrics)
+        model.updatePin("1234")
+        try await waitUntil { model.auth == .unlocked }
+        model.setBiometricUnlockEnabled(true)
+        try await waitUntil { biometrics.authenticateCalls == 1 }
+        model.cancelPinChange()
+        await gate.complete(.succeeded)
+        await Task.yield()
+        XCTAssertFalse(store.isBiometricUnlockEnabled)
+        XCTAssertFalse(model.isAuthenticating)
+    }
+
+    private func makeModel(_ store: DemoPinStore, _ biometrics: any DemoBiometricAuthenticator) -> WalletViewModel {
+        WalletViewModel(walletID: "pin-\(UUID().uuidString)", walletClient: MockWalletClient(),
+            identityDocumentRegistrationUpdate: {}, pinStore: store, biometricAuthenticator: biometrics)
     }
 
     func testBiometricUnlockSkipsPinWhenEnabled() async throws {
@@ -168,6 +494,11 @@ final class WalletViewModelPinTests: XCTestCase {
         try await waitUntil { !viewModel.isAuthenticating }
         XCTAssertEqual(viewModel.auth, .login)
         XCTAssertFalse(viewModel.isReady)
+        XCTAssertFalse(viewModel.shouldPromptBiometricUnlock)
+        viewModel.handleApplicationBecameActive()
+        viewModel.promptBiometricUnlockIfNeeded()
+        await Task.yield()
+        XCTAssertEqual(biometrics.authenticateCalls, 1)
 
         viewModel.pin = "1234"
         viewModel.submitPin()
@@ -175,14 +506,37 @@ final class WalletViewModelPinTests: XCTestCase {
         XCTAssertEqual(viewModel.auth, .unlocked)
     }
 
-    func testLockDoesNotAutoPromptBiometrics() async throws {
+    func testBiometricsOwnUnlockUntilDeclineMakesPinFallbackAvailable() async throws {
+        let store = InMemoryDemoPinStore()
+        try await store.setPin("1234")
+        store.isBiometricUnlockEnabled = true
+        let gate = DemoBiometricTestGate()
+        let biometrics = FakeDemoBiometricAuthenticator(gate: gate)
+        let model = makeModel(store, biometrics)
+        XCTAssertTrue(model.shouldPromptBiometricUnlock)
+        model.promptBiometricUnlockIfNeeded()
+        XCTAssertTrue(model.isAuthenticating)
+        XCTAssertFalse(model.shouldPromptBiometricUnlock)
+        try await waitUntil { biometrics.authenticateCalls == 1 }
+        model.handleApplicationBecameActive()
+        XCTAssertEqual(biometrics.authenticateCalls, 1)
+        await gate.complete(.failed)
+        try await waitUntil { !model.isAuthenticating }
+        XCTAssertEqual(model.auth, .login)
+        XCTAssertFalse(model.shouldPromptBiometricUnlock)
+        model.promptBiometricUnlockIfNeeded()
+        await Task.yield()
+        XCTAssertEqual(biometrics.authenticateCalls, 1)
+    }
+
+    func testNewUnlockAttemptPromptsBiometricsOnceAfterLock() async throws {
         let pinStore = InMemoryDemoPinStore()
         try await pinStore.setPin("1234")
         pinStore.isBiometricUnlockEnabled = true
         let biometrics = FakeDemoBiometricAuthenticator()
         let walletClient = MockWalletClient()
         let viewModel = WalletViewModel(
-            walletID: "pin-lock-no-auto-\(UUID().uuidString)",
+            walletID: "pin-lock-biometric-\(UUID().uuidString)",
             walletClient: walletClient,
             identityDocumentRegistrationUpdate: {},
             pinStore: pinStore,
@@ -197,13 +551,11 @@ final class WalletViewModelPinTests: XCTestCase {
 
         viewModel.lock()
         XCTAssertEqual(viewModel.auth, .login)
+        XCTAssertTrue(viewModel.shouldPromptBiometricUnlock)
         viewModel.promptBiometricUnlockIfNeeded()
+        // Disappearing access settings belong to the previous unlocked session.
+        viewModel.cancelPinChange()
         viewModel.handleApplicationBecameActive()
-        await Task.yield()
-        XCTAssertEqual(biometrics.authenticateCalls, 1)
-        XCTAssertEqual(viewModel.auth, .login)
-
-        viewModel.unlockWithBiometrics(force: true)
         try await waitUntil { viewModel.auth == .unlocked }
         XCTAssertEqual(biometrics.authenticateCalls, 2)
         XCTAssertTrue(viewModel.isReady)
@@ -211,7 +563,7 @@ final class WalletViewModelPinTests: XCTestCase {
         XCTAssertEqual(bootstrapCallsAfterForcedUnlock, bootstrapCallsAfterUnlock)
     }
 
-    func testColdLaunchAutoPromptsBiometricsWithoutActiveScenePhase() async throws {
+    func testColdLaunchWaitsForPinHostThenPromptsBiometricsOnce() async throws {
         let pinStore = InMemoryDemoPinStore()
         try await pinStore.setPin("1234")
         pinStore.isBiometricUnlockEnabled = true
@@ -229,6 +581,9 @@ final class WalletViewModelPinTests: XCTestCase {
         XCTAssertEqual(biometrics.authenticateCalls, 0)
 
         viewModel.handleApplicationBecameActive()
+        XCTAssertEqual(biometrics.authenticateCalls, 0)
+        viewModel.promptBiometricUnlockIfNeeded()
+        viewModel.promptBiometricUnlockIfNeeded()
         try await waitUntil { viewModel.auth == .unlocked && viewModel.isReady }
 
         XCTAssertEqual(biometrics.authenticateCalls, 1)
@@ -247,10 +602,9 @@ final class WalletViewModelPinTests: XCTestCase {
 
         XCTAssertEqual(viewModel.auth, .setup)
         XCTAssertTrue(viewModel.isBiometricUnlockAvailable)
-        XCTAssertFalse(viewModel.useBiometrics)
     }
 
-    func testFreshSignupKeepsBiometricToggleDisabledWhenUnavailable() {
+    func testFreshSignupReportsBiometricsUnavailable() {
         let biometrics = FakeDemoBiometricAuthenticator(isAvailable: false)
         let viewModel = WalletViewModel(
             walletID: "pin-signup-unavailable-\(UUID().uuidString)",
@@ -279,17 +633,65 @@ final class WalletViewModelPinTests: XCTestCase {
 }
 
 final class FakeDemoBiometricAuthenticator: DemoBiometricAuthenticator {
+    var availability: DemoBiometricAvailability { isAvailable ? .available : unavailableReason }
+    var unavailableReason: DemoBiometricAvailability = .unavailable
+    var kind: DemoBiometricKind = .generic
     var isAvailable: Bool
     var result: DemoBiometricResult
     private(set) var authenticateCalls = 0
+    let gate: DemoBiometricTestGate?
 
-    init(isAvailable: Bool = true, result: DemoBiometricResult = .succeeded) {
+    init(isAvailable: Bool = true, result: DemoBiometricResult = .succeeded, gate: DemoBiometricTestGate? = nil) {
         self.isAvailable = isAvailable
         self.result = result
+        self.gate = gate
     }
 
     func authenticate(reason: String) async -> DemoBiometricResult {
         authenticateCalls += 1
+        if let gate { return await gate.wait() }
         return result
     }
+}
+
+actor DemoBiometricTestGate {
+    private var result: DemoBiometricResult?
+    private var continuation: CheckedContinuation<DemoBiometricResult, Never>?
+
+    func wait() async -> DemoBiometricResult {
+        if let result { return result }
+        return await withCheckedContinuation { continuation = $0 }
+    }
+
+    func complete(_ result: DemoBiometricResult) {
+        self.result = result
+        continuation?.resume(returning: result)
+        continuation = nil
+    }
+}
+
+private final class FailingDemoPinStore: DemoPinStore {
+    let store = InMemoryDemoPinStore()
+    var fail = true
+    var failVerification = false
+    private(set) var saves = 0
+    var hasPin: Bool { store.hasPin }
+    var isBiometricUnlockEnabled: Bool {
+        get { store.isBiometricUnlockEnabled }
+        set { store.isBiometricUnlockEnabled = newValue }
+    }
+    var isBiometricSetupPending: Bool {
+        get { store.isBiometricSetupPending }
+        set { store.isBiometricSetupPending = newValue }
+    }
+    func setPin(_ pin: String) async throws {
+        if fail { throw DemoPinRecordError.derivationFailed }
+        saves += 1
+        try await store.setPin(pin)
+    }
+    func verifyPin(_ pin: String) async throws -> Bool {
+        if failVerification { throw DemoPinRecordError.invalidRecord }
+        return await store.verifyPin(pin)
+    }
+    func clear() { store.clear() }
 }

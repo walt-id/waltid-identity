@@ -92,7 +92,8 @@ fun createAndroidDemoWallet(
 
     return LazyProximityDemoWallet {
         createAndroidDemoMobileWallet(context, config, interactionContextProvider).let { created ->
-            MobileDemoWallet(created.wallet, warning = created.transactionDataProfilesWarning)
+            MobileDemoWallet(created.wallet, warning = created.transactionDataProfilesWarning,
+                preferredSigningProtection = config.signingProtectionMode.defaultSelection)
         }
     }
 }

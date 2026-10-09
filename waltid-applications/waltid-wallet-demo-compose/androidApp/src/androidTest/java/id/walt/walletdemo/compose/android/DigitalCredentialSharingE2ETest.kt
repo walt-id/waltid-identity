@@ -402,20 +402,15 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                         message = "SCA payment currency missing from the wallet review",
                     )
                     // The review received both credentials, not just the one the prompt was built from.
-                    // Open the exact age credential and assert its requested disclosure: a card can also
-                    // appear when the platform offered a credential without selecting claims.
-                    clickByTag(
-                        device = device,
-                        tag = WalletDemoSharingReviewTestTags.credentialCard(
-                            queryId = AGE_CREDENTIAL_QUERY_ID,
-                            credentialId = ageCredentialId,
-                        ),
-                    )
+                    // Check the exact age candidate and its disclosure directly in the consent review.
                     assertNotNull(
-                        "Age credential claims dialog did not open",
+                        "Age credential is missing from the wallet review",
                         waitForResource(
                             device = device,
-                            tag = WalletDemoSharingReviewTestTags.ClaimsDialog,
+                            tag = WalletDemoSharingReviewTestTags.credentialRow(
+                                queryId = AGE_CREDENTIAL_QUERY_ID,
+                                credentialId = ageCredentialId,
+                            ),
                             timeoutMs = UI_ELEMENT_TIMEOUT,
                         ),
                     )
@@ -424,7 +419,6 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                         substring = AGE_DISCLOSURE_LABEL,
                         message = "Review did not receive the second credential",
                     )
-                    clickByTag(device, WalletDemoSharingReviewTestTags.ClaimsCloseButton)
                 },
             )
 

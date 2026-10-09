@@ -1,6 +1,9 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,9 +13,11 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -22,7 +27,12 @@ import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationContinuation
 import id.walt.walletdemo.compose.logic.isBusy
+import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.logic.canDismissExternalFlow
+import id.walt.walletdemo.compose.ui.components.WalletIcon
+import id.walt.walletdemo.compose.ui.components.WalletSymbol
 import id.walt.walletdemo.compose.ui.screens.PinScreen
+import id.walt.walletdemo.compose.ui.screens.BiometricSetupScreen
 import id.walt.walletdemo.compose.ui.screens.PinStorageUnavailableScreen
 import id.walt.walletdemo.compose.ui.screens.WalletScreen
 
@@ -65,6 +75,7 @@ internal fun WalletDemoAppHost(
     serverSettingsContent: (@Composable () -> Unit)? = null,
 ) {
     val state by controller.state.collectAsState()
+    LaunchedEffect(state.externalFlow, state.auth, state.session, state.isBusy) { controller.prepareExternalFlow() }
     PresentationContinuationEffect(
         continuation = state.pendingPresentationContinuation?.continuation,
         onCompleted = controller::completePresentationContinuation,
@@ -86,6 +97,10 @@ internal fun WalletDemoAppHost(
                     ),
             ) {
                 when (val auth = state.auth) {
+                    is WalletAuthState.BiometricSetup -> BiometricSetupScreen(
+                        auth, state.isAuthenticating, state.access.biometricAvailability,
+                        controller::retryBiometricSetup, controller::continueWithoutBiometrics, state.access.biometricKind,
+                    )
                     is WalletAuthState.PinEntry -> Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -93,9 +108,7 @@ internal fun WalletDemoAppHost(
                     ) {
                         PinScreen(
                             controller = controller,
-                            auth = auth,
-                            isBusy = state.isBusy,
-                            biometricAvailable = state.biometricUnlockAvailable,
+                            access = state.access,
                         )
                     }
                     is WalletAuthState.StorageUnavailable -> Box(
@@ -124,7 +137,18 @@ internal fun WalletDemoAppHost(
                         serverSettingsContent = serverSettingsContent,
                     )
                 }
+                if (state.externalFlow != null && (state.auth != WalletAuthState.Unlocked || state.session !is WalletSessionState.Ready)) {
+                    IconButton(onClick = { controller.closeExternalFlow() }, enabled = state.canDismissExternalFlow,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).testTag("wallet.external.close")) {
+                        WalletIcon(WalletSymbol.Decline, "Close pending request")
+                    }
+                }
             }
+        }
+        state.incomingLinkNotice?.let { notice ->
+            AlertDialog(onDismissRequest = controller::dismissIncomingLinkNotice,
+                title = { Text("Request already in progress") }, text = { Text(notice) },
+                confirmButton = { TextButton(onClick = controller::dismissIncomingLinkNotice) { Text("OK") } })
         }
         state.signingProtectionWarning?.let { warning ->
             AlertDialog(

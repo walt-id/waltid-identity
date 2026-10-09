@@ -4,28 +4,38 @@ import WalletSDK
 
 struct ReceiveView: View {
     @ObservedObject var viewModel: WalletViewModel
-    let onOpenSettings: () -> Void
     var onBack: (() -> Void)? = nil
     @Environment(\.openURL) private var openURL
-    @Environment(\.walletDemoBranding) private var branding
 
     var body: some View {
-        NavigationView {
+        WalletNavigationContainer {
             Group {
-                if let preview = viewModel.offerPreview {
+                if case .unavailableCallback = viewModel.externalFlow {
+                    Text("The original receiving session is no longer available. Check your wallet before starting again.")
+                        .padding(20).accessibilityIdentifier("wallet.external.unavailable")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                } else if let preview = viewModel.offerPreview {
                     reviewContent(preview: preview)
+                } else if viewModel.issuanceReceipt != nil || !viewModel.deferredCredentials.isEmpty {
+                    resultContent
                 } else {
-                    entryContent
+                    WalletRequestStatus(viewModel: viewModel, tab: .receive,
+                        onRetry: viewModel.previewOffer, onClose: finishReceiving)
                 }
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("Receive credentials")
+            .navigationTitle(viewModel.offerPreview == nil && (viewModel.issuanceReceipt != nil || !viewModel.deferredCredentials.isEmpty)
+                ? "Receiving result" : "Receive credentials")
             .navigationBarTitleDisplayMode(.inline)
-            .walletFlowToolbar(onBack: onBack, backEnabled: !viewModel.isLoading, onOpenSettings: onOpenSettings)
+            .walletFlowToolbar(onBack: onBack, backEnabled: viewModel.externalFlow != nil ? viewModel.canDismissExternalFlow : !viewModel.isLoading,
+                external: viewModel.externalFlow != nil)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
         }
-        .navigationViewStyle(.stack)
+        .walletDetailDismissal(perform: onBack,
+            enabled: viewModel.externalFlow != nil ? viewModel.canDismissExternalFlow : !viewModel.isLoading,
+            identifier: viewModel.externalFlow != nil ? "wallet.external.close" : "wallet.flowBack")
+        .id(viewModel.receiveNavigationResetKey)
         .onChange(of: viewModel.authorizationRequestURL) { authorizationURL in
             guard let authorizationURL else { return }
             openURL(authorizationURL)
@@ -33,62 +43,27 @@ struct ReceiveView: View {
         }
     }
 
-    private var entryContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
-
-                ScannableUrlEditor(
-                    title: "Receive",
-                    label: "Credential offer URL",
-                    text: $viewModel.offerUrl,
-                    inputIdentifier: WalletAccessibilityID.offerInput,
-                    scanButtonIdentifier: WalletAccessibilityID.offerScanButton,
-                    isEnabled: viewModel.receiveUrlEntryEnabled,
-                    focusResetKey: viewModel.inputFocusResetKey
-                )
-
-                Button("Receive") {
-                    viewModel.previewOffer()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(branding.primary)
-                .disabled(!viewModel.receiveActionEnabled)
-                .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
-
-                deferredCredentials
-            }
-            .padding()
-        }
-    }
-
     private func reviewContent(preview: IssuanceOfferPreview) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
+        WalletReviewScaffold {
+            WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
+            OfferReviewView(
+                preview: preview,
+                isAcceptEnabled: viewModel.acceptOfferEnabled,
+                isReviewEnabled: viewModel.offerReviewEnabled,
+                copies: viewModel.issuanceCopyCounts,
+                onCopiesChange: viewModel.updateIssuanceCopies,
+                txCode: viewModel.txCode,
+                onTxCodeChange: viewModel.updateTxCode,
+                onAccept: viewModel.acceptOffer,
+                onDecline: viewModel.declineOffer,
+                showActions: false
+            )
 
-                OfferReviewView(
-                    preview: preview,
-                    isAcceptEnabled: viewModel.acceptOfferEnabled,
-                    isReviewEnabled: viewModel.offerReviewEnabled,
-                    copies: viewModel.issuanceCopyCounts,
-                    onCopiesChange: viewModel.updateIssuanceCopies,
-                    txCode: viewModel.txCode,
-                    onTxCodeChange: viewModel.updateTxCode,
-                    onAccept: viewModel.acceptOffer,
-                    onDecline: viewModel.declineOffer,
-                    showActions: false
-                )
-
-                if let warning = viewModel.transactionDataProfilesWarning {
-                    WarningBannerView(message: warning)
-                }
-
-                deferredCredentials
+            if let warning = viewModel.transactionDataProfilesWarning {
+                WarningBannerView(message: warning)
             }
-            .padding()
-        }
-        .safeAreaInset(edge: .bottom) {
+
+        } actions: {
             OfferReviewActions(
                 requiresIssuerAuthentication: preview.grant == .authorizationCode,
                 isAcceptEnabled: viewModel.acceptOfferEnabled,
@@ -96,24 +71,33 @@ struct ReceiveView: View {
                 onAccept: viewModel.acceptOffer,
                 onDecline: viewModel.declineOffer
             )
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.bar)
         }
     }
 
-    @ViewBuilder
-    private var deferredCredentials: some View {
-        if !viewModel.deferredCredentials.isEmpty {
-            Text("Pending credentials")
-                .font(.subheadline.weight(.semibold))
-            ForEach(viewModel.deferredCredentials, id: \.id) { credential in
-                Button("Check \(credential.credentialConfigurationID ?? "credential")") {
-                    viewModel.resumeDeferredCredential(credential)
-                }
-                .buttonStyle(.bordered)
-                .disabled(viewModel.isLoading)
-            }
+    private var pendingCredentials: [DeferredCredential] {
+        viewModel.deferredCredentials.filter { viewModel.issuanceReceipt?.pendingIDs.contains($0.id) ?? true }
+    }
+
+    private var resultContent: some View {
+        WalletReviewScaffold {
+            WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
+            IssuanceResultContent(receipt: viewModel.issuanceReceipt, saved: viewModel.receivedCredentials,
+                pending: pendingCredentials,
+                busy: viewModel.isLoading, onResume: viewModel.resumeDeferredCredential)
+        } actions: {
+            WalletActions(primary: WalletAction("Done", enabled: !viewModel.isLoading, identifier: "issuance-done") {
+                finishReceiving()
+            }, secondary: pendingCredentials.isEmpty ? nil : WalletAction("Refresh status",
+                enabled: !viewModel.isLoading, identifier: "issuance-refresh", perform: viewModel.refreshIssuanceStatus))
         }
+        .walletSuccessDismissal(key: viewModel.receiveNavigationResetKey,
+            enabled: viewModel.receiveCompleted && !viewModel.isLoading && !viewModel.statusIsError(for: .receive)
+                && viewModel.issuanceReceipt?.problem == nil && pendingCredentials.isEmpty
+                && !viewModel.receivedCredentials.isEmpty, onDone: finishReceiving)
+    }
+
+    private func finishReceiving() {
+        if viewModel.externalFlow != nil { viewModel.closeExternalFlow() }
+        else { viewModel.selectedTab = .credentials }
     }
 }

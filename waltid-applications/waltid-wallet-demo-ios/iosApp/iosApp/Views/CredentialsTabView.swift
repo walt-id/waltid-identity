@@ -10,11 +10,10 @@ struct CredentialsTabView: View {
     let onOpenSettings: () -> Void
     var onScan: (() -> Void)? = nil
     var onShareNearby: (() -> Void)? = nil
+    var nearbyPreparing = false
+    var nearbyEnabled = true
     @Environment(\.walletDemoBranding) private var branding
-    @State private var othersHidden = false
-    @State private var selectedAtTop = false
-    @State private var showDetailsBody = false
-    @State private var motionGeneration = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var confirmDelete = false
 
     @State private var expanded: CredentialDetails?
@@ -29,11 +28,18 @@ struct CredentialsTabView: View {
     }
 
     var body: some View {
-        NavigationView {
+        WalletNavigationContainer {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if selectedDetailsID == nil {
-                        WalletTabStatusBanner(viewModel: viewModel, tab: .credentials)
+                        if !viewModel.deferredCredentials.isEmpty {
+                            WalletSection {
+                                WalletNavigationRow(String(format: String(localized: "Pending · %d"), viewModel.deferredCredentials.count)) {
+                                    viewModel.startNewReceiveFlow()
+                                    viewModel.selectedTab = .receive
+                                }.accessibilityIdentifier("issuance-pending-work")
+                            }
+                        }
 
                         if let warning = viewModel.transactionDataProfilesWarning {
                             WarningBannerView(message: warning)
@@ -54,8 +60,8 @@ struct CredentialsTabView: View {
                         CredentialCardStackView(
                             cards: cards,
                             expandedID: selectedDetailsID,
-                            othersHidden: othersHidden,
-                            selectedAtTop: selectedAtTop
+                            othersHidden: selectedDetailsID != nil,
+                            selectedAtTop: selectedDetailsID != nil
                         ) { id in
                             if selectedDetailsID == id {
                                 closeDetails()
@@ -64,10 +70,10 @@ struct CredentialsTabView: View {
                             }
                         }
 
-                        if showDetailsBody, let expanded {
+                        if selectedDetailsID != nil, let expanded, expanded.id == selectedDetailsID {
                             CredentialDetailsView(details: expanded)
                             .transition(.opacity)
-                        } else if showDetailsBody, selectedCredential != nil {
+                        } else if selectedCredential != nil {
                             ProgressView("Loading details…")
                         }
                     }
@@ -75,28 +81,18 @@ struct CredentialsTabView: View {
                 .padding(.horizontal)
                 .padding(.top, 8)
                 .padding(.bottom)
-                .animation(.easeOut(duration: 0.16), value: showDetailsBody)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: expanded?.id)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if selectedDetailsID == nil { WalletTabFeedback(viewModel: viewModel, tab: .credentials) }
             }
             .background(Color(.systemGroupedBackground))
-            .animation(.easeOut(duration: 0.2), value: selectedDetailsID)
+            .animation(WalletMotion.navigation(reduceMotion: reduceMotion), value: selectedDetailsID)
             .navigationTitle(selectedDetailsID == nil ? branding.appTitle : "")
             .accessibilityIdentifier(WalletAccessibilityID.appTitle)
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(selectedDetailsID != nil)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Group {
-                        if selectedDetailsID != nil {
-                            Button {
-                                closeDetails()
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 14, weight: .semibold))
-                            }
-                            .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
-                        }
-                    }
-                }
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Group {
                         if selectedDetailsID != nil {
@@ -114,10 +110,20 @@ struct CredentialsTabView: View {
                                     .font(.system(size: 16, weight: .semibold))
                             }
                             .accessibilityIdentifier(WalletAccessibilityID.detailsMenu)
+                            Button(action: closeDetails) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .accessibilityLabel("Close credential information")
+                            .frame(minWidth: 44, minHeight: 44)
+                            .accessibilityIdentifier(WalletAccessibilityID.detailsBack)
                         } else {
                             if let onShareNearby {
-                                Button(action: onShareNearby) { Image(systemName: "dot.radiowaves.left.and.right") }
-                                    .accessibilityLabel("Share nearby")
+                                Button(action: onShareNearby) {
+                                    WalletToolbarIcon("dot.radiowaves.left.and.right", isBusy: nearbyPreparing)
+                                }
+                                    .accessibilityLabel(nearbyPreparing ? "Cancel starting nearby sharing" : "Share nearby")
+                                    .disabled(!nearbyEnabled)
                                     .accessibilityIdentifier(WalletAccessibilityID.proximityStartButton)
                             }
                             if let onScan {
@@ -145,11 +151,7 @@ struct CredentialsTabView: View {
             ) {
                 Button("Delete", role: .destructive) {
                     if let id = selectedDetailsID {
-                        motionGeneration += 1
                         selectedDetailsID = nil
-                        showDetailsBody = false
-                        othersHidden = false
-                        selectedAtTop = false
                         viewModel.deleteCredential(id: id)
                     }
                 }
@@ -158,7 +160,6 @@ struct CredentialsTabView: View {
                 Text("This removes the credential from the wallet. This cannot be undone.")
             }
         }
-        .navigationViewStyle(.stack)
         .task(id: selectedCredential) {
             expanded = nil
             guard let selectedCredential else { return }
@@ -169,46 +170,11 @@ struct CredentialsTabView: View {
     }
 
     private func openDetails(_ id: String) {
-        motionGeneration += 1
-        let generation = motionGeneration
-        selectedDetailsID = id
-        showDetailsBody = false
-        selectedAtTop = false
-        withAnimation(.easeOut(duration: 0.22)) {
-            othersHidden = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            guard generation == motionGeneration, selectedDetailsID == id else { return }
-            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
-                selectedAtTop = true
-            }
-            withAnimation(.easeIn(duration: 0.16)) {
-                showDetailsBody = true
-            }
-        }
+        expanded = nil
+        withAnimation(WalletMotion.navigation(reduceMotion: reduceMotion)) { selectedDetailsID = id }
     }
 
-    private func closeDetails(resetSelection: Bool = true) {
-        guard selectedDetailsID != nil else { return }
-        motionGeneration += 1
-        let generation = motionGeneration
-        withAnimation(.easeOut(duration: 0.2)) {
-            showDetailsBody = false
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            guard generation == motionGeneration else { return }
-            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
-                selectedAtTop = false
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.38) {
-                guard generation == motionGeneration else { return }
-                withAnimation(.easeIn(duration: 0.22)) {
-                    othersHidden = false
-                }
-                if resetSelection {
-                    selectedDetailsID = nil
-                }
-            }
-        }
+    private func closeDetails() {
+        withAnimation(WalletMotion.navigation(reduceMotion: reduceMotion)) { selectedDetailsID = nil }
     }
 }

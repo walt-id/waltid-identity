@@ -21,6 +21,8 @@ sealed interface WalletDemoIdentitySetup {
         val message: String? = null,
         val recoveryStorageNotice: String? = null,
         val recoveryUnavailableReasons: List<String> = emptyList(),
+        val preferredApproval: WalletDemoKeyChoice? = null,
+        val existingKeyUnavailable: Boolean = false,
     ) : WalletDemoIdentitySetup
     data class Pending(val identityId: String, val explanation: String, val canRetry: Boolean) : WalletDemoIdentitySetup
 }
@@ -69,3 +71,12 @@ internal class WalletDemoKeyOperationException(message: String) : IllegalStateEx
 internal fun keyOperationFailure(cause: Throwable): String =
     (cause as? WalletDemoKeyOperationException)?.message
         ?: "Could not complete the signing-key operation. Check device and backup availability, then try again."
+
+/** Resolve display configuration while retaining the requested approval separately.
+ * An unavailable requested approval must never authorize this fallback option. */
+fun resolveKeySetupOption(options: List<WalletDemoKeySetupOption>, recoveryId: String?, storageId: String?,
+    approvalId: String?): WalletDemoKeySetupOption? {
+    val recovery = options.filter { it.recovery.id == recoveryId }.ifEmpty { options }
+    val storage = recovery.filter { it.storage.id == storageId }.ifEmpty { recovery }
+    return storage.firstOrNull { it.approval.id == approvalId } ?: storage.firstOrNull()
+}

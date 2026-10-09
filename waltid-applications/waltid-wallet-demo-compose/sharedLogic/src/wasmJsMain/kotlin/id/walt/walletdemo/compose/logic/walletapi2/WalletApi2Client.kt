@@ -10,6 +10,7 @@ import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -35,7 +36,17 @@ internal class WalletApi2Client(
     private val token: String,
     private val kind: WalletApiKind = WalletApiKind.OpenSource,
     private val http: HttpClient = authenticatedHttpClient(baseUrl, token),
+    private val onSessionExpired: () -> Unit = {},
 ) {
+    private var expiryReported = false
+
+    private fun checkSession(response: HttpResponse) {
+        if (response.status == HttpStatusCode.Unauthorized && !expiryReported) {
+            expiryReported = true
+            onSessionExpired()
+        }
+    }
+
     suspend fun listWallets(): List<String> {
         require(kind.canManageWallet) { "This API does not list wallets directly" }
         return request { get("/wallet") }.body()
@@ -118,6 +129,7 @@ internal class WalletApi2Client(
     suspend fun deleteCredential(walletId: String, credentialId: String): Boolean {
         require(kind.canDeleteCredential) { "This API does not delete credentials" }
         val response = http.delete(walletPath(walletId, "credentials/$credentialId"))
+        checkSession(response)
         return when (response.status) {
             HttpStatusCode.NoContent -> true
             HttpStatusCode.NotFound -> false
@@ -183,7 +195,9 @@ internal class WalletApi2Client(
         }
 
     suspend fun listDeferred(walletId: String): List<DeferredCredentialHandleDto> =
-        request { get(walletPath(walletId, "credentials/receive/deferred")) }.body()
+        request {
+            get(walletPath(walletId, "credentials/receive/deferred")) { parameter("includeDetails", true) }
+        }.body()
 
     suspend fun resumeDeferred(walletId: String, deferredCredentialId: String): DeferredIssuanceOutcomeDto =
         request {
@@ -192,6 +206,7 @@ internal class WalletApi2Client(
 
     private suspend fun receiveResult(block: suspend HttpClient.() -> HttpResponse): ReceiveCredentialResultDto {
         val response = http.block()
+        checkSession(response)
         if (response.status.isSuccess()) return response.body()
         val body = response.bodyAsText()
         if (response.status.value in setOf(422, 500, 502)) {
@@ -255,6 +270,7 @@ internal class WalletApi2Client(
         block: suspend HttpClient.() -> HttpResponse,
     ): HttpResponse {
         val response = http.block()
+        checkSession(response)
         val ok = expected?.let { response.status == it } ?: response.status.isSuccess()
         if (!ok) throw response.toApiException()
         return response

@@ -1,126 +1,136 @@
 import SwiftUI
+import UIKit
 import WalletDemoSharingUI
 
 struct PinView: View {
     @ObservedObject var viewModel: WalletViewModel
     @Environment(\.walletDemoBranding) private var branding
-    @FocusState private var focusedInput: Input?
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var inputFocused = false
+    @State private var focusRequest = 0
+    @State private var previousStage = 0
+    @State private var forward = true
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                Text(branding.appTitle).font(.title2.weight(.semibold))
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(isSetup ? "Create a PIN" : "Enter your PIN").font(.largeTitle.weight(.bold))
-                    Text(isSetup ? "Choose four digits and enter them again to confirm."
-                         : "Enter your PIN to unlock this wallet.").foregroundColor(.secondary)
-                }
-                WalletSection {
-                    VStack(alignment: .leading, spacing: 12) {
-                        pinInput(.pin, label: "PIN", identifier: WalletAccessibilityID.pinInput)
-                        if isSetup {
-                            pinInput(.confirmation, label: "Confirm PIN", identifier: WalletAccessibilityID.pinConfirmationInput)
-                        }
-                    }
-                    .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(viewModel.isAuthenticating)
-                    .padding(16)
-                }
-                if isSetup {
-                    WalletSection {
-                        Toggle(isOn: Binding(get: { viewModel.useBiometrics }, set: { enabled in
-                            focusedInput = nil
-                            viewModel.updateUseBiometrics(enabled)
-                        })) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Use biometric unlock")
-                                Text(biometricDescription).font(.footnote).foregroundStyle(.secondary)
-                            }
-                        }
-                        .disabled(!viewModel.isBiometricUnlockAvailable || viewModel.isAuthenticating)
-                        .accessibilityIdentifier(WalletAccessibilityID.pinBiometricToggle)
-                        .padding(16)
-                    }
-                }
-                if viewModel.isAuthenticating { ProgressView("Authenticating…") }
-                if let error = viewModel.pinError {
-                    Text(error).foregroundColor(.red)
-                }
+        WalletAccessScaffold {
+            Text(changing ? "Change PIN" : branding.appTitle).font(.title2.weight(.semibold))
+            ZStack(alignment: .leading) {
+                heading.id(stage)
+                    .transition(WalletMotion.page(forward: forward, reduceMotion: reduceMotion))
             }
-            .frame(maxWidth: 640, alignment: .leading)
-            .padding(20)
-            .frame(maxWidth: .infinity)
+            .animation(WalletMotion.navigation(reduceMotion: reduceMotion), value: stage)
+            .padding(.top, 24)
+            .frame(minHeight: 120, alignment: .top)
+            .clipped()
+        } input: {
+            WalletPinInput(value: pinBinding, label: confirming ? "Confirm PIN" : "PIN",
+                digitCount: WalletViewModel.pinLength, isEnabled: !viewModel.isAuthenticating,
+                isError: error != nil,
+                identifier: confirming ? WalletAccessibilityID.pinConfirmationInput : WalletAccessibilityID.pinInput,
+                focus: $inputFocused, onSubmit: { if value.count == WalletViewModel.pinLength { viewModel.submitPin() } })
+        } feedback: {
+            if viewModel.access.operation == .checkingPin || viewModel.access.operation == .savingPin {
+                ProgressView().accessibilityLabel("Checking PIN")
+            } else if let pinError = viewModel.pinError {
+                Text(pinError).font(.callout).foregroundStyle(.red)
+            } else if !changing && viewModel.auth == .login && viewModel.isBiometricUnlockEnabled && !viewModel.isBiometricUnlockAvailable {
+                BiometricRecoverySection(availability: viewModel.access.biometricAvailability, kind: viewModel.access.biometricKind, showSettingsAction: false)
+            } else if let error {
+                Text(error).font(.callout).foregroundStyle(.red)
+            }
+        } actions: {
+            WalletActions(primary: retryAction,
+                secondary: biometricAction ?? biometricSettingsAction ?? clearAction,
+                tertiary: biometricAction != nil || biometricSettingsAction != nil ? clearAction : backAction)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            WalletActionBar(primary: primary, secondary: secondary)
-        }
-        .walletScrollDismissesKeyboard()
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                if isSetup && focusedInput == .pin {
-                    Button("Next") { focusedInput = .confirmation }
-                }
-                Button("Done") { focusedInput = nil }
+        .task(id: scenePhase) {
+            if scenePhase == .active && !changing {
+                viewModel.refreshBiometricAvailability()
+                viewModel.promptBiometricUnlockIfNeeded()
             }
         }
-        .onAppear { viewModel.refreshBiometricAvailability() }
-    }
-
-    private var isSetup: Bool { viewModel.auth == .setup }
-    private enum Input { case pin, confirmation }
-
-    private func pinInput(_ input: Input, label: LocalizedStringKey, identifier: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label).font(.caption).foregroundStyle(.secondary).accessibilityHidden(true)
-            SecureField(label, text: pinBinding(for: input))
-                .focused($focusedInput, equals: input)
-                .accessibilityIdentifier(identifier)
+        .task(id: inputFocusRequest) {
+            guard scenePhase == .active, !biometricActive else { inputFocused = false; return }
+            inputFocused = true
+        }
+        .onAppear { previousStage = stage }
+        .onChange(of: stage) { next in forward = next > previousStage; previousStage = next }
+        .onChange(of: error) { message in
+            guard let message, UIAccessibility.isVoiceOverRunning else { return }
+            UIAccessibility.post(notification: .announcement, argument: NSAttributedString(string: message,
+                attributes: [.accessibilitySpeechQueueAnnouncement: true]))
         }
     }
 
-    private func pinBinding(for input: Input) -> Binding<String> {
-        Binding(get: { input == .confirmation ? viewModel.pinConfirmation : viewModel.pin }, set: { value in
-            let digits = String(value.filter { $0 >= "0" && $0 <= "9" }.prefix(WalletViewModel.pinLength))
-            guard digits != (input == .confirmation ? viewModel.pinConfirmation : viewModel.pin) else { return }
-            viewModel.pinError = nil
-            if input == .confirmation { viewModel.pinConfirmation = digits } else { viewModel.pin = digits }
+    private var changing: Bool { viewModel.access.pinChange != nil }
+    private var creating: Bool { viewModel.access.isCreatingPin }
+    private var confirming: Bool { creating && viewModel.pinSetupStep == .confirm }
+    private var value: String { confirming ? viewModel.pinConfirmation : viewModel.pin }
+    private var error: String? { viewModel.pinError ?? viewModel.access.biometricOutcome?.fallbackMessage }
+    private var biometricActive: Bool { viewModel.access.operation == .biometrics || viewModel.shouldPromptBiometricUnlock }
+    private var stage: Int { creating ? (confirming ? 3 : 2) : (changing ? 1 : 0) }
+    private struct FocusRequest: Equatable {
+        let stage: Int
+        let biometrics: Bool
+        let active: Bool
+        let request: Int
+    }
+    private var inputFocusRequest: FocusRequest {
+        FocusRequest(stage: stage, biometrics: biometricActive, active: scenePhase == .active, request: focusRequest)
+    }
+
+    private var heading: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if creating {
+                Text(confirming ? "Step 2 of 2" : "Step 1 of 2")
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(Color.accentColor)
+            }
+            Text(creating ? (confirming ? "Confirm your PIN" : changing ? "Choose a new PIN" : "Choose a PIN")
+                : changing ? "Enter your current PIN" : "Enter your PIN")
+                .font(.largeTitle.weight(.bold))
+        }
+    }
+
+    private var pinBinding: Binding<String> {
+        Binding(get: { value }, set: { input in
+            let digits = String(decoding: input.utf8.filter { (48...57).contains($0) }.prefix(WalletViewModel.pinLength), as: UTF8.self)
+            if confirming { viewModel.updatePinConfirmation(digits) } else { viewModel.updatePin(digits) }
         })
     }
 
-    private var biometricDescription: String {
-        if !viewModel.isBiometricUnlockAvailable { return "Biometrics are not available on this device." }
-        if viewModel.useBiometrics && !viewModel.isAuthenticating {
-            return "Biometrics enabled. Your PIN is always available as a fallback."
-        }
-        return "Use biometrics to open the app instead of typing the PIN. Signing approval is set up next."
-    }
-
-    private var primary: WalletAction {
-        WalletAction(isSetup ? "Create PIN" : "Unlock",
-            enabled: !viewModel.isAuthenticating && (!isSetup || (viewModel.pin.count == WalletViewModel.pinLength && viewModel.pinConfirmation.count == WalletViewModel.pinLength)),
-            identifier: WalletAccessibilityID.pinSubmitButton) {
-            focusedInput = nil
-            viewModel.submitPin()
+    private var clearAction: WalletAction {
+        WalletAction("Clear", enabled: !viewModel.isAuthenticating && (!value.isEmpty || error != nil), identifier: "wallet.pinClearButton") {
+            viewModel.clearPin(); focusRequest += 1
         }
     }
-
-    private var secondary: WalletAction? {
-        guard !isSetup && viewModel.isBiometricUnlockEnabled && viewModel.isBiometricUnlockAvailable else { return nil }
-        return WalletAction("Unlock with biometrics", enabled: !viewModel.isAuthenticating,
-                            identifier: WalletAccessibilityID.pinBiometricButton) {
-            focusedInput = nil
+    private var retryAction: WalletAction? {
+        guard case .retryPin = viewModel.access.operation else { return nil }
+        return WalletAction("Try again", identifier: WalletAccessibilityID.pinSubmitButton, perform: viewModel.submitPin)
+    }
+    private var backAction: WalletAction? {
+        if confirming || viewModel.access.pinChange == .newPin {
+            return WalletAction("Back", enabled: !viewModel.isAuthenticating, identifier: "wallet.pinBackButton", perform: viewModel.editSetupPin)
+        }
+        return nil
+    }
+    private var biometricSettingsAction: WalletAction? {
+        guard !changing, viewModel.auth == .login, viewModel.isBiometricUnlockEnabled,
+              viewModel.access.biometricAvailability.offersSettings else { return nil }
+        return WalletAction("Open Settings", enabled: !viewModel.isAuthenticating,
+            identifier: "wallet.biometricOpenSettings", perform: BiometricSettings.open)
+    }
+    private var biometricAction: WalletAction? {
+        guard !changing, viewModel.auth == .login, viewModel.isBiometricUnlockEnabled, viewModel.isBiometricUnlockAvailable else { return nil }
+        let label = switch viewModel.access.biometricKind {
+        case .faceID: "Try Face ID"
+        case .touchID: "Try Touch ID"
+        case .generic: "Try biometrics"
+        }
+        return WalletAction(label, enabled: !viewModel.isAuthenticating, identifier: WalletAccessibilityID.pinBiometricButton) {
+            inputFocused = false
             viewModel.unlockWithBiometrics(force: true)
         }
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func walletScrollDismissesKeyboard() -> some View {
-        if #available(iOS 16.0, *) { scrollDismissesKeyboard(.interactively) } else { self }
     }
 }
 

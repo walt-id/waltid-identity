@@ -1,8 +1,8 @@
 import SwiftUI
 import WalletSDK
 
-/// A compact sharing review, for hosts the operating system launched with no app chrome around
-/// them. It sizes to the heading, credential, and actions rather than filling the display.
+/// A sharing review for the bounded container supplied by an app or operating-system provider host.
+/// Long requests scroll independently of the pinned actions, including at large text sizes.
 ///
 /// It adds only what a standalone surface needs - a heading naming the request, a preparing state and
 /// a failure state - on top of ``SharingReviewView``. The
@@ -12,7 +12,6 @@ import WalletSDK
 /// Selection is owned by the caller rather than by this screen, because the caller is what has to
 /// submit it: in a provider extension the transport, the retained request handle and the platform
 /// result all live outside the view.
-@available(iOS 16.0, *)
 public struct SharingReviewScreen: View {
     private let title: String
     private let review: SharingReviewModel?
@@ -20,6 +19,7 @@ public struct SharingReviewScreen: View {
     private let selectionComplete: Bool
     private let failure: String?
     private let isSubmitting: Bool
+    private let paymentReview: PaymentReviewState
     private let onToggleCredential: (PresentationCredentialSelection) -> Void
     private let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
     private let onSubmit: () -> Void
@@ -41,6 +41,7 @@ public struct SharingReviewScreen: View {
         selectionComplete: Bool,
         failure: String? = nil,
         isSubmitting: Bool = false,
+        paymentReview: PaymentReviewState = .notRequired,
         onToggleCredential: @escaping (PresentationCredentialSelection) -> Void,
         onToggleDisclosure: @escaping (PresentationDisclosureSelection) -> Void,
         onSubmit: @escaping () -> Void,
@@ -53,6 +54,7 @@ public struct SharingReviewScreen: View {
         self.selectionComplete = selectionComplete
         self.failure = failure
         self.isSubmitting = isSubmitting
+        self.paymentReview = paymentReview
         self.onToggleCredential = onToggleCredential
         self.onToggleDisclosure = onToggleDisclosure
         self.onSubmit = onSubmit
@@ -61,35 +63,41 @@ public struct SharingReviewScreen: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(title)
-                    .font(.title2.weight(.semibold))
+        WalletNavigationContainer {
+            WalletReviewScaffold(showsActions: review != nil || failure != nil) {
                 content
+            } actions: {
+                if review != nil && failure == nil {
+                    ReviewActions(
+                        selectionComplete: selectionComplete,
+                        isLoading: isSubmitting,
+                        onSubmit: onSubmit,
+                        onReject: onReject,
+                        onCancel: onCancel,
+                        paymentReview: paymentReview, showCancelWithReject: false
+                    )
+                } else if let failure {
+                    Text(failure).font(.subheadline).foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
-            .padding(20)
-
-            if review != nil && failure == nil {
-                Divider()
-                ReviewActions(
-                    selectionComplete: selectionComplete,
-                    isLoading: isSubmitting,
-                    onSubmit: onSubmit,
-                    onReject: onReject,
-                    onCancel: onCancel
-                )
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
+            .navigationTitle(title).navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: onCancel) { Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44) }
+                        .accessibilityLabel("Close request").disabled(isSubmitting)
+                        .accessibilityIdentifier("wallet.flowBack")
+                }
             }
         }
-        .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
+        .interactiveDismissDisabled(isSubmitting)
     }
 
     @ViewBuilder
     private var content: some View {
-        if let failure {
-            SharingReviewFailureView(message: failure, onCancel: onCancel)
+        if failure != nil {
+            Label("Unable to share", systemImage: "exclamationmark.shield")
+                .font(.headline).accessibilityIdentifier(WalletAccessibilityID.presentationError)
         } else if let review {
             SharingReviewView(
                 review: review,
@@ -102,7 +110,8 @@ public struct SharingReviewScreen: View {
                 onReject: onReject,
                 onCancel: onCancel,
                 compact: true,
-                showActions: false
+                showActions: false,
+                paymentReview: paymentReview
             )
         } else {
             // No request content is shown while preparing: what a request asks for is only known once
@@ -111,25 +120,5 @@ public struct SharingReviewScreen: View {
                 .frame(maxWidth: .infinity, alignment: .center)
                 .accessibilityIdentifier(WalletAccessibilityID.presentationPreparing)
         }
-    }
-}
-
-/// Why the wallet will not continue, with the only action left.
-struct SharingReviewFailureView: View {
-    let message: String
-    let onCancel: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Unable to share", systemImage: "exclamationmark.shield")
-                .font(.headline)
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Button("Cancel", action: onCancel)
-                .buttonStyle(.bordered)
-                .accessibilityIdentifier(WalletAccessibilityID.presentationCancelButton)
-        }
-        .accessibilityIdentifier(WalletAccessibilityID.presentationError)
     }
 }

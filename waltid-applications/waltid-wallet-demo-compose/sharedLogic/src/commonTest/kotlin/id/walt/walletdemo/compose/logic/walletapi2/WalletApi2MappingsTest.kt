@@ -168,6 +168,21 @@ class WalletApi2MappingsTest {
     }
 
     @Test
+    fun retainedStatusIsExplicitAndStorageOnlyFailureIsNotReportedAsSuccess() {
+        val handle = walletApi2Json.decodeFromString<DeferredCredentialHandleDto>(
+            """{"id":"local-save","status":"AWAITING_LOCAL_SAVE","displayMetadataJson":"{}"}""")
+        assertEquals(id.walt.walletdemo.compose.logic.WalletDemoContinuationStatus.AwaitingLocalSave, handle.toDemoDeferred().status)
+        assertEquals("{}", handle.toDemoDeferred().displayMetadataJson)
+        val result = walletApi2Json.decodeFromString<ReceiveCredentialResultDto>("""
+            {"credentialIds":[],"storageOutcome":{"type":"failed","error":{"code":"STORAGE_OUTCOME_UNCERTAIN","message":"Saving was interrupted"}}}
+        """).toOutcome()
+        val failed = assertIs<WalletDemoIssuanceOutcome.Failed>(result)
+        assertEquals("Saving was interrupted", failed.message)
+        assertEquals(id.walt.walletdemo.compose.logic.WalletDemoIssuanceFailureKind.StorageOutcomeUncertain, failed.kind)
+        assertTrue(failed.offerConsumed)
+    }
+
+    @Test
     fun emptyDisclosureSelectionStaysEmpty() {
         assertEquals(
             emptyList(),

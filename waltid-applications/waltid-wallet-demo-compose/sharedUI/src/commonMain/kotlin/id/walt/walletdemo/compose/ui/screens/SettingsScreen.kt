@@ -17,9 +17,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
+import androidx.navigation3.ui.defaultPredictivePopTransitionSpec
+import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.ui.digitalCredentialsRequirements
 import id.walt.walletdemo.compose.ui.SystemBackHandler
@@ -29,8 +33,9 @@ import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
-private enum class SettingsDestination(val title: StringResource) {
+internal enum class SettingsDestination(val title: StringResource) {
     Main(Res.string.settings_title),
+    WalletAccess(Res.string.settings_wallet_access),
     SigningKey(Res.string.settings_signing_key),
     Technical(Res.string.settings_technical),
     Nearby(Res.string.settings_nearby),
@@ -60,29 +65,55 @@ internal fun SettingsScreen(
     resetWalletDescription: String? = null,
     allowWalletReset: Boolean = true,
     serverSettingsContent: (@Composable () -> Unit)? = null,
+    initialDestination: SettingsDestination = SettingsDestination.Main,
+    walletAccessContent: (@Composable () -> Unit)? = null,
+    onCancelPinChange: () -> Unit = {},
+    onClose: (() -> Unit)? = null,
+    closeEnabled: Boolean = true,
 ) {
     val currentState by rememberUpdatedState(state)
     val currentReaderPolicy by rememberUpdatedState(readerTrustPolicySummary)
+    val currentClose by rememberUpdatedState(onClose)
+    val currentCloseEnabled by rememberUpdatedState(closeEnabled)
     var deleteRecovery by remember { mutableStateOf<String?>(null) }
     var confirmReset by rememberSaveable { mutableStateOf(false) }
-    var path by rememberSaveable(stateSaver = listSaver(
+    var path by rememberSaveable(initialDestination, stateSaver = listSaver(
         save = { entries: List<SettingsDestination> -> entries.map { it.name } },
-        restore = { entries -> entries.map(SettingsDestination::valueOf) },
-    )) { mutableStateOf(listOf(SettingsDestination.Main)) }
-    val back = { if (path.size > 1) path = path.dropLast(1) else onBack() }
+        restore = { entries -> entries.map(SettingsDestination::valueOf).takeIf { it.firstOrNull() == initialDestination } ?: listOf(initialDestination) },
+    )) { mutableStateOf(listOf(initialDestination)) }
+    val back = {
+        if (currentState.access.pinChange != null) onCancelPinChange()
+        else if (path.size > 1) path = path.dropLast(1) else onBack()
+    }
     fun open(destination: SettingsDestination) { path = path + destination }
     SystemBackHandler(enabled = path.size == 1, onBack = back)
+    val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val predictivePop = defaultPredictivePopTransitionSpec<SettingsDestination>()
 
     Surface(Modifier.fillMaxSize().testTag(WalletUiTestTags.SettingsScreen), color = MaterialTheme.colorScheme.background) {
-        NavDisplay(backStack = path, onBack = back) { destination ->
+        NavDisplay(backStack = path, onBack = back,
+            transitionSpec = { walletNavigationMotion(true, reduceMotion, rtl) },
+            popTransitionSpec = { walletNavigationMotion(false, reduceMotion, rtl) },
+            predictivePopTransitionSpec = if (reduceMotion) ({ _ -> walletNavigationMotion(false, true, rtl) }) else predictivePop,
+        ) { destination ->
             NavEntry(destination) {
-                Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-                    Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 20.dp, top = 8.dp, bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.fillMaxSize().walletNavigationBackground().safeDrawingPadding()) {
+                    if (destination != SettingsDestination.WalletAccess || currentState.access.pinChange == null)
+                    WalletScreenHeader(stringResource(destination.title), leading = {
                         IconButton(back, Modifier.testTag(WalletUiTestTags.SettingsBack)) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.settings_back))
                         }
-                        Text(stringResource(destination.title), style = MaterialTheme.typography.titleLarge)
+                    }) {
+                        currentClose?.let { close ->
+                            IconButton(close, enabled = currentCloseEnabled, modifier = Modifier.testTag("wallet.sheet.close")) {
+                                WalletIcon(WalletSymbol.Decline, "Close request")
+                            }
+                        }
+                    }
+                    if (destination == SettingsDestination.WalletAccess) {
+                        walletAccessContent?.invoke()
+                        return@NavEntry
                     }
                     Column(
                         Modifier.weight(1f).verticalScroll(rememberScrollState()).fillMaxWidth()
@@ -95,7 +126,7 @@ internal fun SettingsScreen(
                             SettingsDestination.Main -> {
                                 serverSettingsContent?.let {
                                     WalletSection {
-                                        SettingsNavigationRow(
+                                        WalletNavigationRow(
                                             stringResource(Res.string.settings_server),
                                             { open(SettingsDestination.Server) },
                                             Modifier.testTag(WalletUiTestTags.SettingsServer),
@@ -106,6 +137,12 @@ internal fun SettingsScreen(
                                 }
                                 WalletSection(stringResource(Res.string.settings_wallet)) {
                                     if (currentState.pinLockEnabled) {
+                                        if (walletAccessContent != null) {
+                                            WalletNavigationRow(stringResource(Res.string.settings_wallet_access),
+                                                { open(SettingsDestination.WalletAccess) }, Modifier.testTag(WalletUiTestTags.SettingsWalletAccess),
+                                                summary = stringResource(Res.string.settings_wallet_access_summary), icon = { Icon(Icons.Default.Lock, null) })
+                                            SettingsDivider()
+                                        }
                                         WalletNavigationRow(stringResource(Res.string.settings_signing_key),
                                             { open(SettingsDestination.SigningKey) }, Modifier.testTag(WalletUiTestTags.SettingsSigningKey), summary = stringResource(Res.string.settings_key_subtitle),
                                             icon = { SettingsSymbol(Res.drawable.settings_key) })
@@ -151,6 +188,7 @@ internal fun SettingsScreen(
                                     }
                                 }
                             }
+                            SettingsDestination.WalletAccess -> walletAccessContent?.invoke()
                             SettingsDestination.SigningKey -> {
                                 when (val details = currentState.identityDetails) {
                                     WalletDemoIdentityDetailsState.Loading -> CircularProgressIndicator()
@@ -161,20 +199,18 @@ internal fun SettingsScreen(
                                     }
                                     is WalletDemoIdentityDetailsState.Available -> {
                                         val identity = details.details
-                                        WalletSection(stringResource(Res.string.settings_key_protection),
+                                        WalletSection(stringResource(Res.string.setup_summary),
                                             footer = stringResource(Res.string.settings_change_key_notice)) {
-                                            SettingsDetailRow(stringResource(Res.string.settings_storage_policy), identity.storage)
+                                            SigningKeySummary(identity.recovery, identity.storage, identity.authorization)
                                             SettingsDivider()
                                             SettingsDetailRow(stringResource(Res.string.settings_key_protection), identity.protection)
                                             SettingsDivider()
                                             SettingsDetailRow(stringResource(Res.string.settings_key_origin), identity.origin)
-                                            SettingsDivider()
-                                            SettingsDetailRow(stringResource(Res.string.settings_signing_approval), identity.authorization)
                                         }
-                                        WalletSection(stringResource(Res.string.settings_key_backup)) {
-                                            SettingsDetailRow(stringResource(Res.string.settings_backup_status), identity.recovery)
-                                            identity.choices.forEach { choice ->
-                                                SettingsDivider()
+                                        if (identity.choices.isNotEmpty() || currentState.identityProgress != null || currentState.identityError != null)
+                                            WalletSection(stringResource(Res.string.settings_key_backup)) {
+                                            identity.choices.forEachIndexed { index, choice ->
+                                                if (index > 0) SettingsDivider()
                                                 SettingsActionRow(choice.title, {
                                                     if (choice.destructive) deleteRecovery = choice.id else onIdentityAction(choice.id)
                                                 }, detail = choice.detail, enabled = !currentState.identityBusy,
@@ -251,18 +287,18 @@ internal fun SettingsScreen(
         AlertDialog(onDismissRequest = { deleteRecovery = null }, title = { Text(stringResource(Res.string.settings_delete_backup_question)) },
             text = { Text(stringResource(Res.string.settings_delete_backup_notice,
                 (currentState.identityDetails as? WalletDemoIdentityDetailsState.Available)?.details?.choices?.find { it.id == id }?.detail ?: "the backup provider")) },
-            confirmButton = { TextButton(onClick = { deleteRecovery = null; onIdentityAction(id) }) { Text(stringResource(Res.string.settings_delete_backup)) } },
+            confirmButton = { TextButton(onClick = { deleteRecovery = null; onIdentityAction(id) }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(stringResource(Res.string.settings_delete_backup)) } },
             dismissButton = { TextButton(onClick = { deleteRecovery = null }) { Text(stringResource(Res.string.settings_cancel)) } })
     }
     currentState.pendingSigningProtectionChange?.let { target ->
         AlertDialog(onDismissRequest = onCancelSigningProtectionChange, title = { Text("Change signing protection?") },
             text = { Text("Changing to ${target.title().lowercase()} creates a new wallet key and DID. Your current credentials will be removed and must be issued again.") },
-            confirmButton = { TextButton(onConfirmSigningProtectionChange, Modifier.testTag(WalletUiTestTags.SigningProtectionConfirm)) { Text("Create new wallet") } },
+            confirmButton = { TextButton(onConfirmSigningProtectionChange, Modifier.testTag(WalletUiTestTags.SigningProtectionConfirm), colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Create new wallet") } },
             dismissButton = { TextButton(onCancelSigningProtectionChange) { Text(stringResource(Res.string.settings_cancel)) } })
     }
     if (confirmReset) AlertDialog(onDismissRequest = { confirmReset = false },
         title = { Text(stringResource(Res.string.settings_reset_question)) }, text = { Text(resetWalletDescription ?: stringResource(Res.string.settings_reset_description)) },
-        confirmButton = { TextButton({ confirmReset = false; onResetWallet() }, Modifier.testTag(WalletUiTestTags.SettingsResetConfirm)) { Text(stringResource(Res.string.settings_reset)) } },
+        confirmButton = { TextButton({ confirmReset = false; onResetWallet() }, Modifier.testTag(WalletUiTestTags.SettingsResetConfirm), colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text(stringResource(Res.string.settings_reset)) } },
         dismissButton = { TextButton({ confirmReset = false }) { Text(stringResource(Res.string.settings_cancel)) } })
 }
 

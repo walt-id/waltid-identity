@@ -41,6 +41,10 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
 
+    <queries>
+        <intent><action android:name="android.media.action.STILL_IMAGE_CAMERA" /></intent>
+    </queries>
+
     <application
         android:name=".WalletDemoApplication"
         android:allowBackup="false"
@@ -100,6 +104,19 @@
             <intent-filter>
                 <action android:name="androidx.credentials.registry.provider.action.CREATE_CREDENTIAL" />
                 <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".DigitalCredentialCreateCallbackActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="walt-wallet-create" android:host="authorize" />
             </intent-filter>
         </activity>
 

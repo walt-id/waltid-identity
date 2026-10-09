@@ -20,7 +20,6 @@ public struct SharingReviewView: View {
     private let compact: Bool
     private let showActions: Bool
     private let paymentReview: PaymentReviewState
-    @State private var compactClaimsOption: PresentationCredentialOption?
     @State private var credentialDetails: [CredentialDetails] = []
 
     /// Renders one sharing review.
@@ -74,59 +73,49 @@ public struct SharingReviewView: View {
                 ProgressView("Loading credentials…")
             }
 
-            if compact {
-                CredentialCardStackView(
-                    cards: credentialDetails.map { CredentialCardItem(id: $0.id, summary: $0.cardSummary) }
-                ) { id in
-                    compactClaimsOption = review.credentialOptions.first {
-                        $0.selection.id == id
+            WalletSection(compact ? "Requested credentials" : "Select credentials to share") {
+                VStack(spacing: 0) {
+                    if review.credentialOptions.isEmpty {
+                        Text("No credentials available").font(.caption).foregroundStyle(.secondary).padding(16)
                     }
-                }
-                .sheet(isPresented: Binding(
-                    get: { compactClaimsOption != nil },
-                    set: { if !$0 { compactClaimsOption = nil } }
-                )) {
-                    if let option = compactClaimsOption,
-                       let details = credentialDetails.first(where: { $0.id == option.selection.id }) {
-                        SharingClaimsSheet(
-                            option: option,
-                            details: details,
-                            credentialSelected: selection.credentials.contains(option.selection),
-                            selectedDisclosureOptions: selection.disclosures,
-                            requestedDisclosureItems: details.groups
-                                .first { $0.id == "requested" }?
-                                .items ?? [],
-                            isLoading: isLoading,
-                            isReadOnly: isReadOnly,
-                            onToggleDisclosure: onToggleDisclosure,
-                            onDismiss: { compactClaimsOption = nil }
-                        )
-                    }
-                }
-            } else {
-                Text("Select credentials to share")
-                    .font(.subheadline.weight(.semibold))
-
-                if review.credentialOptions.isEmpty {
-                    Text("No credentials available")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                ForEach(review.credentialOptions) { option in
-                    if let details = credentialDetails.first(where: { $0.id == option.selection.id }) {
-                        CredentialReviewCard(
-                            option: option,
-                            details: details,
-                            selection: selection,
-                            isLoading: isLoading,
-                            isReadOnly: isReadOnly,
-                            onToggleCredential: onToggleCredential,
-                            onToggleDisclosure: onToggleDisclosure
-                        )
+                    ForEach(Array(review.credentialOptions.enumerated()), id: \.element.id) { index, option in
+                        if let details = credentialDetails.first(where: { $0.id == option.selection.id }) {
+                            if index > 0 { Divider() }
+                            SharingCredentialRow(option: option, details: details, selection: selection,
+                                isLoading: isLoading, isReadOnly: isReadOnly,
+                                onToggleCredential: onToggleCredential,
+                                hasAlternatives: review.credentialOptions.filter { $0.queryID == option.queryID }.count > 1)
+                        }
                     }
                 }
             }
+            let groups = review.informationToShare(selection: selection, details: credentialDetails)
+            WalletSection(String(localized: "Information to share", bundle: .module)) {
+                VStack(spacing: 0) {
+                    if groups.isEmpty {
+                        Text("Select a credential to see what will be shared.", bundle: .module)
+                            .font(.body).padding(16)
+                    }
+                    ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+                        if index > 0 { Divider() }
+                        ReviewInformationGroup(title: group.details.cardSummary.title, issuer: group.details.cardSummary.issuer) {
+                            ForEach(Array(group.fields.enumerated()), id: \.element.item.id) { index, field in
+                                if index > 0 { Divider() }
+                                if !field.optionalSelections.isEmpty && !isReadOnly {
+                                    Toggle(isOn: Binding(get: { field.included }, set: { include in
+                                        field.optionalSelections.filter { selection.disclosures.contains($0) != include }
+                                            .forEach(onToggleDisclosure)
+                                    })) { fieldContent(field) }
+                                    .toggleStyle(ReviewCheckboxToggleStyle()).disabled(isLoading)
+                                    .accessibilityIdentifier(WalletAccessibilityID.presentationDisclosureToggle(field.optionalSelections.sorted { $0.id < $1.id }[0].id))
+                                } else { fieldContent(field) }
+                            }
+                            if group.fields.isEmpty { Text("No additional information to share.", bundle: .module).font(.footnote) }
+                        }
+                    }
+                }
+            }.accessibilityElement(children: .contain)
+                .accessibilityIdentifier("review-information-to-share")
 
             if !isReadOnly && showActions {
                 ReviewActions(
@@ -139,6 +128,7 @@ public struct SharingReviewView: View {
                 )
             }
         }
+        .preference(key: SharingReviewReadinessKey.self, value: Set(credentialDetails.map(\.id)))
         .task(id: review.credentialOptions) {
             credentialDetails = []
             let snapshot = await CredentialDisplayNormalizer.details(for: review.credentialOptions)
@@ -146,270 +136,20 @@ public struct SharingReviewView: View {
             credentialDetails = snapshot
         }
     }
-}
 
-/// One offered credential: a selectable card that opens claim details.
-struct CredentialReviewCard: View {
-    let option: PresentationCredentialOption
-    let details: CredentialDetails
-    let selection: SharingSelection
-    let isLoading: Bool
-    let isReadOnly: Bool
-    let onToggleCredential: (PresentationCredentialSelection) -> Void
-    let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
-    @State private var claimsOpen = false
-
-    var body: some View {
-        let requestedDisclosureItems = details.groups
-            .first { $0.id == "requested" }?
-            .items ?? []
-        let credentialSelected = selection.credentials.contains(option.selection)
-
-        HStack(alignment: .center, spacing: 12) {
-            if !isReadOnly {
-                Toggle(isOn: Binding(get: {
-                    credentialSelected
-                }, set: { _ in
-                    onToggleCredential(option.selection)
-                })) {
-                    EmptyView()
-                }
-                .toggleStyle(ReviewCheckboxToggleStyle())
-                .labelsHidden()
-                .disabled(isLoading)
-                .accessibilityIdentifier(WalletAccessibilityID.presentationCredentialToggle(option.selection.id))
-            }
-
-            CredentialCardButton(details: details, compact: true) {
-                claimsOpen = true
-            }
-            .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsToggle(option.selection.id))
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(WalletAccessibilityID.presentationCredential(option.selection.id))
-        .sheet(isPresented: $claimsOpen) {
-            SharingClaimsSheet(
-                option: option,
-                details: details,
-                credentialSelected: credentialSelected,
-                selectedDisclosureOptions: selection.disclosures,
-                requestedDisclosureItems: requestedDisclosureItems,
-                isLoading: isLoading,
-                isReadOnly: isReadOnly,
-                onToggleDisclosure: onToggleDisclosure,
-                onDismiss: { claimsOpen = false }
-            )
-        }
-    }
-}
-
-/// Scrollable claim review the user can leave without changing the Share decision.
-private struct SharingClaimsSheet: View {
-    let option: PresentationCredentialOption
-    let details: CredentialDetails
-    let credentialSelected: Bool
-    let selectedDisclosureOptions: Set<PresentationDisclosureSelection>
-    let requestedDisclosureItems: [ClaimItem]
-    let isLoading: Bool
-    let isReadOnly: Bool
-    let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
-    let onDismiss: () -> Void
-
-    @State private var allInformationOpen = false
-
-    var body: some View {
-        WalletDetailSheet(details.cardSummary.title, onDismiss: onDismiss,
-            closeIdentifier: WalletAccessibilityID.presentationClaimsClose) {
-            SharingClaimsIssuerRow(details: details)
-            if option.disclosures.isEmpty {
-                Text("No additional claims to review").font(.caption).foregroundStyle(.secondary)
-            } else {
-                DisclosureList(option: option, credentialSelected: credentialSelected,
-                    selectedDisclosureOptions: selectedDisclosureOptions,
-                    requestedDisclosureItems: requestedDisclosureItems, isLoading: isLoading,
-                    isReadOnly: isReadOnly, onToggleDisclosure: onToggleDisclosure)
-            }
-            if details.groups.contains(where: { $0.id != "requested" }) {
-                WalletSection {
-                    WalletNavigationRow(String(localized: "All credential information", bundle: .module),
-                        subtitle: String(localized: "Includes information outside this request.", bundle: .module)) {
-                        allInformationOpen = true
-                    }.accessibilityIdentifier("review-all-credential-information")
-                }
-            }
-        }
-        .accessibilityIdentifier(WalletAccessibilityID.presentationClaimsDialog)
-        .sheet(isPresented: $allInformationOpen) {
-            WalletDetailSheet(String(localized: "All credential information", bundle: .module), onDismiss: { allInformationOpen = false }) {
-                Text("Includes information outside this request.", bundle: .module).font(.body)
-                CredentialSummaryRow(summary: details.cardSummary)
-                CredentialDetailsView(details: details)
+    private func fieldContent(_ field: SharingInformationField) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ClaimValueRow(item: field.item)
+            if field.alwaysIncluded || !field.optionalSelections.isEmpty {
+                Text(!field.included ? "Not shared" : field.alwaysIncluded ? "Always included by this credential" : "Optional")
+                    .font(.footnote).foregroundStyle(.secondary)
             }
         }
     }
 }
 
-private struct SharingClaimsIssuerRow: View {
-    let details: CredentialDetails
-
-    var body: some View {
-        if let issuerDisplay = details.issuerDisplay {
-            let issuer = details.issuer?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            MetadataIdentityView(
-                display: issuerDisplay,
-                fallbackName: details.cardSummary.issuer,
-                supportingText: issuer.isEmpty || issuer == issuerDisplay.name ? nil : issuer
-            )
-        } else {
-            Text("Issuer: \(details.cardSummary.issuer)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-}
-
-public struct ReviewCheckboxToggleStyle: ToggleStyle {
-    public init() {}
-
-    public func makeBody(configuration: Configuration) -> some View {
-        Button {
-            configuration.isOn.toggle()
-        } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: configuration.isOn ? "checkmark.square.fill" : "square")
-                    .font(.title2)
-                    .foregroundStyle(configuration.isOn ? Color.accentColor : Color.secondary)
-                configuration.label
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(configuration.isOn ? [.isSelected] : [])
-    }
-}
-
-/// What this credential would actually reveal, claim by claim.
-struct DisclosureList: View {
-    let option: PresentationCredentialOption
-    let credentialSelected: Bool
-    let selectedDisclosureOptions: Set<PresentationDisclosureSelection>
-    let requestedDisclosureItems: [ClaimItem]
-    let isLoading: Bool
-    let isReadOnly: Bool
-    let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
-
-    var body: some View {
-        LazyVStack(alignment: .leading, spacing: 8) {
-            Text(CredentialDisplayVocabulary.requestedDisclosuresTitle)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            ForEach(Array(option.disclosures.enumerated()).sorted {
-                (requestedDisclosureItems.indices.contains($0.offset) ? requestedDisclosureItems[$0.offset].displayOrder ?? .max : .max)
-                    < (requestedDisclosureItems.indices.contains($1.offset) ? requestedDisclosureItems[$1.offset].displayOrder ?? .max : .max)
-            }, id: \.element.id) { index, disclosure in
-                let selection = PresentationDisclosureSelection(
-                    queryID: option.queryID,
-                    credentialID: option.credentialID,
-                    path: disclosure.path
-                )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    if disclosure.selectable && !isReadOnly {
-                        Toggle(isOn: Binding(get: {
-                            selectedDisclosureOptions.contains(selection)
-                        }, set: { _ in
-                            onToggleDisclosure(selection)
-                        })) {
-                            disclosureLabel(index: index, disclosure: disclosure)
-                        }
-                        .disabled(isLoading || !credentialSelected)
-                        .accessibilityIdentifier(WalletAccessibilityID.presentationDisclosureToggle(selection.id))
-                    } else {
-                        disclosureLabel(index: index, disclosure: disclosure)
-                    }
-
-                    Text(disclosure.disclosureStatusText)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func disclosureLabel(index: Int, disclosure: PresentationDisclosure) -> some View {
-        if requestedDisclosureItems.indices.contains(index) {
-            ClaimValueRow(item: requestedDisclosureItems[index])
-        } else {
-            DisclosureTextView(disclosure: disclosure)
-        }
-    }
-}
-
-private extension PresentationDisclosure {
-    /// Why this claim is in the request, in the user's terms rather than the format's.
-    var disclosureStatusText: String {
-        if selectable { return "Optional disclosure" }
-        if required { return "Required by request" }
-        if selectivelyDisclosable { return "Selective disclosure" }
-        return "Required by credential format"
-    }
-}
-
-/// Fallback rendering for a disclosure the display normalizer did not produce a claim row for.
-private struct DisclosureTextView: View {
-    let disclosure: PresentationDisclosure
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(disclosure.name ?? disclosure.path)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.primary)
-            Text(disclosure.displayValue ?? disclosure.valueJSON)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(4)
-        }
-    }
-}
-
-/// The supported transport-specific presentations for the shared review actions.
-public enum ReviewActionPresentation {
-    case sharing
-    case proximity
-
-    var submitTitle: String {
-        String(localized: "Share", bundle: .module)
-    }
-
-    var rejectTitle: String {
-        self == .sharing ? String(localized: "Reject", bundle: .module) : String(localized: "Decline", bundle: .module)
-    }
-
-    var cancelTitle: String? {
-        self == .sharing ? nil : String(localized: "Cancel", bundle: .module)
-    }
-
-    var submitAccessibilityIdentifier: String {
-        self == .sharing
-            ? WalletAccessibilityID.presentationSubmitButton
-            : WalletAccessibilityID.proximityApproveButton
-    }
-
-    var rejectAccessibilityIdentifier: String {
-        self == .sharing
-            ? WalletAccessibilityID.presentationRejectButton
-            : WalletAccessibilityID.proximityDeclineButton
-    }
-
-    var cancelAccessibilityIdentifier: String {
-        self == .sharing
-            ? WalletAccessibilityID.presentationCancelButton
-            : WalletAccessibilityID.proximityCancelButton
-    }
+/// Emitted after the normalized credential rows enter layout; hosted previews can await real content.
+struct SharingReviewReadinessKey: PreferenceKey {
+    static let defaultValue: Set<String> = []
+    static func reduce(value: inout Set<String>, nextValue: () -> Set<String>) { value.formUnion(nextValue()) }
 }

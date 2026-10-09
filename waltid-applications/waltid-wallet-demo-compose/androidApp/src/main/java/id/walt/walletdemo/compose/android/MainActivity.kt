@@ -3,11 +3,9 @@ package id.walt.walletdemo.compose.android
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -16,10 +14,8 @@ import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityController
 import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
-import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.ui.MobileWalletDemoApp
-import kotlinx.coroutines.launch
 
 const val WALLET_SIGNING_PROTECTION_MODE_EXTRA =
     "id.walt.walletdemo.compose.android.WALLET_SIGNING_PROTECTION_MODE"
@@ -84,50 +80,18 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         WalletDemoCredentialStoreNotifier.removeListener(onCredentialStoreChanged)
-        if (::proximityController.isInitialized) proximityController.dismiss()
+        if (isFinishing && ::proximityController.isInitialized) proximityController.dismiss()
         if (::activityModel.isInitialized) activityModel.detach(this)
         super.onDestroy()
     }
 
     private fun handleIntent(intent: Intent?) {
         val uri = intent?.data ?: return
-        if (DigitalCredentialCreateAuthHandoff.deliver(this, uri)) {
-            drainOrphanCreateAuthorization()
+        if (DigitalCredentialCreateAuthHandoff.deliver(this, uri) != DigitalCredentialCreateAuthHandoff.Delivery.Unmatched) {
+            activityModel.drainOrphanCreateAuthorization()
             return
         }
         controller.handleDeepLink(uri.toString())
     }
 
-    /**
-     * Completes CREATE_CREDENTIAL authorization-code issuance when the create Activity was
-     * destroyed before the `openid://` callback returned. The credential is stored; the
-     * Credential Manager create result may already be lost.
-     */
-    private fun drainOrphanCreateAuthorization() {
-        val orphan = OrphanAuthorizationCallback.take() ?: return
-        val (sessionId, callbackUri) = orphan
-        lifecycleScope.launch {
-            runCatching {
-                val created = createAndroidDemoMobileWallet(
-                    context = applicationContext,
-                    config = walletConfig,
-                    interactionContextProvider = { this@MainActivity },
-                )
-                created.bootstrap(walletConfig.selectedSigningProtection(applicationContext))
-                created.wallet.continueAuthorizationIssuance(
-                    sessionId = sessionId,
-                    callbackUri = callbackUri,
-                )
-                DigitalCredentialCreateAuthHandoff.clear(this@MainActivity)
-                WalletDemoCredentialStoreNotifier.notifyChanged()
-                Log.i(TAG, "Completed orphan CREATE authorization for session=$sessionId")
-            }.onFailure { error ->
-                Log.e(TAG, "Orphan CREATE authorization failed", error)
-            }
-        }
-    }
-
-    private companion object {
-        private const val TAG = "WaltDigitalCredentials"
-    }
 }

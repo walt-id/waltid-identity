@@ -47,7 +47,7 @@ class WalletDeferredRoutesTest {
                     "/.well-known/openid-credential-issuer" -> """{
                       "credential_issuer":"https://issuer.example","credential_endpoint":"https://issuer.example/credential",
                       "deferred_credential_endpoint":"https://issuer.example/deferred",
-                      "credential_configurations_supported":{"identity":{"format":"dc+sd-jwt","vct":"identity","scope":"identity"}}}
+                      "credential_configurations_supported":{"identity":{"format":"dc+sd-jwt","vct":"identity","scope":"identity","credential_metadata":{"display":[{"name":"Identity card"}]}}}}
                     """
                     "/.well-known/oauth-authorization-server" -> """{
                       "issuer":"https://issuer.example","token_endpoint":"https://issuer.example/token","authorization_endpoint":"https://issuer.example/authorize","response_types_supported":["code"]}
@@ -91,6 +91,7 @@ class WalletDeferredRoutesTest {
         assertEquals(HttpStatusCode.Unauthorized, client.get(path).status)
         assertEquals(HttpStatusCode.Unauthorized, client.post("$path/${pending.id}").status)
         assertEquals(HttpStatusCode.Forbidden, client.get(path) { header("X-Test-Account", "other") }.status)
+        assertEquals(HttpStatusCode.Forbidden, client.get("$path?includeDetails=true") { header("X-Test-Account", "other") }.status)
         assertEquals(HttpStatusCode.Forbidden, client.post("$path/${pending.id}") { header("X-Test-Account", "other") }.status)
         assertEquals(0, polls)
         val foreign = client.post("/wallet/other-wallet/credentials/receive/deferred/${pending.id}") {
@@ -103,6 +104,14 @@ class WalletDeferredRoutesTest {
         val listed = client.get(path) { header("X-Test-Account", "owner") }
         assertEquals(HttpStatusCode.OK, listed.status)
         assertEquals(listOf(WalletIssuanceContinuation(pending)), json.decodeFromString<List<WalletIssuanceContinuation>>(listed.bodyAsText()))
+        // Released clients decode strictly: presentation fields must remain opt-in.
+        assertEquals(listOf(pending), Json.decodeFromString<List<WalletDeferredCredential>>(listed.bodyAsText()))
+        val detailed = client.get("$path?includeDetails=true") { header("X-Test-Account", "owner") }
+        assertEquals(HttpStatusCode.OK, detailed.status)
+        val continuation = Json.decodeFromString<List<WalletIssuanceContinuation>>(detailed.bodyAsText()).single()
+        assertEquals(pending.id, continuation.id)
+        assertEquals(WalletIssuanceContinuationStatus.AWAITING_ISSUER, continuation.status)
+        assertContains(assertNotNull(continuation.displayMetadataJson), "Identity card")
         withContext(Dispatchers.Default) { delay(1000) }
         val resumed = client.post("$path/${pending.id}") { header("X-Test-Account", "owner") }
         if (loseResponse) {
@@ -124,7 +133,7 @@ class WalletDeferredRoutesTest {
             assertIs<WalletIssuanceOutcome.Deferred>(json.decodeFromString<WalletIssuanceOutcome>(early.bodyAsText()))
         }
         assertEquals(1, polls)
-        for (body in listOf(listed.bodyAsText(), resumed.bodyAsText())) {
+        for (body in listOf(listed.bodyAsText(), detailed.bodyAsText(), resumed.bodyAsText())) {
             for (secret in listOf("private-access-token", "private-transaction", "private-code", "keyId")) {
                 assertFalse(secret in body)
             }

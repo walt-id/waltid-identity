@@ -40,12 +40,15 @@ kotlin {
             implementation(identityLibs.compose.runtime)
             implementation(identityLibs.compose.foundation)
             implementation(identityLibs.compose.ui)
+            implementation(identityLibs.compose.ui.tooling.preview)
             implementation(identityLibs.compose.material3)
             implementation(identityLibs.compose.material.icons.core)
             implementation(identityLibs.compose.navigation3.ui)
             implementation(identityLibs.coil.compose)
             implementation(identityLibs.coil.network.ktor3)
             implementation(identityLibs.coil.svg)
+            implementation(identityLibs.haze.core)
+            implementation(identityLibs.haze.blur)
             implementation(identityLibs.compose.resources)
             implementation(identityLibs.kotlinx.serialization.json)
         }
@@ -123,6 +126,11 @@ kotlin {
                         implementation(identityLibs.roborazzi.core)
                         implementation(identityLibs.roborazzi.compose)
                     }
+                }
+                getByName("androidDeviceTest").dependencies {
+                    implementation(identityLibs.androidx.test.ext.junit)
+                    implementation(identityLibs.androidx.test.runner)
+                    implementation(identityLibs.androidx.test.uiautomator)
                 }
             }
         }

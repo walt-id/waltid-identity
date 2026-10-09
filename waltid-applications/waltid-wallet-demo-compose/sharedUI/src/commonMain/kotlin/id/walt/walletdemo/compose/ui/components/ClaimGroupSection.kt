@@ -23,18 +23,21 @@ internal fun ClaimGroupSection(
         title = if (collapsible) null else group.title,
         modifier = modifier,
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = if (collapsible) 4.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (collapsible) {
                 MetadataDisclosure(
                     title = group.title,
                     initiallyExpanded = group.initiallyExpanded,
                     modifier = Modifier.testTag(WalletUiTestTags.claimGroup(group.title)),
                 ) {
-                    ClaimGroupItems(group)
-                  }
-              } else {
+                    Column(Modifier.padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ClaimGroupItems(group)
+                    }
+                }
+            } else {
                 ClaimGroupItems(group)
-              }
+            }
         }
     }
 }
@@ -43,6 +46,8 @@ internal fun ClaimGroupSection(
 private fun ClaimGroupItems(group: ClaimGroup) {
     group.items.forEachIndexed { index, item ->
         if (index > 0) MetadataRowDivider()
-        key(item.path.id) { ClaimValueRow(item = item) }
+        key(item.path.id) {
+            ClaimValueRow(item = item)
+        }
     }
 }

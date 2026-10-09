@@ -10,6 +10,20 @@ final class WalletKeySetupTests: XCTestCase {
         return .init(recovery: value(recovery), storage: value(storage), approval: value(approval), restoring: false, perform: {})
     }
 
+    func testRefreshedOptionsPreferRequestedApprovalAndKeepOriginalHandles() {
+        let plain = option("new", "native", "none")
+        let protected = option("new", "native", "biometric")
+        let database = option("new", "database", "none")
+        let unavailable = Model.resolveSetupOption([plain, database], approvalID: "biometric")
+        XCTAssertEqual(unavailable?.id, plain.id) // Display-only fallback; approval mismatch blocks creation.
+        XCTAssertNotEqual(unavailable?.approval.id, "biometric")
+        XCTAssertEqual(Model.resolveSetupOption([plain, protected, database], approvalID: "biometric")?.id, protected.id)
+        XCTAssertEqual(Model.resolveSetupOption([plain, protected, database], recoveryID: "new", storageID: "database",
+            approvalID: "biometric")?.id, database.id)
+        XCTAssertEqual(Model.resolveSetupOption([plain, protected], approvalID: "none")?.id, plain.id)
+        XCTAssertNil(Model.resolveSetupOption([], approvalID: "biometric"))
+    }
+
     func testPerUseBiometricsSurviveRestoreWithoutChangingTimedProtection() throws {
         XCTAssertEqual(try WalletDemoSigningProtection(appliedPolicy: .biometricCurrentSet), .biometricPerUse)
         XCTAssertEqual(WalletDemoSigningProtection.biometricPerUse.authorizationPolicy, .biometricCurrentSet)

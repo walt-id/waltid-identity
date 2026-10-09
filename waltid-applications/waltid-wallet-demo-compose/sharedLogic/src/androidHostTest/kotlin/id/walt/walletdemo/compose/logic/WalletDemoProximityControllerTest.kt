@@ -65,6 +65,67 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 class WalletDemoProximityControllerTest {
     @Test
+    fun `one close cancels once and stays visible until cleanup has drained`() = runTest {
+        val closeGate = CompletableDeferred<Unit>()
+        val session = FakeSession(ProximityState.EngagementReady(listOf(ProximityEngagement.Qr("mdoc:test"))), closeGate = closeGate)
+        val controller = controller(FakeBackend(session))
+        controller.start()
+        advanceUntilIdle()
+        controller.requestClose()
+        controller.requestClose()
+        advanceUntilIdle()
+        assertEquals(listOf<ProximityAction>(ProximityAction.Cancel), session.actions)
+        assertEquals(1, session.closeCalls)
+        assertTrue(controller.state.value.active)
+        assertTrue(controller.state.value.closing)
+        assertFalse(controller.state.value.canClose)
+        closeGate.complete(Unit)
+        advanceUntilIdle()
+        assertFalse(controller.state.value.active)
+        assertFalse(controller.state.value.closing)
+    }
+
+    @Test
+    fun `rejected close keeps the current task and surfaces the actual rejection`() = runTest {
+        val engagement = ProximityState.EngagementReady(listOf(ProximityEngagement.Qr("mdoc:test")))
+        val error = ProximityError(ProximityErrorCategory.Transport, "close_rejected", "The request is still active", ProximityRecovery.StartNewSession)
+        val session = FakeSession(engagement, ProximityActionResult.Rejected(error))
+        val controller = controller(FakeBackend(session))
+        controller.start()
+        advanceUntilIdle()
+        controller.requestClose()
+        advanceUntilIdle()
+        assertTrue(controller.state.value.active)
+        assertFalse(controller.state.value.closing)
+        assertEquals(engagement, controller.state.value.sessionState)
+        assertEquals(error, controller.state.value.actionError)
+        assertEquals(0, session.closeCalls)
+        controller.dismiss()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `close respects terminating state and terminal acknowledgement sends no new cancel`() = runTest {
+        val session = FakeSession(ProximityState.Terminating(1))
+        val controller = controller(FakeBackend(session))
+        controller.start()
+        advanceUntilIdle()
+        assertFalse(controller.state.value.canClose)
+        controller.requestClose()
+        advanceUntilIdle()
+        assertTrue(controller.state.value.active)
+        assertTrue(session.actions.isEmpty())
+        session.mutableState.value = ProximityState.Cancelled
+        advanceUntilIdle()
+        assertTrue(controller.state.value.canClose)
+        controller.requestClose()
+        advanceUntilIdle()
+        assertTrue(session.actions.isEmpty())
+        assertEquals(1, session.closeCalls)
+        assertFalse(controller.state.value.active)
+    }
+
+    @Test
     fun `reset drains a late startup and its asynchronous close even after settings dismissal`() = runTest {
         val startGate = CompletableDeferred<Unit>()
         val closeGate = CompletableDeferred<Unit>()

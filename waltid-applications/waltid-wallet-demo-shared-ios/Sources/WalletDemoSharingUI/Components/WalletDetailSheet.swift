@@ -15,19 +15,49 @@ public struct WalletDetailSheet<Content: View>: View {
     }
 
     public var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) { content }.padding(20)
+        navigation.walletSheetSizing()
+    }
+
+    @ViewBuilder private var navigation: some View {
+        if #available(iOS 16, *) {
+            NavigationStack {
+                WalletDetailPage(title) { content }
+            }.environment(\.walletDetailDismissal, dismissal)
+        } else {
+            NavigationView {
+                WalletDetailPage(title) { content }
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(String(localized: "Close", bundle: .module), action: onDismiss)
-                        .accessibilityIdentifier(closeIdentifier)
-                }
-            }
-        }.navigationViewStyle(.stack)
+            .navigationViewStyle(.stack)
+            .environment(\.walletDetailDismissal, dismissal)
+        }
+    }
+
+    private var dismissal: WalletDetailDismissal {
+        WalletDetailDismissal(perform: onDismiss, identifier: closeIdentifier)
+    }
+}
+
+/// The presentation supplies one dismissal action to every page in its navigation stack.
+struct WalletDetailDismissal {
+    let perform: () -> Void
+    let identifier: String
+    var enabled = true
+}
+
+public extension View {
+    /// Task pages retain the host's Close action while native navigation supplies Back.
+    func walletDetailDismissal(perform: (() -> Void)?, enabled: Bool = true, identifier: String = "wallet.flowBack") -> some View {
+        environment(\.walletDetailDismissal, perform.map { WalletDetailDismissal(perform: $0, identifier: identifier, enabled: enabled) })
+    }
+}
+
+private struct WalletDetailDismissalKey: EnvironmentKey {
+    static let defaultValue: WalletDetailDismissal? = nil
+}
+
+extension EnvironmentValues {
+    var walletDetailDismissal: WalletDetailDismissal? {
+        get { self[WalletDetailDismissalKey.self] }
+        set { self[WalletDetailDismissalKey.self] = newValue }
     }
 }

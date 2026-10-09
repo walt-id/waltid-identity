@@ -1,6 +1,9 @@
 {
   "schemaVersion": 1,
-  "issuer": { "identifier": "https://issuer.example", "name": "Example City" },
+  "issuer": {
+    "identifier": "https://issuer.example",
+    "name": "Example City"
+  },
   "credential": {
     "id": "visual-resident-card",
     "title": "Resident card",
@@ -9,8 +12,14 @@
     "data": {
       "given_name": "Ada",
       "family_name": "Lovelace",
-      "resident_address": { "street_address": "12 Example Street", "locality": "Vienna" },
-      "children": ["Alice", "Bob"],
+      "resident_address": {
+        "street_address": "12 Example Street",
+        "locality": "Vienna"
+      },
+      "children": [
+        "Alice",
+        "Bob"
+      ],
       "optional_note": null,
       "is_employee": false,
       "balance": 0
@@ -28,8 +37,20 @@
         "backgroundColor": "#164A61",
         "copies": 2,
         "claims": [
-          { "path": ["given_name"], "label": "Given name", "mandatory": true },
-          { "path": ["family_name"], "label": "Family name", "mandatory": true }
+          {
+            "path": [
+              "given_name"
+            ],
+            "label": "Given name",
+            "mandatory": true
+          },
+          {
+            "path": [
+              "family_name"
+            ],
+            "label": "Family name",
+            "mandatory": true
+          }
         ]
       },
       {
@@ -38,27 +59,350 @@
         "title": "Library membership",
         "backgroundColor": "#664373",
         "copies": 1,
-        "claims": [{ "path": ["member_id"], "label": "Member number", "mandatory": true }]
+        "claims": [
+          {
+            "path": [
+              "member_id"
+            ],
+            "label": "Member number",
+            "mandatory": true
+          }
+        ]
       }
     ]
   },
-  "nearby": { "qrPayload": "mdoc:visual-fixture-not-a-live-engagement" },
+  "nearby": {
+    "qrPayload": "mdoc:visual-fixture-not-a-live-engagement",
+    "review": {
+      "id": "5c93e12c-35e8-4a8b-87ae-c9859e760174",
+      "credentialId": "visual-nearby-credential",
+      "docType": "org.iso.18013.5.1.mDL",
+      "namespace": "org.iso.18013.5.1",
+      "element": "given_name",
+      "label": "Given name",
+      "value": "Alex",
+      "title": "Mobile Driving Licence",
+      "issuer": "Example licensing authority",
+      "reader": "City service desk",
+      "backgroundColor": "#174F64",
+      "completedAt": "2026-10-02T12:00:00Z",
+      "permissionMessage": "Bluetooth permission is required",
+      "expiredMessage": "Prepared sharing expired. Review the request again before sharing."
+    }
+  },
   "batchOutcome": {
     "status": "Saved credentials: 1. Pending targets: 1.",
     "pendingId": "visual-deferred-library",
-    "pendingConfigurationId": "library-card"
+    "pendingConfigurationId": "library-card",
+    "pendingMetadata": {
+      "credentialDisplay": [
+        {
+          "name": "Library membership",
+          "locale": "en",
+          "background_color": "#664373"
+        }
+      ]
+    }
   },
   "payment": {
     "revision": "visual-consent-revision-1",
     "locale": "en",
     "title": "Confirm payment",
-    "affirmativeAction": "Pay €11.56",
+    "affirmativeAction": "Pay \u20ac11.56",
     "denialAction": "Decline",
     "fields": [
-      { "name": "Amount", "value": "11.56 EUR", "placement": "Prominent" },
-      { "name": "Payee", "value": "Example Bookshop", "placement": "Main" },
-      { "name": "Transaction identifier", "value": "example-transaction-001", "placement": "Details" },
-      { "name": "Technical reference", "value": "bound-but-hidden", "placement": "Omitted" }
+      {
+        "name": "Amount",
+        "value": "11.56 EUR",
+        "placement": "Prominent"
+      },
+      {
+        "name": "Payee",
+        "value": "Example Bookshop",
+        "placement": "Main"
+      },
+      {
+        "name": "Transaction identifier",
+        "value": "example-transaction-001",
+        "placement": "Details"
+      },
+      {
+        "name": "Technical reference",
+        "value": "bound-but-hidden",
+        "placement": "Omitted"
+      }
+    ]
+  },
+  "keySetup": {
+    "options": [
+      {
+        "id": "option-0",
+        "recovery": {
+          "id": "new",
+          "title": "Without a backup",
+          "detail": "No signing-key backup is created. Credentials may need to be issued again if this key is lost."
+        },
+        "storage": {
+          "id": "hardware",
+          "title": "Hardware-backed key",
+          "detail": "The device protects this key in secure hardware. It cannot be restored elsewhere."
+        },
+        "approval": {
+          "id": "biometric",
+          "title": "Biometric approval",
+          "detail": "Approve signing with biometrics. App unlock remains separate."
+        }
+      },
+      {
+        "id": "option-1",
+        "recovery": {
+          "id": "new",
+          "title": "Without a backup",
+          "detail": "No signing-key backup is created. Credentials may need to be issued again if this key is lost."
+        },
+        "storage": {
+          "id": "native",
+          "title": "System key store",
+          "detail": "The device stores this key. Recoverable configurations can restore it on another device."
+        },
+        "approval": {
+          "id": "biometric",
+          "title": "Biometric approval",
+          "detail": "Approve signing with biometrics. App unlock remains separate."
+        }
+      },
+      {
+        "id": "option-2",
+        "recovery": {
+          "id": "new",
+          "title": "Without a backup",
+          "detail": "No signing-key backup is created. Credentials may need to be issued again if this key is lost."
+        },
+        "storage": {
+          "id": "native",
+          "title": "System key store",
+          "detail": "The device stores this key. Recoverable configurations can restore it on another device."
+        },
+        "approval": {
+          "id": "none",
+          "title": "No signing prompt",
+          "detail": "Signing does not require system approval."
+        }
+      },
+      {
+        "id": "option-3",
+        "recovery": {
+          "id": "backup:example",
+          "title": "Back up with Example provider",
+          "detail": "Saves your signing key. Credentials are not included."
+        },
+        "storage": {
+          "id": "native",
+          "title": "System key store",
+          "detail": "The device stores this key. Recoverable configurations can restore it on another device."
+        },
+        "approval": {
+          "id": "biometric",
+          "title": "Biometric approval",
+          "detail": "Approve signing with biometrics. App unlock remains separate."
+        }
+      }
+    ]
+  },
+  "sharing": {
+    "origin": "https://verifier.example",
+    "credentials": [
+      {
+        "queryId": "pid",
+        "credentialId": "credential-1",
+        "title": "Driving licence",
+        "issuer": "Test Issuer",
+        "format": "mso_mdoc",
+        "disclosures": [
+          {
+            "path": "org.iso.18013.5.1/given_name",
+            "label": "Given name",
+            "value": "Ada",
+            "required": true,
+            "selective": true,
+            "selectable": false,
+            "requested": true
+          }
+        ],
+        "data": {
+          "org.iso.18013.5.1": {
+            "given_name": "Ada",
+            "family_name": "Lovelace",
+            "birth_date": "1815-12-10"
+          }
+        }
+      },
+      {
+        "queryId": "payment",
+        "credentialId": "visual-payment-credential",
+        "title": "Payment authorisation",
+        "issuer": "Test Issuer",
+        "format": "dc+sd-jwt",
+        "disclosures": [
+          {
+            "path": "account_reference",
+            "label": "Account reference",
+            "value": "Example account",
+            "required": true,
+            "selective": true,
+            "selectable": false,
+            "requested": true
+          }
+        ],
+        "data": {
+          "account_reference": "Example account",
+          "account_holder": "Ada Lovelace"
+        }
+      }
+    ]
+  },
+  "paymentLocalized": {
+    "revision": "localized-signed-payment",
+    "locale": "de",
+    "title": null,
+    "affirmativeAction": "Zahlung verbindlich best\u00e4tigen",
+    "denialAction": null,
+    "fields": [
+      {
+        "name": "Betrag",
+        "value": "11.56 EUR",
+        "placement": "Prominent"
+      },
+      {
+        "name": "Empf\u00e4nger",
+        "value": "Example Bookshop",
+        "placement": "Main"
+      },
+      {
+        "name": "Transaktions-ID",
+        "value": "example-transaction-001",
+        "placement": "Details"
+      },
+      {
+        "name": "Interne Referenz",
+        "value": "bound-but-hidden",
+        "placement": "Omitted"
+      }
+    ],
+    "securityHint": "Pr\u00fcfen Sie Betrag und Empf\u00e4nger.",
+    "requiresUnsignedRequestWarning": false
+  },
+  "readerTrust": {
+    "sourceName": "example-reader-ca.pem",
+    "displayName": "Example Reader CA",
+    "subject": "CN=Example Reader CA, O=Example Authority",
+    "issuer": "CN=Example Reader CA, O=Example Authority",
+    "fingerprint": "12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78:12:34:56:78",
+    "validFrom": "2026-01-01T00:00:00Z",
+    "validUntil": "2031-01-01T00:00:00Z"
+  },
+  "sharingInformation": {
+    "origin": "https://verifier.example",
+    "credentials": [
+      {
+        "queryId": "identity",
+        "credentialId": "national-id",
+        "title": "National ID",
+        "issuer": "Example Government",
+        "format": "dc+sd-jwt",
+        "backgroundColor": "#2157A8",
+        "data": {
+          "given_name": "Ada",
+          "birth_date": "1815-12-10",
+          "family_name": "Lovelace"
+        },
+        "disclosures": [
+          {
+            "path": "given_name",
+            "label": "Given name",
+            "value": "Ada",
+            "required": true,
+            "selective": true,
+            "selectable": false,
+            "requested": true
+          },
+          {
+            "path": "birth_date",
+            "label": "Birth date",
+            "value": "1815-12-10",
+            "required": true,
+            "selective": true,
+            "selectable": false,
+            "requested": true
+          }
+        ]
+      },
+      {
+        "queryId": "identity",
+        "credentialId": "city-id",
+        "title": "City ID",
+        "issuer": "Example City",
+        "format": "dc+sd-jwt",
+        "backgroundColor": "#246B57",
+        "data": {
+          "given_name": "Ada",
+          "birth_date": "1815-12-10",
+          "family_name": "Lovelace",
+          "address": "Vienna"
+        },
+        "disclosures": [
+          {
+            "path": "given_name",
+            "label": "Given name",
+            "value": "Ada",
+            "required": true,
+            "selective": true,
+            "selectable": false,
+            "requested": true
+          },
+          {
+            "path": "birth_date",
+            "label": "Birth date",
+            "value": "1815-12-10",
+            "required": true,
+            "selective": true,
+            "selectable": false,
+            "requested": true
+          },
+          {
+            "path": "family_name",
+            "label": "Family name",
+            "value": "Lovelace",
+            "required": false,
+            "selective": false,
+            "selectable": false,
+            "requested": false
+          }
+        ]
+      },
+      {
+        "queryId": "membership",
+        "credentialId": "membership",
+        "title": "Library membership",
+        "issuer": "Example Library",
+        "format": "dc+sd-jwt",
+        "backgroundColor": "#744D9B",
+        "data": {
+          "member_number": "MEM-1234",
+          "membership_type": "Adult"
+        },
+        "disclosures": [
+          {
+            "path": "member_number",
+            "label": "Member number",
+            "value": "MEM-1234",
+            "required": true,
+            "selective": true,
+            "selectable": false,
+            "requested": true
+          }
+        ]
+      }
     ]
   }
 }

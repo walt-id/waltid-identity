@@ -1210,7 +1210,20 @@ private extension Waltid_openid4vc_walletWalletDeferredCredential {
 private extension Waltid_openid4vc_walletWalletIssuanceContinuation {
     func toSwiftDeferredCredential() -> DeferredCredential {
         DeferredCredential(id: id, credentialConfigurationID: credentialConfigurationId,
-            intervalSeconds: intervalSeconds?.int64Value, credentialIdentifier: credentialIdentifier)
+            intervalSeconds: intervalSeconds?.int64Value, credentialIdentifier: credentialIdentifier,
+            status: status.toSwift(), displayMetadataJSON: displayMetadataJson)
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceContinuationStatus {
+    func toSwift() -> IssuanceContinuationStatus {
+        switch self {
+        case .awaitingIssuer: return .awaitingIssuer
+        case .awaitingLocalSave: return .awaitingLocalSave
+        case .remoteOutcomeUncertain: return .remoteOutcomeUncertain
+        case .storageOutcomeUncertain: return .storageOutcomeUncertain
+        default: return .unresolved
+        }
     }
 }
 
@@ -1924,7 +1937,8 @@ private extension MobileWalletPresentationDisclosure {
             displayValue: displayValue,
             selectivelyDisclosable: selectivelyDisclosable,
             required: required,
-            selectable: selectable
+            selectable: selectable,
+            requested: requested
         )
     }
 }

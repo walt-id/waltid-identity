@@ -9,12 +9,14 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runAndroidComposeUiTest
 import id.walt.walletdemo.compose.logic.WalletDemoIdentitySetup
 import id.walt.walletdemo.compose.logic.WalletDemoKeyChoice
@@ -22,6 +24,8 @@ import id.walt.walletdemo.compose.logic.WalletDemoKeySetupOption
 import id.walt.walletdemo.compose.logic.WalletDemoIdentityDetails
 import id.walt.walletdemo.compose.logic.WalletDemoIdentityDetailsState
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.DemoBiometricAvailability
+import id.walt.walletdemo.compose.logic.DemoBiometricKind
 import id.walt.walletdemo.compose.ui.screens.SettingsScreen
 import id.walt.walletdemo.compose.ui.screens.IdentitySetupScreen
 import kotlin.test.Test
@@ -33,6 +37,59 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class KeySetupNavigationAndroidTest {
+    @Test
+    fun unavailableDefaultCannotCreateUntilApprovalIsExplicitlyChanged() = runAndroidComposeUiTest<ComponentActivity> {
+        fun choice(id: String) = WalletDemoKeyChoice(id, id, "Details for $id")
+        val biometric = choice("Biometric signing")
+        val unprotected = WalletDemoKeySetupOption("none-handle", choice("new"), choice("native"), choice("No biometric signing"))
+        val setup = mutableStateOf(WalletDemoIdentitySetup.Choose(listOf(unprotected), preferredApproval = biometric))
+        var submitted: String? = null
+        val restoration = StateRestorationTester(this)
+        restoration.setContent { IdentitySetupScreen(setup.value, null, { submitted = it }, {}, {}, {},
+            biometricAvailability = DemoBiometricAvailability.Unavailable, biometricKind = DemoBiometricKind.FaceId) }
+        onNodeWithTag("wallet.keySetupEdit.Approval").assertTextContains(biometric.title)
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsNotEnabled()
+        onNodeWithText("Face ID is unavailable. Check this app’s Face ID access in Settings.").performScrollToContent(this).assertIsDisplayed()
+        restoration.emulateSaveAndRestore()
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsNotEnabled()
+        onNodeWithTag("wallet.keySetupEdit.Approval").performClick()
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Approval", 0)).performScrollToContent(this).performClick()
+        onNodeWithText("Done").performClick()
+        restoration.emulateSaveAndRestore()
+        onNodeWithTag("wallet.keySetupEdit.Approval").assertTextContains(unprotected.approval.title)
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsEnabled().performClick()
+        kotlin.test.assertEquals("none-handle", submitted)
+    }
+
+    @Test
+    fun availabilityAndStorageChangesPreserveIntendedApproval() = runAndroidComposeUiTest<ComponentActivity> {
+        fun choice(id: String) = WalletDemoKeyChoice(id, id, "Details for $id")
+        val protected = WalletDemoKeySetupOption("protected", choice("new"), choice("native"), choice("biometric"))
+        val plain = protected.copy(id = "plain", approval = choice("none"))
+        val database = plain.copy(id = "database", storage = choice("database"))
+        val setup = mutableStateOf(WalletDemoIdentitySetup.Choose(listOf(plain, database), preferredApproval = protected.approval))
+        val availability = mutableStateOf(DemoBiometricAvailability.Unavailable)
+        var submitted: String? = null
+        setContent { IdentitySetupScreen(setup.value, null, { submitted = it }, {}, {}, {}, biometricAvailability = availability.value) }
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsNotEnabled()
+        runOnUiThread {
+            setup.value = setup.value.copy(options = listOf(protected, plain, database))
+            availability.value = DemoBiometricAvailability.Available
+        }
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsEnabled()
+        onNodeWithTag("wallet.keySetupEdit.Storage").performClick()
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).performScrollToContent(this).performClick()
+        onNodeWithText("Done").performClick()
+        onNodeWithTag("wallet.keySetupEdit.Approval").assertTextContains("biometric")
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsNotEnabled()
+        kotlin.test.assertNull(submitted)
+        onNodeWithTag("wallet.keySetupEdit.Storage").performClick()
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 0)).performScrollToContent(this).performClick()
+        onNodeWithText("Done").performClick()
+        onNodeWithTag(WalletUiTestTags.KeySetupContinue).assertIsEnabled().performClick()
+        kotlin.test.assertEquals("protected", submitted)
+    }
+
     @Test
     fun settingsDoNotOfferLegacySigningControlsWhileDetailsLoadOrFail() = runAndroidComposeUiTest<ComponentActivity> {
         val state = mutableStateOf(WalletDemoUiState())
@@ -56,19 +113,19 @@ class KeySetupNavigationAndroidTest {
         runOnUiThread {
             state.value = state.value.copy(identityDetails = WalletDemoIdentityDetailsState.Failed("Provider unavailable"))
         }
-        onNodeWithText("Provider unavailable").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Provider unavailable").performScrollToContent(this).assertIsDisplayed()
         onAllNodesWithText("Signing protection").assertCountEquals(0)
         runOnUiThread {
             state.value = state.value.copy(identityDetails = WalletDemoIdentityDetailsState.Available(
                 WalletDemoIdentityDetails("Hardware", "Generated", "No signing prompt", "No backup", emptyList())))
         }
-        onNodeWithText("Storage policy").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Unknown").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Key storage").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("Unknown").performScrollToContent(this).assertIsDisplayed()
         onAllNodesWithText("Changing signing protection creates a new wallet key and DID.").assertCountEquals(0)
         runOnUiThread {
             state.value = state.value.copy(identityDetails = WalletDemoIdentityDetailsState.Unsupported)
         }
-        onNodeWithText("Signing protection").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Signing protection").performScrollToContent(this).assertIsDisplayed()
     }
 
     @Test
@@ -98,9 +155,9 @@ class KeySetupNavigationAndroidTest {
         }
         onNodeWithTag(WalletUiTestTags.SettingsTechnicalDetails).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
-        onNodeWithTag(WalletUiTestTags.SettingsSignOut).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsSignOut).performScrollToContent(this).performClick()
         kotlin.test.assertTrue(signedOut)
-        onNodeWithTag(WalletUiTestTags.SettingsReset).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsReset).performScrollToContent(this).performClick()
         kotlin.test.assertFalse(reset)
         onNodeWithText("Delete the current server wallet and create an empty wallet.").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsResetConfirm).performClick()
@@ -120,24 +177,24 @@ class KeySetupNavigationAndroidTest {
         }
         onAllNodesWithText("Wallet actions").assertCountEquals(0)
         onAllNodesWithTag(WalletUiTestTags.SettingsReaderAuthentication).assertCountEquals(0)
-        onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation).performScrollTo().performClick()
-        onNodeWithTag(WalletUiTestTags.SettingsReaderAuthentication).performScrollTo().performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation).performScrollToContent(this).performClick()
+        onNodeWithTag(WalletUiTestTags.SettingsReaderAuthentication).performScrollToContent(this).performClick()
         restoration.emulateSaveAndRestore()
         onNodeWithText("Reader trust editor").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
-        onNodeWithText("Connection method").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Connection method").performScrollToContent(this).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
-        onNodeWithText("Digital Credentials API").performScrollTo().performClick()
+        onNodeWithText("Digital Credentials API").performScrollToContent(this).performClick()
         onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview).assertIsOn().performClick().assertIsOff()
         restoration.emulateSaveAndRestore()
         onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview).assertIsOff()
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
-        onNodeWithText("Signing key").performScrollTo().performClick()
+        onNodeWithText("Signing key").performScrollToContent(this).performClick()
         runOnUiThread { state.value = state.value.copy(identityError = "Backup provider unavailable") }
-        onNodeWithText("Backup provider unavailable").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Backup provider unavailable").performScrollToContent(this).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
-        onNodeWithTag(WalletUiTestTags.SettingsLock).performScrollTo().assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.SettingsReset).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsLock).performScrollToContent(this).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.SettingsReset).performScrollToContent(this).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
         kotlin.test.assertTrue(exited)
     }
@@ -175,9 +232,9 @@ class KeySetupNavigationAndroidTest {
                 onCancelSigningProtectionChange = {},
             ) }
         onNodeWithText("Signing key").performClick()
-        onNodeWithText("StrongBox").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Backup provider requires sign-in.").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Check again").performScrollTo().performClick()
+        onNodeWithText("StrongBox").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("Backup provider requires sign-in.").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("Check again").performScrollToContent(this).performClick()
         kotlin.test.assertTrue(refreshed)
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
         onNodeWithText("Technical details").assertIsDisplayed()
@@ -191,7 +248,8 @@ class KeySetupNavigationAndroidTest {
                 null, {}, {}, {}, { refreshed = true })
         }
         onNodeWithText("Sign in to your backup provider.").assertIsDisplayed()
-        onNodeWithText("Check again").performClick()
+        onAllNodesWithText("Check again").assertCountEquals(0)
+        onNodeWithText("Try again").performClick()
         kotlin.test.assertTrue(refreshed)
         onAllNodesWithText("Continue").assertCountEquals(0)
     }
@@ -209,14 +267,19 @@ class KeySetupNavigationAndroidTest {
             warning.value = null
             setup.value = setup.value.copy(recoveryUnavailableReasons = emptyList())
         }) }
+        onAllNodesWithText("Try again").assertCountEquals(1)
+        onAllNodesWithText("Check again").assertCountEquals(0)
+        onNodeWithTag("wallet.keySetupEdit.Recovery").performClick()
+        onAllNodesWithText("Key options unavailable").assertCountEquals(0)
         onAllNodesWithText("Try again").assertCountEquals(0)
-        onAllNodesWithText("Check again").assertCountEquals(1)
-        onNodeWithText("Encrypted cloud backup: Google reports encryption unavailable.").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Prepare device transfer").performScrollTo().assertIsDisplayed()
-        onNodeWithText("Check again").performScrollTo().performClick()
+        onNodeWithText("Encrypted cloud backup: Google reports encryption unavailable.").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Recovery", 0)).assertIsDisplayed()
+        onNodeWithText("Check again").performScrollToContent(this).performClick()
         kotlin.test.assertTrue(refreshed)
         onAllNodesWithText("Try again").assertCountEquals(0)
-        onNodeWithText("Prepare device transfer").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Recovery", 0)).assertIsDisplayed()
+        onNodeWithText("Done").performClick()
+        onNodeWithText("Create signing key").assertIsDisplayed()
     }
 
     @Test
@@ -229,35 +292,24 @@ class KeySetupNavigationAndroidTest {
         var submitted: String? = null
         val restoration = StateRestorationTester(this)
         restoration.setContent { IdentitySetupScreen(setup.value, null, { submitted = it }, {}, {}, {}) }
-        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
-        onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).performScrollTo().performClick()
-        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
-        onNodeWithText("Back").assertIsDisplayed()
-
+        onNodeWithTag("wallet.keySetupEdit.Storage").performClick()
+        onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).performScrollToContent(this).performClick()
+        kotlin.test.assertNull(submitted)
         runOnUiThread { setup.value = WalletDemoIdentitySetup.Choose(options.map { it.copy(id = "refreshed-${it.id}") }) }
         restoration.emulateSaveAndRestore()
-        onNodeWithText("3 of 4 · Signing approval").assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
-        onNodeWithText("4 of 4 · Review").assertIsDisplayed()
-        kotlin.test.assertNull(submitted)
-        restoration.emulateSaveAndRestore()
-        onNodeWithText("4 of 4 · Review").assertIsDisplayed()
-        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
-        kotlin.test.assertEquals("refreshed-database", submitted)
-        runOnUiThread { requireNotNull(activity).onBackPressedDispatcher.onBackPressed() }
-        onNodeWithText("3 of 4 · Signing approval").assertIsDisplayed()
-        runOnUiThread { requireNotNull(activity).onBackPressedDispatcher.onBackPressed() }
         onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).assertIsSelected()
         runOnUiThread { requireNotNull(activity).onBackPressedDispatcher.onBackPressed() }
-        onNodeWithText("1 of 4 · Recovery").assertIsDisplayed()
-        onAllNodesWithText("Refresh available options").assertCountEquals(0)
-
+        onNodeWithTag("wallet.keySetupEdit.Storage").assertTextContains("database")
+        kotlin.test.assertNull(submitted)
+        restoration.emulateSaveAndRestore()
         onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
-        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        kotlin.test.assertEquals("refreshed-database", submitted)
+        onNodeWithTag("wallet.keySetupEdit.Storage").performClick()
         runOnUiThread { setup.value = WalletDemoIdentitySetup.Choose(options.take(1)) }
-        onNodeWithText("1 of 4 · Recovery").assertIsDisplayed()
+        onNodeWithTag("wallet.keySetupEdit.Storage").assertTextContains("native")
+        onAllNodesWithTag(WalletUiTestTags.keySetupChoice("Storage", 1)).assertCountEquals(0)
         runOnUiThread { setup.value = WalletDemoIdentitySetup.Choose(options) }
-        onNodeWithTag(WalletUiTestTags.KeySetupContinue).performClick()
+        onNodeWithTag("wallet.keySetupEdit.Storage").performClick()
         onNodeWithTag(WalletUiTestTags.keySetupChoice("Storage", 0)).assertIsSelected()
     }
 }

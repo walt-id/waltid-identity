@@ -90,6 +90,7 @@ data class PreviewCredentialDisclosure(
     val selectivelyDisclosable: Boolean,
     val required: Boolean,
     val selectable: Boolean,
+    val requested: Boolean = true,
 )
 
 /** A required DCQL credential-query combination; at least one option must be satisfied. */
@@ -160,6 +161,7 @@ fun StatelessPreviewPresentationResult.toPreviewResponse(
                         selectivelyDisclosable = disclosure.selectivelyDisclosable,
                         required = disclosure.required,
                         selectable = disclosure.selectable,
+                        requested = disclosure.requested,
                     )
                 },
             )

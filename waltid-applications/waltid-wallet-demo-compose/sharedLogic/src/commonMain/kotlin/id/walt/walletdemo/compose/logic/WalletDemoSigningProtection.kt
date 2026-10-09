@@ -89,3 +89,23 @@ class InMemoryWalletDemoSigningProtectionStore(
         value = protection
     }
 }
+
+internal fun WalletDemoSigningProtection.approvalChoice(): WalletDemoKeyChoice = WalletDemoKeyChoice(name,
+    when (this) {
+        WalletDemoSigningProtection.None -> "No biometric signing"
+        WalletDemoSigningProtection.Biometric -> "Biometrics with timed approval"
+        WalletDemoSigningProtection.BiometricPerUse -> "Current biometrics only"
+    }, when (this) {
+        WalletDemoSigningProtection.None -> "Signing does not require system approval. Your wallet PIN does not authorize the signing key."
+        WalletDemoSigningProtection.Biometric -> "Approve signing with biometrics. Authorization is reused for up to 10 seconds."
+        WalletDemoSigningProtection.BiometricPerUse -> "Approve each signature with biometrics. Changing enrolled biometrics invalidates this key."
+    })
+
+fun WalletDemoSigningProtectionAvailability.recoveryAvailability(unlock: DemoBiometricAvailability): DemoBiometricAvailability = when (this) {
+    WalletDemoSigningProtectionAvailability.Available -> DemoBiometricAvailability.Available
+    WalletDemoSigningProtectionAvailability.BiometricNotEnrolled -> DemoBiometricAvailability.NotEnrolled
+    WalletDemoSigningProtectionAvailability.DeviceCredentialNotSet -> DemoBiometricAvailability.DeviceCredentialNotSet
+    WalletDemoSigningProtectionAvailability.Unsupported -> DemoBiometricAvailability.Unsupported
+    WalletDemoSigningProtectionAvailability.BiometricUnavailable ->
+        if (unlock == DemoBiometricAvailability.LockedOut) unlock else DemoBiometricAvailability.Unavailable
+}

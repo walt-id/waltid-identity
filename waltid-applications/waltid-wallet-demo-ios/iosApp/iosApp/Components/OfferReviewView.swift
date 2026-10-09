@@ -14,33 +14,10 @@ struct OfferReviewView: View {
     let onAccept: () -> Void
     let onDecline: () -> Void
     var showActions: Bool = true
-    @State private var issuerExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ExpandableMetadataCard(
-                title: "Issuer",
-                titleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerSection,
-                toggleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerDetailsToggle,
-                isExpanded: $issuerExpanded
-            ) {
-                MetadataIdentityView(
-                    display: issuerDisplay,
-                    fallbackName: preview.issuer.identifier,
-                    supportingText: nil
-                )
-            } details: {
-                if issuerHasFriendlyName {
-                    MetadataDetailList(items: [
-                        MetadataDetailItem(
-                            label: "Credential Issuer",
-                            value: preview.issuer.identifier,
-                            linkURI: preview.issuer.identifier
-                        ),
-                    ])
-                    .accessibilityIdentifier(WalletAccessibilityID.offerIssuerDetails)
-                }
-            }
+            IssuanceIssuerSection(issuer: preview.issuer)
 
             if !preview.credentials.isEmpty {
                 WalletSection("Offered credentials", titleIdentifier: WalletAccessibilityID.offerCredentialsSection) {
@@ -51,7 +28,7 @@ struct OfferReviewView: View {
                                 issuerIdentifier: preview.issuer.identifier,
                                 copies: Binding(get: { copies[credential.configurationID] ?? 1 },
                                                 set: { onCopiesChange(credential.configurationID, $0) }),
-                                limit: preview.batchSize ?? 1, enabled: isReviewEnabled)
+                                limit: preview.batchSize ?? 1, enabled: isReviewEnabled, largeArt: preview.credentials.count == 1)
                             if credential.configurationID != preview.credentials.last?.configurationID { Divider() }
                         }
                     }
@@ -122,21 +99,7 @@ struct OfferReviewView: View {
             : String(format: String(localized: "Selected: %d · Copies: %d"), selected.count, selected.reduce(0, +))
     }
 
-    private var issuerDisplay: MetadataDisplay? {
-        MetadataDisplay(
-            name: preview.issuer.name,
-            locale: preview.issuer.locale,
-            logoURI: preview.issuer.logoURI?.absoluteString,
-            logoAltText: preview.issuer.logoAltText
-        )
-    }
 
-    private var issuerHasFriendlyName: Bool {
-        guard let name = preview.issuer.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
-            return false
-        }
-        return name != preview.issuer.identifier
-    }
 }
 
 struct OfferReviewActions: View {

@@ -24,9 +24,6 @@ public struct WalletActionBar: View {
     }
 
     public var body: some View {
-        WalletActions(primary: primary, secondary: secondary)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(.regularMaterial)
+        WalletFooter { WalletActions(primary: primary, secondary: secondary) }
     }
 }

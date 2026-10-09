@@ -2,6 +2,7 @@
     <string name="issuance_offered_credentials">Offered credentials</string>
     <string name="issuance_information">Credential information</string>
     <string name="issuance_receive_named">Receive %1$s</string>
+    <string name="issuance_receive">Receive</string>
     <string name="issuance_copies">Copies: %1$d</string>
     <string name="issuance_more_copies">More copies of %1$s</string>
     <string name="issuance_fewer_copies">Fewer copies of %1$s</string>
@@ -18,4 +19,22 @@
     <string name="issuance_format">Format</string>
     <string name="issuance_configuration">Configuration</string>
     <string name="issuance_type">Credential type</string>
+    <string name="issuance_saved_count">Saved · %1$d</string>
+    <string name="issuance_pending_count">Pending · %1$d</string>
+    <string name="issuance_original_result">Original request</string>
+    <string name="issuance_failed_targets">Failed targets: %1$d</string>
+    <string name="issuance_unattempted_targets">Not attempted: %1$d</string>
+    <string name="issuance_consumed_hint">Saved credentials remain in your wallet. Ask the issuer for a new offer for any targets that could not be completed.</string>
+    <string name="issuance_pending_credential">Pending credential</string>
+    <string name="issuance_awaiting_issuer">The issuer is preparing your credential.</string>
+    <string name="issuance_awaiting_local_save">Received. Finish saving it to this wallet.</string>
+    <string name="issuance_remote_uncertain">The request is still running or its response was lost. It cannot safely be repeated.</string>
+    <string name="issuance_storage_uncertain">Saving is in progress or was interrupted. Another operation cannot safely take over.</string>
+    <string name="issuance_pending_unknown">Receiving was paused. The wallet will check how to continue.</string>
+    <string name="issuance_poll_interval">Allow %1$d seconds between checks.</string>
+    <string name="issuance_finish_saving">Finish saving</string>
+    <string name="issuance_check_issuer">Check with issuer</string>
+    <string name="issuance_continue">Continue receiving</string>
+    <string name="issuance_done">Done</string>
+    <string name="issuance_refresh_status">Refresh status</string>
 </resources>
