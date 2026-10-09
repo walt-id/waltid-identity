@@ -3,6 +3,7 @@ plugins {
     id("io.ktor.plugin")
     application
     id("com.github.gmazzo.buildconfig")
+    id("waltid.licensee")
 }
 
 val ktorVersion = project.identityCatalog.findVersion("ktor").get().requiredVersion

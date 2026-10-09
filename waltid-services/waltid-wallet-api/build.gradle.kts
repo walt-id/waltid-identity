@@ -61,8 +61,8 @@ dependencies {
     implementation(identityLibs.bouncycastle.prov)
     implementation(identityLibs.bouncycastle.pkix)
 
-    // Argon2
-    implementation(identityLibs.argon2.jvm)
+    // Argon2i password hashes. Apache-2.0; verifies hashes previously produced by argon2-jvm.
+    implementation(identityLibs.password4j)
 
 
     // walt.id
@@ -117,7 +117,6 @@ dependencies {
     // drivers
     implementation(identityLibs.sqlite.wallet)
     implementation(identityLibs.postgresql)
-    implementation(identityLibs.mysql.connector)
     implementation(identityLibs.mssql.jdbc)
 
     // Web push
