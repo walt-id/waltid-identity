@@ -3,6 +3,15 @@ package id.walt.openid4vci.metadata.issuer
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
@@ -11,14 +20,69 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.jsonArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.test.assertNull
 import kotlin.time.Instant
 
 class CredentialIssuerMetadataJwtTest {
+    @Test
+    fun `crypto2 preserves jwk behavior and supports certificate header without changing payload`() = runTest {
+        val key = crypto2Key()
+        val issuedAt = Instant.fromEpochSeconds(1_716_000_000)
+        val metadata = metadata(mapOf("example_extension" to JsonPrimitive("preserved")))
+        val original = metadata.toSignedJwt(key, JwsAlgorithm.ES256, issuedAt, "published-kid")
+        val originalHeader = original.decodeJws().header
+        assertNull(originalHeader["x5c"])
+        assertFalse("d" in originalHeader["jwk"]!!.jsonObject)
+        // Certificate parsing and key matching are service responsibilities; this test checks header transport.
+        val chain = listOf("+/8=", "AQID")
+        val signed = metadata.toSignedJwt(key, JwsAlgorithm.ES256, chain, issuedAt, "published-kid")
+        val header = signed.decodeJws().header
+        assertEquals(chain, header["x5c"]!!.jsonArray.map { it.jsonPrimitive.content })
+        assertNull(header["jwk"])
+        assertEquals("published-kid", header["kid"]?.jsonPrimitive?.content)
+        assertEquals(CredentialIssuerMetadataJwt.TYPE, header["typ"]?.jsonPrimitive?.content)
+        assertEquals(original.decodeJws().payload, signed.decodeJws().payload)
+        CompactJws.verify(original, key, JwsAlgorithm.ES256)
+        CompactJws.verify(signed, key, JwsAlgorithm.ES256)
+        assertEquals(original.decodeJws().header,
+            metadata.toSignedJwt(key, JwsAlgorithm.ES256, null, issuedAt, "published-kid").decodeJws().header)
+    }
+
+    @Test
+    fun `crypto2 certificate overload retains input restrictions`() = runTest {
+        val key = crypto2Key()
+        assertFailsWith<IllegalArgumentException> {
+            metadata().toSignedJwt(key, JwsAlgorithm.ES256, emptyList())
+        }
+        assertFailsWith<IllegalArgumentException> {
+            metadata().toSignedJwt(key, JwsAlgorithm.ES384, listOf("AQID"))
+        }
+        // Crypto2's algorithm type excludes symmetric and unsigned JWS entirely.
+        assertFailsWith<IllegalArgumentException> { JwsAlgorithm.parse("HS256") }
+        assertFailsWith<IllegalArgumentException> { JwsAlgorithm.parse("none") }
+        assertFailsWith<IllegalArgumentException> {
+            metadata().toSignedJwt(key, JwsAlgorithm.ES256, listOf("AQID"), keyId = "")
+        }
+        CredentialIssuerMetadataJwt.reservedPayloadClaims.forEach { claim ->
+            assertFailsWith<IllegalArgumentException> {
+                metadata(mapOf(claim to JsonPrimitive("collision"))).toSignedJwt(key, JwsAlgorithm.ES256, listOf("AQID"))
+            }
+        }
+    }
+
+    private suspend fun crypto2Key() = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
+        GenerateSoftwareKeyRequest(
+            id = KeyId("metadata-test"),
+            spec = KeySpec.Ec(EcCurve.P256),
+            usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+        ),
+    )
 
     @Test
     fun `signs complete issuer metadata with required headers and claims`() = runTest {

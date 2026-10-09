@@ -36,8 +36,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlin.reflect.KClass
 import kotlinx.coroutines.runBlocking
 import kotlin.test.assertEquals
@@ -467,7 +465,14 @@ class Issuer2ProfileEndpointTest {
         profileId: String,
         profilesConfig: Issuer2ProfilesConfig,
     ): IssuerMaterial =
-        if (profileId in HAIP_PROFILE_IDS) {
+        if (profilesConfig.defaultEudiIssuerKey != null &&
+            profileId in setOf("identityCredentialSdJwtEudi", "isoPhotoIdEudi", "eudiPidSdJwt", "eudiPidMdoc")
+        ) {
+            IssuerMaterial(
+                key = assertNotNull(profilesConfig.defaultEudiIssuerKey, "Expected defaultEudiIssuerKey"),
+                x5Chain = profilesConfig.defaultEudiIssuerX5chain,
+            )
+        } else if (profileId in HAIP_PROFILE_IDS) {
             IssuerMaterial(
                 key = assertNotNull(profilesConfig.defaultHaipIssuerKey, "Expected defaultHaipIssuerKey"),
                 x5Chain = if (profileId == ISO_MDL_HAIP_PROFILE_ID) {
@@ -587,29 +592,7 @@ class Issuer2ProfileEndpointTest {
         }
     }
 
-    private fun loadIssuer2ConfigFiles() {
-        ConfigManager.preclear()
-        FeatureManager.preclear()
-        registerIssuer2ConfigDecoders()
-        configFiles.forEach { (id, _) -> System.clearProperty("config.file.$id") }
-
-        val configDir = issuer2ConfigDir()
-        configFiles.forEach { (id, type) ->
-            System.setProperty("config.file.$id", configDir.resolve("$id.conf").toString())
-            ConfigManager.registerConfig(id, type)
-        }
-        ConfigManager.loadConfigs()
-    }
-
-    private fun issuer2ConfigDir(): Path =
-        listOf(
-            Path.of("config"),
-            Path.of("waltid-services/waltid-issuer-api2/config"),
-            Path.of("waltid-identity/waltid-services/waltid-issuer-api2/config"),
-        )
-            .map { it.toAbsolutePath().normalize() }
-            .firstOrNull { Files.isRegularFile(it.resolve("issuer-service.conf")) }
-            ?: error("Could not locate waltid-issuer-api2 config directory")
+    private fun loadIssuer2ConfigFiles() = id.walt.issuer2.testsupport.loadIssuer2ConfigFiles()
 
     private companion object {
         const val OPEN_BADGE_PROFILE_ID = "openBadgeCredential"
@@ -641,6 +624,7 @@ class Issuer2ProfileEndpointTest {
         val MDOC_PROFILE_IDS = setOf(
             ISO_MDL_PROFILE_ID,
             ISO_PHOTO_ID_PROFILE_ID,
+            "isoPhotoIdEudi",
             "eudiPidMdoc",
             SCA_PAYMENT_CARD_MDOC_PROFILE_ID,
             "emvcoDpcMdoc",
