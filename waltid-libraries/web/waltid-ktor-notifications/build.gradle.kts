@@ -29,6 +29,11 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             api(project(":waltid-libraries:web:waltid-ktor-notifications-core"))
         }
+        jvmTest.dependencies {
+            implementation(identityLibs.bundles.waltid.kotlintesting)
+            implementation(identityLibs.ktor.client.mock)
+            implementation(identityLibs.slf4j.simple)
+        }
     }
 }
 
