@@ -26,7 +26,11 @@ sealed class ClientAttestationVerificationMethod {
     @SerialName("x509-chain")
     data class X509Chain(
         val trustedRootCertificatesPem: List<String>,
-        /** When set, a linked trust registry must resolve the leaf as this entity type. */
+        /**
+         * Optional entity-type name. This library stores it and does not enforce it.
+         * A deployment that wraps the verifier, such as Enterprise Issuer2, may require
+         * a linked trust registry to trust the leaf and use this name as an extra filter.
+         */
         val expectedEntityType: String? = null,
     ) : ClientAttestationVerificationMethod() {
         init {
