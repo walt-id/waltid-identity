@@ -5,6 +5,23 @@ import XCTest
 final class MockWalletUITests: XCTestCase {
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
+    func testWalletReadinessOutlivesTheSuccessBannerAcrossRestart() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        for _ in 0..<2 {
+            ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
+            XCTAssertTrue(app.descendants(matching: .any)["wallet.credentials.empty"].waitForExistence(timeout: 20))
+            let hidden = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == false"),
+                object: app.descendants(matching: .any)["wallet.status"]
+            )
+            XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 10), .completed)
+            XCTAssertEqual(ui.waitUntilWalletReady(timeout: 2), "Wallet ready")
+            app.terminate()
+        }
+    }
+
     func testCredentialsStayLoadingUntilTheInitialReadCompletes() {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
@@ -12,7 +29,8 @@ final class MockWalletUITests: XCTestCase {
         let loading = app.descendants(matching: .any)["wallet.credentials.loading"].firstMatch
         XCTAssertTrue(loading.waitForExistence(timeout: 3))
         XCTAssertFalse(app.descendants(matching: .any)["wallet.credentials.empty"].exists)
-        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 20), "Wallet ready")
+        XCTAssertNil(ui.waitUntilWalletReady(timeout: 1), "Wallet readiness must include the initial credential read")
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: 20), "Wallet ready")
         XCTAssertTrue(app.descendants(matching: .any)["wallet.credentials.empty"].waitForExistence(timeout: 3))
         XCTAssertFalse(loading.exists)
     }
@@ -23,7 +41,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
@@ -80,7 +98,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
@@ -136,7 +154,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
         receiveMockCredential(app: app, ui: ui)
@@ -162,7 +180,7 @@ final class MockWalletUITests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -205,7 +223,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -227,7 +245,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -280,7 +298,7 @@ final class MockWalletUITests: XCTestCase {
         ])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -326,7 +344,7 @@ final class MockWalletUITests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
-        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10), "Wallet ready")
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: 10), "Wallet ready")
 
         ui.tapTab(label: "Receive")
         ui.replaceText(
@@ -375,7 +393,7 @@ final class MockWalletUITests: XCTestCase {
         ])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -403,7 +421,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -429,7 +447,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -468,7 +486,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -522,7 +540,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -618,7 +636,7 @@ final class MockWalletUITests: XCTestCase {
         ])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -673,7 +691,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -717,7 +735,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -834,7 +852,7 @@ final class MockWalletUITests: XCTestCase {
         ])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
         receiveMockCredential(app: app, ui: ui)
@@ -863,7 +881,7 @@ final class MockWalletUITests: XCTestCase {
         ])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -906,7 +924,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -945,7 +963,7 @@ final class MockWalletUITests: XCTestCase {
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 
@@ -999,7 +1017,7 @@ final class MockWalletUITests: XCTestCase {
         ])
 
         XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 10),
+            ui.waitUntilWalletReady(timeout: 10),
             "Wallet ready"
         )
 

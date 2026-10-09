@@ -42,7 +42,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         approval.tap()
         print("SCA_OPERATOR: approve iPhone key setup and issuance prompts")
         next.tap()
-        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 180), "Wallet ready")
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: 180), "Wallet ready")
         let authentication = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts["com.apple.localauthentication.ax.authentication.alert"]
         let authorized = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: authentication)
         XCTAssertEqual(XCTWaiter.wait(for: [authorized], timeout: 180), .completed, "Native setup authorization is still pending")
@@ -85,6 +85,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     }
 
     func testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2() async throws {
+        continueAfterFailure = false
         let scenario = try publicDemoScenario()
         let offer = try await backend.createOffer(scenario: scenario)
 
@@ -92,10 +93,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: publicDemoEnvironment())
 
-        let readyStatus = ui.waitForStatus(
-            prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: walletReadyTimeout
-        )
+        let readyStatus = ui.waitUntilWalletReady(timeout: walletReadyTimeout)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         ui.tapTab(label: "Receive")
@@ -125,7 +123,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         // XCUIApplication.terminate ends the app process; a new wallet object alone is insufficient.
         app.terminate()
         ui.launch(initializeSigningIdentity: false)
-        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: walletReadyTimeout), "Wallet ready")
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
         ui.tapTab(label: "Credentials")
         XCTAssertFalse(app.buttons["wallet.keySetupContinue"].exists, "Restart must reuse the saved identity")
         let reopenedCredentialIDs = Set(app.descendants(matching: .any)
@@ -169,10 +167,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: publicDemoEnvironment())
 
-        let readyStatus = ui.waitForStatus(
-            prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: walletReadyTimeout
-        )
+        let readyStatus = ui.waitUntilWalletReady(timeout: walletReadyTimeout)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         ui.tapTab(label: "Receive")
@@ -224,10 +219,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: publicDemoEnvironment())
 
-        let readyStatus = ui.waitForStatus(
-            prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: walletReadyTimeout
-        )
+        let readyStatus = ui.waitUntilWalletReady(timeout: walletReadyTimeout)
         guard readyStatus == "Wallet ready" else {
             XCTFail("Wallet did not become ready, status: \(readyStatus ?? "nil")")
             return
@@ -307,10 +299,7 @@ final class MockCredentialDisplayUITests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
-        let readyStatus = ui.waitForStatus(
-            prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: 30
-        )
+        let readyStatus = ui.waitUntilWalletReady(timeout: 30)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         ui.tapTab(label: "Receive")
