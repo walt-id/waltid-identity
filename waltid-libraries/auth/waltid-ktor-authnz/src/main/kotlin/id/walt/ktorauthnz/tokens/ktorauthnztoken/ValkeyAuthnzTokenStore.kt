@@ -1,13 +1,11 @@
 package id.walt.ktorauthnz.tokens.ktorauthnztoken
 
-import io.github.domgew.kedis.KedisClient
-import io.github.domgew.kedis.arguments.value.SetOptions
-import io.github.domgew.kedis.commands.KedisServerCommands
+import id.walt.ktorauthnz.exceptions.InvalidTokenException
+import id.walt.ktorauthnz.valkey.ValkeyConnection
 import io.github.domgew.kedis.commands.KedisValueCommands
 import io.klogging.logger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Redis/Valkey/Redict/KeyDB Token Store
@@ -25,28 +23,10 @@ class ValkeyAuthnzTokenStore(
 
     override val name = "valkey"
 
-    val redis = KedisClient.builder {
-        if (unixsocket != null) {
-            unixSocket(unixsocket)
-        } else if (host != null) {
-            hostAndPort(
-                host = host,
-                port = port ?: 6379
-            )
-        }
+    private val connection = ValkeyConnection(unixsocket, host, port, username, password, expiration)
 
-        if (password != null) {
-            autoAuth(
-                password = password,
-                username = username, // optional
-            )
-        } else {
-            noAutoAuth()
-        }
-
-        connectTimeout = 250.milliseconds
-    }
-    val option = SetOptions(expire = SetOptions.ExpireOption.ExpiresInSeconds(expiration.inWholeSeconds))
+    val redis = connection.client
+    val option = connection.expiringWrites
 
     override suspend fun mapToken(token: String, sessionId: String) {
         redis.execute(
@@ -57,7 +37,7 @@ class ValkeyAuthnzTokenStore(
     override suspend fun getTokenSessionId(token: String): String {
         return redis.execute(
             KedisValueCommands.get("authnz-token:$token"),
-        ) ?: throw IllegalArgumentException("Unknown token: $token")
+        ) ?: throw InvalidTokenException("Unknown token")
     }
 
     override suspend fun validateToken(token: String): Boolean {
@@ -72,16 +52,7 @@ class ValkeyAuthnzTokenStore(
         )
     }
 
-    suspend fun tryConnect() {
-        val pong = runCatching { redis.execute(KedisServerCommands.ping()) }.getOrElse {
-            throw IllegalArgumentException(
-                "Could not connect to valkey token store: ${it.message}",
-                it
-            )
-        }
-        require(pong.isNotBlank()) { "Valkey ping invalid" }
-        logger.info { "Connected to valkey token store at: $host:$port" }
-    }
+    suspend fun tryConnect() = connection.tryConnect("token store")
 
 }
 

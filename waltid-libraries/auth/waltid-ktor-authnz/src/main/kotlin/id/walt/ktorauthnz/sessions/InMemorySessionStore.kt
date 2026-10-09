@@ -1,8 +1,20 @@
 package id.walt.ktorauthnz.sessions
 
+import id.walt.ktorauthnz.utils.ExternalMappingList
+import id.walt.ktorauthnz.exceptions.AuthSessionNotFoundException
 import io.klogging.logger
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
-class InMemorySessionStore : SessionStore {
+/**
+ * Sessions in process memory. A session is dropped once past its expiration, and an unfinished one
+ * [pendingSessionLifetime] after it was opened - so abandoned logins do not pile up.
+ */
+class InMemorySessionStore(
+    val pendingSessionLifetime: Duration = 15.minutes,
+    private val clock: Clock = Clock.System,
+) : SessionStore {
 
     override val name = "in_memory"
 
@@ -21,9 +33,45 @@ class InMemorySessionStore : SessionStore {
     /** Internal ID -> external ID */
     val externalIdMappingBackward = HashMap<String, String>()
 
-    override suspend fun resolveSessionById(sessionId: String): AuthSession = synchronized(lock) {
-        sessions[sessionId]?.copy() ?: error("Unknown session id: $sessionId")
+    private fun AuthSession.isExpired(): Boolean {
+        val now = clock.now()
+        return expiration?.let { now > it } == true ||
+                (!status.isSuccess() && createdAt?.let { now > it + pendingSessionLifetime } == true)
     }
+
+    /** Drops [sessionId] if it expired; returns the live session. Call with [lock] held. */
+    private fun live(sessionId: String): AuthSession? {
+        val session = sessions[sessionId] ?: return null
+        if (!session.isExpired()) return session
+        session.accountId?.let { removeSessionIdFromAccountSessions(sessionId, it) }
+        sessions.remove(sessionId)
+        dropExternalIdMappings(sessionId)
+        return null
+    }
+
+    /** The external ids (e.g. the OIDC `sid`) of a session that is gone. Call with [lock] held. */
+    private fun dropExternalIdMappings(sessionId: String) {
+        for (namespace in ExternalMappingList.ALL_EXTERNAL_MAPPINGS) {
+            externalIdMappingBackward.remove("externalid-backward:$namespace:$sessionId")?.let { externalId ->
+                externalIdMappingForward.remove("externalid-forward:$namespace:$externalId")
+            }
+        }
+    }
+
+    private var storesSinceSweep = 0
+
+    private fun sweep() {
+        if (++storesSinceSweep < SWEEP_EVERY) return
+        storesSinceSweep = 0
+        sessions.keys.toList().forEach { live(it) }
+    }
+
+    override suspend fun findSessionById(sessionId: String): AuthSession? = synchronized(lock) {
+        live(sessionId)?.copy()
+    }
+
+    override suspend fun resolveSessionById(sessionId: String): AuthSession =
+        findSessionById(sessionId) ?: throw AuthSessionNotFoundException(sessionId)
 
     private fun removeSessionIdFromAccountSessions(sessionId: String, accountId: String) {
         val remaining = accountSessions[accountId].orEmpty() - sessionId
@@ -35,6 +83,7 @@ class InMemorySessionStore : SessionStore {
         synchronized(lock) {
             sessions[id]?.accountId?.let { removeSessionIdFromAccountSessions(id, it) }
             sessions.remove(id)
+            dropExternalIdMappings(id)
         }
     }
 
@@ -49,12 +98,17 @@ class InMemorySessionStore : SessionStore {
             storedSession.accountId?.let { accountId ->
                 accountSessions[accountId] = (accountSessions[accountId].orEmpty() + storedSession.id).distinct()
             }
+            sweep()
         }
+    }
+
+    override suspend fun listSessionsForAccount(accountId: String): List<AuthSession> = synchronized(lock) {
+        accountSessions[accountId].orEmpty().mapNotNull { live(it)?.copy() }
     }
 
     override suspend fun invalidateAllSessionsForAccount(accountId: String) {
         synchronized(lock) {
-            accountSessions.remove(accountId)?.forEach { sessions.remove(it) }
+            accountSessions.remove(accountId)?.forEach { sessions.remove(it); dropExternalIdMappings(it) }
         }
     }
 
@@ -94,5 +148,9 @@ class InMemorySessionStore : SessionStore {
             val externalId = externalIdMappingBackward["externalid-backward:$namespace:$internalSessionId"]
             removeExternalIdMapping(namespace, externalId, internalSessionId)
         }
+    }
+
+    private companion object {
+        const val SWEEP_EVERY = 256
     }
 }
