@@ -305,6 +305,15 @@ runs:
           --suite native-demo-consent \
           --reports "${{ inputs.waltid-directory }}/build/ios-test-reports/xcresult/*.xml"
 
+    - name: Require native wallet readiness and restart test results
+      if: ${{ always() && inputs.run-native-demo-tests == 'true' }}
+      shell: bash
+      run: |
+        python3 "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify_test_results.py" \
+          --manifest "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/native-readiness-test-suite.json" \
+          --suite native-demo-readiness \
+          --reports "${{ inputs.waltid-directory }}/build/ios-test-reports/xcresult/*waltid-wallet-demo-ios*.xml"
+
     - name: Publish iOS test report
       if: always() && steps.ios_test_report.outputs.has_report == 'true'
       uses: mikepenz/action-junit-report@v6
