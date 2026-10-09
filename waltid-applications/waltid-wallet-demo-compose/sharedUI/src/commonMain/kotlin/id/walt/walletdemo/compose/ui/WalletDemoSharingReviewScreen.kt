@@ -23,16 +23,10 @@ import id.walt.walletdemo.compose.ui.components.WalletIcon
 import id.walt.walletdemo.compose.ui.components.WalletSymbol
 
 /**
- * One sharing review for full-screen and platform-invoked sheet hosts.
- *
- * Credential/disclosure choices and resolved payment consent belong to the request, outside the
- * presentation host. Changing [presentation] neither resets them nor prepares/authorizes a new
- * transaction. [compact] shortens the selection heading; every host uses the same thumbnail rows.
- *
- * The caller owns the transport and OS result. [onCancel] declines the request; [onBackAtRoot]
- * leaves this review (for example, returning to Credential Manager's selector without a result).
- * Both the root back gesture and sheet dismissal are blocked while [enabled] is false. A null
- * [onBackAtRoot] lets a full-screen caller handle Back and makes a sheet non-dismissible.
+ * Shared modal review for provider hosts. Choices and payment consent belong to the request owner.
+ * The caller owns transport and OS results: [onCancel] declines, while [onBackAtRoot] can return
+ * to Credential Manager's selector without answering. Busy reviews block dismissal; a null
+ * [onBackAtRoot] makes the sheet non-dismissible. [compact] shortens the selection heading.
  */
 @Composable
 fun WalletDemoSharingReviewScreen(
@@ -44,7 +38,6 @@ fun WalletDemoSharingReviewScreen(
     enabled: Boolean = true,
     onBackAtRoot: (() -> Unit)? = null,
     compact: Boolean = true,
-    presentation: WalletReviewPresentation = WalletReviewPresentation.FullScreen,
     preparePaymentConsent: (suspend (WalletDemoSharingSelection) -> WalletDemoPaymentConsent?)? = null,
     controller: WalletDemoSharingReviewController? = null,
 ) {
@@ -58,9 +51,9 @@ fun WalletDemoSharingReviewScreen(
     val submit = { owner.selectionForSubmission(state)?.let(onSubmit); Unit }
     val selectionComplete = review.hasCompleteCredentialSelection(selection.credentials)
 
-    WalletReviewHost(presentation, dismissEnabled = enabled, onDismiss = onBackAtRoot) { fillViewport ->
+    WalletReviewHost(dismissEnabled = enabled, onDismiss = onBackAtRoot) {
         ReviewScaffold(
-            fillViewport = fillViewport,
+            fillViewport = false,
             header = {
                 WalletScreenHeader(title) {
                     IconButton(onClick = onBackAtRoot ?: onCancel, enabled = enabled,

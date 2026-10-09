@@ -86,12 +86,11 @@ internal class WalletVisualScenarios(
             session = WalletVisualFixtures.partialResult.session, selectedTab = WalletDemoTab.Receive, externalFlow = flow,
             offerPreview = if (unavailable) null else WalletVisualFixtures.offer, issuanceCopyCounts = WalletVisualFixtures.copies)
         content {
-            WalletReviewHost(WalletReviewPresentation.Sheet, true, {}) {
-                id.walt.walletdemo.compose.ui.screens.WalletExternalFlowScreen(controller, state, {}, onOpenInApp = {})
+            WalletReviewHost(true, {}) {
+                id.walt.walletdemo.compose.ui.screens.WalletFlowScreen(controller, state, {})
             }
         }
         onNodeWithTag("wallet.external.close").assertIsDisplayed().assertIsEnabled()
-        onNodeWithTag("wallet.external.openInApp").assertIsDisplayed().assertIsEnabled()
         onAllNodesWithTag("wallet.offerInput").assertCountEquals(0)
         if (unavailable) onNodeWithTag("wallet.external.unavailable").assertIsDisplayed()
         else onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsDisplayed().assertIsEnabled()
@@ -254,7 +253,7 @@ internal class WalletVisualScenarios(
     }
 
     fun readerTrustImport() = with(test) {
-        content { ReaderTrustImportReview(WalletVisualFixtures.readerTrustImport, {}, {}, WalletReviewPresentation.FullScreen) }
+        content { ReaderTrustImportReview(WalletVisualFixtures.readerTrustImport, {}, {}) }
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportConfirm).assertIsDisplayed().assertIsEnabled()
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportCancel).assertIsDisplayed()
         onNodeWithText("Example Reader CA", substring = false).assertIsDisplayed()
@@ -570,7 +569,7 @@ internal class WalletVisualScenarios(
     fun providerSharingReview(compact: Boolean = false) = with(test) {
         content {
             WalletDemoSharingReviewScreen(review = WalletVisualFixtures.providerReview, title = "Share documents",
-                onSubmit = {}, onCancel = {}, onBackAtRoot = {}, presentation = WalletReviewPresentation.Sheet)
+                onSubmit = {}, onCancel = {}, onBackAtRoot = {})
         }
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationVerifierSection).performScrollTo().assertIsDisplayed()
@@ -588,7 +587,7 @@ internal class WalletVisualScenarios(
             })
         content {
             WalletDemoSharingReviewScreen(review = review, title = "Share credentials", compact = false,
-                onSubmit = {}, onCancel = {}, onBackAtRoot = {}, presentation = WalletReviewPresentation.Sheet)
+                onSubmit = {}, onCancel = {}, onBackAtRoot = {})
         }
         if (alternative) onNodeWithTag(WalletUiTestTags.presentationCredentialToggle(options[1].selection.id))
             .performScrollTo().performClick()
@@ -602,7 +601,7 @@ internal class WalletVisualScenarios(
         content {
             WalletDemoOfferCreateScreen(WalletDemoOfferCreateUiState.Review(WalletVisualFixtures.offer),
                 onAccept = { _, _ -> }, onDecline = {}, onDismiss = {}, onCancelAuthorization = {},
-                presentation = WalletReviewPresentation.Sheet)
+                )
         }
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsEnabled().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.OfferCredentialsSection).performScrollTo().assertIsDisplayed()
@@ -623,7 +622,7 @@ internal class WalletVisualScenarios(
         }
         content {
             WalletDemoOfferCreateScreen(state, onAccept = { _, _ -> }, onDecline = {}, onDismiss = {},
-                onCancelAuthorization = {}, presentation = WalletReviewPresentation.Sheet)
+                onCancelAuthorization = {})
         }
         when (state) {
             is WalletDemoOfferCreateUiState.Receipt -> {
@@ -672,13 +671,12 @@ internal class WalletVisualScenarios(
         capture("payment.localized.compact_large_text")
     }
 
-    fun paymentReview(sheet: Boolean = false) = with(test) {
+    fun paymentReview() = with(test) {
         val consent = WalletVisualFixtures.payment
         content {
             WalletDemoSharingReviewScreen(
                 review = WalletVisualFixtures.paymentReview,
                 title = "Payment", compact = false, onSubmit = {}, onCancel = {}, onBackAtRoot = {},
-                presentation = if (sheet) WalletReviewPresentation.Sheet else WalletReviewPresentation.FullScreen,
                 preparePaymentConsent = { consent },
             )
         }
@@ -686,15 +684,15 @@ internal class WalletVisualScenarios(
         onNodeWithText("11.56 EUR").performScrollTo().assertIsDisplayed()
         onNodeWithText("Pay €11.56").assertIsDisplayed()
         onNodeWithText("bound-but-hidden").assertDoesNotExist()
-        capture("${if (sheet) "payment.sheet" else "payment.mixed_credentials"}.main")
+        capture("payment.mixed_credentials.main")
         onNodeWithTag("payment-details-toggle").performScrollTo().performClick()
         onNodeWithText("example-transaction-001").performScrollTo().assertIsDisplayed()
-        capture("${if (sheet) "payment.sheet" else "payment.mixed_credentials"}.details")
+        capture("payment.mixed_credentials.details")
         onNodeWithTag("review-information-to-share").performScrollTo().assertIsDisplayed()
         onNodeWithText("Pay €11.56").assertIsEnabled().assertIsDisplayed()
-        capture("${if (sheet) "payment.sheet" else "payment.mixed_credentials"}.requested_data")
+        capture("payment.mixed_credentials.requested_data")
         onNodeWithText("Pay €11.56").performClick()
         onNodeWithTag("payment-unsigned-confirm").assertIsDisplayed()
-        capture("${if (sheet) "payment.sheet" else "payment.mixed_credentials"}.unsigned_confirmation")
+        capture("payment.mixed_credentials.unsigned_confirmation")
     }
 }

@@ -38,7 +38,6 @@ fun WalletDemoOfferCreateScreen(
     onDecline: () -> Unit,
     onDismiss: () -> Unit,
     onCancelAuthorization: () -> Unit,
-    presentation: WalletReviewPresentation = WalletReviewPresentation.FullScreen,
     draft: WalletDemoOfferDraft? = null,
     onDone: () -> Unit = onDismiss,
     onResumeDeferred: (String) -> Unit = {},
@@ -55,14 +54,14 @@ fun WalletDemoOfferCreateScreen(
         is WalletDemoOfferCreateUiState.Receipt -> !state.busy
         is WalletDemoOfferCreateUiState.Failure -> true
     }
-    WalletReviewHost(presentation, dismissEnabled, onDismiss = {
+    WalletReviewHost(dismissEnabled, onDismiss = {
         when (state) {
             is WalletDemoOfferCreateUiState.Receipt -> onDone()
             else -> onDismiss()
         }
-    }) { fillViewport ->
+    }) {
         when (state) {
-            WalletDemoOfferCreateUiState.Loading -> ReviewScaffold(fillViewport = fillViewport,
+            WalletDemoOfferCreateUiState.Loading -> ReviewScaffold(fillViewport = false,
                 header = {
                     WalletScreenHeader("Receive credentials") {
                         IconButton(onDecline) { WalletIcon(WalletSymbol.Decline, "Close request") }
@@ -84,7 +83,7 @@ fun WalletDemoOfferCreateScreen(
                 WalletReviewNavigationHost(requestKey = offer.hashCode().toString(), offer = offer,
                     enabled = enabled, onClose = onDismiss.takeIf { enabled }) {
                     ReviewScaffold(
-                        fillViewport = fillViewport,
+                        fillViewport = false,
                         header = {
                             WalletScreenHeader(state.title) {
                                 IconButton(onClick = onDismiss, enabled = enabled) { WalletIcon(WalletSymbol.Decline, "Close request") }
@@ -119,7 +118,7 @@ fun WalletDemoOfferCreateScreen(
                 enabled = !state.busy, onClose = onDone.takeIf { !state.busy },
             ) {
                 ReviewScaffold(
-                    fillViewport = fillViewport,
+                    fillViewport = false,
                     header = {
                         WalletScreenHeader("Receiving result") {
                             IconButton(onClick = onDone, enabled = !state.busy) {
@@ -139,7 +138,7 @@ fun WalletDemoOfferCreateScreen(
                 }
             }
             is WalletDemoOfferCreateUiState.Failure -> ReviewScaffold(
-                fillViewport = fillViewport,
+                fillViewport = false,
                 header = {
                     WalletScreenHeader("Unable to receive credentials") {
                         IconButton(onDecline) { WalletIcon(WalletSymbol.Decline, "Close request") }
@@ -149,7 +148,7 @@ fun WalletDemoOfferCreateScreen(
             ) {
             }
             is WalletDemoOfferCreateUiState.WaitingForAuthorization -> ReviewScaffold(
-                fillViewport = fillViewport,
+                fillViewport = false,
                 header = {
                     WalletScreenHeader("Receive credentials") {
                         IconButton(onCancelAuthorization, enabled = !state.completing) {
