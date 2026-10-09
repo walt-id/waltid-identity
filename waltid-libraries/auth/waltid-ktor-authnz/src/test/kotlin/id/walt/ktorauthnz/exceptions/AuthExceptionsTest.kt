@@ -17,6 +17,7 @@ class AuthExceptionsTest {
             Web3AuthException("bad signature") to 401,
             InvalidChallengeException() to 401,
             AccountDataNotFoundException("userpass") to 404,
+            AuthenticationFailureException("LDAP auth failed") to 401,
         )
         statuses.forEach { (exception, status) -> assertEquals(status, exception.status, exception::class.simpleName) }
         assertEquals("expired", ExpiredTokenException("expired").message)

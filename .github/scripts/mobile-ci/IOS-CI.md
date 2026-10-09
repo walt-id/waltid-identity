@@ -11,8 +11,7 @@ The image currently uses macOS 27 and remains in public preview. Demo, bridge an
 Enterprise tests select the image's iPhone 17 simulator on iOS 27.0 explicitly;
 there is no fallback to an older runtime. `DEVELOPER_DIR` pins Xcode for the whole
 workflow, including framework verification. Composite actions inherit that pin
-and use the supplied simulator destination directly, without selecting Xcode again
-or resolving another simulator. Keep the producer and SDK-docs toolchain pins
+and the supplied simulator configuration. Keep the producer and SDK-docs toolchain pins
 aligned because framework reuse requires an exact Xcode match.
 
 ## Shared release framework
@@ -35,6 +34,14 @@ The Enterprise task accepts `-Penterprise.ios.walletCoreArtifact=<directory>` to
 verify an already restored artifact. Without that property, it builds the release
 framework itself. In both paths, its fixture starts only after framework
 preparation succeeds and is stopped after XCTest.
+
+## Compose URL handoffs
+
+Compose tests create a temporary simulator from the workflow's named device type
+and explicit iOS version, wait for boot completion, and delete it after execution.
+Only the Compose wallet handles the demos' shared URL schemes there. XCTest's
+system URL opener delivers links to the running wallet. Test and cleanup failures
+propagate through the existing phase runner.
 
 ## Failure handling
 

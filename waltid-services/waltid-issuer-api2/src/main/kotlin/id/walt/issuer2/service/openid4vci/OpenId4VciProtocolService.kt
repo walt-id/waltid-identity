@@ -1753,6 +1753,17 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         requestId: String,
         error: CredentialError,
     ): CredentialResponseHttp {
+        if (error.isRetryableProofFailure()) {
+            logger.warn {
+                "Credential proof rejected: " + JsonObject(mapOf(
+                    "requestId" to JsonPrimitive(requestId),
+                    "credential_configuration_id" to JsonPrimitive(request.credentialConfigurationId),
+                    "credential_identifier" to JsonPrimitive(request.credentialIdentifier),
+                    "error" to JsonPrimitive(error.error),
+                    "error_description" to JsonPrimitive(error.description),
+                ))
+            }
+        }
         notificationService.notify(
             requestId = requestId,
             session = session,
@@ -1802,14 +1813,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         error: CredentialError,
     ): CredentialResponseHttp {
         restoreClaimedSession(session)
-        notificationService.notify(
-            requestId = requestId,
-            session = session,
-            event = credentialRequestEvent(format, succeeded = false),
-            error = error.error,
-            errorDescription = error.description,
-        )
-        return oauth2Provider.writeCredentialError(request, error)
+        return rejectCredentialRequest(request, session, format, requestId, error)
     }
 
     private suspend fun restoreClaimedSession(session: IssuanceSession) {

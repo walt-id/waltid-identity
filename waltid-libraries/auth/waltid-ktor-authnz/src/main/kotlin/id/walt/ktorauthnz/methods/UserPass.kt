@@ -5,7 +5,7 @@ import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.UsernameIdentifier
-import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
 import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.requests.UserPassCredentials
 import id.walt.ktorauthnz.methods.storeddata.UserPassStoredData
@@ -23,15 +23,22 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
 
     override val relatedAuthMethodStoredData = UserPassStoredData::class
 
-    override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier {
-        val identifier = UsernameIdentifier(credential.name)
+    override val managesPasswords = true
 
-        val storedData: UserPassStoredData = lookupAccountIdentifierStoredData(identifier /*context()*/)
+    override fun identifierFor(name: String) = UsernameIdentifier(name)
+
+    override fun storedDataFor(password: String) = UserPassStoredData(password = password)
+
+    override suspend fun verifyPassword(name: String, password: String): AccountIdentifier {
+        val identifier = UsernameIdentifier(name)
+
+        val storedData: UserPassStoredData = lookupAccountIdentifierStoredData(identifier)
 
         val passwordHash = PasswordHash.fromString(storedData.passwordHash ?: error("Missing password hash"))
-        val check = PasswordHashing.check(credential.password, passwordHash)
+        val check = PasswordHashing.check(password, passwordHash)
 
         authCheck(check.valid, InvalidCredentialsException())
+
         if (check.updated) {
             val newData = storedData.copy(passwordHash = check.updatedHash!!.toString())
             KtorAuthnzManager.accountStore.updateAccountIdentifierStoredData(identifier, id, newData)
@@ -39,6 +46,9 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
 
         return identifier
     }
+
+    override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier =
+        verifyPassword(credential.name, credential.password)
 
     override fun Route.registerAuthenticationRoutes(
         authContext: ApplicationCall.() -> AuthContext,
@@ -50,7 +60,7 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
         }) {
             val session = call.getAuthSession(authContext)
 
-            val credential = call.getUsernamePasswordFromRequest()
+            val credential = call.getUsernamePasswordFromRequest(session)
 
             val identifier = auth(session, credential, call)
 

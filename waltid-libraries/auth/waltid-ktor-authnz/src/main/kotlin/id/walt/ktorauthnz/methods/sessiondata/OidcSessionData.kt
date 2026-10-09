@@ -33,6 +33,10 @@ data class OidcSessionAuthenticatedData(
     val idTokenClaims: JsonObject? = null,
     val userInfoClaims: JsonObject? = null,
     val idTokenRaw: String? = null,  // Raw ID token for logout (id_token_hint)
+    /** Client id and post-logout redirect settings of the flow, for RP-initiated logout after the flow ended. */
+    val clientId: String? = null,
+    val postLogoutRedirectUri: String? = null,
+    val allowedPostLogoutRedirectUrls: List<String> = emptyList(),
 ) : SessionData {
 
     @Serializable
@@ -67,3 +71,28 @@ data class OidcTokenValidationPolicyData(
         idTokenSigningAlgorithms = openIdConfiguration.idTokenSigningAlgValuesSupported.toSet(),
     )
 }
+
+/** The verifier2 session a VC login waits for. */
+@Serializable
+@SerialName("vc-verification")
+data class VerifiableCredentialSessionData(
+    val verifierSessionId: String,
+) : SessionData
+
+/** A pending email code: its digest, when it expires, and the account and address it was sent for. */
+@Serializable
+@SerialName("email-code")
+data class EmailCodeSessionData(
+    val codeDigest: String,
+    val expiresAt: kotlin.time.Instant,
+    val accountId: String?,
+    val email: String?,
+) : SessionData
+
+/** A TOTP secret being set up during login, until a code from the authenticator app confirms it. */
+@Serializable
+@SerialName("totp-setup")
+data class TotpSetupSessionData(
+    val secret: String,
+    val expiresAt: kotlin.time.Instant,
+) : SessionData

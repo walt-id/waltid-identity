@@ -26,6 +26,7 @@ dependencies {
         exclude("org.apache.commons:commons-lang3") // Manually updated due to security CVE
     }
     implementation(identityLibs.mina.core)
+    // Not used directly: pins the version ktor-openapi brings (CVE-2025-48924) for users of this library too.
     implementation(identityLibs.commons.lang3)
 
     // TOTP/HOTP
@@ -38,9 +39,6 @@ dependencies {
     implementation(identityLibs.nimbus.jose.jwt)
 
     // Cryptography
-    /*implementation(platform("dev.whyoleg.cryptography:cryptography-bom:0.4.0"))
-    implementation("dev.whyoleg.cryptography:cryptography-core")
-    implementation("dev.whyoleg.cryptography:cryptography-provider-jdk")*/
     implementation(identityLibs.password4j)
     implementation(identityLibs.kotlincrypto.hash.sha2)
     implementation(identityLibs.kotlincrypto.random)
@@ -48,23 +46,13 @@ dependencies {
     // Ktor server
     implementation(identityLibs.ktor.server.core)
     implementation(identityLibs.ktor.server.auth)
-    implementation(identityLibs.ktor.server.authjwt)
-    //implementation("io.ktor:ktor-server-auth-ldap")
-    implementation(identityLibs.ktor.server.sessions)
-    implementation(identityLibs.ktor.server.auto.head.response)
-    implementation(identityLibs.ktor.server.double.receive)
-    implementation(identityLibs.ktor.server.host.common)
     implementation(identityLibs.ktor.server.status.pages)
-    implementation(identityLibs.ktor.server.cors)
-    implementation(identityLibs.ktor.server.default.headers)
-    implementation(identityLibs.ktor.server.forwarded.header)
-    implementation(identityLibs.ktor.server.call.logging)
     implementation(identityLibs.ktor.server.content.negotiation)
-    implementation(identityLibs.ktor.server.cio)
     implementation(identityLibs.ktor.server.html.builder)
 
     // Ktor client
     implementation(identityLibs.ktor.client.core)
+    // The engine of the OIDC and VC clients (`HttpClient {}` picks it from the classpath)
     implementation(identityLibs.ktor.client.apache5)
     implementation(identityLibs.ktor.client.content.negotiation)
 
@@ -73,21 +61,20 @@ dependencies {
 
     // Ktor server external
     implementation(identityLibs.smiley.ktor.openapi)
-    implementation(identityLibs.smiley.ktor.swaggerui)
-    implementation(identityLibs.smiley.ktor.redoc)
 
     // JSON
     implementation(identityLibs.kotlinx.serialization.json)
-    implementation(identityLibs.kotlinx.datetime)
-    implementation(identityLibs.jsonpathkt)
 
     // Logging
     implementation(identityLibs.klogging)
-    implementation(identityLibs.slf4j.klogging)
 
     // Redis
-    //implementation("eu.vendeli:rethis:0.3.3")
     implementation(identityLibs.kedis)
+
+    // Passkeys (WebAuthn). It parses the CBOR browsers send with Jackson 3, whose BOM it lifts to 3.2.1 (vulnerable
+    // core, databind and CBOR). The forced versions below only hold in this build, so the BOM is also published.
+    implementation(identityLibs.webauthn4j.core)
+    implementation(platform(identityLibs.jackson.bom.tools))
 
     /* --- Testing --- */
     testImplementation(identityLibs.ktor.client.logging)
@@ -95,10 +82,17 @@ dependencies {
 
     // Ktor
     testImplementation(identityLibs.ktor.server.cio)
+    // The example web app of the tests
+    testImplementation(identityLibs.smiley.ktor.swaggerui)
+    testImplementation(identityLibs.smiley.ktor.redoc)
+    testImplementation(identityLibs.ktor.server.auto.head.response)
+    testImplementation(identityLibs.ktor.server.double.receive)
+    testImplementation(identityLibs.unboundid.ldapsdk)
     testImplementation(identityLibs.ktor.server.test.host)
 
     // Kotlin
     testImplementation(kotlin("test"))
+    testImplementation(identityLibs.webauthn4j.test)
 }
 
 // Force-pin vulnerable transitive dependencies.
@@ -113,12 +107,17 @@ dependencies {
 //   CWE-327 (broken crypto, CVSS 8.7), CWE-1240 (timing attack), CWE-90 (LDAP injection)
 //   Snyk said "no supported fix" at 1.80; 1.84 is now available
 //
+// webauthn4j → tools.jackson.dataformat:jackson-dataformat-cbor:3.2.1, allocation without limits
+//   (CVE-2026-68495, fixed in 3.2.2), and through its BOM core and databind 3.2.1. Pinned to the jackson-core-3
+//   catalog version as well; users of this library get it through the published BOM (see the dependencies).
+//
 // ktor-openapi → io.netty (4.2.x branch), pinned to the netty-4_2 catalog version.
 // web3j → tuweni → vertx-core. swagger-parser → json-schema-core → rhino.
 configurations.all {
     resolutionStrategy.force(
         identityLibs.jackson.core.tools,
         identityLibs.jackson.databind.tools,
+        identityLibs.jackson.dataformat.cbor.tools,
         identityLibs.jackson.core,
         identityLibs.jackson.databind,
         identityLibs.bouncycastle.prov,

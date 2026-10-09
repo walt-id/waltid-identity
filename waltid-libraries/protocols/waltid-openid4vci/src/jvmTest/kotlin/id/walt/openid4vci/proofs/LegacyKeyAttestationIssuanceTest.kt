@@ -37,13 +37,20 @@ class LegacyKeyAttestationIssuanceTest {
             put("iat", now.epochSeconds)
             put("exp", now.epochSeconds + 300)
             put("nonce", "nonce")
-            put("attested_keys", JsonArray(listOf(holder.getPublicKey().exportJWKObject())))
+            put("attested_keys", JsonArray(listOf(JsonObject(holder.getPublicKey().exportJWKObject() - "kid"))))
         }.toString().encodeToByteArray(), mapOf("typ" to JsonPrimitive("key-attestation+jwt")))
         val nested = holder.signJws(buildJsonObject {
             put("aud", issuer); put("iat", now.epochSeconds); put("nonce", "nonce")
         }.toString().encodeToByteArray(), mapOf(
             "typ" to JsonPrimitive("openid4vci-proof+jwt"),
             "jwk" to holder.getPublicKey().exportJWKObject(),
+            "key_attestation" to JsonPrimitive(attestation),
+        ))
+        val nestedKid = holder.signJws(buildJsonObject {
+            put("aud", issuer); put("iat", now.epochSeconds); put("nonce", "nonce")
+        }.toString().encodeToByteArray(), mapOf(
+            "typ" to JsonPrimitive("openid4vci-proof+jwt"),
+            "kid" to JsonPrimitive("0"),
             "key_attestation" to JsonPrimitive(attestation),
         ))
         val nonceService = object : CredentialNonceService {
@@ -69,7 +76,7 @@ class LegacyKeyAttestationIssuanceTest {
             ),
         )
         val provider = buildOAuth2Provider(createTestConfig())
-        for (proofs in listOf(Proofs(jwt = listOf(nested)), Proofs(attestation = listOf(attestation)))) {
+        for (proofs in listOf(Proofs(jwt = listOf(nested)), Proofs(jwt = listOf(nestedKid)), Proofs(attestation = listOf(attestation)))) {
             val request = DefaultCredentialRequest(
                 client = DefaultClient("client", emptyList(), emptySet(), emptySet()),
                 credentialIdentifier = null, credentialConfigurationId = "identity",
