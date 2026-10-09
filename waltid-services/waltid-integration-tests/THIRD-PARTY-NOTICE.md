@@ -2,7 +2,7 @@
 
 This document lists third-party libraries used by :waltid-services:waltid-integration-tests.
 
-This distribution includes 618 third-party components, listed below with
+This distribution includes 615 third-party components, listed below with
 their license and copyright holder.
 
 * [at.asitplus.signum:indispensable 3.24.0](https://github.com/a-sit-plus/signum). Apache License, Version 2.0.
@@ -337,27 +337,6 @@ their license and copyright holder.
   - Copyright (c) Microsoft Corporation
 * [com.microsoft.sqlserver:mssql-jdbc 13.4.0.jre11](https://github.com/Microsoft/mssql-jdbc). MIT License.
   - Copyright (c) Microsoft Corporation
-* [com.mysql:mysql-connector-j 9.7.0](http://dev.mysql.com/doc/connector-j/en/). The GNU General Public License, v2 with Universal FOSS Exception, v1.0.
-  - Copyright (c) 2017, 2026, Oracle and/or its affiliates.
-  - Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
-  - copyright notice and disclaimer of warranty; keep intact all the
-  - Copyright (C) <year>  <name of author>
-  - Copyright (C) 2019 Machinery For Change, Inc.
-  - copyright rights in its Contribution, if any, to grant the copyright license
-  - Copyright 2008 Google Inc.  All rights reserved.
-  - copyright notice, this list of conditions and the following disclaimer
-  - Copyright The OpenTelemetry Authors
-  - COPYRIGHT AND PERMISSION NOTICE
-  - Copyright (c) 1991-2014 Unicode, Inc. All rights reserved. Distributed under
-  - copyright holder.
-  - Copyright (C) 1991, 1999 Free Software Foundation, Inc.
-  - copyright law: that is to say, a work containing the Library or a
-  - copyright notice for the Library among them, as well as a reference
-  - copyrighted by the Free Software Foundation, write to the Free
-  - copyright owner that is granting the License.
-  - copyright owner. For the purposes of this definition, "submitted"
-  - copyright license to reproduce, prepare Derivative Works of, publicly
-  - Copyright [yyyy] [name of copyright owner]
 * [com.nimbusds:nimbus-jose-jwt 10.9.1](https://connect2id.com). Apache License, Version 2.0.
   - Copyright (c) Connect2id Ltd.
 * [com.oracle.oci.sdk:oci-java-sdk-shaded-full 3.90.0](https://docs.oracle.com/iaas/Content/API/SDKDocs/javasdk.htm). The Universal Permissive License (UPL), Version 1.0.
@@ -530,10 +509,6 @@ their license and copyright holder.
   - Copyright (c) cketti
 * [de.cketti.unicode:kotlin-codepoints-jvm 0.11.0](https://github.com/cketti/kotlin-codepoints). MIT License.
   - Copyright (c) cketti
-* [de.mkammerer:argon2-jvm 2.11](https://github.com/phxql/argon2-jvm). GNU LESSER GENERAL PUBLIC LICENSE, Version 3.
-  - Copyright (c) Moritz Kammerer
-* [de.mkammerer:argon2-jvm-nolibs 2.11](https://github.com/phxql/argon2-jvm). GNU LESSER GENERAL PUBLIC LICENSE, Version 3.
-  - Copyright (c) Moritz Kammerer
 * [dev.whyoleg.cryptography:cryptography-bigint 0.6.0](https://github.com/whyoleg/cryptography-kotlin). Apache License, Version 2.0.
   - Copyright (c) Oleg Yukhnevich
 * [dev.whyoleg.cryptography:cryptography-bigint-jvm 0.6.0](https://github.com/whyoleg/cryptography-kotlin). Apache License, Version 2.0.
