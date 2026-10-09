@@ -156,17 +156,21 @@ final class WalletE2EUI {
 
     func openDeepLink(_ value: String) {
         guard let url = URL(string: value) else {
-            XCTFail("Invalid deep link URL: \(value)")
+            XCTFail("Invalid deep link URL")
             return
         }
 
-        app.open(url)
-        app.activate()
+        // Route through iOS to preserve the running wallet; app.open launches it again.
+        XCUIDevice.shared.system.open(url)
+        guard app.wait(for: .runningForeground, timeout: 10) else {
+            XCTFail("The URL handoff did not foreground the Compose wallet")
+            return
+        }
 
         let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
         if pinInput.waitForExistence(timeout: 2) {
             unlockWallet()
-            _ = waitUntilWalletReady(timeout: 60)
+            XCTAssertEqual(waitUntilWalletReady(timeout: 60), "Wallet ready")
         }
     }
 
