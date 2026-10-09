@@ -126,7 +126,7 @@ internal fun SettingsScreen(
                             SettingsDestination.Main -> {
                                 serverSettingsContent?.let {
                                     WalletSection {
-                                        SettingsNavigationRow(
+                                        WalletNavigationRow(
                                             stringResource(Res.string.settings_server),
                                             { open(SettingsDestination.Server) },
                                             Modifier.testTag(WalletUiTestTags.SettingsServer),

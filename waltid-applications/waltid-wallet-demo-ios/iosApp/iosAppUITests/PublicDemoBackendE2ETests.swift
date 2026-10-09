@@ -56,13 +56,13 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [authorized], timeout: 180), .completed, "Native setup authorization is still pending")
 
         ui.openWalletLink(offer.offerUrl)
-        XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 90), "Review credential offer")
+        XCTAssertTrue(ui.waitForOfferReview(timeout: 90), app.debugDescription)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
         ui.assertExists(identifierPrefix: "wallet.credentialCard.", timeout: 180)
 
         let session = try await backend.createScaPaymentVerifierSession()
         ui.openWalletLink(session.authorizationRequestUri)
-        XCTAssertEqual(ui.waitForStatus(prefixes: ["Review presentation request", "Preview failed"], timeout: 60), "Review presentation request")
+        XCTAssertTrue(ui.waitForPresentationReview(timeout: 60), app.debugDescription)
         let payment = app.descendants(matching: .any).matching(identifier: "payment-consent").firstMatch
         XCTAssertTrue(payment.waitForExistence(timeout: 60), app.debugDescription)
         for value in ["Super Store", "11.56", "EUR", "Confirm this payment", "Payee", "Payee ID", "Currency", "Amount",
@@ -103,11 +103,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         ui.openWalletLink(offer.offerUrl)
-        let offerReadyStatus = ui.waitForStatus(
-            prefixes: ["Review credential offer", "Receive failed", "Bootstrap failed"],
-            timeout: credentialOperationTimeout
-        )
-        XCTAssertEqual(offerReadyStatus, "Review credential offer", "Offer preview did not appear, status: \(offerReadyStatus ?? "nil")")
+        let offerReadyStatus = ui.waitForOfferReview(timeout: credentialOperationTimeout)
+        XCTAssertTrue(offerReadyStatus, app.debugDescription)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
         ui.allowIdentityDocumentRegistrationIfRequested()
@@ -139,11 +136,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             scenario: scenario, signedRequest: true, clientID: DemoBackend.didVerifierClientID
         )
         ui.openWalletLink(session.authorizationRequestUri)
-        let previewStatus = ui.waitForStatus(
-            prefixes: ["Review presentation request", "Preview failed", "Bootstrap failed"],
-            timeout: credentialOperationTimeout
-        )
-        XCTAssertEqual(previewStatus, "Review presentation request", "Preview failed, status: \(previewStatus ?? "nil")")
+        let previewStatus = ui.waitForPresentationReview(timeout: credentialOperationTimeout)
+        XCTAssertTrue(previewStatus, app.debugDescription)
 
         XCTAssertTrue(app.staticTexts["Information to share"].waitForExistence(timeout: 20))
         XCTAssertTrue(app.staticTexts["Given name"].waitForExistence(timeout: 20))
@@ -178,11 +172,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         ui.openWalletLink(offer.offerUrl)
-        let offerReadyStatus2 = ui.waitForStatus(
-            prefixes: ["Review credential offer", "Receive failed", "Bootstrap failed"],
-            timeout: credentialOperationTimeout
-        )
-        XCTAssertEqual(offerReadyStatus2, "Review credential offer", "Offer preview did not appear, status: \(offerReadyStatus2 ?? "nil")")
+        let offerReadyStatus2 = ui.waitForOfferReview(timeout: credentialOperationTimeout)
+        XCTAssertTrue(offerReadyStatus2, app.debugDescription)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
 
         let receiveStatus = ui.waitForStatus(
@@ -193,11 +184,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         let session = try await backend.createTransactionDataVerifierSession(scenario: scenario)
         ui.openWalletLink(session.authorizationRequestUri)
-        let previewStatus = ui.waitForStatus(
-            prefixes: ["Review presentation request", "Preview failed", "Bootstrap failed"],
-            timeout: credentialOperationTimeout
-        )
-        XCTAssertEqual(previewStatus, "Review presentation request", "Preview failed, status: \(previewStatus ?? "nil")")
+        let previewStatus = ui.waitForPresentationReview(timeout: credentialOperationTimeout)
+        XCTAssertTrue(previewStatus, app.debugDescription)
 
         XCTAssertTrue(app.staticTexts["Payment Authorization"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["42.00"].waitForExistence(timeout: 10))
@@ -287,15 +275,9 @@ final class MockCredentialDisplayUITests: XCTestCase {
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         ui.openWalletLink("openid-credential-offer://mock")
-        XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 10),
-            "Review credential offer"
-        )
+        XCTAssertTrue(ui.waitForOfferReview(timeout: 10), app.debugDescription)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
-        XCTAssertEqual(
-            ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
-            "Received 1 credential(s)"
-        )
+        XCTAssertTrue(app.staticTexts["Saved · 1"].waitForExistence(timeout: 10), app.debugDescription)
 
         let credentialCard = app.buttons["wallet.credentialCard.cred-1"]
         XCTAssertTrue(credentialCard.waitForExistence(timeout: 10), "Mock credential card was not shown")

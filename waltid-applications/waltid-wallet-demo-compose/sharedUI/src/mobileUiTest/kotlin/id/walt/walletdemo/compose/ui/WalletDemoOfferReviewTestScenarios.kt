@@ -11,7 +11,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
@@ -33,15 +32,15 @@ class WalletDemoOfferReviewTestScenarios {
                 onDismiss = {}, onCancelAuthorization = {}, onDone = { done++ }, onResumeDeferred = { resumed += it })
         }
         onAllNodesWithTag("wallet.screen.header").assertCountEquals(1)
-        onNodeWithTag("issuance-saved-${state.saved.single().id}").performScrollTo().performClick()
+        onNodeWithTag("issuance-saved-${state.saved.single().id}").performScrollToContent(this).performClick()
         onAllNodesWithTag("wallet.screen.header").assertCountEquals(1)
         onAllNodesWithTag("wallet.provider.done").assertCountEquals(0)
-        onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
-        onNodeWithTag("credential-technical-details").performScrollTo().performClick()
+        onNodeWithText("Ada").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithTag("credential-technical-details").performScrollToContent(this).performClick()
         onAllNodesWithTag("wallet.screen.header").assertCountEquals(1)
         onNodeWithTag("wallet-detail-back").performClick()
         onNodeWithTag("wallet-detail-back").performClick()
-        onNodeWithTag("issuance-pending-${state.pending.single().id}").performScrollTo().assertIsDisplayed()
+        onNodeWithTag("issuance-pending-${state.pending.single().id}").performScrollToContent(this).assertIsDisplayed()
         assertEquals(emptyList(), resumed)
         onNodeWithTag("wallet.provider.done").performClick()
         assertEquals(1, done)
@@ -71,21 +70,21 @@ class WalletDemoOfferReviewTestScenarios {
                 presentation = presentation.value)
         }
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsNotEnabled()
-        onNodeWithTag("issuance-select-mdl").performScrollTo().performClick()
-        onNodeWithTag("issuance-select-pid").performScrollTo().performClick()
-        onNodeWithTag(WalletUiTestTags.TxCodeInput).performScrollTo().performTextInput("1234")
+        onNodeWithTag("issuance-select-mdl").performScrollToContent(this).performClick()
+        onNodeWithTag("issuance-select-pid").performScrollToContent(this).performClick()
+        onNodeWithTag(WalletUiTestTags.TxCodeInput).performScrollToContent(this).performTextInput("1234")
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsNotEnabled() // No credentials selected.
-        onNodeWithTag("issuance-select-pid").performScrollTo().performClick()
-        repeat(2) { onNodeWithTag("issuance-more-pid").performScrollTo().performClick() }
+        onNodeWithTag("issuance-select-pid").performScrollToContent(this).performClick()
+        repeat(2) { onNodeWithTag("issuance-more-pid").performScrollToContent(this).performClick() }
         onNodeWithTag("issuance-more-pid").assertIsNotEnabled()
         runOnIdle { visible.value = false }
         waitForIdle()
         runOnIdle { visible.value = true }
-        onNodeWithTag(WalletUiTestTags.TxCodeInput).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.TxCodeInput).performScrollToContent(this).assertIsDisplayed()
         assertEquals("1234", draft.transactionCode)
         runOnIdle { presentation.value = WalletReviewPresentation.Sheet }
-        onNodeWithTag("issuance-copies-pid").performScrollTo().assertTextEquals("Copies: 3")
-        onNodeWithTag("issuance-select-mdl").performScrollTo().assertIsOff()
+        onNodeWithTag("issuance-copies-pid").performScrollToContent(this).assertTextEquals("Copies: 3")
+        onNodeWithTag("issuance-select-mdl").performScrollToContent(this).assertIsOff()
         onNodeWithTag(WalletUiTestTags.OfferAcceptButton).performClick()
         assertEquals("1234", accepted.single().first)
         assertEquals(mapOf("pid" to 3, "mdl" to 0), accepted.single().second)

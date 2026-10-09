@@ -13,7 +13,6 @@ struct PresentView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
     @ObservedObject var viewModel: WalletViewModel
-    let onOpenSettings: () -> Void
     let onBack: (() -> Void)?
     let nearbySheet: Bool
     @ObservedObject private var proximityPresentation: ProximityPresentationViewModel
@@ -21,8 +20,7 @@ struct PresentView: View {
     @State private var showingConnectionOptions = false
     @State private var credentialDetailsByID: [String: CredentialDetails] = [:]
 
-    init(viewModel: WalletViewModel, onOpenSettings: @escaping () -> Void, onBack: (() -> Void)? = nil, nearbySheet: Bool = false) {
-        self.onOpenSettings = onOpenSettings
+    init(viewModel: WalletViewModel, onBack: (() -> Void)? = nil, nearbySheet: Bool = false) {
         self.onBack = onBack
         self.nearbySheet = nearbySheet
         _viewModel = ObservedObject(wrappedValue: viewModel)
@@ -50,11 +48,11 @@ struct PresentView: View {
             .walletDetailDestination(isPresented: $showingConnectionOptions) {
                 ConnectionSettingsView(viewModel: viewModel)
                     .walletFlowToolbar(onBack: proximityPresentation.requestClose, backEnabled: proximityPresentation.canClose,
-                        onOpenSettings: nil, closing: proximityPresentation.closing || !proximityPresentation.active)
+                        closing: proximityPresentation.closing || !proximityPresentation.active)
             }
             .walletFlowToolbar(onBack: nearbySheet || proximityPresentation.active ? proximityPresentation.requestClose : onBack,
                 backEnabled: nearbySheet || proximityPresentation.active ? proximityPresentation.canClose : viewModel.externalFlow != nil ? viewModel.canDismissExternalFlow : !viewModel.isLoading,
-                onOpenSettings: nil, external: viewModel.externalFlow != nil,
+                external: viewModel.externalFlow != nil,
                 closing: proximityPresentation.closing || nearbySheet && !proximityPresentation.active)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)

@@ -19,7 +19,7 @@ final class BatchIssuanceE2ETests: XCTestCase {
         XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 60), "Wallet ready")
 
         ui.openWalletLink(offer.offerUrl)
-        XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 60), "Review credential offer")
+        XCTAssertTrue(ui.waitForOfferReview(timeout: 60), app.debugDescription)
         let increment = app.buttons["issuance-copies-org.iso.18013.5.1.mDL-Increment"]
         XCTAssertTrue(increment.waitForExistence(timeout: 10))
         XCTAssertEqual(increment.value as? String, "1", "Advertised batch support must not request extra copies")

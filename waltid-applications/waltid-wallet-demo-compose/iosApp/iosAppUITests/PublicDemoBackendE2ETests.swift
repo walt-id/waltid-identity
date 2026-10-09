@@ -149,15 +149,15 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: 180), "Wallet ready")
 
         ui.openWalletLink(offer.offerUrl)
-        XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 90), "Review credential offer")
+        XCTAssertTrue(ui.waitForOfferReview(timeout: 90), app.debugDescription)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
-        let issuance = ui.waitForStatus(prefixes: ["Received", "Receive failed", "Bootstrap failed"], timeout: 180)
-        XCTAssertTrue(issuance?.hasPrefix("Received") == true, "Issuance did not complete: \(issuance ?? "no outcome")\n\(app.debugDescription)")
+        XCTAssertTrue(app.staticTexts["Saved · 1"].waitForExistence(timeout: 180), app.debugDescription)
+        ui.returnToWallet()
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard.")).firstMatch.waitForExistence(timeout: 20))
 
         let session = try await backend.createScaPaymentVerifierSession()
         ui.openWalletLink(session.authorizationRequestUri)
-        XCTAssertEqual(ui.waitForPresentationReview(timeout: 60), "Review presentation request", app.debugDescription)
+        XCTAssertTrue(ui.waitForPresentationReview(timeout: 60), app.debugDescription)
         let payment = app.descendants(matching: .any).matching(identifier: "payment-consent").firstMatch
         XCTAssertTrue(payment.waitForExistence(timeout: 60), app.debugDescription)
         for value in ["Super Store", "11.56", "EUR", "Confirm this payment", "Payee", "Payee ID", "Currency", "Amount",
@@ -343,7 +343,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         )
         ui.openDeepLink(session.authorizationRequestUri)
         let previewStatus = ui.waitForPresentationReview(timeout: credentialOperationTimeout)
-        XCTAssertEqual(previewStatus, "Review presentation request", "Presentation preview did not load, status: \(previewStatus ?? "nil")")
+        XCTAssertTrue(previewStatus, app.debugDescription)
         XCTAssertTrue(app.staticTexts["Information to share"].waitForExistence(timeout: 10))
         captureHost("Requested credential information")
         XCTAssertTrue(app.staticTexts["Given name"].waitForExistence(timeout: 10))
@@ -486,7 +486,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let session = try await backend.createTransactionDataVerifierSession(scenario: scenario)
         ui.openDeepLink(session.authorizationRequestUri)
         let previewStatus = ui.waitForPresentationReview(timeout: credentialOperationTimeout)
-        XCTAssertEqual(previewStatus, "Review presentation request", "Presentation preview did not load, status: \(previewStatus ?? "nil")")
+        XCTAssertTrue(previewStatus, app.debugDescription)
 
         XCTAssertTrue(app.staticTexts["Payment Authorization"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["42.00"].waitForExistence(timeout: 10))

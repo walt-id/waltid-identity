@@ -16,7 +16,7 @@ final class BatchIssuanceE2ETests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         let environment = ["WALLET_ID": "batch-\(UUID().uuidString)", "ATTESTATION_BASE_URL": "", "TRANSACTION_DATA_PROFILES_URL": ""]
         ui.launch(environment: environment)
-        XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 60), "Wallet ready")
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: 60), "Wallet ready")
 
         ui.openDeepLink(offer.offerUrl)
         XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 60))

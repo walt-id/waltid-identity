@@ -90,7 +90,7 @@ internal class WalletVisualScenarios(
         }
         onNodeWithTag("wallet.external.close").assertIsDisplayed().assertIsEnabled()
         onNodeWithTag("wallet.external.openInApp").assertIsDisplayed().assertIsEnabled()
-        onAllNodesWithTag(WalletUiTestTags.OfferInput).assertCountEquals(0)
+        onAllNodesWithTag("wallet.offerInput").assertCountEquals(0)
         if (unavailable) onNodeWithTag("wallet.external.unavailable").assertIsDisplayed()
         else onNodeWithTag(WalletUiTestTags.OfferAcceptButton).assertIsDisplayed().assertIsEnabled()
         capture(if (unavailable) "external.callback.unavailable" else "external.receiving.review")
@@ -491,7 +491,7 @@ internal class WalletVisualScenarios(
             onNodeWithTag("issuance-resume-visual-deferred-library").assertDoesNotExist()
             onNodeWithTag("issuance-refresh").assertIsDisplayed()
         }
-        onNodeWithTag(WalletUiTestTags.OfferInput).assertDoesNotExist()
+        onNodeWithTag("wallet.offerInput").assertDoesNotExist()
         onNodeWithTag("issuance-saved-${WalletVisualFixtures.credentialSummary.id}").assertExists()
         val id = if (failure) "partial_failure" else when (status) {
             WalletDemoContinuationStatus.AwaitingLocalSave -> "local_save_pending"
@@ -543,7 +543,7 @@ internal class WalletVisualScenarios(
                 hostActions = WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
                 onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> }, onContinueAfterResponseChange = {},
                 onApprove = {}, onDecline = {}, onRetry = {}, onRemediate = { _, _ -> },
-                onCancel = {}, onDismiss = {}, onRestart = {}, headerOwnsClose = true,
+                onCancel = {}, onDismiss = {}, onRestart = {}, onConnectionOptions = {}, headerOwnsClose = true,
             )
         } }
         onNodeWithTag(WalletUiTestTags.ProximityQr).assertIsDisplayed()
@@ -554,11 +554,11 @@ internal class WalletVisualScenarios(
     @Composable
     private fun nearbyVisualHost(content: @Composable () -> Unit) {
         Column(Modifier.fillMaxSize()) {
-            WalletScreenHeader("Share nearby", leading = {
+            WalletScreenHeader("Share nearby") {
                 IconButton({}, modifier = Modifier.testTag(WalletUiTestTags.ProximityCancel)) {
                     WalletIcon(WalletSymbol.Decline, "Close nearby sharing")
                 }
-            })
+            }
             Box(Modifier.weight(1f)) { content() }
         }
     }
@@ -629,8 +629,7 @@ internal class WalletVisualScenarios(
                 onNodeWithText("Not attempted: 2").performScrollTo().assertIsDisplayed()
                 onNodeWithTag("wallet.provider.done").assertIsDisplayed()
             }
-            is WalletDemoOfferCreateUiState.Failure -> onNodeWithContentDescription("Close request").assertIsDisplayed()
-            else -> onNodeWithText("Cancel").assertIsDisplayed()
+            else -> onNodeWithContentDescription("Close request").assertIsDisplayed()
         }
         capture("receiving.provider.$kind")
     }

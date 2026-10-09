@@ -37,7 +37,6 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.SettingsNotice
 import id.walt.walletdemo.compose.ui.components.WalletAction
 import id.walt.walletdemo.compose.ui.components.WalletActions
-import id.walt.walletdemo.compose.ui.components.WalletSymbol
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -70,7 +69,7 @@ fun AccountAuthScreen(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    if (allowRegister) stringResource(Res.string.account_welcome) else "Sign in with your account.",
+                    stringResource(if (allowRegister) Res.string.account_welcome else Res.string.account_sign_in_welcome),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

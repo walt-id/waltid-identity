@@ -52,8 +52,8 @@ struct WalletTabFeedback: View {
 }
 
 extension View {
-    func walletFlowToolbar(onBack: (() -> Void)?, backEnabled: Bool, onOpenSettings: (() -> Void)?, external: Bool = false, closing: Bool = false) -> some View {
-        walletSettingsToolbar(onOpenSettings: onOpenSettings).toolbar {
+    func walletFlowToolbar(onBack: (() -> Void)?, backEnabled: Bool, external: Bool = false, closing: Bool = false) -> some View {
+        toolbar {
             ToolbarItem(placement: .navigationBarTrailing) { WalletOpenInAppButton() }
             ToolbarItem(placement: .navigationBarTrailing) {
                 if let onBack {
@@ -68,15 +68,4 @@ extension View {
         }
     }
 
-    func walletSettingsToolbar(onOpenSettings: (() -> Void)?) -> some View {
-        toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                if let onOpenSettings { Button(action: onOpenSettings) {
-                    Image(systemName: "gearshape")
-                }
-                .accessibilityLabel("Settings")
-                .accessibilityIdentifier(WalletAccessibilityID.settingsButton) }
-            }
-        }
-    }
 }
