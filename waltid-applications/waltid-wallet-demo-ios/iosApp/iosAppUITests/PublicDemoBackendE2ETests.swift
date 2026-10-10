@@ -28,7 +28,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
                 app.terminate()
                 ui.launch(environment: environment, initializeSigningIdentity: false)
             }
-            XCTAssertEqual(ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 60), "Wallet ready")
+            XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
             let offer = try await EudiOfferFlow(client: WalletE2EClient()).generate()
             ui.tapTab(label: "Receive")
             ui.replaceText(in: ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL"), value: offer.offerUrl)
