@@ -824,7 +824,8 @@ class WalletIssuanceSessionService(
             loadDeferred(id)
         } catch (error: CancellationException) {
             throw error
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            log.error(error) { "Could not load issuance continuation '$id'" }
             return failed(id, WalletIssuanceErrorCode.STORAGE)
         } ?: return invalidSession(id)
         // Observing another writer must never enter cleanup that can release its claim.
@@ -838,7 +839,8 @@ class WalletIssuanceSessionService(
                     }.map { it.id }
                 } catch (error: CancellationException) {
                     throw error
-                } catch (_: Exception) {
+                } catch (error: Exception) {
+                    log.error(error) { "Could not check stored credentials for issuance session '${record.sessionId}'" }
                     return failed(record.sessionId, WalletIssuanceErrorCode.STORAGE,
                         deferredCredentials = listOf(record.public))
                 }
@@ -942,8 +944,11 @@ class WalletIssuanceSessionService(
             retainInterruptedDeferred(record)
             throw error
         } catch (error: Exception) {
-            retainInterruptedDeferred(record)
             val errorCode = (error as? IssuanceStageException)?.code ?: stage
+            if (errorCode == WalletIssuanceErrorCode.STORAGE) {
+                log.error(error) { "Could not store issued credentials for issuance session '${record.sessionId}'" }
+            }
+            retainInterruptedDeferred(record)
             val code = if (errorCode == WalletIssuanceErrorCode.NETWORK && record.claimed && record.content is DeferredContent.Remote)
                 WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN else errorCode
             failed(record.sessionId, code,
@@ -1885,7 +1890,8 @@ class WalletIssuanceSessionService(
                 }
             } catch (error: CancellationException) {
                 throw error
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                log.error(error) { "Could not checkpoint received credentials for issuance session '${record.sessionId}'" }
                 return failed(record.sessionId, WalletIssuanceErrorCode.STORAGE, deferredCredentials = listOf(public))
             }
             currentCoroutineContext().ensureActive()
