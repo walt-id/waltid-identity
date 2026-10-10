@@ -4,6 +4,23 @@ import XCTest
 @testable import WalletSDK
 
 final class KMPKeyAttestationProviderTests: XCTestCase {
+    func testResolverPreservesSelectedVerificationKeyAndRejectsUnknownIssuer() async throws {
+        let adapter = KMPKeyAttestationProviderResolverAdapter(resolver: StubResolver())
+        for issuer in ["first", "second"] {
+            let selected = try await adapter.__resolve(credentialIssuer: issuer)
+            let provider = try XCTUnwrap(selected)
+            XCTAssertEqual(provider.verificationPublicJwk, issuer)
+        }
+        let unsupported = try await adapter.__resolve(credentialIssuer: "unknown")
+        XCTAssertNil(unsupported)
+    }
+
+    private struct StubResolver: KeyAttestationProviderResolver {
+        func resolve(credentialIssuer: String) async throws -> (any KeyAttestationProvider)? {
+            guard ["first", "second"].contains(credentialIssuer) else { return nil }
+            return StubProvider(verificationPublicJWK: credentialIssuer) { _ in "signed.attestation.jwt" }
+        }
+    }
     func testAdapterForwardsRequestAndReturnsProviderJWT() async throws {
         let provider = StubProvider { request in
             XCTAssertEqual(request.credentialIssuer, "https://issuer.example")
@@ -62,7 +79,7 @@ final class KMPKeyAttestationProviderTests: XCTestCase {
     private enum ProviderFailure: Error, Equatable { case unavailable }
 
     private struct StubProvider: KeyAttestationProvider {
-        let verificationPublicJWK = "attester-public-jwk"
+        var verificationPublicJWK = "attester-public-jwk"
         let operation: @Sendable (KeyAttestationRequest) async throws -> String
 
         func attest(_ request: KeyAttestationRequest) async throws -> String {

@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
@@ -53,7 +54,7 @@ fun createIosDemoWallet(
                     ),
                 ),
                 DemoClientIdTrust.configuration,
-            ),
+            ).attachKeyAttestationProviderResolver(DemoKeyAttestationProviders()),
             warning = transactionDataProfiles.warning,
             isIos = true,
         )

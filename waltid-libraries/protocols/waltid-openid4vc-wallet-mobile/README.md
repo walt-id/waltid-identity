@@ -90,6 +90,12 @@ continuing issuance. The provider receives the actual proof key, issuer nonce an
 advertised constraints. The wallet validates its signed answer before sending the proof.
 Reattach this runtime dependency after recreating a wallet; it is not persisted.
 Native Swift consumers configure `WalletConfiguration.keyAttestationProvider`.
+For multiple providers, attach a `KeyAttestationProviderResolver` with
+`wallet.attachKeyAttestationProviderResolver(resolver)`. Native Swift accepts a
+`KeyAttestationProviderResolver` in the same configuration property; existing fixed
+providers continue to work. Resolution receives the credential issuer from metadata,
+only runs when attestation is required, and retains the selected provider and its
+verification key throughout a proof collection. Returning null rejects that issuer.
 Issuer trust and evidence supporting the provider's claims remain separate requirements.
 
 Start an issuance session to resolve the offer and retain the exact reviewed

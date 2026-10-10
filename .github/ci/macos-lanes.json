@@ -59,7 +59,9 @@
         "waltid-libraries/protocols/waltid-openid4vc-wallet/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
-        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/Resources/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/swift/*"
       ]
     },
     "compose": {
@@ -69,7 +71,10 @@
         "waltid-applications/waltid-wallet-demo-shared-ios/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
         "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
-        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
+        "waltid-libraries/protocols/waltid-wallet-sdk-ios/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/Resources/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/kotlin/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/sources.gradle.kts"
       ]
     },
     "enterprise": {

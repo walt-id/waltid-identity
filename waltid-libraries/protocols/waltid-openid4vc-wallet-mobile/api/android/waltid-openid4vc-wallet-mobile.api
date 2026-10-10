@@ -100,6 +100,7 @@ public final class id/walt/wallet2/mobile/AndroidMobileWalletNfcConfiguration {
 public final class id/walt/wallet2/mobile/MobileWallet {
 	public final fun annexCRequest (Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialRequest;)Lid/walt/wallet2/mobile/MobileWalletAnnexCRequest;
 	public final fun attachKeyAttestationProvider (Lid/walt/wallet2/handlers/KeyAttestationProvider;)Lid/walt/wallet2/mobile/MobileWallet;
+	public final fun attachKeyAttestationProviderResolver (Lid/walt/wallet2/handlers/KeyAttestationProviderResolver;)Lid/walt/wallet2/mobile/MobileWallet;
 	public final fun beginAuthorizationIssuance (Ljava/lang/String;Ljava/util/List;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun beginAuthorizationIssuance$default (Lid/walt/wallet2/mobile/MobileWallet;Ljava/lang/String;Ljava/util/List;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun cancelIssuance (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;

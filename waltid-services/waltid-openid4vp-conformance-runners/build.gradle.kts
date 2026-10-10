@@ -337,3 +337,9 @@ registerWalletProfileTestTask(
 
 // The opt-in Android fixture compiles the same wallet driver, without the JVM software-key factory.
 kotlin.sourceSets.named("main") { kotlin.srcDir("src/deviceShared/kotlin") }
+
+val fixture = layout.projectDirectory.dir("../../waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation")
+extra["demoKeyAttestationFixture"] = fixture
+apply(from = fixture.file("sources.gradle.kts"))
+val demoKeyAttestationSources = extra["demoKeyAttestationSources"]
+kotlin.sourceSets.named("main") { kotlin.srcDirs(demoKeyAttestationSources) }

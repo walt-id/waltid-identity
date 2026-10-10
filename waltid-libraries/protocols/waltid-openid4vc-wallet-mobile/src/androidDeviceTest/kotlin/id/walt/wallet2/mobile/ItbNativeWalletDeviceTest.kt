@@ -6,12 +6,10 @@ import android.content.Intent
 import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
-import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.*
-import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.itb.*
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.persistence.keys.*
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
@@ -88,17 +86,11 @@ class ItbNativeWalletDeviceTest {
                             KeyUseAuthorizationPrompt("Authorize this WAL-1423 ITB test operation"),
                         )).also { generated = it }
                         val restored = provider.restoreManagedKey(key.storedKey) as PlatformManagedKeyRestoration.Restored
-                        val attesterKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
-                            GenerateSoftwareKeyRequest(
-                                KeyId("wal1423-itb-attester"), KeySpec.Ec(EcCurve.P256),
-                                setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-                            ),
-                        )
                         val wallet = Wallet(
                             id = "itb-native-${UUID.randomUUID()}",
                             keyStores = listOf(InMemoryKeyStore().apply { addCrypto2Key(restored.key) }),
                             credentialStores = listOf(InMemoryCredentialStore()),
-                        ).attachKeyAttestationProvider(ItbSyntheticKeyAttester(attesterKey))
+                        ).attachKeyAttestationProviderResolver(DemoKeyAttestationProviders())
                         HttpClient(Android) {
                             install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
                             install(HttpTimeout) { requestTimeoutMillis = 30_000; connectTimeoutMillis = 10_000 }

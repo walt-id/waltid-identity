@@ -23,8 +23,8 @@ public struct WalletConfiguration: Sendable {
     /// neither requested nor accepted.
     public var issuerMetadataTrustResolver: (any IssuerMetadataTrustResolver)?
 
-    /// Runtime provider for issuers requiring key attestations in credential proofs.
-    public var keyAttestationProvider: (any KeyAttestationProvider)?
+    /// Fixed provider or issuer-specific resolver for credentials requiring key attestation.
+    public var keyAttestationProvider: (any KeyAttestationProviderResolver)?
 
     /// Wallet-local persistence configuration.
     public var persistence: WalletPersistence
@@ -77,7 +77,7 @@ public struct WalletConfiguration: Sendable {
         defaultKeyUseAuthorizationPolicy: WalletKeyUseAuthorizationPolicy = .biometricCurrentSet,
         keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt = .init(),
         signingIdentity: SigningIdentityConfiguration = .init(),
-        keyAttestationProvider: (any KeyAttestationProvider)? = nil
+        keyAttestationProvider: (any KeyAttestationProviderResolver)? = nil
     ) {
         self.walletID = walletID
         self.signingIdentity = signingIdentity

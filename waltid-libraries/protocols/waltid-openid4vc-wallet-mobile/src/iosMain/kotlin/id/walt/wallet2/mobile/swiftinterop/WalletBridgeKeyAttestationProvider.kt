@@ -35,6 +35,18 @@ public interface WalletBridgeKeyAttestationProvider {
     public suspend fun attest(request: WalletBridgeKeyAttestationRequest): String
 }
 
+/** Selects an immutable provider and its verification key for the issuer requiring attestation. */
+public interface WalletBridgeKeyAttestationProviderResolver {
+    /** Returns null when no trusted provider is configured for this issuer. */
+    public suspend fun resolve(credentialIssuer: String): WalletBridgeKeyAttestationProvider?
+}
+
+internal fun WalletBridgeKeyAttestationProviderResolver.toKeyAttestationProviderResolver():
+    id.walt.wallet2.handlers.KeyAttestationProviderResolver =
+    id.walt.wallet2.handlers.KeyAttestationProviderResolver { issuer ->
+        resolve(issuer)?.toKeyAttestationProvider()
+    }
+
 internal suspend fun WalletBridgeKeyAttestationProvider.toKeyAttestationProvider(): KeyAttestationProvider {
     val provider = this
     val publicKey = EncodedKey.Jwk(BinaryData(verificationPublicJwk.encodeToByteArray()), false)

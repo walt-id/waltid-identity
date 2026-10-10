@@ -264,3 +264,11 @@ if (enableAndroidBuild) extensions.configure<KotlinMultiplatformAndroidComponent
         tasks.named("check") { dependsOn(verifyMatcherPackaging) }
     }
 }
+
+if (enableAndroidBuild) {
+    val fixture = layout.projectDirectory.dir("../../../waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation")
+    extra["demoKeyAttestationFixture"] = fixture
+    apply(from = fixture.file("sources.gradle.kts"))
+    val demoKeyAttestationSources = extra["demoKeyAttestationSources"]
+    kotlin.sourceSets.named("androidDeviceTest") { kotlin.srcDirs(demoKeyAttestationSources) }
+}

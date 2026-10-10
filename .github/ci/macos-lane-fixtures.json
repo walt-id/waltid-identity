@@ -189,6 +189,41 @@
         "waltid-libraries/protocols/waltid-openid4vc-wallet-recovery-blockstore/src/commonMain/kotlin/id/walt/wallet2/recovery/BlockstoreRecovery.kt"
       ],
       "lanes": ["ios-simulator", "sdk-docs"]
+    },
+    {
+      "name": "shared attestation profile selects both demo consumers",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/Resources/KeyAttestationProfiles.json"
+      ],
+      "lanes": ["native", "compose"]
+    },
+    {
+      "name": "shared Kotlin attester selects Compose iOS",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/kotlin/id/walt/walletdemo/attestation/DemoKeyAttestationProviders.kt"
+      ],
+      "lanes": ["compose"]
+    },
+    {
+      "name": "shared attestation generator selects Compose iOS",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/sources.gradle.kts"
+      ],
+      "lanes": ["compose"]
+    },
+    {
+      "name": "Swift attester selects the native demo",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/swift/DemoKeyAttestationProviders.swift"
+      ],
+      "lanes": ["native"]
+    },
+    {
+      "name": "attestation package manifest selects the native demo",
+      "files": [
+        "waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/Package.swift"
+      ],
+      "lanes": ["native"]
     }
   ]
 }

@@ -26,8 +26,8 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
         self.bridge = try Self.successValue(result, as: WalletSdkBridge.self, operation: "create wallet bridge")
         if let provider = configuration.keyAttestationProvider {
-            let attached = try await bridge.attachKeyAttestationProvider(
-                provider: KMPKeyAttestationProviderAdapter(provider: provider)
+            let attached = try await bridge.attachKeyAttestationProviderResolver(
+                resolver: KMPKeyAttestationProviderResolverAdapter(resolver: provider)
             )
             _ = try Self.successAnyValue(attached, operation: "attach key attestation provider")
         }
@@ -1274,6 +1274,18 @@ private extension WalletConfiguration {
             ),
             signingIdentity: signingIdentity.toKMPSigningIdentityConfiguration()
         )
+    }
+}
+
+final class KMPKeyAttestationProviderResolverAdapter: WalletBridgeKeyAttestationProviderResolver, @unchecked Sendable {
+    private let resolver: any KeyAttestationProviderResolver
+
+    init(resolver: any KeyAttestationProviderResolver) { self.resolver = resolver }
+
+    func __resolve(credentialIssuer: String) async throws -> (any WalletBridgeKeyAttestationProvider)? {
+        guard let provider = try await resolver.resolve(credentialIssuer: credentialIssuer) else { return nil }
+        try Task.checkCancellation()
+        return KMPKeyAttestationProviderAdapter(provider: provider)
     }
 }
 

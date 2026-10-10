@@ -5,6 +5,9 @@ on:
     paths:
       - '.github/workflows/itb-profile-tests.yml'
       - 'scripts/itb/**'
+      - 'waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/Resources/**'
+      - 'waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/kotlin/**'
+      - 'waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation/sources.gradle.kts'
       - 'waltid-services/waltid-openid4vp-conformance-runners/**'
       - 'waltid-libraries/protocols/waltid-openid4vc-wallet/**'
       - 'waltid-libraries/protocols/waltid-openid4vci-wallet/**'

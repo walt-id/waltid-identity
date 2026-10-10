@@ -87,7 +87,12 @@ data class Wallet(
     val defaultDidId: String? = null,
 ) {
     private var resolvedStaticCrypto2Key: Crypto2Key? = null
-    private var keyAttestationProvider: KeyAttestationProvider? = null
+    private sealed interface KeyAttestationSource {
+        data class Fixed(val provider: KeyAttestationProvider) : KeyAttestationSource
+        data class Routed(val resolver: id.walt.wallet2.handlers.KeyAttestationProviderResolver) : KeyAttestationSource
+    }
+
+    private var keyAttestationSource: KeyAttestationSource? = null
     private var issuanceSessionState: WalletIssuanceSessionState? = null
     private var issuanceSessionService: WalletIssuanceSessionService? = null
     private val issuanceSessionMutex = Mutex()
@@ -109,10 +114,26 @@ data class Wallet(
 
     /** Attach a runtime wallet-provider service without persisting it in the wallet model. */
     fun attachKeyAttestationProvider(provider: KeyAttestationProvider): Wallet = apply {
-        keyAttestationProvider = provider
+        keyAttestationSource = KeyAttestationSource.Fixed(provider)
     }
 
-    fun attachedKeyAttestationProvider(): KeyAttestationProvider? = keyAttestationProvider
+    /** The fixed provider, when configured through [attachKeyAttestationProvider]. */
+    fun attachedKeyAttestationProvider(): KeyAttestationProvider? =
+        (keyAttestationSource as? KeyAttestationSource.Fixed)?.provider
+
+    /** Replaces the runtime provider with issuer-specific resolution. Reattach after recreation. */
+    fun attachKeyAttestationProviderResolver(resolver: id.walt.wallet2.handlers.KeyAttestationProviderResolver): Wallet = apply {
+        keyAttestationSource = KeyAttestationSource.Routed(resolver)
+    }
+
+    internal fun hasKeyAttestationProvider(): Boolean = keyAttestationSource != null
+
+    internal suspend fun keyAttestationProviderFor(credentialIssuer: String): KeyAttestationProvider? =
+        when (val source = keyAttestationSource) {
+            is KeyAttestationSource.Fixed -> source.provider
+            is KeyAttestationSource.Routed -> source.resolver.resolve(credentialIssuer)
+            null -> null
+        }
 
     // ---------------------------------------------------------------------------
     // Aggregate helpers

@@ -1,5 +1,6 @@
 import Foundation
 import WalletDemoIdentityDocumentSupport
+import WalletDemoKeyAttestation
 import WalletDemoSharingUI
 import WalletSDK
 import WalletSDKKeychainRecovery
@@ -669,7 +670,8 @@ class WalletViewModel: ObservableObject {
             signingIdentity: .init(alternativeAuthorizations: signingProtectionMode.alternativeAuthorizations,
                 keychain: .init(accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup),
                 recoveryProviders: [KeychainIdentityRecovery(namespace: "wallet-demo",
-                    accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup)])
+                    accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup)]),
+            keyAttestationProvider: DemoKeyAttestationProviders()
         )
         let resolvedWalletClient = walletClient ?? SDKWalletClient(configuration: configuration)
         self.signingProtectionMode = signingProtectionMode

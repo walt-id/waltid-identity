@@ -21,6 +21,7 @@ internal object SignProofTestSupport {
         bindingMethods: Set<String> = setOf("jwk"),
         requiresKeyAttestation: Boolean = false,
         batchSize: Int? = null,
+        issuer: String = ISSUER,
     ): HttpClient {
         val algorithmsJson = proofAlgorithms.joinToString(",") { "\"$it\"" }
         val bindingMethodsJson = bindingMethods.joinToString(",") { "\"$it\"" }
@@ -28,8 +29,8 @@ internal object SignProofTestSupport {
         val batchMetadata = batchSize?.let { "\"batch_credential_issuance\":{\"batch_size\":$it}," }.orEmpty()
         val body = """
             {
-              "credential_issuer":"$ISSUER",
-              "credential_endpoint":"$ISSUER/credential",
+              "credential_issuer":"$issuer",
+              "credential_endpoint":"$issuer/credential",
               $batchMetadata
               "credential_configurations_supported":{
                 "$configurationId":{
