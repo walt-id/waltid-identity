@@ -23,13 +23,17 @@ final class MockWalletUITests: XCTestCase {
     }
 
     func testCredentialsStayLoadingUntilTheInitialReadCompletes() {
+        continueAfterFailure = false
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
-        ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_WALLET_DELAY_MS": "8000"])
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1", "E2E_MOCK_HOLD_INITIAL_READ": "1"])
+        let completeRead = app.buttons["wallet.test.completeInitialRead"]
+        XCTAssertTrue(completeRead.waitForExistence(timeout: 3), "The initial mock read must be pending")
         let loading = app.descendants(matching: .any)["wallet.credentials.loading"].firstMatch
         XCTAssertTrue(loading.waitForExistence(timeout: 3))
         XCTAssertFalse(app.descendants(matching: .any)["wallet.credentials.empty"].exists)
         XCTAssertNil(ui.waitUntilWalletReady(timeout: 1), "Wallet readiness must include the initial credential read")
+        completeRead.tap()
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: 20), "Wallet ready")
         XCTAssertTrue(app.descendants(matching: .any)["wallet.credentials.empty"].waitForExistence(timeout: 3))
         XCTAssertFalse(loading.exists)
