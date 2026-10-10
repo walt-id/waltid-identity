@@ -8,6 +8,32 @@ import XCTest
 @MainActor
 final class PublicDemoBackendE2ETests: XCTestCase {
 
+    func testButtonActionsWaitForSuccessBannerAndPreserveErrors() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        var environment = isolatedWalletEnvironment()
+        environment["TRANSACTION_DATA_PROFILES_URL"] = ""
+        ui.launch(environment: environment)
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+
+        ui.tapButton(identifier: "wallet.tab.receive", fallbackLabel: "Receive tab, Receive")
+        XCTAssertFalse(app.buttons["wallet.statusDismiss"].exists,
+                       "Success-banner dismissal must finish moving the form before the next action")
+
+        // A malformed inline offer reaches the local parser without an issuer request.
+        let offer = "openid-credential-offer://?credential_offer=%7B%7D"
+        ui.replaceText(in: ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL"), value: offer)
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        let failure = ui.waitForStatus(prefixes: ["Receive failed"], timeout: 10)
+        XCTAssertNotNil(failure, "A single Receive activation must reach the offer parser")
+        XCTAssertTrue(app.buttons["wallet.statusExpand"].exists)
+
+        ui.tapButton(identifier: "wallet.tab.receive", fallbackLabel: "Receive tab, Receive")
+        XCTAssertEqual(ui.latestStatus(prefixes: ["Receive failed"]), failure,
+                       "Button synchronization must preserve the persistent error")
+    }
+
     func testSettingsCopyControlsAreAccessible() throws {
         guard #available(iOS 17.0, *) else { throw XCTSkip("Accessibility audit requires iOS 17") }
         let app = XCUIApplication()
@@ -143,6 +169,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     }
 
     func testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2() async throws {
+        continueAfterFailure = false
         let scenario = try publicDemoScenario()
         let offer = try await backend.createOffer(scenario: scenario)
 

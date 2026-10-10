@@ -186,9 +186,6 @@ final class WalletE2EUI {
         return false
     }
 
-    /// Compose iOS can swallow the first Preview activation after a deep-linked URL field.
-    /// Retry once with a coordinate tap, and treat the review surface as success even if the
-    /// status banner has already dismissed.
     func previewPresentation(timeout: TimeInterval) -> String? {
         let prefixes = [
             "Review presentation request",
@@ -201,10 +198,6 @@ final class WalletE2EUI {
         if presentationReviewVisible() {
             return latestStatus(prefixes: prefixes) ?? "Review presentation request"
         }
-        if let status = waitForStatus(prefixes: prefixes, timeout: min(timeout, 8)) {
-            return status
-        }
-        tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview", useCoordinateTap: true)
         if let status = waitForStatus(prefixes: prefixes, timeout: timeout) {
             return status
         }
@@ -219,9 +212,22 @@ final class WalletE2EUI {
     }
 
     func tapButton(identifier: String, fallbackLabel: String, useCoordinateTap: Bool = false) {
-        let targetButton = button(identifier: identifier, fallbackLabel: fallbackLabel)
-        XCTAssertTrue(targetButton.waitForExistence(timeout: 20), "Button not found: \(identifier)")
+        XCTAssertTrue(button(identifier: identifier, fallbackLabel: fallbackLabel).waitForExistence(timeout: 20),
+                      "Button not found: \(identifier)")
         dismissKeyboard()
+        // Success banners auto-hide and move the form. Resolve the tap after that layout change.
+        // Error banners have an expand control and remain visible for inspection.
+        let statusDismiss = app.buttons["wallet.statusDismiss"]
+        if statusDismiss.exists && !app.buttons["wallet.statusExpand"].exists {
+            let hidden = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "exists == false"), object: statusDismiss
+            )
+            guard XCTWaiter.wait(for: [hidden], timeout: 10) == .completed else {
+                XCTFail("The transient success banner did not finish dismissing before \(identifier)")
+                return
+            }
+        }
+        let targetButton = button(identifier: identifier, fallbackLabel: fallbackLabel)
         makeHittable(targetButton)
         XCTAssertTrue(targetButton.isHittable, "Button is not hittable: \(identifier)")
         XCTAssertTrue(targetButton.isEnabled, "Button is not enabled: \(identifier)")
