@@ -1,0 +1,29 @@
+{
+  "physicalClassPrefixes": [],
+  "suites": {
+    "native-demo-readiness": {
+      "requiredTests": [
+        {
+          "class": "WalletViewModelReceiveTests",
+          "name": "testPendingRegistrationDoesNotBlockStartupOrReceivingAndReconcilesAgain",
+          "oracle": "Pending registration does not block core operations; changes coalesce and reconcile again."
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testWalletReadinessOutlivesTheSuccessBannerAcrossRestart",
+          "oracle": "Wallet readiness survives banner dismissal on both process launches."
+        },
+        {
+          "class": "MockWalletUITests",
+          "name": "testCredentialsStayLoadingUntilTheInitialReadCompletes",
+          "oracle": "Readiness remains false until the initial credential read completes."
+        },
+        {
+          "class": "PublicDemoBackendE2ETests",
+          "name": "testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2",
+          "oracle": "Real issuance persists across process restart and saved identity signs a verified presentation."
+        }
+      ]
+    }
+  }
+}

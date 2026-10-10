@@ -8,6 +8,7 @@ actor MockWalletClient: WalletClient {
     }
 
     private var storedCredentials: [Credential]
+    private var initialCredentialRead: (@Sendable () async -> Void)?
     private let operationDelayNanoseconds: UInt64
     private let verifierStyle: VerifierStyle
     private let duplicatePresentationOptions: Bool
@@ -28,6 +29,7 @@ actor MockWalletClient: WalletClient {
 
     init(
         storedCredentials: [Credential] = [],
+        initialCredentialRead: (@Sendable () async -> Void)? = nil,
         operationDelayMilliseconds: UInt64 = 0,
         verifierStyle: VerifierStyle = .named,
         duplicatePresentationOptions: Bool = false,
@@ -44,6 +46,7 @@ actor MockWalletClient: WalletClient {
         deleteLocalDataError: Error? = nil
     ) {
         self.storedCredentials = storedCredentials
+        self.initialCredentialRead = initialCredentialRead
         self.operationDelayNanoseconds = operationDelayMilliseconds * 1_000_000
         self.verifierStyle = verifierStyle
         self.duplicatePresentationOptions = duplicatePresentationOptions
@@ -79,6 +82,10 @@ actor MockWalletClient: WalletClient {
     }
 
     func credentials() async throws -> [Credential] {
+        if let initialCredentialRead {
+            self.initialCredentialRead = nil
+            await initialCredentialRead()
+        }
         try await delayOperation()
         return storedCredentials
     }
