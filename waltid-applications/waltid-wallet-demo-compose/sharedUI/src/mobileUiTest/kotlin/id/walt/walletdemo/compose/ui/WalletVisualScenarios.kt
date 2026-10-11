@@ -67,9 +67,9 @@ internal class WalletVisualScenarios(
         }
         onNodeWithTag(WalletUiTestTags.credentialDetails(details.summary.id)).assertExists()
         onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
-        capture("credential.details.identity")
         onNodeWithText("Vienna").performScrollTo().assertIsDisplayed()
-        capture("credential.details.nested")
+        onNodeWithText("Ada").assertIsDisplayed()
+        capture("credential.details.identity")
     }
 
     fun batchOffer(noneSelected: Boolean = false) = with(test) {
@@ -90,7 +90,7 @@ internal class WalletVisualScenarios(
         onNodeWithText("Receive Library membership").performScrollTo().assertIsDisplayed()
         if (!noneSelected) onNodeWithText("Copies: 1").performScrollTo().assertIsDisplayed()
         action.assertIsDisplayed()
-        capture("batch.offer.$scenario.second_target")
+        if (!noneSelected) capture("batch.offer.$scenario.second_target")
     }
 
     fun credentialImages() = with(test) {
@@ -108,8 +108,10 @@ internal class WalletVisualScenarios(
                 onNodeWithTag(WalletUiTestTags.claimImage(path)).performScrollTo().assertIsDisplayed()
                 waitUntil { images.isReady(image) }
                 waitForIdle()
-                capture("credential.media.$image")
             }
+            onNodeWithTag(WalletUiTestTags.claimImage("portrait")).assertIsDisplayed()
+            onNodeWithTag(WalletUiTestTags.claimImage("signature_usual_mark")).assertIsDisplayed()
+            capture("credential.media.loaded")
         } finally {
             images.close()
         }
