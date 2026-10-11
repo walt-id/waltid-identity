@@ -130,8 +130,9 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let url = URL(string: "openid4vp://external")!
         model.handleDeepLink(url)
         model.prepareExternalFlow()
-        try await waitUntil { model.presentationPreview != nil && !model.isLoading }
+        try await waitUntil { model.presentationPreview != nil && !model.isLoading && model.paymentReview.canConfirm }
         model.submitPresentation()
+        XCTAssertTrue(model.isLoading, "The assertion must exercise an active submission")
         XCTAssertFalse(model.closeExternalFlow())
         model.handleDeepLink(URL(string: "openid-credential-offer://replacement")!)
         XCTAssertEqual(model.externalFlow?.url, url)
@@ -530,7 +531,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
         viewModel.presentationRequestUrl = "openid4vp://verifier.example"
         viewModel.previewPresentation()
-        try await waitUntil { viewModel.presentationPreview != nil }
+        try await waitUntil { viewModel.presentationPreview != nil && viewModel.paymentReview.canConfirm }
 
         viewModel.submitPresentation()
         viewModel.submitPresentation()
