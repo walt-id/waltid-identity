@@ -8,17 +8,17 @@ The catalogue connects the existing Compose Android, Compose iOS and native Swif
 
 Run from the identity repository. Android uses Robolectric API 35 at mdpi; Compose iOS uses a 393×852 headless Skia surface. SwiftUI uses a hosted iPhone 13 layout at scale 3 on iOS 26.5. Choose a test-owned iOS 26.5 simulator; the native baselines were generated with Xcode 27. Do not reuse baselines on another runtime without an explicit environment review.
 
+Install the small Python reporting dependency in a virtual environment with `python3 -m pip install -r waltid-applications/waltid-wallet-demo-test-fixtures/visual/requirements.txt`. Then run the existing renderer tasks through the comparison entry point:
+
 ```sh
-python3 waltid-applications/waltid-wallet-demo-test-fixtures/visual/report.py begin --output build/reports/wallet-visual
-
-./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:verifyRoborazziAndroidHostTest --tests '*WalletVisualAndroidTest' :waltid-applications:waltid-wallet-demo-compose:sharedUI:verifyRoborazziIosSimulatorArm64 :waltid-applications:waltid-wallet-demo-compose:sharedUI:iosSimulatorArm64Test --device "$WALLET_VISUAL_SIMULATOR_ID" --tests '*WalletVisualIosTest' -PenableAndroidBuild=true -PenableIosBuild=true --max-workers=2
-
-xcodebuildmcp simulator test --project-path "$PWD/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp.xcodeproj" --scheme iosApp --configuration Debug --simulator-id "$WALLET_VISUAL_SIMULATOR_ID" --derived-data-path /tmp/wallet-visual-derived --extra-args '-only-testing:iosAppTests/WalletVisualTests' 'CODE_SIGNING_ALLOWED=NO' --json '{"testRunnerEnv":{"E2E_USE_MOCK_WALLET":"1"}}' --output json > build/reports/wallet-visual/native-results.json
-
-python3 waltid-applications/waltid-wallet-demo-test-fixtures/visual/report.py finish --output build/reports/wallet-visual --native-results build/reports/wallet-visual/native-results.json
+python3 waltid-applications/waltid-wallet-demo-test-fixtures/visual/verify.py --simulator "$WALLET_VISUAL_SIMULATOR_ID"
 ```
 
-The native app requires the existing release WalletCore XCFramework build first; follow its README. Use `--renderers android`, `--renderers compose-ios`, or `--renderers swiftui` on `begin` for a scoped report. Only selected renderers are claimed. The report refuses stale test results, missing tests, unlisted baselines, record-only results, and source/baseline changes after `begin`. Force the selected test task to execute when Gradle would otherwise reuse old results; do not rerun all dependency compilation just to refresh a report. `index.html` contains the contact sheet and `manifest.json` its machine-readable evidence.
+Use `--renderers android`, `--renderers compose-ios`, or `--renderers swiftui` for a scoped comparison. `--gradle-root` may point to a coordinated unified build only when its Identity checkout resolves to this repository. Reports default to `build/reports/wallet-visual`; open `index.html` locally after downloading a CI artifact. Its scenario, renderer, status and evidence filters help inspect the full catalogue. Artifacts are downloadable bundles, not hosted websites.
+
+The entry point builds the native framework before freezing the source fingerprint, forces only selected test tasks to execute, and forwards a unique run ID, exact tested commit and fingerprint to XCTest. Native tests retain a receipt and the actual compared PNG for every comparison. The report requires matching test, receipt, baseline digest, capture digest and configuration before accepting a pass. A passing XCTest or an existing baseline alone is insufficient. Missing, stale, skipped, recorded and failed results remain distinct. Pre-comparison readiness failures retain their diagnostic image.
+
+For custom orchestration, call `report.py begin` first and pass the generated `native-runner-env.json` to XcodeBuildMCP's `--json` argument. Call `report.py finish` with the native JSON result afterward. Reusing an older receipt or changing source/baselines during a run invalidates the report.
 
 Ordinary Gradle runs verify through the `roborazzi.test.verify` project property; the plugin tracks its mode as a test input. SwiftUI defaults to `.never` recording. Missing baselines fail. Do not enable verify-and-record in CI.
 
@@ -28,7 +28,17 @@ Use the same destinations and fixture configuration. Replace `verifyRoborazzi…
 
 Inspect each expected/actual/diff image and its semantic assertions before committing an intentional change. Then compare again with recording disabled. Both integrations reject recording when a CI environment is detected. Do not relax pixel thresholds to conceal missing text, images or action clipping. Keep toolchain-only refreshes separate from design changes.
 
-Committed PNGs are synthetic test assets. Generated reports and diffs stay under ignored build directories and may be retained as CI artifacts. Inline PR screenshots still require GitHub `user-attachments`; repository baselines are not a substitute screenshot host.
+Committed PNGs are synthetic test assets. Reuse them in PR galleries with URLs pinned to the exact comparison commits. Upload additional unversioned E2E/device captures through GitHub `user-attachments`. Actual images, differences, receipts and diagnostics stay in ignored reports and CI artifacts; never commit transient captures solely to host a gallery. Release assets, tags, storage branches and external image hosts are not screenshot-hosting alternatives.
+
+## PR galleries
+
+```sh
+python3 waltid-applications/waltid-wallet-demo-test-fixtures/visual/gallery.py --base "$PR_BASE" --head "$PR_HEAD" --repository walt-id/waltid-identity --output build/reports/wallet-gallery
+```
+
+Use the actual PR target, including the parent branch for a stack. The generator resolves its merge-base, handles additions/removals/renames, and compares decoded pixels so encoding-only updates do not crowd the previews. Catalogue and configuration changes remain visible. For forks, set `--head-repository` to the owning fork. The default collapsed gallery shows six representative scenarios and links every changed platform reference through the pinned comparison. `gallery.json` retains direct full-size before/after links and content digests.
+
+`--body path/to/body.md` replaces only the marked generated portion of a local PR body and preserves authored prose. Generation has no publishing permission. Before publishing, confirm the PR's current base/head, verify image access for the intended readers, assess selected E2E evidence, and use the shared mobile-evidence/PR-description workflow. Baselines show expected appearance; fresh comparison reports and observed app journeys have separate provenance. A superseded run must not overwrite a newer gallery.
 
 ## Adding a state
 

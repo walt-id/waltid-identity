@@ -1,3 +1,4 @@
+import CryptoKit
 import SnapshotTesting
 import SwiftUI
 import WalletDemoIdentityDocumentSupport
@@ -148,24 +149,67 @@ final class WalletVisualTests: XCTestCase {
         var strategy = Snapshotting<UIViewController, UIImage>.image(
             on: .iPhone13, drawHierarchyInKeyWindow: true, precision: 1)
         let diffing = strategy.diffing
+        let baseline = URL(fileURLWithPath: "\(file)").deletingLastPathComponent()
+            .appendingPathComponent("__Snapshots__/WalletVisualTests")
+            .appendingPathComponent("\(id.replacingOccurrences(of: ".", with: "-")).native-ios26_5-phone-en-light.png")
+        let baselineData = try? Data(contentsOf: baseline)
+        var actualData: Data?
+        var actualSize: CGSize?
+        var actualScale: CGFloat?
+        let snapshot = strategy.snapshot
+        strategy.snapshot = { value in
+            snapshot(value).map { image in
+                actualData = diffing.toData(image)
+                actualSize = image.size
+                actualScale = image.scale
+                return image
+            }
+        }
+        var compared = false
         // Compare the same PNG representation on both sides. Core Image's perceptual path is
         // inconsistent on the pinned simulator. Bound measured edge noise in each sRGB channel;
         // unlike a percentage tolerance this never ignores a small missing label or icon.
         strategy.diffing.diffV2 = { reference, actual in
+            compared = true
             let decoded = diffing.fromData(diffing.toData(actual))
             if matchesWithinRasterNoise(reference, decoded) { return nil }
             return diffing.diffV2(reference, decoded)
         }
-        withSnapshotTesting(record: record ? .all : .never) {
-            assertSnapshot(
-                of: controller,
-                as: strategy,
-                named: "native-ios26_5-phone-en-light",
-                file: file, testName: id, line: line
-            )
+        let failure = verifySnapshot(of: controller, as: strategy,
+            named: "native-ios26_5-phone-en-light", record: record ? .all : .never,
+            file: file, testName: id, line: line)
+        if let actualData {
+            let attachment = XCTAttachment(data: actualData, uniformTypeIdentifier: "public.png")
+            attachment.name = "wallet-visual-actual-\(id.replacingOccurrences(of: ".", with: "-")).png"
+            attachment.lifetime = .keepAlways
+            add(attachment)
         }
+        let receipt: [String: Any] = [
+            "schemaVersion": 1, "id": id, "renderer": "swiftui", "kind": "deterministic",
+            "test": name, "runId": environment["WALLET_VISUAL_RUN_ID"] ?? "",
+            "sha": environment["WALLET_VISUAL_SHA"] ?? "",
+            "fingerprint": environment["WALLET_VISUAL_FINGERPRINT"] ?? "",
+            "mode": record ? "record" : "verify", "compared": compared,
+            "result": record ? "recorded" : (failure == nil && compared ? "passed" : "failed"),
+            "baselineDigest": baselineData.map(visualDigest) ?? "",
+            "actualDigest": actualData.map(visualDigest) ?? "",
+            "viewport": [actualSize?.width ?? 0, actualSize?.height ?? 0],
+            "scale": actualScale ?? 0, "locale": "en-US", "theme": "light", "textSize": "large",
+            "timezone": TimeZone.current.identifier, "runtime": UIDevice.current.systemVersion,
+            "diagnostic": failure ?? ""
+        ]
+        let attachment = XCTAttachment(data: try JSONSerialization.data(withJSONObject: receipt, options: [.sortedKeys]),
+            uniformTypeIdentifier: "public.json")
+        attachment.name = "wallet-visual-receipt-\(id.replacingOccurrences(of: ".", with: "-")).json"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        if let failure { XCTFail(failure, file: file, line: line) }
     }
 
+}
+
+private func visualDigest(_ data: Data) -> String {
+    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
 }
 
 private struct ImageRowHeightKey: PreferenceKey {
