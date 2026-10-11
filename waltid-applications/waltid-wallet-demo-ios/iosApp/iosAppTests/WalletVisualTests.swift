@@ -213,10 +213,11 @@ final class WalletVisualTests: XCTestCase {
         .environment(\.walletDemoBranding, .default)
         .background(Color(.systemGroupedBackground))
 
-        try capture(UIHostingController(rootView: content), id: id, config: config, file: file, line: line)
+        try capture(UIHostingController(rootView: content), id: id, config: config, colorScheme: colorScheme, sizeCategory: sizeCategory, file: file, line: line)
     }
 
     private func capture(_ controller: UIViewController, id: String, config: ViewImageConfig = .iPhone13,
+                         colorScheme: ColorScheme = .light, sizeCategory: ContentSizeCategory = .large,
                          file: StaticString = #filePath, line: UInt = #line) throws {
         let environment = ProcessInfo.processInfo.environment
         let record = environment["WALLET_VISUAL_RECORD"] == "1"
@@ -272,7 +273,8 @@ final class WalletVisualTests: XCTestCase {
             "baselineDigest": baselineData.map(visualDigest) ?? "",
             "actualDigest": actualData.map(visualDigest) ?? "",
             "viewport": [actualSize?.width ?? 0, actualSize?.height ?? 0],
-            "scale": actualScale ?? 0, "locale": "en-US", "theme": "light", "textSize": "large",
+            "scale": actualScale ?? 0, "locale": "en-US", "theme": colorScheme == .dark ? "dark" : "light",
+            "textSize": sizeCategory == .large ? "large" : sizeCategory == .accessibilityMedium ? "accessibilityMedium" : String(describing: sizeCategory),
             "timezone": TimeZone.current.identifier, "runtime": UIDevice.current.systemVersion,
             "diagnostic": failure ?? ""
         ]
