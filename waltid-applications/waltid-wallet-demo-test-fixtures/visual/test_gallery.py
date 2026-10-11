@@ -178,6 +178,15 @@ class GalleryTests(unittest.TestCase):
         for page in result["inventoryPages"]:
             self.assertLess(len(page.encode()), 60_000)
 
+    def test_preview_prioritizes_different_screen_families(self):
+        for identifier in ("wallet.empty", "wallet.populated", "credential.details"):
+            self.add(identifier)
+        self.checkpoint()
+        body = gallery.markdown(self.build(), limit=2)
+        self.assertIn("**credential.details**", body)
+        self.assertIn("**wallet.empty**", body)
+        self.assertNotIn("**wallet.populated**", body)
+
     def test_refresh_is_idempotent_and_preserves_authored_prose(self):
         self.add("wallet.empty")
         self.checkpoint()
