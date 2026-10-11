@@ -129,6 +129,23 @@ class GalleryTests(unittest.TestCase):
         result = gallery.build(self.root, self.empty, "HEAD", "example/wallet", "contributor/wallet")
         self.assertIn("github.com/contributor/wallet/blob/", result["changes"][0]["afterUrl"])
 
+    def test_browser_catalogue_is_included_without_mobile_duplication(self):
+        catalogue = self.root / gallery.BROWSER_CATALOGUE_PATH
+        catalogue.parent.mkdir(parents=True)
+        catalogue.write_text(json.dumps({"requirements": ["R01"], "environment": "Chromium fixture host",
+            "states": [{"id": "account.empty.wide", "width": 1280, "height": 800}]}))
+        snapshots = catalogue.parent / "snapshots"
+        snapshots.mkdir()
+        Image.new("RGB", (1280, 800), "red").save(snapshots / "account-empty-wide.png")
+        self.checkpoint()
+        result = self.build()
+        self.assertEqual(result["counts"], {"added": 1})
+        cell = result["changes"][0]
+        self.assertEqual(cell["renderer"], "browser")
+        self.assertEqual(cell["after"]["configuration"]["viewport"], [1280, 800])
+        self.assertIn(gallery.BROWSER_CATALOGUE_PATH, result["changedCatalogues"])
+        self.assertIn("Browser", gallery.markdown(result))
+
     def test_gallery_contains_every_changed_platform_cell(self):
         for i in range(9):
             self.add(f"wallet.state_{i}")

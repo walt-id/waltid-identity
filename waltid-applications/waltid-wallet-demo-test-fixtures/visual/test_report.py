@@ -101,6 +101,39 @@ class NativeReceiptTests(unittest.TestCase):
         self.assertNotEqual(report.image_info(self.baseline)["digest"], report.image_info(self.actual)["digest"])
         self.assertEqual(report.image_info(self.baseline)["pixels"], report.image_info(self.actual)["pixels"])
 
+    def test_invalid_icc_profile_and_oversized_inputs_fail_closed(self):
+        Image.new("RGB", (2, 3), "red").save(self.actual, icc_profile=b"invalid ICC profile")
+        with self.assertRaisesRegex(ValueError, "Invalid visual PNG"):
+            report.image_info(self.actual)
+        with self.assertRaisesRegex(ValueError, "exceeds 10 MiB"):
+            report.image_info(b"x" * (10 * 1024 * 1024 + 1))
+
+    def test_compose_comparison_requires_run_and_configuration_binding(self):
+        metadata = {**self.run, "id": self.state["id"], "renderer": "android", "kind": "deterministic",
+                    "viewportWidth": 393, "viewportHeight": 852, "theme": "light", "scale": 1, "fontScale": 1}
+        config = {"viewport": [393, 852], "theme": "light", "scale": 1, "fontScale": 1}
+        def assess(value):
+            return report.assess_compose(self.state, "android", self.case, value, self.baseline, self.run, config)[0]
+        result = {"type": "unchanged", "context_data": metadata}
+        self.assertEqual(assess(result), "passed")
+        self.assertEqual(assess({"type": "unchanged"}), "stale")
+        self.assertEqual(assess({**result, "context_data": {**metadata, "runId": "old"}}), "stale")
+        self.assertEqual(assess({**result, "context_data": {**metadata, "renderer": "compose-ios"}}), "invalid")
+        self.assertEqual(assess({**result, "context_data": {**metadata, "theme": "dark"}}), "invalid")
+        self.assertEqual(assess({**result, "type": "recorded"}), "recorded")
+        self.assertEqual(assess({**result, "type": "changed"}), "failed")
+
+    def test_readiness_transitions_are_kept_with_the_compared_capture(self):
+        receipt = self.root / "receipt.json"
+        receipt.write_text(json.dumps(self.result))
+        readiness = self.root / "readiness.json"
+        observations = [{"beforeRender": False, "afterRender": True, "ready": True}]
+        readiness.write_text(json.dumps({"id": self.state["id"], "observations": observations}))
+        results = self.export([
+            {"exportedFileName": receipt.name, "suggestedHumanReadableName": "wallet-visual-receipt-test.json"},
+            {"exportedFileName": readiness.name, "suggestedHumanReadableName": "wallet-visual-readiness-test.json"}])
+        self.assertEqual(results[self.state["id"]]["readiness"]["observations"], observations)
+
     def export(self, attachments):
         (self.root / "manifest.json").write_text(json.dumps([{"testIdentifier": "WalletVisualTests/testScreen()", "attachments": attachments}]))
         return report.native_attachments(self.root, {"testScreen": self.case})

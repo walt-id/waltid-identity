@@ -30,18 +30,25 @@ def digest(path):
 
 def image_info(path):
     from PIL import Image, ImageCms
+    if not isinstance(path, bytes) and Path(path).stat().st_size > 10 * 1024 * 1024:
+        raise ValueError("Visual evidence exceeds 10 MiB")
     data = path if isinstance(path, bytes) else Path(path).read_bytes()
-    with Image.open(io.BytesIO(data)) as image:
-        if image.format != "PNG":
-            raise ValueError("Visual evidence must be PNG")
-        if image.width * image.height > 16_000_000:
-            raise ValueError("Visual evidence exceeds the supported image size")
-        image.load()
-        profile = image.info.get("icc_profile")
-        pixels = (ImageCms.profileToProfile(image, ImageCms.ImageCmsProfile(io.BytesIO(profile)),
-                  ImageCms.createProfile("sRGB"), outputMode="RGBA") if profile else image.convert("RGBA"))
-        return {"digest": hashlib.sha256(data).hexdigest(), "pixels": hashlib.sha256(pixels.tobytes()).hexdigest(),
-                "dimensions": list(image.size)}
+    if len(data) > 10 * 1024 * 1024:
+        raise ValueError("Visual evidence exceeds 10 MiB")
+    try:
+        with Image.open(io.BytesIO(data)) as image:
+            if image.format != "PNG":
+                raise ValueError("Visual evidence must be PNG")
+            if image.width * image.height > 16_000_000:
+                raise ValueError("Visual evidence exceeds the supported image size")
+            image.load()
+            profile = image.info.get("icc_profile")
+            pixels = (ImageCms.profileToProfile(image, ImageCms.ImageCmsProfile(io.BytesIO(profile)),
+                      ImageCms.createProfile("sRGB"), outputMode="RGBA") if profile else image.convert("RGBA"))
+            return {"digest": hashlib.sha256(data).hexdigest(), "pixels": hashlib.sha256(pixels.tobytes()).hexdigest(),
+                    "dimensions": list(image.size)}
+    except (OSError, Image.DecompressionBombError, ImageCms.PyCMSError) as error:
+        raise ValueError(f"Invalid visual PNG: {error}") from error
 
 
 def fingerprint():
@@ -77,7 +84,7 @@ def native_attachments(export, tests):
         test = case["testIdentifier"].split("/")[-1].removesuffix("()")
         if test not in tests:
             raise ValueError(f"Attachment for an unexpected test: {test}")
-        receipts, actuals, diagnostics, differences = [], {}, [], []
+        receipts, actuals, diagnostics, differences, readiness = [], {}, [], [], {}
         for item in case["attachments"]:
             path = (export / item["exportedFileName"]).resolve()
             if not path.is_relative_to(export.resolve()) or not path.is_file():
@@ -86,6 +93,9 @@ def native_attachments(export, tests):
             if name.startswith("wallet-visual-receipt-"):
                 receipt = json.loads(path.read_text())
                 receipts.append({**receipt, "receipt_file_path": str(path)})
+            elif name.startswith("wallet-visual-readiness-"):
+                value = json.loads(path.read_text())
+                readiness[value["id"]] = value
             elif name.startswith("wallet-visual-actual-"):
                 actuals[digest(path)] = str(path)
             elif name.startswith("readiness-"):
@@ -97,11 +107,13 @@ def native_attachments(export, tests):
                 raise ValueError(f"Multiple comparisons for {receipt['id']}; use distinct catalogue cells")
             results[receipt["id"]] = {**receipt, "test": test,
                 "actual_file_path": actuals.get(receipt.get("actualDigest")),
+                "readiness": readiness.get(receipt["id"]),
                 "compare_file_path": differences[0] if len(differences) == 1 else None}
         if diagnostics:
             # A readiness failure can occur before a receipt exists. Retain the phase and image.
             results[f"readiness:{test}"] = {"diagnostic_file_path": diagnostics[0],
-                "diagnostic": tests[test].get("failureMessage", "Readiness failed before comparison")}
+                "diagnostic": tests[test].get("failureMessage", "Readiness failed before comparison"),
+                "readiness": next(iter(readiness.values()), None)}
     return results
 
 
@@ -179,7 +191,7 @@ def assess_native(state, case, result, baseline, run, config):
         viewport = result["viewport"]
         if actual["dimensions"] != [round(v * result["scale"]) for v in viewport]:
             raise ValueError("Capture dimensions do not match its viewport and scale")
-        for key in ("viewport", "scale", "theme", "textSize", "locale", "runtime"):
+        for key in ("viewport", "scale", "theme", "textSize", "locale", "runtime", "layoutDirection"):
             if key in config and result.get(key) != config[key]:
                 raise ValueError(f"Capture configuration differs: {key}")
         if result.get("timezone") not in ("UTC", "GMT", "Etc/UTC"):
@@ -190,6 +202,28 @@ def assess_native(state, case, result, baseline, run, config):
         return "failed", "capture", result.get("diagnostic") or "Snapshot never reached pixel comparison"
     if result.get("result") != "passed" or case.get("status") != "passed":
         return "failed", "comparison", result.get("diagnostic") or "Native test or comparison failed"
+    return "passed", "comparison", ""
+
+
+def assess_compose(state, renderer, case, result, baseline, run, config):
+    if case.get("status") == "skipped":
+        return "skipped", "test", "Compose test skipped"
+    if not baseline.is_file():
+        return "missing-baseline", "comparison", "Reviewed baseline is missing"
+    if not case or not result:
+        return "missing", "comparison", "Fresh test or comparison result is missing"
+    if result.get("type") == "recorded":
+        return "recorded", "comparison", "Recording is not verification"
+    metadata = result.get("context_data", {})
+    if any(metadata.get(key) != run[key] for key in ("runId", "sha", "fingerprint")):
+        return "stale", "provenance", "Comparison does not describe this source and run"
+    if metadata.get("id") != state["id"] or metadata.get("renderer") != renderer or metadata.get("kind") != "deterministic":
+        return "invalid", "provenance", "Comparison belongs to a different catalogue cell"
+    actual_config = {**metadata, "viewport": [metadata.get("viewportWidth"), metadata.get("viewportHeight")]}
+    if any(actual_config.get(key) != value for key, value in config.items()):
+        return "invalid", "provenance", "Comparison configuration differs from the catalogue"
+    if case.get("status") != "passed" or result.get("type") != "unchanged":
+        return "failed", "comparison", "Compose test or pixel comparison failed"
     return "passed", "comparison", ""
 
 
@@ -227,16 +261,8 @@ def finish(args, run):
                 if readiness and not result:
                     result = readiness
                     status, phase, diagnostic = "failed", "readiness", readiness["diagnostic"]
-            elif case.get("status") == "skipped":
-                status = "skipped"
-            elif not baseline.is_file():
-                status = "missing-baseline"
-            elif not case or not result:
-                status = "missing"
-            elif result.get("type") == "recorded":
-                status = "recorded"
             else:
-                status = "passed" if case["status"] == "passed" and result.get("type") == "unchanged" else "failed"
+                status, phase, diagnostic = assess_compose(state, name, case, result, baseline, run, config)
             links, images = {}, {}
             for kind, source in [("expected", baseline), ("actual", result.get("actual_file_path")),
                                  ("diff", result.get("compare_file_path")), ("readiness", result.get("diagnostic_file_path"))]:
@@ -254,7 +280,7 @@ def finish(args, run):
             cells.append({"id": state["id"], "renderer": name, "kind": "deterministic", "status": status,
                           "phase": phase, "diagnostic": diagnostic, "configuration": config,
                           "requirements": state["requirements"], "note": state.get("note"),
-                          "test": test, "durationMs": case.get("durationMs"), "receipt": result if name == "swiftui" else None,
+                          "test": test, "durationMs": case.get("durationMs"), "receipt": result if name == "swiftui" else None, "capture": result.get("context_data"),
                           "comparison": result.get("result", result.get("type", "missing")), "artifacts": links, "images": images})
         orphans = {p.name for p in (ROOT / renderer["baselineDirectory"]).glob("*.png")} - expected
         if orphans:
