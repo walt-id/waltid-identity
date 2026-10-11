@@ -43,13 +43,29 @@ class WalletVisualAndroidTest {
     @Test
     fun nearbyReady() = scenario { nearbyReady() }
 
-    private fun scenario(block: WalletVisualScenarios.() -> Unit) = runComposeUiTest {
-        WalletVisualScenarios(this, captureImage = { id ->
+    private fun scenario(fontScale: Float = 1f, block: WalletVisualScenarios.() -> Unit) = runComposeUiTest {
+        WalletVisualScenarios(this, captureImage = { id, direction ->
             val directory = checkNotNull(System.getProperty("roborazzi.output.dir")) { "Roborazzi output directory is not configured" }
-            onRoot().captureRoboImage("$directory/android-api35-phone-en-light/$id.png")
+            val configuration = android.content.res.Resources.getSystem().configuration
+            val density = android.content.res.Resources.getSystem().displayMetrics.density
+            val metadata: Map<String, Any> = mapOf(
+                "runId" to (System.getenv("WALLET_VISUAL_RUN_ID") ?: ""),
+                "sha" to (System.getenv("WALLET_VISUAL_SHA") ?: ""),
+                "fingerprint" to (System.getenv("WALLET_VISUAL_FINGERPRINT") ?: ""),
+                "id" to id, "renderer" to "android", "kind" to "deterministic",
+                "viewportWidth" to configuration.screenWidthDp, "viewportHeight" to configuration.screenHeightDp,
+                "scale" to density.toDouble(), "fontScale" to fontScale.toDouble(),
+                "theme" to if (configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK ==
+                    android.content.res.Configuration.UI_MODE_NIGHT_YES) "dark" else "light",
+                "locale" to configuration.locales[0].toLanguageTag(), "timezone" to java.util.TimeZone.getDefault().id,
+                "layoutDirection" to direction)
+            onRoot().captureRoboImage("$directory/android-api35-phone-en-light/$id.png",
+                roborazziOptions = com.github.takahirom.roborazzi.RoborazziOptions(contextData = metadata))
         }, platformTheme = { content ->
             // Android RenderThread ripples do not follow the Compose test clock.
-            CompositionLocalProvider(LocalRippleConfiguration provides null, content = content)
+            CompositionLocalProvider(LocalRippleConfiguration provides null,
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(
+                    androidx.compose.ui.platform.LocalDensity.current.density, fontScale), content = content)
         }).block()
     }
 }
