@@ -199,7 +199,7 @@ def markdown(gallery, limit=6, check_budget=True):
     for identifier, cells in rows.items():
         if len(selected) >= limit:
             break
-        family = ".".join(identifier.split(".")[:2])
+        family = identifier.split(".")[0]
         if family not in families and any(c["pixelsChanged"] for c in cells):
             selected.append(identifier)
             families.add(family)
