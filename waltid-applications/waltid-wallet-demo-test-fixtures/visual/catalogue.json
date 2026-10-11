@@ -16,7 +16,8 @@
         "theme": "light",
         "locale": "en-US",
         "timezone": "UTC",
-        "fontScale": 1
+        "fontScale": 1,
+        "layoutDirection": "ltr"
       }
     },
     "compose-ios": {
@@ -34,7 +35,8 @@
         "theme": "light",
         "locale": "en-US",
         "timezone": "UTC",
-        "fontScale": 1
+        "fontScale": 1,
+        "layoutDirection": "ltr"
       }
     },
     "swiftui": {
@@ -52,7 +54,8 @@
         "locale": "en-US",
         "timezone": "UTC",
         "textSize": "large",
-        "runtime": "27.0"
+        "runtime": "27.0",
+        "layoutDirection": "ltr"
       }
     }
   },
@@ -246,7 +249,33 @@
         "R12",
         "R13"
       ],
-      "note": "Confirmation at 320x568, dark mode, Compose font scale 1.5 / SwiftUI accessibilityMedium. Four positions and compact trailing actions remain visible."
+      "note": "Confirmation at 320x568, dark mode, Compose font scale 1.5 / SwiftUI accessibilityMedium. Four positions and compact trailing actions remain visible.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "textSize": "accessibilityMedium"
+        }
+      }
     },
     {
       "id": "onboarding.pin.unlock",
@@ -270,7 +299,18 @@
         "R12",
         "R13"
       ],
-      "note": "Confirmation heading and trailing controls under RTL. Compose also uses reduced-motion preferences here; SwiftUI reads the OS preference separately. This still image proves the settled layout; app-host recordings cover transitions."
+      "note": "Confirmation heading and trailing controls under RTL. Compose also uses reduced-motion preferences here; SwiftUI reads the OS preference separately. This still image proves the settled layout; app-host recordings cover transitions.",
+      "configuration": {
+        "android": {
+          "layoutDirection": "rtl"
+        },
+        "compose-ios": {
+          "layoutDirection": "rtl"
+        },
+        "swiftui": {
+          "layoutDirection": "rtl"
+        }
+      }
     },
     {
       "id": "credential.details.localized_metadata",
@@ -504,7 +544,33 @@
       ],
       "composeTest": "compactProviderSharingReview",
       "swiftTest": "testCompactProviderSharingReview",
-      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome. 320x568, dark, Compose font scale 1.5 / SwiftUI accessibilityMedium."
+      "note": "Compose captures the actual modal-sheet window; native captures the bounded shared provider content. Neither proves OS-owned Credential Manager or IdentityDocumentServices chrome. 320x568, dark, Compose font scale 1.5 / SwiftUI accessibilityMedium.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "textSize": "accessibilityMedium"
+        }
+      }
     },
     {
       "id": "receiving.provider.review",
@@ -552,7 +618,17 @@
         "R11",
         "R15"
       ],
-      "note": "Native 320x568 dark accessibilityMedium review scrolled to its final credential row; confirmation stays pinned. Bounded provider content, not the Apple system container."
+      "note": "Native 320x568 dark accessibilityMedium review scrolled to its final credential row; confirmation stays pinned. Bounded provider content, not the Apple system container.",
+      "configuration": {
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "textSize": "accessibilityMedium"
+        }
+      }
     },
     {
       "id": "receiving.provider.preparing",
@@ -643,7 +719,30 @@
         "T08",
         "T10"
       ],
-      "note": "SDK-shaped payment state; local labels do not replace missing issuer instructions. Compact localized state uses 320x568 and large text."
+      "note": "SDK-shaped payment state; local labels do not replace missing issuer instructions. Compact localized state uses 320x568 and large text.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "textSize": "accessibilityMedium"
+        }
+      }
     },
     {
       "id": "payment.mixed_credentials.unsigned_confirmation",
@@ -701,7 +800,30 @@
         "R11",
         "R15"
       ],
-      "note": "Production nearby review at 320x568 with Compose font scale 1.5 / SwiftUI accessibilityMedium; selected values, retention and pinned actions. Initial viewport."
+      "note": "Production nearby review at 320x568 with Compose font scale 1.5 / SwiftUI accessibilityMedium; selected values, retention and pinned actions. Initial viewport.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "textSize": "accessibilityMedium"
+        }
+      }
     },
     {
       "id": "nearby.expired",
@@ -741,7 +863,30 @@
         "R07",
         "R12"
       ],
-      "note": "Production nearby review at 320x568 with Compose font scale 1.5 / SwiftUI accessibilityMedium; selected values, retention and pinned actions. Scrolled to the requested field."
+      "note": "Production nearby review at 320x568 with Compose font scale 1.5 / SwiftUI accessibilityMedium; selected values, retention and pinned actions. Scrolled to the requested field.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "textSize": "accessibilityMedium"
+        }
+      }
     },
     {
       "id": "settings.dc_api.enabled",
@@ -896,7 +1041,18 @@
       ],
       "composeTest": "controlsRtl",
       "swiftTest": "testControlsRtl",
-      "note": "Side-effect-free controls fixture shared with IDE previews. RTL checks reading-direction mirroring, not translated labels."
+      "note": "Side-effect-free controls fixture shared with IDE previews. RTL checks reading-direction mirroring, not translated labels.",
+      "configuration": {
+        "android": {
+          "layoutDirection": "rtl"
+        },
+        "compose-ios": {
+          "layoutDirection": "rtl"
+        },
+        "swiftui": {
+          "layoutDirection": "rtl"
+        }
+      }
     },
     {
       "id": "onboarding.biometric.cancelled",
@@ -1051,6 +1207,49 @@
       "composeTest": "accessBiometricUnavailable",
       "swiftTest": "testAccessBiometricUnavailable",
       "note": "Configured Face ID is unavailable: PIN fallback and a supported Open Settings action. Synthetic wallet UI; no OS permission dialog is imitated."
+    },
+    {
+      "id": "wallet.opening.loading",
+      "composeTest": "walletOpening",
+      "requirements": [
+        "R01",
+        "R11"
+      ],
+      "kind": "deterministic",
+      "note": "Production opening content with in-memory clients; deliberately frozen progress animation. Initial-read lifecycle has separate host and model tests.",
+      "swiftTest": "testWalletOpening"
+    },
+    {
+      "id": "wallet.opening.failure",
+      "composeTest": "walletOpeningFailure",
+      "requirements": [
+        "R01",
+        "R11"
+      ],
+      "kind": "deterministic",
+      "note": "Production opening failure and Retry action; no wallet initialization, storage operation or retry is performed by this visual fixture.",
+      "swiftTest": "testWalletOpeningFailure"
+    },
+    {
+      "id": "access.storage.unavailable",
+      "composeTest": "pinStorageUnavailable",
+      "requirements": [
+        "R01",
+        "R11"
+      ],
+      "kind": "deterministic",
+      "note": "Production locked storage-error content. Compose exposes Retry; native presents the failure. Storage recovery behavior is tested separately.",
+      "swiftTest": "testPinStorageUnavailable"
+    },
+    {
+      "id": "settings.reset.confirmation",
+      "composeTest": "resetConfirmation",
+      "requirements": [
+        "R01",
+        "R11"
+      ],
+      "kind": "deterministic",
+      "note": "Production Compose confirmation dialog opened through Settings; cancellation is asserted. SwiftUI uses a system alert covered by the existing recovery/reset host journey rather than a replica of OS chrome."
     }
   ],
   "galleryPreview": [

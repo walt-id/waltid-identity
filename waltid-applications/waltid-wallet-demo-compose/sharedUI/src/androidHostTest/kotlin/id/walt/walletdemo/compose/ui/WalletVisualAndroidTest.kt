@@ -34,6 +34,11 @@ class WalletVisualAndroidTest {
     }
     @org.junit.After fun restoreTimeZone() { java.util.TimeZone.setDefault(previousTimeZone) }
 
+    @Test fun walletOpening() = scenario { walletOpening() }
+    @Test fun walletOpeningFailure() = scenario { walletOpening(failure = true) }
+    @Test fun pinStorageUnavailable() = scenario { pinStorageUnavailable() }
+    @Test fun resetConfirmation() = scenario(sheetHost = true) { settingsRoot("reset_confirmation") }
+
     @Test fun controls() = scenario { controls() }
     @Test fun controlsRtl() = scenario { controls(rtl = true) }
 
@@ -160,7 +165,9 @@ class WalletVisualAndroidTest {
         if (sheetHost) runOnUiThread { requireNotNull(activity).actionBar?.hide() }
         WalletVisualScenarios(this, captureImage = { id, direction ->
             val directory = checkNotNull(System.getProperty("roborazzi.output.dir")) { "Roborazzi output directory is not configured" }
-            val root = if (id.endsWith(".unsigned_confirmation"))
+            val root = if (id == "settings.reset.confirmation")
+                onNode(isRoot() and hasAnyDescendant(hasTestTag(WalletUiTestTags.SettingsResetConfirm)))
+            else if (id.endsWith(".unsigned_confirmation"))
                 onNode(isRoot() and hasAnyDescendant(hasTestTag("payment-unsigned-confirm")))
             else if (id.startsWith("external.") || id.startsWith("sharing.") || id.startsWith("receiving.provider") || id == "settings.reader.import_review" || id.startsWith("payment."))
                 onNode(isRoot() and hasAnyDescendant(hasTestTag("wallet.review.sheet"))) else onRoot()

@@ -65,6 +65,7 @@ internal class WalletVisualScenarios(
     }
 
     fun controls(rtl: Boolean = false) = with(test) {
+        layoutDirection = if (rtl) "rtl" else "ltr"
         content {
             androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides
                 if (rtl) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr) {
@@ -76,6 +77,24 @@ internal class WalletVisualScenarios(
         capture(if (rtl) "components.controls.rtl" else "components.controls.default")
         onNodeWithTag("preview.copies.more").performClick()
         onNodeWithText("Copies: 2").assertIsDisplayed()
+    }
+
+    fun walletOpening(failure: Boolean = false) = with(test) {
+        content { id.walt.walletdemo.compose.ui.screens.WalletOpeningScreen(
+            if (failure) "Local storage could not be read. Try again." else null, {}) }
+        if (failure) onNodeWithTag("wallet.openingRetry").assertIsDisplayed().assertIsEnabled()
+        else onNodeWithTag(WalletUiTestTags.CredentialsLoading).assertIsDisplayed()
+        capture(if (failure) "wallet.opening.failure" else "wallet.opening.loading")
+    }
+
+    fun pinStorageUnavailable() = with(test) {
+        val controller = id.walt.walletdemo.compose.logic.WalletDemoController(WalletUiTestWallet(),
+            id.walt.walletdemo.compose.logic.InMemoryDemoPinStore())
+        content { id.walt.walletdemo.compose.ui.screens.PinStorageUnavailableScreen(controller,
+            "Secure PIN storage could not be read") }
+        onNodeWithText("PIN storage unavailable").assertIsDisplayed()
+        onNodeWithTag("wallet.pinStorageRetryButton").assertIsDisplayed().assertIsEnabled()
+        capture("access.storage.unavailable")
     }
 
     fun externalReceiving(unavailable: Boolean = false) = with(test) {
@@ -98,6 +117,7 @@ internal class WalletVisualScenarios(
     }
 
     fun pin(state: String) = with(test) {
+        layoutDirection = if (state == "rtl") "rtl" else "ltr"
         val gate = kotlinx.coroutines.CompletableDeferred<id.walt.walletdemo.compose.logic.DemoBiometricResult>()
         val biometrics = object : id.walt.walletdemo.compose.logic.DemoBiometricAuthenticator {
             override fun availability() = if (state in setOf("confirmation", "biometric_prompt", "compact_dark_large_text")) DemoBiometricAvailability.Available else DemoBiometricAvailability.Unavailable
@@ -291,6 +311,10 @@ internal class WalletVisualScenarios(
                 if (destination == "connection") onNodeWithTag(WalletUiTestTags.SettingsConnectionMethod).performClick()
                 if (destination.startsWith("reader")) onNodeWithTag(WalletUiTestTags.SettingsReaderAuthentication).performClick()
             }
+            "reset_confirmation" -> {
+                onNodeWithTag(WalletUiTestTags.SettingsReset).performScrollTo().performClick()
+                onNodeWithTag(WalletUiTestTags.SettingsResetConfirm).assertIsDisplayed().assertIsEnabled()
+            }
             "technical" -> onNodeWithTag(WalletUiTestTags.SettingsTechnicalDetails).performClick()
         }
         val stateId = when (destination) {
@@ -298,7 +322,11 @@ internal class WalletVisualScenarios(
             "technical" -> "unavailable"
             else -> "default"
         }
-        capture("settings.$destination.$stateId")
+        if (destination == "reset_confirmation") {
+            capture("settings.reset.confirmation")
+            onNodeWithText("Cancel").performClick()
+            onAllNodesWithTag(WalletUiTestTags.SettingsResetConfirm).assertCountEquals(0)
+        } else capture("settings.$destination.$stateId")
     }
 
     fun walletHome(empty: Boolean = false) = with(test) {

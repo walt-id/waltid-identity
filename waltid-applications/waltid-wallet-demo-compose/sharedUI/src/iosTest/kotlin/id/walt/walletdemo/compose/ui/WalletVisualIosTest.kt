@@ -22,7 +22,6 @@ import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import io.github.takahirom.roborazzi.captureRoboImage
 import kotlin.test.Test
-import kotlinx.cinterop.toKString
 
 /** Compose iOS/Skia content on an iOS simulator; does not imitate a UIKit provider container. */
 @OptIn(ExperimentalTestApi::class, ExperimentalRoborazziApi::class, InternalComposeUiApi::class)
@@ -37,6 +36,11 @@ class WalletVisualIosTest {
         previousTimeZone?.let { platform.posix.setenv("TZ", it, 1) } ?: platform.posix.unsetenv("TZ")
         platform.posix.tzset()
     }
+
+    @Test fun walletOpening() = scenario { walletOpening() }
+    @Test fun walletOpeningFailure() = scenario { walletOpening(failure = true) }
+    @Test fun pinStorageUnavailable() = scenario { pinStorageUnavailable() }
+    @Test fun resetConfirmation() = scenario { settingsRoot("reset_confirmation") }
 
     @Test fun controls() = scenario { controls() }
     @Test fun controlsRtl() = scenario { controls(rtl = true) }
@@ -155,7 +159,9 @@ class WalletVisualIosTest {
                          block: WalletVisualScenarios.() -> Unit) = runSkikoComposeUiTest(size = size) {
         WalletVisualScenarios(this,
             captureImage = { id, direction ->
-                val root = if (id.endsWith(".unsigned_confirmation"))
+                val root = if (id == "settings.reset.confirmation")
+                onNode(isRoot() and hasAnyDescendant(hasTestTag(WalletUiTestTags.SettingsResetConfirm)))
+            else if (id.endsWith(".unsigned_confirmation"))
                 onNode(isRoot() and hasAnyDescendant(hasTestTag("payment-unsigned-confirm")))
             else if (id.startsWith("external.") || id.startsWith("sharing.") || id.startsWith("receiving.provider") || id == "settings.reader.import_review" || id.startsWith("payment."))
                     onNode(isRoot() and hasAnyDescendant(hasTestTag("wallet.review.sheet"))) else onRoot()
