@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 from PIL import Image, PngImagePlugin
 import gallery
@@ -161,6 +162,21 @@ class GalleryTests(unittest.TestCase):
         for i in range(9):
             self.assertIn(f"| wallet.state_{i} |", body)
         self.assertNotIn("/main/", body)
+
+    def test_large_gallery_preserves_the_complete_inventory_in_bounded_pages(self):
+        for i in range(9):
+            self.add(f"wallet.state_{i}")
+        self.checkpoint()
+        with mock.patch.object(gallery, "BODY_BUDGET", 5_000):
+            result = self.build()
+            body = gallery.markdown(result)
+        self.assertIn(gallery.INVENTORY_LINKS, body)
+        self.assertLessEqual(len(body.encode()), 5_000)
+        inventory = "\n".join(result["inventoryPages"])
+        for i in range(9):
+            self.assertEqual(inventory.count(f"| wallet.state_{i} |"), 1)
+        for page in result["inventoryPages"]:
+            self.assertLess(len(page.encode()), 60_000)
 
     def test_refresh_is_idempotent_and_preserves_authored_prose(self):
         self.add("wallet.empty")
