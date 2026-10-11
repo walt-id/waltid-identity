@@ -38,6 +38,8 @@ python3 waltid-applications/waltid-wallet-demo-test-fixtures/visual/gallery.py -
 
 Use the actual PR target, including the parent branch for a stack. The generator resolves its merge-base, handles additions/removals/renames, and compares decoded pixels so encoding-only updates do not crowd the previews. Catalogue and configuration changes remain visible. For forks, set `--head-repository` to the owning fork. The default collapsed gallery shows six representative scenarios and links every changed platform reference through the pinned comparison. `gallery.json` retains direct full-size before/after links and content digests.
 
+When the preview and complete inventory exceed the PR-body budget, the generator also emits bounded `inventory-*.md` pages in `gallery.json`'s `inventoryPages`. The trusted shared publisher reuses marked, collapsed PR comments and fills their links into the preview. Review those pages together with the gallery; an unresolved inventory-link marker is not publishable. Small inventories remain inside the PR body, and preview rows shrink only if needed to fit.
+
 `--body path/to/body.md` replaces only the marked generated portion of a local PR body and preserves authored prose. Generation has no publishing permission. Before publishing, confirm the PR's current base/head, verify image access for the intended readers, assess selected E2E evidence, and use the shared mobile-evidence/PR-description workflow. Baselines show expected appearance; fresh comparison reports and observed app journeys have separate provenance. A superseded run must not overwrite a newer gallery.
 
 ## Adding a state

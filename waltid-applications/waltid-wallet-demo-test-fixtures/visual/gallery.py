@@ -16,6 +16,8 @@ CATALOGUE_PATH = "waltid-applications/waltid-wallet-demo-test-fixtures/visual/ca
 BROWSER_CATALOGUE_PATH = "waltid-applications/waltid-wallet-demo-compose/webApp/visual/catalogue.json"
 START = "<!-- wallet-visual-gallery:start -->"
 END = "<!-- wallet-visual-gallery:end -->"
+INVENTORY_LINKS = "<!-- wallet-visual-inventory-links -->"
+BODY_BUDGET = 60_000
 LABELS = {"android": "Compose Android", "compose-ios": "Compose iOS", "swiftui": "SwiftUI", "browser": "Browser"}
 
 
@@ -137,23 +139,62 @@ def build(root, base_ref, head_ref, repository, head_repository=None):
             "pixelsChanged": True, "before": before, "after": None,
             "beforeImage": report.image_info(blob(root, base, path)), "afterImage": None,
             "beforeUrl": image_url(repository, base, path), "afterUrl": None})
-    return {"schemaVersion": 1, "kind": "committed-baseline", "base": base, "target": target, "head": head,
+    result = {"schemaVersion": 1, "kind": "committed-baseline", "base": base, "target": target, "head": head,
             "repository": repository, "headRepository": head_repository or repository,
             "counts": dict(Counter(c["status"] for c in changes)), "changes": changes, "encodingOnly": encoding,
             "catalogueChanged": old_catalogue != new_catalogue,
             "changedCatalogues": sorted(path for path in old_catalogue.keys() | new_catalogue.keys()
                 if old_catalogue.get(path) != new_catalogue.get(path))}
+    if len(markdown(result, check_budget=False).encode()) > BODY_BUDGET:
+        result["inventoryPages"] = inventory_pages(result)
+    return result
 
 
-def markdown(gallery, limit=6):
+def inventory_rows(gallery):
+    rows = defaultdict(list)
+    for cell in gallery["changes"]:
+        rows[cell["id"]].append(cell)
+    head_ref = gallery["head"] if gallery["headRepository"] == gallery["repository"] else gallery["headRepository"].split("/")[0] + ":" + gallery["head"]
+    comparison = f"/{gallery['repository']}/compare/{gallery['base']}...{head_ref}"
+    for identifier, cells in rows.items():
+        links = []
+        for cell in sorted(cells, key=lambda c: c["renderer"]):
+            path = (cell["after"] or cell["before"])["path"]
+            anchor = hashlib.sha256(path.encode()).hexdigest()
+            # Catalogue-only changes have no PNG diff anchor.
+            url = cell["afterUrl"] if cell["status"] == "metadata" else f"{comparison}#diff-{anchor}"
+            links.append(f"[{LABELS[cell['renderer']]} · {cell['status']}]({url})")
+        yield f"| {identifier} | {' · '.join(links)} |"
+
+
+def inventory_pages(gallery):
+    pages, lines, size = [], [], 0
+    for line in inventory_rows(gallery):
+        if lines and size + len(line.encode()) > 48_000:
+            pages.append(lines)
+            lines, size = [], 0
+        lines.append(line)
+        size += len(line.encode()) + 1
+    if lines:
+        pages.append(lines)
+    result = []
+    for number, page in enumerate(pages, 1):
+        result.append("\n".join([
+            f"<!-- wallet-visual-inventory:{number}:start -->", "<details>",
+            f"<summary>Changed visual references — part {number} of {len(pages)}</summary>", "",
+            f"Committed references at `{gallery['base']}` → `{gallery['head']}`.", "",
+            "| Scenario | Platform references |", "|---|---|", *page, "", "</details>",
+            f"<!-- wallet-visual-inventory:{number}:end -->", ""]))
+    return result
+
+
+def markdown(gallery, limit=6, check_budget=True):
     rows = defaultdict(list)
     for cell in gallery["changes"]:
         rows[cell["id"]].append(cell)
     if not rows and not gallery["catalogueChanged"] and not gallery["encodingOnly"]:
         return ""
     repository, base, head = gallery["repository"], gallery["base"], gallery["head"]
-    head_ref = head if gallery["headRepository"] == repository else gallery["headRepository"].split("/")[0] + ":" + head
-    comparison = f"/{repository}/compare/{base}...{head_ref}"
     selected, families = [], set()
     for identifier, cells in rows.items():
         if len(selected) >= limit:
@@ -181,17 +222,11 @@ def markdown(gallery, limit=6):
                 pictures.append(f'<a href="{html.escape(url)}"><img src="{html.escape(url + "?raw=true")}" alt="{identifier}, {LABELS[cell["renderer"]]}, {side}" width="220"></a>' if url else ("Added" if side == "before" else "Removed"))
             lines.append(f"| {LABELS[cell['renderer']]} · {cell['status']} | {pictures[0]} | {pictures[1]} |")
         lines.append("")
-    lines += ["<details>", "<summary>Every changed reference</summary>", "", "| Scenario | Platform references |", "|---|---|"]
-    for identifier, cells in rows.items():
-        links = []
-        for cell in sorted(cells, key=lambda c: c["renderer"]):
-            path = (cell["after"] or cell["before"])["path"]
-            anchor = hashlib.sha256(path.encode()).hexdigest()
-            # An unchanged PNG has no file-diff anchor when only its catalogue metadata changed.
-            url = cell["afterUrl"] if cell["status"] == "metadata" else f"{comparison}#diff-{anchor}"
-            links.append(f"[{LABELS[cell['renderer']]} · {cell['status']}]({url})")
-        lines.append(f"| {identifier} | {' · '.join(links)} |")
-    lines += ["", "</details>", ""]
+    if gallery.get("inventoryPages"):
+        lines += [f"Every changed reference: {INVENTORY_LINKS}", ""]
+    else:
+        lines += ["<details>", "<summary>Every changed reference</summary>", "", "| Scenario | Platform references |", "|---|---|",
+                  *inventory_rows(gallery), "", "</details>", ""]
     if gallery["encodingOnly"]:
         lines.append(f"{len(gallery['encodingOnly'])} encoding-only updates have identical decoded pixels; excluded from the image preview.")
     if gallery["catalogueChanged"]:
@@ -200,8 +235,10 @@ def markdown(gallery, limit=6):
         lines.append("Catalogue and configuration changed: " + ", ".join(links) + ".")
     lines += ["", "Selected app-journey evidence belongs in a separate, clearly labelled gallery.", "", "</details>", END]
     value = "\n".join(lines) + "\n"
-    if len(value.encode()) > 60_000:
-        raise ValueError("Gallery exceeds the PR-body budget; split the complete inventory into linked, collapsed PR comments")
+    if check_budget and len(value.encode()) > BODY_BUDGET:
+        if limit:
+            return markdown(gallery, limit - 1)
+        raise ValueError("Gallery exceeds the PR-body budget even without inline previews")
     return value
 
 
@@ -231,6 +268,8 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     (args.output / "gallery.json").write_text(json.dumps(gallery, indent=2) + "\n")
     (args.output / "gallery.md").write_text(generated)
+    for number, page in enumerate(gallery.get("inventoryPages", []), 1):
+        (args.output / f"inventory-{number}.md").write_text(page)
     if args.body:
         args.body.write_text(replace_generated(args.body.read_text(), generated))
     print(json.dumps({"counts": gallery["counts"], "encodingOnly": len(gallery["encodingOnly"]), "gallery": str(args.output / "gallery.md")}, indent=2))
