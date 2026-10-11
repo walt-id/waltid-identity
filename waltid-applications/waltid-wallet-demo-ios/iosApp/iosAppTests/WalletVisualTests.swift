@@ -33,9 +33,27 @@ final class WalletVisualTests: XCTestCase {
         super.tearDown()
     }
 
+    func testWalletOpening() async throws { try await walletOpening(failure: false) }
+    func testWalletOpeningFailure() async throws { try await walletOpening(failure: true) }
+    private func walletOpening(failure: Bool) async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        model.auth = .unlocked
+        model.isReady = false
+        model.isLoading = !failure
+        model.statusMessage = "Local storage could not be read. Try again."
+        try capture(HomeView(viewModel: model), id: failure ? "wallet.opening.failure" : "wallet.opening.loading")
+    }
+    func testPinStorageUnavailable() async throws {
+        let model = makeModel()
+        await model.readerTrustSettings.awaitPendingOperations()
+        model.auth = .storageUnavailable("Secure PIN storage could not be read")
+        try capture(ContentView(viewModel: model), id: "access.storage.unavailable")
+    }
+
     func testControls() throws { try capture(WalletControlsPreview(), id: "components.controls.default") }
     func testControlsRtl() throws {
-        try capture(WalletControlsPreview().environment(\.layoutDirection, .rightToLeft), id: "components.controls.rtl")
+        try capture(WalletControlsPreview().environment(\.layoutDirection, .rightToLeft), id: "components.controls.rtl", layoutDirection: .rightToLeft)
     }
 
     func testExternalReceiving() async throws { try await externalReceiving(unavailable: false) }
@@ -143,7 +161,8 @@ final class WalletVisualTests: XCTestCase {
             try capture(PinView(viewModel: model)
                 .environment(\.layoutDirection, state == "rtl" ? .rightToLeft : .leftToRight), id: "onboarding.pin.\(state)",
                 config: compact ? .iPhoneSe : .iPhone13,
-                colorScheme: compact ? .dark : .light, sizeCategory: compact ? .accessibilityMedium : .large)
+                colorScheme: compact ? .dark : .light, sizeCategory: compact ? .accessibilityMedium : .large,
+                layoutDirection: state == "rtl" ? .rightToLeft : .leftToRight)
         }
         await gate.complete(.failed)
     }
@@ -523,7 +542,7 @@ final class WalletVisualTests: XCTestCase {
         if showDisclosures {
             let content = screen.environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
                 .environment(\.locale, Locale(identifier: "en_US")).environment(\.sizeCategory, .accessibilityMedium)
-            try await captureWhenReady(content, id: "nearby.review.disclosures", config: .iPhoneSe, isReady: { true }, failure: "Review not ready", scrollToBottom: true, scrollFraction: 0.55)
+            try await captureWhenReady(content, id: "nearby.review.disclosures", config: .iPhoneSe, sizeCategory: .accessibilityMedium, isReady: { true }, failure: "Review not ready", scrollToBottom: true, scrollFraction: 0.55)
         } else {
             try capture(screen, id: "nearby.\(kind)", config: kind == "review" ? .iPhoneSe : .iPhone13,
                 sizeCategory: kind == "review" ? .accessibilityMedium : .large)
@@ -581,12 +600,13 @@ final class WalletVisualTests: XCTestCase {
             .environment(\.colorScheme, colorScheme).environment(\.sizeCategory, sizeCategory)
             .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
             .onPreferenceChange(SharingReviewReadinessKey.self) { ready = $0 }
-        try await captureWhenReady(content, id: id, config: config,
+        try await captureWhenReady(content, id: id, config: config, colorScheme: colorScheme, sizeCategory: sizeCategory,
             isReady: { expected.isSubset(of: ready) }, failure: "Requested credential rows did not finish loading",
             readinessDescription: { "Expected \(expected.sorted()), rendered \(ready.sorted())" }, scrollToBottom: scrollToBottom)
     }
 
     private func captureWhenReady<Content: View>(_ content: Content, id: String, config: ViewImageConfig = .iPhone13,
+                                                 colorScheme: ColorScheme = .light, sizeCategory: ContentSizeCategory = .large,
                                                  isReady: () -> Bool, isImageReady: ((UIImage) -> Bool)? = nil,
                                                  failure: String, readinessDescription: () -> String = { "" },
                                                  scrollToBottom: Bool = false, scrollFraction: CGFloat = 1) async throws {
@@ -609,34 +629,60 @@ final class WalletVisualTests: XCTestCase {
         // time, still gates every capture; the deadline only bounds a genuine failure.
         window.layoutIfNeeded()
         host.view.layoutIfNeeded()
-        func renderedReady() -> Bool {
-            guard isReady() else { return false }
-            guard let isImageReady else { return true }
-            let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
-                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
-            }
-            return isImageReady(image)
-        }
-        let deadline = ProcessInfo.processInfo.systemUptime + 30
-        while !renderedReady() && ProcessInfo.processInfo.systemUptime < deadline {
+        let started = ProcessInfo.processInfo.systemUptime
+        var readiness: [[String: Any]] = []
+        var lastImage: UIImage?
+        func renderAndCheckReadiness() -> Bool {
             host.view.layoutIfNeeded()
-            try await Task.sleep(nanoseconds: 10_000_000)
-        }
-        guard renderedReady() else {
+            let before = isReady()
+            var rendered = false
             let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
-                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+                rendered = window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
             }
-            let attachment = XCTAttachment(image: image)
-            attachment.name = "readiness-\(id)"
-            attachment.lifetime = .keepAlways
-            add(attachment)
+            lastImage = image
+            // Drawing commits pending SwiftUI preferences. Readiness must describe this rendered
+            // frame, rather than a cached preference followed by a different diagnostic frame.
+            let after = isReady()
+            let ready = rendered && after && (isImageReady?(image) ?? true)
+            let observation: [String: Any] = ["beforeRender": before, "afterRender": after,
+                "rendered": rendered, "ready": ready, "description": readinessDescription(),
+                "elapsedMs": Int((ProcessInfo.processInfo.systemUptime - started) * 1000)]
+            if readiness.last?["ready"] as? Bool != ready || before != after || readiness.isEmpty {
+                readiness.append(observation)
+            }
+            return ready
+        }
+        let deadline = started + 30
+        var ready = renderAndCheckReadiness()
+        while !ready && ProcessInfo.processInfo.systemUptime < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+            ready = renderAndCheckReadiness()
+        }
+        let environment = ProcessInfo.processInfo.environment
+        let diagnostic: [String: Any] = ["schemaVersion": 1, "id": id,
+            "runId": environment["WALLET_VISUAL_RUN_ID"] ?? "",
+            "sha": environment["WALLET_VISUAL_SHA"] ?? "",
+            "fingerprint": environment["WALLET_VISUAL_FINGERPRINT"] ?? "",
+            "ready": ready, "observations": readiness]
+        let metadata = XCTAttachment(data: try JSONSerialization.data(withJSONObject: diagnostic, options: [.sortedKeys]),
+            uniformTypeIdentifier: "public.json")
+        metadata.name = "wallet-visual-readiness-\(id.replacingOccurrences(of: ".", with: "-")).json"
+        metadata.lifetime = .keepAlways
+        add(metadata)
+        guard ready else {
+            if let lastImage {
+                let attachment = XCTAttachment(image: lastImage)
+                attachment.name = "readiness-\(id)"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+            }
             return XCTFail("\(failure). \(readinessDescription())")
         }
         // SnapshotTesting applies its device traits and geometry during capture. Scroll after that
         // layout, rather than using the live simulator scene's larger viewport.
         host.scrollToBottom = scrollToBottom
         host.scrollFraction = scrollFraction
-        try capture(host, id: id, config: config)
+        try capture(host, id: id, config: config, colorScheme: colorScheme, sizeCategory: sizeCategory)
         if scrollToBottom {
             XCTAssertTrue(host.didScroll, "The compact fixture must overflow and scroll to its requested offset")
         }
@@ -644,6 +690,7 @@ final class WalletVisualTests: XCTestCase {
 
     private func capture<Content: View>(_ view: Content, id: String, config: ViewImageConfig = .iPhone13,
                                       colorScheme: ColorScheme = .light, sizeCategory: ContentSizeCategory = .large,
+                                      layoutDirection: LayoutDirection = .leftToRight,
                                       file: StaticString = #filePath, line: UInt = #line) throws {
         let content = view.environment(\.locale, Locale(identifier: "en_US"))
         .environment(\.colorScheme, colorScheme)
@@ -651,11 +698,12 @@ final class WalletVisualTests: XCTestCase {
         .environment(\.walletDemoBranding, .default).tint(WalletDemoBranding.default.primary)
         .background(Color(.systemGroupedBackground))
 
-        try capture(WalletVisualHostingController(rootView: content), id: id, config: config, colorScheme: colorScheme, sizeCategory: sizeCategory, file: file, line: line)
+        try capture(WalletVisualHostingController(rootView: content), id: id, config: config, colorScheme: colorScheme, sizeCategory: sizeCategory, layoutDirection: layoutDirection, file: file, line: line)
     }
 
     private func capture(_ controller: UIViewController, id: String, config: ViewImageConfig = .iPhone13,
                          colorScheme: ColorScheme = .light, sizeCategory: ContentSizeCategory = .large,
+                         layoutDirection: LayoutDirection = .leftToRight,
                          file: StaticString = #filePath, line: UInt = #line) throws {
         let environment = ProcessInfo.processInfo.environment
         let record = environment["WALLET_VISUAL_RECORD"] == "1"
@@ -714,6 +762,8 @@ final class WalletVisualTests: XCTestCase {
             "scale": actualScale ?? 0, "locale": "en-US", "theme": colorScheme == .dark ? "dark" : "light",
             "textSize": sizeCategory == .large ? "large" : sizeCategory == .accessibilityMedium ? "accessibilityMedium" : String(describing: sizeCategory),
             "timezone": TimeZone.current.identifier, "runtime": UIDevice.current.systemVersion,
+            "layoutDirection": layoutDirection == .rightToLeft ? "rtl" : "ltr",
+            "reducedMotion": UIAccessibility.isReduceMotionEnabled,
             "diagnostic": failure ?? ""
         ]
         let attachment = XCTAttachment(data: try JSONSerialization.data(withJSONObject: receipt, options: [.sortedKeys]),

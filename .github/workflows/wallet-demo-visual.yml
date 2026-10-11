@@ -68,6 +68,19 @@ jobs:
       TZ: UTC
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install visual report dependencies and verify their contracts
+        run: |
+          python3 -m venv "$RUNNER_TEMP/wallet-visual-python"
+          "$RUNNER_TEMP/wallet-visual-python/bin/pip" install -r waltid-applications/waltid-wallet-demo-test-fixtures/visual/requirements.txt
+          echo "$RUNNER_TEMP/wallet-visual-python/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/wallet-visual-python/bin/python" -m unittest discover -s waltid-applications/waltid-wallet-demo-test-fixtures/visual -p 'test_*.py'
 
       - uses: actions/setup-java@v5
         with:
@@ -104,6 +117,18 @@ jobs:
       - name: Compare every catalogue cell
         run: python3 waltid-applications/waltid-wallet-demo-test-fixtures/visual/verify.py --simulator "$WALLET_VISUAL_SIMULATOR_ID"
 
+      - name: Generate the PR reference gallery
+        if: always() && github.event_name == 'pull_request'
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: >-
+          python3 waltid-applications/waltid-wallet-demo-test-fixtures/visual/gallery.py
+          --base "$PR_BASE" --head "$PR_HEAD" --repository "$PR_BASE_REPOSITORY"
+          --head-repository "$PR_HEAD_REPOSITORY" --output build/reports/wallet-gallery
+
       - name: Retain the gallery, diagnostics and differences
         if: always()
         uses: actions/upload-artifact@v7
@@ -111,6 +136,7 @@ jobs:
           name: wallet-visual-${{ github.sha }}
           path: |
             build/reports/wallet-visual
+            build/reports/wallet-gallery
             waltid-applications/waltid-wallet-demo-compose/sharedUI/build/outputs/visual-diffs
             waltid-applications/waltid-wallet-demo-compose/sharedUI/build/test-results
           if-no-files-found: warn
