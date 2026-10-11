@@ -299,7 +299,33 @@
       ],
       "composeTest": "compactBatchOffer",
       "swiftTest": "testCompactBatchOffer",
-      "note": "320x568 dark viewport. Compose font scale 1.5; SwiftUI accessibilityMedium. Initial review and trailing actions."
+      "note": "320x568 dark viewport. Compose font scale 1.5; SwiftUI accessibilityMedium. Initial review and trailing actions.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        },
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "textSize": "accessibilityMedium"
+        }
+      }
     },
     {
       "id": "batch.offer.compact_dark_large_text.last_target",
@@ -310,7 +336,25 @@
         "R18"
       ],
       "composeTest": "compactBatchOffer",
-      "note": "Same compact viewport scrolled to final target. Copy controls and actions remain visible."
+      "note": "Same compact viewport scrolled to final target. Copy controls and actions remain visible.",
+      "configuration": {
+        "android": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        },
+        "compose-ios": {
+          "viewport": [
+            320,
+            568
+          ],
+          "theme": "dark",
+          "fontScale": 1.5
+        }
+      }
     }
   ],
   "galleryPreview": [
