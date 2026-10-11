@@ -13,6 +13,7 @@ from urllib.parse import quote
 import report
 
 CATALOGUE_PATH = "waltid-applications/waltid-wallet-demo-test-fixtures/visual/catalogue.json"
+BROWSER_CATALOGUE_PATH = "waltid-applications/waltid-wallet-demo-compose/webApp/visual/catalogue.json"
 START = "<!-- wallet-visual-gallery:start -->"
 END = "<!-- wallet-visual-gallery:end -->"
 LABELS = {"android": "Compose Android", "compose-ios": "Compose iOS", "swiftui": "SwiftUI", "browser": "Browser"}
@@ -32,11 +33,17 @@ def blob(root, sha, path):
     return git(root, "show", f"{sha}:{path}")
 
 
-def inventory(root, sha):
+def read_catalogue(root, sha, path):
     try:
-        catalogue = json.loads(blob(root, sha, CATALOGUE_PATH))
+        return json.loads(blob(root, sha, path))
     except subprocess.CalledProcessError:
-        return {}, {}
+        return None
+
+
+def inventory(root, sha):
+    mobile = read_catalogue(root, sha, CATALOGUE_PATH)
+    browser = read_catalogue(root, sha, BROWSER_CATALOGUE_PATH)
+    catalogue = mobile or {"states": [], "renderers": {}}
     cells, ids = {}, set()
     for state in catalogue["states"]:
         if not re.fullmatch(r"[a-z0-9_]+(?:\.[a-z0-9_]+)*", state["id"]) or state["id"] in ids:
@@ -59,7 +66,19 @@ def inventory(root, sha):
             cells[path] = {"id": state["id"], "renderer": name, "path": path, "test": test,
                            "requirements": state["requirements"], "configuration": config,
                            "environment": renderer.get("environment"), "note": state.get("note")}
-    return cells, catalogue
+    if browser:
+        ids = set()
+        for state in browser["states"]:
+            identifier = state["id"]
+            if not re.fullmatch(r"[a-z0-9_]+(?:\.[a-z0-9_]+)*", identifier) or identifier in ids:
+                raise ValueError("Browser catalogue IDs must be unique semantic identifiers")
+            ids.add(identifier)
+            path = str(PurePosixPath(BROWSER_CATALOGUE_PATH).parent / "snapshots" / (identifier.replace(".", "-") + ".png"))
+            cells[path] = {"id": identifier, "renderer": "browser", "path": path,
+                "test": f"account.spec.cjs::{identifier}", "requirements": browser["requirements"],
+                "configuration": {"viewport": [state["width"], state["height"]]},
+                "environment": browser["environment"], "note": "Production Wasm host with synthetic HTTP responses"}
+    return cells, {path: value for path, value in ((CATALOGUE_PATH, mobile), (BROWSER_CATALOGUE_PATH, browser)) if value is not None}
 
 
 def renames(root, base, head):
@@ -121,7 +140,9 @@ def build(root, base_ref, head_ref, repository, head_repository=None):
     return {"schemaVersion": 1, "kind": "committed-baseline", "base": base, "target": target, "head": head,
             "repository": repository, "headRepository": head_repository or repository,
             "counts": dict(Counter(c["status"] for c in changes)), "changes": changes, "encodingOnly": encoding,
-            "catalogueChanged": old_catalogue != new_catalogue}
+            "catalogueChanged": old_catalogue != new_catalogue,
+            "changedCatalogues": sorted(path for path in old_catalogue.keys() | new_catalogue.keys()
+                if old_catalogue.get(path) != new_catalogue.get(path))}
 
 
 def markdown(gallery, limit=6):
@@ -172,8 +193,10 @@ def markdown(gallery, limit=6):
     if gallery["encodingOnly"]:
         lines.append(f"{len(gallery['encodingOnly'])} encoding-only updates have identical decoded pixels; excluded from the image preview.")
     if gallery["catalogueChanged"]:
-        lines.append(f"[Catalogue and configuration]({image_url(gallery['headRepository'], head, CATALOGUE_PATH)}) changed; inspect their coverage and provenance as well.")
-    lines += ["", "E2E evidence selection is required before publication. Retain selected fresh app captures separately from these reference assets.", "", "</details>", END]
+        links = [f"[{PurePosixPath(path).parent.name} catalogue]({image_url(gallery['headRepository'], head, path)})"
+                 for path in gallery["changedCatalogues"]]
+        lines.append("Catalogue and configuration changed: " + ", ".join(links) + ".")
+    lines += ["", "Selected app-journey evidence belongs in a separate, clearly labelled gallery.", "", "</details>", END]
     value = "\n".join(lines) + "\n"
     if len(value.encode()) > 60_000:
         raise ValueError("Gallery exceeds the PR-body budget; split the complete inventory into linked, collapsed PR comments")

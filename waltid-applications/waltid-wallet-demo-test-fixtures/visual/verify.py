@@ -65,8 +65,8 @@ def main():
         status = run(gradle + [":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework"], "framework.log")
         if status:
             return status
-    report = [sys.executable, str(HERE / "report.py")]
-    subprocess.run(report + ["begin", "--output", str(args.output), "--renderers", *args.renderers], cwd=ROOT, check=True)
+    report_command = [sys.executable, str(HERE / "report.py")]
+    subprocess.run(report_command + ["begin", "--output", str(args.output), "--renderers", *args.renderers], cwd=ROOT, check=True)
     run_metadata = json.loads((args.output / "run.json").read_text())
     env.update(report.runner_env(run_metadata))
     env.update({"SIMCTL_CHILD_" + key: value for key, value in report.runner_env(run_metadata).items()})
@@ -88,7 +88,7 @@ def main():
                    "--json", json.dumps({"testRunnerEnv": test_env}), "--output", "json"]
         with native.open("w") as output, (args.output / "native-stderr.log").open("w") as errors:
             codes.append(subprocess.run(command, cwd=ROOT, env=env, stdout=output, stderr=errors).returncode)
-    finish = report + ["finish", "--output", str(args.output)]
+    finish = report_command + ["finish", "--output", str(args.output)]
     if "swiftui" in args.renderers:
         finish += ["--native-results", str(native)]
     codes.append(subprocess.run(finish, cwd=ROOT).returncode)
