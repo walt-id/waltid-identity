@@ -187,7 +187,9 @@ def markdown(gallery, limit=6):
         for cell in sorted(cells, key=lambda c: c["renderer"]):
             path = (cell["after"] or cell["before"])["path"]
             anchor = hashlib.sha256(path.encode()).hexdigest()
-            links.append(f"[{LABELS[cell['renderer']]} · {cell['status']}]({comparison}#diff-{anchor})")
+            # An unchanged PNG has no file-diff anchor when only its catalogue metadata changed.
+            url = cell["afterUrl"] if cell["status"] == "metadata" else f"{comparison}#diff-{anchor}"
+            links.append(f"[{LABELS[cell['renderer']]} · {cell['status']}]({url})")
         lines.append(f"| {identifier} | {' · '.join(links)} |")
     lines += ["", "</details>", ""]
     if gallery["encodingOnly"]:

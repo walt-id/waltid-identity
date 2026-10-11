@@ -89,7 +89,11 @@ class GalleryTests(unittest.TestCase):
         before = self.checkpoint()
         self.data["renderers"]["android"]["configuration"]["theme"] = "dark"
         self.checkpoint()
-        self.assertEqual(self.build(before)["counts"], {"metadata": 1})
+        result = self.build(before)
+        self.assertEqual(result["counts"], {"metadata": 1})
+        body = gallery.markdown(result)
+        self.assertIn(f"[Compose Android · metadata]({result['changes'][0]['afterUrl']})", body)
+        self.assertNotIn("#diff-", body)
 
     def test_rename_retains_both_reference_paths(self):
         path = self.add("wallet.empty")
