@@ -38,8 +38,8 @@ pixels for at least 0.5 seconds within a bounded ten-second wait. Compose canvas
 are not stopped by Playwright's CSS-animation controls; two equal frames alone can precede
 their completion. The native HTML/JSON reports include source SHA, dirty status, renderer, requirements,
 duration, rendered images and failure differences under `webApp/build/reports/browser-visual`.
-Hosted execution uploads those files even on failure. Synthetic baselines are test fixtures,
-not PR screenshot hosting.
+Hosted execution uploads those files even on failure. Reuse committed browser baselines in PR galleries with exact-SHA repository image URLs.
+They show expected fixture appearance; fresh comparison and real-backend app evidence remain separately labelled.
 
 Compose's ARIA nodes mirror the canvas geometry. Pointer actions target their measured bounds.
 Text entry waits for the actual backing editor's input mode and focus, fills that input,

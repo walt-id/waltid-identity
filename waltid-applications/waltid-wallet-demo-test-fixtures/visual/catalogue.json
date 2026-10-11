@@ -762,7 +762,15 @@
       ],
       "composeTest": "externalReceiving",
       "swiftTest": "testExternalReceiving",
-      "note": "Compose actual modal window; native bounded receive content with external chrome. Real cold/warm windows, unlock, recreation and return paths have separate UI/instrumentation tests."
+      "note": "Compose actual modal window; native bounded receive content with external chrome. Real cold/warm windows, unlock, recreation and return paths have separate UI/instrumentation tests.",
+      "configuration": {
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ]
+        }
+      }
     },
     {
       "id": "external.callback.unavailable",
@@ -772,7 +780,15 @@
       ],
       "composeTest": "externalUnavailableCallback",
       "swiftTest": "testExternalUnavailableCallback",
-      "note": "Unknown callback explains the unavailable original session and provides Close; no automatic replay or fabricated receipt."
+      "note": "Unknown callback explains the unavailable original session and provides Close; no automatic replay or fabricated receipt.",
+      "configuration": {
+        "swiftui": {
+          "viewport": [
+            320,
+            568
+          ]
+        }
+      }
     },
     {
       "id": "nearby.permission",
