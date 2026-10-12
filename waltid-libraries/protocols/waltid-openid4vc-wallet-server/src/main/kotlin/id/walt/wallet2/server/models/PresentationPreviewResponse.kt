@@ -90,6 +90,7 @@ data class PreviewCredentialDisclosure(
     val selectivelyDisclosable: Boolean,
     val required: Boolean,
     val selectable: Boolean,
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     val requested: Boolean = true,
 )
 
@@ -113,6 +114,7 @@ data class PreviewError(
  */
 fun StatelessPreviewPresentationResult.toPreviewResponse(
     preferredLocales: List<String> = emptyList(),
+    includeDetails: Boolean = false,
 ): PresentationPreviewResponse = when (this) {
     is StatelessPreviewPresentationResult.Invalid -> PresentationPreviewResponse(
         authorizationRequest = authorizationRequest,
@@ -161,7 +163,7 @@ fun StatelessPreviewPresentationResult.toPreviewResponse(
                         selectivelyDisclosable = disclosure.selectivelyDisclosable,
                         required = disclosure.required,
                         selectable = disclosure.selectable,
-                        requested = disclosure.requested,
+                        requested = !includeDetails || disclosure.requested,
                     )
                 },
             )

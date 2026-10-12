@@ -737,7 +737,14 @@ object Wallet2RouteHandler {
                                     "(do not echo authorizationRequest), or /reject with requestUrl. " +
                                     "If the request is invalid but a response can still be sent, the result has " +
                                     "valid=false and an error."
-                        request { pathParameter<String>("walletId"); body<PreviewPresentationRequest>() }
+                        request {
+                            pathParameter<String>("walletId")
+                            queryParameter<Boolean>("includeDetails") {
+                                description = "Distinguish additional immutable claims with requested=false; defaults to false for released-client compatibility."
+                                required = false
+                            }
+                            body<PreviewPresentationRequest>()
+                        }
                         response { HttpStatusCode.OK to { body<PresentationPreviewResponse>() } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
@@ -748,7 +755,7 @@ object Wallet2RouteHandler {
                             transactionDataTypeRegistry = transactionDataTypeRegistry,
                             clientIdTrustConfiguration = clientIdTrustConfiguration,
                         )
-                        call.respond(result.toPreviewResponse())
+                        call.respond(result.toPreviewResponse(includeDetails = call.request.queryParameters["includeDetails"] == "true"))
                     }
 
                     post("/reject", {
