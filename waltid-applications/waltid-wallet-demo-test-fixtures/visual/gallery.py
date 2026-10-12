@@ -105,7 +105,9 @@ def renames(root, base, head):
 
 
 def image_url(repository, sha, path, raw=False):
-    return f"https://github.com/{repository}/blob/{sha}/{quote(path)}" + ("?raw=true" if raw else "")
+    if raw:
+        return f"https://raw.githubusercontent.com/{repository}/{sha}/{quote(path)}"
+    return f"https://github.com/{repository}/blob/{sha}/{quote(path)}"
 
 
 def titles(catalogues):
@@ -254,7 +256,9 @@ def preview_table(gallery, rows, identifiers, renderers):
                 continue
             side = "after" if cell.get("after") else "before"
             label = configuration_label(cell[side])
-            url = html.escape(cell[side + "Url"] + "?raw=true")
+            repository = gallery["headRepository"] if side == "after" else gallery["repository"]
+            sha = gallery["head"] if side == "after" else gallery["base"]
+            url = html.escape(image_url(repository, sha, cell[side]["path"], raw=True))
             picture = f'**{title}**<br><img src="{url}" alt="{title}, {LABELS[renderer]}, {side}" width="240">'
             if label:
                 picture += "<br>" + html.escape(label)
