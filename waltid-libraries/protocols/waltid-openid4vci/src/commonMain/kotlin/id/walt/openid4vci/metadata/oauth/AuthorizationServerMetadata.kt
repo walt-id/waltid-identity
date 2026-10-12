@@ -103,6 +103,9 @@ data class AuthorizationServerMetadata(
     @SerialName("challenge_endpoint")
     val challengeEndpoint: String? = null,
     val customParameters: Map<String, JsonElement>? = null,
+    /** RFC 8414 section 2.1: compact JWS attesting to authorization server metadata. */
+    @SerialName("signed_metadata")
+    val signedMetadata: String? = null,
 ) {
     init {
         // RFC 8414 §2: issuer is REQUIRED
@@ -313,6 +316,7 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
             ?: error("AuthorizationServerMetadataSerializer only supports JSON")
         val base = buildJsonObject {
             put("issuer", JsonPrimitive(value.issuer))
+            value.signedMetadata?.let { put("signed_metadata", JsonPrimitive(it)) }
             value.authorizationEndpoint?.let { put("authorization_endpoint", JsonPrimitive(it)) }
             value.tokenEndpoint?.let { put("token_endpoint", JsonPrimitive(it)) }
             value.jwksUri?.let { put("jwks_uri", JsonPrimitive(it)) }
@@ -431,6 +435,7 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
                 element.bool("pre-authorized_grant_anonymous_access_supported"),
             statusListAggregationEndpoint = element.string("status_list_aggregation_endpoint"),
             customParameters = customParameters,
+            signedMetadata = element.string("signed_metadata"),
         )
     }
 }
