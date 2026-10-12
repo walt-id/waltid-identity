@@ -48,10 +48,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             }
             XCTAssertEqual(ui.waitUntilWalletReady(timeout: 60), "Wallet ready")
             let offer = try await EudiOfferFlow(client: WalletE2EClient()).generate()
-            ui.openDeepLink(offer.offerUrl)
-            XCTAssertTrue(ui.waitForTextInputValue(identifier: "wallet.offerInput",
-                fallbackLabel: "Credential offer URL", value: offer.offerUrl, timeout: 20))
-            ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+            ui.openWalletLink(offer.offerUrl)
             XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 90), "Review credential offer")
             guard let input = ui.waitForTextInput(identifier: "wallet.txCodeInput", fallbackLabel: "Transaction code", timeout: 20) else {
                 XCTFail("EUDI offer did not show its transaction-code input")
@@ -61,7 +58,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
             let status = ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 90)
             XCTAssertTrue(status?.hasPrefix("Received") == true, "EUDI issuance failed: \(status ?? "nil")")
-            ui.tapButton(identifier: "wallet.tab.credentials", fallbackLabel: "Credentials tab")
+            ui.returnToWallet()
             let cards = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
             XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 20))

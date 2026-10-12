@@ -34,9 +34,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             }
             XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
             let offer = try await EudiOfferFlow(client: WalletE2EClient()).generate()
-            ui.tapTab(label: "Receive")
-            ui.replaceText(in: ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL"), value: offer.offerUrl)
-            ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+            ui.openWalletLink(offer.offerUrl)
             XCTAssertEqual(ui.waitForStatus(prefixes: ["Review credential offer", "Receive failed"], timeout: 90), "Review credential offer")
             let input = ui.textInput(identifier: "wallet.txCodeInput", fallbackLabel: "Transaction code")
             XCTAssertTrue(input.waitForExistence(timeout: 20))
@@ -44,6 +42,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
             let status = ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 90)
             XCTAssertTrue(status?.hasPrefix("Received") == true, "EUDI issuance failed: \(status ?? "nil")")
+            ui.returnToWallet()
             ui.assertExists(identifierPrefix: "wallet.credentialCard.", timeout: 20)
         }
     }
