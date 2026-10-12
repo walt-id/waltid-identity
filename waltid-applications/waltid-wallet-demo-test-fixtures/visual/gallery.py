@@ -161,9 +161,11 @@ def inventory_rows(gallery):
         for cell in sorted(cells, key=lambda c: c["renderer"]):
             path = (cell["after"] or cell["before"])["path"]
             anchor = hashlib.sha256(path.encode()).hexdigest()
-            # Catalogue-only changes have no PNG diff anchor.
-            url = cell["afterUrl"] if cell["status"] == "metadata" else f"{comparison}#diff-{anchor}"
-            links.append(f"[{LABELS[cell['renderer']]} · {cell['status']}]({url})")
+            references = [f"[{side}]({cell[side + 'Url']})" for side in ("before", "after")
+                          if cell.get(side + "Url")]
+            if cell["status"] in {"changed", "renamed"}:
+                references.append(f"[diff]({comparison}#diff-{anchor})")
+            links.append(f"{LABELS[cell['renderer']]} · {cell['status']}: {' / '.join(references)}")
         yield f"| {identifier} | {' · '.join(links)} |"
 
 

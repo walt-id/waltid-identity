@@ -93,7 +93,7 @@ class GalleryTests(unittest.TestCase):
         result = self.build(before)
         self.assertEqual(result["counts"], {"metadata": 1})
         body = gallery.markdown(result)
-        self.assertIn(f"[Compose Android · metadata]({result['changes'][0]['afterUrl']})", body)
+        self.assertIn(f"[after]({result['changes'][0]['afterUrl']})", body)
         self.assertNotIn("#diff-", body)
 
     def test_rename_retains_both_reference_paths(self):
@@ -161,7 +161,25 @@ class GalleryTests(unittest.TestCase):
         self.assertEqual(body.count('<img src='), 6)
         for i in range(9):
             self.assertIn(f"| wallet.state_{i} |", body)
+            self.assertIn(result["changes"][i]["afterUrl"], body)
         self.assertNotIn("/main/", body)
+
+    def test_inventory_keeps_direct_before_after_links_outside_the_preview(self):
+        path = self.add("wallet.changed")
+        removed = self.add("wallet.removed")
+        before = self.checkpoint()
+        Image.new("RGB", (2, 3), "blue").save(path)
+        removed.unlink()
+        self.data["states"] = self.data["states"][:1]
+        self.checkpoint()
+        result = self.build(before)
+        body = gallery.markdown(result, limit=0)
+        self.assertNotIn("<img", body)
+        for cell in result["changes"]:
+            for side in ("before", "after"):
+                if cell[side + "Url"]:
+                    self.assertIn(f"[{side}]({cell[side + 'Url']})", body)
+        self.assertIn("[diff]", body)
 
     def test_large_gallery_preserves_the_complete_inventory_in_bounded_pages(self):
         for i in range(9):
