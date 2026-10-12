@@ -65,7 +65,8 @@
         "R15"
       ],
       "composeTest": "settingsRoot",
-      "swiftTest": "testSettingsRoot"
+      "swiftTest": "testSettingsRoot",
+      "title": "Settings"
     },
     {
       "id": "credential.details.identity",
@@ -77,7 +78,8 @@
       ],
       "composeTest": "credentialDetails",
       "swiftTest": "testCredentialDetails",
-      "note": "Identity and nested values share this viewport; both are asserted before capture."
+      "note": "Identity and nested values share this viewport; both are asserted before capture.",
+      "title": "Credential information"
     },
     {
       "id": "credential.media.loaded",
@@ -87,7 +89,8 @@
       ],
       "swiftTest": "testCredentialImages",
       "note": "Portrait and signature share this viewport; both wait for image readiness and remain visible.",
-      "composeTest": "credentialImages"
+      "composeTest": "credentialImages",
+      "title": "Credential images"
     },
     {
       "id": "batch.offer.two_targets_three_copies",
@@ -97,7 +100,8 @@
         "R18"
       ],
       "composeTest": "batchOffer",
-      "swiftTest": "testBatchOffer"
+      "swiftTest": "testBatchOffer",
+      "title": "Receiving \u2014 selected credentials"
     },
     {
       "id": "batch.offer.two_targets_three_copies.second_target",
@@ -125,7 +129,8 @@
         "R18"
       ],
       "composeTest": "partialBatchResult",
-      "swiftTest": "testPartialBatchResult"
+      "swiftTest": "testPartialBatchResult",
+      "title": "Receiving \u2014 saved and deferred"
     },
     {
       "id": "payment.mixed_credentials.main",
@@ -136,7 +141,8 @@
         "T05",
         "T10"
       ],
-      "composeTest": "paymentReview"
+      "composeTest": "paymentReview",
+      "title": "Payment review"
     },
     {
       "id": "payment.mixed_credentials.details",
@@ -175,7 +181,17 @@
         "R12"
       ],
       "composeTest": "nearbyReady",
-      "swiftTest": "testNearbyReady"
+      "swiftTest": "testNearbyReady",
+      "title": "Nearby sharing"
     }
+  ],
+  "galleryPreview": [
+    "settings.root.default",
+    "credential.details.identity",
+    "batch.offer.two_targets_three_copies",
+    "batch.result.saved_and_deferred",
+    "payment.mixed_credentials.main",
+    "nearby.ready.qr",
+    "credential.media.loaded"
   ]
 }
