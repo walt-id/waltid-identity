@@ -42,7 +42,9 @@ case "$phase" in
     ;;
   dc-api-compose)
     # Dedicated Google APIs lane for the GMS-gated Digital Credentials E2Es.
-    script="./waltid-identity/.github/scripts/mobile-ci/run-android-dc-api-compose-tests.sh"
+    # The authorization journey runs with the coordinated Enterprise fixture.
+    dc_api_fixture_test="id.walt.walletdemo.compose.android.DigitalCredentialIssuanceE2ETest#authorizationCodeRetainsCopiesThroughBrowserReturn"
+    script="ANDROID_TEST_NOT_CLASS=$dc_api_fixture_test ./waltid-identity/.github/scripts/mobile-ci/run-android-dc-api-compose-tests.sh"
     # The cached artifact is the configured userdata disk, not a Quick Boot state. Always cold-boot
     # it so the first process/ADB/GMS state is recreated for every job and never restored from a
     # potentially poisoned host snapshot.

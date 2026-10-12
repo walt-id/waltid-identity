@@ -14,12 +14,14 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.VERIFIER_POLLIN
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.dismissKeyboard
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.relaunchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.latestStatus
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.setTextByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResourceAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNotNull
@@ -72,7 +74,10 @@ class PublicDemoBackendE2ETest {
         assertReview(device, "wallet.offerAcceptButton")
 
         setTextByTag(device, "wallet.txCodeInput", incorrectCodeFor(transactionCode))
+        dismissKeyboard(device)
         clickByTag(device, "wallet.offerAcceptButton")
+        assertNotNull("The rejection must remain visible in the reviewed offer",
+            waitForResourceAfterScrolling(device, "wallet.status", CREDENTIAL_OPERATION_TIMEOUT))
         assertTrue(
             "Incorrect transaction code was not rejected. Latest status: ${latestStatus(device)}",
             waitForStatus(
@@ -85,6 +90,7 @@ class PublicDemoBackendE2ETest {
 
         // The reviewed offer remains active so the corrected code can be retried directly.
         setTextByTag(device, "wallet.txCodeInput", transactionCode)
+        dismissKeyboard(device)
         clickByTag(device, "wallet.offerAcceptButton")
         assertReview(device, "issuance-done")
     }

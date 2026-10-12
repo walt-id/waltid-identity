@@ -281,6 +281,12 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                             "Payment review is missing issuer instruction '$label'")
                     }
                     clickByTag(fixture.device, WALLET_SHARE_BUTTON_TAG)
+                    assertNotNull(
+                        "Unsigned payment confirmation did not open",
+                        waitForResource(fixture.device, "payment-unsigned-confirm", UI_ELEMENT_TIMEOUT),
+                    )
+                    assertFalse("Unsigned payment submitted before explicit confirmation", request.isComplete)
+                    clickByTag(fixture.device, "payment-unsigned-confirm")
                     withTimeout(CREDENTIAL_OPERATION_TIMEOUT) { request.await() }
                 } else {
                     fixture.completeWithoutWalletReview(request, scenario.credentialConfigurationId) { device ->

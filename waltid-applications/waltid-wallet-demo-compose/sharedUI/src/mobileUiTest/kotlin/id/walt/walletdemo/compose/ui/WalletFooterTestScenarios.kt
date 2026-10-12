@@ -16,7 +16,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performSemanticsAction
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.Density
@@ -81,7 +80,7 @@ class WalletFooterTestScenarios(
         val footer = onNodeWithTag("wallet.footer").getUnclippedBoundsInRoot()
         assertTrue(content.bottom - content.top < 300.dp, "Compact hosts must wrap the review rather than occupy the screen")
         assertTrue(onNodeWithTag("footer-last").getUnclippedBoundsInRoot().bottom <= footer.top - 8.dp)
-        assertEquals(content.bottom, footer.top)
+        assertEquals(content.bottom, footer.bottom)
     }
 
     fun ordinaryScrollToKeepsInteractiveRowsAboveTheFooter() = runComposeUiTest {
@@ -103,7 +102,7 @@ class WalletFooterTestScenarios(
         }
         for (index in listOf(8, 19, 2)) {
             val row = onNodeWithTag("footer-link-$index")
-            row.performScrollTo().assertIsDisplayed().performClick()
+            row.performScrollToContent(this).assertIsDisplayed().performClick()
             runOnIdle { assertEquals(index, clicked, "Ordinary scrolling must leave the row tappable") }
             assertTrue(row.getUnclippedBoundsInRoot().bottom <= onNodeWithTag("wallet.footer").getUnclippedBoundsInRoot().top)
         }

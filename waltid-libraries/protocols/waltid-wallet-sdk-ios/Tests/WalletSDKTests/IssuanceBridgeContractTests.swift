@@ -38,7 +38,8 @@ final class IssuanceBridgeContractTests: XCTestCase {
             (.remoteOutcomeUncertain, .remoteOutcomeUncertain), (.storageOutcomeUncertain, .storageOutcomeUncertain),
         ]
         let pending = Waltid_openid4vc_walletWalletIssuanceContinuation(id: "handle",
-            credentialConfigurationId: "identity", intervalSeconds: nil, credentialIdentifier: nil)
+            credentialConfigurationId: "identity", intervalSeconds: nil, credentialIdentifier: nil,
+            status: .unresolved, displayMetadataJson: nil)
         for (coreCode, swiftCode) in codes {
             let core = Waltid_openid4vc_walletWalletIssuanceOutcomeFailed(sessionId: "session",
                 error: .init(code: coreCode, message: "Retain this handle"), storedCredentialIds: ["stored"],
@@ -68,7 +69,8 @@ final class IssuanceBridgeContractTests: XCTestCase {
 
     func testLocalStorageHandlePreservesAnUnknownConfiguration() throws {
         let pending = Waltid_openid4vc_walletWalletIssuanceContinuation(id: "local-save",
-            credentialConfigurationId: nil, intervalSeconds: nil, credentialIdentifier: nil)
+            credentialConfigurationId: nil, intervalSeconds: nil, credentialIdentifier: nil,
+            status: .unresolved, displayMetadataJson: nil)
         let core = Waltid_openid4vc_walletWalletIssuanceOutcomeFailed(sessionId: "session",
             error: .init(code: .storage, message: "Retry local storage"), storedCredentialIds: [],
             deferredCredentials: [pending], failure: nil)
@@ -85,7 +87,8 @@ final class IssuanceBridgeContractTests: XCTestCase {
             (.proof, .proof), (.request, .request), (.response, .response), (.storage, .storage), (.observer, .observer),
         ]
         let pending = Waltid_openid4vc_walletWalletIssuanceContinuation(id: "handle",
-            credentialConfigurationId: "identity", intervalSeconds: .init(longLong: 7), credentialIdentifier: "dataset-a")
+            credentialConfigurationId: "identity", intervalSeconds: .init(longLong: 7), credentialIdentifier: "dataset-a",
+            status: .unresolved, displayMetadataJson: nil)
         let stopped = Waltid_openid4vci_walletCredentialIssuanceTarget(credentialConfigurationId: "identity", credentialIdentifier: "dataset-b")
         let unattempted = Waltid_openid4vci_walletCredentialIssuanceTarget(credentialConfigurationId: "identity", credentialIdentifier: "dataset-c")
         for (coreStage, swiftStage) in stages {
