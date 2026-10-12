@@ -24,9 +24,12 @@ internal fun IssuanceResultContent(
     pending: List<WalletDemoDeferredCredential>,
     busy: Boolean,
     onResume: (String) -> Unit,
+    missingSavedCount: Int = 0,
 ) {
     receipt?.issuer?.let { IssuanceIssuerSection(it) }
-    if (saved.isNotEmpty()) WalletSection(stringResource(Res.string.issuance_saved_count, saved.size)) {
+    if (missingSavedCount > 0 || receipt?.detailsError != null) Text(stringResource(Res.string.issuance_missing_details),
+        Modifier.testTag("issuance-missing-details"), color = MaterialTheme.colorScheme.error)
+    if (saved.isNotEmpty() || missingSavedCount > 0) WalletSection(stringResource(Res.string.issuance_saved_count, saved.size + missingSavedCount)) {
         saved.forEachIndexed { index, credential ->
             if (index > 0) HorizontalDivider()
             SavedCredentialRow(credential)

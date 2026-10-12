@@ -63,6 +63,15 @@ fun WalletDemoUiState.receivedCredentials(): List<WalletDemoCredential> {
     return lastReceivedCredentialIds.mapNotNull { id -> credentialsById[id] }
 }
 
+fun WalletDemoUiState.missingReceivedCredentialIds(): Set<String> {
+    val available = (session as? WalletSessionState.Ready)?.credentials.orEmpty().map { it.id }.toSet()
+    return lastReceivedCredentialIds.toSet() - available
+}
+
+fun WalletDemoUiState.issuanceReceiptComplete(): Boolean =
+    issuanceReceipt?.let { it.problem == null && it.detailsError == null && it.pendingIds.isEmpty() } == true &&
+        lastReceivedCredentialIds.isNotEmpty() && missingReceivedCredentialIds().isEmpty()
+
 fun WalletDemoUiState.presentationCredentialSelectionComplete(): Boolean =
     presentationPreview?.hasCompleteCredentialSelection(selectedPresentationCredentialOptions) == true
 
@@ -71,11 +80,7 @@ internal fun resolvedReceivedCredentialIds(
     previousCredentials: List<WalletDemoCredential>,
     refreshedCredentials: List<WalletDemoCredential>,
 ): List<String> {
-    val refreshedIds = refreshedCredentials.map { it.id }.toSet()
-    val returnedResolvedIds = returnedCredentialIds.filter { id -> id in refreshedIds }
-    if (returnedResolvedIds.isNotEmpty()) {
-        return returnedResolvedIds
-    }
+    if (returnedCredentialIds.isNotEmpty()) return returnedCredentialIds.distinct()
 
     val previousIds = previousCredentials.map { it.id }.toSet()
     val newCredentialIds = refreshedCredentials

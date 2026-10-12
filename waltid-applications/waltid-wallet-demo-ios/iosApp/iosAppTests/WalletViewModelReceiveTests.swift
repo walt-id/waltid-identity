@@ -6,6 +6,61 @@ import XCTest
 
 @MainActor
 final class WalletViewModelReceiveTests: XCTestCase {
+    func testIncompleteSavedReceiptRetainsEveryIDAndLocalRefreshCompletesIt() async throws {
+        for visible in [Set<String>(), Set(["credential-1"])] {
+            let client = TransactionCodeWalletClient(transactionCode: nil, storedCredentialIDs: ["credential-1", "credential-2"])
+            await client.setVisibleReceivedIDs(visible)
+            let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+            model.unlockForTests()
+            try await waitUntil { model.isReady && !model.isLoading }
+            model.offerUrl = "openid-credential-offer://issuer.example"
+            model.previewOffer()
+            try await waitUntil { model.offerPreview != nil && !model.isLoading }
+            model.acceptOffer()
+            try await waitUntil { !model.isLoading }
+            XCTAssertEqual(model.lastReceivedCredentialIDs, ["credential-1", "credential-2"])
+            XCTAssertNotNil(model.issuanceReceipt)
+            XCTAssertTrue(model.receivedDetailsUnavailable)
+            XCTAssertFalse(model.issuanceReceiptComplete)
+            XCTAssertFalse(model.receiveCompleted)
+            XCTAssertNil(model.offerPreview)
+            model.refreshIssuanceStatus()
+            try await waitUntil { !model.isLoading }
+            XCTAssertFalse(model.issuanceReceiptComplete)
+            await client.setVisibleReceivedIDs(["credential-1", "credential-2"])
+            model.refreshIssuanceStatus()
+            try await waitUntil { !model.isLoading }
+            XCTAssertTrue(model.issuanceReceiptComplete)
+            XCTAssertTrue(model.receiveCompleted)
+            XCTAssertFalse(model.receivedDetailsUnavailable)
+            XCTAssertEqual(model.receivedCredentials.map(\.id), ["credential-1", "credential-2"])
+            let calls = await client.issuanceContinuationCalls
+            XCTAssertEqual(calls, 1)
+        }
+    }
+
+    func testFailedPostIssuanceReadKeepsReceiptAndLocalRefreshRecovers() async throws {
+        let client = TransactionCodeWalletClient(transactionCode: nil)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+        model.unlockForTests()
+        try await waitUntil { model.isReady && !model.isLoading }
+        model.offerUrl = "openid-credential-offer://issuer.example"
+        model.previewOffer()
+        try await waitUntil { model.offerPreview != nil && !model.isLoading }
+        await client.setCredentialReadFailure(true)
+        model.acceptOffer()
+        try await waitUntil { !model.isLoading }
+        XCTAssertEqual(model.lastReceivedCredentialIDs, ["credential-1"])
+        XCTAssertNotNil(model.issuanceReceipt?.detailsError)
+        XCTAssertFalse(model.issuanceReceiptComplete)
+        XCTAssertNil(model.offerPreview)
+        await client.setCredentialReadFailure(false)
+        model.refreshIssuanceStatus()
+        try await waitUntil { !model.isLoading }
+        XCTAssertNil(model.issuanceReceipt?.detailsError)
+        XCTAssertTrue(model.issuanceReceiptComplete)
+    }
+
     func testPendingRegistrationDoesNotBlockStartupOrReceivingAndReconcilesAgain() async throws {
         let registration = PendingRegistrationUpdate()
         let client = TransactionCodeWalletClient(transactionCode: nil)
@@ -870,6 +925,9 @@ private actor TransactionCodeWalletClient: WalletClient {
     private let startsWithCredential: Bool
     private let presentationPreviewDelayNanoseconds: UInt64
     private let presentationActionDelayNanoseconds: UInt64
+    private let storedCredentialIDs: [String]
+    private var visibleReceivedIDs: Set<String>? = nil
+    private var credentialReadFailure = false
 
     init(
         issuanceStartDelayNanoseconds: UInt64 = 0,
@@ -884,7 +942,8 @@ private actor TransactionCodeWalletClient: WalletClient {
         deferWithProgress: Bool = false,
         startsWithCredential: Bool = false,
         presentationPreviewDelayNanoseconds: UInt64 = 0,
-        presentationActionDelayNanoseconds: UInt64 = 0
+        presentationActionDelayNanoseconds: UInt64 = 0,
+        storedCredentialIDs: [String] = ["credential-1"]
     ) {
         self.issuanceStartDelayNanoseconds = issuanceStartDelayNanoseconds
         self.transactionCode = transactionCode
@@ -895,6 +954,7 @@ private actor TransactionCodeWalletClient: WalletClient {
         self.startsWithCredential = startsWithCredential
         self.presentationPreviewDelayNanoseconds = presentationPreviewDelayNanoseconds
         self.presentationActionDelayNanoseconds = presentationActionDelayNanoseconds
+        self.storedCredentialIDs = storedCredentialIDs
     }
 
     private(set) var bootstrapCalls = 0
@@ -936,9 +996,17 @@ private actor TransactionCodeWalletClient: WalletClient {
     }
 
     func credentials() async throws -> [Credential] {
-        let available = startsWithCredential || credentialIssued ? [Self.credential] : []
+        if credentialReadFailure { throw WalletError.internalFailure("Storage read unavailable") }
+        let available = startsWithCredential || credentialIssued ? storedCredentialIDs.map { id in
+            Credential(id: id, format: Self.credential.format, issuer: Self.credential.issuer,
+                subject: Self.credential.subject, label: Self.credential.label, addedAt: nil,
+                credentialDataJSON: Self.credential.credentialDataJSON)
+        }.filter { visibleReceivedIDs?.contains($0.id) ?? true } : []
         return available.filter { !deletedCredentialIDs.contains($0.id) }
     }
+
+    func setVisibleReceivedIDs(_ ids: Set<String>) { visibleReceivedIDs = ids }
+    func setCredentialReadFailure(_ fail: Bool) { credentialReadFailure = fail }
 
     func listDeferredIssuance() async throws -> [DeferredCredential] {
         (failWithProgress || deferWithProgress) && credentialIssued ? [.init(id: "pending", credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)] : []
@@ -995,7 +1063,7 @@ private actor TransactionCodeWalletClient: WalletClient {
                     stage: .request, notAttempted: [.init(configurationID: "OtherCredential"), .init(configurationID: "AnotherCredential")])), storedCredentialIDs: [Self.credential.id],
                 deferredCredentials: try await listDeferredIssuance())
         }
-        return .stored(sessionID: sessionID, credentialIDs: [Self.credential.id])
+        return .stored(sessionID: sessionID, credentialIDs: storedCredentialIDs)
     }
 
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome {

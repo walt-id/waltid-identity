@@ -420,6 +420,18 @@
       "note": "Production receiving content. Retained SDK state controls recovery actions; fixtures do not poll an issuer or save credentials."
     },
     {
+      "id": "batch.result.missing_details",
+      "requirements": [
+        "R04",
+        "R06",
+        "R18"
+      ],
+      "composeTest": "missingSavedDetails",
+      "swiftTest": "testMissingSavedDetails",
+      "note": "A saved batch retains every confirmed ID when only a subset is readable. The receipt shows a warning and local Refresh status; completion remains disabled.",
+      "title": "Receiving \u2014 saved details unavailable"
+    },
+    {
       "id": "onboarding.key.summary",
       "composeTest": "keySummary",
       "swiftTest": "testKeySummary",

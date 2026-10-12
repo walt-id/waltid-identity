@@ -62,6 +62,7 @@ data class WalletDemoIssuanceReceipt(
     val issuer: WalletDemoIssuerMetadata? = null,
     val pendingIds: Set<String> = emptySet(),
     val problem: WalletDemoIssuanceProblem? = null,
+    val detailsError: String? = null,
 )
 
 sealed interface WalletDemoIssuanceOutcome {
