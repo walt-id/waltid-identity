@@ -15,10 +15,9 @@ internal fun <S> AnimatedContentTransitionScope<S>.walletNavigationMotion(
     if (reduceMotion) return fadeIn(tween(0)) togetherWith fadeOut(tween(0))
     val direction = if (forward != rightToLeft) AnimatedContentTransitionScope.SlideDirection.Left
         else AnimatedContentTransitionScope.SlideDirection.Right
-    // The new page travels from the edge; its parent moves a quarter-width behind it.
-    // Back reverses that relationship instead of fading two barely moving pages together.
+    // Both pages travel the full width, matching native iOS. A partial exit leaves
+    // transparent content, such as the PIN heading, underneath the incoming text.
     val timing = WalletMotion.navigation<IntOffset>()
-    return (slideIntoContainer(direction, timing, initialOffset = { if (forward) it else it / 4 }) togetherWith
-        slideOutOfContainer(direction, timing, targetOffset = { if (forward) it / 4 else it }))
+    return (slideIntoContainer(direction, timing) togetherWith slideOutOfContainer(direction, timing))
         .apply { targetContentZIndex = if (forward) 1f else -1f }
 }
