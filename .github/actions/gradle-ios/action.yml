@@ -179,6 +179,7 @@ runs:
           -skip-testing:iosAppEnterpriseTests \
           -skip-testing:iosAppUITests/BatchIssuanceE2ETests \
           -skip-testing:iosAppUITests/PublicDemoBackendE2ETests/testScaPaymentWithNativeAuthorization \
+          -skip-testing:iosAppTests/WalletVisualTests \
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived \
           -enableCodeCoverage NO \

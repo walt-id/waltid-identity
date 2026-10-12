@@ -8,6 +8,8 @@ The catalogue connects the existing Compose Android, Compose iOS and native Swif
 
 Run from the identity repository. Android uses Robolectric API 35 at mdpi; Compose iOS uses a 393×852 headless Skia surface. SwiftUI uses a hosted iPhone 13 layout at scale 3 on iOS 26.5. Choose a test-owned iOS 26.5 simulator; the native baselines were generated with Xcode 27. Do not reuse baselines on another runtime without an explicit environment review.
 
+The wallet visual workflow compares the complete catalogue on this pinned runtime. Generic iOS CI runs the functional and readiness suites and excludes the two snapshot classes. The comparison entry point selects those classes and supplies the run metadata required by the catalogue report.
+
 Install the small Python reporting dependency in a virtual environment with `python3 -m pip install -r waltid-applications/waltid-wallet-demo-test-fixtures/visual/requirements.txt`. Then run the existing renderer tasks through the comparison entry point:
 
 ```sh
