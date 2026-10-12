@@ -170,6 +170,22 @@
         "waltid-applications/waltid-wallet-demo-ios/*",
         "waltid-applications/waltid-wallet-demo-shared-ios/*"
       ]
+    },
+    "visual-browser": {
+      "description": "Complete browser account visual catalogue",
+      "patterns": [
+        "waltid-libraries/*/src/commonMain/*",
+        "waltid-libraries/*/src/wasmJsMain/*",
+        "waltid-libraries/*/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/commonMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/src/wasmJsMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedUI/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/commonMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/wasmJsMain/*",
+        "waltid-applications/waltid-wallet-demo-compose/sharedLogic/build.gradle.kts",
+        "waltid-applications/waltid-wallet-demo-compose/webApp/*",
+        "waltid-applications/waltid-wallet-demo-test-fixtures/visual/*"
+      ]
     }
   }
 }

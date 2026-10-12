@@ -26,9 +26,25 @@ npx playwright install chromium --only-shell
 npm test
 ```
 
-Use macOS 27 arm64, Playwright 1.62.0 and its bundled Chromium 151.0.7922.34. Other OS baselines
-require a separate environment review; the adapter fails explicitly instead of silently choosing
-another browser. The test-owned server binds localhost:8073 and is removed by Playwright.
+Use Ubuntu 24.04 x86_64, Playwright 1.62.0 and its bundled Chromium 151.0.7922.34. CI uses the
+version-pinned `mcr.microsoft.com/playwright:v1.62.0-noble` image. On another OS, run the built
+host and this test directory in that Linux container. Other environments require a separate
+baseline review; the adapter fails instead of silently choosing another renderer. The
+test-owned server binds localhost:8073 and is removed by Playwright.
+
+After building the host, compare from macOS with the same container as CI. Mount Git's common
+directory as well so worktree provenance remains available:
+
+```sh
+WALLET_VISUAL_ROOT=$(git rev-parse --show-toplevel)
+WALLET_VISUAL_GIT=$(git rev-parse --path-format=absolute --git-common-dir)
+docker run --rm --init --ipc=host --platform linux/amd64 \
+  -v "${WALLET_VISUAL_ROOT}:${WALLET_VISUAL_ROOT}" -v "${WALLET_VISUAL_GIT}:${WALLET_VISUAL_GIT}:ro" \
+  -w "$WALLET_VISUAL_ROOT/waltid-applications/waltid-wallet-demo-compose/webApp/visual" \
+  -e CI -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0="$WALLET_VISUAL_ROOT" \
+  mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07 \
+  bash -lc 'npm ci && npm test'
+```
 
 `npm run record` deliberately replaces references outside CI. Inspect those images, then run
 `npm test` twice to check determinism. Record output is not comparison evidence. CI rejects

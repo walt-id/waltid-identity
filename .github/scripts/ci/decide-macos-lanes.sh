@@ -23,6 +23,7 @@ write_outputs() {
   echo "run-visual-android=${RUN_VISUAL_ANDROID}" >> "$GITHUB_OUTPUT"
   echo "run-visual-compose=${RUN_VISUAL_COMPOSE}" >> "$GITHUB_OUTPUT"
   echo "run-visual-native=${RUN_VISUAL_NATIVE}" >> "$GITHUB_OUTPUT"
+  echo "run-visual-browser=${RUN_VISUAL_BROWSER}" >> "$GITHUB_OUTPUT"
   echo "should-run=${should_run}" >> "$GITHUB_OUTPUT"
   echo "reason=${REASON}" >> "$GITHUB_OUTPUT"
   echo "macOS lane eligibility: simulator=${RUN_IOS_SIMULATOR} native=${RUN_NATIVE} compose=${RUN_COMPOSE} enterprise=${RUN_ENTERPRISE} sdk-docs=${RUN_SDK_DOCS}"
@@ -38,6 +39,7 @@ set_all_lanes() {
   RUN_VISUAL_ANDROID="$1"
   RUN_VISUAL_COMPOSE="$1"
   RUN_VISUAL_NATIVE="$1"
+  RUN_VISUAL_BROWSER="$1"
 }
 
 label_match() {
@@ -67,6 +69,7 @@ RUN_SDK_DOCS="false"
 RUN_VISUAL_ANDROID="false"
 RUN_VISUAL_COMPOSE="false"
 RUN_VISUAL_NATIVE="false"
+RUN_VISUAL_BROWSER="false"
 REASON=""
 
 case "$EVENT_NAME" in
@@ -114,6 +117,7 @@ case "$EVENT_NAME" in
         RUN_VISUAL_ANDROID="true"
         RUN_VISUAL_COMPOSE="true"
         RUN_VISUAL_NATIVE="true"
+        RUN_VISUAL_BROWSER="true"
         [[ "$matched_labels" != visuals_docs ]] || RUN_SDK_DOCS="true"
         if [[ "$PR_DRAFT" == "true" ]]; then
           REASON="ci:visual label on draft PR"
@@ -161,6 +165,7 @@ case "$EVENT_NAME" in
         visual-android) RUN_VISUAL_ANDROID="true" ;;
         visual-compose) RUN_VISUAL_COMPOSE="true" ;;
         visual-native) RUN_VISUAL_NATIVE="true" ;;
+        visual-browser) RUN_VISUAL_BROWSER="true" ;;
       esac
     done
 
