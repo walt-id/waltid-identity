@@ -5,6 +5,42 @@ import XCTest
 
 @MainActor
 final class WalletViewModelReceiveTests: XCTestCase {
+    func testPendingRegistrationDoesNotBlockStartupOrReceivingAndReconcilesAgain() async throws {
+        let registration = PendingRegistrationUpdate()
+        let client = TransactionCodeWalletClient(transactionCode: nil)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {
+            try await registration.update()
+        })
+        model.unlockForTests()
+        try await waitUntilAsync { await registration.count == 1 }
+        guard model.isReady && !model.isLoading else {
+            await registration.complete()
+            XCTFail("Apple's registration service must not gate wallet readiness")
+            return
+        }
+
+        model.offerUrl = "openid-credential-offer://issuer.example"
+        model.previewOffer()
+        try await waitUntil { model.offerPreview != nil && !model.isLoading }
+        model.acceptOffer()
+        try await waitUntil { !model.isLoading }
+        XCTAssertEqual(model.credentials.map(\.id), ["credential-1"])
+        XCTAssertEqual(model.lastReceivedCredentialIDs, ["credential-1"])
+        XCTAssertFalse(model.isError)
+        let countWhilePending = await registration.count
+        XCTAssertEqual(countWhilePending, 1)
+
+        await registration.complete()
+        try await waitUntilAsync { await registration.count == 2 }
+        await registration.complete(.failure(WalletError.internalFailure("Registration unavailable")))
+        model.deleteCredential(id: "credential-1")
+        try await waitUntilAsync { await registration.count == 3 }
+        XCTAssertTrue(model.isReady)
+        XCTAssertTrue(model.credentials.isEmpty)
+        XCTAssertFalse(model.isError)
+        await registration.complete()
+    }
+
     func testCopySelectionIsExplicitBoundedAndForwardedForBothGrants() async throws {
         for grant in [IssuanceGrant.preAuthorizedCode, .authorizationCode] {
             let client = TransactionCodeWalletClient(transactionCode: nil, issuanceGrant: grant, batchSize: 3)
@@ -614,6 +650,21 @@ final class WalletViewModelReceiveTests: XCTestCase {
             }
             try await Task.sleep(nanoseconds: 10_000_000)
         }
+    }
+}
+
+private actor PendingRegistrationUpdate {
+    private(set) var count = 0
+    private var continuation: CheckedContinuation<Void, Error>?
+
+    func update() async throws {
+        count += 1
+        try await withCheckedThrowingContinuation { continuation = $0 }
+    }
+
+    func complete(_ result: Result<Void, Error> = .success(())) {
+        continuation?.resume(with: result)
+        continuation = nil
     }
 }
 

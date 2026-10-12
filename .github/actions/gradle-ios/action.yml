@@ -128,7 +128,8 @@ runs:
           --keychain-group-suffix id.walt.wallet.compose.shared \
           --app-bundle-id id.walt.wallet.compose \
           --appex-bundle-id id.walt.wallet.compose.identitydocumentprovider \
-          --development-team 9BB78CFW7Y
+          --development-team 9BB78CFW7Y \
+          --build-setting "GRADLE_OPTS=${GRADLE_OPTS:-} -Dorg.gradle.daemon=false"
 
     - name: Execute WalletSDK package bridge tests
       if: ${{ inputs.run-wallet-sdk-tests == 'true' }}
@@ -167,7 +168,10 @@ runs:
           -scheme iosApp \
           -destination "${{ inputs.simulator-destination }}" \
           -only-testing:iosAppTests \
+          -only-testing:iosAppUITests/MockWalletUITests/testWalletReadinessOutlivesTheSuccessBannerAcrossRestart \
+          -only-testing:iosAppUITests/MockWalletUITests/testCredentialsStayLoadingUntilTheInitialReadCompletes \
           -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2 \
+          -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testAutomaticallyAttestsEudiIssuanceBeforeAndAfterRestart \
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived \
           -enableCodeCoverage NO \
@@ -213,7 +217,8 @@ runs:
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived-compose \
           -enableCodeCoverage NO \
-          -parallel-testing-enabled NO
+          -parallel-testing-enabled NO \
+          "GRADLE_OPTS=${GRADLE_OPTS:-} -Dorg.gradle.daemon=false"
         TESTS
 
     - name: Collect iOS test reports
@@ -302,6 +307,15 @@ runs:
           --manifest "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/proximity-test-suites.json" \
           --suite native-demo-consent \
           --reports "${{ inputs.waltid-directory }}/build/ios-test-reports/xcresult/*.xml"
+
+    - name: Require native wallet readiness and restart test results
+      if: ${{ always() && inputs.run-native-demo-tests == 'true' }}
+      shell: bash
+      run: |
+        python3 "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/verify_test_results.py" \
+          --manifest "${{ inputs.waltid-directory }}/.github/scripts/mobile-ci/native-readiness-test-suite.json" \
+          --suite native-demo-readiness \
+          --reports "${{ inputs.waltid-directory }}/build/ios-test-reports/xcresult/*waltid-wallet-demo-ios*.xml"
 
     - name: Publish iOS test report
       if: always() && steps.ios_test_report.outputs.has_report == 'true'
