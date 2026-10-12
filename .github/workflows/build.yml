@@ -33,7 +33,8 @@ jobs:
       - uses: ./waltid-identity/.github/actions/gradle-setup-action
       - uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-37 build-tools;37.0.0'
+          cmdline-tools-version: '16111833'
+          packages: 'platform-tools platforms;android-37.0 build-tools;37.0.0'
       - name: Compare Compose Android visual references
         uses: ./waltid-identity/.github/actions/wallet-visual
         with:
