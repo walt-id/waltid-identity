@@ -32,7 +32,7 @@ class WalletJourneyTest {
         assertFalse(device.hasObject(By.res("wallet.presentationInput")))
         WalletComposeE2EHelper.clickByTag(device, "wallet.proximityCancelButton")
         assertTrue(device.wait(Until.gone(By.res("wallet.proximityScreen")), 10_000))
-        assertTrue(device.hasObject(By.res("wallet.scanButton")))
+        assertTrue(device.wait(Until.hasObject(By.res("wallet.scanButton")), 10_000))
         assertFalse(device.hasObject(By.res("wallet.presentationInput")))
     }
 
