@@ -422,9 +422,7 @@
     {
       "id": "batch.result.missing_details",
       "requirements": [
-        "R04",
-        "R06",
-        "R18"
+        "Complete saved count, unavailable-details warning and local refresh"
       ],
       "composeTest": "missingSavedDetails",
       "swiftTest": "testMissingSavedDetails",
