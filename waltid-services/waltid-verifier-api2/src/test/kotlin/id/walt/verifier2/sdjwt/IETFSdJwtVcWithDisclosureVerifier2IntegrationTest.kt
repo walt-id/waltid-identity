@@ -122,7 +122,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
     ]
   }
         """.trimIndent()
-        )
+        ).copy(vp_policies = preFinalFixtureVpPolicies)
 
     private fun verificationSessionSetup(issuer: String, webhookUrl: String): VerificationSessionSetup = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
