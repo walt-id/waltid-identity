@@ -331,8 +331,12 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     }
 
     private func assertPinKeyboardAboveAction(_ app: XCUIApplication) {
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "PIN input must open the keyboard automatically")
-        XCTAssertLessThanOrEqual(app.buttons["wallet.pinClearButton"].frame.maxY, app.keyboards.firstMatch.frame.minY,
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.keys["1"].waitForExistence(timeout: 5), "PIN input must open the on-screen number pad, not just a keyboard accessory")
+        for digit in 0...9 {
+            XCTAssertTrue(keyboard.keys[String(digit)].isHittable, "PIN number key \(digit) must be visible and tappable")
+        }
+        XCTAssertLessThanOrEqual(app.buttons["wallet.pinClearButton"].frame.maxY, keyboard.frame.minY,
             "The keyboard must not cover the PIN action")
     }
 
