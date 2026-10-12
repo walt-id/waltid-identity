@@ -51,16 +51,17 @@ def image_info(path):
         raise ValueError(f"Invalid visual PNG: {error}") from error
 
 
-def fingerprint():
+def fingerprint(gradle_root):
+    """Bind evidence to source, SDKs and build inputs, excluding ignored generated files."""
     value = hashlib.sha256()
-    paths = git("ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0")
-    for name in sorted(set(paths)):
-        if not (name.startswith("waltid-applications/waltid-wallet-demo-") or
-                name in ("gradle.properties", "gradle/libs.versions.toml", "settings.gradle.kts")):
-            continue
-        path = ROOT / name
-        value.update(name.encode() + b"\0")
-        value.update(path.read_bytes() if path.is_file() else b"<deleted>")
+    for root in dict.fromkeys((ROOT, Path(gradle_root))):
+        value.update(b"\0repository\0")
+        paths = subprocess.check_output(
+            ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"], text=True)
+        for name in sorted(set(filter(None, paths.split("\0")))):
+            path = root / name
+            value.update(name.encode() + b"\0")
+            value.update(hashlib.sha256(path.read_bytes() if path.is_file() else b"<deleted>").digest())
     return value.hexdigest()
 
 
@@ -229,7 +230,8 @@ def assess_compose(state, renderer, case, result, baseline, run, config):
 
 def finish(args, run):
     errors, cells = [], []
-    stale_source = run["fingerprint"] != fingerprint() or run["sha"] != git("rev-parse", "HEAD")
+    stale_source = (run.get("schemaVersion") != 3 or run["sha"] != git("rev-parse", "HEAD") or
+                    run["fingerprint"] != fingerprint(run["gradleRoot"]))
     if stale_source:
         errors.append("Source or baselines changed after begin; results cannot describe this source state")
     for name in run["renderers"]:
@@ -318,15 +320,20 @@ def main():
     parser.add_argument("--output", type=Path, required=True, help="Ignored build directory outside fixture sources")
     parser.add_argument("--renderers", nargs="+", choices=list(CATALOGUE["renderers"]), default=list(CATALOGUE["renderers"]))
     parser.add_argument("--native-results", type=Path)
+    parser.add_argument("--gradle-root", type=Path, default=ROOT, help="Identity or coordinated build root used for this run")
     args = parser.parse_args()
+    args.gradle_root = args.gradle_root.resolve()
+    if args.gradle_root != ROOT and (args.gradle_root / "waltid-identity").resolve() != ROOT:
+        parser.error("The build root must use this Identity checkout")
     args.output = args.output.resolve()
     if args.output == HERE or HERE in args.output.parents:
         parser.error("Reports must stay outside fixture sources")
     args.output.mkdir(parents=True, exist_ok=True)
     marker = args.output / "run.json"
     if args.phase == "begin":
-        run = {"schemaVersion": 2, "runId": str(uuid.uuid4()), "started": time.time(), "sha": git("rev-parse", "HEAD"),
-               "dirty": bool(git("status", "--porcelain")), "fingerprint": fingerprint(), "renderers": args.renderers,
+        run = {"schemaVersion": 3, "runId": str(uuid.uuid4()), "started": time.time(), "sha": git("rev-parse", "HEAD"),
+               "dirty": bool(git("status", "--porcelain")), "gradleRoot": str(args.gradle_root),
+               "fingerprint": fingerprint(args.gradle_root), "renderers": args.renderers,
                "fixtureDigest": digest(HERE.parent / "resources/files/wallet-visual-data.json"),
                "ci": {key: os.environ[key] for key in ("GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_REPOSITORY", "GITHUB_EVENT_NAME") if key in os.environ}}
         marker.write_text(json.dumps(run, indent=2) + "\n")

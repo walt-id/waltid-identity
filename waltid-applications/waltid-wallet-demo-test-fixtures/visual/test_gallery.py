@@ -46,7 +46,7 @@ class GalleryTests(unittest.TestCase):
         return self.head()
 
     def add(self, identifier, color="red"):
-        self.data["states"].append({"id": identifier, "composeTest": "testScreen", "requirements": ["R01"]})
+        self.data["states"].append({"id": identifier, "composeTest": "testScreen", "requirements": ["Readable account feedback"]})
         path = self.root / self.baselines / (identifier + ".png")
         path.parent.mkdir(parents=True, exist_ok=True)
         Image.new("RGB", (2, 3), color).save(path)
@@ -139,7 +139,7 @@ class GalleryTests(unittest.TestCase):
     def test_browser_catalogue_is_included_without_mobile_duplication(self):
         catalogue = self.root / gallery.BROWSER_CATALOGUE_PATH
         catalogue.parent.mkdir(parents=True)
-        catalogue.write_text(json.dumps({"requirements": ["R01"], "environment": "Chromium fixture host",
+        catalogue.write_text(json.dumps({"requirements": ["Readable account feedback"], "environment": "Chromium fixture host",
             "states": [{"id": "account.empty.wide", "width": 1280, "height": 800}]}))
         snapshots = catalogue.parent / "snapshots"
         snapshots.mkdir()

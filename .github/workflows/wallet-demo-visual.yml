@@ -9,6 +9,9 @@ on:
       - 'waltid-libraries/protocols/waltid-wallet-sdk-ios/**'
       - 'gradle/libs.versions.toml'
       - 'gradle.properties'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - 'build-logic/**'
       - '.github/workflows/wallet-demo-visual.yml'
 
 permissions:
@@ -49,6 +52,11 @@ jobs:
           java-version: '21'
 
       - uses: gradle/actions/setup-gradle@v5
+
+      - name: Check ordinary and coordinated snapshot verification
+        run: >-
+          ./gradlew -p build-logic test --tests WalletVisualVerificationTest --max-workers=2
+          -Dorg.gradle.jvmargs=-Xmx2g -Pkotlin.compiler.execution.strategy=in-process
 
       - name: Cache Kotlin Native dependencies
         uses: actions/cache@v5
