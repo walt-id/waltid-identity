@@ -6,6 +6,46 @@ Committed expected appearance from production UI with synthetic data. These imag
 
 Open an image for its full size. Compact, large-text, dark and RTL captures are labelled explicitly. A missing renderer means that this catalogue has no reference for it.
 
+## wallet-home-empty
+
+**wallet · home · empty**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/wallet.home.empty.png" alt="wallet · home · empty, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/wallet.home.empty.png" alt="wallet · home · empty, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/wallet-home-empty.native-ios26_5-phone-en-light.png" alt="wallet · home · empty, Native iOS" width="240"> |
+
+## wallet-home-credential
+
+**Wallet — saved credential**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/wallet.home.credential.png" alt="Wallet — saved credential, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/wallet.home.credential.png" alt="Wallet — saved credential, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/wallet-home-credential.native-ios26_5-phone-en-light.png" alt="Wallet — saved credential, Native iOS" width="240"> |
+
+## wallet-scan-empty
+
+**Scan or paste a request**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/wallet.scan.empty.png" alt="Scan or paste a request, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/wallet.scan.empty.png" alt="Scan or paste a request, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/wallet-scan-empty.native-ios26_5-phone-en-light.png" alt="Scan or paste a request, Native iOS" width="240"> |
+
+## wallet-scan-unsupported
+
+**wallet · scan · unsupported**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/wallet.scan.unsupported.png" alt="wallet · scan · unsupported, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/wallet.scan.unsupported.png" alt="wallet · scan · unsupported, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/wallet-scan-unsupported.native-ios26_5-phone-en-light.png" alt="wallet · scan · unsupported, Native iOS" width="240"> |
+
+## wallet-scan-link
+
+**wallet · scan · link**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/wallet.scan.link.png" alt="wallet · scan · link, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/wallet.scan.link.png" alt="wallet · scan · link, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/wallet-scan-link.native-ios26_5-phone-en-light.png" alt="wallet · scan · link, Native iOS" width="240"> |
+
 ## settings-root-default
 
 **Settings**
@@ -37,14 +77,6 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
 | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/batch.offer.two_targets_three_copies.png" alt="Receiving — selected credentials, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/batch.offer.two_targets_three_copies.png" alt="Receiving — selected credentials, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/batch-offer-two_targets_three_copies.native-ios26_5-phone-en-light.png" alt="Receiving — selected credentials, Native iOS" width="240"> |
-
-## batch-offer-two_targets_three_copies-second_target
-
-**batch · offer · two targets three copies · second target**
-
-| Compose Android | Compose iOS | Native iOS |
-| --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/batch.offer.two_targets_three_copies.second_target.png" alt="batch · offer · two targets three copies · second target, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/batch.offer.two_targets_three_copies.second_target.png" alt="batch · offer · two targets three copies · second target, Compose iOS" width="240"> | No reference |
 
 ## batch-offer-none_selected
 
@@ -101,3 +133,59 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
 | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/nearby.ready.qr.png" alt="Nearby sharing, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/nearby.ready.qr.png" alt="Nearby sharing, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/nearby-ready-qr.native-ios26_5-phone-en-light.png" alt="Nearby sharing, Native iOS" width="240"> |
+
+## onboarding-pin-setup
+
+**Onboarding — choose a PIN**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/onboarding.pin.setup.png" alt="Onboarding — choose a PIN, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/onboarding.pin.setup.png" alt="Onboarding — choose a PIN, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/onboarding-pin-setup.native-ios26_5-phone-en-light.png" alt="Onboarding — choose a PIN, Native iOS" width="240"> |
+
+## onboarding-pin-mismatch
+
+**onboarding · pin · mismatch**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/onboarding.pin.mismatch.png" alt="onboarding · pin · mismatch, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/onboarding.pin.mismatch.png" alt="onboarding · pin · mismatch, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/onboarding-pin-mismatch.native-ios26_5-phone-en-light.png" alt="onboarding · pin · mismatch, Native iOS" width="240"> |
+
+## onboarding-pin-biometrics_enabled
+
+**onboarding · pin · biometrics enabled**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/onboarding.pin.biometrics_enabled.png" alt="onboarding · pin · biometrics enabled, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/onboarding.pin.biometrics_enabled.png" alt="onboarding · pin · biometrics enabled, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/onboarding-pin-biometrics_enabled.native-ios26_5-phone-en-light.png" alt="onboarding · pin · biometrics enabled, Native iOS" width="240"> |
+
+## credential-details-localized_metadata
+
+**credential · details · localized metadata**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/credential.details.localized_metadata.png" alt="credential · details · localized metadata, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/credential.details.localized_metadata.png" alt="credential · details · localized metadata, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/credential-details-localized_metadata.native-ios26_5-phone-en-light.png" alt="credential · details · localized metadata, Native iOS" width="240"> |
+
+## batch-offer-definitions
+
+**batch · offer · definitions**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/batch.offer.definitions.png" alt="batch · offer · definitions, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/batch.offer.definitions.png" alt="batch · offer · definitions, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/batch-offer-definitions.native-ios26_5-phone-en-light.png" alt="batch · offer · definitions, Native iOS" width="240"> |
+
+## batch-offer-compact_dark_large_text
+
+**Receiving — compact, dark, large text**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/batch.offer.compact_dark_large_text.png" alt="Receiving — compact, dark, large text, Compose Android" width="240"><br>320×568, 1.5× text, dark | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/batch.offer.compact_dark_large_text.png" alt="Receiving — compact, dark, large text, Compose iOS" width="240"><br>320×568, 1.5× text, dark | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/batch-offer-compact_dark_large_text.native-ios26_5-phone-en-light.png" alt="Receiving — compact, dark, large text, Native iOS" width="240"><br>320×568, accessibilityMedium, dark |
+
+## batch-offer-compact_dark_large_text-last_target
+
+**batch · offer · compact dark large text · last target**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/batch.offer.compact_dark_large_text.last_target.png" alt="batch · offer · compact dark large text · last target, Compose Android" width="240"><br>320×568, 1.5× text, dark | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/batch.offer.compact_dark_large_text.last_target.png" alt="batch · offer · compact dark large text · last target, Compose iOS" width="240"><br>320×568, 1.5× text, dark | No reference |
