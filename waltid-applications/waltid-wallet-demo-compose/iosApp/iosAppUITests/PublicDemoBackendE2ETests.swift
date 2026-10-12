@@ -255,7 +255,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
         let environment = isolatedWalletEnvironment()
-        app.launchEnvironment = environment.merging(["WALLET_SIGNING_PROTECTION_MODE": "disabled"]) { _, new in new }
+        configurePinOnlyProfile(app, environment: environment)
         app.launch()
         let input = ui.textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
         XCTAssertTrue(input.waitForExistence(timeout: 10))
@@ -274,7 +274,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(confirmation.waitForExistence(timeout: 10))
         assertPinKeyboardAboveAction(app)
         confirmation.typeText("1234")
-        ui.completeKeySetupIfNeeded()
+        completePinOnlySetup(app, ui: ui)
         let readyStatus = ui.waitUntilWalletReady(timeout: walletReadyTimeout)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
@@ -294,7 +294,10 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
-        ui.launch(environment: isolatedWalletEnvironment())
+        let environment = isolatedWalletEnvironment()
+        configurePinOnlyProfile(app, environment: environment)
+        ui.launch(environment: environment, initializeSigningIdentity: false)
+        completePinOnlySetup(app, ui: ui)
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
         ui.tapButton(identifier: "wallet.settingsButton", fallbackLabel: "Settings")
         ui.tapButton(identifier: "wallet.settingsWalletAccess", fallbackLabel: "Wallet access")
@@ -335,6 +338,33 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         }
         XCTAssertLessThanOrEqual(app.buttons["wallet.pinClearButton"].frame.maxY, keyboard.frame.minY,
             "The keyboard must not cover the PIN action")
+    }
+
+    private func configurePinOnlyProfile(_ app: XCUIApplication, environment: [String: String]) {
+        let walletID = environment["WALLET_ID"]!
+        app.launchEnvironment = environment.merging(["WALLET_SIGNING_PROTECTION_MODE": "disabled"]) { _, new in new }
+        // A volatile override for this test's wallet prevents an enrolled phone from
+        // unlocking with Face ID before the PIN assertions can exercise the keypad.
+        app.launchArguments += ["-id.walt.walletdemo.pin.biometric.\(walletID)", "NO"]
+    }
+
+    private func completePinOnlySetup(_ app: XCUIApplication, ui: WalletE2EUI) {
+        let pinOnly = app.buttons["wallet.biometricSetupContinue"]
+        if pinOnly.waitForExistence(timeout: 3), !pinOnly.isEnabled {
+            // Termination cancels the initial system prompt. Pending setup is persisted
+            // and resumes with an explicit choice after the saved PIN is verified.
+            app.terminate()
+            app.launch()
+            let input = ui.textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
+            XCTAssertTrue(input.waitForExistence(timeout: 10))
+            XCTAssertFalse(app.staticTexts["Step 1 of 2"].exists)
+            input.typeText("1234")
+        }
+        if pinOnly.waitForExistence(timeout: 2) {
+            XCTAssertTrue(pinOnly.isEnabled, "PIN-only continuation must be available after authentication ends")
+            pinOnly.tap()
+        }
+        ui.completeKeySetupIfNeeded()
     }
 
     func testBootstrapCreatesDid() async throws {
