@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalWasmDsl::class, com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)
 
 import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
+import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
@@ -143,8 +144,14 @@ if (visualCi) {
         gradle.startParameter.taskNames.none { it.substringAfterLast(':').let { name ->
             name.startsWith("recordRoborazzi") || name.startsWith("verifyAndRecordRoborazzi") || name.startsWith("compareRoborazzi")
         } }) { "CI must verify reviewed wallet snapshots; it cannot record or accept baselines." }
-    check(providers.gradleProperty("roborazzi.test.verify").orNull == "true") {
-        "CI must not disable wallet screenshot verification."
+    tasks.withType<AbstractTestTask>().configureEach {
+        val screenshotVerification = providers.gradleProperty("roborazzi.test.verify")
+        onlyIf {
+            check(screenshotVerification.orNull == "true") {
+                "CI must not disable wallet screenshot verification."
+            }
+            true
+        }
     }
 }
 
