@@ -13,7 +13,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     }
 
 
-    func testButtonActionsWaitForSuccessBannerAndPreserveErrors() {
+    func testScannerActionsWaitForSuccessBannerAndReachTheOfferParser() {
         continueAfterFailure = false
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
@@ -22,21 +22,17 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ui.launch(environment: environment)
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
 
-        ui.tapButton(identifier: "wallet.tab.receive", fallbackLabel: "Receive tab, Receive")
+        ui.tapButton(identifier: "wallet.scanButton", fallbackLabel: "Scan QR code")
         XCTAssertFalse(app.buttons["wallet.statusDismiss"].exists,
                        "Success-banner dismissal must finish moving the form before the next action")
+        ui.tapButton(identifier: "wallet.scanMode", fallbackLabel: "Enter a link")
 
         // A malformed inline offer reaches the local parser without an issuer request.
         let offer = "openid-credential-offer://?credential_offer=%7B%7D"
-        ui.replaceText(in: ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL"), value: offer)
-        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        ui.replaceText(in: ui.textInput(identifier: "wallet.scanInput", fallbackLabel: "Credential offer or request"), value: offer)
+        ui.tapButton(identifier: "wallet.scanContinue", fallbackLabel: "Continue")
         let failure = ui.waitForStatus(prefixes: ["Receive failed"], timeout: 10)
-        XCTAssertNotNil(failure, "A single Receive activation must reach the offer parser")
-        XCTAssertTrue(app.buttons["wallet.statusExpand"].exists)
-
-        ui.tapButton(identifier: "wallet.tab.receive", fallbackLabel: "Receive tab, Receive")
-        XCTAssertEqual(ui.latestStatus(prefixes: ["Receive failed"]), failure,
-                       "Button synchronization must preserve the persistent error")
+        XCTAssertNotNil(failure, "A single Continue activation must reach the offer parser")
     }
 
     func testAutomaticallyAttestsEudiIssuanceBeforeAndAfterRestart() async throws {
@@ -362,6 +358,12 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
+        let registrationConsent = addUIInterruptionMonitor(withDescription: "Identity document registration") { alert in
+            guard alert.label.contains("Identity Verification") else { return false }
+            alert.buttons["Allow"].tap()
+            return true
+        }
+        defer { removeUIInterruptionMonitor(registrationConsent) }
         ui.launch(environment: isolatedWalletEnvironment())
 
         let readyStatus = ui.waitUntilWalletReady(timeout: walletReadyTimeout)
@@ -382,6 +384,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
 
+        // Touching the blank receipt content keeps it open for explicit completion.
+        app.otherElements["wallet.review.content"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         ui.tapButton(identifier: "issuance-done", fallbackLabel: "Done")
         assertHome(app)
         let credentialCards = app.descendants(matching: .any)
@@ -403,7 +407,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         ui.openDeepLink(session.authorizationRequestUri)
         let previewStatus = ui.waitForPresentationReview(timeout: credentialOperationTimeout)
         XCTAssertTrue(previewStatus, app.debugDescription)
-        XCTAssertTrue(app.staticTexts["Information to share"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.otherElements["Information to share"].waitForExistence(timeout: 10))
         captureHost("Requested credential information")
         XCTAssertTrue(app.staticTexts["Given name"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Family name"].waitForExistence(timeout: 10))
@@ -453,6 +457,8 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             XCTAssertFalse(presentStatus.starts(with: "Bootstrap failed"), "Bootstrap failed during presentation: \(presentStatus)")
         }
         XCTAssertTrue(app.buttons["wallet.presentationDone"].waitForExistence(timeout: credentialOperationTimeout))
+        // Touching the blank receipt content keeps it open for explicit completion.
+        app.otherElements["wallet.review.content"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
         captureHost("Sharing result")
         ui.tapButton(identifier: "wallet.presentationDone", fallbackLabel: "Done")
@@ -512,11 +518,17 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         ui.replaceText(in: txCodeInput, value: incorrectCode(for: transactionCode), dismiss: false)
         ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
+        // The rejection is above the code input in the scrolling review.
+        app.otherElements["wallet.review.content"].swipeDown()
         let rejectedStatus = ui.waitForStatus(prefixes: ["Receive failed"], timeout: credentialOperationTimeout)
         guard rejectedStatus?.starts(with: "Receive failed") == true else {
             XCTFail("Incorrect transaction code was not rejected, status: \(rejectedStatus ?? "nil")")
             return
         }
+        XCTAssertTrue(app.buttons["wallet.statusExpand"].exists)
+        ui.tapButton(identifier: "wallet.statusExpand", fallbackLabel: "Expand error")
+        XCTAssertEqual(ui.latestStatus(prefixes: ["Receive failed"]), rejectedStatus,
+                       "Button synchronization must preserve the persistent error")
 
         // The reviewed offer remains active so the corrected code can be retried directly.
         ui.replaceText(in: txCodeInput, value: transactionCode, dismiss: false)
@@ -547,7 +559,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let previewStatus = ui.waitForPresentationReview(timeout: credentialOperationTimeout)
         XCTAssertTrue(previewStatus, app.debugDescription)
 
-        XCTAssertTrue(app.staticTexts["Payment Authorization"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.otherElements["Payment Authorization"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["42.00"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["EUR"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["ACME Corp"].waitForExistence(timeout: 10))
@@ -644,6 +656,11 @@ final class WalletIdentitySetupUITests: XCTestCase {
         ui.launch(environment: environment, initializeSigningIdentity: false)
         XCTAssertTrue(next.waitForExistence(timeout: 30))
         ui.tapButton(identifier: "wallet.keySetupEdit.Recovery", fallbackLabel: "Recovery")
+        let continueButtons = app.buttons.matching(identifier: "wallet.keySetupContinue")
+        let recoveryReady = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            continueButtons.count == 1 && continueButtons.element.label == "Done"
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [recoveryReady], timeout: 5), .completed, app.debugDescription)
         let restore = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", SHA256.hash(data: Data(did.utf8)).prefix(6).map { String(format: "%02x", $0) }.joined())).firstMatch
         for _ in 0..<20 {
             if restore.exists && restore.frame.minY < next.frame.minY - 120 && restore.frame.maxY > 240 { break }
@@ -669,6 +686,10 @@ final class WalletIdentitySetupUITests: XCTestCase {
         capture("selected-recovery-record", app: app)
         ui.tapButton(identifier: "wallet.keySetupContinue", fallbackLabel: "Continue")
         XCTAssertTrue(app.buttons["wallet.keySetupEdit.Recovery"].waitForExistence(timeout: 10))
+        let summaryReady = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            continueButtons.count == 1 && continueButtons.element.label == "Restore signing key"
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [summaryReady], timeout: 5), .completed, app.debugDescription)
         XCTAssertEqual(next.label, "Restore signing key")
         ui.tapButton(identifier: "wallet.keySetupContinue", fallbackLabel: "Continue")
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: 30), "Wallet ready")
