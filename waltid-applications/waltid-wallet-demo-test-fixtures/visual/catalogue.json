@@ -60,9 +60,7 @@
     {
       "id": "settings.root.default",
       "requirements": [
-        "R03",
-        "R11",
-        "R15"
+        "Grouped settings and available actions"
       ],
       "composeTest": "settingsRoot",
       "swiftTest": "testSettingsRoot",
@@ -71,10 +69,7 @@
     {
       "id": "credential.details.identity",
       "requirements": [
-        "R04",
-        "R05",
-        "R15",
-        "R12"
+        "Credential identity and nested claims"
       ],
       "composeTest": "credentialDetails",
       "swiftTest": "testCredentialDetails",
@@ -84,8 +79,7 @@
     {
       "id": "credential.media.loaded",
       "requirements": [
-        "R04",
-        "R06"
+        "Decoded portrait and signature images"
       ],
       "swiftTest": "testCredentialImages",
       "note": "Portrait and signature share this viewport; both wait for image readiness and remain visible.",
@@ -95,9 +89,7 @@
     {
       "id": "batch.offer.two_targets_three_copies",
       "requirements": [
-        "R06",
-        "R07",
-        "R18"
+        "Multiple targets, selected copies and receive action"
       ],
       "composeTest": "batchOffer",
       "swiftTest": "testBatchOffer",
@@ -106,17 +98,14 @@
     {
       "id": "batch.offer.two_targets_three_copies.second_target",
       "requirements": [
-        "R11",
-        "R12",
-        "R18"
+        "Scroll access to the second target"
       ],
       "composeTest": "batchOffer"
     },
     {
       "id": "batch.offer.none_selected",
       "requirements": [
-        "R11",
-        "R18"
+        "Disabled receive action with no selection"
       ],
       "composeTest": "batchOfferWithNothingSelected",
       "swiftTest": "testBatchOfferWithNothingSelected"
@@ -124,9 +113,7 @@
     {
       "id": "batch.result.saved_and_deferred",
       "requirements": [
-        "R02",
-        "R07",
-        "R18"
+        "Saved credentials and deferred copies"
       ],
       "composeTest": "partialBatchResult",
       "swiftTest": "testPartialBatchResult",
@@ -135,11 +122,7 @@
     {
       "id": "payment.mixed_credentials.main",
       "requirements": [
-        "R14",
-        "T01",
-        "T04",
-        "T05",
-        "T10"
+        "Payment summary and separate credential groups"
       ],
       "composeTest": "paymentReview",
       "title": "Payment review"
@@ -147,28 +130,21 @@
     {
       "id": "payment.mixed_credentials.details",
       "requirements": [
-        "R14",
-        "T06",
-        "T07"
+        "Payment parties and transaction details"
       ],
       "composeTest": "paymentReview"
     },
     {
       "id": "payment.mixed_credentials.requested_data",
       "requirements": [
-        "R04",
-        "R14",
-        "T03"
+        "Nested requested data"
       ],
       "composeTest": "paymentReview"
     },
     {
       "id": "payment.consent.main",
       "requirements": [
-        "R14",
-        "T01",
-        "T04",
-        "T05"
+        "Payment consent and primary action"
       ],
       "swiftTest": "testPaymentConsent",
       "note": "Native consent component; mixed-credential host coverage is still required."
@@ -176,9 +152,7 @@
     {
       "id": "nearby.ready.qr",
       "requirements": [
-        "R02",
-        "R10",
-        "R12"
+        "QR sharing instructions and cancel action"
       ],
       "composeTest": "nearbyReady",
       "swiftTest": "testNearbyReady",

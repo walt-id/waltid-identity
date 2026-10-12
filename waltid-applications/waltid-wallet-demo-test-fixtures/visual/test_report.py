@@ -1,8 +1,14 @@
 """Negative contracts: a passing XCTest alone must never certify a visual comparison."""
 import json
+import contextlib
+import io
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from PIL import Image, PngImagePlugin
 import report
@@ -157,6 +163,117 @@ class NativeReceiptTests(unittest.TestCase):
     def test_export_rejects_path_escape(self):
         with self.assertRaisesRegex(ValueError, "Invalid native attachment path"):
             self.export([{ "exportedFileName": "../outside.png", "suggestedHumanReadableName": "readiness-test"}])
+
+
+class SourceBindingTests(unittest.TestCase):
+    """Exercise begin/finish with real Git state and pixels; mock only native result transport."""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.workspace = Path(directory.name).resolve()
+        self.root = self.workspace / "waltid-identity"
+        self.root.mkdir()
+        self.files = {
+            "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonMain/Wallet.kt": "class Wallet",
+            "waltid-libraries/protocols/waltid-wallet-sdk-ios/Sources/WalletSDK/CredentialTitles.swift": "struct CredentialTitles {}",
+            "build-logic/src/main/kotlin/waltid.mobile.library.gradle.kts": "// build input",
+            "build.gradle.kts": "// build root",
+            ".gitignore": "build/\nlocal.properties\n",
+        }
+        for name, text in self.files.items():
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+        self.here = self.root / "waltid-applications/waltid-wallet-demo-test-fixtures/visual"
+        self.here.mkdir(parents=True)
+        fixtures = self.here.parent / "resources/files/wallet-visual-data.json"
+        fixtures.parent.mkdir(parents=True)
+        fixtures.write_text("{}")
+        self.baseline = self.root / "snapshots/test-screen.png"
+        self.baseline.parent.mkdir()
+        Image.new("RGB", (2, 3), "red").save(self.baseline)
+        for command in (["init", "-q"], ["add", "."],
+                        ["-c", "user.name=Visual test", "-c", "user.email=visual@example.test",
+                         "-c", "commit.gpgsign=false", "commit", "-qm", "fixture"]):
+            subprocess.run(["git", "-C", str(self.root), *command], check=True, capture_output=True)
+        self.output = self.root / "build/report"
+        catalogue = {"renderers": {"swiftui": {"baselineDirectory": "snapshots", "suffix": ""}},
+                     "states": [{"id": "test.screen", "swiftTest": "testScreen", "requirements": ["Source-bound comparison"]}]}
+        for name, value in (("ROOT", self.root), ("HERE", self.here), ("CATALOGUE", catalogue)):
+            replacement = patch.object(report, name, value)
+            replacement.start()
+            self.addCleanup(replacement.stop)
+
+    def begin(self, gradle_root=None):
+        arguments = ["report.py", "begin", "--output", str(self.output), "--renderers", "swiftui",
+                     "--gradle-root", str(gradle_root or self.root)]
+        with patch.object(sys, "argv", arguments), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(report.main(), 0)
+        run = json.loads((self.output / "run.json").read_text())
+        actual = self.output / "actual.png"
+        Image.new("RGB", (2, 3), "red").save(actual)
+        self.receipt = {**run, "schemaVersion": 1, "id": "test.screen", "test": "testScreen", "renderer": "swiftui",
+                        "kind": "deterministic", "mode": "verify", "compared": True, "result": "passed",
+                        "baselineDigest": report.digest(self.baseline), "actualDigest": report.digest(actual),
+                        "actual_file_path": str(actual), "viewport": [2, 3], "scale": 1, "timezone": "UTC"}
+        return run
+
+    def finish(self, run):
+        results = ({"testScreen": {"status": "passed"}}, {"test.screen": self.receipt}, None)
+        with patch.object(report, "native_tests", return_value=results), contextlib.redirect_stdout(io.StringIO()):
+            status = report.finish(SimpleNamespace(output=self.output, native_results=None), run)
+        return status, json.loads((self.output / "manifest.json").read_text())
+
+    def test_sdk_and_build_edits_make_otherwise_valid_comparisons_stale(self):
+        for name, original in self.files.items():
+            with self.subTest(path=name):
+                run = self.begin()
+                path = self.root / name
+                path.write_text(original + "\n// changed during comparison")
+                status, manifest = self.finish(run)
+                self.assertEqual(status, 1)
+                self.assertEqual(manifest["counts"], {"stale": 1})
+                self.assertIn("Source or baselines changed after begin", manifest["errors"][0])
+                path.write_text(original)
+
+    def test_new_sdk_source_and_deleted_build_input_invalidate_the_run(self):
+        added = self.root / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Sources/WalletSDK/New.swift"
+        deleted = self.root / "build-logic/src/main/kotlin/waltid.mobile.library.gradle.kts"
+        for change in (lambda: added.write_text("struct New {}"), deleted.unlink):
+            with self.subTest(change=change):
+                run = self.begin()
+                change()
+                status, manifest = self.finish(run)
+                self.assertEqual((status, manifest["counts"]), (1, {"stale": 1}))
+                added.unlink(missing_ok=True)
+                deleted.write_text(self.files[deleted.relative_to(self.root).as_posix()])
+
+    def test_ignored_build_outputs_and_local_settings_do_not_invalidate_source(self):
+        run = self.begin()
+        (self.root / "build/compiled.bin").write_bytes(b"generated after begin")
+        (self.root / "local.properties").write_text("sdk.dir=/synthetic/sdk")
+        status, manifest = self.finish(run)
+        self.assertEqual((status, manifest["counts"], manifest["errors"]), (0, {"passed": 1}, []))
+
+    def test_coordinated_build_inputs_are_bound_to_the_same_run(self):
+        (self.workspace / ".gitignore").write_text("waltid-identity/\n")
+        settings = self.workspace / "settings.gradle.kts"
+        settings.write_text("// coordinated settings")
+        subprocess.run(["git", "-C", str(self.workspace), "init", "-q"], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(self.workspace), "add", "."], check=True, capture_output=True)
+        run = self.begin(self.workspace)
+        self.assertEqual(self.finish(run)[0], 0)
+        settings.write_text("// changed coordinated settings")
+        status, manifest = self.finish(run)
+        self.assertEqual((status, manifest["counts"]), (1, {"stale": 1}))
+
+    def test_run_from_the_old_fingerprint_contract_is_stale(self):
+        run = self.begin()
+        run["schemaVersion"] = 2
+        del run["gradleRoot"]
+        status, manifest = self.finish(run)
+        self.assertEqual((status, manifest["counts"]), (1, {"stale": 1}))
 
 
 if __name__ == "__main__":

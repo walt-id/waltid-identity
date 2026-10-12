@@ -1,16 +1,15 @@
 @file:OptIn(ExperimentalWasmDsl::class, com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)
 
 import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
-import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
-import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 
 plugins {
     id("waltid.mobile.library")
     alias(identityLibs.plugins.compose.multiplatform)
     alias(identityLibs.plugins.roborazzi)
+    id("waltid.wallet.visual")
     kotlin("plugin.compose")
 }
 
@@ -135,31 +134,6 @@ roborazzi {
     outputDir.set(layout.projectDirectory.dir("src/visualTest/snapshots"))
     compare.outputDir.set(layout.buildDirectory.dir("outputs/visual-diffs"))
     separateOutputDirs.set(true)
-}
-
-// Recording is a developer action. In CI, even an explicitly requested record task must fail closed.
-val visualCi = listOf("CI", "GITHUB_ACTIONS", "GITLAB_CI", "BUILD_BUILDID", "JENKINS_URL", "TEAMCITY_VERSION")
-    .any { providers.environmentVariable(it).isPresent }
-if (visualCi) {
-    check(providers.gradleProperty("roborazzi.test.record").orNull != "true" &&
-        gradle.startParameter.taskNames.none { it.substringAfterLast(':').let { name ->
-            name.startsWith("recordRoborazzi") || name.startsWith("verifyAndRecordRoborazzi") || name.startsWith("compareRoborazzi")
-        } }) { "CI must verify reviewed wallet snapshots; it cannot record or accept baselines." }
-    // The catalogue runner owns iOS snapshot comparisons on its pinned simulator runtime.
-    tasks.withType<KotlinNativeTest>().configureEach {
-        if (!providers.environmentVariable("WALLET_VISUAL_RUN_ID").isPresent) {
-            filter.excludeTestsMatching("id.walt.walletdemo.compose.ui.WalletVisualIosTest")
-        }
-    }
-    tasks.withType<AbstractTestTask>().configureEach {
-        val screenshotVerification = providers.gradleProperty("roborazzi.test.verify")
-        onlyIf {
-            check(screenshotVerification.orNull == "true") {
-                "CI must not disable wallet screenshot verification."
-            }
-            true
-        }
-    }
 }
 
 compose {

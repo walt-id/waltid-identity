@@ -2,7 +2,7 @@
 
 The catalogue connects the existing Compose Android, Compose iOS and native SwiftUI test lanes. Fixtures render production content with synthetic inputs from `resources/files/wallet-visual-data.json`; they never create wallet keys, fetch issuer metadata or start real proximity sessions. Existing semantic and lifecycle tests remain separate.
 
-`catalogue.json` lists each captured state, its test, renderer and requirements. It is the current deterministic catalogue, not a claim that every wallet screen, system prompt or physical flow is covered. Native payment consent is currently a component capture; Compose payment fixtures include the ordinary and payment credential groups. Native media rows wait for decoded thumbnail layout and compare actual pixels. Compose media waits for successful image-loader completion. Nothing uses a fixed capture delay.
+`catalogue.json` lists each captured state, its test, renderer and readable visual requirements. It is the current deterministic catalogue, not a claim that every wallet screen, system prompt or physical flow is covered. Native payment consent is currently a component capture; Compose payment fixtures include the ordinary and payment credential groups. Native media rows wait for decoded thumbnail layout and compare actual pixels. Compose media waits for successful image-loader completion. Nothing uses a fixed capture delay.
 
 ## Compare
 
@@ -20,9 +20,9 @@ Use `--renderers android`, `--renderers compose-ios`, or `--renderers swiftui` f
 
 The entry point builds the native framework before freezing the source fingerprint, forces only selected test tasks to execute, and forwards a unique run ID, exact tested commit and fingerprint to XCTest. Native tests retain a receipt and the actual compared PNG for every comparison. The report requires matching test, receipt, baseline digest, capture digest and configuration before accepting a pass. A passing XCTest or an existing baseline alone is insufficient. Missing, stale, skipped, recorded and failed results remain distinct. Pre-comparison readiness failures retain their diagnostic image.
 
-For custom orchestration, call `report.py begin` first and pass the generated `native-runner-env.json` to XcodeBuildMCP's `--json` argument. Call `report.py finish` with the native JSON result afterward. Reusing an older receipt or changing source/baselines during a run invalidates the report.
+For custom orchestration, call `report.py begin` first and pass the generated `native-runner-env.json` to XcodeBuildMCP's `--json` argument. Call `report.py finish` with the native JSON result afterward. The fingerprint conservatively includes tracked files and non-ignored additions across Identity source, SDKs and build logic, plus coordinated build-root inputs when selected. Ignored build outputs and local settings are excluded. Reusing an older receipt or changing these inputs during a run invalidates the report.
 
-Ordinary Gradle runs verify through the `roborazzi.test.verify` project property; the plugin tracks its mode as a test input. SwiftUI defaults to `.never` recording. Missing baselines fail. Do not enable verify-and-record in CI.
+The wallet module defaults ordinary Gradle tests to verification from both Identity and coordinated build roots, with mode and baselines tracked as test inputs. The `roborazzi.test.verify` project property remains an explicit override; CI rejects disabled verification and recording or compare-only modes. SwiftUI defaults to `.never` recording. Missing baselines fail. Do not enable verify-and-record in CI.
 
 ## Deliberate baseline updates
 
@@ -54,7 +54,7 @@ CI runs `--check-index`. The publisher validates the index's Git digest and each
 
 ## Adding a state
 
-Add shared data only for a distinct risk. Render the real component through `WalletVisualScenarios` and/or `WalletVisualTests`, assert its content/actions, and wait for asynchronous readiness. Add the stable state ID, test method, requirement IDs and exact renderer applicability to the catalogue. Record on the pinned environment, inspect and verify. Include compact, large-text, dark, RTL or other variants where they expose a different layout risk instead of multiplying every state by every configuration.
+Add shared data only for a distinct risk. Render the real component through `WalletVisualScenarios` and/or `WalletVisualTests`, assert its content/actions, and wait for asynchronous readiness. Add the stable state ID, test method, concrete visible requirements and exact renderer applicability to the catalogue. Record on the pinned environment, inspect and verify. Include compact, large-text, dark, RTL or other variants where they expose a different layout risk instead of multiplying every state by every configuration.
 
 Simulator pixels do not prove external activity/scene lifecycle, OS-owned DC API sheets, signing, physical BLE/NFC or TS-12 conformance. Keep those evidence lanes explicit.
 

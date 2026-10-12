@@ -66,7 +66,8 @@ def main():
         if status:
             return status
     report_command = [sys.executable, str(HERE / "report.py")]
-    subprocess.run(report_command + ["begin", "--output", str(args.output), "--renderers", *args.renderers], cwd=ROOT, check=True)
+    subprocess.run(report_command + ["begin", "--output", str(args.output), "--gradle-root", str(args.gradle_root),
+                                    "--renderers", *args.renderers], cwd=ROOT, check=True)
     run_metadata = json.loads((args.output / "run.json").read_text())
     env.update(report.runner_env(run_metadata))
     env.update({"SIMCTL_CHILD_" + key: value for key, value in report.runner_env(run_metadata).items()})
