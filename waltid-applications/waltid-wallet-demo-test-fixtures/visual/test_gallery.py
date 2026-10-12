@@ -73,6 +73,8 @@ class GalleryTests(unittest.TestCase):
         self.assertEqual(result["counts"], {"removed": 1})
         self.assertIn(before, result["changes"][0]["beforeUrl"])
         self.assertIsNone(result["changes"][0]["afterUrl"])
+        self.assertIn(f'src="https://raw.githubusercontent.com/example/wallet/{before}/{self.baselines}/wallet.empty.png"',
+                      gallery.markdown(result))
 
     def test_pixel_change_is_distinct_from_encoding_change(self):
         path = self.add("wallet.empty")
@@ -132,9 +134,12 @@ class GalleryTests(unittest.TestCase):
 
     def test_fork_after_image_uses_the_fork_repository(self):
         self.add("wallet.empty")
-        self.checkpoint()
+        head = self.checkpoint()
         result = gallery.build(self.root, self.empty, "HEAD", "example/wallet", "contributor/wallet")
         self.assertIn("github.com/contributor/wallet/blob/", result["changes"][0]["afterUrl"])
+        body = gallery.markdown(result)
+        self.assertIn(f'src="https://raw.githubusercontent.com/contributor/wallet/{head}/{self.baselines}/wallet.empty.png"', body)
+        self.assertNotIn("?raw=true", body)
 
     def test_browser_catalogue_is_included_without_mobile_duplication(self):
         catalogue = self.root / gallery.BROWSER_CATALOGUE_PATH
