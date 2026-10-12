@@ -60,9 +60,7 @@
     {
       "id": "wallet.home.empty",
       "requirements": [
-        "R01",
-        "R10",
-        "R15"
+        "Empty wallet guidance and acquisition actions"
       ],
       "composeTest": "homeEmpty",
       "swiftTest": "testHomeEmpty",
@@ -71,9 +69,7 @@
     {
       "id": "wallet.home.credential",
       "requirements": [
-        "R01",
-        "R06",
-        "R10"
+        "Saved credential and wallet actions"
       ],
       "composeTest": "homeCredential",
       "swiftTest": "testHomeCredential",
@@ -83,10 +79,7 @@
     {
       "id": "wallet.scan.empty",
       "requirements": [
-        "R02",
-        "R07",
-        "R11",
-        "R15"
+        "Scanner guidance and manual request input"
       ],
       "composeTest": "scanEmpty",
       "swiftTest": "testScanEmpty",
@@ -95,10 +88,7 @@
     {
       "id": "wallet.scan.unsupported",
       "requirements": [
-        "R02",
-        "R07",
-        "R11",
-        "R15"
+        "Unsupported camera feedback and manual input"
       ],
       "composeTest": "scanUnsupported",
       "swiftTest": "testScanUnsupported"
@@ -106,10 +96,7 @@
     {
       "id": "wallet.scan.link",
       "requirements": [
-        "R02",
-        "R07",
-        "R11",
-        "R15"
+        "Entered request and continue action"
       ],
       "composeTest": "scanWebLink",
       "swiftTest": "testScanWebLink"
@@ -117,9 +104,7 @@
     {
       "id": "settings.root.default",
       "requirements": [
-        "R03",
-        "R11",
-        "R15"
+        "Grouped settings and available actions"
       ],
       "composeTest": "settingsRoot",
       "swiftTest": "testSettingsRoot",
@@ -128,10 +113,7 @@
     {
       "id": "credential.details.identity",
       "requirements": [
-        "R04",
-        "R05",
-        "R15",
-        "R12"
+        "Credential identity and nested claims"
       ],
       "composeTest": "credentialDetails",
       "swiftTest": "testCredentialDetails",
@@ -141,8 +123,7 @@
     {
       "id": "credential.media.loaded",
       "requirements": [
-        "R04",
-        "R06"
+        "Decoded portrait and signature images"
       ],
       "swiftTest": "testCredentialImages",
       "note": "Portrait and signature share this viewport; both wait for image readiness and remain visible.",
@@ -152,9 +133,7 @@
     {
       "id": "batch.offer.two_targets_three_copies",
       "requirements": [
-        "R06",
-        "R07",
-        "R18"
+        "Multiple targets, selected copies and receive action"
       ],
       "composeTest": "batchOffer",
       "swiftTest": "testBatchOffer",
@@ -163,8 +142,7 @@
     {
       "id": "batch.offer.none_selected",
       "requirements": [
-        "R11",
-        "R18"
+        "Disabled receive action with no selection"
       ],
       "composeTest": "batchOfferWithNothingSelected",
       "swiftTest": "testBatchOfferWithNothingSelected"
@@ -172,9 +150,7 @@
     {
       "id": "batch.result.saved_and_deferred",
       "requirements": [
-        "R02",
-        "R07",
-        "R18"
+        "Saved credentials and deferred copies"
       ],
       "composeTest": "partialBatchResult",
       "swiftTest": "testPartialBatchResult",
@@ -183,11 +159,7 @@
     {
       "id": "payment.mixed_credentials.main",
       "requirements": [
-        "R14",
-        "T01",
-        "T04",
-        "T05",
-        "T10"
+        "Payment summary and separate credential groups"
       ],
       "composeTest": "paymentReview",
       "title": "Payment review"
@@ -195,28 +167,21 @@
     {
       "id": "payment.mixed_credentials.details",
       "requirements": [
-        "R14",
-        "T06",
-        "T07"
+        "Payment parties and transaction details"
       ],
       "composeTest": "paymentReview"
     },
     {
       "id": "payment.mixed_credentials.requested_data",
       "requirements": [
-        "R04",
-        "R14",
-        "T03"
+        "Nested requested data"
       ],
       "composeTest": "paymentReview"
     },
     {
       "id": "payment.consent.main",
       "requirements": [
-        "R14",
-        "T01",
-        "T04",
-        "T05"
+        "Payment consent and primary action"
       ],
       "swiftTest": "testPaymentConsent",
       "note": "Native consent component; mixed-credential host coverage is still required."
@@ -224,9 +189,7 @@
     {
       "id": "nearby.ready.qr",
       "requirements": [
-        "R02",
-        "R10",
-        "R12"
+        "QR sharing instructions and cancel action"
       ],
       "composeTest": "nearbyReady",
       "swiftTest": "testNearbyReady",
@@ -237,10 +200,7 @@
       "composeTest": "pinSetup",
       "swiftTest": "testPinSetup",
       "requirements": [
-        "R01",
-        "R11",
-        "R12",
-        "R13"
+        "PIN setup guidance and input"
       ],
       "note": "One app-unlock form contains PIN, confirmation and optional biometrics. Synthetic in-memory state; real OS prompt and persistence use separate flow/model tests.",
       "title": "Onboarding \u2014 choose a PIN"
@@ -250,10 +210,7 @@
       "composeTest": "pinMismatch",
       "swiftTest": "testPinMismatch",
       "requirements": [
-        "R01",
-        "R11",
-        "R12",
-        "R13"
+        "PIN mismatch feedback and correction"
       ],
       "note": "One app-unlock form contains PIN, confirmation and optional biometrics. Synthetic in-memory state; real OS prompt and persistence use separate flow/model tests."
     },
@@ -262,10 +219,7 @@
       "composeTest": "pinBiometrics",
       "swiftTest": "testPinBiometrics",
       "requirements": [
-        "R01",
-        "R11",
-        "R12",
-        "R13"
+        "Enabled biometric option during PIN setup"
       ],
       "note": "One app-unlock form contains PIN, confirmation and optional biometrics. Synthetic in-memory state; real OS prompt and persistence use separate flow/model tests."
     },
@@ -274,18 +228,14 @@
       "composeTest": "localizedCredentialDetails",
       "swiftTest": "testLocalizedCredentialDetails",
       "requirements": [
-        "R04",
-        "R05",
-        "R15"
+        "Localized identity and namespaced claims"
       ],
       "note": "Shared German locale fallback, issuer ordering and independent namespaced claims."
     },
     {
       "id": "batch.offer.definitions",
       "requirements": [
-        "R04",
-        "R05",
-        "R18"
+        "Credential definitions during offer review"
       ],
       "composeTest": "offerDefinitions",
       "swiftTest": "testOfferDefinitions",
@@ -294,11 +244,7 @@
     {
       "id": "batch.offer.compact_dark_large_text",
       "requirements": [
-        "R07",
-        "R11",
-        "R12",
-        "R13",
-        "R18"
+        "Offer wrapping and pinned actions with compact large text"
       ],
       "composeTest": "compactBatchOffer",
       "swiftTest": "testCompactBatchOffer",
@@ -334,10 +280,7 @@
     {
       "id": "batch.offer.compact_dark_large_text.last_target",
       "requirements": [
-        "R07",
-        "R11",
-        "R12",
-        "R18"
+        "Scroll access to the final target with compact large text"
       ],
       "composeTest": "compactBatchOffer",
       "note": "Same compact viewport scrolled to final target. Copy controls and actions remain visible.",
