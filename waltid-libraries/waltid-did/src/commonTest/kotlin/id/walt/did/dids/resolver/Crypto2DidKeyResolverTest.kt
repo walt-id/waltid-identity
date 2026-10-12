@@ -111,6 +111,20 @@ class Crypto2DidKeyResolverTest {
             resolver.resolveToKeys(
                 DID,
                 keyId = ENCRYPTION_METHOD_ID,
+                relationship = null,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            resolver.resolveToKeys(
+                DID,
+                keyId = "$DID#missing",
+                relationship = null,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            resolver.resolveToKeys(
+                DID,
+                keyId = ENCRYPTION_METHOD_ID,
                 relationship = VerificationRelationshipType.KeyAgreement,
             )
         }
@@ -171,6 +185,25 @@ class Crypto2DidKeyResolverTest {
             DID,
             keyId = SIGNING_METHOD_ID,
             relationship = VerificationRelationshipType.Authentication,
+        )
+
+        assertEquals(setOf(KeyId(SIGNING_METHOD_ID)), keys.map { it.id }.toSet())
+    }
+
+    @Test
+    fun `embedded verification method is resolved without relationship filter`() = runTest {
+        val runtime = CryptoRuntime(listOf(CryptographySoftwareKeyProvider()))
+        val document = buildJsonObject {
+            put("id", DID)
+            put("assertionMethod", buildJsonArray {
+                add(verificationMethod(SIGNING_METHOD_ID, generatePublicJwk(runtime, "signing-private")))
+            })
+        }
+
+        val keys = DidDocumentCrypto2KeyResolver(FakeResolver(document), runtime).resolveToKeys(
+            DID,
+            keyId = SIGNING_METHOD_ID,
+            relationship = null,
         )
 
         assertEquals(setOf(KeyId(SIGNING_METHOD_ID)), keys.map { it.id }.toSet())
