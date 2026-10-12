@@ -71,6 +71,7 @@ class ComparisonRunnerTests(unittest.TestCase):
         self.assertFalse(any(command[0].endswith("gradlew") for command in commands))
         native = next(command for command in commands if command[0] == "xcodebuildmcp")
         self.assertIn("-only-testing:iosAppTests/WalletVisualTests", native)
+        self.assertIn("-only-testing:iosAppTests/WalletVisualComparatorTests", native)
         environment = json.loads(native[native.index("--json") + 1])["testRunnerEnv"]
         self.assertEqual(environment["WALLET_VISUAL_RUN_ID"], "fresh-run")
         self.assertEqual(environment["WALLET_VISUAL_RECORD"], "0")
