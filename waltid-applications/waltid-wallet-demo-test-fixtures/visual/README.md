@@ -13,7 +13,7 @@ transaction-code retention, stale-consent rejection, correlated callbacks and no
 
 ## Compare
 
-Run from the identity repository. Android uses Robolectric API 35 at mdpi; Compose iOS uses a 393×852 headless Skia surface. SwiftUI uses a hosted iPhone 13 layout at scale 3 on iOS 27.0 with Xcode 27.0. Choose a test-owned iOS 27.0 simulator. Do not reuse baselines on another runtime without an explicit environment review.
+Run from the identity repository. Android uses Robolectric API 35 at mdpi; Compose iOS uses a 393×852 headless Skia surface. SwiftUI uses a hosted iPhone 13 layout at scale 3 on an iPhone 17 simulator running iOS 27.0 with Xcode 27.0, matching CI. The snapshot viewport does not replace the host hardware's safe areas, so the runner rejects other simulator models for SwiftUI. Choose a test-owned simulator. Do not reuse baselines on another runtime or native simulator model without an explicit environment review.
 
 The existing build workflow runs reporting contracts on Linux and selects complete renderer comparisons through its platform eligibility rules. Android comparisons run on Linux. Compose iOS comparisons share the Kotlin simulator job's compilation cache; SwiftUI comparisons reuse the consumer job's verified release WalletCore artifact and native build directory. Functional suites keep their own selection. Drafts can use `ci:visual` for comparisons alone; `ci:mobile` and `ci:macos` retain their wider gates. Forks require maintainer dispatch. Path selection chooses renderers, never a subset of their catalogue cells.
 

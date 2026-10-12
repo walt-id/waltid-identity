@@ -40,7 +40,7 @@
       }
     },
     "swiftui": {
-      "environment": "Xcode 27 / iOS 27.0 / hosted SwiftUI / iPhone 13 layout / scale 3 / en-US / light / Large / UTC",
+      "environment": "Xcode 27 / iOS 27.0 / hosted SwiftUI / iPhone 17 simulator / iPhone 13 layout / scale 3 / en-US / light / Large / UTC",
       "baselineDirectory": "waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests",
       "suite": "WalletVisualTests",
       "suffix": ".native-ios27_0-phone-en-light",
