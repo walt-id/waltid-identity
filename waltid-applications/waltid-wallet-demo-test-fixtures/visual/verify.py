@@ -103,7 +103,8 @@ def main():
                    str(ROOT / "waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp.xcodeproj"),
                    "--scheme", "iosApp", "--configuration", "Debug", "--simulator-id", args.simulator,
                    "--derived-data-path", str(args.derived_data.resolve()), "--extra-args",
-                   "-only-testing:iosAppTests/WalletVisualTests", "CODE_SIGNING_ALLOWED=YES", "CODE_SIGN_IDENTITY=-",
+                   "-only-testing:iosAppTests/WalletVisualTests", "-only-testing:iosAppTests/WalletVisualComparatorTests",
+                   "CODE_SIGNING_ALLOWED=YES", "CODE_SIGN_IDENTITY=-",
                    "--json", json.dumps({"testRunnerEnv": test_env}), "--output", "json"]
         with (args.output / "native-stderr.log").open("w") as errors:
             codes.append(run(command, "native-results.json", stderr=errors))

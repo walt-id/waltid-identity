@@ -219,7 +219,7 @@ private struct ImageRowHeightKey: PreferenceKey {
     }
 }
 
-/// Every channel must stay within the measured SF Symbol edge noise (5/255); dimensions must match.
+/// Every channel must stay within the measured iOS 27 SF Symbol edge noise (6/255); dimensions must match.
 private func matchesWithinRasterNoise(_ reference: UIImage, _ actual: UIImage) -> Bool {
     guard let lhs = reference.cgImage, let rhs = actual.cgImage,
           lhs.width == rhs.width, lhs.height == rhs.height,
@@ -239,8 +239,40 @@ private func matchesWithinRasterNoise(_ reference: UIImage, _ actual: UIImage) -
     guard let a = pixels(lhs), let b = pixels(rhs) else { return false }
     var index = 0
     while index < byteCount {
-        if abs(Int(a[index]) - Int(b[index])) > 5 { return false }
+        if abs(Int(a[index]) - Int(b[index])) > 6 { return false }
         index += 1
     }
     return true
+}
+
+@MainActor
+final class WalletVisualComparatorTests: XCTestCase {
+    func testChannelNoiseHasAnExactBound() throws {
+        let reference = try image([100])
+        XCTAssertTrue(matchesWithinRasterNoise(reference, try image([100])))
+        XCTAssertTrue(matchesWithinRasterNoise(reference, try image([106])))
+        XCTAssertFalse(matchesWithinRasterNoise(reference, try image([107])))
+    }
+
+    func testOneMissingDetailCannotHideInMatchingPixels() throws {
+        let reference = Array(repeating: UInt8(100), count: 64)
+        var actual = reference
+        actual[63] = 200
+        XCTAssertFalse(matchesWithinRasterNoise(try image(reference), try image(actual)))
+    }
+
+    func testDifferentDimensionsFail() throws {
+        XCTAssertFalse(matchesWithinRasterNoise(try image([100]), try image([100, 100])))
+    }
+
+    private func image(_ levels: [UInt8]) throws -> UIImage {
+        let pixels = levels.flatMap { level -> [UInt8] in [level, level, level, 255] }
+        let provider = try XCTUnwrap(CGDataProvider(data: Data(pixels) as CFData))
+        let colorSpace = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+        let cgImage = try XCTUnwrap(CGImage(width: levels.count, height: 1, bitsPerComponent: 8,
+            bitsPerPixel: 32, bytesPerRow: levels.count * 4, space: colorSpace,
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
+        return UIImage(cgImage: cgImage)
+    }
 }
