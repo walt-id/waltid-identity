@@ -151,6 +151,13 @@ Settings → Signing key shows the storage policy, observed key protection, key 
 
 The web demo uses account sign-in instead of a local PIN. Its Settings root retains Technical details, Sign out, and Reset wallet; device-only signing and sharing controls are hidden.
 
+## Automatic test key attestations
+
+The Compose Android and iOS demos automatically select ITB/EUDI test key attestation when
+issuer metadata requires it, including after wallet recreation. Ordinary issuance
+uses its normal proof path. See the [shared demo attestation support](../waltid-wallet-demo-test-fixtures/key-attestation/README.md)
+for the exact issuer allowlist, configuration, test reuse and assurance limits.
+
 ## Local wallet data
 
 Android and iOS demo targets use the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in platform-protected storage. During local development, reset wallet state through `MobileWallet.deleteWallet()`, by uninstalling the app, or by deleting the app's local data.

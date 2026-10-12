@@ -3,6 +3,14 @@ name: Android device tests
 on:
   workflow_dispatch:
     inputs:
+      phase:
+        description: 'Run all enabled phases or only Enterprise mobile integration.'
+        type: choice
+        required: false
+        default: all
+        options:
+          - all
+          - enterprise-mobile
       run_dc_api:
         description: 'Include the Digital Credentials API device-test phase.'
         type: boolean
@@ -36,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        phase: ${{ fromJSON(inputs.dc_api_only && '["dc-api-compose"]' || inputs.run_dc_api && '["wallet-mobile","wallet-recovery","compose-demo","dc-api-compose","enterprise-mobile"]' || '["wallet-mobile","wallet-recovery","compose-demo","enterprise-mobile"]') }}
+        phase: ${{ fromJSON(inputs.phase == 'enterprise-mobile' && '["enterprise-mobile"]' || inputs.dc_api_only && '["dc-api-compose"]' || inputs.run_dc_api && '["wallet-mobile","wallet-recovery","compose-demo","dc-api-compose","enterprise-mobile"]' || '["wallet-mobile","wallet-recovery","compose-demo","enterprise-mobile"]') }}
     env:
       MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
       MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}

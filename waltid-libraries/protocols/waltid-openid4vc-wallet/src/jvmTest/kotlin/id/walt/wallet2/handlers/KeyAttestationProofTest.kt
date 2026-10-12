@@ -31,6 +31,10 @@ import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonArray
@@ -52,6 +56,48 @@ class KeyAttestationProofTest {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
+    fun `concurrent issuers retain their selected providers and verification keys`() = runTest {
+        val issuers = listOf("https://first.example", "https://second.example")
+        val attesters = issuers.associateWith { newKey(it) }
+        val bothAttesting = CompletableDeferred<Unit>()
+        var started = 0
+        val wallet = walletWithProofKey().attachKeyAttestationProviderResolver { issuer ->
+            TestProvider(attesters.getValue(issuer), payload = { request ->
+                if (++started == 2) bothAttesting.complete(Unit)
+                bothAttesting.await()
+                claims(request)
+            })
+        }
+        issuers.map { issuer -> async {
+            val proof = WalletIssuanceHandler.signProof(
+                wallet, SignProofRequest(Url(issuer), CONFIG_ID, nonce = issuer),
+                issuerMetadataClient(requiresKeyAttestation = true, issuer = issuer),
+            ).proofJwt
+            val jwt = CompactJws.decodeUnverified(proof).protectedHeader.getValue("key_attestation").jsonPrimitive.content
+            val verified = CompactJws.verify(jwt, attesters.getValue(issuer), JwsAlgorithm.ES256)
+            assertEquals(issuer, Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject["nonce"]?.jsonPrimitive?.content)
+        } }.awaitAll()
+    }
+
+    @Test
+    fun `issuer without requirement never resolves a provider`() = runTest {
+        val wallet = walletWithProofKey().attachKeyAttestationProviderResolver { error("Unexpected resolution") }
+        val proof = WalletIssuanceHandler.signProof(
+            wallet, SignProofRequest(Url(ISSUER), CONFIG_ID), issuerMetadataClient(),
+        ).proofJwt
+        assertTrue("key_attestation" !in CompactJws.decodeUnverified(proof).protectedHeader)
+    }
+
+    @Test
+    fun `unsupported issuer has no fallback and resolver cancellation propagates`() = runTest {
+        val wallet = walletWithProofKey().attachKeyAttestationProviderResolver { null }
+        val error = assertFailsWith<IllegalArgumentException> { sign(wallet) }
+        assertEquals("No key-attestation provider is configured for this credential issuer", error.message)
+        wallet.attachKeyAttestationProviderResolver { throw CancellationException("cancelled") }
+        assertFailsWith<CancellationException> { sign(wallet) }
+    }
+
+    @Test
     fun `required attestation is signed and bound to proof key and nonce`() = runTest {
         val attester = newKey("attester")
         val wallet = walletWithProofKey().attachKeyAttestationProvider(TestProvider(attester))
@@ -70,12 +116,17 @@ class KeyAttestationProofTest {
         val keys = listOf(newKey("first-holder"), newKey("second-holder"))
         val attester = newKey("attester")
         val attestationRequests = mutableListOf<KeyAttestationRequest>()
+        var resolutions = 0
         val store = InMemoryKeyStore().also { store -> keys.forEach { store.addCrypto2Key(it) } }
         val wallet = Wallet(id = "batch-wallet", keyStores = listOf(store))
-            .attachKeyAttestationProvider(TestProvider(attester, payload = { request ->
-                attestationRequests += request
-                claims(request)
-            }))
+            .attachKeyAttestationProviderResolver { issuer ->
+                assertEquals(ISSUER, issuer)
+                resolutions++
+                TestProvider(attester, payload = { request ->
+                    attestationRequests += request
+                    claims(request)
+                })
+            }
         val result = WalletIssuanceHandler.signProofs(
             wallet = wallet,
             request = SignProofsRequest(
@@ -88,6 +139,7 @@ class KeyAttestationProofTest {
         val proofs = assertNotNull(result.proofs.jwt)
         assertEquals(2, proofs.size)
         assertEquals(2, attestationRequests.size)
+        assertEquals(1, resolutions)
         keys.zip(proofs).forEach { (key, proof) ->
             val verified = CompactJws.verify(proof, key, JwsAlgorithm.ES256)
             val proofClaims = Json.parseToJsonElement(verified.payload.decodeToString()).jsonObject

@@ -429,7 +429,7 @@ object Verifier2VPDirectPostHandler {
         suspend fun Verification2Session.failSession(event: SessionEvent) =
             failSessionCallback.invoke(this, event, updateSessionCallback)
 
-        log.debug { "Handling direct post for received data: $responseData" }
+        log.trace { "Handling direct post for received data: $responseData" }
 
         val session = verificationSession
         val responseMode = session.authorizationRequest.responseMode
@@ -488,7 +488,7 @@ object Verifier2VPDirectPostHandler {
         val phaseStart = TimeSource.Monotonic.markNow()
         val vpTokenContents = parseVpToken(vpTokenString)
         val afterVpToken = phaseStart.elapsedNow()
-        log.debug { "Parsed vp_token for state $receivedState: $vpTokenContents" }
+        log.trace { "Parsed vp_token for state $receivedState: $vpTokenContents" }
 
         session.updateSession(SessionEvent.attempted_presentation) {
             attempted = true

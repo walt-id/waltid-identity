@@ -1,5 +1,6 @@
 import Foundation
 import WalletDemoIdentityDocumentSupport
+import WalletDemoKeyAttestation
 import WalletDemoSharingUI
 import WalletSDK
 import WalletSDKKeychainRecovery
@@ -326,7 +327,7 @@ class WalletViewModel: ObservableObject {
                 let removed = try await walletClient.deleteCredential(id: id)
                 guard removed else { return }
                 credentials = try await walletClient.credentials()
-                try await reconcileIdentityDocumentRegistrations()
+                reconcileIdentityDocumentRegistrations()
                 if presentationReview != nil {
                     discardPresentationPreviewIfPresent()
                     presentationReview = nil
@@ -364,11 +365,7 @@ class WalletViewModel: ObservableObject {
                 biometricPromptConsumed = false
                 auth = .setup
                 refreshBiometricSigningAvailability()
-                do {
-                    try await reconcileIdentityDocumentRegistrations()
-                } catch {
-                    setError(WalletStatusText.failure(WalletStatusText.resetWalletFailed, error))
-                }
+                reconcileIdentityDocumentRegistrations()
             } catch {
                 // Cleanup may have removed keys before failing. Keep reset available, but do not
                 // present the old identity and credentials as a usable wallet.
@@ -604,7 +601,7 @@ class WalletViewModel: ObservableObject {
                 setSuccess(WalletStatusText.walletReady)
             } catch {
                 clearWalletState()
-                try? await reconcileIdentityDocumentRegistrations()
+                reconcileIdentityDocumentRegistrations()
                 selectedSigningProtection = target
                 signingProtectionReprovisionTarget = target
                 signingProtectionError = WalletStatusText.failure(
@@ -619,6 +616,8 @@ class WalletViewModel: ObservableObject {
     private let walletClient: any WalletClient
     private let signingProtectionStore: any WalletDemoSigningProtectionStore
     private let identityDocumentRegistrationUpdate: @Sendable () async throws -> Void
+    private var identityDocumentRegistrationTask: Task<Void, Never>?
+    private var identityDocumentRegistrationNeedsUpdate = false
     private let pinStore: DemoPinStore
     private let biometricAuthenticator: any DemoBiometricAuthenticator
     private var biometricPromptConsumed = false
@@ -671,7 +670,8 @@ class WalletViewModel: ObservableObject {
             signingIdentity: .init(alternativeAuthorizations: signingProtectionMode.alternativeAuthorizations,
                 keychain: .init(accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup),
                 recoveryProviders: [KeychainIdentityRecovery(namespace: "wallet-demo",
-                    accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup)])
+                    accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup)]),
+            keyAttestationProvider: DemoKeyAttestationProviders()
         )
         let resolvedWalletClient = walletClient ?? SDKWalletClient(configuration: configuration)
         self.signingProtectionMode = signingProtectionMode
@@ -1153,7 +1153,7 @@ class WalletViewModel: ObservableObject {
         }
 
         credentials = refreshedCredentials
-        try await reconcileIdentityDocumentRegistrations()
+        reconcileIdentityDocumentRegistrations()
         issuanceSession = nil
         offerPreview = nil
         authorizationRequestURL = nil
@@ -1185,7 +1185,7 @@ class WalletViewModel: ObservableObject {
                     try Task.checkCancellation()
                     guard isCurrent(request) else { return }
                     credentials = refreshedCredentials
-                    try await reconcileIdentityDocumentRegistrations()
+                    reconcileIdentityDocumentRegistrations()
                     try Task.checkCancellation()
                     guard isCurrent(request) else { return }
                     deferredCredentials.removeAll { $0.id == credential.id }
@@ -1548,8 +1548,22 @@ class WalletViewModel: ObservableObject {
         Task { try? await walletClient.discardPresentationPreview(previewHandle) }
     }
 
-    private func reconcileIdentityDocumentRegistrations() async throws {
-        try await identityDocumentRegistrationUpdate()
+    private func reconcileIdentityDocumentRegistrations() {
+        // Apple's registration service controls DC API discoverability, not core wallet readiness.
+        // Coalesce changes while it is pending, then reconcile the latest published projection.
+        identityDocumentRegistrationNeedsUpdate = true
+        guard identityDocumentRegistrationTask == nil else { return }
+        identityDocumentRegistrationTask = Task {
+            defer { identityDocumentRegistrationTask = nil }
+            while identityDocumentRegistrationNeedsUpdate {
+                identityDocumentRegistrationNeedsUpdate = false
+                do {
+                    try await identityDocumentRegistrationUpdate()
+                } catch {
+                    logE2E("Identity document registration failed: \(error.localizedDescription)")
+                }
+            }
+        }
     }
 
     private static func defaultIdentityDocumentRegistrationUpdate() async throws {
@@ -1678,7 +1692,7 @@ class WalletViewModel: ObservableObject {
         selectedSigningProtection = signingProtectionMode.resolve(appliedProtection)
         signingProtectionStore.save(selectedSigningProtection)
         signingProtectionReprovisionTarget = nil
-        try await reconcileIdentityDocumentRegistrations()
+        reconcileIdentityDocumentRegistrations()
         isReady = true
         showBiometricSigningWarningIfNeeded(
             warningSequence: foregroundSequence > 0 ? foregroundSequence : nil

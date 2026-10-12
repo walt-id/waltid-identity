@@ -49,7 +49,7 @@ internal suspend fun executeCredentialTargets(
         try {
             ensureOwned()
             val configuration = issuerMetadata.credentialConfigurationsSupported.getValue(target.credentialConfigurationId)
-            val algorithms = supportedJwtProofAlgorithms(configuration.proofTypesSupported, wallet.attachedKeyAttestationProvider() != null)
+            val algorithms = supportedJwtProofAlgorithms(configuration.proofTypesSupported, wallet.hasKeyAttestationProvider())
             stage = CredentialIssuanceStage.REQUEST
             val response = WalletIssuanceHandler.requestCredentialWithNonceRetry(
                 FetchCredentialRequest(Url(issuerMetadata.credentialEndpoint), access.accessToken,

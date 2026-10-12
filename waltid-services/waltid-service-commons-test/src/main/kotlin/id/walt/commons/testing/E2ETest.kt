@@ -27,7 +27,7 @@ class E2ETest(
     val host: String = "localhost",
     val port: Int = 22222,
     val failEarly: Boolean = false,
-    val loglevelOption: String = "trace"
+    val loglevelOption: String = "debug"
 ) {
 
     data class TestStats(
@@ -177,14 +177,23 @@ class E2ETest(
 
         testResults.add(result)
 
-        term.println(TextColors.blue("End result of test \"$name\": $result"))
-
+        term.println(
+            TextColors.blue(
+                "End result of test \"$name\": '${truncatedResult(result.toString())}'"
+            )
+        )
 
         if (result.isFailure) {
             result.exceptionOrNull()!!.printStackTrace()
         }
 
-        term.println(TextStyles.bold(TextColors.cyan("---===  End  ${id}. test: $name === ---") + " " + result.toSuccessString()) + "\n")
+        term.println(
+            TextStyles.bold(
+                TextColors.cyan("---===  End  ${id}. test: $name === ---") + " " + truncatedResult(
+                    result.toSuccessString()
+                )
+            ) + "\n"
+        )
 
         val overallSuccess = testResults.count { it.isSuccess }
         val failed = testResults.size - overallSuccess
@@ -193,5 +202,15 @@ class E2ETest(
 
         return result
     }
+
+    private val maxResultLength = 300
+
+    fun truncatedResult(resultString: String): String =
+        if (resultString.length > maxResultLength) {
+            "${resultString.take(maxResultLength)}..."
+        } else {
+            resultString
+        }
+
 
 }

@@ -90,6 +90,13 @@ independently configured public JWK. Supply the provider again when recreating t
 wallet. This runtime integration does not establish issuer trust or substantiate
 hardware, certification or user-authentication claims.
 
+The same configuration property also accepts a `KeyAttestationProviderResolver`
+for issuer-specific selection. Its `resolve(credentialIssuer:)` returns a fixed
+provider or `nil` to reject an unsupported issuer. Resolution is skipped when the
+credential does not require attestation; the selected provider and verification key
+remain together throughout a proof collection. Existing fixed providers implement
+the resolver through a default method.
+
 ```swift
 import WalletSDK
 
