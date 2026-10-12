@@ -55,7 +55,7 @@ check_draft_selection() {
     [[ "$status" != 0 && ! -s "$output" ]] || matches=false
   else
     [[ "$status" == 0 ]] || matches=false
-    for lane in ios-simulator native compose enterprise sdk-docs; do
+    for lane in ios-simulator native compose enterprise sdk-docs visual-android visual-compose visual-native; do
       value=false
       if [[ "$expected" == all || ("$expected" == docs && "$lane" == sdk-docs) ]]; then
         value=true
@@ -80,6 +80,27 @@ check_draft_selection 'an unlabelled draft stays skipped' '[]' walt-id/waltid-id
 check_draft_selection 'an unrelated label does not opt a draft in' '["bug"]' walt-id/waltid-identity none
 check_draft_selection 'a fork cannot opt into privileged lanes' '["ci:mobile"]' contributor/fork none
 check_draft_selection 'invalid label JSON fails without publishing skip outputs' 'invalid-json' walt-id/waltid-identity error
+
+# API failure must never masquerade as an unrelated, successfully skipped PR.
+cat > "$selection_dir/gh" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
+chmod +x "$selection_dir/gh"
+count=$((count + 1))
+: > "$selection_dir/output"
+if env PATH="$selection_dir:$PATH" EVENT_NAME=pull_request PR_DRAFT=false PR_LABELS='[]' \
+    PR_HEAD_REPO=walt-id/waltid-identity GITHUB_REPOSITORY=walt-id/waltid-identity \
+    PR_NUMBER=1 GITHUB_OUTPUT="$selection_dir/output" \
+    bash "$SCRIPT_DIR/decide-macos-lanes.sh" > "$selection_dir/log" 2>&1; then
+  echo 'FAIL: a failed changed-file read was accepted'
+  failures=$((failures + 1))
+elif [[ -s "$selection_dir/output" ]]; then
+  echo 'FAIL: a failed changed-file read published skip outputs'
+  failures=$((failures + 1))
+else
+  echo 'PASS: a failed changed-file read fails eligibility'
+fi
 
 if ((failures > 0)); then
   echo "macOS lane tests: $failures/$count failed"

@@ -12,7 +12,7 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/settings.root.default.png" alt="Settings, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/settings.root.default.png" alt="Settings, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/settings-root-default.native-ios26_5-phone-en-light.png" alt="Settings, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/settings.root.default.png" alt="Settings, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/settings.root.default.png" alt="Settings, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/settings-root-default.native-ios27_0-phone-en-light.png" alt="Settings, Native iOS" width="240"> |
 
 ## credential-details-identity
 
@@ -20,7 +20,7 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/credential.details.identity.png" alt="Credential information, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/credential.details.identity.png" alt="Credential information, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/credential-details-identity.native-ios26_5-phone-en-light.png" alt="Credential information, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/credential.details.identity.png" alt="Credential information, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/credential.details.identity.png" alt="Credential information, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/credential-details-identity.native-ios27_0-phone-en-light.png" alt="Credential information, Native iOS" width="240"> |
 
 ## credential-media-loaded
 
@@ -28,7 +28,7 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/credential.media.loaded.png" alt="Credential images, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/credential.media.loaded.png" alt="Credential images, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/credential-media-loaded.native-ios26_5-phone-en-light.png" alt="Credential images, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/credential.media.loaded.png" alt="Credential images, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/credential.media.loaded.png" alt="Credential images, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/credential-media-loaded.native-ios27_0-phone-en-light.png" alt="Credential images, Native iOS" width="240"> |
 
 ## batch-offer-two_targets_three_copies
 
@@ -36,7 +36,7 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/batch.offer.two_targets_three_copies.png" alt="Receiving — selected credentials, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/batch.offer.two_targets_three_copies.png" alt="Receiving — selected credentials, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/batch-offer-two_targets_three_copies.native-ios26_5-phone-en-light.png" alt="Receiving — selected credentials, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/batch.offer.two_targets_three_copies.png" alt="Receiving — selected credentials, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/batch.offer.two_targets_three_copies.png" alt="Receiving — selected credentials, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/batch-offer-two_targets_three_copies.native-ios27_0-phone-en-light.png" alt="Receiving — selected credentials, Native iOS" width="240"> |
 
 ## batch-offer-two_targets_three_copies-second_target
 
@@ -52,7 +52,7 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/batch.offer.none_selected.png" alt="batch · offer · none selected, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/batch.offer.none_selected.png" alt="batch · offer · none selected, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/batch-offer-none_selected.native-ios26_5-phone-en-light.png" alt="batch · offer · none selected, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/batch.offer.none_selected.png" alt="batch · offer · none selected, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/batch.offer.none_selected.png" alt="batch · offer · none selected, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/batch-offer-none_selected.native-ios27_0-phone-en-light.png" alt="batch · offer · none selected, Native iOS" width="240"> |
 
 ## batch-result-saved_and_deferred
 
@@ -60,7 +60,7 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/batch.result.saved_and_deferred.png" alt="Receiving — saved and deferred, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/batch.result.saved_and_deferred.png" alt="Receiving — saved and deferred, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/batch-result-saved_and_deferred.native-ios26_5-phone-en-light.png" alt="Receiving — saved and deferred, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/batch.result.saved_and_deferred.png" alt="Receiving — saved and deferred, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/batch.result.saved_and_deferred.png" alt="Receiving — saved and deferred, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/batch-result-saved_and_deferred.native-ios27_0-phone-en-light.png" alt="Receiving — saved and deferred, Native iOS" width="240"> |
 
 ## payment-mixed_credentials-main
 
@@ -92,7 +92,7 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| No reference | No reference | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/payment-consent-main.native-ios26_5-phone-en-light.png" alt="payment · consent · main, Native iOS" width="240"> |
+| No reference | No reference | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/payment-consent-main.native-ios27_0-phone-en-light.png" alt="payment · consent · main, Native iOS" width="240"> |
 
 ## nearby-ready-qr
 
@@ -100,4 +100,4 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 
 | Compose Android | Compose iOS | Native iOS |
 | --- | --- | --- |
-| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/nearby.ready.qr.png" alt="Nearby sharing, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/nearby.ready.qr.png" alt="Nearby sharing, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/nearby-ready-qr.native-ios26_5-phone-en-light.png" alt="Nearby sharing, Native iOS" width="240"> |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/nearby.ready.qr.png" alt="Nearby sharing, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/nearby.ready.qr.png" alt="Nearby sharing, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/nearby-ready-qr.native-ios27_0-phone-en-light.png" alt="Nearby sharing, Native iOS" width="240"> |
