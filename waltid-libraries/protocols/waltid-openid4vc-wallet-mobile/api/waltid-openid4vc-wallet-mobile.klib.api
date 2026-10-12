@@ -834,6 +834,10 @@ abstract interface id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyAttestatio
     abstract suspend fun attest(id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyAttestationRequest): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyAttestationProvider.attest|attest(id.walt.wallet2.mobile.swiftinterop.WalletBridgeKeyAttestationRequest){}[0]
 }
 
+abstract interface id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyAttestationProviderResolver { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyAttestationProviderResolver|null[0]
+    abstract suspend fun resolve(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyAttestationProvider? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyAttestationProviderResolver.resolve|resolve(kotlin.String){}[0]
+}
+
 abstract interface id.walt.wallet2.mobile/MobileWalletCredentialRegistry { // id.walt.wallet2.mobile/MobileWalletCredentialRegistry|null[0]
     abstract val capabilities // id.walt.wallet2.mobile/MobileWalletCredentialRegistry.capabilities|{}capabilities[0]
         abstract fun <get-capabilities>(): id.walt.wallet2.mobile/MobileWalletDigitalCredentialCapabilities // id.walt.wallet2.mobile/MobileWalletCredentialRegistry.capabilities.<get-capabilities>|<get-capabilities>(){}[0]
@@ -2935,6 +2939,7 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge { // id.walt.wal
 
     final fun digitalCredentialCapabilities(): id.walt.wallet2.mobile/MobileWalletDigitalCredentialCapabilities // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.digitalCredentialCapabilities|digitalCredentialCapabilities(){}[0]
     final suspend fun attachKeyAttestationProvider(id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyAttestationProvider): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin/Unit> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.attachKeyAttestationProvider|attachKeyAttestationProvider(id.walt.wallet2.mobile.swiftinterop.WalletBridgeKeyAttestationProvider){}[0]
+    final suspend fun attachKeyAttestationProviderResolver(id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyAttestationProviderResolver): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin/Unit> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.attachKeyAttestationProviderResolver|attachKeyAttestationProviderResolver(id.walt.wallet2.mobile.swiftinterop.WalletBridgeKeyAttestationProviderResolver){}[0]
     final suspend fun backupSigningIdentity(id.walt.wallet2.mobile.identity/SigningIdentityBackupOption): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.identity/SigningIdentityOperationResult> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.backupSigningIdentity|backupSigningIdentity(id.walt.wallet2.mobile.identity.SigningIdentityBackupOption){}[0]
     final suspend fun beginAuthorizationIssuance(kotlin/String, kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletCredentialSelection>? = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.handlers/WalletIssuanceAuthorization> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.beginAuthorizationIssuance|beginAuthorizationIssuance(kotlin.String;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletCredentialSelection>?){}[0]
     final suspend fun cancelIssuance(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.handlers/WalletIssuanceOutcome> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.cancelIssuance|cancelIssuance(kotlin.String){}[0]
@@ -3067,6 +3072,7 @@ final class id.walt.wallet2.mobile/MobileWallet { // id.walt.wallet2.mobile/Mobi
 
     final fun annexCRequest(id.walt.wallet2.mobile/MobileWalletDigitalCredentialRequest): id.walt.wallet2.mobile/MobileWalletAnnexCRequest // id.walt.wallet2.mobile/MobileWallet.annexCRequest|annexCRequest(id.walt.wallet2.mobile.MobileWalletDigitalCredentialRequest){}[0]
     final fun attachKeyAttestationProvider(id.walt.wallet2.handlers/KeyAttestationProvider): id.walt.wallet2.mobile/MobileWallet // id.walt.wallet2.mobile/MobileWallet.attachKeyAttestationProvider|attachKeyAttestationProvider(id.walt.wallet2.handlers.KeyAttestationProvider){}[0]
+    final fun attachKeyAttestationProviderResolver(id.walt.wallet2.handlers/KeyAttestationProviderResolver): id.walt.wallet2.mobile/MobileWallet // id.walt.wallet2.mobile/MobileWallet.attachKeyAttestationProviderResolver|attachKeyAttestationProviderResolver(id.walt.wallet2.handlers.KeyAttestationProviderResolver){}[0]
     final fun digitalCredentialCapabilities(): id.walt.wallet2.mobile/MobileWalletDigitalCredentialCapabilities // id.walt.wallet2.mobile/MobileWallet.digitalCredentialCapabilities|digitalCredentialCapabilities(){}[0]
     final fun digitalCredentialErrorResponse(kotlin/String, kotlin/String): id.walt.wallet2.mobile/MobileWalletDigitalCredentialResponse // id.walt.wallet2.mobile/MobileWallet.digitalCredentialErrorResponse|digitalCredentialErrorResponse(kotlin.String;kotlin.String){}[0]
     final fun parseAnnexCDeviceRequest(kotlin/String): id.walt.wallet2.mobile/MobileWalletAnnexCParsedRequest // id.walt.wallet2.mobile/MobileWallet.parseAnnexCDeviceRequest|parseAnnexCDeviceRequest(kotlin.String){}[0]

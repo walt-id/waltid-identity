@@ -128,7 +128,8 @@ runs:
           --keychain-group-suffix id.walt.wallet.compose.shared \
           --app-bundle-id id.walt.wallet.compose \
           --appex-bundle-id id.walt.wallet.compose.identitydocumentprovider \
-          --development-team 9BB78CFW7Y
+          --development-team 9BB78CFW7Y \
+          --build-setting "GRADLE_OPTS=${GRADLE_OPTS:-} -Dorg.gradle.daemon=false"
 
     - name: Execute WalletSDK package bridge tests
       if: ${{ inputs.run-wallet-sdk-tests == 'true' }}
@@ -170,6 +171,7 @@ runs:
           -only-testing:iosAppUITests/MockWalletUITests/testWalletReadinessOutlivesTheSuccessBannerAcrossRestart \
           -only-testing:iosAppUITests/MockWalletUITests/testCredentialsStayLoadingUntilTheInitialReadCompletes \
           -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2 \
+          -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testAutomaticallyAttestsEudiIssuanceBeforeAndAfterRestart \
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived \
           -enableCodeCoverage NO \
@@ -215,7 +217,8 @@ runs:
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived-compose \
           -enableCodeCoverage NO \
-          -parallel-testing-enabled NO
+          -parallel-testing-enabled NO \
+          "GRADLE_OPTS=${GRADLE_OPTS:-} -Dorg.gradle.daemon=false"
         TESTS
 
     - name: Collect iOS test reports
