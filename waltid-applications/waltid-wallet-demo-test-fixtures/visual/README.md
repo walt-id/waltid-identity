@@ -39,13 +39,14 @@ For coordinated Enterprise/License source validation, pass `--gradle-root` with 
 unified checkout. Its `waltid-identity` directory must resolve to this exact Identity checkout;
 the runner rejects another source tree. Record the companion revisions with the local evidence.
 
-The matching GitHub workflow retains the gallery, JUnit results and difference images as job
-artifacts. Apple comparisons require **Xcode 27.0 (27A266a), iOS 26.5 and XcodeBuildMCP 2.7.0**;
+The existing platform jobs retain the gallery, JUnit results, timings and differences as job
+artifacts. Apple comparisons require **Xcode 27.0 (27A266a) and iOS 27.0**; SwiftUI also uses
+**XcodeBuildMCP 2.7.0**. Android and browser comparisons run on Linux;
 all fixture clocks use UTC, and the native nearby receipt pins its locale's 24-hour cycle independently
 of the simulator's user preference. Its [official `xcode-27` runner](https://github.com/actions/runner-images/issues/14404)
 is currently a public preview. The [image inventory](https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md)
-provides the pinned Xcode, Java and Android SDK, but the job downloads iOS 26.5 and creates its
-own simulator. An unavailable runtime or changed Xcode fails explicitly; the workflow never
+provides the pinned Xcode and iOS 27 runtime. Each comparison creates its own simulator.
+An unavailable runtime or changed Xcode fails explicitly; the workflow never
 falls back to another OS or records replacement references. This pipeline requires hosted
 verification before it can establish CI portability; local success alone is insufficient.
 

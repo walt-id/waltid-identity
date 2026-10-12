@@ -55,7 +55,7 @@ check_draft_selection() {
     [[ "$status" != 0 && ! -s "$output" ]] || matches=false
   else
     [[ "$status" == 0 ]] || matches=false
-    for lane in ios-simulator native compose enterprise sdk-docs visual-android visual-compose visual-native; do
+    for lane in ios-simulator native compose enterprise sdk-docs visual-android visual-compose visual-native visual-browser; do
       value=false
       if [[ "$expected" == all || ("$expected" == *docs && "$lane" == sdk-docs) || ("$expected" == visuals* && "$lane" == visual-*) ]]; then
         value=true

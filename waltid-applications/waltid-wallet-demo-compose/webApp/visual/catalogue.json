@@ -1,6 +1,6 @@
 {
   "requirements": ["Account form feedback and available actions", "Compact and wide layouts"],
-  "environment": "Playwright 1.62.0 / Chromium 151.0.7922.34 / macOS 27 arm64 / en-US / UTC / scale 1 / light",
+  "environment": "Playwright 1.62.0 / Chromium 151.0.7922.34 / Ubuntu 24.04 x86_64 / en-US / UTC / scale 1 / light",
   "states": [
     { "id": "account.empty.compact", "state": "empty", "width": 393, "height": 852 },
     { "id": "account.empty.wide", "state": "empty", "width": 1280, "height": 800 },

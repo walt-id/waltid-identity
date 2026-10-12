@@ -1,6 +1,6 @@
 const { defineConfig } = require('@playwright/test');
 const { execFileSync } = require('node:child_process');
-const { readdirSync } = require('node:fs');
+const { readdirSync, readFileSync } = require('node:fs');
 const path = require('node:path');
 const catalogue = require('./catalogue.json');
 
@@ -10,9 +10,10 @@ const ci = ['CI', 'GITHUB_ACTIONS', 'GITLAB_CI', 'BUILD_BUILDID', 'JENKINS_URL',
 if ((record && ci) || (process.argv.some(arg => arg.startsWith('--update-snapshots') || arg.startsWith('-u')) && (!record || ci))) {
   throw new Error('Browser references may only be recorded deliberately outside CI.');
 }
-if (process.platform !== 'darwin' || process.arch !== 'arm64' ||
-    !execFileSync('sw_vers', ['-productVersion'], { encoding: 'utf8' }).startsWith('27.')) {
-  throw new Error('These browser references require macOS 27 arm64. Review other platform baselines separately.');
+if (process.platform !== 'linux' || process.arch !== 'x64' ||
+    !/^ID=ubuntu$/m.test(readFileSync('/etc/os-release', 'utf8')) ||
+    !/^VERSION_ID="24\.04"$/m.test(readFileSync('/etc/os-release', 'utf8'))) {
+  throw new Error('These browser references require Ubuntu 24.04 x86_64. Use the pinned Playwright container.');
 }
 const snapshots = path.join(__dirname, 'snapshots');
 if (!record) {
