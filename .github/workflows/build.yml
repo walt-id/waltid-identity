@@ -32,8 +32,8 @@ jobs:
           identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: ./waltid-identity/.github/actions/gradle-setup-action
       - uses: android-actions/setup-android@v3
-      - name: Install the project's Android build SDK
-        run: sdkmanager --install 'platforms;android-37' 'build-tools;37.0.0'
+        with:
+          packages: 'platform-tools platforms;android-37 build-tools;37.0.0'
       - name: Compare Compose Android visual references
         uses: ./waltid-identity/.github/actions/wallet-visual
         with:
