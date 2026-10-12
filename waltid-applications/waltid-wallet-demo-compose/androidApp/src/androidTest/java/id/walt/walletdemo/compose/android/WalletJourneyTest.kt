@@ -52,7 +52,7 @@ class WalletJourneyTest {
         input.setText("openid4vp://fixture")
         assertTrue(device.wait(Until.hasObject(By.res("wallet.scanPaste")), 10_000))
         assertActionAboveKeyboard(device)
-        assertTrue(requireNotNull(device.findObject(By.res("wallet.scanContinue"))).isEnabled)
+        assertTrue(device.wait(Until.hasObject(By.res("wallet.scanContinue").enabled(true)), 10_000))
         val output = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")?.let(::File)
             ?: context.cacheDir
         val directory = File(output, "wallet-journey-evidence").apply { mkdirs() }

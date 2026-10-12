@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.android
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.view.WindowInsets
@@ -249,7 +250,12 @@ internal object WalletComposeE2EHelper {
             fail("$tag is disabled.\n${visibleUiSnapshot(device)}")
         }
         device.waitForIdle()
-        node.clickableAncestorOrSelf()?.click() ?: node.click()
+        val target = findVisibleResource(device, tag)
+        if (target == null) {
+            fail("$tag is not visible.\n${visibleUiSnapshot(device)}")
+            return
+        }
+        (target.clickableAncestorOrSelf() ?: target).click()
         device.waitForIdle()
     }
 
@@ -432,7 +438,6 @@ internal object WalletComposeE2EHelper {
         while (System.currentTimeMillis() < deadline) {
             try {
                 findVisibleResource(device, tag)?.let { return it }
-                device.findObject(By.res(tag))?.let { return it }
                 if (towardBottom) device.scrollDown() else device.scrollUp()
                 stepsInDirection++
                 if (stepsInDirection == 6) {
@@ -464,8 +469,25 @@ internal object WalletComposeE2EHelper {
             bounds.right > 0 &&
             bounds.bottom > 0 &&
             bounds.left < device.displayWidth &&
-            bounds.top < device.displayHeight
+            bounds.top < device.displayHeight &&
+            (unobscuredReviewBounds()?.let { reviewBounds ->
+                val targetBounds = (clickableAncestorOrSelf() ?: this).visibleBounds
+                Rect.intersects(bounds, reviewBounds) &&
+                    reviewBounds.contains(targetBounds.centerX(), targetBounds.centerY())
+            } ?: true)
     }.getOrDefault(false)
+
+    private fun UiObject2.unobscuredReviewBounds(): Rect? {
+        val content = generateSequence(this) { it.parent }
+            .firstOrNull { it.resourceName == "wallet.review.content" } ?: return null
+        val bounds = Rect(content.visibleBounds)
+        content.parent?.findObject(By.res("wallet.footer"))?.visibleBounds?.let { footerBounds ->
+            if (Rect.intersects(bounds, footerBounds)) {
+                bounds.bottom = minOf(bounds.bottom, footerBounds.top)
+            }
+        }
+        return bounds
+    }
 
     private fun claimTag(path: String): String =
         "wallet.claim.${path.map { if (it.isLetterOrDigit()) it else '_' }.joinToString("")}"
@@ -494,15 +516,16 @@ internal object WalletComposeE2EHelper {
     internal fun UiDevice.scrollUp() = scrollContent(towardBottom = false)
 
     private fun UiDevice.scrollContent(towardBottom: Boolean): Boolean {
-        // Review actions are fixed below the scroll viewport, especially on compact devices.
+        // Review content scrolls behind the fixed footer; gestures stay above it.
         val viewport = findObjects(By.pkg(walletPackage).scrollable(true)).mapNotNull { node ->
             try { node.visibleBounds.let { node to it } } catch (_: StaleObjectException) { null }
         }.filter { (_, bounds) -> bounds.width() > 0 && bounds.height() > 0 }
             .maxByOrNull { (_, bounds) -> bounds.width().toLong() * bounds.height() }?.first ?: return false
         val bounds = viewport.visibleBounds
+        viewport.unobscuredReviewBounds()?.let { if (!bounds.intersect(it)) return false }
         fun visibleContent() = findObjects(By.pkg(walletPackage).text(Pattern.compile(".*"))).mapNotNull { node ->
             try {
-                node.visibleBounds.takeIf { android.graphics.Rect.intersects(it, bounds) }
+                node.visibleBounds.takeIf { Rect.intersects(it, bounds) }
                     ?.let { "${node.text}:$it" }
             } catch (_: StaleObjectException) { null }
         }
@@ -518,7 +541,10 @@ internal object WalletComposeE2EHelper {
     }
 
     fun latestStatus(device: UiDevice): String = try {
-        device.findObject(By.res("wallet.status"))?.text
+        device.findObject(By.res("wallet.status"))?.let { node ->
+            node.text?.takeIf { it.isNotBlank() }
+                ?: node.contentDescription?.takeIf { it.isNotBlank() }
+        }
             ?: statusPrefixes.firstNotNullOfOrNull { prefix ->
                 device.findObject(By.textStartsWith(prefix))?.text
             }

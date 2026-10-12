@@ -287,12 +287,12 @@ class WalletDemoProximityTestScenarios {
         onNodeWithText("Decline").assertIsDisplayed()
 
         onNodeWithTag(WalletUiTestTags.proximityElement(0, namespace, "portrait"))
-            .performScrollTo()
+            .performScrollToContent(this)
             .performClick()
         assertEquals(element, toggled)
 
         onNodeWithTag(WalletUiTestTags.ProximityContinueAfterResponse)
-            .performScrollTo()
+            .performScrollToContent(this)
             .performClick()
         onNodeWithTag(WalletUiTestTags.ProximityApprove)
             .assertIsDisplayed()

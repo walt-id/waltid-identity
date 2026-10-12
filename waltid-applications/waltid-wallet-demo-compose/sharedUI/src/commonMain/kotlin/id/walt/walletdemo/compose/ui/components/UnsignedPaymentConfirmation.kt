@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import id.walt.walletdemo.compose.logic.WalletDemoPaymentReview
 import id.walt.walletdemo.compose.logic.consent
+import id.walt.walletdemo.compose.ui.exportTestTagsForPlatformAutomation
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -24,6 +25,7 @@ internal fun rememberPaymentSubmission(
     var confirming by remember(consent?.revision, enabled) { mutableStateOf(false) }
     if (confirming && enabled && consent != null) {
         AlertDialog(
+            modifier = Modifier.exportTestTagsForPlatformAutomation(),
             onDismissRequest = { confirming = false },
             title = { Text(stringResource(Res.string.payment_unsigned_title)) },
             text = { Text(stringResource(Res.string.payment_unsigned_confirmation)) },
