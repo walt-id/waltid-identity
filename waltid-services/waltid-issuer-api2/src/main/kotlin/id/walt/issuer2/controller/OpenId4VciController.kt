@@ -124,7 +124,7 @@ class OpenId4VciController(
                 ".well-known/oauth-authorization-server/openid4vci",
                 OpenId4VciRoutesDocs.authorizationServerMetadata()
             ) {
-                call.respond(metadataService.getAuthorizationServerMetadata())
+                call.respond(metadataService.getAuthorizationServerDiscoveryMetadata())
             }
 
             route.get(".well-known/jwt-vc-issuer/openid4vci", OpenId4VciRoutesDocs.jwtVcIssuerMetadata()) {
