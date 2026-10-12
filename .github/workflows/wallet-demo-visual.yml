@@ -80,6 +80,7 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/wallet-visual-python"
           "$RUNNER_TEMP/wallet-visual-python/bin/pip" install -r waltid-applications/waltid-wallet-demo-test-fixtures/visual/requirements.txt
           echo "$RUNNER_TEMP/wallet-visual-python/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/wallet-visual-python/bin/python" waltid-applications/waltid-wallet-demo-test-fixtures/visual/gallery.py --check-index
           "$RUNNER_TEMP/wallet-visual-python/bin/python" -m unittest discover -s waltid-applications/waltid-wallet-demo-test-fixtures/visual -p 'test_*.py'
 
       - uses: actions/setup-java@v5

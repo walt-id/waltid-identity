@@ -86,7 +86,8 @@
       ],
       "composeTest": "scanEmpty",
       "swiftTest": "testScanEmpty",
-      "note": "F011: scanner-first wallet chrome; sensor preview and permission UI require actual-host evidence."
+      "note": "F011: scanner-first wallet chrome; sensor preview and permission UI require actual-host evidence.",
+      "title": "Scan or paste a request"
     },
     {
       "id": "wallet.scan.unsupported",
@@ -207,7 +208,8 @@
       "requirements": [
         "PIN setup guidance and input"
       ],
-      "note": "Four masked positions over underlines, separate Choose and Confirm headings, automatic fourth-digit advancement and immediate mismatch clearing. Wallet-owned state; keyboard continuity and OS biometrics have separate app-host tests."
+      "note": "Four masked positions over underlines, separate Choose and Confirm headings, automatic fourth-digit advancement and immediate mismatch clearing. Wallet-owned state; keyboard continuity and OS biometrics have separate app-host tests.",
+      "title": "Onboarding \u2014 choose a PIN"
     },
     {
       "id": "onboarding.pin.mismatch",
@@ -275,7 +277,8 @@
           "theme": "dark",
           "textSize": "accessibilityMedium"
         }
-      }
+      },
+      "title": "PIN \u2014 compact, dark, large text"
     },
     {
       "id": "onboarding.pin.unlock",
@@ -507,7 +510,8 @@
       ],
       "composeTest": "sharingInformationSelected",
       "swiftTest": "testSharingInformationSelected",
-      "note": "F036: candidate rows select; one expanded information group shows actual values for the selected ID."
+      "note": "F036: candidate rows select; one expanded information group shows actual values for the selected ID.",
+      "title": "Sharing \u2014 selected information"
     },
     {
       "id": "sharing.information.alternative",
@@ -1273,12 +1277,13 @@
     "onboarding.pin.setup",
     "wallet.scan.empty",
     "batch.offer.two_targets_three_copies",
+    "sharing.information.selected",
     "credential.details.identity",
     "nearby.ready.qr",
-    "settings.root.default",
-    "payment.mixed_credentials.main"
+    "settings.root.default"
   ],
   "galleryVariants": [
+    "onboarding.pin.compact_dark_large_text",
     "batch.offer.compact_dark_large_text"
   ]
 }
