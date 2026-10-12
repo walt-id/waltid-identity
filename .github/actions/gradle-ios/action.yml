@@ -167,6 +167,7 @@ runs:
           -scheme iosApp \
           -destination "${{ inputs.simulator-destination }}" \
           -only-testing:iosAppTests \
+          -skip-testing:iosAppTests/WalletVisualTests \
           -only-testing:iosAppUITests/MockWalletUITests/testWalletReadinessOutlivesTheSuccessBannerAcrossRestart \
           -only-testing:iosAppUITests/MockWalletUITests/testCredentialsStayLoadingUntilTheInitialReadCompletes \
           -only-testing:iosAppUITests/PublicDemoBackendE2ETests/testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2 \

@@ -5,6 +5,7 @@ import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 
 plugins {
     id("waltid.mobile.library")
@@ -144,6 +145,12 @@ if (visualCi) {
         gradle.startParameter.taskNames.none { it.substringAfterLast(':').let { name ->
             name.startsWith("recordRoborazzi") || name.startsWith("verifyAndRecordRoborazzi") || name.startsWith("compareRoborazzi")
         } }) { "CI must verify reviewed wallet snapshots; it cannot record or accept baselines." }
+    // The catalogue runner owns iOS snapshot comparisons on its pinned simulator runtime.
+    tasks.withType<KotlinNativeTest>().configureEach {
+        if (!providers.environmentVariable("WALLET_VISUAL_RUN_ID").isPresent) {
+            filter.excludeTestsMatching("id.walt.walletdemo.compose.ui.WalletVisualIosTest")
+        }
+    }
     tasks.withType<AbstractTestTask>().configureEach {
         val screenshotVerification = providers.gradleProperty("roborazzi.test.verify")
         onlyIf {
