@@ -77,7 +77,8 @@
       ],
       "composeTest": "homeCredential",
       "swiftTest": "testHomeCredential",
-      "note": "Production home content with normalized card inputs. App loading and routing have separate behavior/UI tests."
+      "note": "Production home content with normalized card inputs. App loading and routing have separate behavior/UI tests.",
+      "title": "Wallet \u2014 saved credential"
     },
     {
       "id": "wallet.scan.empty",
@@ -88,7 +89,8 @@
         "R15"
       ],
       "composeTest": "scanEmpty",
-      "swiftTest": "testScanEmpty"
+      "swiftTest": "testScanEmpty",
+      "title": "Scan or paste a request"
     },
     {
       "id": "wallet.scan.unsupported",
@@ -240,7 +242,8 @@
         "R12",
         "R13"
       ],
-      "note": "One app-unlock form contains PIN, confirmation and optional biometrics. Synthetic in-memory state; real OS prompt and persistence use separate flow/model tests."
+      "note": "One app-unlock form contains PIN, confirmation and optional biometrics. Synthetic in-memory state; real OS prompt and persistence use separate flow/model tests.",
+      "title": "Onboarding \u2014 choose a PIN"
     },
     {
       "id": "onboarding.pin.mismatch",
@@ -325,7 +328,8 @@
           "theme": "dark",
           "textSize": "accessibilityMedium"
         }
-      }
+      },
+      "title": "Receiving \u2014 compact, dark, large text"
     },
     {
       "id": "batch.offer.compact_dark_large_text.last_target",
@@ -358,12 +362,16 @@
     }
   ],
   "galleryPreview": [
-    "settings.root.default",
-    "credential.details.identity",
+    "wallet.home.credential",
+    "onboarding.pin.setup",
+    "wallet.scan.empty",
     "batch.offer.two_targets_three_copies",
-    "batch.result.saved_and_deferred",
-    "payment.mixed_credentials.main",
+    "credential.details.identity",
     "nearby.ready.qr",
-    "credential.media.loaded"
+    "settings.root.default",
+    "payment.mixed_credentials.main"
+  ],
+  "galleryVariants": [
+    "batch.offer.compact_dark_large_text"
   ]
 }
