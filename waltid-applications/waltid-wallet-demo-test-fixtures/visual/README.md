@@ -6,9 +6,9 @@ The catalogue connects the existing Compose Android, Compose iOS and native Swif
 
 ## Compare
 
-Run from the identity repository. Android uses Robolectric API 35 at mdpi; Compose iOS uses a 393×852 headless Skia surface. SwiftUI uses a hosted iPhone 13 layout at scale 3 on iOS 26.5. Choose a test-owned iOS 26.5 simulator; the native baselines were generated with Xcode 27. Do not reuse baselines on another runtime without an explicit environment review.
+Run from the identity repository. Android uses Robolectric API 35 at mdpi; Compose iOS uses a 393×852 headless Skia surface. SwiftUI uses a hosted iPhone 13 layout at scale 3 on iOS 27.0 with Xcode 27.0. Choose a test-owned iOS 27.0 simulator. Do not reuse baselines on another runtime without an explicit environment review.
 
-The wallet visual workflow compares the complete catalogue on this pinned runtime. Generic iOS CI runs the functional and readiness suites and excludes the two snapshot classes. The comparison entry point selects those classes and supplies the run metadata required by the catalogue report.
+The existing build workflow runs reporting contracts on Linux and selects complete renderer comparisons through its platform eligibility rules. Android comparisons run on Linux. Compose iOS comparisons share the Kotlin simulator job's compilation cache; SwiftUI comparisons reuse the consumer job's verified release WalletCore artifact and native build directory. Functional suites keep their own selection. Draft and fork opt-in rules remain unchanged. Path selection chooses renderers, never a subset of their catalogue cells.
 
 Install the small Python reporting dependency in a virtual environment with `python3 -m pip install -r waltid-applications/waltid-wallet-demo-test-fixtures/visual/requirements.txt`. Then run the existing renderer tasks through the comparison entry point:
 
@@ -17,6 +17,8 @@ python3 waltid-applications/waltid-wallet-demo-test-fixtures/visual/verify.py --
 ```
 
 Use `--renderers android`, `--renderers compose-ios`, or `--renderers swiftui` for a scoped comparison. `--gradle-root` may point to a coordinated unified build only when its Identity checkout resolves to this repository. Reports default to `build/reports/wallet-visual`; open `index.html` locally after downloading a CI artifact. Its scenario, renderer, status and evidence filters help inspect the full catalogue. Artifacts are downloadable bundles, not hosted websites.
+
+`timings.json` records each build, comparison and report phase in seconds, including failures. For an existing release build, use `--reuse-framework path/to/artifact`; the artifact helper verifies its Identity commit, Xcode version and complete device/simulator binary inventory before comparing. An invalid artifact fails without rebuilding a replacement. Compare cold build cost and warm comparison cost separately; CI queue time is not renderer time.
 
 The entry point builds the native framework before freezing the source fingerprint, forces only selected test tasks to execute, and forwards a unique run ID, exact tested commit and fingerprint to XCTest. Native tests retain a receipt and the actual compared PNG for every comparison. The report requires matching test, receipt, baseline digest, capture digest and configuration before accepting a pass. A passing XCTest or an existing baseline alone is insufficient. Missing, stale, skipped, recorded and failed results remain distinct. Pre-comparison readiness failures retain their diagnostic image.
 

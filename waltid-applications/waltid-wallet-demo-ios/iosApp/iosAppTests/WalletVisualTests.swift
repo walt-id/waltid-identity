@@ -151,7 +151,7 @@ final class WalletVisualTests: XCTestCase {
         let diffing = strategy.diffing
         let baseline = URL(fileURLWithPath: "\(file)").deletingLastPathComponent()
             .appendingPathComponent("__Snapshots__/WalletVisualTests")
-            .appendingPathComponent("\(id.replacingOccurrences(of: ".", with: "-")).native-ios26_5-phone-en-light.png")
+            .appendingPathComponent("\(id.replacingOccurrences(of: ".", with: "-")).native-ios27_0-phone-en-light.png")
         let baselineData = try? Data(contentsOf: baseline)
         var actualData: Data?
         var actualSize: CGSize?
@@ -176,7 +176,7 @@ final class WalletVisualTests: XCTestCase {
             return diffing.diffV2(reference, decoded)
         }
         let failure = verifySnapshot(of: controller, as: strategy,
-            named: "native-ios26_5-phone-en-light", record: record ? .all : .never,
+            named: "native-ios27_0-phone-en-light", record: record ? .all : .never,
             file: file, testName: id, line: line)
         if let actualData {
             let attachment = XCTAttachment(data: actualData, uniformTypeIdentifier: "public.png")
